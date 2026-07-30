@@ -25,18 +25,18 @@ func TestJSONSchemaChatRuntime(t *testing.T) {
 	minimal := roundTripJSONEq[chat.Message](t, dc, "chat", "message-minimal.json")
 	require.Equal(t, chat.MessageKindText, minimal.Kind)
 	require.Equal(t, "hi", minimal.Body)
-	require.Nil(t, minimal.ReplyToId)
+	require.Nil(t, minimal.ReplyToID)
 	require.Nil(t, minimal.Priority)
 	require.Equal(t, int64(0), minimal.PriorityOrDefault())
 
 	// message-full carries replyToId: null (optional+nullable) — deserialization only.
 	full := decodeFixture[chat.Message](t, dc, "chat", "message-full.json")
-	require.Nil(t, full.ReplyToId)
+	require.Nil(t, full.ReplyToID)
 	require.NotNil(t, full.Priority)
 	require.Equal(t, int64(7), *full.Priority)
 
 	room := roundTripJSONEq[chat.Room](t, dc, "chat", "room-open.json")
-	require.Equal(t, "r1", room.RoomId)
+	require.Equal(t, "r1", room.RoomID)
 	require.Nil(t, room.Topic)
 	require.Equal(t, []string{"a"}, room.Members)
 	require.Contains(t, room.AdditionalProperties, "x-extra")
@@ -46,9 +46,9 @@ func TestJSONSchemaChatRuntime(t *testing.T) {
 	require.Equal(t, "core", labels.AdditionalProperties["team"])
 
 	input := roundTripJSONEq[chat.SendMessageInput](t, dc, "chat", "send-message-input.json")
-	require.Equal(t, "r1", input.RoomId)
+	require.Equal(t, "r1", input.RoomID)
 	require.Equal(t, "hi", input.Message.Body)
 
 	output := roundTripJSONEq[chat.SendMessageOutput](t, dc, "chat", "send-message-output.json")
-	require.Equal(t, "m1", output.MessageId)
+	require.Equal(t, "m1", output.MessageID)
 }

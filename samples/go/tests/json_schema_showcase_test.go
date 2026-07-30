@@ -242,8 +242,8 @@ func TestJSONSchemaShowcaseFormat(t *testing.T) {
 	dc := converter.GetDefaultDataConverter()
 
 	formats := roundTripJSONEq[showcase.Showcase](t, dc, "showcase", "showcase-format.json")
-	require.NotNil(t, formats.RequestId)
-	require.Equal(t, "de305d54-75b4-431b-adb2-eb6b9e546013", *formats.RequestId)
+	require.NotNil(t, formats.RequestID)
+	require.Equal(t, "de305d54-75b4-431b-adb2-eb6b9e546013", *formats.RequestID)
 	require.NotNil(t, formats.ContactEmail)
 	require.Equal(t, "user@example.com", *formats.ContactEmail)
 	require.NotNil(t, formats.Host)
@@ -291,7 +291,7 @@ func TestJSONSchemaShowcaseFormat(t *testing.T) {
 	// Serialize side (P12): an in-memory malformed uuid fails to marshal.
 	bad := formats
 	badID := "nope"
-	bad.RequestId = &badID
+	bad.RequestID = &badID
 	_, serr := dc.ToPayload(bad)
 	require.Error(t, serr)
 	require.Contains(t, serr.Error(), `must be a valid uuid, got "nope"`)
@@ -445,7 +445,7 @@ func TestJSONSchemaShowcaseAllOfMerge(t *testing.T) {
 	dc := converter.GetDefaultDataConverter()
 
 	widget := roundTripJSONEq[showcase.Widget](t, dc, "showcase", "widget.json")
-	require.Equal(t, "w-1", widget.Id)
+	require.Equal(t, "w-1", widget.ID)
 	require.NotNil(t, widget.Kind)
 	require.Equal(t, "gadget", *widget.Kind)
 	require.Equal(t, "Widget One", widget.Name)
@@ -538,11 +538,11 @@ func TestJSONSchemaShowcaseUnions(t *testing.T) {
 
 	// Disjoint-kind union: string branch.
 	s := roundTripJSONEq[showcase.Showcase](t, dc, "showcase", "showcase-union-string.json")
-	require.Equal(t, showcase.ShowcaseIdOrNameString("abc"), s.IdOrName)
+	require.Equal(t, showcase.ShowcaseIDOrNameString("abc"), s.IDOrName)
 
 	// Disjoint-kind union: integer branch.
 	i := roundTripJSONEq[showcase.Showcase](t, dc, "showcase", "showcase-union-int.json")
-	require.Equal(t, showcase.ShowcaseIdOrNameInteger(7), i.IdOrName)
+	require.Equal(t, showcase.ShowcaseIDOrNameInteger(7), i.IDOrName)
 
 	// Discriminated union: circle branch.
 	circle := roundTripJSONEq[showcase.Showcase](t, dc, "showcase", "showcase-shape-circle.json")
@@ -615,7 +615,7 @@ func TestJSONSchemaShowcaseBranchConstraints(t *testing.T) {
 	// Serialize re-runs the selected branch's constraints (P12): an in-memory
 	// member violating its own branch is rejected before any bytes are written.
 	invalid := mode
-	invalid.IdOrName = showcase.ShowcaseIdOrNameString("ab")
+	invalid.IDOrName = showcase.ShowcaseIDOrNameString("ab")
 	_, err = dc.ToPayload(invalid)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "idOrName: must have length >= 3, got 2")

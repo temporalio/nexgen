@@ -35,7 +35,7 @@ func (s *TypeShowcaseIntegrationSuite) SetupTest() {
 		// The workflow test environment serializes native WIT models through its
 		// ordinary data converter. Keep the response scalar-only; the request
 		// assertions below are where this suite exercises the rich native shapes.
-		return typeshowcase.User{UserId: stringField(input, "UserId"), Email: "alice@example.com", DisplayName: "Alice"}
+		return typeshowcase.User{UserID: stringField(input, "UserID"), Email: "alice@example.com", DisplayName: "Alice"}
 	}
 	getUser := nexus.NewSyncOperation("GetUser",
 		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (typeshowcase.User, error) {
@@ -150,22 +150,22 @@ func sampleSyncReport() typeshowcase.SyncReport {
 func (s *TypeShowcaseIntegrationSuite) TestOperationsAndResourceMethods() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		var user typeshowcase.User
-		if err := typeshowcase.GetUser(ctx, typeshowcase.GetUserOptions{UserId: "user-123", ConsistencyToken: "read-123"}).Get(ctx, &user); err != nil {
+		if err := typeshowcase.GetUser(ctx, typeshowcase.GetUserOptions{UserID: "user-123", ConsistencyToken: "read-123"}).Get(ctx, &user); err != nil {
 			return err
 		}
 		var updatedUser typeshowcase.User
-		if err := typeshowcase.UpdateEmail(ctx, typeshowcase.UpdateEmailOptions{UserId: "user-123", Email: "new@example.com"}).Get(ctx, &updatedUser); err != nil {
+		if err := typeshowcase.UpdateEmail(ctx, typeshowcase.UpdateEmailOptions{UserID: "user-123", Email: "new@example.com"}).Get(ctx, &updatedUser); err != nil {
 			return err
 		}
 		var renamedUser typeshowcase.User
-		if err := typeshowcase.Rename(ctx, typeshowcase.RenameOptions{UserId: "user-123", DisplayName: "New Name"}).Get(ctx, &renamedUser); err != nil {
+		if err := typeshowcase.Rename(ctx, typeshowcase.RenameOptions{UserID: "user-123", DisplayName: "New Name"}).Get(ctx, &renamedUser); err != nil {
 			return err
 		}
 		var profileUser typeshowcase.User
-		if err := typeshowcase.SetProfile(ctx, typeshowcase.SetProfileOptions{UserId: "user-123", Profile: sampleProfile()}).Get(ctx, &profileUser); err != nil {
+		if err := typeshowcase.SetProfile(ctx, typeshowcase.SetProfileOptions{UserID: "user-123", Profile: sampleProfile()}).Get(ctx, &profileUser); err != nil {
 			return err
 		}
-		if err := typeshowcase.Deactivate(ctx, typeshowcase.DeactivateOptions{UserId: "user-123", Reason: "requested"}).Get(ctx, nil); err != nil {
+		if err := typeshowcase.Deactivate(ctx, typeshowcase.DeactivateOptions{UserID: "user-123", Reason: "requested"}).Get(ctx, nil); err != nil {
 			return err
 		}
 		var resourceUpdatedUser typeshowcase.User
@@ -182,7 +182,7 @@ func (s *TypeShowcaseIntegrationSuite) TestOperationsAndResourceMethods() {
 		// Container fields exercise the generated generic Tuple2 and Result
 		// types as nested list and map values.
 		return typeshowcase.RecordSync(ctx, typeshowcase.RecordSyncOptions{
-			UserId: "user-123",
+			UserID: "user-123",
 			Report: sampleSyncReport(),
 		}).Get(ctx, nil)
 	})
@@ -203,11 +203,11 @@ func (s *TypeShowcaseIntegrationSuite) TestOperationsAndResourceMethods() {
 	s.Contains(profile, "NotificationTarget")
 	s.Contains(profile, "Address")
 	s.Equal("requested", stringField(s.calls[4].Input, "Reason"))
-	s.Equal("user-123", stringField(s.calls[5].Input, "UserId"))
+	s.Equal("user-123", stringField(s.calls[5].Input, "UserID"))
 	s.Equal("resource@example.com", stringField(s.calls[5].Input, "Email"))
 	s.Equal("Resource Name", stringField(s.calls[6].Input, "DisplayName"))
 	s.Equal("resource-requested", stringField(s.calls[7].Input, "Reason"))
-	s.Equal("user-123", stringField(s.calls[8].Input, "UserId"))
+	s.Equal("user-123", stringField(s.calls[8].Input, "UserID"))
 	report := mapValue(field(s.calls[8].Input, "Report"))
 	s.NotNil(report)
 	s.Contains(report, "Route")

@@ -28,7 +28,7 @@ func (s *UserServiceIntegrationSuite) SetupTest() {
 	getUser := nexus.NewSyncOperation("GetUser",
 		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (userservice.User, error) {
 			s.calls = append(s.calls, nexusCall{"GetUser", input})
-			userID := stringField(input, "UserId")
+			userID := stringField(input, "UserID")
 			if userID == "missing" {
 				return userservice.User{}, nexus.NewOperationFailedError("user not found")
 			}
@@ -38,7 +38,7 @@ func (s *UserServiceIntegrationSuite) SetupTest() {
 	updateEmail := nexus.NewSyncOperation("UpdateEmail",
 		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (userservice.User, error) {
 			s.calls = append(s.calls, nexusCall{"UpdateEmail", input})
-			return *userservice.NewUser(stringField(input, "UserId"), stringField(input, "Email")), nil
+			return *userservice.NewUser(stringField(input, "UserID"), stringField(input, "Email")), nil
 		})
 
 	service := nexus.NewService(userServiceName)
@@ -53,20 +53,20 @@ func TestUserServiceIntegrationSuite(t *testing.T) {
 func (s *UserServiceIntegrationSuite) TestOperationsAndResourceMethod() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*userservice.User, error) {
 		var user userservice.User
-		if err := userservice.GetUser(ctx, userservice.GetUserOptions{UserId: "user-123"}).Get(ctx, &user); err != nil {
+		if err := userservice.GetUser(ctx, userservice.GetUserOptions{UserID: "user-123"}).Get(ctx, &user); err != nil {
 			return nil, err
 		}
 
 		var updated userservice.User
 		if err := userservice.UpdateEmail(ctx, userservice.UpdateEmailOptions{
-			UserId: "user-123",
+			UserID: "user-123",
 			Email:  "direct@example.com",
 		}).Get(ctx, &updated); err != nil {
 			return nil, err
 		}
 
 		// A WIT resource retains its identity fields. The generated receiver method
-		// supplies UserId from user, leaving only the new email at the call site.
+		// supplies UserID from user, leaving only the new email at the call site.
 		var resourceUpdated userservice.User
 		return &resourceUpdated, user.UpdateEmail(ctx, "resource@example.com").Get(ctx, &resourceUpdated)
 	})
@@ -80,14 +80,14 @@ func (s *UserServiceIntegrationSuite) TestOperationsAndResourceMethod() {
 	s.Require().Len(s.calls, 3)
 	s.Equal([]string{"GetUser", "UpdateEmail", "UpdateEmail"}, operationNames(s.calls))
 	s.Equal("direct@example.com", stringField(s.calls[1].Input, "Email"))
-	s.Equal("user-123", stringField(s.calls[2].Input, "UserId"))
+	s.Equal("user-123", stringField(s.calls[2].Input, "UserID"))
 	s.Equal("resource@example.com", stringField(s.calls[2].Input, "Email"))
 }
 
 func (s *UserServiceIntegrationSuite) TestOperationFailure() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		var result userservice.User
-		return userservice.GetUser(ctx, userservice.GetUserOptions{UserId: "missing"}).Get(ctx, &result)
+		return userservice.GetUser(ctx, userservice.GetUserOptions{UserID: "missing"}).Get(ctx, &result)
 	})
 
 	s.True(s.env.IsWorkflowCompleted())

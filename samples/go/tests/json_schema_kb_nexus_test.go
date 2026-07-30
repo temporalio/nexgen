@@ -38,7 +38,7 @@ func (s *KBNexusIntegrationSuite) SetupTest() {
 	getPage := nexus.NewSyncOperation(kb.KnowledgeBaseService.GetPage.Name(),
 		func(_ context.Context, input kb.GetPageInput, _ nexus.StartOperationOptions) (kb.Page, error) {
 			s.calls = append(s.calls, "GetPage")
-			s.Equal("page-1", input.PageId)
+			s.Equal("page-1", input.PageID)
 			var page kb.Page
 			s.loadModel("page.json", &page)
 			return page, nil
@@ -47,7 +47,7 @@ func (s *KBNexusIntegrationSuite) SetupTest() {
 	putBlock := nexus.NewSyncOperation(kb.KnowledgeBaseService.PutBlock.Name(),
 		func(_ context.Context, input kb.Block, _ nexus.StartOperationOptions) (kb.PutBlockOutput, error) {
 			s.calls = append(s.calls, "PutBlock")
-			s.Equal("block-1", input.BlockId)
+			s.Equal("block-1", input.BlockID)
 			s.Require().NotNil(input.Style)
 			s.Require().NotNil(input.Style.Bold)
 			s.True(*input.Style.Bold)
@@ -59,7 +59,7 @@ func (s *KBNexusIntegrationSuite) SetupTest() {
 	getCategoryTree := nexus.NewSyncOperation(kb.KnowledgeBaseService.GetCategoryTree.Name(),
 		func(_ context.Context, input kb.GetCategoryTreeInput, _ nexus.StartOperationOptions) (kb.Category, error) {
 			s.calls = append(s.calls, "GetCategoryTree")
-			s.Equal("root", input.RootId)
+			s.Equal("root", input.RootID)
 			var category kb.Category
 			s.loadModel("category-tree.json", &category)
 			return category, nil
@@ -87,7 +87,7 @@ func (s *KBNexusIntegrationSuite) TestOperationsUseRealNexusClient() {
 
 		var page kb.Page
 		if err := client.ExecuteOperation(
-			ctx, kb.KnowledgeBaseService.GetPage, kb.GetPageInput{PageId: "page-1"},
+			ctx, kb.KnowledgeBaseService.GetPage, kb.GetPageInput{PageID: "page-1"},
 			workflow.NexusOperationOptions{},
 		).Get(ctx, &page); err != nil {
 			return kbResult{}, err
@@ -106,7 +106,7 @@ func (s *KBNexusIntegrationSuite) TestOperationsUseRealNexusClient() {
 
 		var category kb.Category
 		if err := client.ExecuteOperation(
-			ctx, kb.KnowledgeBaseService.GetCategoryTree, kb.GetCategoryTreeInput{RootId: "root"},
+			ctx, kb.KnowledgeBaseService.GetCategoryTree, kb.GetCategoryTreeInput{RootID: "root"},
 			workflow.NexusOperationOptions{},
 		).Get(ctx, &category); err != nil {
 			return kbResult{}, err
@@ -114,13 +114,13 @@ func (s *KBNexusIntegrationSuite) TestOperationsUseRealNexusClient() {
 
 		var categoryChildID string
 		if len(category.Children) > 0 {
-			categoryChildID = category.Children[0].Id
+			categoryChildID = category.Children[0].ID
 		}
 
 		return kbResult{
-			BlockId:         putBlockOutput.BlockId,
+			BlockId:         putBlockOutput.BlockID,
 			CategoryChildId: categoryChildID,
-			PageId:          page.PageId,
+			PageId:          page.PageID,
 			Revision:        putBlockOutput.Revision,
 		}, nil
 	})
