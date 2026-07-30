@@ -2722,7 +2722,18 @@ pub(in crate::generator) fn go_unexported_name(name: &str) -> String {
 /// Converts a WIT field name (kebab-case) to an exported Go field name
 /// (UpperCamelCase), escaping Go keywords with a trailing underscore.
 pub(in crate::generator) fn go_field_name(name: &str) -> String {
-    let camel = name.to_upper_camel_case();
+    let camel = name
+        .to_snake_case()
+        .split('_')
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            if word.eq_ignore_ascii_case("id") {
+                "ID".to_string()
+            } else {
+                word.to_upper_camel_case()
+            }
+        })
+        .collect::<String>();
     go_ident(&camel)
 }
 
@@ -3037,7 +3048,7 @@ fn render_file(
 ) -> String {
     let mut output = String::new();
     output.push_str(GENERATED_HEADER);
-    output.push('\n');
+    output.push_str("\n\n");
     output.push_str("package ");
     output.push_str(&package.package_name);
     output.push('\n');
@@ -3336,28 +3347,32 @@ fn render_go_doc_comment(output: &mut String, indent: &str, text: &str) {
     }
 }
 
-/// Renders the leading godoc comment for a struct field. Required fields are
-/// prefixed with `Required.`; the prefix is folded onto the first line of the
-/// field's `@nexus.doc`/WIT doc text when present.
+/// Renders the name-led godoc comment for a struct field. When descriptive
+/// text is present, the required/optional status is emitted as a separate
+/// paragraph.
 ///
 /// ```go
-/// // Required. Unique identifier for the workflow execution.
-/// Id string
+/// // ID - Unique identifier for the workflow execution.
+/// //
+/// // Required.
+/// ID string
 /// ```
-fn render_field_doc_comment(output: &mut String, indent: &str, doc: Option<&str>, required: bool) {
-    match (required, doc) {
-        (true, Some(doc)) => {
-            let trimmed = doc.trim();
-            let combined = if trimmed.is_empty() {
-                "Required.".to_string()
-            } else {
-                format!("Required. {trimmed}")
-            };
-            render_go_doc_comment(output, indent, &combined);
-        }
-        (true, None) => render_go_doc_comment(output, indent, "Required."),
-        (false, Some(doc)) => render_go_doc_comment(output, indent, doc),
-        (false, None) => {}
+fn render_field_doc_comment(
+    output: &mut String,
+    indent: &str,
+    name: &str,
+    doc: Option<&str>,
+    required: bool,
+) {
+    let status = if required { "Required." } else { "Optional." };
+    let doc = doc.map(str::trim).filter(|doc| !doc.is_empty());
+    if let Some(doc) = doc {
+        render_go_doc_comment(output, indent, &format!("{name} - {doc}"));
+        output.push_str(indent);
+        output.push_str("//\n");
+        render_go_doc_comment(output, indent, status);
+    } else {
+        render_go_doc_comment(output, indent, &format!("{name} - {status}"));
     }
 }
 
@@ -3567,14 +3582,13 @@ fn render_model(
     } else {
         for field in &model.fields {
             if public {
-                if field.required {
-                    render_field_doc_comment(output, "\t", field.doc.as_deref(), true);
-                } else {
-                    render_go_doc_comment(output, "\t", "Optional.");
-                    if let Some(doc) = field.doc.as_deref() {
-                        render_go_doc_comment(output, "\t", doc);
-                    }
-                }
+                render_field_doc_comment(
+                    output,
+                    "\t",
+                    &field.name,
+                    field.doc.as_deref(),
+                    field.required,
+                );
             }
             output.push('\t');
             output.push_str(&field.name);
@@ -3622,9 +3636,9 @@ fn render_resource(
                 package,
             ));
             if field.optional {
-                render_go_doc_comment(output, "\t", "Optional.");
+                render_field_doc_comment(output, "\t", &field_name, None, false);
             } else {
-                render_field_doc_comment(output, "\t", None, true);
+                render_field_doc_comment(output, "\t", &field_name, None, true);
             }
             output.push('\t');
             output.push_str(&field_name);
@@ -4203,12 +4217,9 @@ fn render_options_struct(
     output.push_str(" struct {\n");
     for param in params.iter().filter(|p| param_belongs_in_options(p)) {
         if param.required {
-            render_field_doc_comment(output, "\t", param.doc.as_deref(), true);
+            render_field_doc_comment(output, "\t", &param.field_name, param.doc.as_deref(), true);
         } else {
-            render_go_doc_comment(output, "\t", "Optional.");
-            if let Some(doc) = &param.doc {
-                render_go_doc_comment(output, "\t", doc);
-            }
+            render_field_doc_comment(output, "\t", &param.field_name, param.doc.as_deref(), false);
         }
         output.push('\t');
         if param.embed_in_options {
