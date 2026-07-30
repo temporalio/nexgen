@@ -53,14 +53,17 @@ interface workflow-service {
     /// @nexus.proto-field "signal_name"
     signal: signal-function,
     /// @nexus.doc "Total workflow execution timeout, including retries and continue-as-new."
+    ///   go-defaults="Defaults to unlimited."
     /// @nexus.proto-field "workflow_execution_timeout"
     /// @nexus.name go="WorkflowExecutionTimeout"
     execution-timeout: option<duration>,
     /// @nexus.doc "Timeout of a single workflow run."
+    ///   go-defaults="Defaults to WorkflowExecutionTimeout."
     /// @nexus.proto-field "workflow_run_timeout"
     /// @nexus.name go="WorkflowRunTimeout"
     run-timeout: option<duration>,
     /// @nexus.doc "Timeout of a single workflow task."
+    ///   go-defaults="Defaults to 10 seconds."
     /// @nexus.proto-field "workflow_task_timeout"
     /// @nexus.name go="WorkflowTaskTimeout"
     task-timeout: option<duration>,
@@ -69,11 +72,13 @@ interface workflow-service {
     /// @nexus.omit
     request-id: placeholder,
     /// @nexus.doc "Behavior when a closed workflow with the same ID exists. Default is allow-duplicate."
+    ///   go-defaults="Defaults to AllowDuplicate."
     /// @nexus.proto-field "workflow_id_reuse_policy"
     /// @nexus.default "allow-duplicate"
     /// @nexus.name go="WorkflowIDReusePolicy"
     id-reuse-policy: workflow-id-reuse-policy,
     /// @nexus.doc "Behavior when a workflow is currently running with the same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is terminate-if-running."
+    ///   go-defaults="Defaults to Fail."
     /// @nexus.proto-field "workflow_id_conflict_policy"
     /// @nexus.name go="WorkflowIDConflictPolicy"
     id-conflict-policy: option<workflow-id-conflict-policy>,
@@ -84,11 +89,13 @@ interface workflow-service {
     /// @nexus.doc "Memo for the workflow."
     memo: option<memo>,
     /// @nexus.doc "Typed search attributes for the workflow."
+    ///   go-defaults="Defaults to None."
     /// @nexus.name go="TypedSearchAttributes"
     search-attributes: option<search-attributes>,
     /// @nexus.doc "Priority of the workflow execution."
     priority: option<priority>,
     /// @nexus.doc "Override for workflow versioning behavior."
+    ///   go-defaults="Defaults to no override."
     versioning-override: option<versioning-override>,
     /// @nexus.doc "Amount of time to wait before starting the workflow. This does not work with cron-schedule."
     /// @nexus.proto-field "workflow_start_delay"

@@ -108,6 +108,7 @@ pub(in crate::generator) struct PlannedField {
     pub(in crate::generator) proto_name: String,
     pub(in crate::generator) authored_name: String,
     pub(in crate::generator) doc: Option<LanguageStringSpec>,
+    pub(in crate::generator) defaults_doc: Option<LanguageStringSpec>,
     annotation_override: Option<LanguageStringSpec>,
     pub(in crate::generator) flattened_annotation_override: Option<LanguageStringSpec>,
     pub(in crate::generator) required: bool,
@@ -343,6 +344,7 @@ pub(in crate::generator) fn planned_field(
         proto_name: field_name.to_string(),
         authored_name: field.name.clone(),
         doc: field.doc.clone(),
+        defaults_doc: field.defaults_doc.clone(),
         annotation_override: field.annotation.clone(),
         flattened_annotation_override: field.flattened_annotation.clone(),
         required: field.required,
@@ -1251,6 +1253,7 @@ impl<'a> ApiPlanner<'a> {
                     RenderedUnpackedParam {
                         field_name: field.name.clone(),
                         doc: field.doc.clone(),
+                        defaults_doc: field.defaults_doc.clone(),
                         param_name: go_unexported_name(&field.name),
                         go_type: field.go_type.clone(),
                         public_go_type,
@@ -1630,6 +1633,11 @@ impl<'a> ApiPlanner<'a> {
                 .as_ref()
                 .and_then(|doc| doc.for_language(Language::Go))
                 .map(str::to_string),
+            defaults_doc: field
+                .defaults_doc
+                .as_ref()
+                .and_then(|doc| doc.for_language(Language::Go))
+                .map(str::to_string),
             go_type,
             required: field.required,
         })
@@ -1891,6 +1899,8 @@ struct RenderedUnpackedParam {
     /// Doc text for the field (from `@nexus.doc`), rendered as a godoc
     /// comment on the options struct field for optional parameters.
     doc: Option<String>,
+    /// Default-value documentation for Go from `@nexus.doc go-defaults=`.
+    defaults_doc: Option<String>,
     /// Unexported Go parameter name used in the function signature
     /// (e.g. `"userId"`).
     param_name: String,
@@ -1994,6 +2004,8 @@ pub(in crate::generator) struct RenderedField {
     /// Doc text for the field (from `@nexus.doc`), rendered as a godoc
     /// comment above the struct field.
     pub(in crate::generator) doc: Option<String>,
+    /// Default-value documentation for Go from `@nexus.doc go-defaults=`.
+    pub(in crate::generator) defaults_doc: Option<String>,
     /// Go type expression (e.g. `"string"`, `"*PostalAddress"`, `"[]string"`).
     pub(in crate::generator) go_type: String,
     /// Whether the field is required in the WIT definition. Rendered as a
@@ -2662,6 +2674,7 @@ fn ensure_generic_tuple(
             .map(|index| RenderedField {
                 name: TUPLE_FIELD_NAMES[index].to_string(),
                 doc: None,
+                defaults_doc: None,
                 go_type: format!("T{}", index + 1),
                 required: true,
             })
@@ -2690,12 +2703,14 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
                     RenderedField {
                         name: "Result".to_string(),
                         doc: None,
+                        defaults_doc: None,
                         go_type: "T".to_string(),
                         required: false,
                     },
                     RenderedField {
                         name: "Error".to_string(),
                         doc: None,
+                        defaults_doc: None,
                         go_type: "E".to_string(),
                         required: false,
                     },
@@ -3363,14 +3378,21 @@ fn render_field_doc_comment(
     name: &str,
     doc: Option<&str>,
     required: bool,
+    defaults_doc: Option<&str>,
 ) {
-    let status = if required { "Required." } else { "Optional." };
+    let status = if required {
+        "Required.".to_string()
+    } else if let Some(defaults) = defaults_doc.map(str::trim).filter(|doc| !doc.is_empty()) {
+        format!("Optional: {defaults}")
+    } else {
+        "Optional.".to_string()
+    };
     let doc = doc.map(str::trim).filter(|doc| !doc.is_empty());
     if let Some(doc) = doc {
         render_go_doc_comment(output, indent, &format!("{name} - {doc}"));
         output.push_str(indent);
         output.push_str("//\n");
-        render_go_doc_comment(output, indent, status);
+        render_go_doc_comment(output, indent, &status);
     } else {
         render_go_doc_comment(output, indent, &format!("{name} - {status}"));
     }
@@ -3588,6 +3610,7 @@ fn render_model(
                     &field.name,
                     field.doc.as_deref(),
                     field.required,
+                    field.defaults_doc.as_deref(),
                 );
             }
             output.push('\t');
@@ -3636,9 +3659,9 @@ fn render_resource(
                 package,
             ));
             if field.optional {
-                render_field_doc_comment(output, "\t", &field_name, None, false);
+                render_field_doc_comment(output, "\t", &field_name, None, false, None);
             } else {
-                render_field_doc_comment(output, "\t", &field_name, None, true);
+                render_field_doc_comment(output, "\t", &field_name, None, true, None);
             }
             output.push('\t');
             output.push_str(&field_name);
@@ -3924,6 +3947,7 @@ fn render_resource_methods(
                     let synthetic = RenderedUnpackedParam {
                         field_name: go_field_name(&primary.name),
                         doc: None,
+                        defaults_doc: None,
                         param_name,
                         go_type: "string".to_string(),
                         public_go_type: "any".to_string(),
@@ -4217,9 +4241,23 @@ fn render_options_struct(
     output.push_str(" struct {\n");
     for param in params.iter().filter(|p| param_belongs_in_options(p)) {
         if param.required {
-            render_field_doc_comment(output, "\t", &param.field_name, param.doc.as_deref(), true);
+            render_field_doc_comment(
+                output,
+                "\t",
+                &param.field_name,
+                param.doc.as_deref(),
+                true,
+                param.defaults_doc.as_deref(),
+            );
         } else {
-            render_field_doc_comment(output, "\t", &param.field_name, param.doc.as_deref(), false);
+            render_field_doc_comment(
+                output,
+                "\t",
+                &param.field_name,
+                param.doc.as_deref(),
+                false,
+                param.defaults_doc.as_deref(),
+            );
         }
         output.push('\t');
         if param.embed_in_options {

@@ -1340,13 +1340,16 @@ Cannot be combined with `@nexus.source`.
 ### @nexus.doc
 
 **Placement:** Record field or operation (function)
-**Syntax:** `@nexus.doc "<text>" [returns="<text>"]`
+**Syntax:** `@nexus.doc "<text>" [returns="<text>"] [<lang>-defaults="<text>"]`
 Per-language overrides: `python="<text>"` `typescript="<text>"` `go="<text>"`
 Return docs: `python-returns="<text>"` `typescript-returns="<text>"` `go-returns="<text>"`
 
 Adds documentation to generated code. The default text applies to all languages;
 per-language keys override for specific targets. The `returns` key generates
 return-value documentation.
+Language-specific `*-defaults` keys document the value used when an optional
+field is omitted. In Go, `go-defaults` replaces `Optional.` with
+`Optional: <text>`.
 
 ```wit
 /// @nexus.doc

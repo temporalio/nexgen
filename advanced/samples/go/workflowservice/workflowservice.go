@@ -414,26 +414,26 @@ type SignalWithStartWorkflowOptions struct {
 	// WorkflowExecutionTimeout - Total workflow execution timeout, including retries and
 	// continue-as-new.
 	//
-	// Optional.
+	// Optional: Defaults to unlimited.
 	WorkflowExecutionTimeout time.Duration
 	// WorkflowRunTimeout - Timeout of a single workflow run.
 	//
-	// Optional.
+	// Optional: Defaults to WorkflowExecutionTimeout.
 	WorkflowRunTimeout time.Duration
 	// WorkflowTaskTimeout - Timeout of a single workflow task.
 	//
-	// Optional.
+	// Optional: Defaults to 10 seconds.
 	WorkflowTaskTimeout time.Duration
 	// WorkflowIDReusePolicy - Behavior when a closed workflow with the same ID exists.
 	// Default is allow-duplicate.
 	//
-	// Optional.
+	// Optional: Defaults to AllowDuplicate.
 	WorkflowIDReusePolicy enums.WorkflowIdReusePolicy
 	// WorkflowIDConflictPolicy - Behavior when a workflow is currently running with the
 	// same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be
 	// set if id-reuse-policy is terminate-if-running.
 	//
-	// Optional.
+	// Optional: Defaults to Fail.
 	WorkflowIDConflictPolicy enums.WorkflowIdConflictPolicy
 	// RetryPolicy - Retry policy for the workflow.
 	//
@@ -450,7 +450,7 @@ type SignalWithStartWorkflowOptions struct {
 	Memo map[string]any
 	// TypedSearchAttributes - Typed search attributes for the workflow.
 	//
-	// Optional.
+	// Optional: Defaults to None.
 	TypedSearchAttributes temporal.SearchAttributes
 	// Priority - Priority of the workflow execution.
 	//
@@ -458,7 +458,7 @@ type SignalWithStartWorkflowOptions struct {
 	Priority *temporal.Priority
 	// VersioningOverride - Override for workflow versioning behavior.
 	//
-	// Optional.
+	// Optional: Defaults to no override.
 	VersioningOverride client.VersioningOverride
 	// StartDelay - Amount of time to wait before starting the workflow. This does not work
 	// with cron-schedule.

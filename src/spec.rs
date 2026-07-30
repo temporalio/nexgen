@@ -751,6 +751,7 @@ pub struct RecordSpec<F: TypeFamily = AuthoredFamily> {
 pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub doc: Option<F::Text>,
+    pub defaults_doc: Option<F::Text>,
     pub annotation: Option<F::Text>,
     pub flattened_annotation: Option<F::Text>,
     pub field_type: TypeSpec<F>,
@@ -961,6 +962,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
         RecordFieldSpec {
             name: self.name,
             doc: self.doc.map(|text| map.map_text(text)),
+            defaults_doc: self.defaults_doc.map(|text| map.map_text(text)),
             annotation: self.annotation.map(|text| map.map_text(text)),
             flattened_annotation: self.flattened_annotation.map(|text| map.map_text(text)),
             field_type: self.field_type.map_names_with(map),
