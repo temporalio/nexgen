@@ -412,28 +412,29 @@ type SignalWithStartWorkflowOptions struct {
 	// Required.
 	TaskQueue string
 	// WorkflowExecutionTimeout - Total workflow execution timeout, including retries and
-	// continue-as-new.
+	// continue-as-new. Defaults to unlimited.
 	//
-	// Optional: Defaults to unlimited.
+	// Optional.
 	WorkflowExecutionTimeout time.Duration
-	// WorkflowRunTimeout - Timeout of a single workflow run.
+	// WorkflowRunTimeout - Timeout of a single workflow run. Defaults to the workflow
+	// execution timeout.
 	//
-	// Optional: Defaults to WorkflowExecutionTimeout.
+	// Optional.
 	WorkflowRunTimeout time.Duration
-	// WorkflowTaskTimeout - Timeout of a single workflow task.
+	// WorkflowTaskTimeout - Timeout of a single workflow task. Defaults to 10 seconds.
 	//
-	// Optional: Defaults to 10 seconds.
+	// Optional.
 	WorkflowTaskTimeout time.Duration
 	// WorkflowIDReusePolicy - Behavior when a closed workflow with the same ID exists.
 	// Default is allow-duplicate.
 	//
-	// Optional: Defaults to AllowDuplicate.
+	// Optional.
 	WorkflowIDReusePolicy enums.WorkflowIdReusePolicy
 	// WorkflowIDConflictPolicy - Behavior when a workflow is currently running with the
 	// same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be
-	// set if id-reuse-policy is terminate-if-running.
+	// set if id-reuse-policy is terminate-if-running. Defaults to fail.
 	//
-	// Optional: Defaults to Fail.
+	// Optional.
 	WorkflowIDConflictPolicy enums.WorkflowIdConflictPolicy
 	// RetryPolicy - Retry policy for the workflow.
 	//
@@ -448,17 +449,19 @@ type SignalWithStartWorkflowOptions struct {
 	//
 	// Optional.
 	Memo map[string]any
-	// TypedSearchAttributes - Typed search attributes for the workflow.
+	// TypedSearchAttributes - Typed search attributes for the workflow. Defaults to no
+	// search attributes.
 	//
-	// Optional: Defaults to None.
+	// Optional.
 	TypedSearchAttributes temporal.SearchAttributes
 	// Priority - Priority of the workflow execution.
 	//
 	// Optional.
 	Priority *temporal.Priority
-	// VersioningOverride - Override for workflow versioning behavior.
+	// VersioningOverride - Override for workflow versioning behavior. Defaults to no
+	// override.
 	//
-	// Optional: Defaults to no override.
+	// Optional.
 	VersioningOverride client.VersioningOverride
 	// StartDelay - Amount of time to wait before starting the workflow. This does not work
 	// with cron-schedule.

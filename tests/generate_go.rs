@@ -1512,8 +1512,7 @@ interface doc-service {
   record greet-request {
     /// @nexus.doc "Name of the person to greet."
     name: string,
-    /// @nexus.doc "Default greeting doc." go="Go-specific greeting doc."
-    ///   go-defaults="Defaults to Hello."
+    /// @nexus.doc "Default greeting doc." go="Go-specific greeting doc. Defaults to Hello."
     greeting: option<string>,
     /// @nexus.doc python="Python-only field doc."
     locale: option<string>,
@@ -1553,7 +1552,7 @@ interface doc-service {
     // The `go=` override wins over the default text on the public options
     // type; the default-only doc falls through.
     assert!(rendered.contains(
-        "\t// Greeting - Go-specific greeting doc.\n\t//\n\t// Optional: Defaults to Hello.\n\tGreeting string"
+        "\t// Greeting - Go-specific greeting doc. Defaults to Hello.\n\t//\n\t// Optional.\n\tGreeting string"
     ));
     assert!(!rendered.contains("Default greeting doc."));
 

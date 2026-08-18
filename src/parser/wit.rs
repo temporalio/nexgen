@@ -1222,7 +1222,6 @@ fn build_fields_from_record(
                 RecordFieldSpec {
                     name: generated_field_name.clone(),
                     doc: None,
-                    defaults_doc: None,
                     annotation: None,
                     flattened_annotation: None,
                     field_type,
@@ -1238,9 +1237,6 @@ fn build_fields_from_record(
 
         let field_doc = directive(&directives, "doc", path, &field_context)?
             .map(directive_language_string)
-            .filter(|doc| !doc.is_empty());
-        let defaults_doc = directive(&directives, "doc", path, &field_context)?
-            .map(|directive| directive_prefixed_language_string(directive, "defaults"))
             .filter(|doc| !doc.is_empty());
         let field_type = authored_field_type_for_language(
             resolve_authored_field_type_spec(resolve, &field.ty, path, &field_context)?,
@@ -1271,7 +1267,6 @@ fn build_fields_from_record(
             RecordFieldSpec {
                 name: generated_field_name,
                 doc: field_doc,
-                defaults_doc,
                 annotation,
                 flattened_annotation,
                 field_type,
@@ -1303,7 +1298,6 @@ fn build_fields_from_record(
                     RecordFieldSpec {
                         name: arg_field.args_name,
                         doc: Some(arg_doc),
-                        defaults_doc: None,
                         annotation: None,
                         flattened_annotation: None,
                         field_type: authored_field_type_for_language(
@@ -4234,9 +4228,7 @@ world system {
 interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
-    /// @nexus.doc "Default field doc" python="Python field doc" typescript="TypeScript field doc"
-    ///   go-defaults="Defaults to the empty string."
-    ///   python-defaults="Defaults to an empty string."
+    /// @nexus.doc "Default field doc" python="Python field doc. Defaults to an empty string." typescript="TypeScript field doc"
     id: string,
   }
 
@@ -4293,31 +4285,7 @@ interface workflow-service {
                 .unwrap()
                 .field_doc("id")
                 .and_then(|doc| doc.for_language(Language::Python)),
-            Some("Python field doc")
-        );
-        assert_eq!(
-            python
-                .record_for_proto(
-                    "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-                )
-                .unwrap()
-                .fields["id"]
-                .defaults_doc
-                .as_ref()
-                .and_then(|doc| doc.for_language(Language::Go)),
-            Some("Defaults to the empty string.")
-        );
-        assert_eq!(
-            python
-                .record_for_proto(
-                    "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-                )
-                .unwrap()
-                .fields["id"]
-                .defaults_doc
-                .as_ref()
-                .and_then(|doc| doc.for_language(Language::Python)),
-            Some("Defaults to an empty string.")
+            Some("Python field doc. Defaults to an empty string.")
         );
     }
 
