@@ -37,15 +37,15 @@ namespace Temporalio.Workflows
         /// </summary>
         public string TaskQueue { get; set; }
         /// <summary>
-        /// Total workflow execution timeout, including retries and continue-as-new.
+        /// Total workflow execution timeout, including retries and continue-as-new. Defaults to unlimited.
         /// </summary>
         public System.TimeSpan? ExecutionTimeout { get; set; }
         /// <summary>
-        /// Timeout of a single workflow run.
+        /// Timeout of a single workflow run. Defaults to the workflow execution timeout.
         /// </summary>
         public System.TimeSpan? RunTimeout { get; set; }
         /// <summary>
-        /// Timeout of a single workflow task.
+        /// Timeout of a single workflow task. Defaults to 10 seconds.
         /// </summary>
         public System.TimeSpan? TaskTimeout { get; set; }
         /// <summary>
@@ -53,7 +53,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public Temporalio.Api.Enums.V1.WorkflowIdReusePolicy? IdReusePolicy { get; set; }
         /// <summary>
-        /// Behavior when a workflow is currently running with the same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is terminate-if-running.
+        /// Behavior when a workflow is currently running with the same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is terminate-if-running. Defaults to use-existing.
         /// </summary>
         public Temporalio.Api.Enums.V1.WorkflowIdConflictPolicy? IdConflictPolicy { get; set; }
         /// <summary>

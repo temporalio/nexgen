@@ -432,7 +432,7 @@ type SignalWithStartWorkflowOptions struct {
 	WorkflowIDReusePolicy enums.WorkflowIdReusePolicy
 	// WorkflowIDConflictPolicy - Behavior when a workflow is currently running with the
 	// same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be
-	// set if id-reuse-policy is terminate-if-running. Defaults to fail.
+	// set if id-reuse-policy is terminate-if-running. Defaults to use-existing.
 	//
 	// Optional.
 	WorkflowIDConflictPolicy enums.WorkflowIdConflictPolicy
@@ -449,8 +449,7 @@ type SignalWithStartWorkflowOptions struct {
 	//
 	// Optional.
 	Memo map[string]any
-	// TypedSearchAttributes - Typed search attributes for the workflow. Defaults to no
-	// search attributes.
+	// TypedSearchAttributes - Typed search attributes for the workflow.
 	//
 	// Optional.
 	TypedSearchAttributes temporal.SearchAttributes
@@ -458,8 +457,7 @@ type SignalWithStartWorkflowOptions struct {
 	//
 	// Optional.
 	Priority *temporal.Priority
-	// VersioningOverride - Override for workflow versioning behavior. Defaults to no
-	// override.
+	// VersioningOverride - Override for workflow versioning behavior.
 	//
 	// Optional.
 	VersioningOverride client.VersioningOverride
