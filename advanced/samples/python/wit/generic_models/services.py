@@ -8,6 +8,7 @@ import typing
 from .models import (
     GenericRequest,
     GenericResponse,
+    ReuseCompletionResult,
 )
 
 
@@ -17,3 +18,8 @@ class GenericModelService:
         GenericRequest[typing.Any],
         GenericResponse[typing.Any, typing.Any, typing.Any],
     ] = Operation(name="Complete")
+
+    reuse_complete: Operation[
+        GenericRequest[typing.Any],
+        ReuseCompletionResult[typing.Any],
+    ] = Operation(name="ReuseComplete")

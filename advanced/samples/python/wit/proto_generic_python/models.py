@@ -20,6 +20,11 @@ ContextT = typing.TypeVar("ContextT")
 OutputT = typing.TypeVar("OutputT")
 
 
+@dataclasses.dataclass(slots=True)
+class PayloadBackedContext(typing.Generic[ContextT]):
+    details: ContextT
+
+
 class _PayloadBackedContextTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         "PayloadBackedContext[typing.Any]",
@@ -49,20 +54,22 @@ class _PayloadBackedContextTransferTypeConverter(
         self,
         value: "PayloadBackedContext[typing.Any]",
     ) -> temporalio.api.compute.v1.scaler_pb2.ComputeScaler:
+        runtime_value: typing.Any = value
         message = temporalio.api.compute.v1.scaler_pb2.ComputeScaler()
-        message.details.CopyFrom(payload_to_proto(value.details))
+        message.details.CopyFrom(payload_to_proto(runtime_value.details))
         return message
 
 
-@typing.cast(
-    typing.Any,
-    temporalio.converter.transfer_type_convertible(
-        _PayloadBackedContextTransferTypeConverter
-    ),
-)
+# Registration stores the converter on the model; the returned class is unused.
+temporalio.converter.transfer_type_convertible(
+    _PayloadBackedContextTransferTypeConverter
+)(PayloadBackedContext)  # pyright: ignore[reportUnusedCallResult]
+
+
 @dataclasses.dataclass(slots=True)
-class PayloadBackedContext(typing.Generic[ContextT]):
-    details: ContextT
+class PayloadBackedEnvelope(typing.Generic[OutputT, ContextT]):
+    provider: PayloadBackedOutput[OutputT]
+    scaler: PayloadBackedContext[ContextT]
 
 
 class _PayloadBackedEnvelopeTransferTypeConverter(
@@ -105,26 +112,30 @@ class _PayloadBackedEnvelopeTransferTypeConverter(
         self,
         value: "PayloadBackedEnvelope[typing.Any, typing.Any]",
     ) -> temporalio.api.compute.v1.config_pb2.ComputeConfigScalingGroup:
+        runtime_value: typing.Any = value
         message = temporalio.api.compute.v1.config_pb2.ComputeConfigScalingGroup()
         message.provider.CopyFrom(
-            _PayloadBackedOutputTransferTypeConverter().to_transfer_type(value.provider)
+            _PayloadBackedOutputTransferTypeConverter().to_transfer_type(
+                runtime_value.provider
+            )
         )
         message.scaler.CopyFrom(
-            _PayloadBackedContextTransferTypeConverter().to_transfer_type(value.scaler)
+            _PayloadBackedContextTransferTypeConverter().to_transfer_type(
+                runtime_value.scaler
+            )
         )
         return message
 
 
-@typing.cast(
-    typing.Any,
-    temporalio.converter.transfer_type_convertible(
-        _PayloadBackedEnvelopeTransferTypeConverter
-    ),
-)
+# Registration stores the converter on the model; the returned class is unused.
+temporalio.converter.transfer_type_convertible(
+    _PayloadBackedEnvelopeTransferTypeConverter
+)(PayloadBackedEnvelope)  # pyright: ignore[reportUnusedCallResult]
+
+
 @dataclasses.dataclass(slots=True)
-class PayloadBackedEnvelope(typing.Generic[OutputT, ContextT]):
-    provider: PayloadBackedOutput[OutputT]
-    scaler: PayloadBackedContext[ContextT]
+class PayloadBackedOutput(typing.Generic[OutputT]):
+    details: OutputT
 
 
 class _PayloadBackedOutputTransferTypeConverter(
@@ -156,17 +167,13 @@ class _PayloadBackedOutputTransferTypeConverter(
         self,
         value: "PayloadBackedOutput[typing.Any]",
     ) -> temporalio.api.compute.v1.provider_pb2.ComputeProvider:
+        runtime_value: typing.Any = value
         message = temporalio.api.compute.v1.provider_pb2.ComputeProvider()
-        message.details.CopyFrom(payload_to_proto(value.details))
+        message.details.CopyFrom(payload_to_proto(runtime_value.details))
         return message
 
 
-@typing.cast(
-    typing.Any,
-    temporalio.converter.transfer_type_convertible(
-        _PayloadBackedOutputTransferTypeConverter
-    ),
-)
-@dataclasses.dataclass(slots=True)
-class PayloadBackedOutput(typing.Generic[OutputT]):
-    details: OutputT
+# Registration stores the converter on the model; the returned class is unused.
+temporalio.converter.transfer_type_convertible(
+    _PayloadBackedOutputTransferTypeConverter
+)(PayloadBackedOutput)  # pyright: ignore[reportUnusedCallResult]

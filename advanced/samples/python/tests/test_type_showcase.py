@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import dataclasses
+import json
 from pathlib import Path
+import typing
 import uuid
 
+import pytest
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 from nexusrpc import Operation
 from temporalio import workflow
+from temporalio.converter import PayloadConverter
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
@@ -39,7 +44,9 @@ def user_profile() -> type_showcase_models.UserProfile:
     return type_showcase_models.UserProfile(
         capabilities=type_showcase_models.UserCapabilityReadProfile
         | type_showcase_models.UserCapabilityUpdateEmail,
-        notification_target=("email", "old@example.com"),
+        notification_target=type_showcase_models.NotificationTargetEmail(
+            "old@example.com"
+        ),
         sync_state=("ok", "synced"),
         address=type_showcase_models.PostalAddress(
             street="1 Main St",
@@ -204,7 +211,9 @@ def test_generated_metadata() -> None:
 def test_generated_wit_native_models_cover_common_wit_shapes() -> None:
     profile = user_profile()
 
-    assert profile.notification_target == ("email", "old@example.com")
+    assert profile.notification_target == type_showcase_models.NotificationTargetEmail(
+        "old@example.com"
+    )
     assert profile.capabilities == (
         type_showcase_models.UserCapabilityReadProfile
         | type_showcase_models.UserCapabilityUpdateEmail
@@ -214,6 +223,57 @@ def test_generated_wit_native_models_cover_common_wit_shapes() -> None:
     assert profile.address.coordinates == (45.5152, -122.6784)
     assert profile.metadata == {"tier": "enterprise"}
     assert profile.tags == ["admin", "beta"]
+    assert profile.notification_target.tag == "email"
+    tag_field = next(
+        field
+        for field in dataclasses.fields(type_showcase_models.NotificationTargetEmail)
+        if field.name == "tag"
+    )
+    assert not tag_field.init
+    with pytest.raises(TypeError, match="unexpected keyword argument 'tag'"):
+        _ = typing.cast(typing.Any, type(profile.notification_target))(
+            "old@example.com", tag="sms"
+        )
+
+
+def test_direct_variant_payload_converter_round_trip() -> None:
+    profile = dataclasses.replace(user_profile(), tags=None, metadata=None)
+
+    payload = PayloadConverter.default.to_payloads([profile])[0]
+
+    assert payload.metadata["encoding"] == b"json/plain"
+    transfer_value = json.loads(payload.data)
+    assert transfer_value["notification_target"] == {
+        "tag": "email",
+        "value": "old@example.com",
+    }
+    assert transfer_value["tags"] is None
+    assert transfer_value["metadata"] is None
+    decoded = PayloadConverter.default.from_payloads(
+        [payload], [type_showcase_models.UserProfile]
+    )[0]
+    assert decoded == profile
+
+
+def test_direct_variant_converter_rejects_malformed_values() -> None:
+    type_hint = typing.cast(
+        type[typing.Any], typing.cast(object, type_showcase_models.NotificationTarget)
+    )
+
+    with pytest.raises(ValueError, match="invalid variant envelope"):
+        _ = type_showcase_models._notification_target_from_transfer_type([], type_hint)
+    with pytest.raises(ValueError, match="requires one payload"):
+        _ = type_showcase_models._notification_target_from_transfer_type(
+            {"tag": "email"}, type_hint
+        )
+    with pytest.raises(ValueError, match="unknown variant tag"):
+        _ = type_showcase_models._notification_target_from_transfer_type(
+            {"tag": "push", "value": "device"}, type_hint
+        )
+    with pytest.raises(TypeError, match="unsupported variant case"):
+        _ = type_showcase_models._notification_target_to_transfer_type(
+            typing.cast(typing.Any, ("email", "old@example.com"))
+        )
 
 
 async def test_get_user_returns_wit_user_resource_through_real_nexus_client(
@@ -244,7 +304,9 @@ async def test_get_user_returns_wit_user_resource_through_real_nexus_client(
     assert user.email == "new@example.com"
     assert user.display_name == "New Name"
     assert user.status is type_showcase_models.UserStatus.Active
-    assert user.profile.notification_target == ("email", "old@example.com")
+    assert user.profile.notification_target == (
+        type_showcase_models.NotificationTargetEmail("old@example.com")
+    )
     assert user.profile.sync_state == ("ok", "synced")
     assert (
         user.profile.capabilities & type_showcase_models.UserCapabilityReadProfile

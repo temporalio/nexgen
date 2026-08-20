@@ -8,11 +8,11 @@ import (
 var _ func(workflow.Context, gm.CompleteOptions[string]) workflow.Future = gm.Complete[string]
 
 var success gm.OperationCompletionResult[int] = gm.OperationCompletionResultSuccess[int]{
-	Value: gm.OperationCompletionSuccess[int]{Output: 42},
+	Value: 42,
 }
 
 var failure gm.OperationCompletionResult[int] = gm.OperationCompletionResultFailure[int]{
-	Value: gm.OperationCompletionFailure{Message: "failed"},
+	Value: "failed",
 }
 
 var _ = gm.GenericResponse[string, int, bool]{

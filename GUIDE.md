@@ -183,7 +183,8 @@ export enum UserCapability {
 
 ### Variants
 
-WIT variants become discriminated unions using a `tag` field.
+WIT variants become target-native sum types. Python generates a slotted
+dataclass for each case and a union alias over those classes.
 
 ```wit
 variant notification-target {
@@ -196,12 +197,55 @@ variant notification-target {
 **Python:**
 
 ```python
+@dataclasses.dataclass(slots=True, init=False)
+class NotificationTargetEmail:
+    tag: typing.Literal["email"] = dataclasses.field(init=False)
+    value: str
+
+    def __init__(self, value: str) -> None:
+        self.tag = "email"
+        self.value = value
+
+@dataclasses.dataclass(slots=True, init=False)
+class NotificationTargetSms:
+    tag: typing.Literal["sms"] = dataclasses.field(init=False)
+    value: str
+
+    def __init__(self, value: str) -> None:
+        self.tag = "sms"
+        self.value = value
+
+@dataclasses.dataclass(slots=True, init=False)
+class NotificationTargetNone:
+    tag: typing.Literal["none"] = dataclasses.field(init=False)
+
+    def __init__(self) -> None:
+        self.tag = "none"
+
 NotificationTarget = (
-    tuple[typing.Literal["email"], str]
-    | tuple[typing.Literal["sms"], str]
-    | tuple[typing.Literal["none"]]
+    NotificationTargetEmail
+    | NotificationTargetSms
+    | NotificationTargetNone
 )
 ```
+
+Python callers construct and match the case classes directly. Payload-bearing
+cases use a uniform `value` field. Generated constructors assign the literal
+`tag`; callers cannot provide or override it.
+
+Python direct JSON transfer uses an adjacent-tagged object. For example,
+`NotificationTargetEmail("a@example.com")` transfers as
+`{"tag": "email", "value": "a@example.com"}`. A payload-free case transfers
+as `{"tag": "none"}`. Protobuf-backed records map the same public case classes
+to their protobuf `oneof` members without using the JSON envelope.
+
+Because a Python union alias cannot carry Temporal's transfer-converter
+registration, generated private functions decode and encode the variant by its
+`tag`. A non-protobuf record or resource that contains the variant receives a
+registered transfer type converter. That converter accepts the default payload
+converter's raw JSON value, validates the enclosing object, and delegates the
+nested variant to those functions. Records that cannot reach a variant do not
+receive this JSON conversion machinery.
 
 **TypeScript:**
 
@@ -211,8 +255,6 @@ export type NotificationTarget =
   | { tag: "sms"; value: string }
   | { tag: "none" };
 ```
-
-Cases with a payload carry a `value` field; cases without a payload do not.
 
 ### Results
 
@@ -1218,9 +1260,10 @@ record response {
 }
 ```
 
-Python performs bidirectional oneof conversion using tagged tuples such as
-`("success", value)`. Other targets reject a reachable model containing a
-oneof they cannot convert; unreachable declarations and omitted oneofs remain valid.
+Python performs bidirectional oneof conversion using generated case classes,
+such as `OutcomeSuccess(value)`. Other targets reject a reachable model
+containing a oneof they cannot convert. Unreachable declarations and omitted
+oneofs remain valid.
 
 ---
 
@@ -1260,10 +1303,10 @@ as `typing.Any`. `Payloads` fields continue to decode as untyped sequences.
 Type parameters are also unsupported in resources, map keys, function-signature
 metadata, or resource-bound generic operations.
 
-Generic variants retain each target's normal tagged representation: tagged
-tuples in Python, tagged object unions in TypeScript, sealed interfaces and
-case structs in Go, and nested records in .NET. References to generic variants
-are closed automatically wherever they occur.
+Generic variants retain each target's normal representation: generic case
+dataclasses and a union alias in Python, tagged object unions in TypeScript,
+sealed interfaces and case structs in Go, and nested records in .NET.
+References to generic variants are closed automatically wherever they occur.
 
 ---
 

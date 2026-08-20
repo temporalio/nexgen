@@ -7,48 +7,42 @@ import temporalio.workflow
 
 from ..models import (
     GenericRequest,
-    GenericResponse,
     Inner,
+    ReuseCompletionResult,
 )
 
 
 ContextT = typing.TypeVar("ContextT")
 
 
-async def _complete(
+async def _reuse_complete(
     request: GenericRequest[ContextT],
-) -> temporalio.workflow.NexusOperationHandle[
-    GenericResponse[ContextT, object, object],
-]:
+) -> temporalio.workflow.NexusOperationHandle[ReuseCompletionResult[object],]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="GenericModelService",
         endpoint="generic-models",
     )
     return typing.cast(
-        temporalio.workflow.NexusOperationHandle[
-            GenericResponse[ContextT, object, object],
-        ],
+        temporalio.workflow.NexusOperationHandle[ReuseCompletionResult[object],],
         await nexus_client.start_operation(
-            operation="Complete",
+            operation="ReuseComplete",
             input=request,
-            output_type=GenericResponse[typing.Any, typing.Any, typing.Any],
+            output_type=ReuseCompletionResult[typing.Any],
         ),
     )
 
 
-async def complete(
+async def reuse_complete(
     *,
     context: ContextT,
     contexts: list[ContextT] | None = None,
     by_name: dict[str, ContextT] | None = None,
     nested: Inner[ContextT],
-) -> temporalio.workflow.NexusOperationHandle[
-    GenericResponse[ContextT, object, object],
-]:
+) -> temporalio.workflow.NexusOperationHandle[ReuseCompletionResult[object],]:
     request = GenericRequest(
         context=context,
         contexts=contexts or [],
         by_name=by_name or {},
         nested=nested,
     )
-    return await _complete(request)
+    return await _reuse_complete(request)
