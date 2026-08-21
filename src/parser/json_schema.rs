@@ -1132,11 +1132,36 @@ fn validate_dependent_required_grammar(path: &Path, schema: &Schema, context: &s
     Ok(())
 }
 
+/// Checks the portable property-count representation before normalization can
+/// merge an `allOf` branch (or `$ref` sibling) away. The complete object-shape
+/// validation still runs later on the normalized schema.
+fn validate_raw_property_count_grammar(path: &Path, schema: &Schema, context: &str) -> Result<()> {
+    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
+    for key in ["minProperties", "maxProperties"] {
+        let Some(value) = schema.extra.get(key) else {
+            continue;
+        };
+        let valid = value.as_f64().is_some_and(|value| {
+            value.is_finite() && value >= 0.0 && value <= MAX_SAFE_INTEGER && value.fract() == 0.0
+        });
+        if !valid {
+            return Err(Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!(
+                    "{context}: `{key}` must be a non-negative integer no greater than 9007199254740991"
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
 fn validate_raw_schema_grammar(path: &Path, schema: &Schema, context: &str) -> Result<()> {
     validate_schema_keyword_allowlist(path, schema, context)?;
     validate_annotations(path, schema, context)?;
     validate_required_grammar(path, schema, context)?;
     validate_dependent_required_grammar(path, schema, context)?;
+    validate_raw_property_count_grammar(path, schema, context)?;
     validate_default(path, schema, context)?;
     validate_const_enum(path, schema, context)?;
 
@@ -1159,6 +1184,24 @@ fn validate_raw_schema_grammar(path: &Path, schema: &Schema, context: &str) -> R
     }
     if let Some(branches) = &schema.one_of {
         for (index, branch) in branches.iter().enumerate() {
+            // Validate the nullability branch grammar before its individual
+            // keywords. Otherwise a sibling such as `default: null` can emit
+            // a value-keyword diagnostic and obscure the more fundamental
+            // requirement that the null branch have no siblings at all.
+            if branch.ty.as_ref().and_then(Value::as_str) == Some("null")
+                && branch
+                    != &(Schema {
+                        ty: Some(Value::String("null".to_string())),
+                        ..Schema::default()
+                    })
+            {
+                return Err(Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!(
+                        "{context}.oneOf[{index}]: a null branch must be exactly `{{type: \"null\"}}` with no sibling keywords"
+                    ),
+                });
+            }
             validate_raw_schema_grammar(path, branch, &format!("{context}.oneOf[{index}]"))?;
         }
     }
@@ -2496,6 +2539,9 @@ fn validate_array_constraints(path: &Path, schema: &Schema, context: &str) -> Re
                 ));
             }
         };
+        let matcher_context = format!("{context}.contains");
+        validate_schema_common(path, &matcher, &matcher_context)?;
+        validate_type_form(path, &matcher, &matcher_context)?;
 
         let matcher_ty = matcher.ty.as_ref().and_then(Value::as_str);
         let matcher_const_kind = matcher.extra.get("const").and_then(scalar_value_kind);
@@ -2523,12 +2569,25 @@ fn validate_array_constraints(path: &Path, schema: &Schema, context: &str) -> Re
         // composite `const`/`enum` value — is deferred.
         if matches!(matcher_ty, Some("object" | "array"))
             || matcher.reference.is_some()
+            || matcher.properties.is_some()
+            || matcher.required.is_some()
+            || matcher.additional_properties.is_some()
+            || matcher.items.is_some()
+            || matcher.one_of.is_some()
             || matcher_const_is_composite
             || matcher_enum_is_composite
         {
             return reject(format!(
-                "{context}: a composite `contains` matcher is not yet supported; deep matching is deferred (scalar matcher only)"
+                "{matcher_context}: a composite `contains` matcher is not yet supported; deep matching is deferred (scalar matcher only)"
             ));
+        }
+        if matcher.extra.contains_key("contentEncoding") {
+            return reject(format!(
+                "{matcher_context}: `contentEncoding` is not supported in a scalar matcher; match the encoded wire string with the supported string predicates instead"
+            ));
+        }
+        if matcher.ty.is_some() {
+            validate_type_presence(path, &matcher, &matcher_context)?;
         }
 
         // Composite element type — `contains` over a composite `items` is
@@ -2538,6 +2597,44 @@ fn validate_array_constraints(path: &Path, schema: &Schema, context: &str) -> Re
                 "{context}: `contains` over a composite element type is not yet supported; deep matching is deferred (scalar `items` only)"
             ));
         }
+
+        // Validate the matcher as a scalar schema, including constraints whose
+        // invalid form would otherwise be hidden because `contains` is stored
+        // in `extra` rather than the ordinary child fields. A matcher may omit
+        // `type` when its assertion implies one (`minimum`, `minLength`, const,
+        // or enum), so give the validation copy the effective scalar kind while
+        // leaving the authored matcher unchanged for generator lowering.
+        let mut validated_matcher = matcher.clone();
+        if validated_matcher.ty.is_none() {
+            let inferred_kind = if matcher.extra.contains_key("minimum")
+                || matcher.extra.contains_key("maximum")
+                || matcher.extra.contains_key("exclusiveMinimum")
+                || matcher.extra.contains_key("exclusiveMaximum")
+                || matcher.extra.contains_key("multipleOf")
+            {
+                match items_kind {
+                    Some("integer") => Some("integer"),
+                    _ => Some("number"),
+                }
+            } else if matcher.extra.contains_key("minLength")
+                || matcher.extra.contains_key("maxLength")
+                || matcher.extra.contains_key("pattern")
+                || matcher.extra.contains_key("format")
+            {
+                Some("string")
+            } else {
+                matcher_const_kind.or(matcher_enum_kind)
+            };
+            if let Some(kind) = inferred_kind {
+                validated_matcher.ty = Some(Value::String(kind.to_string()));
+            }
+        }
+        validate_numeric_constraints(path, &validated_matcher, &matcher_context)?;
+        validate_string_constraints(path, &validated_matcher, &matcher_context)?;
+        validate_format(path, &validated_matcher, &matcher_context)?;
+        validate_array_constraints(path, &validated_matcher, &matcher_context)?;
+        validate_object_constraints(path, &validated_matcher, &matcher_context)?;
+        validate_const_enum(path, &validated_matcher, &matcher_context)?;
 
         // The matcher must carry at least one recognized scalar assertion — a
         // scalar `type`, a `const`/`enum`, or a scalar constraint.
@@ -7524,6 +7621,62 @@ services:
     }
 
     #[test]
+    fn accepts_every_one_sided_operation_io_combination() {
+        let spec = parse(
+            r##"
+nexusrpc: "1.0.0"
+services:
+  ChatService:
+    operations:
+      sendData:
+        input: { type: object, properties: {} }
+      getData:
+        output: { type: object, properties: {} }
+      ping: {}
+"##,
+        );
+        let operations = &spec.services[0].operations;
+        for (name, has_input, has_output) in [
+            ("SendData", true, false),
+            ("GetData", false, true),
+            ("Ping", false, false),
+        ] {
+            let operation = operations
+                .iter()
+                .find(|operation| operation.name == name)
+                .unwrap_or_else(|| panic!("missing operation {name}"));
+            assert_eq!(operation.input.is_some(), has_input, "{name} input");
+            assert_eq!(operation.output.is_some(), has_output, "{name} output");
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_schema_keywords_in_each_operation_io_position() {
+        for label in ["input", "output"] {
+            let error = doc_reject(&format!(
+                r##"
+nexusrpc: "1.0.0"
+services:
+  ChatService:
+    operations:
+      getData:
+        {label}:
+          type: object
+          properties:
+            nested:
+              type: string
+              minLenght: 2
+"##
+            ));
+            assert!(
+                error.contains("unknown schema keyword `minLenght`")
+                    && error.contains(&format!(".{label}.properties.nested")),
+                "{label}: {error}"
+            );
+        }
+    }
+
+    #[test]
     fn lowers_service_and_operation_deprecation() {
         let spec = parse(
             r##"
@@ -8385,6 +8538,63 @@ properties:
     }
 
     #[test]
+    fn recursively_validates_contains_scalar_matcher_constraints() {
+        for (constraint, schema, expected) in [
+            (
+                "fractional multipleOf",
+                "type: array\nitems: { type: number }\ncontains: { type: number, multipleOf: 0.1 }",
+                "fractional divisors are deferred",
+            ),
+            (
+                "fractional integer bound",
+                "type: array\nitems: { type: integer }\ncontains: { type: integer, minimum: 1.5 }",
+                "integer bound",
+            ),
+            (
+                "negative string length",
+                "type: array\nitems: { type: string }\ncontains: { type: string, minLength: -1 }",
+                "non-negative integer",
+            ),
+            (
+                "unknown asserted format",
+                "type: array\nitems: { type: string }\ncontains: { type: string, format: made-up }",
+                "unknown `format",
+            ),
+            (
+                "literal violating matcher bound",
+                "type: array\nitems: { type: integer }\ncontains: { minimum: 5, const: 2 }",
+                "must be >= 5",
+            ),
+            (
+                "categorically rejected not",
+                "type: array\nitems: { type: string }\ncontains: { type: string, not: { const: x } }",
+                "`not` is not supported",
+            ),
+            (
+                "unsupported content encoding predicate",
+                "type: array\nitems: { type: string }\ncontains: { type: string, contentEncoding: base64 }",
+                "not supported in a scalar matcher",
+            ),
+            (
+                "array assertion on scalar matcher",
+                "type: array\nitems: { type: string }\ncontains: { type: string, minItems: 1 }",
+                "require `type: array`",
+            ),
+            (
+                "union hidden beside scalar assertion",
+                "type: array\nitems: { type: string }\ncontains: { oneOf: [{ type: string }, { type: integer }], const: x }",
+                "composite `contains` matcher",
+            ),
+        ] {
+            let error = numeric_reject(schema);
+            assert!(
+                error.contains(expected) && error.contains(".contains"),
+                "{constraint}: expected {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
     fn rejects_vacuous_min_contains_zero() {
         let error = numeric_reject(
             "type: array\nitems: { type: string }\ncontains: { const: x }\nminContains: 0",
@@ -8574,6 +8784,53 @@ properties:
         assert!(
             error.contains("maxProperties") && error.contains("9007199254740991"),
             "{error}"
+        );
+    }
+
+    #[test]
+    fn rejects_unsafe_property_counts_before_recursive_or_all_of_lowering() {
+        for (position, schema) in [
+            (
+                "nested property",
+                "type: object\nproperties:\n  nested:\n    type: object\n    additionalProperties: true\n    minProperties: 9007199254740992",
+            ),
+            (
+                "array items",
+                "type: array\nitems:\n  type: object\n  additionalProperties: true\n  maxProperties: 9007199254740992",
+            ),
+            (
+                "typed additionalProperties",
+                "type: object\nadditionalProperties:\n  type: object\n  additionalProperties: true\n  minProperties: 9007199254740992",
+            ),
+            (
+                "allOf branch overwritten by a later bound",
+                "allOf:\n  - { type: object, additionalProperties: true, maxProperties: 9007199254740992 }\n  - { type: object, maxProperties: 4 }",
+            ),
+        ] {
+            let error = structural_reject(schema);
+            assert!(
+                error.contains("Properties") && error.contains("9007199254740991"),
+                "{position}: {error}"
+            );
+        }
+
+        let error = doc_reject(
+            r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  value:
+    $ref: "#/$defs/Base"
+    maxProperties: 9007199254740992
+$defs:
+  Base:
+    type: object
+    additionalProperties: true
+"##,
+        );
+        assert!(
+            error.contains("maxProperties") && error.contains("9007199254740991"),
+            "$ref sibling: {error}"
         );
     }
 
@@ -8917,25 +9174,58 @@ properties:
 
     #[test]
     fn rejects_null_branch_with_sibling_keywords() {
-        let error = structural_reject(
-            "oneOf:\n  - { type: string }\n  - { type: \"null\", description: not exact }",
-        );
-        assert!(
-            error.contains("null branch") && error.contains("exactly `{type: \"null\"}`"),
-            "{error}"
-        );
+        for (keyword, sibling) in [
+            ("description", "description: not exact"),
+            ("deprecated", "deprecated: true"),
+            ("default", "default: null"),
+            ("inert comment", "$comment: still not exact"),
+            ("extension", "x-java-name: NullValue"),
+        ] {
+            let error = structural_reject(&format!(
+                "oneOf:\n  - {{ type: string }}\n  - {{ type: \"null\", {sibling} }}"
+            ));
+            assert!(
+                error.contains("null branch") && error.contains("exactly `{type: \"null\"}`"),
+                "{keyword}: {error}"
+            );
+        }
     }
 
     #[test]
     fn rejects_nullable_default_invalid_for_non_null_branch() {
-        let wrong_type =
-            structural_reject("oneOf:\n  - { type: string }\n  - { type: \"null\" }\ndefault: 42");
-        assert!(wrong_type.contains("incompatible"), "{wrong_type}");
-
-        let constraint = structural_reject(
-            "oneOf:\n  - { type: string, minLength: 3 }\n  - { type: \"null\" }\ndefault: x",
-        );
-        assert!(constraint.contains("minLength"), "{constraint}");
+        for (constraint, schema, expected) in [
+            (
+                "type",
+                "oneOf:\n  - { type: string }\n  - { type: \"null\" }\ndefault: 42",
+                "incompatible",
+            ),
+            (
+                "length",
+                "oneOf:\n  - { type: string, minLength: 3 }\n  - { type: \"null\" }\ndefault: x",
+                "minLength",
+            ),
+            (
+                "enum",
+                "oneOf:\n  - { type: string, enum: [open, closed] }\n  - { type: \"null\" }\ndefault: pending",
+                "enum",
+            ),
+            (
+                "format",
+                "oneOf:\n  - { type: string, format: email }\n  - { type: \"null\" }\ndefault: not-an-email",
+                "email",
+            ),
+            (
+                "content encoding",
+                "oneOf:\n  - { type: string, contentEncoding: base64 }\n  - { type: \"null\" }\ndefault: '***'",
+                "base64",
+            ),
+        ] {
+            let error = structural_reject(schema);
+            assert!(
+                error.contains(expected),
+                "{constraint}: expected {expected}, got {error}"
+            );
+        }
     }
 
     #[test]
@@ -9407,6 +9697,67 @@ properties:
             "allOf:\n  - { type: string, default: [bad] }\n  - { type: string, default: good }",
         );
         assert!(default.contains("object/array"), "{default}");
+    }
+
+    #[test]
+    fn all_of_and_ref_siblings_reject_malformed_keywords_before_merge() {
+        for (position, schema, expected) in [
+            (
+                "allOf type",
+                "allOf:\n  - { type: 5 }\n  - { type: string }",
+                "`type`",
+            ),
+            (
+                "allOf numeric bound",
+                "allOf:\n  - { type: integer, minimum: nope }\n  - { type: integer, minimum: 1 }",
+                "`minimum`",
+            ),
+            (
+                "allOf string count",
+                "allOf:\n  - { type: string, minLength: nope }\n  - { type: string, minLength: 1 }",
+                "`minLength`",
+            ),
+            (
+                "allOf array count",
+                "allOf:\n  - { type: array, items: { type: string }, minItems: nope }\n  - { type: array, minItems: 1 }",
+                "`minItems`",
+            ),
+            (
+                "allOf property count",
+                "allOf:\n  - { type: object, minProperties: nope }\n  - { type: object, minProperties: 1 }",
+                "`minProperties`",
+            ),
+            (
+                "allOf pattern",
+                "allOf:\n  - { type: string, pattern: 5 }\n  - { type: string, pattern: '^x' }",
+                "`pattern`",
+            ),
+            (
+                "allOf format",
+                "allOf:\n  - { type: string, format: 5 }\n  - { type: string, format: email }",
+                "`format`",
+            ),
+        ] {
+            let error = numeric_reject(schema);
+            assert!(
+                error.contains(expected),
+                "{position}: expected {expected}, got {error}"
+            );
+        }
+
+        let error = doc_reject(
+            r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  value:
+    $ref: "#/$defs/Base"
+    minimum: nope
+$defs:
+  Base: { type: integer, minimum: 1 }
+"##,
+        );
+        assert!(error.contains("`minimum`"), "$ref sibling: {error}");
     }
 
     #[test]
@@ -11967,6 +12318,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 type: object
 properties:
   middle: { $ref: "../shared/middle.yaml#/$defs/Middle" }
+  middleAlias: { $ref: "../shared/nested/.././middle.yaml#/$defs/Middle" }
 "##,
         )
         .unwrap();
@@ -12101,6 +12453,21 @@ $defs:
     fn rejects_invalid_rfc6901_escape_in_ref_pointer() {
         let error = numeric_reject("$ref: \"#/$defs/bad~2name\"");
         assert!(error.contains("invalid RFC 6901 escape"), "{error}");
+    }
+
+    #[test]
+    fn rejects_malformed_local_ref_pointer_structures() {
+        for (reference, expected) in [
+            ("#/$defs", "must point at a `$defs` entry"),
+            ("#/$defs/bad~", "trailing `~`"),
+            ("#anchor", "must use a JSON Pointer"),
+        ] {
+            let error = numeric_reject(&format!("$ref: {reference:?}"));
+            assert!(
+                error.contains(expected),
+                "{reference}: expected {expected}, got {error}"
+            );
+        }
     }
 
     #[test]
