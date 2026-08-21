@@ -53,9 +53,11 @@ system can't carry that constraint by itself. The `@Nullable`/
 `@NullMarked` annotations are **complementary**: they track in-memory
 post-construction nullness (required → non-null; optional → may be
 null when the key is absent) and propagate it into the consumer's
-static null-analysis. They are compile-time only (CLASS retention →
-no runtime dependency, **P4**) and do **not** encode the wire-level
-nullable distinction — every optional reference field is `@Nullable`
+static null-analysis. Because generated source imports them,
+`org.jspecify:jspecify:1.0.0` must be on the compile classpath (normally
+`compileOnly` in Gradle or `provided` in Maven). They have CLASS retention and
+therefore require no runtime dependency (**P4**). They do **not** encode the
+wire-level nullable distinction — every optional reference field is `@Nullable`
 regardless of whether it is optional-non-nullable or optional+nullable.
 
 ### Go

@@ -97,6 +97,28 @@ nexgen java samples/schemas/showcase.nexusrpc.yaml \
   --output ./gen/com/example/showcase --package-name com.example.showcase
 ```
 
+Generated Java source uses JSpecify's `@NullMarked` and `@Nullable`
+annotations. Add JSpecify 1.0.0 to the compile classpath; it is not needed at
+runtime. For Gradle:
+
+```groovy
+dependencies {
+    compileOnly 'org.jspecify:jspecify:1.0.0'
+    testCompileOnly 'org.jspecify:jspecify:1.0.0'
+}
+```
+
+For Maven, use a `provided` dependency:
+
+```xml
+<dependency>
+  <groupId>org.jspecify</groupId>
+  <artifactId>jspecify</artifactId>
+  <version>1.0.0</version>
+  <scope>provided</scope>
+</dependency>
+```
+
 Choose how TypeScript represents temporal `format` fields (date-time, date, time,
 duration) in memory:
 
