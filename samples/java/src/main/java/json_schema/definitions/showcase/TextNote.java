@@ -133,6 +133,20 @@ public final class TextNote implements Note {
                     violations.add(new Violation("body", "must have length >= 1, got " + length));
                 }
             }
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.kind != null) {
+                wireKeys.add("kind");
+            }
+            if (value.body != null) {
+                wireKeys.add("body");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
             if (!violations.isEmpty()) {
                 throw new ValidationException(violations);
             }

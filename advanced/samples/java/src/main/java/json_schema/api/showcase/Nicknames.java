@@ -18,7 +18,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A typed map of **nullable** members: a member may be an explicit null, which is kept as a null member rather than dropped from the map, while a present member still carries its own constraint.
+ * A typed map of **nullable** members: a member may be an explicit null, which is kept
+ * as a null member rather than dropped from the map, while a present member still
+ * carries its own constraint.
  */
 @JsonSerialize(using = Nicknames.Serializer.class)
 @JsonDeserialize(using = Nicknames.Deserializer.class)

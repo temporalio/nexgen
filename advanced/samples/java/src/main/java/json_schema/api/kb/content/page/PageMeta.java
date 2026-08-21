@@ -21,7 +21,8 @@ import json_schema.api.kb.Violation;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Non-cyclic helper. Referenced only by Page, references nothing recursive, so it stays in the content_page module even though Page is hoisted.
+ * Non-cyclic helper. Referenced only by Page, references nothing recursive, so it stays
+ * in the content_page module even though Page is hoisted.
  */
 @JsonSerialize(using = PageMeta.Serializer.class)
 @JsonDeserialize(using = PageMeta.Deserializer.class)

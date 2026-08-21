@@ -21,7 +21,8 @@ import json_schema.definitions.kb.Violation;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A dead $def - defined but never referenced anywhere. Still generated and exported as intended reusable API surface (see the $ref spec).
+ * A dead $def - defined but never referenced anywhere. Still generated and exported as
+ * intended reusable API surface (see the $ref spec).
  */
 @JsonSerialize(using = Palette.Serializer.class)
 @JsonDeserialize(using = Palette.Deserializer.class)
@@ -109,7 +110,8 @@ public final class Palette {
                             if (!element.isTextual()) {
                                 violations.add(new Violation(elementPath, "expected string"));
                             } else {
-                                items.add(element.textValue());
+                                String parsed = element.textValue();
+                                items.add(parsed);
                             }
                         }
                         swatches = items;

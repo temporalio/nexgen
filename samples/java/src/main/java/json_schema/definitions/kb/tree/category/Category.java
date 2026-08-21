@@ -21,7 +21,8 @@ import json_schema.definitions.kb.Violation;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A node in a self-recursive category tree. The root of this file is itself a type (pure JSON Schema file), named Category from the basename.
+ * A node in a self-recursive category tree. The root of this file is itself a type
+ * (pure JSON Schema file), named Category from the basename.
  */
 @JsonSerialize(using = Category.Serializer.class)
 @JsonDeserialize(using = Category.Deserializer.class)
@@ -29,7 +30,8 @@ public final class Category {
     private final String id;
     private final String name;
     /**
-     * Sub-categories. A within-file self-cycle via `$ref: '#'`; the possibly-empty array is the terminating edge, so it stays in this module.
+     * Sub-categories. A within-file self-cycle via `$ref: '#'`; the possibly-empty
+     * array is the terminating edge, so it stays in this module.
      */
     private final @Nullable List<Category> children;
 

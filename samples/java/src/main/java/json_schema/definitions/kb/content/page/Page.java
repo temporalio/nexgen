@@ -22,7 +22,9 @@ import json_schema.definitions.kb.content.block.Block;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A page. One half of the Page <-> Block cross-file cycle. Because the cycle spans two input files, Page and Block hoist together into Python's _recursive.py; the non-cyclic PageMeta helper stays in this module.
+ * A page. One half of the Page &lt;-&gt; Block cross-file cycle. Because the cycle
+ * spans two input files, Page and Block hoist together into Python's _recursive.py; the
+ * non-cyclic PageMeta helper stays in this module.
  */
 @JsonSerialize(using = Page.Serializer.class)
 @JsonDeserialize(using = Page.Deserializer.class)
@@ -31,7 +33,8 @@ public final class Page {
     private final String title;
     private final PageMeta meta;
     /**
-     * Ordered content blocks. Cross-file `$ref` to block.json (same directory); the array is the terminating edge of the cycle.
+     * Ordered content blocks. Cross-file `$ref` to block.json (same directory); the
+     * array is the terminating edge of the cycle.
      */
     private final @Nullable List<Block> blocks;
 

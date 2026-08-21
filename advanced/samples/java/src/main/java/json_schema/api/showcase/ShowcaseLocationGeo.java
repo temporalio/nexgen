@@ -84,6 +84,20 @@ public final class ShowcaseLocationGeo {
                     violations.add(new Violation("lon", "must be a finite number, got " + value.lon));
                 }
             }
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.lat != null) {
+                wireKeys.add("lat");
+            }
+            if (value.lon != null) {
+                wireKeys.add("lon");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
             if (!violations.isEmpty()) {
                 throw new ValidationException(violations);
             }

@@ -18,7 +18,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A typed map with a refined *string* member: 2 to 8 code points of lowercase ASCII. Exercises the member-level `minLength`/`maxLength`/`pattern` in every language.
+ * A typed map with a refined *string* member: 2 to 8 code points of lowercase ASCII.
+ * Exercises the member-level `minLength`/`maxLength`/`pattern` in every language.
  */
 @JsonSerialize(using = Tokens.Serializer.class)
 @JsonDeserialize(using = Tokens.Deserializer.class)

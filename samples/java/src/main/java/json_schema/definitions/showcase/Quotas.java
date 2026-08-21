@@ -18,7 +18,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A typed map whose members carry their own constraints: every member is a non-negative multiple of 5, at most 100. A member is held to exactly what a declared field of that type is held to, in both directions, with the offending member's key as the violation path.
+ * A typed map whose members carry their own constraints: every member is a non-negative
+ * multiple of 5, at most 100. A member is held to exactly what a declared field of that
+ * type is held to, in both directions, with the offending member's key as the violation
+ * path.
  */
 @JsonSerialize(using = Quotas.Serializer.class)
 @JsonDeserialize(using = Quotas.Deserializer.class)

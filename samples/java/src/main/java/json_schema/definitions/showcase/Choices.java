@@ -18,7 +18,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A map whose *member* type is a union written inline in `additionalProperties`. Like an element union it has no name of its own, so it is named after its position — `ChoicesValue` — and moved into `$defs`; each member then decodes through that union's selector, with the member key carrying into the violation path.
+ * A map whose *member* type is a union written inline in `additionalProperties`. Like
+ * an element union it has no name of its own, so it is named after its position —
+ * `ChoicesValue` — and moved into `$defs`; each member then decodes through that
+ * union's selector, with the member key carrying into the violation path.
  */
 @JsonSerialize(using = Choices.Serializer.class)
 @JsonDeserialize(using = Choices.Deserializer.class)

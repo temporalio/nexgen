@@ -22,20 +22,24 @@ import json_schema.definitions.kb.content.page.Page;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A content block. The other half of the Page <-> Block cross-file cycle. The `page` back-reference is optional + nullable, which terminates the cycle so it is satisfiable.
+ * A content block. The other half of the Page &lt;-&gt; Block cross-file cycle. The
+ * `page` back-reference is optional + nullable, which terminates the cycle so it is
+ * satisfiable.
  */
 @JsonSerialize(using = Block.Serializer.class)
 @JsonDeserialize(using = Block.Deserializer.class)
 public final class Block {
     private final String blockId;
     /**
-     * Non-negative position within the page. Exercises a numeric `minimum` bound over an integer field.
+     * Non-negative position within the page. Exercises a numeric `minimum` bound over
+     * an integer field.
      */
     private final long order;
     private final @Nullable String text;
     private final @Nullable BlockStyle style;
     /**
-     * Optional back-reference to the containing page - closes the Page <-> Block cycle. Optional + nullable, so this edge terminates.
+     * Optional back-reference to the containing page - closes the Page &lt;-&gt; Block
+     * cycle. Optional + nullable, so this edge terminates.
      */
     private final @Nullable Page page;
 

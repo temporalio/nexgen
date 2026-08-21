@@ -22,13 +22,18 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Temporal
- * Root object materializing the four RFC 3339 temporal formats as native typed fields: date-time (offset & sub-second precision preserved), date, time (offset preserved when present), and duration (time-only, canonicalized). Covers required, optional, and nullable members of each.
+ *
+ * Root object materializing the four RFC 3339 temporal formats as native typed fields:
+ * date-time (offset &amp; sub-second precision preserved), date, time (offset preserved
+ * when present), and duration (time-only, canonicalized). Covers required, optional,
+ * and nullable members of each.
  */
 @JsonSerialize(using = Temporal.Serializer.class)
 @JsonDeserialize(using = Temporal.Deserializer.class)
 public final class Temporal {
     /**
-     * Required event timestamp; materialized date-time (offset required, sub-second precision & offset preserved on round-trip).
+     * Required event timestamp; materialized date-time (offset required, sub-second
+     * precision &amp; offset preserved on round-trip).
      */
     private final OffsetDateTime createdAt;
     /**
@@ -36,11 +41,13 @@ public final class Temporal {
      */
     private final LocalDate birthday;
     /**
-     * Required wall-clock time; materialized time (offset preserved when present, otherwise offset-less).
+     * Required wall-clock time; materialized time (offset preserved when present,
+     * otherwise offset-less).
      */
     private final String alarm;
     /**
-     * Required time-only duration; materialized duration, canonicalized to PT…H…M…S (e.g. PT90M → PT1H30M).
+     * Required time-only duration; materialized duration, canonicalized to PT…H…M…S
+     * (e.g. PT90M → PT1H30M).
      */
     private final Duration timeout;
     /**

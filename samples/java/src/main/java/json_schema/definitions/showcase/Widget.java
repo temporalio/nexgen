@@ -18,7 +18,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Base-type extension via allOf: WidgetBase is flattened in and the extension branch adds fields, so Widget merges to one standalone object with the union of properties ({id, kind, name, size}) and required ([id, name]). The `size` member is itself an allOf that tightens two numeric bounds to a single interval [10, 20]; a value outside it is rejected by the merged constraint. No allOf survives past the loader.
+ * Base-type extension via allOf: WidgetBase is flattened in and the extension branch
+ * adds fields, so Widget merges to one standalone object with the union of properties
+ * ({id, kind, name, size}) and required ([id, name]). The `size` member is itself an
+ * allOf that tightens two numeric bounds to a single interval [10, 20]; a value outside
+ * it is rejected by the merged constraint. No allOf survives past the loader.
  */
 @JsonSerialize(using = Widget.Serializer.class)
 @JsonDeserialize(using = Widget.Deserializer.class)
@@ -102,6 +106,26 @@ public final class Widget {
                 }
                 if (value.size > 20L) {
                     violations.add(new Violation("size", "must be <= 20, got " + value.size));
+                }
+            }
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.id != null) {
+                wireKeys.add("id");
+            }
+            if (value.kind != null) {
+                wireKeys.add("kind");
+            }
+            if (value.name != null) {
+                wireKeys.add("name");
+            }
+            if (value.size != null) {
+                wireKeys.add("size");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
                 }
             }
             if (!violations.isEmpty()) {

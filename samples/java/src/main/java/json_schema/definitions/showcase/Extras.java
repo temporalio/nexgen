@@ -18,7 +18,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A free-form object (`additionalProperties: true` with no declared properties): every member is carried verbatim, bounded to at most 4 members. Members keep their wire form, so large integers survive a round-trip untruncated.
+ * A free-form object (`additionalProperties: true` with no declared properties): every
+ * member is carried verbatim, bounded to at most 4 members. Members keep their wire
+ * form, so large integers survive a round-trip untruncated.
  */
 @JsonSerialize(using = Extras.Serializer.class)
 @JsonDeserialize(using = Extras.Deserializer.class)
@@ -61,12 +63,16 @@ public final class Extras {
         @Override
         public void serialize(Extras value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             List<Violation> violations = new ArrayList<>();
-            int wireKeyCount = 0;
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
             if (value.additionalProperties != null) {
-                wireKeyCount += value.additionalProperties.size();
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
             }
-            if (wireKeyCount > 4) {
-                violations.add(new Violation("", "must have at most 4 properties, got " + wireKeyCount));
+            if (wireKeys.size() > 4) {
+                violations.add(new Violation("", "must have at most 4 properties, got " + wireKeys.size()));
             }
             if (!violations.isEmpty()) {
                 throw new ValidationException(violations);

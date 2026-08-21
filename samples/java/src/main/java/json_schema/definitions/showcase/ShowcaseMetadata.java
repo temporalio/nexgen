@@ -18,7 +18,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A free-form object written inline. Even this is named (`ShowcaseMetadata`): every object emits as a named aggregate holding its members in a catch-all, so adding `properties` to it later only adds fields rather than changing the emitted type's kind, and its member-count bound rides along with it.
+ * A free-form object written inline. Even this is named (`ShowcaseMetadata`): every
+ * object emits as a named aggregate holding its members in a catch-all, so adding
+ * `properties` to it later only adds fields rather than changing the emitted type's
+ * kind, and its member-count bound rides along with it.
  */
 @JsonSerialize(using = ShowcaseMetadata.Serializer.class)
 @JsonDeserialize(using = ShowcaseMetadata.Deserializer.class)
@@ -61,12 +64,16 @@ public final class ShowcaseMetadata {
         @Override
         public void serialize(ShowcaseMetadata value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             List<Violation> violations = new ArrayList<>();
-            int wireKeyCount = 0;
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
             if (value.additionalProperties != null) {
-                wireKeyCount += value.additionalProperties.size();
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
             }
-            if (wireKeyCount > 3) {
-                violations.add(new Violation("", "must have at most 3 properties, got " + wireKeyCount));
+            if (wireKeys.size() > 3) {
+                violations.add(new Violation("", "must have at most 3 properties, got " + wireKeys.size()));
             }
             if (!violations.isEmpty()) {
                 throw new ValidationException(violations);

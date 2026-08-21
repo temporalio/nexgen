@@ -204,10 +204,17 @@ fn render_service_file(
     render_service_javadoc(
         &mut body,
         service.doc.for_language(crate::language::Language::Java),
+        service.deprecated,
+        "service",
     );
     body.push_str(&format!(
-        "@Service(name = {})\npublic interface {} {{\n",
+        "@Service(name = {})\n{}public interface {} {{\n",
         java_string_literal(&service.wire_name),
+        if service.deprecated {
+            "@Deprecated\n"
+        } else {
+            ""
+        },
         service
             .code_name
             .for_language(crate::language::Language::Java)
@@ -221,11 +228,16 @@ fn render_service_file(
         render_service_javadoc_indented(
             &mut body,
             operation.doc.for_language(crate::language::Language::Java),
+            operation.deprecated,
+            "operation",
         );
         body.push_str(&format!(
             "    @Operation(name = {})\n",
             java_string_literal(&operation.wire_name)
         ));
+        if operation.deprecated {
+            body.push_str("    @Deprecated\n");
+        }
 
         let output = io_type(operation.output.as_ref(), module, base_package);
         let input = io_type(operation.input.as_ref(), module, base_package);
@@ -286,12 +298,33 @@ fn io_type(
     }
 }
 
-fn render_service_javadoc(output: &mut String, doc: Option<&str>) {
-    render_java_doc_comment(output, "", doc, &[]);
+fn render_service_javadoc(output: &mut String, doc: Option<&str>, deprecated: bool, kind: &str) {
+    let tags = if deprecated {
+        vec![(
+            "@deprecated".to_string(),
+            format!("This {kind} is deprecated."),
+        )]
+    } else {
+        Vec::new()
+    };
+    render_java_doc_comment(output, "", doc, &tags);
 }
 
-fn render_service_javadoc_indented(output: &mut String, doc: Option<&str>) {
-    render_java_doc_comment(output, "    ", doc, &[]);
+fn render_service_javadoc_indented(
+    output: &mut String,
+    doc: Option<&str>,
+    deprecated: bool,
+    kind: &str,
+) {
+    let tags = if deprecated {
+        vec![(
+            "@deprecated".to_string(),
+            format!("This {kind} is deprecated."),
+        )]
+    } else {
+        Vec::new()
+    };
+    render_java_doc_comment(output, "    ", doc, &tags);
 }
 
 pub(in crate::generator) fn render_java_doc_comment(

@@ -72,6 +72,17 @@ public final class ShowcaseRowsItem {
                     violations.add(new Violation("cell", "must have length >= 1, got " + length));
                 }
             }
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.cell != null) {
+                wireKeys.add("cell");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
             if (!violations.isEmpty()) {
                 throw new ValidationException(violations);
             }

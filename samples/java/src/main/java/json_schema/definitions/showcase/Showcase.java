@@ -22,7 +22,11 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Showcase
- * Root object exercising the supported JSON-Schema feature subset: required and optional fields of every scalar type, optional+nullable and required+nullable members, arrays, a nested object via $ref, a typed-map, a closed object, an open (catch-all) object, a string const, a scalar default, and member docs.
+ *
+ * Root object exercising the supported JSON-Schema feature subset: required and
+ * optional fields of every scalar type, optional+nullable and required+nullable
+ * members, arrays, a nested object via $ref, a typed-map, a closed object, an open
+ * (catch-all) object, a string const, a scalar default, and member docs.
  */
 @JsonSerialize(using = Showcase.Serializer.class)
 @JsonDeserialize(using = Showcase.Deserializer.class)
@@ -1175,7 +1179,11 @@ public final class Showcase {
      */
     private final Kind kind;
     /**
-     * Integer const; always 1. Also exercises the single-`const` value override: `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the wire value stays `1`. TS/Python are inert here (no const override keyword — the value is emitted as a plain literal type).
+     * Integer const; always 1. Also exercises the single-`const` value override:
+     * `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived
+     * name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the
+     * wire value stays `1`. TS/Python are inert here (no const override keyword — the
+     * value is emitted as a plain literal type).
      */
     private final Revision revision;
     /**
@@ -1183,7 +1191,11 @@ public final class Showcase {
      */
     private final Enabled enabled;
     /**
-     * Closed string value set. Also exercises the enum value-constant override: `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`) while the wire value stays `active`. TS/Python are inert here (no enum override keyword).
+     * Closed string value set. Also exercises the enum value-constant override:
+     * `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted
+     * constant to the value name plus a per-language suffix (Go `ActiveGo`, Java
+     * `ACTIVE_JAVA`) while the wire value stays `active`. TS/Python are inert here (no
+     * enum override keyword).
      */
     private final Status status;
     /**
@@ -1191,11 +1203,13 @@ public final class Showcase {
      */
     private final Tier tier;
     /**
-     * Closed number value set (exercises the Python float exception: emitted as plain float, validated by membership).
+     * Closed number value set (exercises the Python float exception: emitted as plain
+     * float, validated by membership).
      */
     private final Scale scale;
     /**
      * Display name
+     *
      * Required human-readable name, 1 to 64 code points.
      */
     private final String name;
@@ -1212,31 +1226,41 @@ public final class Showcase {
      */
     private final @Nullable String nickname;
     /**
-     * Optional code, 2 to 5 code points. Counted in Unicode code points, so a multi-byte value (e.g. "a😀b", 3 code points / 6 UTF-8 bytes) is valid.
+     * Optional code, 2 to 5 code points. Counted in Unicode code points, so a
+     * multi-byte value (e.g. "a😀b", 3 code points / 6 UTF-8 bytes) is valid.
      */
     private final @Nullable String code;
     /**
-     * Optional product code: 2 to 4 uppercase ASCII letters, anchored (`^[A-Z]{2,4}$`). Exercises the RE2-safe `pattern` gate.
+     * Optional product code: 2 to 4 uppercase ASCII letters, anchored (`^[A-Z]{2,4}$`).
+     * Exercises the RE2-safe `pattern` gate.
      */
     private final @Nullable String sku;
     /**
-     * Optional two-word phrase separated by whitespace (`^\S+\s\S+$`). Exercises the loader's `\s`/`\S` → ASCII-class normalization and the per-target `$` end-anchor rewrite (Python `\Z` / Java `\z`), so a Unicode space (NBSP) and a trailing newline are rejected consistently across all four languages.
+     * Optional two-word phrase separated by whitespace (`^\S+\s\S+$`). Exercises the
+     * loader's `\s`/`\S` → ASCII-class normalization and the per-target `$` end-anchor
+     * rewrite (Python `\Z` / Java `\z`), so a Unicode space (NBSP) and a trailing
+     * newline are rejected consistently across all four languages.
      */
     private final @Nullable String phrase;
     /**
-     * Optional request identifier; asserted RFC 4122 UUID via `format: uuid`. Stays `string`-typed (format assertion, no materialization); the pinned regex is validated identically across all four languages.
+     * Optional request identifier; asserted RFC 4122 UUID via `format: uuid`. Stays
+     * `string`-typed (format assertion, no materialization); the pinned regex is
+     * validated identically across all four languages.
      */
     private final @Nullable String requestId;
     /**
-     * Optional contact address; asserted ASCII dot-atom `format: email` (single `@`, >=2-label domain, total length <= 254, guard-before-regex).
+     * Optional contact address; asserted ASCII dot-atom `format: email` (single `@`,
+     * &gt;=2-label domain, total length &lt;= 254, guard-before-regex).
      */
     private final @Nullable String contactEmail;
     /**
-     * Optional host name; asserted RFC 1123 `format: hostname` (LDH labels, total length <= 253).
+     * Optional host name; asserted RFC 1123 `format: hostname` (LDH labels, total
+     * length &lt;= 253).
      */
     private final @Nullable String host;
     /**
-     * Optional homepage; asserted RFC 3986 `format: uri` (scheme required, ASCII only; an IP-literal host is validated by the spliced ipv6 grammar).
+     * Optional homepage; asserted RFC 3986 `format: uri` (scheme required, ASCII only;
+     * an IP-literal host is validated by the spliced ipv6 grammar).
      */
     private final @Nullable String homepage;
     /**
@@ -1244,31 +1268,45 @@ public final class Showcase {
      */
     private final @Nullable String gateway;
     /**
-     * Optional binary payload carried as a `contentEncoding: base64` string, materialized to native bytes (Go []byte, TS Uint8Array, Python bytes, Java byte[]). The wire is canonical padded standard base64; a malformed value is rejected by the pinned regex before decode.
+     * Optional binary payload carried as a `contentEncoding: base64` string,
+     * materialized to native bytes (Go []byte, TS Uint8Array, Python bytes, Java
+     * byte[]). The wire is canonical padded standard base64; a malformed value is
+     * rejected by the pinned regex before decode.
      */
     private final byte @Nullable [] blob;
     /**
-     * Optional binary payload carried as a `contentEncoding: base64url` string (URL-safe alphabet, unpadded, RFC 4648 §5), materialized to the same native bytes type. The same bytes encode to a different wire than base64 ("Pj4+" vs "Pj4-").
+     * Optional binary payload carried as a `contentEncoding: base64url` string
+     * (URL-safe alphabet, unpadded, RFC 4648 §5), materialized to the same native bytes
+     * type. The same bytes encode to a different wire than base64 ("Pj4+" vs "Pj4-").
      */
     private final byte @Nullable [] urlBlob;
     /**
      * Retry budget
+     *
      * Optional integer with a schema default.
      */
     private final @Nullable Long retries;
     private final @Nullable Boolean verbose;
     /**
      * Greeting
+     *
      * Optional string with a schema default, surfaced on read.
      */
     private final @Nullable String greeting;
     /**
      * Debug flag
+     *
      * Optional boolean with a schema default.
      */
     private final @Nullable Boolean debug;
     /**
-     * Deprecated legacy identifier; prefer `requestId`. Exercises the native deprecation marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702 @deprecated). Also exercises the property-level `x-<lang>-name` override (the Stage 4 escape hatch): the emitted member identifier is renamed to the derived name plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`, Java `legacyIdJava`) while the wire name stays `legacyId` (json tag / alias / @JsonProperty).
+     * Deprecated legacy identifier; prefer `requestId`. Exercises the native
+     * deprecation marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python
+     * PEP 702 @deprecated). Also exercises the property-level `x-&lt;lang&gt;-name`
+     * override (the Stage 4 escape hatch): the emitted member identifier is renamed to
+     * the derived name plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`,
+     * Python `legacy_id_py`, Java `legacyIdJava`) while the wire name stays `legacyId`
+     * (json tag / alias / @JsonProperty).
      */
     private final @Nullable String legacyIdJava;
     /**
@@ -1312,47 +1350,90 @@ public final class Showcase {
      */
     private final @Nullable List<String> roles;
     /**
-     * Disjoint-kind union (oneOf sum type): the wire value is either a string of at least 3 code points or an integer of at least 1, selected by its JSON token. Not a member of a discriminated union — the token itself is the selector. Each branch also carries its **own constraints**: once the token selects a branch, the value is held to everything that branch declares, in both directions, with the union's path on the violation.
+     * Disjoint-kind union (oneOf sum type): the wire value is either a string of at
+     * least 3 code points or an integer of at least 1, selected by its JSON token. Not
+     * a member of a discriminated union — the token itself is the selector. Each branch
+     * also carries its **own constraints**: once the token selects a branch, the value
+     * is held to everything that branch declares, in both directions, with the union's
+     * path on the violation.
      */
     private final @Nullable IdOrName idOrName;
     /**
-     * A union whose string branch is a **closed value set**: either one of two named modes or an unbounded non-negative integer. The branch narrows to its own admissible values (a Go/Java membership check, a TypeScript literal union, a Python `Literal`), so an unknown string is a Violation while any non-negative integer is accepted.
+     * A union whose string branch is a **closed value set**: either one of two named
+     * modes or an unbounded non-negative integer. The branch narrows to its own
+     * admissible values (a Go/Java membership check, a TypeScript literal union, a
+     * Python `Literal`), so an unknown string is a Violation while any non-negative
+     * integer is accepted.
      */
     private final @Nullable Mode mode;
     /**
-     * Mixed-kind union whose object branch is an inline free-form object: the wire value is either an arbitrary object (members carried verbatim) or a string, selected by its JSON token. The free-form object is the one object branch that needs no type name — TypeScript and Python carry it structurally, Go and Java wrap it as `<Union>Object`.
+     * Mixed-kind union whose object branch is an inline free-form object: the wire
+     * value is either an arbitrary object (members carried verbatim) or a string,
+     * selected by its JSON token. The free-form object is the one object branch that
+     * needs no type name — TypeScript and Python carry it structurally, Go and Java
+     * wrap it as `&lt;Union&gt;Object`.
      */
     private final @Nullable Payload payload;
     /**
-     * Mixed-kind union whose object branch is an inline *structured* object, written directly on the property rather than in `$defs`. It is the only object branch of this union, so it derives its name from the union it belongs to — `ShowcaseDetailObject` — and is emitted as an ordinary model: its members keep their own constraints and it stays open to unknown ones.
+     * Mixed-kind union whose object branch is an inline *structured* object, written
+     * directly on the property rather than in `$defs`. It is the only object branch of
+     * this union, so it derives its name from the union it belongs to —
+     * `ShowcaseDetailObject` — and is emitted as an ordinary model: its members keep
+     * their own constraints and it stays open to unknown ones.
      */
     private final @Nullable Detail detail;
     /**
-     * Tagged object union mixed with a scalar kind: the two selector layers compose — the JSON token picks object-vs-string, and, for an object, the shared required `kind` const picks Circle-vs-Square. Written inline on the property, so the union itself is named after its position (`ShowcaseShapeOrName` / nested `Showcase.ShapeOrName`), and it reuses the `Circle`/`Square` branches of `shape` — a branch type may belong to more than one union (Go gains a second marker method, Java a second implemented interface). The scalar branch carries a length bound of its own; the object branches validate through their own models.
+     * Tagged object union mixed with a scalar kind: the two selector layers compose —
+     * the JSON token picks object-vs-string, and, for an object, the shared required
+     * `kind` const picks Circle-vs-Square. Written inline on the property, so the union
+     * itself is named after its position (`ShowcaseShapeOrName` / nested
+     * `Showcase.ShapeOrName`), and it reuses the `Circle`/`Square` branches of `shape`
+     * — a branch type may belong to more than one union (Go gains a second marker
+     * method, Java a second implemented interface). The scalar branch carries a length
+     * bound of its own; the object branches validate through their own models.
      */
     private final @Nullable ShapeOrName shapeOrName;
     /**
-     * Mixed-kind union with an array branch: the wire value is either a non-empty list of distinct numbers or a lowercase preset name, selected by its JSON token. An array branch has no definition to take a name from, so Go and Java emit it as the synthesized `<Union>Array` variant (a defined type / a `@JsonValue` wrapper) while TypeScript and Python carry it structurally as `number[]` / `list[float]`. Both branches carry their own constraints — the array's `minItems`/`uniqueItems` and the string's `pattern` — so the array-vs-string choice is validated as well as selected.
+     * Mixed-kind union with an array branch: the wire value is either a non-empty list
+     * of distinct numbers or a lowercase preset name, selected by its JSON token. An
+     * array branch has no definition to take a name from, so Go and Java emit it as the
+     * synthesized `&lt;Union&gt;Array` variant (a defined type / a `@JsonValue`
+     * wrapper) while TypeScript and Python carry it structurally as `number[]` /
+     * `list[float]`. Both branches carry their own constraints — the array's
+     * `minItems`/`uniqueItems` and the string's `pattern` — so the array-vs-string
+     * choice is validated as well as selected.
      */
     private final @Nullable Measurements measurements;
     /**
-     * A list whose element type is a named union: every element is routed to exactly one branch by the union's own selector, and its index carries into the violation path (`shapes[1]`). Go and Java cannot decode a sealed interface as a whole, so the element decodes through the union's dispatcher one at a time.
+     * A list whose element type is a named union: every element is routed to exactly
+     * one branch by the union's own selector, and its index carries into the violation
+     * path (`shapes[1]`). Go and Java cannot decode a sealed interface as a whole, so
+     * the element decodes through the union's dispatcher one at a time.
      */
     private final @Nullable List<Shape> shapes;
     /**
-     * A list whose element union is written **inline**. An element has no name of its own, so the union is named after its position — `ShowcaseSegmentsItem` — moved into `$defs`, and the element becomes a `$ref` at it; from there it is an ordinary named union in every language.
+     * A list whose element union is written **inline**. An element has no name of its
+     * own, so the union is named after its position — `ShowcaseSegmentsItem` — moved
+     * into `$defs`, and the element becomes a `$ref` at it; from there it is an
+     * ordinary named union in every language.
      */
     private final @Nullable List<ShowcaseSegmentsItem> segments;
     /**
-     * A list of **nullable, constrained scalar elements** — the two-branch nullability `oneOf` rather than a sum type, so nothing is named: the elements themselves become nullable (`[]*string`, `(string | null)[]`, `list[str | None]`, `List<@Nullable String>`) while each present string retains its own minimum length and the list stays a list.
+     * A list of **nullable, constrained scalar elements** — the two-branch nullability
+     * `oneOf` rather than a sum type, so nothing is named: the elements themselves
+     * become nullable (`[]*string`, `(string | null)[]`, `list[str | None]`,
+     * `List&lt;@Nullable String&gt;`) while each present string retains its own minimum
+     * length and the list stays a list.
      */
     private final @Nullable List<@Nullable String> slots;
     /**
-     * A nested array: `items` at depth two. Each level decodes elementwise, so a bad element is reported at its own two-dimensional index (`grid[1][0]`).
+     * A nested array: `items` at depth two. Each level decodes elementwise, so a bad
+     * element is reported at its own two-dimensional index (`grid[1][0]`).
      */
     private final @Nullable List<List<Long>> grid;
     /**
-     * A nested array of numbers used to prove recursive finite-number validation and two-dimensional indexed aggregation.
+     * A nested array of numbers used to prove recursive finite-number validation and
+     * two-dimensional indexed aggregation.
      */
     private final @Nullable List<List<Double>> numberGrid;
     /**
@@ -1380,16 +1461,21 @@ public final class Showcase {
      */
     private final @Nullable MetricOrLabel metricOrLabel;
     /**
-     * A union whose array branch contains referenced models, proving that branch conversion uses the ordinary recursive array mapper.
+     * A union whose array branch contains referenced models, proving that branch
+     * conversion uses the ordinary recursive array mapper.
      */
     private final @Nullable AddressListOrLabel addressListOrLabel;
     private final @Nullable ShowcaseLocation location;
     /**
-     * A nullable inline object. The nullability wrapper emits no type of its own, so the object inside it takes the property's name — `ShowcaseAudit`, the same name it would take written plainly: adding or removing nullability never renames the type.
+     * A nullable inline object. The nullability wrapper emits no type of its own, so
+     * the object inside it takes the property's name — `ShowcaseAudit`, the same name
+     * it would take written plainly: adding or removing nullability never renames the
+     * type.
      */
     private final @Nullable ShowcaseAudit audit;
     /**
-     * A list whose element is an inline object, named after its position (`ShowcaseRowsItem`) exactly as an inline element *union* is.
+     * A list whose element is an inline object, named after its position
+     * (`ShowcaseRowsItem`) exactly as an inline element *union* is.
      */
     private final @Nullable List<ShowcaseRowsItem> rows;
     private final @Nullable ShowcaseLedger ledgerJava;
@@ -2079,7 +2165,7 @@ public final class Showcase {
             if (value.roles != null) {
                 int matchCount = 0;
                 for (String element : value.roles) {
-                    if ("admin".equals(element)) {
+                    if (true && ("admin".equals(element))) {
                         matchCount++;
                     }
                 }
@@ -2118,6 +2204,16 @@ public final class Showcase {
                                     violations.add(new Violation("numberGrid" + "[" + finiteIndex0 + "]" + "[" + finiteIndex1 + "]", "must be a finite number, got " + finiteValue1));
                                 }
                             }
+                        }
+                    }
+                }
+            }
+            if (value.links != null) {
+                for (int validationIndex0 = 0; validationIndex0 < value.links.size(); validationIndex0++) {
+                    String validationValue0 = value.links.get(validationIndex0);
+                    if (validationValue0 != null) {
+                        if (!java.util.regex.Pattern.compile("^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z").matcher(validationValue0).find()) {
+                            violations.add(new Violation("links" + "[" + validationIndex0 + "]", "must be a valid uri, got " + validationValue0));
                         }
                     }
                 }
@@ -3054,7 +3150,8 @@ public final class Showcase {
                             if (!element.isTextual()) {
                                 violations.add(new Violation(elementPath, "expected string"));
                             } else {
-                                items.add(element.textValue());
+                                String parsed = element.textValue();
+                                items.add(parsed);
                             }
                         }
                         tags = items;
@@ -3084,7 +3181,8 @@ public final class Showcase {
                             if (!element.isTextual()) {
                                 violations.add(new Violation(elementPath, "expected string"));
                             } else {
-                                items.add(element.textValue());
+                                String parsed = element.textValue();
+                                items.add(parsed);
                             }
                         }
                         aliases = items;
@@ -3118,7 +3216,8 @@ public final class Showcase {
                             if (!element.isTextual()) {
                                 violations.add(new Violation(elementPath, "expected string"));
                             } else {
-                                items.add(element.textValue());
+                                String parsed = element.textValue();
+                                items.add(parsed);
                             }
                         }
                         roles = items;
@@ -3264,7 +3363,8 @@ public final class Showcase {
                             if (!element.isTextual()) {
                                 violations.add(new Violation(elementPath, "expected string"));
                             } else {
-                                items.add(element.textValue());
+                                String parsed = element.textValue();
+                                items.add(parsed);
                             }
                         }
                         slots = items;
@@ -3354,7 +3454,11 @@ public final class Showcase {
                             if (!element.isTextual()) {
                                 violations.add(new Violation(elementPath, "expected string"));
                             } else {
-                                items.add(element.textValue());
+                                String parsed = element.textValue();
+                                if (!java.util.regex.Pattern.compile("^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z").matcher(parsed).find()) {
+                                    violations.add(new Violation(elementPath, "must be a valid uri, got " + parsed));
+                                }
+                                items.add(parsed);
                             }
                         }
                         links = items;

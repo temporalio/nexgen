@@ -103,6 +103,31 @@ public final class Room {
     public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Room> {
         @Override
         public void serialize(Room value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            List<Violation> violations = new ArrayList<>();
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.roomId != null) {
+                wireKeys.add("roomId");
+            }
+            if (value.displayName != null) {
+                wireKeys.add("displayName");
+            }
+            wireKeys.add("topic");
+            if (value.members != null) {
+                wireKeys.add("members");
+            }
+            if (value.labels != null) {
+                wireKeys.add("labels");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
+            if (!violations.isEmpty()) {
+                throw new ValidationException(violations);
+            }
             gen.writeStartObject();
             if (value.roomId != null) {
                 gen.writeStringField("roomId", value.roomId);
@@ -218,7 +243,8 @@ public final class Room {
                             if (!element.isTextual()) {
                                 violations.add(new Violation(elementPath, "expected string"));
                             } else {
-                                items.add(element.textValue());
+                                String parsed = element.textValue();
+                                items.add(parsed);
                             }
                         }
                         members = items;

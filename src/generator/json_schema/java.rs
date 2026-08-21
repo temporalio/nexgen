@@ -293,6 +293,99 @@ fn java_type_needs_calendar_year_check(ty: &JavaType) -> bool {
     }
 }
 
+fn schema_has_recursive_value_checks(schema: &Schema) -> bool {
+    schema.const_value.is_some()
+        || schema.enum_values.is_some()
+        || !NumericConstraints::from_schema(schema).is_empty()
+        || !StringLengthConstraints::from_schema(schema).is_empty()
+        || !ArrayConstraints::from_schema(schema).is_empty()
+        || schema
+            .items
+            .as_deref()
+            .is_some_and(schema_has_recursive_value_checks)
+}
+
+fn render_java_recursive_value_checks(
+    output: &mut String,
+    value_expr: &str,
+    path_expr: &str,
+    schema: &Schema,
+    ty: &JavaType,
+    indent: &str,
+    depth: usize,
+) {
+    match ty {
+        JavaType::String => {
+            render_java_inline_string_checks(output, value_expr, path_expr, schema, indent);
+        }
+        JavaType::Long | JavaType::Double => {
+            render_java_numeric_checks(
+                output,
+                value_expr,
+                path_expr,
+                &NumericConstraints::from_schema(schema),
+                matches!(ty, JavaType::Long),
+                indent,
+            );
+            render_java_closed_scalar_checks(output, value_expr, path_expr, schema, ty, indent);
+        }
+        JavaType::Boolean => {
+            render_java_closed_scalar_checks(output, value_expr, path_expr, schema, ty, indent);
+        }
+        JavaType::Temporal(kind) => {
+            let wire = format!("nestedWire{depth}");
+            let expression = java_temporal_format_fn(*kind)
+                .map(|format_fn| format!("TemporalSupport.{format_fn}({value_expr})"))
+                .unwrap_or_else(|| value_expr.to_string());
+            output.push_str(&format!("{indent}String {wire} = {expression};\n"));
+            render_java_inline_string_checks(output, &wire, path_expr, schema, indent);
+        }
+        JavaType::Bytes(encoding) => {
+            let wire = format!("nestedWire{depth}");
+            output.push_str(&format!(
+                "{indent}String {wire} = Base64Support.{}({value_expr});\n",
+                java_content_encoding_format_fn(*encoding)
+            ));
+            render_java_inline_string_checks(output, &wire, path_expr, schema, indent);
+        }
+        JavaType::List(element_ty) => {
+            let constraints = ArrayConstraints::from_schema(schema);
+            if !constraints.is_empty() {
+                render_java_array_checks(
+                    output,
+                    value_expr,
+                    path_expr,
+                    element_ty,
+                    &constraints,
+                    indent,
+                );
+            }
+            if let Some(item_schema) = schema.items.as_deref()
+                && schema_has_recursive_value_checks(item_schema)
+            {
+                let index = format!("validationIndex{depth}");
+                let item = format!("validationValue{depth}");
+                let item_path = format!("{path_expr} + \"[\" + {index} + \"]\"");
+                output.push_str(&format!(
+                    "{indent}for (int {index} = 0; {index} < {value_expr}.size(); {index}++) {{\n{indent}    {} {item} = {value_expr}.get({index});\n{indent}    if ({item} != null) {{\n",
+                    element_ty.boxed_name()
+                ));
+                render_java_recursive_value_checks(
+                    output,
+                    &item,
+                    &item_path,
+                    item_schema,
+                    element_ty,
+                    &format!("{indent}        "),
+                    depth + 1,
+                );
+                output.push_str(&format!("{indent}    }}\n{indent}}}\n"));
+            }
+        }
+        JavaType::Ref { .. } | JavaType::Union { .. } | JavaType::ClosedValue { .. } => {}
+    }
+}
+
 /// Emits the serialize-side finiteness predicate for every `number` reachable
 /// through `ty`. Arrays recurse elementwise and extend the violation path at
 /// each level, so nested failures surface as `field[1][2]`.
@@ -439,6 +532,57 @@ fn render_java_string_checks(
     }
 }
 
+/// String checks for recursively nested positions that do not have a stable
+/// class member name on which to hang a compiled static pattern.
+fn render_java_inline_string_checks(
+    output: &mut String,
+    value_expr: &str,
+    path_expr: &str,
+    schema: &Schema,
+    indent: &str,
+) {
+    let constraints = StringLengthConstraints::from_schema(schema);
+    if constraints.has_length() {
+        output.push_str(&format!(
+            "{indent}int nestedLength = {value_expr}.codePointCount(0, {value_expr}.length());\n"
+        ));
+        if let Some(min) = constraints.min_length {
+            output.push_str(&format!(
+                "{indent}if (nestedLength < {min}) {{\n{indent}    violations.add(new Violation({path_expr}, \"must have length >= {min}, got \" + nestedLength));\n{indent}}}\n"
+            ));
+        }
+        if let Some(max) = constraints.max_length {
+            output.push_str(&format!(
+                "{indent}if (nestedLength > {max}) {{\n{indent}    violations.add(new Violation({path_expr}, \"must have length <= {max}, got \" + nestedLength));\n{indent}}}\n"
+            ));
+        }
+    }
+    if let Some(pattern) = constraints.pattern {
+        output.push_str(&format!(
+            "{indent}if (!java.util.regex.Pattern.compile({}).matcher({value_expr}).find()) {{\n{indent}    violations.add(new Violation({path_expr}, \"must match pattern \" + {} + \", got \" + {value_expr}));\n{indent}}}\n",
+            java_string_literal(&pattern),
+            java_string_literal(&pattern),
+        ));
+    }
+    if let Some(format) = constraints.format {
+        let mut condition = String::new();
+        if let Some(max) = format.max_code_points {
+            condition.push_str(&format!(
+                "{value_expr}.codePointCount(0, {value_expr}.length()) > {max} || "
+            ));
+        }
+        condition.push_str(&format!(
+            "!java.util.regex.Pattern.compile({}).matcher({value_expr}).find()",
+            java_string_literal(&format.pattern)
+        ));
+        output.push_str(&format!(
+            "{indent}if ({condition}) {{\n{indent}    violations.add(new Violation({path_expr}, \"must be a valid {}, got \" + {value_expr}));\n{indent}}}\n",
+            format.name
+        ));
+    }
+    render_java_closed_string_checks(output, value_expr, path_expr, schema, indent);
+}
+
 /// The static `Pattern` field name for a `pattern` on the Java field
 /// `java_name` — unique per class, compiled once at class init.
 fn java_pattern_field_name(java_name: &str) -> String {
@@ -484,7 +628,9 @@ fn render_java_property_name_checks(
     subschema: &Schema,
     indent: &str,
 ) {
-    if subschema.min_length.is_none() && subschema.max_length.is_none() {
+    let constraints = StringLengthConstraints::from_schema(subschema);
+    if constraints.is_empty() && subschema.const_value.is_none() && subschema.enum_values.is_none()
+    {
         return;
     }
     output.push_str(&format!(
@@ -493,19 +639,39 @@ fn render_java_property_name_checks(
     output.push_str(&format!(
         "{indent}    String pnKey = propertyNameKeys.next();\n"
     ));
-    output.push_str(&format!(
-        "{indent}    int pnLength = pnKey.codePointCount(0, pnKey.length());\n"
-    ));
-    if let Some(min) = subschema.min_length {
+    if constraints.has_length() {
         output.push_str(&format!(
-            "{indent}    if (pnLength < {min}) {{\n{indent}        violations.add(new Violation(pnKey, \"invalid property name \\\"\" + pnKey + \"\\\": must have length >= {min}, got \" + pnLength));\n{indent}    }}\n"
+            "{indent}    int pnLength = pnKey.codePointCount(0, pnKey.length());\n"
         ));
+        if let Some(min) = constraints.min_length {
+            output.push_str(&format!(
+                "{indent}    if (pnLength < {min}) {{\n{indent}        violations.add(new Violation(pnKey, \"invalid property name \\\"\" + pnKey + \"\\\": must have length >= {min}, got \" + pnLength));\n{indent}    }}\n"
+            ));
+        }
+        if let Some(max) = constraints.max_length {
+            output.push_str(&format!(
+                "{indent}    if (pnLength > {max}) {{\n{indent}        violations.add(new Violation(pnKey, \"invalid property name \\\"\" + pnKey + \"\\\": must have length <= {max}, got \" + pnLength));\n{indent}    }}\n"
+            ));
+        }
     }
-    if let Some(max) = subschema.max_length {
-        output.push_str(&format!(
-            "{indent}    if (pnLength > {max}) {{\n{indent}        violations.add(new Violation(pnKey, \"invalid property name \\\"\" + pnKey + \"\\\": must have length <= {max}, got \" + pnLength));\n{indent}    }}\n"
-        ));
-    }
+    let mut non_length = constraints.clone();
+    non_length.min_length = None;
+    non_length.max_length = None;
+    render_java_string_checks(
+        output,
+        "pnKey",
+        "pnKey",
+        PROPERTY_NAME_POSITION,
+        &non_length,
+        &format!("{indent}    "),
+    );
+    render_java_closed_string_checks(
+        output,
+        "pnKey",
+        "pnKey",
+        subschema,
+        &format!("{indent}    "),
+    );
     output.push_str(&format!("{indent}}}\n"));
 }
 
@@ -612,10 +778,59 @@ fn java_matcher_condition(matcher: &Schema, elem: &str, element_ty: &JavaType) -
             "{elem}.codePointCount(0, {elem}.length()) <= {max}"
         ));
     }
+    if let Some(pattern) = &matcher.pattern {
+        let pattern = crate::json_schema::pattern::rewrite_end_anchor(pattern, r"\z");
+        parts.push(format!(
+            "java.util.regex.Pattern.compile({}).matcher({elem}).find()",
+            java_string_literal(&pattern)
+        ));
+    }
+    if let Some(format) = matcher
+        .format
+        .as_deref()
+        .and_then(crate::json_schema::format::check_for)
+    {
+        let pattern = crate::json_schema::pattern::rewrite_end_anchor(&format.pattern, r"\z");
+        if let Some(max) = format.max_code_points {
+            parts.push(format!(
+                "{elem}.codePointCount(0, {elem}.length()) <= {max}"
+            ));
+        }
+        parts.push(format!(
+            "java.util.regex.Pattern.compile({}).matcher({elem}).find()",
+            java_string_literal(&pattern)
+        ));
+    }
     if parts.is_empty() {
         "true".to_string()
     } else {
         parts.join(" && ")
+    }
+}
+
+fn matcher_kind<'a>(matcher: &'a Schema, fallback: &'a JavaType) -> &'a str {
+    matcher
+        .ty
+        .as_ref()
+        .and_then(Value::as_str)
+        .unwrap_or(match fallback {
+            JavaType::String => "string",
+            JavaType::Boolean => "boolean",
+            JavaType::Long => "integer",
+            JavaType::Double => "number",
+            _ => "unsupported",
+        })
+}
+
+fn java_typed_matcher_guard(matcher: &Schema, elem: &str, element_ty: &JavaType) -> String {
+    match (matcher_kind(matcher, element_ty), element_ty) {
+        ("string", JavaType::String) | ("boolean", JavaType::Boolean) => "true".to_string(),
+        ("integer", JavaType::Long) | ("number", JavaType::Long) => "true".to_string(),
+        ("number", JavaType::Double) => format!("Double.isFinite({elem})"),
+        ("integer", JavaType::Double) => format!(
+            "Double.isFinite({elem}) && {elem} == Math.rint({elem}) && {elem} >= -(double) SpecNumbers.INTEGER_CAP && {elem} <= (double) SpecNumbers.INTEGER_CAP"
+        ),
+        _ => "false".to_string(),
     }
 }
 
@@ -665,10 +880,11 @@ fn render_java_array_checks(
     if let Some(matcher) = &constraints.contains {
         let boxed = element_ty.boxed_name();
         let condition = java_matcher_condition(matcher, "element", element_ty);
+        let guard = java_typed_matcher_guard(matcher, "element", element_ty);
         let effective_min = constraints.min_contains.unwrap_or(1);
         output.push_str(&format!("{indent}int matchCount = 0;\n"));
         output.push_str(&format!("{indent}for ({boxed} element : {list}) {{\n"));
-        output.push_str(&format!("{indent}    if ({condition}) {{\n"));
+        output.push_str(&format!("{indent}    if ({guard} && ({condition})) {{\n"));
         output.push_str(&format!("{indent}        matchCount++;\n"));
         output.push_str(&format!("{indent}    }}\n"));
         output.push_str(&format!("{indent}}}\n"));
@@ -723,26 +939,31 @@ fn render_java_raw_array_checks(
         ));
     }
     if let Some(matcher) = &constraints.contains {
-        let (guard, value) = match element_ty {
-            JavaType::String => (
+        let kind = matcher_kind(matcher, element_ty);
+        let (guard, value, evaluation_ty) = match kind {
+            "string" => (
                 "rawElement.isTextual()".to_string(),
                 "rawElement.textValue()",
+                JavaType::String,
             ),
-            JavaType::Boolean => (
+            "boolean" => (
                 "rawElement.isBoolean()".to_string(),
                 "rawElement.booleanValue()",
+                JavaType::Boolean,
             ),
-            JavaType::Long => (
+            "integer" => (
                 "SpecNumbers.isSpecLong(rawElement)".to_string(),
-                "rawElement.longValue()",
+                "rawElement.doubleValue()",
+                JavaType::Double,
             ),
-            JavaType::Double => (
+            "number" => (
                 "rawElement.isNumber() && Double.isFinite(rawElement.doubleValue())".to_string(),
                 "rawElement.doubleValue()",
+                JavaType::Double,
             ),
-            _ => ("false".to_string(), "rawElement"),
+            _ => ("false".to_string(), "rawElement", element_ty.clone()),
         };
-        let condition = java_matcher_condition(matcher, value, element_ty);
+        let condition = java_matcher_condition(matcher, value, &evaluation_ty);
         let effective_min = constraints.min_contains.unwrap_or(1);
         output.push_str(&format!(
             "{indent}int rawMatchCount = 0;\n{indent}for (JsonNode rawElement : {node}) {{\n{indent}    if ({guard} && ({condition})) {{\n{indent}        rawMatchCount++;\n{indent}    }}\n{indent}}}\n"
@@ -1486,11 +1707,20 @@ enum ModelKind {
     Object {
         open: bool,
         fields: Vec<FieldPlan>,
+        typed_additional: Option<TypedAdditionalPlan>,
     },
     TypedMap {
         value: JavaType,
         max_properties: Option<usize>,
     },
+}
+
+#[derive(Debug, Clone)]
+struct TypedAdditionalPlan {
+    ty: JavaType,
+    schema: Schema,
+    nullable: bool,
+    union: Option<JavaUnion>,
 }
 
 /// Resolves the emitted Java identifier for every planned model through the
@@ -1644,6 +1874,26 @@ fn resolve_model_kind(
     }
 
     let open = schema.additional_properties.as_ref() != Some(&Value::Bool(false));
+    let typed_additional =
+        match &schema.additional_properties {
+            Some(Value::Object(value)) => {
+                let authored: Schema = serde_json::from_value(Value::Object(value.clone()))
+                    .map_err(|error| Error::InvalidJsonSchema {
+                        path: PathBuf::from("<json-generator>"),
+                        reason: format!("failed to read `additionalProperties`: {error}"),
+                    })?;
+                let schema = nullable_non_null_schema(&authored)
+                    .cloned()
+                    .unwrap_or_else(|| authored.clone());
+                Some(TypedAdditionalPlan {
+                    ty: java_type_for(&schema, context)?,
+                    union: ref_union(&schema, all_models, context),
+                    nullable: allows_null(&authored),
+                    schema,
+                })
+            }
+            _ => None,
+        };
     let mut fields = Vec::new();
     let required: BTreeSet<String> = schema.required.iter().flatten().cloned().collect();
     if let Some(properties) = &schema.properties {
@@ -1677,13 +1927,17 @@ fn resolve_model_kind(
                 // underlying scalar (P13.1). The class name follows the member
                 // (`x-java-name` moves it, per the properties resolved policy).
                 let wire = java_type_for(property, context)?;
-                (
-                    JavaType::ClosedValue {
-                        class: upper_first(&java_name),
-                        wire: Box::new(wire),
-                    },
-                    None,
-                )
+                if matches!(wire, JavaType::Temporal(_) | JavaType::Bytes(_)) {
+                    (wire, None)
+                } else {
+                    (
+                        JavaType::ClosedValue {
+                            class: upper_first(&java_name),
+                            wire: Box::new(wire),
+                        },
+                        None,
+                    )
+                }
             } else {
                 (java_type_for(property, context)?, None)
             };
@@ -1715,7 +1969,11 @@ fn resolve_model_kind(
             });
         }
     }
-    Ok(ModelKind::Object { open, fields })
+    Ok(ModelKind::Object {
+        open,
+        fields,
+        typed_additional,
+    })
 }
 
 /// Renders the full `.java` source for a single JSON model class.
@@ -1830,13 +2088,18 @@ pub(in crate::generator) fn render_model_file(
     implements.dedup();
 
     match &kind {
-        ModelKind::Object { open, fields } => {
+        ModelKind::Object {
+            open,
+            fields,
+            typed_additional,
+        } => {
             render_object_class(
                 &mut body,
                 class,
                 &schema,
                 *open,
                 fields,
+                typed_additional.as_ref(),
                 &implements,
                 &mut refs,
             );
@@ -2186,7 +2449,15 @@ fn java_variant_checks(
 ) -> Option<String> {
     let ty = variant.underlying.as_ref()?;
     let mut body = String::new();
-    render_java_member_checks(&mut body, "value", path_expr, &variant.schema, ty, indent);
+    render_java_member_checks(
+        &mut body,
+        "value",
+        path_expr,
+        &variant.schema,
+        ty,
+        "value",
+        indent,
+    );
     (!body.is_empty()).then_some(body)
 }
 
@@ -2480,11 +2751,15 @@ fn render_object_class(
     schema: &Schema,
     open: bool,
     fields: &[FieldPlan],
+    typed_additional: Option<&TypedAdditionalPlan>,
     implements: &[String],
     refs: &mut BTreeSet<(String, String)>,
 ) {
     for field in fields {
         field.ty.collect_refs(refs);
+    }
+    if let Some(additional) = typed_additional {
+        additional.ty.collect_refs(refs);
     }
 
     render_java_schema_doc(
@@ -2512,7 +2787,6 @@ fn render_object_class(
             render_nested_union(output, union);
         }
     }
-
     // Closed value-set (const/enum) nested value classes.
     for field in fields {
         if let JavaType::ClosedValue { class, wire } = &field.ty {
@@ -2526,10 +2800,38 @@ fn render_object_class(
             );
         }
     }
+    let mut wrote_pattern = false;
+    for (position, candidate) in [
+        (
+            ADDITIONAL_PROPERTIES_POSITION,
+            typed_additional.map(|additional| &additional.schema),
+        ),
+        (PROPERTY_NAME_POSITION, schema.property_names.as_deref()),
+    ] {
+        let Some(candidate) = candidate else {
+            continue;
+        };
+        let constraints = StringLengthConstraints::from_schema(candidate);
+        if let Some(pattern) = &constraints.pattern {
+            output.push_str(&format!(
+                "    private static final java.util.regex.Pattern {} = java.util.regex.Pattern.compile({});\n",
+                java_pattern_field_name(position),
+                java_string_literal(pattern),
+            ));
+            wrote_pattern = true;
+        }
+        if let Some(format) = &constraints.format {
+            output.push_str(&format!(
+                "    private static final java.util.regex.Pattern {} = java.util.regex.Pattern.compile({});\n",
+                java_format_field_name(position),
+                java_string_literal(&format.pattern),
+            ));
+            wrote_pattern = true;
+        }
+    }
 
     // Compiled `pattern` regexes (compiled once at class init; the load-time
     // gate already proved they compile). `find()` (unanchored) at each use site.
-    let mut wrote_pattern = false;
     for field in fields {
         if let Some(pattern) = &field.string_length.pattern {
             output.push_str(&format!(
@@ -2562,12 +2864,17 @@ fn render_object_class(
         output.push_str(";\n");
     }
     if open {
-        output.push_str("    private final Map<String, JsonNode> additionalProperties;\n");
+        let value_type = typed_additional
+            .map(|additional| element_declaration(&additional.ty, additional.nullable))
+            .unwrap_or_else(|| "JsonNode".to_string());
+        output.push_str(&format!(
+            "    private final Map<String, {value_type}> additionalProperties;\n"
+        ));
     }
     output.push('\n');
 
     // Constructor.
-    render_constructor(output, class, fields, open);
+    render_constructor(output, class, fields, open, typed_additional);
 
     // Getters.
     for field in fields {
@@ -2594,14 +2901,19 @@ fn render_object_class(
         // Default accessor for scalar defaults.
         if let Some(default) = &field.default {
             if !field.required {
-                if let Some(default_expr) = default_expr(&field.ty, default) {
-                    output.push_str(&format!(
-                        "    public {} get{}OrDefault() {{\n        return {} != null ? {} : {};\n    }}\n\n",
+                if let Some(default_expr) = default_expr(field, default) {
+                    let return_type = if default.is_null() {
+                        field.ty.boxed_name()
+                    } else {
                         field
                             .ty
                             .primitive_name()
                             .map(str::to_string)
-                            .unwrap_or_else(|| field.ty.boxed_name()),
+                            .unwrap_or_else(|| field.ty.boxed_name())
+                    };
+                    output.push_str(&format!(
+                        "    public {} get{}OrDefault() {{\n        return {} != null ? {} : {};\n    }}\n\n",
+                        return_type,
                         upper_first(&field.java_name),
                         field.java_name,
                         field.java_name,
@@ -2612,19 +2924,28 @@ fn render_object_class(
         }
     }
     if open {
-        output.push_str(
-            "    public Map<String, JsonNode> getAdditionalProperties() {\n        return additionalProperties;\n    }\n\n",
-        );
+        let value_type = typed_additional
+            .map(|additional| element_declaration(&additional.ty, additional.nullable))
+            .unwrap_or_else(|| "JsonNode".to_string());
+        output.push_str(&format!(
+            "    public Map<String, {value_type}> getAdditionalProperties() {{\n        return additionalProperties;\n    }}\n\n"
+        ));
     }
 
     render_equals_hashcode_tostring(output, class, fields, open);
-    render_object_serializer(output, class, schema, fields, open);
-    render_object_deserializer(output, class, schema, open, fields);
+    render_object_serializer(output, class, schema, fields, open, typed_additional);
+    render_object_deserializer(output, class, schema, open, fields, typed_additional);
 
     output.push_str("}\n");
 }
 
-fn render_constructor(output: &mut String, class: &str, fields: &[FieldPlan], open: bool) {
+fn render_constructor(
+    output: &mut String,
+    class: &str,
+    fields: &[FieldPlan],
+    open: bool,
+    typed_additional: Option<&TypedAdditionalPlan>,
+) {
     output.push_str("    public ");
     output.push_str(class);
     output.push('(');
@@ -2634,7 +2955,10 @@ fn render_constructor(output: &mut String, class: &str, fields: &[FieldPlan], op
         params.push(format!("{param_type} {}", field.java_name));
     }
     if open {
-        params.push("Map<String, JsonNode> additionalProperties".to_string());
+        let value_type = typed_additional
+            .map(|additional| element_declaration(&additional.ty, additional.nullable))
+            .unwrap_or_else(|| "JsonNode".to_string());
+        params.push(format!("Map<String, {value_type}> additionalProperties"));
     }
     output.push_str(&params.join(", "));
     output.push_str(") {\n");
@@ -2735,8 +3059,23 @@ fn field_has_serialize_check(field: &FieldPlan) -> bool {
     if java_type_needs_calendar_year_check(&field.ty) {
         return true;
     }
+    if !field.closed_values.is_empty()
+        && matches!(field.ty, JavaType::Temporal(_) | JavaType::Bytes(_))
+    {
+        return true;
+    }
+    if matches!(field.ty, JavaType::List(_))
+        && field
+            .schema
+            .items
+            .as_deref()
+            .is_some_and(schema_has_recursive_value_checks)
+    {
+        return true;
+    }
     match &field.ty {
         JavaType::String => !field.string_length.is_empty(),
+        JavaType::Temporal(_) | JavaType::Bytes(_) => !field.string_length.is_empty(),
         JavaType::Long | JavaType::Double => !field.numeric.is_empty(),
         JavaType::List(_) => !field.array.is_empty(),
         _ => false,
@@ -2746,10 +3085,12 @@ fn field_has_serialize_check(field: &FieldPlan) -> bool {
 /// True when an object POJO's `Serializer` must run collecting validation before
 /// writing: any constrained field, or an object-level count/dependency
 /// constraint.
-fn object_needs_serialize_validation(schema: &Schema, fields: &[FieldPlan]) -> bool {
+fn object_needs_serialize_validation(schema: &Schema, fields: &[FieldPlan], open: bool) -> bool {
     schema.min_properties.is_some()
         || schema.max_properties.is_some()
         || schema.dependent_required.is_some()
+        || schema.property_names.is_some()
+        || open
         || fields.iter().any(field_has_serialize_check)
 }
 
@@ -2792,14 +3133,75 @@ fn render_java_serialize_field_check(output: &mut String, field: &FieldPlan, ind
                 false,
                 &inner,
             ),
-            JavaType::List(element_ty) if !field.array.is_empty() => render_java_array_checks(
-                &mut body,
-                &accessor,
-                &json,
-                element_ty,
-                &field.array,
-                &inner,
-            ),
+            JavaType::List(element_ty) => {
+                if !field.array.is_empty() {
+                    render_java_array_checks(
+                        &mut body,
+                        &accessor,
+                        &json,
+                        element_ty,
+                        &field.array,
+                        &inner,
+                    );
+                }
+                if let Some(item_schema) = field.schema.items.as_deref()
+                    && schema_has_recursive_value_checks(item_schema)
+                {
+                    let index = "validationIndex0";
+                    let item = "validationValue0";
+                    let item_path = format!("{json} + \"[\" + {index} + \"]\"");
+                    body.push_str(&format!(
+                        "{inner}for (int {index} = 0; {index} < {accessor}.size(); {index}++) {{\n{inner}    {} {item} = {accessor}.get({index});\n{inner}    if ({item} != null) {{\n",
+                        element_ty.boxed_name()
+                    ));
+                    render_java_recursive_value_checks(
+                        &mut body,
+                        item,
+                        &item_path,
+                        item_schema,
+                        element_ty,
+                        &format!("{inner}        "),
+                        1,
+                    );
+                    body.push_str(&format!("{inner}    }}\n{inner}}}\n"));
+                }
+            }
+            JavaType::Temporal(kind)
+                if !field.string_length.is_empty() || !field.closed_values.is_empty() =>
+            {
+                let wire = format!("{}Wire", field.java_name);
+                let expression = java_temporal_format_fn(*kind)
+                    .map(|format_fn| format!("TemporalSupport.{format_fn}({accessor})"))
+                    .unwrap_or_else(|| accessor.clone());
+                body.push_str(&format!("{inner}String {wire} = {expression};\n"));
+                render_java_string_checks(
+                    &mut body,
+                    &wire,
+                    &json,
+                    &field.java_name,
+                    &field.string_length,
+                    &inner,
+                );
+                render_java_closed_string_checks(&mut body, &wire, &json, &field.schema, &inner);
+            }
+            JavaType::Bytes(encoding)
+                if !field.string_length.is_empty() || !field.closed_values.is_empty() =>
+            {
+                let wire = format!("{}Wire", field.java_name);
+                let format_fn = java_content_encoding_format_fn(*encoding);
+                body.push_str(&format!(
+                    "{inner}String {wire} = Base64Support.{format_fn}({accessor});\n"
+                ));
+                render_java_string_checks(
+                    &mut body,
+                    &wire,
+                    &json,
+                    &field.java_name,
+                    &field.string_length,
+                    &inner,
+                );
+                render_java_closed_string_checks(&mut body, &wire, &json, &field.schema, &inner);
+            }
             _ => {}
         }
         // A union member is re-checked against the branch it holds before emit,
@@ -2930,24 +3332,101 @@ fn render_java_serialize_property_name_checks(
     subschema: &Schema,
     indent: &str,
 ) {
-    if subschema.min_length.is_none() && subschema.max_length.is_none() {
+    let constraints = StringLengthConstraints::from_schema(subschema);
+    if constraints.is_empty() && subschema.const_value.is_none() && subschema.enum_values.is_none()
+    {
         return;
     }
     output.push_str(&format!("{indent}for (String pnKey : {keys_expr}) {{\n"));
-    output.push_str(&format!(
-        "{indent}    int pnLength = pnKey.codePointCount(0, pnKey.length());\n"
-    ));
-    if let Some(min) = subschema.min_length {
+    if constraints.has_length() {
         output.push_str(&format!(
-            "{indent}    if (pnLength < {min}) {{\n{indent}        violations.add(new Violation(pnKey, \"invalid property name \\\"\" + pnKey + \"\\\": must have length >= {min}, got \" + pnLength));\n{indent}    }}\n"
+            "{indent}    int pnLength = pnKey.codePointCount(0, pnKey.length());\n"
         ));
+        if let Some(min) = constraints.min_length {
+            output.push_str(&format!(
+                "{indent}    if (pnLength < {min}) {{\n{indent}        violations.add(new Violation(pnKey, \"invalid property name \\\"\" + pnKey + \"\\\": must have length >= {min}, got \" + pnLength));\n{indent}    }}\n"
+            ));
+        }
+        if let Some(max) = constraints.max_length {
+            output.push_str(&format!(
+                "{indent}    if (pnLength > {max}) {{\n{indent}        violations.add(new Violation(pnKey, \"invalid property name \\\"\" + pnKey + \"\\\": must have length <= {max}, got \" + pnLength));\n{indent}    }}\n"
+            ));
+        }
     }
-    if let Some(max) = subschema.max_length {
-        output.push_str(&format!(
-            "{indent}    if (pnLength > {max}) {{\n{indent}        violations.add(new Violation(pnKey, \"invalid property name \\\"\" + pnKey + \"\\\": must have length <= {max}, got \" + pnLength));\n{indent}    }}\n"
-        ));
-    }
+    let mut non_length = constraints.clone();
+    non_length.min_length = None;
+    non_length.max_length = None;
+    render_java_string_checks(
+        output,
+        "pnKey",
+        "pnKey",
+        PROPERTY_NAME_POSITION,
+        &non_length,
+        &format!("{indent}    "),
+    );
+    render_java_closed_string_checks(
+        output,
+        "pnKey",
+        "pnKey",
+        subschema,
+        &format!("{indent}    "),
+    );
     output.push_str(&format!("{indent}}}\n"));
+}
+
+fn render_java_closed_string_checks(
+    output: &mut String,
+    value_expr: &str,
+    path_expr: &str,
+    schema: &Schema,
+    indent: &str,
+) {
+    render_java_closed_scalar_checks(
+        output,
+        value_expr,
+        path_expr,
+        schema,
+        &JavaType::String,
+        indent,
+    );
+}
+
+fn render_java_closed_scalar_checks(
+    output: &mut String,
+    value_expr: &str,
+    path_expr: &str,
+    schema: &Schema,
+    ty: &JavaType,
+    indent: &str,
+) {
+    let values = schema
+        .const_value
+        .as_ref()
+        .map(|value| vec![value.clone()])
+        .or_else(|| schema.enum_values.clone());
+    let Some(values) = values else {
+        return;
+    };
+    let condition = values
+        .iter()
+        .map(|value| format!("!({})", java_equals_term(value, value_expr, ty)))
+        .collect::<Vec<_>>()
+        .join(" && ");
+    let reason = if values.len() == 1 {
+        format!(
+            "must equal {}, got ",
+            serde_json::to_string(&values[0]).unwrap()
+        )
+    } else {
+        format!(
+            "must be one of [{}], got ",
+            java_closed_set_display(&values)
+        )
+    };
+    output.push_str(&format!(
+        "{indent}if ({condition}) {{\n{indent}    violations.add(new Violation({path_expr}, {} + {value_expr}));\n{indent}}}\n",
+        java_string_literal(&reason)
+    ));
 }
 
 fn render_object_serializer(
@@ -2956,6 +3435,7 @@ fn render_object_serializer(
     schema: &Schema,
     fields: &[FieldPlan],
     open: bool,
+    typed_additional: Option<&TypedAdditionalPlan>,
 ) {
     output.push_str(&format!(
         "    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<{class}> {{\n"
@@ -2968,13 +3448,82 @@ fn render_object_serializer(
     // in-memory model and throw the aggregated `ValidationException` before
     // emitting any wire member — matching the deserializer (both directions over
     // one set of check emitters).
-    let needs_validation = object_needs_serialize_validation(schema, fields);
+    let needs_validation = object_needs_serialize_validation(schema, fields, open);
     if needs_validation {
         output.push_str("            List<Violation> violations = new ArrayList<>();\n");
         for field in fields {
             render_java_serialize_field_check(output, field, "            ");
         }
-        render_java_serialize_property_count(output, schema, fields, open, "            ");
+        if open {
+            output.push_str(
+                "            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();\n",
+            );
+            for field in fields {
+                let key = java_string_literal(&field.json_name);
+                if field.is_primitive() || (field.required && field.nullable) {
+                    output.push_str(&format!("            wireKeys.add({key});\n"));
+                } else {
+                    output.push_str(&format!(
+                        "            if (value.{} != null) {{\n                wireKeys.add({key});\n            }}\n",
+                        field.java_name
+                    ));
+                }
+            }
+            output.push_str("            if (value.additionalProperties != null) {\n");
+            output.push_str(
+                "                for (String key : value.additionalProperties.keySet()) {\n",
+            );
+            output.push_str("                    if (!wireKeys.add(key)) {\n");
+            output.push_str("                        violations.add(new Violation(key, \"declared property key collision\"));\n");
+            output.push_str("                    }\n                }\n            }\n");
+            render_java_property_count_checks(output, "wireKeys.size()", schema, "            ");
+            if let Some(subschema) = &schema.property_names {
+                render_java_serialize_property_name_checks(
+                    output,
+                    "wireKeys",
+                    subschema,
+                    "            ",
+                );
+            }
+            if let Some(additional) = typed_additional {
+                let value_type = element_declaration(&additional.ty, additional.nullable);
+                output.push_str(&format!(
+                    "            if (value.additionalProperties != null) {{\n                for (Map.Entry<String, {value_type}> entry : value.additionalProperties.entrySet()) {{\n"
+                ));
+                if additional.nullable {
+                    output.push_str("                    if (entry.getValue() == null) {\n                        continue;\n                    }\n");
+                }
+                render_java_member_checks(
+                    output,
+                    "entry.getValue()",
+                    "entry.getKey()",
+                    &additional.schema,
+                    &additional.ty,
+                    ADDITIONAL_PROPERTIES_POSITION,
+                    "                    ",
+                );
+                render_java_materialized_wire_checks(
+                    output,
+                    "entry.getValue()",
+                    "entry.getKey()",
+                    &additional.schema,
+                    &additional.ty,
+                    ADDITIONAL_PROPERTIES_POSITION,
+                    "                    ",
+                );
+                if let Some(interface) = java_union_interface(&additional.ty)
+                    && let Some(union) = &additional.union
+                    && java_union_has_checks(union)
+                {
+                    output.push_str(&format!(
+                        "                    {interface}.validate(entry.getValue(), entry.getKey(), violations);\n"
+                    ));
+                }
+                output.push_str("                }\n            }\n");
+            }
+        } else {
+            render_java_serialize_property_count(output, schema, fields, open, "            ");
+        }
         render_java_serialize_dependent_required(output, schema, fields, open, "            ");
         output.push_str("            if (!violations.isEmpty()) {\n                throw new ValidationException(violations);\n            }\n");
     }
@@ -2985,11 +3534,21 @@ fn render_object_serializer(
     }
     if open {
         output.push_str("            if (value.additionalProperties != null) {\n");
-        output.push_str(
-            "                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {\n",
-        );
-        output.push_str("                    gen.writeFieldName(entry.getKey());\n");
-        output.push_str("                    gen.writeTree(entry.getValue());\n");
+        let value_type = typed_additional
+            .map(|additional| element_declaration(&additional.ty, additional.nullable))
+            .unwrap_or_else(|| "JsonNode".to_string());
+        output.push_str(&format!(
+            "                for (Map.Entry<String, {value_type}> entry : value.additionalProperties.entrySet()) {{\n"
+        ));
+        if let Some(additional) = typed_additional {
+            if additional.nullable {
+                output.push_str("                    if (entry.getValue() == null) {\n                        gen.writeNullField(entry.getKey());\n                        continue;\n                    }\n");
+            }
+            output.push_str(&write_map_value(&additional.ty));
+        } else {
+            output.push_str("                    gen.writeFieldName(entry.getKey());\n");
+            output.push_str("                    gen.writeTree(entry.getValue());\n");
+        }
         output.push_str("                }\n");
         output.push_str("            }\n");
     }
@@ -3063,6 +3622,7 @@ fn render_object_deserializer(
     schema: &Schema,
     open: bool,
     fields: &[FieldPlan],
+    typed_additional: Option<&TypedAdditionalPlan>,
 ) {
     output.push_str(&format!(
         "    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<{class}> {{\n"
@@ -3082,9 +3642,12 @@ fn render_object_deserializer(
         .map(|field| field.json_name.as_str())
         .collect();
     if open {
-        output.push_str(
-            "            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();\n",
-        );
+        let value_type = typed_additional
+            .map(|additional| element_declaration(&additional.ty, additional.nullable))
+            .unwrap_or_else(|| "JsonNode".to_string());
+        output.push_str(&format!(
+            "            Map<String, {value_type}> additionalProperties = new LinkedHashMap<>();\n"
+        ));
         output.push_str("            Iterator<String> fieldNames = node.fieldNames();\n");
         output.push_str("            while (fieldNames.hasNext()) {\n");
         output.push_str("                String key = fieldNames.next();\n");
@@ -3099,7 +3662,30 @@ fn render_object_deserializer(
             output.push_str("                        break;\n");
         }
         output.push_str("                    default:\n");
-        output.push_str("                        additionalProperties.put(key, node.get(key));\n");
+        if let Some(additional) = typed_additional {
+            output.push_str("                        JsonNode element = node.get(key);\n");
+            output.push_str("                        if (element.isNull()) {\n");
+            if additional.nullable {
+                output.push_str("                            additionalProperties.put(key, null);\n                            break;\n");
+            } else {
+                output.push_str("                            violations.add(new Violation(key, \"explicit null not allowed\"));\n                            break;\n");
+            }
+            output.push_str("                        }\n");
+            render_parse_map_value(
+                output,
+                &additional.ty,
+                "additionalProperties",
+                "element",
+                "key",
+                Some(&additional.schema),
+                ADDITIONAL_PROPERTIES_POSITION,
+                "                        ",
+            );
+        } else {
+            output.push_str(
+                "                        additionalProperties.put(key, node.get(key));\n",
+            );
+        }
         output.push_str("                }\n");
         output.push_str("            }\n");
     } else {
@@ -3258,6 +3844,23 @@ fn render_parse_value(
                 "{indent}    violations.add(new Violation({json}, \"expected string\"));\n"
             ));
             output.push_str(&format!("{indent}}} else {{\n"));
+            if !string_length.is_empty() {
+                render_java_string_checks(
+                    output,
+                    "field.textValue()",
+                    json,
+                    field_java_name,
+                    string_length,
+                    &format!("{indent}    "),
+                );
+            }
+            render_java_closed_string_checks(
+                output,
+                "field.textValue()",
+                json,
+                schema,
+                &format!("{indent}    "),
+            );
             output.push_str(&format!(
                 "{indent}    {target} = TemporalSupport.{parse_fn}(field.textValue(), {json}, violations);\n"
             ));
@@ -3270,6 +3873,23 @@ fn render_parse_value(
                 "{indent}    violations.add(new Violation({json}, \"expected string\"));\n"
             ));
             output.push_str(&format!("{indent}}} else {{\n"));
+            if !string_length.is_empty() {
+                render_java_string_checks(
+                    output,
+                    "field.textValue()",
+                    json,
+                    field_java_name,
+                    string_length,
+                    &format!("{indent}    "),
+                );
+            }
+            render_java_closed_string_checks(
+                output,
+                "field.textValue()",
+                json,
+                schema,
+                &format!("{indent}    "),
+            );
             output.push_str(&format!(
                 "{indent}    {target} = Base64Support.{parse_fn}(field.textValue(), {json}, violations);\n"
             ));
@@ -3460,7 +4080,19 @@ fn render_parse_element(
                 "{indent}    violations.add(new Violation({path_var}, \"expected string\"));\n"
             ));
             output.push_str(&format!("{indent}}} else {{\n"));
-            output.push_str(&format!("{indent}    {list}.add({element}.textValue());\n"));
+            output.push_str(&format!(
+                "{indent}    String parsed = {element}.textValue();\n"
+            ));
+            if let Some(schema) = schema {
+                render_java_inline_string_checks(
+                    output,
+                    "parsed",
+                    path_var,
+                    schema,
+                    &format!("{indent}    "),
+                );
+            }
+            output.push_str(&format!("{indent}    {list}.add(parsed);\n"));
             output.push_str(&format!("{indent}}}\n"));
         }
         JavaType::Long => {
@@ -3468,6 +4100,25 @@ fn render_parse_element(
                 "{indent}Long parsed = SpecNumbers.specLong({element}, {path_var}, violations);\n"
             ));
             output.push_str(&format!("{indent}if (parsed != null) {{\n"));
+            if let Some(schema) = schema {
+                let constraints = NumericConstraints::from_schema(schema);
+                render_java_numeric_checks(
+                    output,
+                    "parsed",
+                    path_var,
+                    &constraints,
+                    true,
+                    &format!("{indent}    "),
+                );
+                render_java_closed_scalar_checks(
+                    output,
+                    "parsed",
+                    path_var,
+                    schema,
+                    ty,
+                    &format!("{indent}    "),
+                );
+            }
             output.push_str(&format!("{indent}    {list}.add(parsed);\n"));
             output.push_str(&format!("{indent}}}\n"));
         }
@@ -3476,6 +4127,25 @@ fn render_parse_element(
                 "{indent}Double parsed = SpecNumbers.specDouble({element}, {path_var}, violations);\n"
             ));
             output.push_str(&format!("{indent}if (parsed != null) {{\n"));
+            if let Some(schema) = schema {
+                let constraints = NumericConstraints::from_schema(schema);
+                render_java_numeric_checks(
+                    output,
+                    "parsed",
+                    path_var,
+                    &constraints,
+                    false,
+                    &format!("{indent}    "),
+                );
+                render_java_closed_scalar_checks(
+                    output,
+                    "parsed",
+                    path_var,
+                    schema,
+                    ty,
+                    &format!("{indent}    "),
+                );
+            }
             output.push_str(&format!("{indent}    {list}.add(parsed);\n"));
             output.push_str(&format!("{indent}}}\n"));
         }
@@ -3485,6 +4155,16 @@ fn render_parse_element(
                 "{indent}    violations.add(new Violation({path_var}, \"expected boolean\"));\n"
             ));
             output.push_str(&format!("{indent}}} else {{\n"));
+            if let Some(schema) = schema {
+                render_java_closed_scalar_checks(
+                    output,
+                    &format!("{element}.booleanValue()"),
+                    path_var,
+                    schema,
+                    ty,
+                    &format!("{indent}    "),
+                );
+            }
             output.push_str(&format!(
                 "{indent}    {list}.add({element}.booleanValue());\n"
             ));
@@ -3537,6 +4217,15 @@ fn render_parse_element(
                 "{indent}    violations.add(new Violation({path_var}, \"expected array\"));\n"
             ));
             output.push_str(&format!("{indent}}} else {{\n"));
+            if let Some(schema) = schema {
+                render_java_inline_string_checks(
+                    output,
+                    &format!("{element}.textValue()"),
+                    path_var,
+                    schema,
+                    &format!("{indent}    "),
+                );
+            }
             output.push_str(&format!(
                 "{indent}    List<{}> {nested} = new ArrayList<>();\n",
                 element_declaration(inner, false)
@@ -3591,6 +4280,15 @@ fn render_parse_element(
                 "{indent}    violations.add(new Violation({path_var}, \"expected string\"));\n"
             ));
             output.push_str(&format!("{indent}}} else {{\n"));
+            if let Some(schema) = schema {
+                render_java_inline_string_checks(
+                    output,
+                    &format!("{element}.textValue()"),
+                    path_var,
+                    schema,
+                    &format!("{indent}    "),
+                );
+            }
             output.push_str(&format!(
                 "{indent}    {parsed_type} parsed = TemporalSupport.{parse_fn}({element}.textValue(), {path_var}, violations);\n"
             ));
@@ -3625,12 +4323,13 @@ fn render_parse_map_value(
     element: &str,
     key_var: &str,
     member: Option<&Schema>,
+    position: &str,
     indent: &str,
 ) {
     // The member's own constraints run over the decoded value, keyed by its key.
     let checks = |output: &mut String, value_expr: &str, indent: &str| {
         if let Some(member) = member {
-            render_java_member_checks(output, value_expr, key_var, member, ty, indent);
+            render_java_member_checks(output, value_expr, key_var, member, ty, position, indent);
         }
     };
     // A member with nothing to check needs no local for the decoded value.
@@ -3787,6 +4486,19 @@ fn render_parse_map_value(
                 "{indent}    violations.add(new Violation({key_var}, \"expected string value\"));\n"
             ));
             output.push_str(&format!("{indent}}} else {{\n"));
+            if let Some(member) = member {
+                let constraints = StringLengthConstraints::from_schema(member);
+                if !constraints.is_empty() {
+                    render_java_string_checks(
+                        output,
+                        &format!("{element}.textValue()"),
+                        key_var,
+                        position,
+                        &constraints,
+                        &format!("{indent}    "),
+                    );
+                }
+            }
             output.push_str(&format!(
                 "{indent}    {parsed_type} parsed = TemporalSupport.{parse_fn}({element}.textValue(), {key_var}, violations);\n"
             ));
@@ -3800,6 +4512,19 @@ fn render_parse_map_value(
                 "{indent}    violations.add(new Violation({key_var}, \"expected string value\"));\n"
             ));
             output.push_str(&format!("{indent}}} else {{\n"));
+            if let Some(member) = member {
+                let constraints = StringLengthConstraints::from_schema(member);
+                if !constraints.is_empty() {
+                    render_java_string_checks(
+                        output,
+                        &format!("{element}.textValue()"),
+                        key_var,
+                        position,
+                        &constraints,
+                        &format!("{indent}    "),
+                    );
+                }
+            }
             output.push_str(&format!(
                 "{indent}    byte[] parsed = Base64Support.{parse_fn}({element}.textValue(), {key_var}, violations);\n"
             ));
@@ -3818,6 +4543,8 @@ fn render_parse_map_value(
 /// the static `Pattern` fields its `pattern`/`format` compile into. Matches the
 /// `Value` position name the loader gives an inline member shape.
 const MAP_MEMBER_POSITION: &str = "value";
+const ADDITIONAL_PROPERTIES_POSITION: &str = "additionalPropertiesValue";
+const PROPERTY_NAME_POSITION: &str = "propertyName";
 
 /// Emits the predicates a typed map's member schema declares, over `value_expr`
 /// (the decoded member in scope) keyed by `key_expr` (the member's own key, which
@@ -3831,24 +4558,12 @@ fn render_java_member_checks(
     key_expr: &str,
     member: &Schema,
     ty: &JavaType,
+    position: &str,
     indent: &str,
 ) {
     render_java_finite_checks(output, ty, value_expr, key_expr, indent, 0);
     render_java_calendar_year_checks(output, ty, value_expr, key_expr, indent, 0);
-    if let Some(values) = closed_member_values(member) {
-        let condition = values
-            .iter()
-            .map(|value| format!("!({})", java_equals_term(value, value_expr, ty)))
-            .collect::<Vec<_>>()
-            .join(" && ");
-        let reason = java_string_literal(&format!(
-            "must be one of [{}], got ",
-            java_closed_set_display(&values)
-        ));
-        output.push_str(&format!(
-            "{indent}if ({condition}) {{\n{indent}    violations.add(new Violation({key_expr}, {reason} + {value_expr}));\n{indent}}}\n"
-        ));
-    }
+    render_java_closed_scalar_checks(output, value_expr, key_expr, member, ty, indent);
     match member.ty.as_ref().and_then(Value::as_str) {
         Some("string") if matches!(ty, JavaType::String) => {
             let constraints = StringLengthConstraints::from_schema(member);
@@ -3857,7 +4572,7 @@ fn render_java_member_checks(
                     output,
                     value_expr,
                     key_expr,
-                    MAP_MEMBER_POSITION,
+                    position,
                     &constraints,
                     indent,
                 );
@@ -3878,32 +4593,76 @@ fn render_java_member_checks(
         }
         Some("array") => {
             let constraints = ArrayConstraints::from_schema(member);
-            if !constraints.is_empty()
-                && let JavaType::List(element) = ty
-            {
-                render_java_array_checks(
-                    output,
-                    value_expr,
-                    key_expr,
-                    element,
-                    &constraints,
-                    indent,
-                );
+            if let JavaType::List(element) = ty {
+                if !constraints.is_empty() {
+                    render_java_array_checks(
+                        output,
+                        value_expr,
+                        key_expr,
+                        element,
+                        &constraints,
+                        indent,
+                    );
+                }
+                if let Some(item_schema) = member.items.as_deref()
+                    && schema_has_recursive_value_checks(item_schema)
+                {
+                    let index = "validationIndex0";
+                    let item = "validationValue0";
+                    let item_path = format!("{key_expr} + \"[\" + {index} + \"]\"");
+                    output.push_str(&format!(
+                        "{indent}for (int {index} = 0; {index} < {value_expr}.size(); {index}++) {{\n{indent}    {} {item} = {value_expr}.get({index});\n{indent}    if ({item} != null) {{\n",
+                        element.boxed_name()
+                    ));
+                    render_java_recursive_value_checks(
+                        output,
+                        item,
+                        &item_path,
+                        item_schema,
+                        element,
+                        &format!("{indent}        "),
+                        1,
+                    );
+                    output.push_str(&format!("{indent}    }}\n{indent}}}\n"));
+                }
             }
         }
         _ => {}
     }
 }
 
-/// The admissible values of a closed member value set (`const`/`enum`). A map
-/// member has no field to hang Java's value class off, so its closedness lives in
-/// the validator alone; the accepted value set is identical to every other
-/// target's.
-fn closed_member_values(member: &Schema) -> Option<Vec<Value>> {
-    if let Some(value) = &member.const_value {
-        return Some(vec![value.clone()]);
+fn render_java_materialized_wire_checks(
+    output: &mut String,
+    value_expr: &str,
+    key_expr: &str,
+    member: &Schema,
+    ty: &JavaType,
+    position: &str,
+    indent: &str,
+) {
+    let constraints = StringLengthConstraints::from_schema(member);
+    if constraints.is_empty() {
+        return;
     }
-    member.enum_values.clone()
+    let wire = match ty {
+        JavaType::Temporal(kind) => java_temporal_format_fn(*kind)
+            .map(|format_fn| format!("TemporalSupport.{format_fn}({value_expr})"))
+            .unwrap_or_else(|| value_expr.to_string()),
+        JavaType::Bytes(encoding) => format!(
+            "Base64Support.{}({value_expr})",
+            java_content_encoding_format_fn(*encoding)
+        ),
+        _ => return,
+    };
+    output.push_str(&format!("{indent}String canonicalWire = {wire};\n"));
+    render_java_string_checks(
+        output,
+        "canonicalWire",
+        key_expr,
+        position,
+        &constraints,
+        indent,
+    );
 }
 
 /// True when a map-shaped schema admits an explicit `null` member (its
@@ -3986,6 +4745,23 @@ fn render_typed_map_class(
             ));
         }
     }
+    if let Some(property_names) = &schema.property_names {
+        let constraints = StringLengthConstraints::from_schema(property_names);
+        if let Some(pattern) = &constraints.pattern {
+            output.push_str(&format!(
+                "    private static final java.util.regex.Pattern {} = java.util.regex.Pattern.compile({});\n\n",
+                java_pattern_field_name(PROPERTY_NAME_POSITION),
+                java_string_literal(pattern),
+            ));
+        }
+        if let Some(format) = &constraints.format {
+            output.push_str(&format!(
+                "    private static final java.util.regex.Pattern {} = java.util.regex.Pattern.compile({});\n\n",
+                java_format_field_name(PROPERTY_NAME_POSITION),
+                java_string_literal(&format.pattern),
+            ));
+        }
+    }
     // The catch-all is always the named `additionalProperties` member, matching
     // the struct-shaped POJOs — see `specs/json-schema/features/additionalProperties.md`.
     output.push_str(&format!(
@@ -4034,6 +4810,16 @@ fn render_typed_map_class(
             "entry.getKey()",
             member,
             value,
+            MAP_MEMBER_POSITION,
+            "                ",
+        );
+        render_java_materialized_wire_checks(
+            &mut member_checks,
+            "entry.getValue()",
+            "entry.getKey()",
+            member,
+            value,
+            MAP_MEMBER_POSITION,
             "                ",
         );
         // A union-typed member is re-checked against the branch it holds, through
@@ -4135,6 +4921,7 @@ fn render_typed_map_class(
         "element",
         "key",
         member.as_ref(),
+        MAP_MEMBER_POSITION,
         "                ",
     );
     output.push_str("            }\n");
@@ -4331,14 +5118,50 @@ fn java_closed_throw_message(values: &[Value], is_string: bool) -> String {
     }
 }
 
-fn default_expr(ty: &JavaType, value: &Value) -> Option<String> {
+fn default_expr(field: &FieldPlan, value: &Value) -> Option<String> {
+    let ty = &field.ty;
     match (ty, value) {
+        (_, Value::Null) if field.nullable => Some("null".to_string()),
         (JavaType::Long, Value::Number(number)) => number.as_i64().map(|value| format!("{value}L")),
         (JavaType::Double, Value::Number(number)) => {
             number.as_f64().map(|value| format!("{value}"))
         }
         (JavaType::Boolean, Value::Bool(value)) => Some(value.to_string()),
         (JavaType::String, Value::String(text)) => Some(java_string_literal(text)),
+        (JavaType::ClosedValue { class, .. }, _) => Some(format!(
+            "{class}.{}",
+            java_const_name(
+                &field.closed_overrides,
+                &field.java_name,
+                &field.closed_values,
+                value,
+            )
+        )),
+        (JavaType::Temporal(kind), Value::String(text)) => {
+            let literal = java_string_literal(text);
+            Some(match kind {
+                crate::json_schema::format::TemporalKind::DateTime => {
+                    format!("OffsetDateTime.parse({literal})")
+                }
+                crate::json_schema::format::TemporalKind::Date => {
+                    format!("LocalDate.parse({literal})")
+                }
+                crate::json_schema::format::TemporalKind::Time => literal,
+                crate::json_schema::format::TemporalKind::Duration => {
+                    format!("Duration.parse({literal})")
+                }
+            })
+        }
+        (JavaType::Bytes(encoding), Value::String(text)) => {
+            let decoder = match encoding {
+                crate::json_schema::content_encoding::Encoding::Base64 => "getDecoder",
+                crate::json_schema::content_encoding::Encoding::Base64Url => "getUrlDecoder",
+            };
+            Some(format!(
+                "java.util.Base64.{decoder}().decode({})",
+                java_string_literal(text)
+            ))
+        }
         _ => None,
     }
 }
