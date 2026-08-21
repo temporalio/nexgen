@@ -8,11 +8,11 @@ namespace Nexgen.DotNetExamples
     {
         private static readonly GenericModels.OperationCompletionResult<object> Success =
             new GenericModels.OperationCompletionResult<object>.Success(
-                new object());
+                new GenericModels.OperationCompletionSuccess<object>(new object()));
 
         private static readonly GenericModels.OperationCompletionResult<object> Failure =
             new GenericModels.OperationCompletionResult<object>.Failure(
-                "failed");
+                new GenericModels.OperationCompletionFailure("failed"));
 
         internal static Task<GenericModels.GenericResponse<string, object, object>> CompleteAsync() =>
             GenericModels.Operations.CompleteAsync(

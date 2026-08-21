@@ -11,7 +11,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use heck::ToSnakeCase;
 use nexgen::SupportFiles;
-use nexgen::descriptors::DescriptorIndex;
 use nexgen::generator::generate_source;
 use nexgen::spec::SupportFragmentSpec;
 use nexgen::{GenerateRequest, generate_to_file};
@@ -762,12 +761,12 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
     assert!(models.contains("class Outcome(typing.Generic[OutputT]):"));
     assert!(models.contains("\"Outcome[typing.Any]\""));
     assert!(models.contains("output_type, = typing.get_args(type_hint) or (typing.Any,)"));
-    assert!(models.contains("@dataclasses.dataclass(slots=True, init=False)"));
-    assert!(models.contains("class OutcomeValueSuccess(typing.Generic[OutputT]):"));
-    assert!(models.contains("tag: typing.Literal[\"success\"] = dataclasses.field(init=False)"));
     assert!(models.contains(
-        "def __init__(self, value: OutputT) -> None:\n        self.tag = \"success\"\n        self.value = value"
+        "@dataclasses.dataclass(slots=True)\nclass OutcomeValueSuccess(typing.Generic[OutputT]):\n    value: OutputT"
     ));
+    assert!(models.contains("class OutcomeValueSuccess(typing.Generic[OutputT]):"));
+    assert!(!models.contains("@dataclasses.dataclass(slots=True, init=False)"));
+    assert!(!models.contains("tag: typing.Literal[\"success\"]"));
     assert!(models.contains("class OutcomeValueFailure:"));
     assert!(models.contains(
         "OutcomeValue = (\n    OutcomeValueSuccess[OutputT]\n    | OutcomeValueFailure\n)"
@@ -820,6 +819,64 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
 }
 
 #[test]
+fn python_non_proto_variants_remain_tagged_tuples_without_transfer_converters() {
+    let root = project_root();
+    let package = generate_python_package_files(
+        &example_input_paths(&root, "type-showcase"),
+        &[descriptor_path(&root)],
+    );
+    let models = package
+        .get(&PathBuf::from("models.py"))
+        .expect("type showcase should include models.py");
+    let resource = package
+        .get(&PathBuf::from("_resources/user.py"))
+        .expect("type showcase should include the User resource module");
+
+    assert!(models.contains(
+        "NotificationTarget = (\n    tuple[typing.Literal[\"email\"], str]\n    | tuple[typing.Literal[\"sms\"], str]\n    | tuple[typing.Literal[\"none\"]]\n)"
+    ));
+    assert!(!models.contains("class NotificationTargetEmail"));
+    assert!(!models.contains("TransferTypeConverter"));
+    assert!(!resource.contains("TransferTypeConverter"));
+}
+
+#[test]
+fn python_rejects_proto_variant_case_class_name_collisions() {
+    let root = project_root();
+    let temp_dir = unique_output_path("python-proto-variant-case-collision");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let collision_path = temp_dir.join("collision.wit");
+    let fixture = fs::read_to_string(input_path(&root, "proto-oneof")).unwrap();
+    let fixture = fixture.strip_suffix("}\n").unwrap();
+    fs::write(
+        &collision_path,
+        format!("{fixture}  record outcome-value-success {{\n    value: string,\n  }}\n}}\n"),
+    )
+    .unwrap();
+    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
+        nexgen::language::Language::Python,
+        &[collision_path, linked_inputs_path(&root)],
+    )
+    .unwrap();
+    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
+
+    let error = generate_source(
+        nexgen::language::Language::Python,
+        spec,
+        &descriptors,
+        &SupportFiles::default(),
+    )
+    .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("Python generated name `OutcomeValueSuccess`")
+    );
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
 fn python_proto_generics_propagate_payload_type_hints() {
     let root = project_root();
     let package = generate_python_package_files(
@@ -852,62 +909,6 @@ fn python_proto_generics_propagate_payload_type_hints() {
     assert!(models.contains("payload_from_proto(value.details, context_type)"));
     assert!(support.contains("type_hint: type[typing.Any] | None = None,"));
     assert!(support.contains("converter.from_payload(_clone_payload(proto), type_hint)"));
-}
-
-#[test]
-fn python_rejects_variant_case_class_name_collisions() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-variant-case-collision");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("collision.wit");
-    fs::write(
-        &input_path,
-        r#"package example:collision@1.0.0;
-
-world system {
-  export example;
-}
-
-interface example {
-  variant notification-target {
-    email(string),
-  }
-
-  record notification-target-email {
-    value: string,
-  }
-
-  record request {
-    target: notification-target,
-    reserved: notification-target-email,
-  }
-
-  call: func(request: request);
-}
-"#,
-    )
-    .unwrap();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &[input_path],
-    )
-    .unwrap();
-    let descriptors = DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-
-    let error = generate_source(
-        nexgen::language::Language::Python,
-        spec,
-        &descriptors,
-        &SupportFiles::default(),
-    )
-    .unwrap_err();
-
-    assert!(
-        error
-            .to_string()
-            .contains("Python generated name `NotificationTargetEmail`")
-    );
-    fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
@@ -1046,118 +1047,5 @@ fn python_json_annotates_element_position_unions() {
     assert!(rendered.contains("slots: list[str | None] | None"));
     let exports = fs::read_to_string(output_path.join("__init__.py")).unwrap();
     assert!(exports.contains("BagSegmentsItem"));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-#[test]
-fn python_direct_transfer_hooks_preserve_model_types() {
-    let root = project_root();
-    let package = generate_python_package_files(
-        &example_input_paths(&root, "generic-models"),
-        &[descriptor_path(&root)],
-    );
-    let models = package
-        .get(&PathBuf::from("models.py"))
-        .expect("Python package should include models.py");
-    let operation = package
-        .get(&PathBuf::from("operations/complete.py"))
-        .expect("Python package should include the Complete operation module");
-
-    assert!(models.contains(
-        "class _GenericResponseTransferTypeConverter(temporalio.converter.TransferTypeConverter[GenericResponse[ContextT, OutputT, MetadataT], dict[str, typing.Any]]):"
-    ));
-    assert!(models.contains("value: dict[str, typing.Any],"));
-    assert!(models.contains(") -> GenericResponse[ContextT, OutputT, MetadataT]:"));
-    assert!(models.contains(
-        "(_context_t_type, _output_t_type, _metadata_t_type) = typing.get_args(type_hint)"
-    ));
-    assert!(models.contains("def _operation_completion_result_from_transfer_type("));
-    assert!(models.contains(") -> OperationCompletionResult[OutputT]:"));
-    assert!(models.contains("def _operation_completion_result_to_transfer_type("));
-    assert!(models.contains("class _ReuseCompletionResultTransferTypeConverter("));
-    assert!(models.contains("completion=_operation_completion_result_from_transfer_type("));
-    assert!(models.contains("result=_operation_completion_result_from_transfer_type("));
-    assert!(models.contains(
-        "\"completion\": _operation_completion_result_to_transfer_type(value.completion)"
-    ));
-    assert!(
-        models.contains("\"result\": _operation_completion_result_to_transfer_type(value.result)")
-    );
-    assert_eq!(
-        models
-            .matches("def _operation_completion_result_from_transfer_type(")
-            .count(),
-        1
-    );
-    assert_eq!(
-        models
-            .matches("def _operation_completion_result_to_transfer_type(")
-            .count(),
-        1
-    );
-    assert!(!models.contains("class _OperationCompletionResultTransferTypeConverter"));
-    assert!(!models.contains("_generic_response_transfer_type_converter"));
-    assert!(!models.contains("_operation_completion_result_transfer_type_converter"));
-    assert!(!models.contains("transfer_type: type[dict[str, typing.Any]] | None = dict"));
-    assert!(operation.contains("output_type=GenericResponse[typing.Any, typing.Any, typing.Any],"));
-
-    let showcase = generate_python_package_files(
-        &example_input_paths(&root, "type-showcase"),
-        &[descriptor_path(&root)],
-    );
-    let user = showcase
-        .get(&PathBuf::from("_resources/user.py"))
-        .expect("Python package should include the User resource module");
-    assert!(user.contains(
-        "class _UserTransferTypeConverter(temporalio.converter.TransferTypeConverter[User, dict[str, typing.Any]]):"
-    ));
-}
-
-#[test]
-fn python_direct_transfer_hooks_cover_resource_variant_fields() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-resource-variant");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("resource-variant.wit");
-    fs::write(
-        &input_path,
-        r#"package example:resource-variant@1.0.0;
-
-world system {
-  export example;
-}
-
-interface example {
-  record address {
-    line: string,
-  }
-
-  variant destination {
-    email(address),
-    none,
-  }
-
-  resource subscription {
-    constructor(destination: destination);
-  }
-}
-"#,
-    )
-    .unwrap();
-
-    let package = generate_python_package_files(&[input_path], &[descriptor_path(&root)]);
-    let models = package
-        .get(&PathBuf::from("models.py"))
-        .expect("Python package should include models.py");
-    let resource = package
-        .get(&PathBuf::from("_resources/subscription.py"))
-        .expect("Python package should include the Subscription resource module");
-
-    assert!(models.contains("def _destination_from_transfer_type("));
-    assert!(models.contains("def _destination_to_transfer_type("));
-    assert!(models.contains("temporalio.converter.value_to_type(Address, value[\"value\"])"));
-    assert!(models.contains("dataclasses.asdict(value.value)"));
-    assert!(resource.contains("class _SubscriptionTransferTypeConverter("));
-    assert!(resource.contains("_destination_from_transfer_type("));
-    assert!(resource.contains("_destination_to_transfer_type("));
     fs::remove_dir_all(temp_dir).unwrap();
 }

@@ -16,10 +16,10 @@ namespace Nexgen.GenericModelService
         private OperationCompletionResult() { }
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Success(OutputT Value) : OperationCompletionResult<OutputT>;
+        public sealed record Success(OperationCompletionSuccess<OutputT> Value) : OperationCompletionResult<OutputT>;
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Failure(string Value) : OperationCompletionResult<OutputT>;
+        public sealed record Failure(OperationCompletionFailure Value) : OperationCompletionResult<OutputT>;
     }
 
     [GeneratedCode("nexgen", null)]
@@ -65,14 +65,25 @@ namespace Nexgen.GenericModelService
     }
 
     [GeneratedCode("nexgen", null)]
-    public class ReuseCompletionResult<OutputT>
+    public class OperationCompletionFailure
     {
-        public ReuseCompletionResult(OperationCompletionResult<OutputT> result)
+        public OperationCompletionFailure(string message)
         {
-            Result = result;
+            Message = message;
         }
 
-        public OperationCompletionResult<OutputT> Result { get; }
+        public string Message { get; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class OperationCompletionSuccess<OutputT>
+    {
+        public OperationCompletionSuccess(OutputT output)
+        {
+            Output = output;
+        }
+
+        public OutputT Output { get; }
     }
 
 }

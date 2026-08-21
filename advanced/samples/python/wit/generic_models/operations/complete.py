@@ -31,7 +31,7 @@ async def _complete(
         await nexus_client.start_operation(
             operation="Complete",
             input=request,
-            output_type=GenericResponse[typing.Any, typing.Any, typing.Any],
+            output_type=GenericResponse,
         ),
     )
 

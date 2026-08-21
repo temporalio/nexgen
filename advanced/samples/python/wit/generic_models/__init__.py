@@ -9,11 +9,9 @@ import nexusrpc
 import temporalio.converter
 from . import services as _services
 from .operations.complete import complete
-from .operations.reuse_complete import reuse_complete
 
 __all__ = [
     "complete",
-    "reuse_complete",
 ]
 
 
@@ -45,11 +43,5 @@ __nexus_operation_registry__ = {
         "Complete",
     ): _NexusOperationInfo(
         operation=_services.GenericModelService.complete,
-    ),
-    (
-        "GenericModelService",
-        "ReuseComplete",
-    ): _NexusOperationInfo(
-        operation=_services.GenericModelService.reuse_complete,
     ),
 }

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use heck::{ToShoutySnakeCase, ToSnakeCase, ToUpperCamelCase};
@@ -14,7 +14,7 @@ use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedOperationResourceReturn,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedRecordType, PlannedResource,
     PlannedResourceMethod, PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind,
-    PlannedSpec, PlannedType, message_model_name, operation_input_model,
+    PlannedSpec, PlannedType, PlannedWireFieldBinding, message_model_name, operation_input_model,
     operation_output_direct_result,
 };
 use crate::planning::{RequestPlan, ResolvedResourceBindingSource};
@@ -235,22 +235,46 @@ fn branch_export_names(
     names
 }
 
+fn python_proto_backed_variant_names(plan: &PlannedSpec) -> BTreeSet<String> {
+    plan.records()
+        .filter(|(_, record)| record.data.proto.is_some())
+        .flat_map(|(_, record)| record.fields.values())
+        .filter(|field| {
+            matches!(
+                field.data.wire_binding,
+                Some(PlannedWireFieldBinding::VariantMembers { .. })
+            )
+        })
+        .filter_map(
+            |field| match field.field_type.without_option().validation_type() {
+                PlannedType::Variant(variant) => Some(variant.full_name.clone()),
+                _ => None,
+            },
+        )
+        .collect()
+}
+
 fn leaf_export_names(
     plan: &PlannedSpec,
     model_hoists: &PythonModelHoists,
     mode: GenerationMode,
 ) -> BTreeSet<String> {
+    let proto_backed_variants = python_proto_backed_variant_names(plan);
     let mut model_names = plan
         .enums()
         .map(|(_, enumeration)| enumeration.name.clone())
         .chain(plan.flags().map(|(_, flag_set)| flag_set.name.clone()))
-        .chain(plan.variants().flat_map(|(_, variant)| {
-            std::iter::once(variant.name.clone()).chain(
-                variant
-                    .cases
-                    .iter()
-                    .map(|case| python_variant_case_class_name(&variant.name, &case.name)),
-            )
+        .chain(plan.variants().flat_map(|(full_name, variant)| {
+            let mut names = vec![variant.name.clone()];
+            if proto_backed_variants.contains(full_name) {
+                names.extend(
+                    variant
+                        .cases
+                        .iter()
+                        .map(|case| python_variant_case_class_name(&variant.name, &case.name)),
+                );
+            }
+            names
         }))
         .chain(plan.external_types().filter_map(|(_, binding)| {
             let ExternalTypeSpec::Json(json_type) = &binding.external_type else {
@@ -310,7 +334,9 @@ fn leaf_export_names(
 }
 
 fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
-    plan.types
+    let proto_backed_variants = python_proto_backed_variant_names(plan);
+    let mut names = plan
+        .types
         .values()
         .filter(|entry| entry.module_exported)
         .filter_map(|entry| match &entry.declaration {
@@ -320,20 +346,26 @@ fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
             TypeDeclSpec::Variant(variant) => Some(variant.name.clone()),
             TypeDeclSpec::External(_) => None,
         })
-        .chain(
-            plan.types
-                .values()
-                .filter(|entry| entry.module_exported)
-                .flat_map(|entry| match &entry.declaration {
-                    TypeDeclSpec::Variant(variant) => variant
-                        .cases
-                        .iter()
-                        .map(|case| python_variant_case_class_name(&variant.name, &case.name))
-                        .collect::<Vec<_>>(),
-                    _ => Vec::new(),
-                }),
-        )
-        .collect()
+        .collect::<BTreeSet<_>>();
+    for variant in plan.types.values().filter_map(|entry| {
+        if !entry.module_exported {
+            return None;
+        }
+        let TypeDeclSpec::Variant(variant) = &entry.declaration else {
+            return None;
+        };
+        proto_backed_variants
+            .contains(&variant.full_name)
+            .then_some(variant)
+    }) {
+        names.extend(
+            variant
+                .cases
+                .iter()
+                .map(|case| python_variant_case_class_name(&variant.name, &case.name)),
+        );
+    }
+    names
 }
 
 fn support_fragments_for_plan(
@@ -349,137 +381,6 @@ fn support_fragments_for_plan(
     }
 }
 
-fn direct_transfer_declarations(api_plan: &PlannedSpec) -> BTreeSet<String> {
-    let direct_record_names = api_plan
-        .records()
-        .filter(|(_, record)| record.data.proto.is_none())
-        .map(|(name, _)| name.to_string())
-        .collect::<BTreeSet<_>>();
-    let variant_names = api_plan
-        .variants()
-        .map(|(name, _)| name.to_string())
-        .collect::<BTreeSet<_>>();
-    let candidate_declarations = direct_record_names
-        .union(&variant_names)
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    let mut edges = BTreeMap::<String, BTreeSet<String>>::new();
-
-    for (name, record) in api_plan.records() {
-        if !direct_record_names.contains(name) {
-            continue;
-        }
-        let refs = edges.entry(name.to_string()).or_default();
-        for field in record.fields.values().filter(|field| {
-            field.visibility != RecordFieldVisibility::Omitted
-                && field
-                    .annotation
-                    .as_ref()
-                    .and_then(|annotation| annotation.for_language(Language::Python))
-                    .is_none()
-        }) {
-            collect_direct_transfer_refs(&field.field_type, &candidate_declarations, refs);
-        }
-    }
-    for (name, variant) in api_plan.variants() {
-        let refs = edges.entry(name.to_string()).or_default();
-        for payload in variant
-            .cases
-            .iter()
-            .filter_map(|case| case.payload.as_ref())
-        {
-            collect_direct_transfer_refs(payload, &candidate_declarations, refs);
-        }
-    }
-
-    let mut declarations = BTreeSet::new();
-    for record_name in &direct_record_names {
-        let reachable = direct_transfer_closure(std::iter::once(record_name.clone()), &edges);
-        if !reachable.is_disjoint(&variant_names) {
-            declarations.insert(record_name.clone());
-            declarations.extend(reachable.intersection(&variant_names).cloned());
-        }
-    }
-    for resource in api_plan
-        .services
-        .iter()
-        .flat_map(|service| service.resources.iter().map(|resource| &resource.data))
-    {
-        let mut roots = BTreeSet::new();
-        for field in &resource.fields {
-            collect_direct_transfer_refs(&field.kind, &candidate_declarations, &mut roots);
-        }
-        let reachable = direct_transfer_closure(roots, &edges);
-        declarations.extend(reachable.intersection(&variant_names).cloned());
-    }
-    declarations
-}
-
-fn direct_transfer_closure(
-    roots: impl IntoIterator<Item = String>,
-    edges: &BTreeMap<String, BTreeSet<String>>,
-) -> BTreeSet<String> {
-    let mut declarations = BTreeSet::new();
-    let mut queue = roots.into_iter().collect::<VecDeque<_>>();
-    while let Some(declaration) = queue.pop_front() {
-        if declarations.insert(declaration.clone()) {
-            queue.extend(edges.get(&declaration).into_iter().flatten().cloned());
-        }
-    }
-    declarations
-}
-
-fn collect_direct_transfer_refs(
-    value_type: &PlannedType,
-    direct_transfer_declarations: &BTreeSet<String>,
-    refs: &mut BTreeSet<String>,
-) {
-    match value_type {
-        PlannedType::Option(inner) | PlannedType::List(inner) => {
-            collect_direct_transfer_refs(inner, direct_transfer_declarations, refs);
-        }
-        PlannedType::Tuple(items) => {
-            for item in items {
-                collect_direct_transfer_refs(item, direct_transfer_declarations, refs);
-            }
-        }
-        PlannedType::Map(key, value) => {
-            collect_direct_transfer_refs(key, direct_transfer_declarations, refs);
-            collect_direct_transfer_refs(value, direct_transfer_declarations, refs);
-        }
-        PlannedType::Result { ok, err } => {
-            for item in [ok.as_deref(), err.as_deref()].into_iter().flatten() {
-                collect_direct_transfer_refs(item, direct_transfer_declarations, refs);
-            }
-        }
-        PlannedType::Record(record) if direct_transfer_declarations.contains(&record.full_name) => {
-            refs.insert(record.full_name.clone());
-        }
-        PlannedType::Variant(variant)
-            if direct_transfer_declarations.contains(&variant.full_name) =>
-        {
-            refs.insert(variant.full_name.clone());
-        }
-        PlannedType::External(ExternalTypeSpec::Alias {
-            type_name, target, ..
-        }) if type_name.for_language(Language::Python).is_none() => {
-            collect_direct_transfer_refs(target, direct_transfer_declarations, refs);
-        }
-        PlannedType::Bool
-        | PlannedType::Int(_)
-        | PlannedType::Float
-        | PlannedType::String
-        | PlannedType::Bytes
-        | PlannedType::TypeParameter(_)
-        | PlannedType::Record(_)
-        | PlannedType::Enum(_)
-        | PlannedType::Flags(_)
-        | PlannedType::Variant(_)
-        | PlannedType::Resource(_)
-        | PlannedType::External(_) => {}
-    }
-}
-
 struct ApiPlanner<'a> {
     api_plan: &'a PlannedSpec,
     inline_model_rebuilds: bool,
@@ -490,7 +391,7 @@ struct ApiPlanner<'a> {
     flags: IndexMap<String, RenderedFlags>,
     variants: IndexMap<String, RenderedVariant>,
     models: IndexMap<String, RenderedModel>,
-    direct_transfer_declarations: BTreeSet<String>,
+    proto_backed_variants: BTreeSet<String>,
 }
 
 #[derive(Debug, Default)]
@@ -517,15 +418,9 @@ impl PythonExternalModels {
         &self,
         models: &[&RenderedModel],
         api_plan: &PlannedSpec,
-        direct_transfer_declarations: &BTreeSet<String>,
     ) -> Result<RenderedModelFragments> {
         let mut fragments = RenderedModelFragments::default();
-        fragments.extend(render_record_models(
-            models,
-            api_plan,
-            self,
-            direct_transfer_declarations,
-        )?);
+        fragments.extend(render_record_models(models, api_plan, self)?);
         fragments.extend(self.json.render_models()?);
         Ok(fragments)
     }
@@ -606,25 +501,11 @@ impl PythonExternalModels {
         api_plan: &PlannedSpec,
         model: &RenderedModel,
         planned_model: &RecordSpec<PlannedFamily>,
-        direct_transfer: bool,
-        direct_transfer_declarations: &BTreeSet<String>,
     ) -> Result<Option<RenderedRecordWireBlock>> {
-        let proto =
-            self.proto
-                .render_record_wire_block(api_plan, model, planned_model, &|value_type| {
-                    resolve_python_value_type(api_plan, self, value_type)
-                })?;
-        if proto.is_some() || !direct_transfer {
-            return Ok(proto);
-        }
-        render_direct_record_wire_block(
-            api_plan,
-            self,
-            model,
-            planned_model,
-            direct_transfer_declarations,
-        )
-        .map(Some)
+        self.proto
+            .render_record_wire_block(api_plan, model, planned_model, &|value_type| {
+                resolve_python_value_type(api_plan, self, value_type)
+            })
     }
 }
 
@@ -691,8 +572,8 @@ impl<'a> ApiPlanner<'a> {
         inline_model_rebuilds: bool,
         model_hoists: Option<&'a PythonModelHoists>,
     ) -> Result<Self> {
-        validate_python_variant_case_names(api_plan)?;
-        let direct_transfer_declarations = direct_transfer_declarations(api_plan);
+        let proto_backed_variants = python_proto_backed_variant_names(api_plan);
+        validate_python_variant_case_names(api_plan, &proto_backed_variants)?;
         let external_models = if let Some(model_hoists) = model_hoists {
             PythonExternalModels::new_with_hoists(api_plan, model_hoists)?
         } else {
@@ -708,7 +589,7 @@ impl<'a> ApiPlanner<'a> {
             flags: IndexMap::new(),
             variants: IndexMap::new(),
             models: IndexMap::new(),
-            direct_transfer_declarations,
+            proto_backed_variants,
         })
     }
 
@@ -770,11 +651,8 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn render_model_fragments(&self, models: &[&RenderedModel]) -> Result<RenderedModelFragments> {
-        self.external_models.render_model_fragments(
-            models,
-            self.api_plan,
-            &self.direct_transfer_declarations,
-        )
+        self.external_models
+            .render_model_fragments(models, self.api_plan)
     }
 
     fn render_package(
@@ -795,28 +673,17 @@ impl<'a> ApiPlanner<'a> {
             .map(|enumeration| enumeration.name.clone())
             .chain(self.flags.values().map(|flag_set| flag_set.name.clone()))
             .chain(self.variants.values().flat_map(|variant| {
-                std::iter::once(variant.name.clone())
-                    .chain(variant.cases.iter().map(|case| case.class_name.clone()))
+                let mut names = vec![variant.name.clone()];
+                if variant.proto_backed {
+                    names.extend(variant.cases.iter().map(|case| case.class_name.clone()));
+                }
+                names
             }))
             .chain(model_fragments.exported_names.iter().cloned())
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
-        model_names.sort_by_key(|name| {
-            self.variants
-                .values()
-                .find_map(|variant| {
-                    if name == &variant.name {
-                        return Some((variant.name.clone(), 0));
-                    }
-                    variant
-                        .cases
-                        .iter()
-                        .position(|case| name == &case.class_name)
-                        .map(|index| (variant.name.clone(), index + 1))
-                })
-                .unwrap_or_else(|| (name.clone(), 0))
-        });
+        sort_python_model_names(&mut model_names, &self.variants);
         let operation_model_names = model_names
             .iter()
             .cloned()
@@ -858,21 +725,7 @@ impl<'a> ApiPlanner<'a> {
                 .cloned(),
         );
         let mut package_model_names = package_model_names.into_iter().collect::<Vec<_>>();
-        package_model_names.sort_by_key(|name| {
-            self.variants
-                .values()
-                .find_map(|variant| {
-                    if name == &variant.name {
-                        return Some((variant.name.clone(), 0));
-                    }
-                    variant
-                        .cases
-                        .iter()
-                        .position(|case| name == &case.class_name)
-                        .map(|index| (variant.name.clone(), index + 1))
-                })
-                .unwrap_or_else(|| (name.clone(), 0))
-        });
+        sort_python_model_names(&mut package_model_names, &self.variants);
         insert_generated_file(
             &mut files,
             "__init__.py",
@@ -901,11 +754,9 @@ impl<'a> ApiPlanner<'a> {
                 &support_names,
                 &self.language_imports,
                 self.api_plan,
-                &self.external_models,
-                &self.direct_transfer_declarations,
                 self.inline_model_rebuilds,
                 self.model_hoists,
-            )?,
+            ),
         )?;
         if !resource_names.is_empty() {
             insert_generated_file(
@@ -951,7 +802,7 @@ impl<'a> ApiPlanner<'a> {
                         &operation_model_names,
                         &resource_names,
                         &support_names,
-                    )?,
+                    ),
                 )?;
             }
             if mode == GenerationMode::NativeApi {
@@ -993,7 +844,7 @@ impl<'a> ApiPlanner<'a> {
         model_names: &[String],
         resource_names: &[String],
         support_names: &[String],
-    ) -> Result<String> {
+    ) -> String {
         let mut module_imports = bound_operations
             .iter()
             .flat_map(|bound_operation| {
@@ -1028,7 +879,7 @@ impl<'a> ApiPlanner<'a> {
             );
             body.push_str("\n\n");
         }
-        self.render_resource(&mut body, service, resource, bound_operations)?;
+        self.render_resource(&mut body, service, resource, bound_operations);
         if !bound_operations.is_empty() && service.endpoint.is_some() {
             body.push_str("\n\n");
             for (index, bound_operation) in bound_operations.iter().enumerate() {
@@ -1044,9 +895,6 @@ impl<'a> ApiPlanner<'a> {
         }
         if !service.delay_load_temporalio_workflow {
             module_imports.insert("temporalio.workflow".to_string());
-        }
-        if body.contains("temporalio.converter.") {
-            module_imports.insert("temporalio.converter".to_string());
         }
 
         let mut output = String::new();
@@ -1101,33 +949,12 @@ impl<'a> ApiPlanner<'a> {
         if !used_support_names.is_empty() {
             render_named_python_import(&mut output, ".._support", &used_support_names);
         }
-        let converter_names = self
-            .api_plan
-            .records()
-            .filter(|(full_name, _)| self.direct_transfer_declarations.contains(*full_name))
-            .map(|(_, record)| direct_record_converter_name(&record.name))
-            .chain(
-                self.api_plan
-                    .variants()
-                    .filter(|(full_name, _)| self.direct_transfer_declarations.contains(*full_name))
-                    .flat_map(|(_, variant)| {
-                        [
-                            direct_variant_from_transfer_type_name(&variant.name),
-                            direct_variant_to_transfer_type_name(&variant.name),
-                        ]
-                    }),
-            )
-            .collect::<Vec<_>>();
-        let used_converter_names = used_python_symbol_imports(&body, &converter_names);
-        if !used_converter_names.is_empty() {
-            render_named_python_import(&mut output, "..models", &used_converter_names);
-        }
         if !body.is_empty() {
             output.push('\n');
             output.push('\n');
             output.push_str(&body);
         }
-        Ok(output)
+        output
     }
 
     fn render_resource(
@@ -1136,16 +963,7 @@ impl<'a> ApiPlanner<'a> {
         service: &RenderedService<'_>,
         resource: &PlannedResource,
         bound_operations: &[ResourceBoundOperation<'_>],
-    ) -> Result<()> {
-        let mut direct_transfer_refs = BTreeSet::new();
-        for field in &resource.fields {
-            collect_direct_transfer_refs(
-                &field.kind,
-                &self.direct_transfer_declarations,
-                &mut direct_transfer_refs,
-            );
-        }
-        let direct_transfer = !direct_transfer_refs.is_empty();
+    ) {
         output.push_str("@dataclasses.dataclass\n");
         output.push_str("class ");
         output.push_str(&resource.type_name);
@@ -1163,129 +981,13 @@ impl<'a> ApiPlanner<'a> {
         }
         if resource.methods.is_empty() {
             output.push_str("\n    pass\n");
-        } else {
-            for method in &resource.methods {
-                output.push_str("\n");
-                self.render_resource_class_method(
-                    output,
-                    service,
-                    resource,
-                    method,
-                    bound_operations,
-                );
-            }
+            return;
         }
-        if direct_transfer {
-            output.push_str("\n\n");
-            self.render_resource_transfer_converter(output, resource)?;
-            output.push_str(
-                "\n\n# Registration stores the converter on the model; the returned class is unused.\n",
-            );
-            output.push_str("temporalio.converter.transfer_type_convertible(_");
-            output.push_str(&resource.type_name);
-            output.push_str("TransferTypeConverter)(");
-            output.push_str(&resource.type_name);
-            output.push_str(")  # pyright: ignore[reportUnusedCallResult]\n");
-        }
-        Ok(())
-    }
 
-    fn render_resource_transfer_converter(
-        &self,
-        output: &mut String,
-        resource: &PlannedResource,
-    ) -> Result<()> {
-        let converter_name = format!("_{}TransferTypeConverter", resource.type_name);
-        output.push_str("class ");
-        output.push_str(&converter_name);
-        output.push_str("(temporalio.converter.TransferTypeConverter[");
-        output.push_str(&resource.type_name);
-        output.push_str(", dict[str, typing.Any]]):\n");
-        output.push_str("    @typing_extensions.override\n");
-        output.push_str("    def from_transfer_type(\n");
-        output.push_str("        self,\n");
-        output.push_str("        value: dict[str, typing.Any],\n");
-        output.push_str("        type_hint: type[");
-        output.push_str(&resource.type_name);
-        output.push_str("],\n");
-        output.push_str("    ) -> ");
-        output.push_str(&resource.type_name);
-        output.push_str(":\n");
-        output.push_str("        _ = type_hint\n");
-        for field in resource.fields.iter().filter(|field| !field.optional) {
-            let attr_name = python_field_name(&field.name);
-            output.push_str("        if ");
-            output.push_str(&python_string_literal(&attr_name));
-            output.push_str(" not in value:\n");
-            output.push_str("            raise ValueError(");
-            output.push_str(&python_string_literal(&format!(
-                "missing required field {}.{attr_name}",
-                resource.type_name
-            )));
-            output.push_str(")\n");
+        for method in &resource.methods {
+            output.push_str("\n");
+            self.render_resource_class_method(output, service, resource, method, bound_operations);
         }
-        output.push_str("        return ");
-        output.push_str(&resource.type_name);
-        output.push_str("(\n");
-        for field in &resource.fields {
-            let attr_name = python_field_name(&field.name);
-            let key = python_string_literal(&attr_name);
-            let raw = if field.optional {
-                format!("value.get({key})")
-            } else {
-                format!("value[{key}]")
-            };
-            let decoded = direct_transfer_decode_expr(
-                self.api_plan,
-                &self.external_models,
-                &self.direct_transfer_declarations,
-                &field.kind,
-                &raw,
-                &BTreeMap::new(),
-                0,
-            )?;
-            let decoded = if field.optional && !matches!(field.kind, PlannedType::Option(_)) {
-                format!("None if {raw} is None else {decoded}")
-            } else {
-                decoded
-            };
-            output.push_str("            ");
-            output.push_str(&attr_name);
-            output.push('=');
-            output.push_str(&decoded);
-            output.push_str(",\n");
-        }
-        output.push_str("        )\n\n");
-        output.push_str("    @typing_extensions.override\n");
-        output.push_str("    def to_transfer_type(\n");
-        output.push_str("        self,\n");
-        output.push_str("        value: ");
-        output.push_str(&resource.type_name);
-        output.push_str(",\n");
-        output.push_str("    ) -> dict[str, typing.Any]:\n");
-        output.push_str("        return {\n");
-        for field in &resource.fields {
-            let attr_name = python_field_name(&field.name);
-            let value_expr = format!("value.{attr_name}");
-            let encoded = direct_transfer_encode_expr(
-                &self.direct_transfer_declarations,
-                &field.kind,
-                &value_expr,
-                0,
-            )?;
-            let encoded = if field.optional && !matches!(field.kind, PlannedType::Option(_)) {
-                format!("None if {value_expr} is None else {encoded}")
-            } else {
-                encoded
-            };
-            output.push_str("            ");
-            output.push_str(&python_string_literal(&attr_name));
-            output.push_str(": ");
-            output.push_str(&encoded);
-            output.push_str(",\n");
-        }
-        output.push_str("        }");
-        Ok(())
     }
 
     fn render_resource_class_method(
@@ -1629,16 +1331,10 @@ impl<'a> ApiPlanner<'a> {
             .collect::<BTreeSet<_>>();
         let output_annotation =
             erase_python_type_parameters(&overload_output_annotation, &output_type_parameters);
-        let local_output_ref = local_python_model_type_expr(&output_ref);
-        let output_type_expr = match operation.output_type() {
-            Some(PlannedType::Record(record)) => python_erased_generic_record_annotation(
-                &local_output_ref,
-                &self
-                    .api_plan
-                    .record_type_parameters(&record.full_name, Language::Python),
-            ),
-            _ => erase_python_type_parameters(&local_output_ref, &output_type_parameters),
-        };
+        let output_type_expr = erase_python_type_parameters(
+            &local_python_model_type_expr(&output_ref),
+            &output_type_parameters,
+        );
         let descriptor_output_ref = match operation.output_type() {
             Some(PlannedType::Record(record)) => python_erased_generic_record_annotation(
                 &output_ref,
@@ -1998,7 +1694,7 @@ impl<'a> ApiPlanner<'a> {
             .iter()
             .map(|case| -> Result<_> {
                 Ok(RenderedVariantCase {
-                    wire_name: case.wire_name.clone(),
+                    name: case.name.clone(),
                     class_name: python_variant_case_class_name(&variant_spec.name, &case.name),
                     type_parameters: case
                         .payload
@@ -2019,15 +1715,14 @@ impl<'a> ApiPlanner<'a> {
                                 .map(|resolved| resolved.annotation)
                         })
                         .transpose()?,
-                    payload_type: case.payload.clone(),
                 })
             })
             .collect::<Result<Vec<_>>>()?;
         self.variants.insert(
             variant_spec.full_name.clone(),
             RenderedVariant {
-                full_name: variant_spec.full_name.clone(),
                 name: variant_spec.name.clone(),
+                proto_backed: self.proto_backed_variants.contains(&variant_spec.full_name),
                 type_parameters: self
                     .api_plan
                     .variant_type_parameters(&variant_spec.full_name, Language::Python)
@@ -2482,524 +2177,10 @@ fn collect_python_language_imports(api_plan: &PlannedSpec) -> Vec<LanguageImport
     imports.into_iter().collect()
 }
 
-fn python_type_parameter_local(parameter: &str) -> String {
-    format!("_{}_type", parameter.to_snake_case())
-}
-
-fn substitute_python_type_parameters(
-    annotation: String,
-    type_parameters: &BTreeMap<String, String>,
-) -> String {
-    type_parameters
-        .iter()
-        .fold(annotation, |annotation, (parameter, replacement)| {
-            replace_python_identifier(&annotation, parameter, replacement)
-        })
-}
-
-fn direct_transfer_type_expr(
-    api_plan: &PlannedSpec,
-    external_models: &PythonExternalModels,
-    value_type: &PlannedType,
-    type_parameters: &BTreeMap<String, String>,
-) -> Result<String> {
-    let annotation = resolve_python_value_type(api_plan, external_models, value_type)?.annotation;
-    Ok(substitute_python_type_parameters(
-        annotation,
-        type_parameters,
-    ))
-}
-
-fn direct_record_converter_name(model_name: &str) -> String {
-    format!("_{model_name}TransferTypeConverter")
-}
-
-fn direct_variant_from_transfer_type_name(variant_name: &str) -> String {
-    format!("_{}_from_transfer_type", variant_name.to_snake_case())
-}
-
-fn direct_variant_to_transfer_type_name(variant_name: &str) -> String {
-    format!("_{}_to_transfer_type", variant_name.to_snake_case())
-}
-
-fn direct_transfer_decode_expr(
-    api_plan: &PlannedSpec,
-    external_models: &PythonExternalModels,
-    direct_transfer_declarations: &BTreeSet<String>,
-    value_type: &PlannedType,
-    value_expr: &str,
-    type_parameters: &BTreeMap<String, String>,
-    depth: usize,
-) -> Result<String> {
-    let expression = match value_type {
-        PlannedType::TypeParameter(parameter) => format!(
-            "temporalio.converter.value_to_type({}, {value_expr})",
-            type_parameters
-                .get(&parameter.name)
-                .map(String::as_str)
-                .unwrap_or("typing.Any")
-        ),
-        PlannedType::Option(inner) => format!(
-            "None if {value_expr} is None else {}",
-            direct_transfer_decode_expr(
-                api_plan,
-                external_models,
-                direct_transfer_declarations,
-                inner,
-                value_expr,
-                type_parameters,
-                depth + 1,
-            )?
-        ),
-        PlannedType::List(inner) => {
-            let item = format!("_item_{depth}");
-            let converted = direct_transfer_decode_expr(
-                api_plan,
-                external_models,
-                direct_transfer_declarations,
-                inner,
-                &item,
-                type_parameters,
-                depth + 1,
-            )?;
-            format!("[{converted} for {item} in {value_expr}]")
-        }
-        PlannedType::Tuple(items) => {
-            let mut converted = items
-                .iter()
-                .enumerate()
-                .map(|(index, item)| {
-                    direct_transfer_decode_expr(
-                        api_plan,
-                        external_models,
-                        direct_transfer_declarations,
-                        item,
-                        &format!("{value_expr}[{index}]"),
-                        type_parameters,
-                        depth + index + 1,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?
-                .join(", ");
-            if items.len() == 1 {
-                converted.push(',');
-            }
-            format!("({converted})")
-        }
-        PlannedType::Map(key, value) => {
-            let key_var = format!("_key_{depth}");
-            let value_var = format!("_value_{depth}");
-            let converted_key = direct_transfer_decode_expr(
-                api_plan,
-                external_models,
-                direct_transfer_declarations,
-                key,
-                &key_var,
-                type_parameters,
-                depth + 1,
-            )?;
-            let converted_value = direct_transfer_decode_expr(
-                api_plan,
-                external_models,
-                direct_transfer_declarations,
-                value,
-                &value_var,
-                type_parameters,
-                depth + 2,
-            )?;
-            format!(
-                "{{{converted_key}: {converted_value} for {key_var}, {value_var} in {value_expr}.items()}}"
-            )
-        }
-        PlannedType::Result { ok, err } => {
-            let ok_value = if let Some(ok) = ok {
-                format!(
-                    "(\"ok\", {})",
-                    direct_transfer_decode_expr(
-                        api_plan,
-                        external_models,
-                        direct_transfer_declarations,
-                        ok,
-                        &format!("{value_expr}[1]"),
-                        type_parameters,
-                        depth + 1,
-                    )?
-                )
-            } else {
-                "(\"ok\",)".to_string()
-            };
-            let err_value = if let Some(err) = err {
-                format!(
-                    "(\"err\", {})",
-                    direct_transfer_decode_expr(
-                        api_plan,
-                        external_models,
-                        direct_transfer_declarations,
-                        err,
-                        &format!("{value_expr}[1]"),
-                        type_parameters,
-                        depth + 1,
-                    )?
-                )
-            } else {
-                "(\"err\",)".to_string()
-            };
-            let ok_len = usize::from(ok.is_some()) + 1;
-            let err_len = usize::from(err.is_some()) + 1;
-            format!(
-                "{ok_value} if len({value_expr}) == {ok_len} and {value_expr}[0] == \"ok\" else {err_value} if len({value_expr}) == {err_len} and {value_expr}[0] == \"err\" else (_invalid for _invalid in ()).throw(ValueError(\"invalid result envelope: \" + repr({value_expr})))"
-            )
-        }
-        PlannedType::Variant(variant)
-            if direct_transfer_declarations.contains(&variant.full_name) =>
-        {
-            let type_expr =
-                direct_transfer_type_expr(api_plan, external_models, value_type, type_parameters)?;
-            format!(
-                "{}({value_expr}, {type_expr})",
-                direct_variant_from_transfer_type_name(&variant.name)
-            )
-        }
-        PlannedType::Record(record) if direct_transfer_declarations.contains(&record.full_name) => {
-            let type_expr =
-                direct_transfer_type_expr(api_plan, external_models, value_type, type_parameters)?;
-            format!(
-                "{}().from_transfer_type({value_expr}, {type_expr})",
-                direct_record_converter_name(&record.model_name)
-            )
-        }
-        PlannedType::External(ExternalTypeSpec::Alias {
-            type_name, target, ..
-        }) if type_name.for_language(Language::Python).is_none() => {
-            return direct_transfer_decode_expr(
-                api_plan,
-                external_models,
-                direct_transfer_declarations,
-                target,
-                value_expr,
-                type_parameters,
-                depth,
-            );
-        }
-        _ => format!(
-            "temporalio.converter.value_to_type({}, {value_expr})",
-            direct_transfer_type_expr(api_plan, external_models, value_type, type_parameters,)?
-        ),
-    };
-    Ok(expression)
-}
-
-fn direct_transfer_encode_expr(
-    direct_transfer_declarations: &BTreeSet<String>,
-    value_type: &PlannedType,
-    value_expr: &str,
-    depth: usize,
-) -> Result<String> {
-    let expression = match value_type {
-        PlannedType::Option(inner) => format!(
-            "None if {value_expr} is None else {}",
-            direct_transfer_encode_expr(
-                direct_transfer_declarations,
-                inner,
-                value_expr,
-                depth + 1,
-            )?
-        ),
-        PlannedType::List(inner) => {
-            let item = format!("_item_{depth}");
-            let converted =
-                direct_transfer_encode_expr(direct_transfer_declarations, inner, &item, depth + 1)?;
-            format!("[{converted} for {item} in {value_expr}]")
-        }
-        PlannedType::Tuple(items) => {
-            let mut converted = items
-                .iter()
-                .enumerate()
-                .map(|(index, item)| {
-                    direct_transfer_encode_expr(
-                        direct_transfer_declarations,
-                        item,
-                        &format!("{value_expr}[{index}]"),
-                        depth + index + 1,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?
-                .join(", ");
-            if items.len() == 1 {
-                converted.push(',');
-            }
-            format!("({converted})")
-        }
-        PlannedType::Map(key, value) => {
-            let key_var = format!("_key_{depth}");
-            let value_var = format!("_value_{depth}");
-            let converted_key = direct_transfer_encode_expr(
-                direct_transfer_declarations,
-                key,
-                &key_var,
-                depth + 1,
-            )?;
-            let converted_value = direct_transfer_encode_expr(
-                direct_transfer_declarations,
-                value,
-                &value_var,
-                depth + 2,
-            )?;
-            format!(
-                "{{{converted_key}: {converted_value} for {key_var}, {value_var} in {value_expr}.items()}}"
-            )
-        }
-        PlannedType::Result { ok, err } => {
-            let ok_value = if let Some(ok) = ok {
-                format!(
-                    "(\"ok\", {})",
-                    direct_transfer_encode_expr(
-                        direct_transfer_declarations,
-                        ok,
-                        &format!("{value_expr}[1]"),
-                        depth + 1,
-                    )?
-                )
-            } else {
-                "(\"ok\",)".to_string()
-            };
-            let err_value = if let Some(err) = err {
-                format!(
-                    "(\"err\", {})",
-                    direct_transfer_encode_expr(
-                        direct_transfer_declarations,
-                        err,
-                        &format!("{value_expr}[1]"),
-                        depth + 1,
-                    )?
-                )
-            } else {
-                "(\"err\",)".to_string()
-            };
-            let ok_len = usize::from(ok.is_some()) + 1;
-            let err_len = usize::from(err.is_some()) + 1;
-            format!(
-                "{ok_value} if len({value_expr}) == {ok_len} and {value_expr}[0] == \"ok\" else {err_value} if len({value_expr}) == {err_len} and {value_expr}[0] == \"err\" else (_invalid for _invalid in ()).throw(ValueError(\"invalid result envelope: \" + repr({value_expr})))"
-            )
-        }
-        PlannedType::Variant(variant)
-            if direct_transfer_declarations.contains(&variant.full_name) =>
-        {
-            format!(
-                "{}({value_expr})",
-                direct_variant_to_transfer_type_name(&variant.name)
-            )
-        }
-        PlannedType::Record(record) if direct_transfer_declarations.contains(&record.full_name) => {
-            format!(
-                "{}().to_transfer_type({value_expr})",
-                direct_record_converter_name(&record.model_name)
-            )
-        }
-        PlannedType::Record(_) => format!("dataclasses.asdict({value_expr})"),
-        PlannedType::External(ExternalTypeSpec::Alias {
-            type_name, target, ..
-        }) if type_name.for_language(Language::Python).is_none() => {
-            return direct_transfer_encode_expr(
-                direct_transfer_declarations,
-                target,
-                value_expr,
-                depth,
-            );
-        }
-        _ => value_expr.to_string(),
-    };
-    Ok(expression)
-}
-
-fn direct_record_public_annotation(model: &RenderedModel) -> String {
-    if model.type_parameters.is_empty() {
-        model.name.clone()
-    } else {
-        format!("{}[{}]", model.name, model.type_parameters.join(", "))
-    }
-}
-
-fn direct_record_field_value_expr(field: &RenderedField) -> String {
-    let key = python_string_literal(&field.attr_name);
-    match &field.default_kind {
-        PythonFieldDefaultKind::Required => format!("value[{key}]"),
-        PythonFieldDefaultKind::None => format!("value.get({key})"),
-        PythonFieldDefaultKind::EmptyList => format!("value.get({key}, [])"),
-        PythonFieldDefaultKind::EmptyDict => format!("value.get({key}, {{}})"),
-        PythonFieldDefaultKind::Expression(expression) => {
-            format!("value.get({key}, {expression})")
-        }
-    }
-}
-
-fn render_direct_record_wire_block(
-    api_plan: &PlannedSpec,
-    external_models: &PythonExternalModels,
-    model: &RenderedModel,
-    planned_model: &RecordSpec<PlannedFamily>,
-    direct_transfer_declarations: &BTreeSet<String>,
-) -> Result<RenderedRecordWireBlock> {
-    let converter_name = format!("_{}TransferTypeConverter", model.name);
-    let model_annotation = direct_record_public_annotation(model);
-    let type_parameters = model
-        .type_parameters
-        .iter()
-        .map(|parameter| (parameter.clone(), python_type_parameter_local(parameter)))
-        .collect::<BTreeMap<_, _>>();
-    let fields = planned_model
-        .fields
-        .values()
-        .filter(|field| field.visibility != RecordFieldVisibility::Omitted)
-        .zip(model.fields.iter())
-        .collect::<Vec<_>>();
-
-    let mut lines = vec![
-        format!(
-            "class {converter_name}(temporalio.converter.TransferTypeConverter[{model_annotation}, dict[str, typing.Any]]):"
-        ),
-        "    @typing_extensions.override".to_string(),
-        "    def from_transfer_type(".to_string(),
-        "        self,".to_string(),
-        "        value: dict[str, typing.Any],".to_string(),
-        format!("        type_hint: type[{model_annotation}],"),
-        format!("    ) -> {model_annotation}:"),
-    ];
-    for (_, field) in &fields {
-        if field.default_kind == PythonFieldDefaultKind::Required {
-            lines.push(format!("        if {:?} not in value:", field.attr_name));
-            lines.push(format!(
-                "            raise ValueError({})",
-                python_string_literal(&format!(
-                    "missing required field {}.{}",
-                    model.name, field.attr_name
-                ))
-            ));
-        }
-    }
-    if !type_parameters.is_empty() {
-        let locals = model
-            .type_parameters
-            .iter()
-            .map(|parameter| type_parameters[parameter].as_str())
-            .collect::<Vec<_>>();
-        let trailing_comma = if locals.len() == 1 { "," } else { "" };
-        lines.push(format!(
-            "        ({}{trailing_comma}) = typing.get_args(type_hint)",
-            locals.join(", "),
-        ));
-    }
-    lines.push(format!("        return {}(", model.name));
-    for (planned_field, rendered_field) in &fields {
-        let value_expr = direct_record_field_value_expr(rendered_field);
-        let conversion_value = value_expr.clone();
-        let uses_rendered_annotation = planned_field
-            .annotation
-            .as_ref()
-            .and_then(|annotation| annotation.for_language(Language::Python))
-            .is_some()
-            || planned_field.function.is_some();
-        let decoded = if uses_rendered_annotation {
-            format!(
-                "temporalio.converter.value_to_type({}, {conversion_value})",
-                substitute_python_type_parameters(
-                    rendered_field.annotation.clone(),
-                    &type_parameters,
-                )
-            )
-        } else {
-            direct_transfer_decode_expr(
-                api_plan,
-                external_models,
-                direct_transfer_declarations,
-                &planned_field.field_type,
-                &conversion_value,
-                &type_parameters,
-                0,
-            )?
-        };
-        let decoded = if matches!(
-            rendered_field.default_kind,
-            PythonFieldDefaultKind::None
-                | PythonFieldDefaultKind::EmptyList
-                | PythonFieldDefaultKind::EmptyDict
-        ) && !matches!(planned_field.field_type, PlannedType::Option(_))
-        {
-            format!("None if {value_expr} is None else {decoded}")
-        } else {
-            decoded
-        };
-        lines.push(format!(
-            "            {}={decoded},",
-            rendered_field.attr_name
-        ));
-    }
-    lines.push("        )".to_string());
-    lines.push(String::new());
-    lines.push("    @typing_extensions.override".to_string());
-    lines.push("    def to_transfer_type(".to_string());
-    lines.push("        self,".to_string());
-    lines.push(format!("        value: {model_annotation},"));
-    lines.push("    ) -> dict[str, typing.Any]:".to_string());
-    lines.push("        return {".to_string());
-    for (planned_field, rendered_field) in &fields {
-        let value_expr = format!("value.{}", rendered_field.attr_name);
-        let uses_rendered_annotation = planned_field
-            .annotation
-            .as_ref()
-            .and_then(|annotation| annotation.for_language(Language::Python))
-            .is_some()
-            || planned_field.function.is_some();
-        let encoded = if uses_rendered_annotation {
-            value_expr.clone()
-        } else {
-            direct_transfer_encode_expr(
-                direct_transfer_declarations,
-                &planned_field.field_type,
-                &value_expr,
-                0,
-            )?
-        };
-        let encoded = if matches!(
-            rendered_field.default_kind,
-            PythonFieldDefaultKind::None
-                | PythonFieldDefaultKind::EmptyList
-                | PythonFieldDefaultKind::EmptyDict
-        ) && !matches!(planned_field.field_type, PlannedType::Option(_))
-        {
-            format!("None if {value_expr} is None else {encoded}")
-        } else {
-            encoded
-        };
-        lines.push(format!(
-            "            {}: {encoded},",
-            python_string_literal(&rendered_field.attr_name)
-        ));
-    }
-    lines.push("        }".to_string());
-
-    Ok(RenderedRecordWireBlock {
-        imports: PythonImports {
-            module_imports: ["temporalio.converter".to_string()].into_iter().collect(),
-        },
-        pre_class_lines: Vec::new(),
-        decorator: None,
-        class_body_lines: Vec::new(),
-        post_class_lines: lines
-            .into_iter()
-            .chain(std::iter::once(String::new()))
-            .chain(std::iter::once(format!(
-                "# Registration stores the converter on the model; the returned class is unused.\ntemporalio.converter.transfer_type_convertible({converter_name})({})  # pyright: ignore[reportUnusedCallResult]",
-                model.name
-            )))
-            .collect(),
-    })
-}
 fn render_record_models(
     models: &[&RenderedModel],
     api_plan: &PlannedSpec,
     external_models: &PythonExternalModels,
-    direct_transfer_declarations: &BTreeSet<String>,
 ) -> Result<RenderedModelFragments> {
     let mut body = String::new();
     let type_parameters = models
@@ -3021,13 +2202,8 @@ fn render_record_models(
         let planned_model = api_plan
             .record(&model.full_name)
             .unwrap_or_else(|| panic!("planned model should exist for {}", model.full_name));
-        let wire_block = external_models.render_record_wire_block(
-            api_plan,
-            model,
-            planned_model,
-            direct_transfer_declarations.contains(&model.full_name),
-            direct_transfer_declarations,
-        )?;
+        let wire_block =
+            external_models.render_record_wire_block(api_plan, model, planned_model)?;
         if let Some(wire_block) = &wire_block {
             for line in &wire_block.pre_class_lines {
                 body.push_str(line);
@@ -3035,15 +2211,6 @@ fn render_record_models(
             }
         }
         render_record_model(&mut body, model, wire_block.as_ref());
-        if let Some(wire_block) = &wire_block
-            && !wire_block.post_class_lines.is_empty()
-        {
-            body.push_str("\n\n");
-            for line in &wire_block.post_class_lines {
-                body.push_str(line);
-                body.push('\n');
-            }
-        }
         if let Some(wire_block) = wire_block {
             wire_blocks.insert(model.full_name.clone(), wire_block);
         }
@@ -3497,19 +2664,37 @@ struct RenderedFlag {
 
 #[derive(Debug)]
 struct RenderedVariant {
-    full_name: String,
     name: String,
+    proto_backed: bool,
     type_parameters: Vec<String>,
     cases: Vec<RenderedVariantCase>,
 }
 
 #[derive(Debug)]
 struct RenderedVariantCase {
-    wire_name: String,
+    name: String,
     class_name: String,
     type_parameters: Vec<String>,
     payload_annotation: Option<String>,
-    payload_type: Option<PlannedType>,
+}
+
+fn sort_python_model_names(names: &mut [String], variants: &IndexMap<String, RenderedVariant>) {
+    names.sort_by_key(|name| {
+        variants
+            .values()
+            .filter(|variant| variant.proto_backed)
+            .find_map(|variant| {
+                if name == &variant.name {
+                    return Some((variant.name.clone(), 0));
+                }
+                variant
+                    .cases
+                    .iter()
+                    .position(|case| name == &case.class_name)
+                    .map(|index| (variant.name.clone(), index + 1))
+            })
+            .unwrap_or_else(|| (name.clone(), 0))
+    });
 }
 
 #[derive(Debug)]
@@ -3537,7 +2722,6 @@ pub(in crate::generator) struct RenderedRecordWireBlock {
     pub(in crate::generator) pre_class_lines: Vec<String>,
     pub(in crate::generator) decorator: Option<String>,
     pub(in crate::generator) class_body_lines: Vec<String>,
-    pub(in crate::generator) post_class_lines: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -4672,11 +3856,9 @@ fn render_models_module(
     support_names: &[String],
     language_imports: &[LanguageImportSpec],
     api_plan: &PlannedSpec,
-    external_models: &PythonExternalModels,
-    direct_transfer_declarations: &BTreeSet<String>,
     inline_model_rebuilds: bool,
     model_hoists: Option<&PythonModelHoists>,
-) -> Result<String> {
+) -> String {
     let mut module_imports = BTreeSet::new();
     module_imports.extend(model_fragments.module_imports.iter().cloned());
     let mut body = String::new();
@@ -4736,13 +3918,7 @@ fn render_models_module(
             body.push_str("\n\n");
         }
         for (index, variant) in variants.iter().enumerate() {
-            render_variant(
-                &mut body,
-                variant,
-                api_plan,
-                external_models,
-                direct_transfer_declarations,
-            )?;
+            render_variant(&mut body, variant);
             if index + 1 != variants.len() {
                 body.push_str("\n\n");
             }
@@ -4813,7 +3989,7 @@ fn render_models_module(
         output.push_str(&body);
     }
 
-    Ok(output)
+    output
 }
 
 fn render_resources_package_init(services: &[RenderedService<'_>]) -> String {
@@ -5910,15 +5086,43 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
     }
 }
 
-fn render_variant(
-    output: &mut String,
-    variant: &RenderedVariant,
-    api_plan: &PlannedSpec,
-    external_models: &PythonExternalModels,
-    direct_transfer_declarations: &BTreeSet<String>,
-) -> Result<()> {
+fn render_variant(output: &mut String, variant: &RenderedVariant) {
+    if variant.proto_backed {
+        render_proto_backed_variant(output, variant);
+        return;
+    }
+
+    output.push_str(variant.name.as_str());
+    output.push_str(" = ");
+    if variant.cases.is_empty() {
+        output.push_str("typing.Never\n");
+        return;
+    }
+    if variant.cases.len() > 1 {
+        output.push_str("(\n    ");
+    }
+    for (index, case) in variant.cases.iter().enumerate() {
+        if index > 0 {
+            output.push_str("\n    | ");
+        }
+        output.push_str("tuple[typing.Literal[");
+        output.push_str(&python_string_literal(&case.name));
+        output.push(']');
+        if let Some(payload_annotation) = &case.payload_annotation {
+            output.push_str(", ");
+            output.push_str(payload_annotation);
+        }
+        output.push(']');
+    }
+    if variant.cases.len() > 1 {
+        output.push_str("\n)");
+    }
+    output.push('\n');
+}
+
+fn render_proto_backed_variant(output: &mut String, variant: &RenderedVariant) {
     for case in &variant.cases {
-        output.push_str("@dataclasses.dataclass(slots=True, init=False)\n");
+        output.push_str("@dataclasses.dataclass(slots=True)\n");
         output.push_str("class ");
         output.push_str(&case.class_name);
         if !case.type_parameters.is_empty() {
@@ -5927,216 +5131,40 @@ fn render_variant(
             output.push_str("])");
         }
         output.push_str(":\n");
-        output.push_str("    tag: typing.Literal[");
-        output.push_str(&python_string_literal(&case.wire_name));
-        output.push_str("] = dataclasses.field(init=False)\n");
         if let Some(payload_annotation) = &case.payload_annotation {
             output.push_str("    value: ");
             output.push_str(payload_annotation);
             output.push('\n');
-        }
-        output.push_str("\n    def __init__(self");
-        if let Some(payload_annotation) = &case.payload_annotation {
-            output.push_str(", value: ");
-            output.push_str(payload_annotation);
-        }
-        output.push_str(") -> None:\n");
-        output.push_str("        self.tag = ");
-        output.push_str(&python_string_literal(&case.wire_name));
-        output.push('\n');
-        if case.payload_annotation.is_some() {
-            output.push_str("        self.value = value\n");
+        } else {
+            output.push_str("    pass\n");
         }
         output.push_str("\n\n");
     }
 
-    output.push_str(variant.name.as_str());
+    output.push_str(&variant.name);
     output.push_str(" = ");
     if variant.cases.is_empty() {
         output.push_str("typing.Never\n");
-    } else {
-        if variant.cases.len() > 1 {
-            output.push_str("(\n    ");
-        }
-        for (index, case) in variant.cases.iter().enumerate() {
-            if index > 0 {
-                output.push_str("\n    | ");
-            }
-            output.push_str(&case.class_name);
-            if !case.type_parameters.is_empty() {
-                output.push('[');
-                output.push_str(&case.type_parameters.join(", "));
-                output.push(']');
-            }
-        }
-        if variant.cases.len() > 1 {
-            output.push_str("\n)");
-        }
-        output.push('\n');
+        return;
     }
-
-    if !direct_transfer_declarations.contains(&variant.full_name) {
-        return Ok(());
+    if variant.cases.len() > 1 {
+        output.push_str("(\n    ");
     }
-
-    let public_annotation = if variant.type_parameters.is_empty() {
-        variant.name.clone()
-    } else {
-        format!("{}[{}]", variant.name, variant.type_parameters.join(", "))
-    };
-    let type_parameters = variant
-        .type_parameters
-        .iter()
-        .map(|parameter| (parameter.clone(), python_type_parameter_local(parameter)))
-        .collect::<BTreeMap<_, _>>();
-    output.push_str("\n\ndef ");
-    output.push_str(&direct_variant_from_transfer_type_name(&variant.name));
-    output.push_str("(\n");
-    output.push_str("    value: typing.Any,\n");
-    output.push_str("    type_hint: object,\n");
-    output.push_str(") -> ");
-    output.push_str(&public_annotation);
-    output.push_str(":\n");
-    output.push_str("    _ = type_hint\n");
-    output.push_str("    if not isinstance(value, dict):\n");
-    output.push_str("        raise ValueError(");
-    output.push_str(&python_string_literal(&format!(
-        "invalid variant envelope {}",
-        variant.name
-    )));
-    output.push_str(")\n");
-    output.push_str("    value = typing.cast(dict[str, typing.Any], value)\n");
-    for parameter in &variant.type_parameters {
-        output.push_str("    ");
-        output.push_str(&type_parameters[parameter]);
-        output.push_str(": typing.Any = typing.Any\n");
-    }
-    if !type_parameters.is_empty() {
-        output.push_str("    _member_types = typing.get_args(type_hint)\n");
-        let generic_case_names = variant
-            .cases
-            .iter()
-            .filter(|case| !case.type_parameters.is_empty())
-            .map(|case| case.class_name.as_str())
-            .collect::<Vec<_>>();
-        if !generic_case_names.is_empty() {
-            output.push_str("    if typing.get_origin(type_hint) in (");
-            output.push_str(&generic_case_names.join(", "));
-            if generic_case_names.len() == 1 {
-                output.push(',');
-            }
-            output.push_str("):\n");
-            output.push_str("        _member_types = (type_hint,)\n");
+    for (index, case) in variant.cases.iter().enumerate() {
+        if index > 0 {
+            output.push_str("\n    | ");
         }
-        output.push_str("    for _member_type in _member_types:\n");
-        for case in variant
-            .cases
-            .iter()
-            .filter(|case| !case.type_parameters.is_empty())
-        {
-            output.push_str("        if typing.get_origin(_member_type) is ");
-            output.push_str(&case.class_name);
-            output.push_str(":\n");
-            output.push_str("            (");
-            output.push_str(
-                &case
-                    .type_parameters
-                    .iter()
-                    .map(|parameter| type_parameters[parameter].as_str())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            );
-            if case.type_parameters.len() == 1 {
-                output.push(',');
-            }
-            output.push_str(") = typing.get_args(_member_type)\n");
-        }
-    }
-    output.push_str("    tag = value.get(\"tag\")\n");
-    for case in &variant.cases {
-        output.push_str("    if tag == ");
-        output.push_str(&python_string_literal(&case.wire_name));
-        output.push_str(":\n");
-        let expected_keys = if case.payload_type.is_some() {
-            "{\"tag\", \"value\"}"
-        } else {
-            "{\"tag\"}"
-        };
-        output.push_str("        if set(value) != ");
-        output.push_str(expected_keys);
-        output.push_str(":\n");
-        let error = if case.payload_type.is_some() {
-            format!(
-                "variant case {}.{} requires one payload",
-                variant.name, case.wire_name
-            )
-        } else {
-            format!(
-                "variant case {}.{} does not accept a payload",
-                variant.name, case.wire_name
-            )
-        };
-        output.push_str("            raise ValueError(");
-        output.push_str(&python_string_literal(&error));
-        output.push_str(")\n");
-        output.push_str("        return ");
         output.push_str(&case.class_name);
-        output.push('(');
-        if let Some(payload) = &case.payload_type {
-            output.push_str(&direct_transfer_decode_expr(
-                api_plan,
-                external_models,
-                direct_transfer_declarations,
-                payload,
-                "value[\"value\"]",
-                &type_parameters,
-                0,
-            )?);
+        if !case.type_parameters.is_empty() {
+            output.push('[');
+            output.push_str(&case.type_parameters.join(", "));
+            output.push(']');
         }
-        output.push_str(")\n");
     }
-    output.push_str("    raise ValueError(f");
-    output.push_str(&python_string_literal(&format!(
-        "unknown variant tag {}: {{tag!r}}",
-        variant.name
-    )));
-    output.push_str(")\n\n\n");
-
-    output.push_str("def ");
-    output.push_str(&direct_variant_to_transfer_type_name(&variant.name));
-    output.push_str("(\n");
-    output.push_str("    value: ");
-    output.push_str(&public_annotation);
-    output.push_str(",\n");
-    output.push_str(") -> typing.Any:\n");
-    output.push_str("    match value:\n");
-    for case in &variant.cases {
-        output.push_str("        case ");
-        output.push_str(&case.class_name);
-        output.push_str("():\n");
-        output.push_str("            return {\"tag\": ");
-        output.push_str(&python_string_literal(&case.wire_name));
-        if let Some(payload) = &case.payload_type {
-            output.push_str(", \"value\": ");
-            output.push_str(&direct_transfer_encode_expr(
-                direct_transfer_declarations,
-                payload,
-                "value.value",
-                0,
-            )?);
-        }
-        output.push_str("}\n");
+    if variant.cases.len() > 1 {
+        output.push_str("\n)");
     }
-    output.push_str(
-        "        case unsupported_value:  # pyright: ignore[reportUnnecessaryComparison]\n",
-    );
-    output.push_str("            raise TypeError(f");
-    output.push_str(&python_string_literal(&format!(
-        "unsupported variant case {}: {{unsupported_value!r}}",
-        variant.name
-    )));
-    output.push_str(")  # pyright: ignore[reportUnreachable]\n");
-    Ok(())
+    output.push('\n');
 }
 
 fn render_resource_client_binder(output: &mut String, resource: &PlannedResource) {
@@ -8453,7 +7481,10 @@ pub(in crate::generator) fn python_variant_case_class_name(
     format!("{variant_name}{}", case_name.to_upper_camel_case())
 }
 
-fn validate_python_variant_case_names(api_plan: &PlannedSpec) -> Result<()> {
+fn validate_python_variant_case_names(
+    api_plan: &PlannedSpec,
+    proto_backed_variants: &BTreeSet<String>,
+) -> Result<()> {
     let mut declarations = BTreeMap::<String, String>::new();
     for entry in api_plan.types.values() {
         let (name, description) = match &entry.declaration {
@@ -8496,10 +7527,13 @@ fn validate_python_variant_case_names(api_plan: &PlannedSpec) -> Result<()> {
         }
     }
 
-    for (_, variant) in api_plan.variants() {
+    for (full_name, variant) in api_plan
+        .variants()
+        .filter(|(full_name, _)| proto_backed_variants.contains(*full_name))
+    {
         for case in &variant.cases {
             let class_name = python_variant_case_class_name(&variant.name, &case.name);
-            let generated_by = format!("variant case `{}.{}`", variant.full_name, case.name);
+            let generated_by = format!("variant case `{full_name}.{}`", case.name);
             if let Some(conflicting_declaration) = declarations.get(&class_name) {
                 return Err(Error::PythonGeneratedNameConflict {
                     name: class_name,

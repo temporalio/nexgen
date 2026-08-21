@@ -28,9 +28,17 @@ interface generic-model-service {
     nested: inner,
   }
 
+  record operation-completion-success {
+    output: output-t,
+  }
+
+  record operation-completion-failure {
+    message: string,
+  }
+
   variant operation-completion-result {
-    success(output-t),
-    failure(string),
+    success(operation-completion-success),
+    failure(operation-completion-failure),
   }
 
   record generic-response {
@@ -39,10 +47,5 @@ interface generic-model-service {
     metadata: option<metadata-t>,
   }
 
-  record reuse-completion-result {
-    %result: operation-completion-result,
-  }
-
   complete: func(request: generic-request) -> generic-response;
-  reuse-complete: func(request: generic-request) -> reuse-completion-result;
 }

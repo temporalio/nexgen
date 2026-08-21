@@ -21,11 +21,6 @@ from ._support import (
 OutputT = typing.TypeVar("OutputT")
 
 
-@dataclasses.dataclass(slots=True)
-class Outcome(typing.Generic[OutputT]):
-    value: OutcomeValue[OutputT]
-
-
 class _OutcomeTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         "Outcome[typing.Any]", temporalio.api.update.v1.message_pb2.Outcome
@@ -80,8 +75,13 @@ class _OutcomeTransferTypeConverter(
         return message
 
 
-# Registration stores the converter on the model; the returned class is unused.
-temporalio.converter.transfer_type_convertible(_OutcomeTransferTypeConverter)(Outcome)  # pyright: ignore[reportUnusedCallResult]
+@typing.cast(
+    typing.Any,
+    temporalio.converter.transfer_type_convertible(_OutcomeTransferTypeConverter),
+)
+@dataclasses.dataclass(slots=True)
+class Outcome(typing.Generic[OutputT]):
+    value: OutcomeValue[OutputT]
 
 
 class _PauseActivityRequestTransferTypeConverter(
@@ -225,47 +225,27 @@ class WorkflowExecution:
     run_id: str
 
 
-@dataclasses.dataclass(slots=True, init=False)
+@dataclasses.dataclass(slots=True)
 class OutcomeValueSuccess(typing.Generic[OutputT]):
-    tag: typing.Literal["success"] = dataclasses.field(init=False)
     value: OutputT
 
-    def __init__(self, value: OutputT) -> None:
-        self.tag = "success"
-        self.value = value
 
-
-@dataclasses.dataclass(slots=True, init=False)
+@dataclasses.dataclass(slots=True)
 class OutcomeValueFailure:
-    tag: typing.Literal["failure"] = dataclasses.field(init=False)
     value: BaseException
-
-    def __init__(self, value: BaseException) -> None:
-        self.tag = "failure"
-        self.value = value
 
 
 OutcomeValue = OutcomeValueSuccess[OutputT] | OutcomeValueFailure
 
 
-@dataclasses.dataclass(slots=True, init=False)
+@dataclasses.dataclass(slots=True)
 class ActivitySelectionId:
-    tag: typing.Literal["id"] = dataclasses.field(init=False)
     value: str
 
-    def __init__(self, value: str) -> None:
-        self.tag = "id"
-        self.value = value
 
-
-@dataclasses.dataclass(slots=True, init=False)
+@dataclasses.dataclass(slots=True)
 class ActivitySelectionType:
-    tag: typing.Literal["type"] = dataclasses.field(init=False)
     value: str
-
-    def __init__(self, value: str) -> None:
-        self.tag = "type"
-        self.value = value
 
 
 ActivitySelection = ActivitySelectionId | ActivitySelectionType

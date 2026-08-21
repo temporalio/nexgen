@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import dataclasses
 import typing
-import typing_extensions
-import temporalio.converter
 
 
 ContextT = typing.TypeVar("ContextT")
@@ -33,166 +31,17 @@ class GenericResponse(typing.Generic[ContextT, OutputT, MetadataT]):
     metadata: MetadataT | None = None
 
 
-class _GenericResponseTransferTypeConverter(
-    temporalio.converter.TransferTypeConverter[
-        GenericResponse[ContextT, OutputT, MetadataT], dict[str, typing.Any]
-    ]
-):
-    @typing_extensions.override
-    def from_transfer_type(
-        self,
-        value: dict[str, typing.Any],
-        type_hint: type[GenericResponse[ContextT, OutputT, MetadataT]],
-    ) -> GenericResponse[ContextT, OutputT, MetadataT]:
-        if "context" not in value:
-            raise ValueError("missing required field GenericResponse.context")
-        if "completion" not in value:
-            raise ValueError("missing required field GenericResponse.completion")
-        (_context_t_type, _output_t_type, _metadata_t_type) = typing.get_args(type_hint)
-        return GenericResponse(
-            context=temporalio.converter.value_to_type(
-                _context_t_type, value["context"]
-            ),
-            completion=_operation_completion_result_from_transfer_type(
-                value["completion"], OperationCompletionResult[_output_t_type]
-            ),
-            metadata=None
-            if value.get("metadata") is None
-            else temporalio.converter.value_to_type(
-                _metadata_t_type, value.get("metadata")
-            ),
-        )
-
-    @typing_extensions.override
-    def to_transfer_type(
-        self,
-        value: GenericResponse[ContextT, OutputT, MetadataT],
-    ) -> dict[str, typing.Any]:
-        return {
-            "context": value.context,
-            "completion": _operation_completion_result_to_transfer_type(
-                value.completion
-            ),
-            "metadata": None if value.metadata is None else value.metadata,
-        }
-
-
-# Registration stores the converter on the model; the returned class is unused.
-temporalio.converter.transfer_type_convertible(_GenericResponseTransferTypeConverter)(
-    GenericResponse
-)  # pyright: ignore[reportUnusedCallResult]
+@dataclasses.dataclass(slots=True)
+class OperationCompletionSuccess(typing.Generic[OutputT]):
+    output: OutputT
 
 
 @dataclasses.dataclass(slots=True)
-class ReuseCompletionResult(typing.Generic[OutputT]):
-    result: OperationCompletionResult[OutputT]
-
-
-class _ReuseCompletionResultTransferTypeConverter(
-    temporalio.converter.TransferTypeConverter[
-        ReuseCompletionResult[OutputT], dict[str, typing.Any]
-    ]
-):
-    @typing_extensions.override
-    def from_transfer_type(
-        self,
-        value: dict[str, typing.Any],
-        type_hint: type[ReuseCompletionResult[OutputT]],
-    ) -> ReuseCompletionResult[OutputT]:
-        if "result" not in value:
-            raise ValueError("missing required field ReuseCompletionResult.result")
-        (_output_t_type,) = typing.get_args(type_hint)
-        return ReuseCompletionResult(
-            result=_operation_completion_result_from_transfer_type(
-                value["result"], OperationCompletionResult[_output_t_type]
-            ),
-        )
-
-    @typing_extensions.override
-    def to_transfer_type(
-        self,
-        value: ReuseCompletionResult[OutputT],
-    ) -> dict[str, typing.Any]:
-        return {
-            "result": _operation_completion_result_to_transfer_type(value.result),
-        }
-
-
-# Registration stores the converter on the model; the returned class is unused.
-temporalio.converter.transfer_type_convertible(
-    _ReuseCompletionResultTransferTypeConverter
-)(ReuseCompletionResult)  # pyright: ignore[reportUnusedCallResult]
-
-
-@dataclasses.dataclass(slots=True, init=False)
-class OperationCompletionResultSuccess(typing.Generic[OutputT]):
-    tag: typing.Literal["success"] = dataclasses.field(init=False)
-    value: OutputT
-
-    def __init__(self, value: OutputT) -> None:
-        self.tag = "success"
-        self.value = value
-
-
-@dataclasses.dataclass(slots=True, init=False)
-class OperationCompletionResultFailure:
-    tag: typing.Literal["failure"] = dataclasses.field(init=False)
-    value: str
-
-    def __init__(self, value: str) -> None:
-        self.tag = "failure"
-        self.value = value
+class OperationCompletionFailure:
+    message: str
 
 
 OperationCompletionResult = (
-    OperationCompletionResultSuccess[OutputT] | OperationCompletionResultFailure
+    tuple[typing.Literal["success"], OperationCompletionSuccess[OutputT]]
+    | tuple[typing.Literal["failure"], OperationCompletionFailure]
 )
-
-
-def _operation_completion_result_from_transfer_type(
-    value: typing.Any,
-    type_hint: object,
-) -> OperationCompletionResult[OutputT]:
-    _ = type_hint
-    if not isinstance(value, dict):
-        raise ValueError("invalid variant envelope OperationCompletionResult")
-    value = typing.cast(dict[str, typing.Any], value)
-    _output_t_type: typing.Any = typing.Any
-    _member_types = typing.get_args(type_hint)
-    if typing.get_origin(type_hint) in (OperationCompletionResultSuccess,):
-        _member_types = (type_hint,)
-    for _member_type in _member_types:
-        if typing.get_origin(_member_type) is OperationCompletionResultSuccess:
-            (_output_t_type,) = typing.get_args(_member_type)
-    tag = value.get("tag")
-    if tag == "success":
-        if set(value) != {"tag", "value"}:
-            raise ValueError(
-                "variant case OperationCompletionResult.success requires one payload"
-            )
-        return OperationCompletionResultSuccess(
-            temporalio.converter.value_to_type(_output_t_type, value["value"])
-        )
-    if tag == "failure":
-        if set(value) != {"tag", "value"}:
-            raise ValueError(
-                "variant case OperationCompletionResult.failure requires one payload"
-            )
-        return OperationCompletionResultFailure(
-            temporalio.converter.value_to_type(str, value["value"])
-        )
-    raise ValueError(f"unknown variant tag OperationCompletionResult: {tag!r}")
-
-
-def _operation_completion_result_to_transfer_type(
-    value: OperationCompletionResult[OutputT],
-) -> typing.Any:
-    match value:
-        case OperationCompletionResultSuccess():
-            return {"tag": "success", "value": value.value}
-        case OperationCompletionResultFailure():
-            return {"tag": "failure", "value": value.value}
-        case unsupported_value:  # pyright: ignore[reportUnnecessaryComparison]
-            raise TypeError(
-                f"unsupported variant case OperationCompletionResult: {unsupported_value!r}"
-            )  # pyright: ignore[reportUnreachable]

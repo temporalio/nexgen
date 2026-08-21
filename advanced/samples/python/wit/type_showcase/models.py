@@ -5,8 +5,6 @@ from __future__ import annotations
 import dataclasses
 import enum
 import typing
-import typing_extensions
-import temporalio.converter
 
 
 class UserStatus(enum.IntEnum):
@@ -45,45 +43,6 @@ class SetProfileRequest:
     profile: UserProfile
 
 
-class _SetProfileRequestTransferTypeConverter(
-    temporalio.converter.TransferTypeConverter[SetProfileRequest, dict[str, typing.Any]]
-):
-    @typing_extensions.override
-    def from_transfer_type(
-        self,
-        value: dict[str, typing.Any],
-        type_hint: type[SetProfileRequest],
-    ) -> SetProfileRequest:
-        if "user_id" not in value:
-            raise ValueError("missing required field SetProfileRequest.user_id")
-        if "profile" not in value:
-            raise ValueError("missing required field SetProfileRequest.profile")
-        return SetProfileRequest(
-            user_id=temporalio.converter.value_to_type(str, value["user_id"]),
-            profile=_UserProfileTransferTypeConverter().from_transfer_type(
-                value["profile"], UserProfile
-            ),
-        )
-
-    @typing_extensions.override
-    def to_transfer_type(
-        self,
-        value: SetProfileRequest,
-    ) -> dict[str, typing.Any]:
-        return {
-            "user_id": value.user_id,
-            "profile": _UserProfileTransferTypeConverter().to_transfer_type(
-                value.profile
-            ),
-        }
-
-
-# Registration stores the converter on the model; the returned class is unused.
-temporalio.converter.transfer_type_convertible(_SetProfileRequestTransferTypeConverter)(
-    SetProfileRequest
-)  # pyright: ignore[reportUnusedCallResult]
-
-
 @dataclasses.dataclass(slots=True, kw_only=True)
 class UserProfile:
     tags: list[str] | None = dataclasses.field(default_factory=list)
@@ -92,95 +51,6 @@ class UserProfile:
     sync_state: tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]
     notification_target: NotificationTarget
     address: PostalAddress | None = None
-
-
-class _UserProfileTransferTypeConverter(
-    temporalio.converter.TransferTypeConverter[UserProfile, dict[str, typing.Any]]
-):
-    @typing_extensions.override
-    def from_transfer_type(
-        self,
-        value: dict[str, typing.Any],
-        type_hint: type[UserProfile],
-    ) -> UserProfile:
-        if "capabilities" not in value:
-            raise ValueError("missing required field UserProfile.capabilities")
-        if "sync_state" not in value:
-            raise ValueError("missing required field UserProfile.sync_state")
-        if "notification_target" not in value:
-            raise ValueError("missing required field UserProfile.notification_target")
-        return UserProfile(
-            tags=None
-            if value.get("tags", []) is None
-            else [
-                temporalio.converter.value_to_type(str, _item_0)
-                for _item_0 in value.get("tags", [])
-            ],
-            metadata=None
-            if value.get("metadata", {}) is None
-            else {
-                temporalio.converter.value_to_type(
-                    str, _key_0
-                ): temporalio.converter.value_to_type(str, _value_0)
-                for _key_0, _value_0 in value.get("metadata", {}).items()
-            },
-            capabilities=temporalio.converter.value_to_type(
-                UserCapability, value["capabilities"]
-            ),
-            sync_state=(
-                "ok",
-                temporalio.converter.value_to_type(str, value["sync_state"][1]),
-            )
-            if len(value["sync_state"]) == 2 and value["sync_state"][0] == "ok"
-            else (
-                "err",
-                temporalio.converter.value_to_type(str, value["sync_state"][1]),
-            )
-            if len(value["sync_state"]) == 2 and value["sync_state"][0] == "err"
-            else (_invalid for _invalid in ()).throw(
-                ValueError("invalid result envelope: " + repr(value["sync_state"]))
-            ),
-            notification_target=_notification_target_from_transfer_type(
-                value["notification_target"], NotificationTarget
-            ),
-            address=None
-            if value.get("address") is None
-            else temporalio.converter.value_to_type(
-                PostalAddress, value.get("address")
-            ),
-        )
-
-    @typing_extensions.override
-    def to_transfer_type(
-        self,
-        value: UserProfile,
-    ) -> dict[str, typing.Any]:
-        return {
-            "tags": None if value.tags is None else [_item_0 for _item_0 in value.tags],
-            "metadata": None
-            if value.metadata is None
-            else {_key_0: _value_0 for _key_0, _value_0 in value.metadata.items()},
-            "capabilities": value.capabilities,
-            "sync_state": ("ok", value.sync_state[1])
-            if len(value.sync_state) == 2 and value.sync_state[0] == "ok"
-            else ("err", value.sync_state[1])
-            if len(value.sync_state) == 2 and value.sync_state[0] == "err"
-            else (_invalid for _invalid in ()).throw(
-                ValueError("invalid result envelope: " + repr(value.sync_state))
-            ),
-            "notification_target": _notification_target_to_transfer_type(
-                value.notification_target
-            ),
-            "address": None
-            if value.address is None
-            else dataclasses.asdict(value.address),
-        }
-
-
-# Registration stores the converter on the model; the returned class is unused.
-temporalio.converter.transfer_type_convertible(_UserProfileTransferTypeConverter)(
-    UserProfile
-)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -216,82 +86,8 @@ class DeactivateRequest:
     reason: str | None = None
 
 
-@dataclasses.dataclass(slots=True, init=False)
-class NotificationTargetEmail:
-    tag: typing.Literal["email"] = dataclasses.field(init=False)
-    value: str
-
-    def __init__(self, value: str) -> None:
-        self.tag = "email"
-        self.value = value
-
-
-@dataclasses.dataclass(slots=True, init=False)
-class NotificationTargetSms:
-    tag: typing.Literal["sms"] = dataclasses.field(init=False)
-    value: str
-
-    def __init__(self, value: str) -> None:
-        self.tag = "sms"
-        self.value = value
-
-
-@dataclasses.dataclass(slots=True, init=False)
-class NotificationTargetNone:
-    tag: typing.Literal["none"] = dataclasses.field(init=False)
-
-    def __init__(self) -> None:
-        self.tag = "none"
-
-
 NotificationTarget = (
-    NotificationTargetEmail | NotificationTargetSms | NotificationTargetNone
+    tuple[typing.Literal["email"], str]
+    | tuple[typing.Literal["sms"], str]
+    | tuple[typing.Literal["none"]]
 )
-
-
-def _notification_target_from_transfer_type(
-    value: typing.Any,
-    type_hint: object,
-) -> NotificationTarget:
-    _ = type_hint
-    if not isinstance(value, dict):
-        raise ValueError("invalid variant envelope NotificationTarget")
-    value = typing.cast(dict[str, typing.Any], value)
-    tag = value.get("tag")
-    if tag == "email":
-        if set(value) != {"tag", "value"}:
-            raise ValueError(
-                "variant case NotificationTarget.email requires one payload"
-            )
-        return NotificationTargetEmail(
-            temporalio.converter.value_to_type(str, value["value"])
-        )
-    if tag == "sms":
-        if set(value) != {"tag", "value"}:
-            raise ValueError("variant case NotificationTarget.sms requires one payload")
-        return NotificationTargetSms(
-            temporalio.converter.value_to_type(str, value["value"])
-        )
-    if tag == "none":
-        if set(value) != {"tag"}:
-            raise ValueError(
-                "variant case NotificationTarget.none does not accept a payload"
-            )
-        return NotificationTargetNone()
-    raise ValueError(f"unknown variant tag NotificationTarget: {tag!r}")
-
-
-def _notification_target_to_transfer_type(
-    value: NotificationTarget,
-) -> typing.Any:
-    match value:
-        case NotificationTargetEmail():
-            return {"tag": "email", "value": value.value}
-        case NotificationTargetSms():
-            return {"tag": "sms", "value": value.value}
-        case NotificationTargetNone():
-            return {"tag": "none"}
-        case unsupported_value:  # pyright: ignore[reportUnnecessaryComparison]
-            raise TypeError(
-                f"unsupported variant case NotificationTarget: {unsupported_value!r}"
-            )  # pyright: ignore[reportUnreachable]

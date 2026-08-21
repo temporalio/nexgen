@@ -12,13 +12,21 @@ export function requiredField<T>(
 }
 
 export type OperationCompletionResult<OutputT> =
-  | { tag: "success"; value: OutputT }
-  | { tag: "failure"; value: string };
+  | { tag: "success"; value: OperationCompletionSuccess<OutputT> }
+  | { tag: "failure"; value: OperationCompletionFailure };
 
 export interface GenericResponse<ContextT, OutputT, MetadataT> {
   context: ContextT;
   completion: OperationCompletionResult<OutputT>;
   metadata?: MetadataT;
+}
+
+export interface OperationCompletionSuccess<OutputT> {
+  output: OutputT;
+}
+
+export interface OperationCompletionFailure {
+  message: string;
 }
 
 export interface GenericRequest<ContextT> {
@@ -30,8 +38,4 @@ export interface GenericRequest<ContextT> {
 
 export interface Inner<ContextT> {
   value: ContextT;
-}
-
-export interface ReuseCompletionResult<OutputT> {
-  result: OperationCompletionResult<OutputT>;
 }

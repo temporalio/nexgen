@@ -33,23 +33,6 @@ namespace Nexgen.GenericModelService
     }
 
     [GeneratedCode("nexgen", null)]
-    public class ReuseCompleteOptions<ContextT>
-    {
-        public ReuseCompleteOptions(ContextT context, IReadOnlyList<ContextT> contexts, IReadOnlyDictionary<string, ContextT> byName, Inner<ContextT> nested)
-        {
-            Context = context;
-            Contexts = contexts;
-            ByName = byName;
-            Nested = nested;
-        }
-
-        public ContextT Context { get; set; }
-        public IReadOnlyList<ContextT> Contexts { get; set; }
-        public IReadOnlyDictionary<string, ContextT> ByName { get; set; }
-        public Inner<ContextT> Nested { get; set; }
-    }
-
-    [GeneratedCode("nexgen", null)]
     public static class Operations
     {
         [GeneratedCode("nexgen", null)]
@@ -69,22 +52,6 @@ namespace Nexgen.GenericModelService
         {
             var request = new GenericRequest<ContextT>(options.Context, options.Contexts, options.ByName, options.Nested);
             return CompleteAsync(request);
-        }
-
-        [GeneratedCode("nexgen", null)]
-        private static async Task<ReuseCompletionResult<object>> ReuseCompleteAsync<ContextT>(GenericRequest<ContextT> request)
-        {
-            var client = Workflow.CreateNexusWorkflowClient("GenericModelService", GenericModelServiceEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<ReuseCompletionResult<object>>("ReuseComplete", request).ConfigureAwait(true);
-            return result;
-        }
-
-        /// <param name="options">Options for the operation.</param>
-        [GeneratedCode("nexgen", null)]
-        public static Task<ReuseCompletionResult<object>> ReuseCompleteAsync<ContextT>(ReuseCompleteOptions<ContextT> options)
-        {
-            var request = new GenericRequest<ContextT>(options.Context, options.Contexts, options.ByName, options.Nested);
-            return ReuseCompleteAsync(request);
         }
 
     }

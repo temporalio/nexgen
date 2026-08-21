@@ -54,4 +54,6 @@ def test_unparameterized_proto_backed_generic_decodes_payload_values() -> None:
     )
 
     payload = converter.to_payload(model)
-    assert converter.from_payload(payload, PayloadBackedEnvelope) == model
+    decoded = converter.from_payload(payload, PayloadBackedEnvelope)
+
+    assert decoded == model

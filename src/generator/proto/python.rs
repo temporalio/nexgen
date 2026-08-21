@@ -1082,6 +1082,8 @@ fn render_record_wire_block(
     }
     let wrote_method = true;
     {
+        let generic_oneof = !model.type_parameters.is_empty()
+            && proto_fields.iter().any(|field| field.oneof.is_some());
         if model.fields.is_empty() {
             if wrote_method {
                 output.push('\n');
@@ -1101,7 +1103,7 @@ fn render_record_wire_block(
         output.push_str("    ) -> ");
         output.push_str(&proto_ref.type_ref);
         output.push_str(":\n");
-        if !model.type_parameters.is_empty() {
+        if generic_oneof {
             output.push_str("        runtime_value: typing.Any = value\n");
         }
         output.push_str("        message = ");
@@ -1117,10 +1119,10 @@ fn render_record_wire_block(
         {
             let value_expr = format!(
                 "{}.{}",
-                if model.type_parameters.is_empty() {
-                    "value"
-                } else {
+                if generic_oneof {
                     "runtime_value"
+                } else {
+                    "value"
                 },
                 rendered_field.attr_name
             );
@@ -1131,7 +1133,7 @@ fn render_record_wire_block(
                 rendered_field,
                 proto_field,
                 &value_expr,
-                !model.type_parameters.is_empty(),
+                generic_oneof,
             );
             for line in &write.lines {
                 output.push_str("        ");
@@ -1155,31 +1157,20 @@ fn render_record_wire_block(
             }
         }
     }
-    pre_class_lines.extend(output.lines().map(str::to_string));
-    let generic = !model.type_parameters.is_empty();
-    let (pre_class_lines, decorator, post_class_lines) = if generic {
-        let mut post_class_lines = pre_class_lines;
-        post_class_lines.push(String::new());
-        post_class_lines.push(format!(
-            "# Registration stores the converter on the model; the returned class is unused.\ntemporalio.converter.transfer_type_convertible({converter_name})({})  # pyright: ignore[reportUnusedCallResult]",
-            model.name
-        ));
-        (Vec::new(), None, post_class_lines)
-    } else {
-        (
-            pre_class_lines,
-            Some(format!(
-                "@temporalio.converter.transfer_type_convertible({converter_name})"
-            )),
-            Vec::new(),
-        )
-    };
     Ok(Some(RenderedRecordWireBlock {
         imports,
-        pre_class_lines,
-        decorator,
+        pre_class_lines: {
+            pre_class_lines.extend(output.lines().map(str::to_string));
+            pre_class_lines
+        },
+        decorator: Some(if model.type_parameters.is_empty() {
+            format!("@temporalio.converter.transfer_type_convertible({converter_name})")
+        } else {
+            format!(
+                "@typing.cast(typing.Any, temporalio.converter.transfer_type_convertible({converter_name}))"
+            )
+        }),
         class_body_lines: Vec::new(),
-        post_class_lines,
     }))
 }
 

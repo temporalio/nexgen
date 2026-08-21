@@ -16,7 +16,7 @@ describe("generic models generated output", () => {
     };
     const completion: OperationCompletionResult<number> = {
       tag: "success",
-      value: 42,
+      value: { output: 42 },
     };
     const response: GenericResponse<string, number, boolean> = {
       context: request.context,
@@ -25,6 +25,6 @@ describe("generic models generated output", () => {
     };
 
     expect(response.context).toBe("context");
-    expect(response.completion).toEqual({ tag: "success", value: 42 });
+    expect(response.completion).toEqual({ tag: "success", value: { output: 42 } });
   });
 });
