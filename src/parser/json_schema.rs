@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, btree_map};
+use std::collections::{BTreeMap, BTreeSet, VecDeque, btree_map};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -172,7 +172,10 @@ fn schema_extra_keyword_is_known(keyword: &str) -> bool {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum TypeKey {
     Root(PathBuf),
-    Def(PathBuf, String),
+    /// Names of each definition in an RFC 6901 `$defs` chain, outermost
+    /// first. Keeping tokens separate avoids confusing an escaped `/` inside a
+    /// definition name with a pointer path separator.
+    Def(PathBuf, Vec<String>),
 }
 
 #[derive(Clone, Debug)]
@@ -200,17 +203,14 @@ pub fn load_api_spec_from_json_schema_for_language_with_inputs(
     language: Language,
     input_paths: &[PathBuf],
 ) -> Result<ApiSpec> {
-    let sources = input_paths
-        .iter()
-        .map(|path| {
-            let input = fs::read_to_string(path).map_err(|source| Error::ReadFile {
-                path: path.clone(),
-                source,
-            })?;
-            Ok((path.clone(), input))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    api_spec_from_json_schema_sources(language, sources)
+    let sources = expand_json_schema_sources(input_paths)?;
+    api_spec_from_json_schema_sources(
+        language,
+        sources
+            .into_iter()
+            .map(|source| (source.path, source.input))
+            .collect(),
+    )
 }
 
 pub fn load_api_spec_tree_from_json_schema_for_language_with_inputs(
@@ -228,48 +228,76 @@ fn expand_json_schema_sources(input_paths: &[PathBuf]) -> Result<Vec<JsonSource>
             reason: "at least one JSON schema input path is required".to_string(),
         });
     }
-    let mut sources = Vec::new();
+    let mut source_inputs = BTreeMap::<PathBuf, String>::new();
     for input_path in input_paths {
         if input_path.is_dir() {
-            let source_root = canonical(input_path);
             let mut files = Vec::new();
             collect_json_schema_files(input_path, &mut files)?;
             files.sort();
             for path in files {
-                let relative_path =
-                    normalize(path.strip_prefix(input_path).unwrap_or(path.as_path()));
-                let input = fs::read_to_string(&path).map_err(|source| Error::ReadFile {
-                    path: path.clone(),
-                    source,
-                })?;
-                sources.push(JsonSource {
-                    path,
-                    source_root: source_root.clone(),
-                    relative_path,
-                    input,
-                });
+                insert_json_schema_source(&path, &mut source_inputs)?;
             }
         } else {
-            let input = fs::read_to_string(input_path).map_err(|source| Error::ReadFile {
-                path: input_path.clone(),
-                source,
-            })?;
-            let source_root = input_path
-                .parent()
-                .map(canonical)
-                .unwrap_or_else(|| PathBuf::from("."));
-            let relative_path = input_path
-                .file_name()
-                .map(PathBuf::from)
-                .unwrap_or_else(|| input_path.clone());
-            sources.push(JsonSource {
-                path: input_path.clone(),
-                source_root,
-                relative_path,
-                input,
-            });
+            insert_json_schema_source(input_path, &mut source_inputs)?;
         }
     }
+
+    // The input set is the transitive closure of local file refs, not merely
+    // the paths named on the command line. Scan raw values so refs inside dead
+    // `$defs` are included too: those definitions are generated API surface and
+    // therefore their dependencies must be available.
+    let mut pending = source_inputs.keys().cloned().collect::<VecDeque<_>>();
+    while let Some(path) = pending.pop_front() {
+        let input = source_inputs
+            .get(&path)
+            .expect("queued JSON schema source should be present");
+        let document =
+            serde_yaml::from_str::<Document>(input).map_err(|error| Error::JsonSchemaParse {
+                path: path.clone(),
+                message: error.to_string(),
+            })?;
+        // Diagnose malformed/unknown authored grammar before following refs it
+        // may have placed in a position that is not a schema at all.
+        validate_raw_document_grammar(&path, &document)?;
+        let raw = serde_yaml::from_str::<Value>(input).map_err(|error| Error::JsonSchemaParse {
+            path: path.clone(),
+            message: error.to_string(),
+        })?;
+        let mut references = Vec::new();
+        collect_local_ref_file_parts(&raw, &mut references);
+        for file_part in references {
+            let target = normalize(
+                &path
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .join(&file_part),
+            );
+            let target = canonical(&target);
+            if source_inputs.contains_key(&target) {
+                continue;
+            }
+            insert_json_schema_source(&target, &mut source_inputs)?;
+            pending.push_back(target);
+        }
+    }
+
+    let source_root =
+        common_source_root(source_inputs.keys()).ok_or_else(|| Error::InvalidJsonSchema {
+            path: PathBuf::from("<input>"),
+            reason: "could not determine a common root for the JSON schema input set".to_string(),
+        })?;
+    let mut sources = source_inputs
+        .into_iter()
+        .map(|(path, input)| JsonSource {
+            relative_path: normalize(
+                path.strip_prefix(&source_root)
+                    .expect("common source root must prefix every input path"),
+            ),
+            path,
+            source_root: source_root.clone(),
+            input,
+        })
+        .collect::<Vec<_>>();
     sources.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     let mut seen = BTreeMap::<PathBuf, PathBuf>::new();
     for source in &sources {
@@ -285,6 +313,66 @@ fn expand_json_schema_sources(input_paths: &[PathBuf]) -> Result<Vec<JsonSource>
         }
     }
     Ok(sources)
+}
+
+fn insert_json_schema_source(path: &Path, sources: &mut BTreeMap<PathBuf, String>) -> Result<()> {
+    let input = fs::read_to_string(path).map_err(|source| Error::ReadFile {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    sources.entry(canonical(path)).or_insert(input);
+    Ok(())
+}
+
+fn collect_local_ref_file_parts(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::Object(entries) => {
+            if let Some(Value::String(reference)) = entries.get("$ref") {
+                let file_part = reference
+                    .split_once('#')
+                    .map_or(reference.as_str(), |(file, _)| file);
+                if !file_part.is_empty() && !ref_file_part_has_uri_scheme(file_part) {
+                    out.push(file_part.to_string());
+                }
+            }
+            for child in entries.values() {
+                collect_local_ref_file_parts(child, out);
+            }
+        }
+        Value::Array(entries) => {
+            for child in entries {
+                collect_local_ref_file_parts(child, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn ref_file_part_has_uri_scheme(file_part: &str) -> bool {
+    let Some((scheme, _)) = file_part.split_once(':') else {
+        return false;
+    };
+    let mut characters = scheme.chars();
+    characters
+        .next()
+        .is_some_and(|first| first.is_ascii_alphabetic())
+        && characters.all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '+' | '-' | '.')
+        })
+}
+
+fn common_source_root<'a>(paths: impl Iterator<Item = &'a PathBuf>) -> Option<PathBuf> {
+    let mut paths = paths;
+    let first = paths.next()?;
+    let mut root = first.parent()?.to_path_buf();
+    for path in paths {
+        while !path.starts_with(&root) {
+            if !root.pop() {
+                return None;
+            }
+        }
+    }
+    Some(root)
 }
 
 fn collect_json_schema_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
@@ -558,7 +646,7 @@ fn parse_json_documents(
     // schema in place (merging/flattening `allOf` into a single materialized
     // schema) so the rest of the pipeline — validation, ref collection, and every
     // backend — sees a plain merged schema with no combinator residue.
-    let raw_models = collect_raw_models(&docs);
+    let raw_models = collect_raw_models(&docs)?;
     let doc_paths: BTreeSet<PathBuf> = docs.keys().cloned().collect();
     let merge_ctx = MergeCtx {
         doc_paths: &doc_paths,
@@ -576,9 +664,7 @@ fn parse_json_documents(
     for (path, doc) in docs.values() {
         validate_document(path, doc)?;
         if let Some(defs) = &doc.defs {
-            for (name, schema) in defs {
-                validate_model_schema(path, schema, &format!("$defs.{name}"))?;
-            }
+            validate_def_model_tree(path, defs, &[])?;
         }
         if root_is_schema_shaped(&doc.root) && !doc.root.is_bare_ref() {
             validate_model_schema(path, &doc.root, "root schema")?;
@@ -595,17 +681,7 @@ fn parse_json_documents(
     let mut models = BTreeMap::<TypeKey, JsonModel>::new();
     for (canonical_path, (path, doc)) in &docs {
         if let Some(defs) = &doc.defs {
-            for (name, schema) in defs {
-                models.insert(
-                    TypeKey::Def(canonical_path.clone(), name.clone()),
-                    JsonModel {
-                        full_name: name.clone(),
-                        canonical_path: canonical_path.clone(),
-                        model_name: name.to_upper_camel_case(),
-                        schema: schema.clone(),
-                    },
-                );
-            }
+            collect_json_models_from_defs(path, canonical_path, defs, &[], &mut models)?;
         }
         if root_is_schema_shaped(&doc.root) && !doc.root.is_bare_ref() {
             let model_name = root_model_name(path);
@@ -646,6 +722,23 @@ fn parse_json_documents(
     validate_reference_satisfiability(&docs, &models)?;
 
     Ok(ParsedJsonDocuments { docs, models })
+}
+
+fn validate_def_model_tree(
+    path: &Path,
+    defs: &IndexMap<String, Schema>,
+    parent_names: &[String],
+) -> Result<()> {
+    for (name, schema) in defs {
+        let mut names = parent_names.to_vec();
+        names.push(name.clone());
+        let context = def_context(&names);
+        validate_model_schema(path, schema, &context)?;
+        if let Some(nested) = nested_defs(path, schema, &context)? {
+            validate_def_model_tree(path, &nested, &names)?;
+        }
+    }
+    Ok(())
 }
 
 fn api_spec_from_parsed_json_documents(
@@ -1410,13 +1503,18 @@ fn validate_schema_common(path: &Path, schema: &Schema, context: &str) -> Result
             ),
         });
     }
-    if let Some(reference) = &schema.reference
-        && (reference.starts_with("http://") || reference.starts_with("https://"))
-    {
-        return Err(Error::InvalidJsonSchema {
-            path: path.to_path_buf(),
-            reason: format!("{context}: remote `$ref` `{reference}` is not supported"),
-        });
+    if let Some(reference) = &schema.reference {
+        let file_part = reference
+            .split_once('#')
+            .map_or(reference.as_str(), |(file, _)| file);
+        if ref_file_part_has_uri_scheme(file_part) {
+            return Err(Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!(
+                    "{context}: remote `$ref` `{reference}` is not supported; references must name local files without a URI scheme"
+                ),
+            });
+        }
     }
     // `not` has degenerate forms the spec calls out with distinct diagnostics.
     if let Some(negated) = schema.extra.get("not") {
@@ -3082,7 +3180,10 @@ fn validate_reference_satisfiability(
                     .map(|model| model.full_name.clone())
                     .unwrap_or_else(|| match type_key {
                         TypeKey::Root(path) => root_type_name(path),
-                        TypeKey::Def(_, name) => name.clone(),
+                        TypeKey::Def(_, names) => names
+                            .last()
+                            .cloned()
+                            .unwrap_or_else(|| "<definition>".to_string()),
                     })
             };
             let path = cycle.iter().map(display).collect::<Vec<_>>().join(" → ");
@@ -3106,19 +3207,21 @@ fn validate_model_refs(
     docs: &IndexMap<PathBuf, (PathBuf, Document)>,
     models: &BTreeMap<TypeKey, JsonModel>,
 ) -> Result<()> {
+    for model in models.values() {
+        let path = docs
+            .get(&model.canonical_path)
+            .map(|(path, _)| path.as_path())
+            .unwrap_or(model.canonical_path.as_path());
+        validate_schema_refs(
+            path,
+            &model.canonical_path,
+            &model.schema,
+            &model.full_name,
+            docs,
+            models,
+        )?;
+    }
     for (canonical_path, (path, doc)) in docs {
-        if let Some(defs) = &doc.defs {
-            for (name, schema) in defs {
-                validate_schema_refs(
-                    path,
-                    canonical_path,
-                    schema,
-                    &format!("$defs.{name}"),
-                    docs,
-                    models,
-                )?;
-            }
-        }
         if let Some(services) = &doc.services {
             for (service_name, service) in services {
                 for (operation_name, operation) in &service.operations {
@@ -3228,22 +3331,21 @@ fn validate_all_unions(
     docs: &IndexMap<PathBuf, (PathBuf, Document)>,
     models: &BTreeMap<TypeKey, JsonModel>,
 ) -> Result<()> {
+    for model in models.values() {
+        let path = docs
+            .get(&model.canonical_path)
+            .map(|(path, _)| path.as_path())
+            .unwrap_or(model.canonical_path.as_path());
+        validate_schema_unions(
+            path,
+            &model.canonical_path,
+            &model.schema,
+            &model.full_name,
+            docs,
+            models,
+        )?;
+    }
     for (canonical_path, (path, doc)) in docs {
-        if let Some(defs) = &doc.defs {
-            for (name, schema) in defs {
-                validate_schema_unions(
-                    path,
-                    canonical_path,
-                    schema,
-                    &format!("$defs.{name}"),
-                    docs,
-                    models,
-                )?;
-            }
-        }
-        if root_is_schema_shaped(&doc.root) && !doc.root.is_bare_ref() {
-            validate_schema_unions(path, canonical_path, &doc.root, "root schema", docs, models)?;
-        }
         if let Some(services) = &doc.services {
             for (service_name, service) in services {
                 for (operation_name, operation) in &service.operations {
@@ -3506,16 +3608,7 @@ fn hoist_inline_object_shapes(
         loop {
             let mut hoisted: Vec<HoistedDef> = Vec::new();
             if let Some(defs) = doc.defs.as_mut() {
-                for (name, schema) in defs.iter_mut() {
-                    hoist_model_inline_shapes(
-                        language,
-                        path,
-                        &name.to_upper_camel_case(),
-                        &format!("$defs.{name}"),
-                        schema,
-                        &mut hoisted,
-                    )?;
-                }
+                hoist_def_inline_shapes(language, path, defs, &[], &mut hoisted)?;
             }
             if let Some(model_name) = &root_model {
                 hoist_model_inline_shapes(
@@ -3605,6 +3698,44 @@ struct HoistedDef {
     origin: String,
     /// The shape moved out of that position.
     schema: Schema,
+}
+
+fn hoist_def_inline_shapes(
+    language: Language,
+    path: &Path,
+    defs: &mut IndexMap<String, Schema>,
+    parent_names: &[String],
+    hoisted: &mut Vec<HoistedDef>,
+) -> Result<()> {
+    for (name, schema) in defs.iter_mut() {
+        let mut names = parent_names.to_vec();
+        names.push(name.clone());
+        let context = def_context(&names);
+        hoist_model_inline_shapes(
+            language,
+            path,
+            &name.to_upper_camel_case(),
+            &context,
+            schema,
+            hoisted,
+        )?;
+        if let Some(value) = schema.extra.shift_remove("$defs") {
+            let mut nested: IndexMap<String, Schema> =
+                serde_json::from_value(value).map_err(|error| Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!("{context}: `$defs` is not an object of schemas: {error}"),
+                })?;
+            hoist_def_inline_shapes(language, path, &mut nested, &names, hoisted)?;
+            schema.extra.insert(
+                "$defs".to_string(),
+                serde_json::to_value(nested).map_err(|error| Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!("{context}: failed to preserve nested `$defs`: {error}"),
+                })?,
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Hoists the inline shapes a model declares that need a name: the object
@@ -4515,22 +4646,94 @@ struct MergeCtx<'a> {
 /// document root) as a raw, pre-merge [`Schema`], keyed by [`TypeKey`]. This is
 /// the map the `allOf`/`$ref`-sibling fold resolves a branch `$ref` against so it
 /// can inline (flatten) the target's schema.
-fn collect_raw_models(docs: &IndexMap<PathBuf, (PathBuf, Document)>) -> BTreeMap<TypeKey, Schema> {
+fn collect_raw_models(
+    docs: &IndexMap<PathBuf, (PathBuf, Document)>,
+) -> Result<BTreeMap<TypeKey, Schema>> {
     let mut raw = BTreeMap::new();
-    for (canonical_path, (_path, doc)) in docs {
+    for (canonical_path, (path, doc)) in docs {
         if let Some(defs) = &doc.defs {
-            for (name, schema) in defs {
-                raw.insert(
-                    TypeKey::Def(canonical_path.clone(), name.clone()),
-                    schema.clone(),
-                );
-            }
+            collect_raw_defs(path, canonical_path, defs, &[], &mut raw)?;
         }
         if root_is_schema_shaped(&doc.root) && !doc.root.is_bare_ref() {
             raw.insert(TypeKey::Root(canonical_path.clone()), doc.root.clone());
         }
     }
-    raw
+    Ok(raw)
+}
+
+fn collect_raw_defs(
+    path: &Path,
+    canonical_path: &Path,
+    defs: &IndexMap<String, Schema>,
+    parent_names: &[String],
+    raw: &mut BTreeMap<TypeKey, Schema>,
+) -> Result<()> {
+    for (name, schema) in defs {
+        let mut names = parent_names.to_vec();
+        names.push(name.clone());
+        raw.insert(
+            TypeKey::Def(canonical_path.to_path_buf(), names.clone()),
+            schema.clone(),
+        );
+        if let Some(nested) = nested_defs(path, schema, &def_context(&names))? {
+            collect_raw_defs(path, canonical_path, &nested, &names, raw)?;
+        }
+    }
+    Ok(())
+}
+
+fn collect_json_models_from_defs(
+    path: &Path,
+    canonical_path: &Path,
+    defs: &IndexMap<String, Schema>,
+    parent_names: &[String],
+    models: &mut BTreeMap<TypeKey, JsonModel>,
+) -> Result<()> {
+    for (name, schema) in defs {
+        let mut names = parent_names.to_vec();
+        names.push(name.clone());
+        models.insert(
+            TypeKey::Def(canonical_path.to_path_buf(), names.clone()),
+            JsonModel {
+                full_name: names.join("."),
+                canonical_path: canonical_path.to_path_buf(),
+                model_name: name.to_upper_camel_case(),
+                schema: schema.clone(),
+            },
+        );
+        if let Some(nested) = nested_defs(path, schema, &def_context(&names))? {
+            collect_json_models_from_defs(path, canonical_path, &nested, &names, models)?;
+        }
+    }
+    Ok(())
+}
+
+fn nested_defs(
+    path: &Path,
+    schema: &Schema,
+    context: &str,
+) -> Result<Option<IndexMap<String, Schema>>> {
+    schema
+        .extra
+        .get("$defs")
+        .map(|value| {
+            serde_json::from_value(value.clone()).map_err(|error| Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!("{context}: `$defs` is not an object of schemas: {error}"),
+            })
+        })
+        .transpose()
+}
+
+fn def_context(names: &[String]) -> String {
+    let mut context = String::new();
+    for name in names {
+        context.push_str("$defs.");
+        context.push_str(name);
+        context.push('.');
+    }
+    context.pop();
+    context
 }
 
 /// The canonical file path a [`TypeKey`] lives in.
@@ -4739,6 +4942,37 @@ fn normalize_children(
                     format!("{context}: failed to preserve additionalProperties: {error}"),
                 )
             })?);
+    }
+    if let Some(value) = schema.extra.shift_remove("$defs") {
+        let defs: IndexMap<String, Schema> = serde_json::from_value(value).map_err(|error| {
+            merge_reject(
+                path,
+                format!("{context}: `$defs` is not an object of schemas: {error}"),
+            )
+        })?;
+        let mut normalized_defs = IndexMap::new();
+        for (name, definition) in defs {
+            normalized_defs.insert(
+                name.clone(),
+                normalize_schema(
+                    path,
+                    canonical_path,
+                    &definition,
+                    ctx,
+                    cycle,
+                    &format!("{context}.$defs.{name}"),
+                )?,
+            );
+        }
+        schema.extra.insert(
+            "$defs".to_string(),
+            serde_json::to_value(normalized_defs).map_err(|error| {
+                merge_reject(
+                    path,
+                    format!("{context}: failed to preserve nested `$defs`: {error}"),
+                )
+            })?,
+        );
     }
     for keyword in ["contains", "propertyNames"] {
         if let Some(value) = schema.extra.get(keyword).cloned()
@@ -5458,19 +5692,77 @@ fn resolve_ref_key(
         target
     };
 
-    if pointer.is_empty() || pointer == "/" {
+    if pointer.is_empty() {
         Ok(TypeKey::Root(target_path))
-    } else if let Some(name) = pointer.strip_prefix("/$defs/") {
+    } else {
+        if pointer == "/" {
+            return Err(Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!(
+                    "`$ref` `{reference}` uses `#/`, which points at a property with the empty name and is not the file root; use `#` for the file root"
+                ),
+            });
+        }
+        let Some(pointer) = pointer.strip_prefix('/') else {
+            return Err(Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!(
+                    "`$ref` `{reference}` must use a JSON Pointer to a `$defs` entry or file root"
+                ),
+            });
+        };
+        let tokens = pointer
+            .split('/')
+            .map(|token| decode_json_pointer_token(path, reference, token))
+            .collect::<Result<Vec<_>>>()?;
+        if tokens.len() < 2
+            || tokens.len() % 2 != 0
+            || tokens.iter().step_by(2).any(|keyword| keyword != "$defs")
+        {
+            return Err(Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!(
+                    "`$ref` `{reference}` must point at a `$defs` entry or file root; nested targets must follow a `$defs` chain (`#/$defs/Outer/$defs/Inner`)"
+                ),
+            });
+        }
         Ok(TypeKey::Def(
             target_path,
-            name.replace("~1", "/").replace("~0", "~"),
+            tokens.into_iter().skip(1).step_by(2).collect(),
         ))
-    } else {
-        Err(Error::InvalidJsonSchema {
-            path: path.to_path_buf(),
-            reason: format!("`$ref` `{reference}` must point at a `$defs` entry or file root"),
-        })
     }
+}
+
+fn decode_json_pointer_token(path: &Path, reference: &str, token: &str) -> Result<String> {
+    let mut decoded = String::with_capacity(token.len());
+    let mut chars = token.chars();
+    while let Some(character) = chars.next() {
+        if character != '~' {
+            decoded.push(character);
+            continue;
+        }
+        match chars.next() {
+            Some('0') => decoded.push('~'),
+            Some('1') => decoded.push('/'),
+            Some(other) => {
+                return Err(Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!(
+                        "`$ref` `{reference}` contains the invalid RFC 6901 escape `~{other}`; use `~0` for `~` or `~1` for `/`"
+                    ),
+                });
+            }
+            None => {
+                return Err(Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!(
+                        "`$ref` `{reference}` contains a trailing `~`, which is an invalid RFC 6901 escape"
+                    ),
+                });
+            }
+        }
+    }
+    Ok(decoded)
 }
 
 fn resolve_ref<'a>(
@@ -5737,7 +6029,11 @@ fn normalize(path: &Path) -> PathBuf {
     for component in path.components() {
         match component {
             std::path::Component::ParentDir => {
-                out.pop();
+                if out.file_name().is_some() {
+                    out.pop();
+                } else if !out.has_root() {
+                    out.push("..");
+                }
             }
             std::path::Component::CurDir => {}
             other => out.push(other.as_os_str()),
@@ -11618,9 +11914,174 @@ $defs:
     // --- cross-file `$ref` target must be in the input set (resolve_ref_key) ---
 
     #[test]
+    fn discovers_transitive_local_ref_closure_and_recomputes_common_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let entry_dir = temp.path().join("app");
+        let shared_dir = temp.path().join("shared");
+        let nested_dir = shared_dir.join("nested");
+        fs::create_dir_all(&entry_dir).unwrap();
+        fs::create_dir_all(&nested_dir).unwrap();
+        let entry = entry_dir.join("entry.yaml");
+        let middle = shared_dir.join("middle.yaml");
+        let end = nested_dir.join("end.yaml");
+        fs::write(
+            &entry,
+            r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  middle: { $ref: "../shared/middle.yaml#/$defs/Middle" }
+"##,
+        )
+        .unwrap();
+        fs::write(
+            &middle,
+            r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+$defs:
+  Middle:
+    type: object
+    properties:
+      end: { $ref: "nested/end.yaml#/$defs/Outer/$defs/End" }
+"##,
+        )
+        .unwrap();
+        fs::write(
+            &end,
+            r#"
+$schema: https://json-schema.org/draft/2020-12/schema
+$defs:
+  Outer:
+    type: object
+    properties: {}
+    $defs:
+      End:
+        type: object
+        properties:
+          value: { type: string }
+"#,
+        )
+        .unwrap();
+
+        let sources = expand_json_schema_sources(std::slice::from_ref(&entry_dir)).unwrap();
+        assert_eq!(
+            sources
+                .iter()
+                .map(|source| source.relative_path.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                PathBuf::from("app/entry.yaml"),
+                PathBuf::from("shared/middle.yaml"),
+                PathBuf::from("shared/nested/end.yaml"),
+            ]
+        );
+        let common_root = canonical(temp.path());
+        assert!(
+            sources
+                .iter()
+                .all(|source| source.source_root == common_root)
+        );
+
+        let flat = load_api_spec_from_json_schema_for_language_with_inputs(
+            Language::Python,
+            std::slice::from_ref(&entry),
+        )
+        .expect("the flat public loader should load the complete ref closure");
+        assert!(flat.external_type_binding("Middle").is_some());
+        assert!(flat.external_type_binding("Outer.End").is_some());
+
+        load_api_spec_tree_from_json_schema_for_language_with_inputs(
+            Language::Python,
+            &[entry_dir],
+        )
+        .expect("the public tree loader should load the complete ref closure");
+    }
+
+    #[test]
     fn rejects_ref_target_file_not_in_input_set() {
         let error = numeric_reject("$ref: \"missing.yaml#/$defs/X\"");
         assert!(error.contains("not in the input set"), "{error}");
+    }
+
+    #[test]
+    fn resolves_nested_defs_pointer_tokens_with_rfc6901_unescaping() {
+        let spec = parse(
+            r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+$defs:
+  Outer:
+    type: object
+    properties:
+      nested: { $ref: "#/$defs/Outer/$defs/inner~1value" }
+    $defs:
+      inner/value:
+        allOf:
+          - type: object
+            properties:
+              id: { type: string }
+          - type: object
+            properties:
+              label: { type: string }
+"##,
+        );
+        assert!(spec.external_type_binding("Outer").is_some());
+        let nested = spec
+            .external_type_binding("Outer.inner/value")
+            .expect("nested definition should have its own model identity");
+        let ExternalTypeSpec::Json(nested) = &nested.external_type else {
+            panic!("nested definition should remain a JSON model");
+        };
+        assert!(nested.schema.get("allOf").is_none());
+        assert_eq!(nested.schema["properties"]["id"]["type"], "string");
+        assert_eq!(nested.schema["properties"]["label"]["type"], "string");
+    }
+
+    #[test]
+    fn pointer_unescaping_happens_token_by_token() {
+        let spec = parse(
+            r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+$defs:
+  Outer/$defs/Inner:
+    type: object
+    properties: {}
+  Holder:
+    type: object
+    properties:
+      value: { $ref: "#/$defs/Outer~1$defs~1Inner" }
+"##,
+        );
+        assert!(spec.external_type_binding("Outer/$defs/Inner").is_some());
+    }
+
+    #[test]
+    fn rejects_slash_fragment_as_a_root_reference() {
+        let error = numeric_reject("$ref: \"#/\"");
+        assert!(error.contains("`#/`"), "{error}");
+        assert!(error.contains("not the file root"), "{error}");
+    }
+
+    #[test]
+    fn rejects_invalid_rfc6901_escape_in_ref_pointer() {
+        let error = numeric_reject("$ref: \"#/$defs/bad~2name\"");
+        assert!(error.contains("invalid RFC 6901 escape"), "{error}");
+    }
+
+    #[test]
+    fn validates_nested_defs_as_generated_models() {
+        let error = doc_reject(
+            r#"
+$schema: https://json-schema.org/draft/2020-12/schema
+$defs:
+  Outer:
+    type: object
+    properties: {}
+    $defs:
+      InvalidScalar: { type: string }
+"#,
+        );
+        assert!(error.contains("InvalidScalar"), "{error}");
+        assert!(error.contains("must be `type: object`"), "{error}");
     }
 
     #[test]
