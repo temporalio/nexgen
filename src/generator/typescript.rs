@@ -4743,14 +4743,16 @@ fn with_arguments_args_type_expression(
     args_type_template.replace("Value", type_parameter_name)
 }
 
-fn render_typescript_doc_comment(
+pub(in crate::generator) fn render_typescript_doc_comment(
     output: &mut String,
     indent: &str,
     summary: Option<&str>,
     tags: &[(String, String)],
 ) {
     let has_summary = summary.is_some_and(|summary| !summary.trim().is_empty());
-    let has_tags = tags.iter().any(|(_, doc)| !doc.trim().is_empty());
+    let has_tags = tags
+        .iter()
+        .any(|(tag, doc)| !tag.trim().is_empty() || !doc.trim().is_empty());
     if !has_summary && !has_tags {
         return;
     }
@@ -4767,11 +4769,16 @@ fn render_typescript_doc_comment(
         output.push_str(" *\n");
     }
     for (tag, doc) in tags {
+        let tag = tag.trim();
         let doc = doc.trim();
-        if doc.is_empty() {
+        if tag.is_empty() && doc.is_empty() {
             continue;
         }
-        push_wrapped_typescript_doc_line(output, indent, &format!("{tag} "), "  ", doc);
+        if doc.is_empty() {
+            push_wrapped_typescript_doc_line(output, indent, "", "", tag);
+        } else {
+            push_wrapped_typescript_doc_line(output, indent, &format!("{tag} "), "  ", doc);
+        }
     }
     output.push_str(indent);
     output.push_str(" */\n");

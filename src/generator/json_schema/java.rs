@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use crate::error::{Error, Result};
 use crate::generator::ExternalModelBackend;
+use crate::generator::java::render_java_doc_comment;
 use crate::language::Language;
 use crate::parser::{ManifestModel, NameManifest, build_name_manifest};
 use crate::planning::{PlannedFamily, PlannedJsonType, PlannedSpec};
@@ -2410,19 +2411,17 @@ fn assemble_file(
 /// `description` (body); returns `None` when both are empty. See
 /// specs/json-schema/features/{title,description}.md.
 fn compose_doc(title: Option<&str>, description: Option<&str>) -> Option<String> {
-    let mut lines: Vec<String> = Vec::new();
+    let mut parts: Vec<String> = Vec::new();
     if let Some(title) = title.map(str::trim).filter(|t| !t.is_empty()) {
-        lines.push(title.to_string());
+        parts.push(title.to_string());
     }
     if let Some(description) = description.map(str::trim).filter(|d| !d.is_empty()) {
-        for line in description.lines() {
-            lines.push(line.trim().to_string());
-        }
+        parts.push(description.to_string());
     }
-    if lines.is_empty() {
+    if parts.is_empty() {
         None
     } else {
-        Some(lines.join("\n"))
+        Some(parts.join("\n\n"))
     }
 }
 
@@ -2438,15 +2437,16 @@ fn render_java_schema_doc(
     deprecated: bool,
     kind: &str,
 ) {
-    let mut doc = compose_doc(title, description);
-    if deprecated {
-        let tag = format!("@deprecated This {kind} is deprecated.");
-        doc = Some(match doc {
-            Some(existing) => format!("{existing}\n\n{tag}"),
-            None => tag,
-        });
-    }
-    render_javadoc(output, indent, doc.as_deref());
+    let doc = compose_doc(title, description);
+    let tags = if deprecated {
+        vec![(
+            "@deprecated".to_string(),
+            format!("This {kind} is deprecated."),
+        )]
+    } else {
+        Vec::new()
+    };
+    render_java_doc_comment(output, indent, doc.as_deref(), &tags);
     if deprecated {
         output.push_str(indent);
         output.push_str("@Deprecated\n");
@@ -2454,19 +2454,7 @@ fn render_java_schema_doc(
 }
 
 fn render_javadoc(output: &mut String, indent: &str, doc: Option<&str>) {
-    let Some(doc) = doc.map(str::trim).filter(|doc| !doc.is_empty()) else {
-        return;
-    };
-    output.push_str(indent);
-    output.push_str("/**\n");
-    for line in doc.lines() {
-        output.push_str(indent);
-        output.push_str(" * ");
-        output.push_str(line.trim());
-        output.push('\n');
-    }
-    output.push_str(indent);
-    output.push_str(" */\n");
+    render_java_doc_comment(output, indent, doc, &[]);
 }
 
 fn java_string_literal(value: &str) -> String {
@@ -2587,9 +2575,16 @@ fn render_object_class(
         if field.deprecated {
             // Native marker on the public getter: `@Deprecated` annotation plus a
             // Javadoc `@deprecated` tag (the rationale lives on the field above).
-            output.push_str(
-                "    /**\n     * @deprecated This field is deprecated.\n     */\n    @Deprecated\n",
+            render_java_doc_comment(
+                output,
+                "    ",
+                None,
+                &[(
+                    "@deprecated".to_string(),
+                    "This field is deprecated.".to_string(),
+                )],
             );
+            output.push_str("    @Deprecated\n");
         }
         output.push_str(&format!(
             "    public {return_type} get{}() {{\n        return {};\n    }}\n\n",

@@ -12,7 +12,8 @@ use crate::error::{Error, Result};
 use crate::generator::json_schema::build_json_name_manifest;
 use crate::generator::json_schema::register_cross_module_ref_names;
 use crate::generator::typescript::{
-    RenderedExternalModelFragments, WireValueConversion, typescript_generated_field_name,
+    RenderedExternalModelFragments, WireValueConversion, render_typescript_doc_comment,
+    typescript_generated_field_name,
 };
 use crate::generator::{ExternalModelBackend, TsDateTimeTypes};
 use crate::json_schema::format::TemporalKind;
@@ -4085,34 +4086,18 @@ fn string_literal_value(value: &str) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
-fn render_doc_comment(output: &mut String, indent: &str, doc: Option<&str>) {
-    let Some(doc) = doc.map(str::trim).filter(|doc| !doc.is_empty()) else {
-        return;
-    };
-    output.push_str(indent);
-    output.push_str("/**\n");
-    for line in doc.lines() {
-        output.push_str(indent);
-        output.push_str(" * ");
-        output.push_str(line.trim());
-        output.push('\n');
-    }
-    output.push_str(indent);
-    output.push_str(" */\n");
-}
-
 /// Renders the JSDoc for a schema declaration: `title` summary line,
 /// `description` body, and a bare `@deprecated` tag when `deprecated: true`.
 /// See specs/json-schema/features/{title,description,deprecated}.md.
 fn render_ts_schema_doc(output: &mut String, indent: &str, schema: &Schema) {
-    let mut lines: Vec<String> = Vec::new();
+    let mut parts: Vec<String> = Vec::new();
     if let Some(title) = schema
         .title
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty())
     {
-        lines.push(title.to_string());
+        parts.push(title.to_string());
     }
     if let Some(desc) = schema
         .description
@@ -4120,17 +4105,15 @@ fn render_ts_schema_doc(output: &mut String, indent: &str, schema: &Schema) {
         .map(str::trim)
         .filter(|d| !d.is_empty())
     {
-        for line in desc.lines() {
-            lines.push(line.trim().to_string());
-        }
+        parts.push(desc.to_string());
     }
-    if schema.deprecated == Some(true) {
-        lines.push("@deprecated".to_string());
-    }
-    if lines.is_empty() {
-        return;
-    }
-    render_doc_comment(output, indent, Some(&lines.join("\n")));
+    let summary = (!parts.is_empty()).then(|| parts.join("\n\n"));
+    let tags = if schema.deprecated == Some(true) {
+        vec![("@deprecated".to_string(), String::new())]
+    } else {
+        Vec::new()
+    };
+    render_typescript_doc_comment(output, indent, summary.as_deref(), &tags);
 }
 
 fn typescript_object_key(name: &str) -> String {

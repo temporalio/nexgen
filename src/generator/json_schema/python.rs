@@ -4784,19 +4784,17 @@ fn py_matcher_condition(matcher: &Schema, elem: &str) -> Result<String> {
 /// Composes a docstring from a `title` (summary line) and `description` (body);
 /// returns `None` when both are empty. See specs/json-schema/features/{title,description}.md.
 fn compose_python_doc(title: Option<&str>, description: Option<&str>) -> Option<String> {
-    let mut lines: Vec<String> = Vec::new();
+    let mut parts: Vec<String> = Vec::new();
     if let Some(title) = title.map(str::trim).filter(|t| !t.is_empty()) {
-        lines.push(title.to_string());
+        parts.push(title.to_string());
     }
     if let Some(description) = description.map(str::trim).filter(|d| !d.is_empty()) {
-        for line in description.lines() {
-            lines.push(line.trim().to_string());
-        }
+        parts.push(description.to_string());
     }
-    if lines.is_empty() {
+    if parts.is_empty() {
         None
     } else {
-        Some(lines.join("\n"))
+        Some(parts.join("\n\n"))
     }
 }
 

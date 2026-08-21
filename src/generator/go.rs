@@ -3304,7 +3304,7 @@ fn render_file(
 /// // Behavior when a workflow is currently running with the same ID. Set to
 /// // use-existing for idempotent deduplication on workflow ID.
 /// ```
-fn render_go_doc_comment(output: &mut String, indent: &str, text: &str) {
+pub(in crate::generator) fn render_go_doc_comment(output: &mut String, indent: &str, text: &str) {
     let max_width = GO_DOC_COMMENT_LINE_LENGTH.saturating_sub(indent.chars().count() + 3);
     for line in text.trim().lines() {
         let line = line.trim();

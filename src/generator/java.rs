@@ -12,6 +12,7 @@ use crate::spec::{ApiSpecLeaf, ApiSpecNode};
 use crate::spec::{ExternalTypeSpec, ModulePath, ServiceSpec, TypeSpec};
 
 const DEFAULT_PACKAGE: &str = "generated";
+const JAVA_FORMAT_LINE_LENGTH: usize = 88;
 
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
@@ -286,29 +287,102 @@ fn io_type(
 }
 
 fn render_service_javadoc(output: &mut String, doc: Option<&str>) {
-    let Some(doc) = doc.map(str::trim).filter(|doc| !doc.is_empty()) else {
-        return;
-    };
-    output.push_str("/**\n");
-    for line in doc.lines() {
-        output.push_str(" * ");
-        output.push_str(line.trim());
-        output.push('\n');
-    }
-    output.push_str(" */\n");
+    render_java_doc_comment(output, "", doc, &[]);
 }
 
 fn render_service_javadoc_indented(output: &mut String, doc: Option<&str>) {
-    let Some(doc) = doc.map(str::trim).filter(|doc| !doc.is_empty()) else {
+    render_java_doc_comment(output, "    ", doc, &[]);
+}
+
+pub(in crate::generator) fn render_java_doc_comment(
+    output: &mut String,
+    indent: &str,
+    summary: Option<&str>,
+    tags: &[(String, String)],
+) {
+    let has_summary = summary.is_some_and(|summary| !summary.trim().is_empty());
+    let has_tags = tags
+        .iter()
+        .any(|(tag, doc)| !tag.trim().is_empty() || !doc.trim().is_empty());
+    if !has_summary && !has_tags {
         return;
-    };
-    output.push_str("    /**\n");
-    for line in doc.lines() {
-        output.push_str("     * ");
-        output.push_str(line.trim());
-        output.push('\n');
     }
-    output.push_str("     */\n");
+
+    output.push_str(indent);
+    output.push_str("/**\n");
+    if let Some(summary) = summary.map(str::trim).filter(|summary| !summary.is_empty()) {
+        for line in summary.lines() {
+            push_wrapped_java_doc_line(output, indent, "", "", line.trim());
+        }
+    }
+    if has_summary && has_tags {
+        output.push_str(indent);
+        output.push_str(" *\n");
+    }
+    for (tag, doc) in tags {
+        let tag = tag.trim();
+        let doc = doc.trim();
+        if tag.is_empty() && doc.is_empty() {
+            continue;
+        }
+        if doc.is_empty() {
+            push_wrapped_java_doc_line(output, indent, "", "", tag);
+        } else {
+            push_wrapped_java_doc_line(output, indent, &format!("{tag} "), "    ", doc);
+        }
+    }
+    output.push_str(indent);
+    output.push_str(" */\n");
+}
+
+fn push_wrapped_java_doc_line(
+    output: &mut String,
+    indent: &str,
+    first_prefix: &str,
+    continuation_prefix: &str,
+    text: &str,
+) {
+    let max_width = JAVA_FORMAT_LINE_LENGTH.saturating_sub(indent.chars().count() + 3);
+    if text.trim().is_empty() {
+        output.push_str(indent);
+        output.push_str(" *\n");
+        return;
+    }
+
+    let escaped = text
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace("*/", "* /");
+    let mut prefix = first_prefix;
+    let mut current = String::new();
+    for word in escaped.split_whitespace() {
+        let prefix_width = prefix.chars().count();
+        let current_width = current.chars().count();
+        let word_width = word.chars().count();
+        let separator_width = usize::from(!current.is_empty());
+        if current_width > 0
+            && prefix_width + current_width + separator_width + word_width > max_width
+        {
+            output.push_str(indent);
+            output.push_str(" * ");
+            output.push_str(prefix);
+            output.push_str(&current);
+            output.push('\n');
+            prefix = continuation_prefix;
+            current.clear();
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(word);
+    }
+
+    output.push_str(indent);
+    output.push_str(" * ");
+    output.push_str(prefix);
+    output.push_str(&current);
+    output.push('\n');
 }
 
 fn java_string_literal(value: &str) -> String {

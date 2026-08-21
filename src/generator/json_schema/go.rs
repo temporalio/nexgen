@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 use crate::generator::ExternalModelBackend;
 use crate::generator::go::{
     GoPackageContext, PlannedMessageSource, PlannedMessageType, PlannedValueType, go_field_name,
-    go_string_literal,
+    go_string_literal, render_go_doc_comment as render_wrapped_go_doc_comment,
 };
 use crate::generator::json_schema::build_json_name_manifest;
 use crate::generator::json_schema::register_cross_module_ref_names;
@@ -5387,12 +5387,7 @@ fn render_go_doc_comment(output: &mut String, indent: &str, doc: Option<&str>, f
         .map(str::trim)
         .filter(|doc| !doc.is_empty())
         .unwrap_or(fallback);
-    for line in text.lines() {
-        output.push_str(indent);
-        output.push_str("// ");
-        output.push_str(line.trim());
-        output.push('\n');
-    }
+    render_wrapped_go_doc_comment(output, indent, text);
 }
 
 /// Renders the doc comment for a schema declaration: the `title` summary line
@@ -5431,44 +5426,35 @@ fn render_go_schema_doc(
         .as_deref()
         .map(str::trim)
         .filter(|d| !d.is_empty());
-    let mut lines: Vec<String> = Vec::new();
-    match (title, description) {
+    let mut doc = match (title, description) {
         (Some(title), description) => {
-            lines.push(name_led(title));
-            for line in description.into_iter().flat_map(str::lines) {
-                lines.push(line.trim().to_string());
+            let mut doc = name_led(title);
+            if let Some(description) = description {
+                doc.push_str("\n\n");
+                doc.push_str(description);
             }
+            doc
         }
         (None, Some(description)) => {
             // No title: the identifier leads the first line of the
             // description instead (specs/json-schema/features/description.md).
             let mut desc_lines = description.lines();
+            let mut doc = String::new();
             if let Some(first) = desc_lines.next() {
-                lines.push(name_led(first.trim()));
+                doc.push_str(&name_led(first.trim()));
             }
             for line in desc_lines {
-                lines.push(line.trim().to_string());
+                doc.push('\n');
+                doc.push_str(line.trim());
             }
+            doc
         }
-        (None, None) => {}
-    }
-    if lines.is_empty() {
-        lines.push(fallback.to_string());
-    }
+        (None, None) => fallback.to_string(),
+    };
     if schema.deprecated == Some(true) {
-        if !lines.is_empty() {
-            lines.push(String::new());
-        }
-        lines.push(format!("Deprecated: This {kind} is deprecated."));
+        doc.push_str("\n\nDeprecated: This ");
+        doc.push_str(kind);
+        doc.push_str(" is deprecated.");
     }
-    for line in lines {
-        output.push_str(indent);
-        if line.is_empty() {
-            output.push_str("//\n");
-        } else {
-            output.push_str("// ");
-            output.push_str(&line);
-            output.push('\n');
-        }
-    }
+    render_wrapped_go_doc_comment(output, indent, &doc);
 }
