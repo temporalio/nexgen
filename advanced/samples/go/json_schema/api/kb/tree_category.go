@@ -6,13 +6,15 @@ import (
 	"fmt"
 )
 
-// Category A node in a self-recursive category tree. The root of this file is itself a type (pure JSON Schema file), named Category from the basename.
+// Category A node in a self-recursive category tree. The root of this file is itself a
+// type (pure JSON Schema file), named Category from the basename.
 type Category struct {
 	// Id corresponds to the "id" JSON property.
 	Id string `json:"id"`
 	// Name corresponds to the "name" JSON property.
 	Name string `json:"name"`
-	// Children Sub-categories. A within-file self-cycle via `$ref: '#'`; the possibly-empty array is the terminating edge, so it stays in this module.
+	// Children Sub-categories. A within-file self-cycle via `$ref: '#'`; the
+	// possibly-empty array is the terminating edge, so it stays in this module.
 	Children []Category `json:"children,omitempty"`
 }
 
@@ -105,7 +107,8 @@ func (m Category) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// Palette A dead $def - defined but never referenced anywhere. Still generated and exported as intended reusable API surface (see the $ref spec).
+// Palette A dead $def - defined but never referenced anywhere. Still generated and
+// exported as intended reusable API surface (see the $ref spec).
 type Palette struct {
 	// Swatches corresponds to the "swatches" JSON property.
 	Swatches []string `json:"swatches"`

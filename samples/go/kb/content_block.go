@@ -6,17 +6,21 @@ import (
 	"fmt"
 )
 
-// Block A content block. The other half of the Page <-> Block cross-file cycle. The `page` back-reference is optional + nullable, which terminates the cycle so it is satisfiable.
+// Block A content block. The other half of the Page <-> Block cross-file cycle. The
+// `page` back-reference is optional + nullable, which terminates the cycle so it is
+// satisfiable.
 type Block struct {
 	// BlockId corresponds to the "blockId" JSON property.
 	BlockId string `json:"blockId"`
-	// Order Non-negative position within the page. Exercises a numeric `minimum` bound over an integer field.
+	// Order Non-negative position within the page. Exercises a numeric `minimum` bound
+	// over an integer field.
 	Order int64 `json:"order"`
 	// Text corresponds to the "text" JSON property.
 	Text *string `json:"text,omitempty"`
 	// Style corresponds to the "style" JSON property.
 	Style *BlockStyle `json:"style,omitempty"`
-	// Page Optional back-reference to the containing page - closes the Page <-> Block cycle. Optional + nullable, so this edge terminates.
+	// Page Optional back-reference to the containing page - closes the Page <-> Block
+	// cycle. Optional + nullable, so this edge terminates.
 	Page *Page `json:"page,omitempty"`
 }
 
@@ -123,7 +127,8 @@ func (m Block) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// BlockStyle Non-cyclic helper; stays in the content_block module. All members optional.
+// BlockStyle Non-cyclic helper; stays in the content_block module. All members
+// optional.
 type BlockStyle struct {
 	// Bold corresponds to the "bold" JSON property.
 	Bold *bool `json:"bold,omitempty"`

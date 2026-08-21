@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
@@ -80,6 +81,18 @@ func mergeNested(errs *[]Violation, path string, err error) {
 }
 
 const integerCap = 1<<53 - 1
+
+func isJSONMultiple(value float64, divisor string) bool {
+	v, ok := new(big.Rat).SetString(strconv.FormatFloat(value, 'g', -1, 64))
+	if !ok {
+		return false
+	}
+	d, ok := new(big.Rat).SetString(divisor)
+	if !ok || d.Sign() == 0 {
+		return false
+	}
+	return new(big.Rat).Quo(v, d).IsInt()
+}
 
 var (
 	errFractional = errors.New("not an integer")

@@ -17,17 +17,32 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-// Fetch the showcase payload. Also exercises the service-level `x-<lang>-name` override: the emitted service code identifier is renamed to the derived name plus a per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`) while the wire service name / `@Service` / `ServiceName` string stays `example.showcase.v1.ShowcaseService`.
+// Fetch the showcase payload. Also exercises the service-level `x-<lang>-name`
+// override: the emitted service code identifier is renamed to the derived name plus a
+// per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python
+// class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`) while the wire
+// service name / `@Service` / `ServiceName` string stays
+// `example.showcase.v1.ShowcaseService`.
 var ShowcaseServiceGo = struct {
 	ServiceName string
-	// Fetch a showcase by id. Also exercises the operation-level `x-<lang>-name` override: the emitted operation code identifier is renamed to the derived name plus a per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python `get_showcase_py`, Java `getShowcaseJava`) while the wire operation name stays `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from the operation key, not the override).
+	// Fetch a showcase by id. Also exercises the operation-level `x-<lang>-name` override:
+	// the emitted operation code identifier is renamed to the derived name plus a
+	// per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python
+	// `get_showcase_py`, Java `getShowcaseJava`) while the wire operation name stays
+	// `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from
+	// the operation key, not the override).
 	GetShowcaseGo nexus.OperationReference[GetShowcaseInput, Showcase]
 }{
 	ServiceName:   "example.showcase.v1.ShowcaseService",
 	GetShowcaseGo: nexus.NewOperationReference[GetShowcaseInput, Showcase]("GetShowcase"),
 }
 
-// Fetch the showcase payload. Also exercises the service-level `x-<lang>-name` override: the emitted service code identifier is renamed to the derived name plus a per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`) while the wire service name / `@Service` / `ServiceName` string stays `example.showcase.v1.ShowcaseService`.
+// Fetch the showcase payload. Also exercises the service-level `x-<lang>-name`
+// override: the emitted service code identifier is renamed to the derived name plus a
+// per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python
+// class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`) while the wire
+// service name / `@Service` / `ServiceName` string stays
+// `example.showcase.v1.ShowcaseService`.
 type ShowcaseServiceGoClient struct {
 	client workflow.NexusClient
 }
@@ -37,7 +52,12 @@ func NewShowcaseServiceGoClient(endpoint string) *ShowcaseServiceGoClient {
 	return &ShowcaseServiceGoClient{client: workflow.NewNexusClient(endpoint, ShowcaseServiceGo.ServiceName)}
 }
 
-// Fetch a showcase by id. Also exercises the operation-level `x-<lang>-name` override: the emitted operation code identifier is renamed to the derived name plus a per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python `get_showcase_py`, Java `getShowcaseJava`) while the wire operation name stays `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from the operation key, not the override).
+// Fetch a showcase by id. Also exercises the operation-level `x-<lang>-name` override:
+// the emitted operation code identifier is renamed to the derived name plus a
+// per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python
+// `get_showcase_py`, Java `getShowcaseJava`) while the wire operation name stays
+// `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from the
+// operation key, not the override).
 func (c *ShowcaseServiceGoClient) GetShowcaseGo(ctx workflow.Context, request GetShowcaseInput) workflow.Future {
 	return c.client.ExecuteOperation(ctx, ShowcaseServiceGo.GetShowcaseGo, request, workflow.NexusOperationOptions{})
 }
@@ -60,7 +80,11 @@ type ShowcaseKind string
 // ShowcaseKindShowcase is the ShowcaseKind value "showcase".
 const ShowcaseKindShowcase ShowcaseKind = "showcase"
 
-// ShowcaseRevision Integer const; always 1. Also exercises the single-`const` value override: `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the wire value stays `1`. TS/Python are inert here (no const override keyword — the value is emitted as a plain literal type).
+// ShowcaseRevision Integer const; always 1. Also exercises the single-`const` value
+// override: `x-go-const-name`/`x-java-const-name` rename the emitted constant to the
+// derived name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while
+// the wire value stays `1`. TS/Python are inert here (no const override keyword — the
+// value is emitted as a plain literal type).
 type ShowcaseRevision int64
 
 // RevisionGo is the ShowcaseRevision value 1.
@@ -72,7 +96,11 @@ type ShowcaseEnabled bool
 // ShowcaseEnabledTrue is the ShowcaseEnabled value true.
 const ShowcaseEnabledTrue ShowcaseEnabled = true
 
-// ShowcaseStatus Closed string value set. Also exercises the enum value-constant override: `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`) while the wire value stays `active`. TS/Python are inert here (no enum override keyword).
+// ShowcaseStatus Closed string value set. Also exercises the enum value-constant
+// override: `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted
+// constant to the value name plus a per-language suffix (Go `ActiveGo`, Java
+// `ACTIVE_JAVA`) while the wire value stays `active`. TS/Python are inert here (no enum
+// override keyword).
 type ShowcaseStatus string
 
 const (
@@ -96,7 +124,8 @@ const (
 	ShowcaseTier3 ShowcaseTier = 3
 )
 
-// ShowcaseScale Closed number value set (exercises the Python float exception: emitted as plain float, validated by membership).
+// ShowcaseScale Closed number value set (exercises the Python float exception: emitted
+// as plain float, validated by membership).
 type ShowcaseScale float64
 
 const (
@@ -164,7 +193,12 @@ func unmarshalChoicesValue(raw json.RawMessage, path string, errs *[]Violation) 
 	return nil, false
 }
 
-// Note A tagged union whose object branches are written **inline** rather than `$ref`ed: each branch is emitted as a named type, so each names itself with the per-language `x-<lang>-name` override (two or more inline object branches cannot derive distinguishing names — the discriminator `const` is a wire value, not an identifier). Selection reads the shared required `kind` const, and each branch keeps its own constraints and stays open to unknown members.
+// Note A tagged union whose object branches are written **inline** rather than
+// `$ref`ed: each branch is emitted as a named type, so each names itself with the
+// per-language `x-<lang>-name` override (two or more inline object branches cannot
+// derive distinguishing names — the discriminator `const` is a wire value, not an
+// identifier). Selection reads the shared required `kind` const, and each branch keeps
+// its own constraints and stays open to unknown members.
 type Note interface {
 	isNote()
 	Validate() error
@@ -210,7 +244,9 @@ func unmarshalNote(raw json.RawMessage, path string, errs *[]Violation) (Note, b
 	return nil, false
 }
 
-// Shape A closed sum type (discriminated union) of Circle | Square, tagged by the shared required `kind` const. Selection reads `kind` and routes to the matching branch; an unknown tag is a Violation.
+// Shape A closed sum type (discriminated union) of Circle | Square, tagged by the
+// shared required `kind` const. Selection reads `kind` and routes to the matching
+// branch; an unknown tag is a Violation.
 type Shape interface {
 	isShape()
 	Validate() error
@@ -262,7 +298,8 @@ type ShowcaseAddressListOrLabel interface {
 	Validate() error
 }
 
-// ShowcaseAddressListOrLabelArray wraps a []Address value admissible in the ShowcaseAddressListOrLabel union.
+// ShowcaseAddressListOrLabelArray wraps a []Address value admissible in the
+// ShowcaseAddressListOrLabel union.
 type ShowcaseAddressListOrLabelArray []Address
 
 func (ShowcaseAddressListOrLabelArray) isShowcaseAddressListOrLabel() {}
@@ -284,7 +321,8 @@ func (v ShowcaseAddressListOrLabelArray) Validate() error {
 	return nil
 }
 
-// ShowcaseAddressListOrLabelString wraps a string value admissible in the ShowcaseAddressListOrLabel union.
+// ShowcaseAddressListOrLabelString wraps a string value admissible in the
+// ShowcaseAddressListOrLabel union.
 type ShowcaseAddressListOrLabelString string
 
 func (ShowcaseAddressListOrLabelString) isShowcaseAddressListOrLabel() {}
@@ -494,7 +532,8 @@ type ShowcaseMeasurements interface {
 	Validate() error
 }
 
-// ShowcaseMeasurementsArray wraps a []float64 value admissible in the ShowcaseMeasurements union.
+// ShowcaseMeasurementsArray wraps a []float64 value admissible in the
+// ShowcaseMeasurements union.
 type ShowcaseMeasurementsArray []float64
 
 func (ShowcaseMeasurementsArray) isShowcaseMeasurements() {}
@@ -530,7 +569,8 @@ func (v ShowcaseMeasurementsArray) Validate() error {
 
 var showcaseMeasurementsStringPattern = regexp.MustCompile("^[a-z]+$")
 
-// ShowcaseMeasurementsString wraps a string value admissible in the ShowcaseMeasurements union.
+// ShowcaseMeasurementsString wraps a string value admissible in the
+// ShowcaseMeasurements union.
 type ShowcaseMeasurementsString string
 
 func (ShowcaseMeasurementsString) isShowcaseMeasurements() {}
@@ -628,7 +668,8 @@ type ShowcaseMetricOrLabel interface {
 	Validate() error
 }
 
-// ShowcaseMetricOrLabelNumber wraps a float64 value admissible in the ShowcaseMetricOrLabel union.
+// ShowcaseMetricOrLabelNumber wraps a float64 value admissible in the
+// ShowcaseMetricOrLabel union.
 type ShowcaseMetricOrLabelNumber float64
 
 func (ShowcaseMetricOrLabelNumber) isShowcaseMetricOrLabel() {}
@@ -646,7 +687,8 @@ func (v ShowcaseMetricOrLabelNumber) Validate() error {
 	return nil
 }
 
-// ShowcaseMetricOrLabelString wraps a string value admissible in the ShowcaseMetricOrLabel union.
+// ShowcaseMetricOrLabelString wraps a string value admissible in the
+// ShowcaseMetricOrLabel union.
 type ShowcaseMetricOrLabelString string
 
 func (ShowcaseMetricOrLabelString) isShowcaseMetricOrLabel() {}
@@ -886,7 +928,8 @@ type ShowcaseSegmentsItem interface {
 	Validate() error
 }
 
-// ShowcaseSegmentsItemString wraps a string value admissible in the ShowcaseSegmentsItem union.
+// ShowcaseSegmentsItemString wraps a string value admissible in the
+// ShowcaseSegmentsItem union.
 type ShowcaseSegmentsItemString string
 
 func (ShowcaseSegmentsItemString) isShowcaseSegmentsItem() {}
@@ -904,7 +947,8 @@ func (v ShowcaseSegmentsItemString) Validate() error {
 	return nil
 }
 
-// ShowcaseSegmentsItemInteger wraps a int64 value admissible in the ShowcaseSegmentsItem union.
+// ShowcaseSegmentsItemInteger wraps a int64 value admissible in the
+// ShowcaseSegmentsItem union.
 type ShowcaseSegmentsItemInteger int64
 
 func (ShowcaseSegmentsItemInteger) isShowcaseSegmentsItem() {}
@@ -972,7 +1016,8 @@ func (Circle) isShowcaseShapeOrName() {}
 
 func (Square) isShowcaseShapeOrName() {}
 
-// ShowcaseShapeOrNameString wraps a string value admissible in the ShowcaseShapeOrName union.
+// ShowcaseShapeOrNameString wraps a string value admissible in the ShowcaseShapeOrName
+// union.
 type ShowcaseShapeOrNameString string
 
 func (ShowcaseShapeOrNameString) isShowcaseShapeOrName() {}
@@ -1225,6 +1270,42 @@ func formatDuration(d time.Duration) string {
 	return out
 }
 
+func mustParseDateTime(s string) time.Time {
+	var errs []Violation
+	v, ok := parseDateTime("", s, &errs)
+	if !ok {
+		panic(errs[0].Reason)
+	}
+	return v
+}
+
+func mustParseDate(s string) time.Time {
+	var errs []Violation
+	v, ok := parseDate("", s, &errs)
+	if !ok {
+		panic(errs[0].Reason)
+	}
+	return v
+}
+
+func mustParseTime(s string) time.Time {
+	var errs []Violation
+	v, ok := parseTime("", s, &errs)
+	if !ok {
+		panic(errs[0].Reason)
+	}
+	return v
+}
+
+func mustParseDuration(s string) time.Duration {
+	var errs []Violation
+	v, ok := parseDuration("", s, &errs)
+	if !ok {
+		panic(errs[0].Reason)
+	}
+	return v
+}
+
 // decodeBase64 validates the wire string against the pinned canonical base64
 // regex, then decodes it via the standard (padded) alphabet into bytes.
 func decodeBase64(path, s string, re *regexp.Regexp, errs *[]Violation) ([]byte, bool) {
@@ -1263,6 +1344,22 @@ func decodeBase64URL(path, s string, re *regexp.Regexp, errs *[]Violation) ([]by
 // encodeBase64URL re-encodes bytes to canonical unpadded URL-safe base64.
 func encodeBase64URL(b []byte) string {
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func mustDecodeBase64(s string) []byte {
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func mustDecodeBase64URL(s string) []byte {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 // Address A nested object, open to forward-compatible extension.
@@ -1409,7 +1506,9 @@ func (m AddressBook) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// Attributes A string map with member-count and key-shape constraints: 1 to 3 entries, each key at most 8 code points (minProperties/maxProperties/propertyNames on a map-shaped object).
+// Attributes A string map with member-count and key-shape constraints: 1 to 3 entries,
+// each key at most 8 code points (minProperties/maxProperties/propertyNames on a
+// map-shaped object).
 type Attributes struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]string
@@ -1537,7 +1636,11 @@ func (m BlobIndex) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// Choices A map whose *member* type is a union written inline in `additionalProperties`. Like an element union it has no name of its own, so it is named after its position — `ChoicesValue` — and moved into `$defs`; each member then decodes through that union's selector, with the member key carrying into the violation path.
+// Choices A map whose *member* type is a union written inline in
+// `additionalProperties`. Like an element union it has no name of its own, so it is
+// named after its position — `ChoicesValue` — and moved into `$defs`; each member then
+// decodes through that union's selector, with the member key carrying into the
+// violation path.
 type Choices struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]ChoicesValue
@@ -1680,7 +1783,13 @@ func (m Circle) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// ContactGo Contact details with a conditional requirement and a member-count bound: a shipping street requires a shipping zip (dependentRequired), and the object must carry 1 to 3 members (minProperties/maxProperties on a declared-property object). Also exercises the type-level `x-<lang>-name` override (the Stage 4 escape hatch): the emitted type is renamed to the derived name plus a per-language suffix (Go `ContactGo`, TS `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its declaration and at every `$ref`, while the wire `$ref` name stays `Contact`.
+// ContactGo Contact details with a conditional requirement and a member-count bound: a
+// shipping street requires a shipping zip (dependentRequired), and the object must
+// carry 1 to 3 members (minProperties/maxProperties on a declared-property object).
+// Also exercises the type-level `x-<lang>-name` override (the Stage 4 escape hatch):
+// the emitted type is renamed to the derived name plus a per-language suffix (Go
+// `ContactGo`, TS `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its
+// declaration and at every `$ref`, while the wire `$ref` name stays `Contact`.
 type ContactGo struct {
 	// Email corresponds to the "email" JSON property.
 	Email *string `json:"email,omitempty"`
@@ -1846,7 +1955,9 @@ func (m DateIndex) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// Extras A free-form object (`additionalProperties: true` with no declared properties): every member is carried verbatim, bounded to at most 4 members. Members keep their wire form, so large integers survive a round-trip untruncated.
+// Extras A free-form object (`additionalProperties: true` with no declared properties):
+// every member is carried verbatim, bounded to at most 4 members. Members keep their
+// wire form, so large integers survive a round-trip untruncated.
 type Extras struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]json.RawMessage
@@ -2097,7 +2208,9 @@ func (m Metrics) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// Nicknames A typed map of **nullable** members: a member may be an explicit null, which is kept as a null member rather than dropped from the map, while a present member still carries its own constraint.
+// Nicknames A typed map of **nullable** members: a member may be an explicit null,
+// which is kept as a null member rather than dropped from the map, while a present
+// member still carries its own constraint.
 type Nicknames struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]*string
@@ -2161,7 +2274,10 @@ func (m Nicknames) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// Quotas A typed map whose members carry their own constraints: every member is a non-negative multiple of 5, at most 100. A member is held to exactly what a declared field of that type is held to, in both directions, with the offending member's key as the violation path.
+// Quotas A typed map whose members carry their own constraints: every member is a
+// non-negative multiple of 5, at most 100. A member is held to exactly what a declared
+// field of that type is held to, in both directions, with the offending member's key as
+// the violation path.
 type Quotas struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]int64
@@ -2319,21 +2435,35 @@ var showcaseLinksItemFormat = regexp.MustCompile("^(?:[A-Za-z][A-Za-z0-9+.-]*:(?
 var showcaseBlobsItemContentEncoding = regexp.MustCompile("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
 
 // Showcase
-// Root object exercising the supported JSON-Schema feature subset: required and optional fields of every scalar type, optional+nullable and required+nullable members, arrays, a nested object via $ref, a typed-map, a closed object, an open (catch-all) object, a string const, a scalar default, and member docs.
+//
+// Root object exercising the supported JSON-Schema feature subset: required and
+// optional fields of every scalar type, optional+nullable and required+nullable
+// members, arrays, a nested object via $ref, a typed-map, a closed object, an open
+// (catch-all) object, a string const, a scalar default, and member docs.
 type Showcase struct {
 	// Kind Discriminator; always "showcase".
 	Kind ShowcaseKind `json:"kind"`
-	// Revision Integer const; always 1. Also exercises the single-`const` value override: `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the wire value stays `1`. TS/Python are inert here (no const override keyword — the value is emitted as a plain literal type).
+	// Revision Integer const; always 1. Also exercises the single-`const` value override:
+	// `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived
+	// name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the
+	// wire value stays `1`. TS/Python are inert here (no const override keyword — the
+	// value is emitted as a plain literal type).
 	Revision ShowcaseRevision `json:"revision"`
 	// Enabled Boolean const; always true.
 	Enabled ShowcaseEnabled `json:"enabled"`
-	// Status Closed string value set. Also exercises the enum value-constant override: `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`) while the wire value stays `active`. TS/Python are inert here (no enum override keyword).
+	// Status Closed string value set. Also exercises the enum value-constant override:
+	// `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant
+	// to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`)
+	// while the wire value stays `active`. TS/Python are inert here (no enum override
+	// keyword).
 	Status ShowcaseStatus `json:"status"`
 	// Tier Closed integer value set.
 	Tier ShowcaseTier `json:"tier"`
-	// Scale Closed number value set (exercises the Python float exception: emitted as plain float, validated by membership).
+	// Scale Closed number value set (exercises the Python float exception: emitted as
+	// plain float, validated by membership).
 	Scale ShowcaseScale `json:"scale"`
 	// Name Display name
+	//
 	// Required human-readable name, 1 to 64 code points.
 	Name string `json:"name"`
 	// Count Required integer scalar.
@@ -2342,38 +2472,62 @@ type Showcase struct {
 	Active bool `json:"active"`
 	// Nickname Optional short name, at most 12 code points.
 	Nickname *string `json:"nickname,omitempty"`
-	// Code Optional code, 2 to 5 code points. Counted in Unicode code points, so a multi-byte value (e.g. "a😀b", 3 code points / 6 UTF-8 bytes) is valid.
+	// Code Optional code, 2 to 5 code points. Counted in Unicode code points, so a
+	// multi-byte value (e.g. "a😀b", 3 code points / 6 UTF-8 bytes) is valid.
 	Code *string `json:"code,omitempty"`
-	// Sku Optional product code: 2 to 4 uppercase ASCII letters, anchored (`^[A-Z]{2,4}$`). Exercises the RE2-safe `pattern` gate.
+	// Sku Optional product code: 2 to 4 uppercase ASCII letters, anchored
+	// (`^[A-Z]{2,4}$`). Exercises the RE2-safe `pattern` gate.
 	Sku *string `json:"sku,omitempty"`
-	// Phrase Optional two-word phrase separated by whitespace (`^\S+\s\S+$`). Exercises the loader's `\s`/`\S` → ASCII-class normalization and the per-target `$` end-anchor rewrite (Python `\Z` / Java `\z`), so a Unicode space (NBSP) and a trailing newline are rejected consistently across all four languages.
+	// Phrase Optional two-word phrase separated by whitespace (`^\S+\s\S+$`). Exercises
+	// the loader's `\s`/`\S` → ASCII-class normalization and the per-target `$` end-anchor
+	// rewrite (Python `\Z` / Java `\z`), so a Unicode space (NBSP) and a trailing newline
+	// are rejected consistently across all four languages.
 	Phrase *string `json:"phrase,omitempty"`
-	// RequestId Optional request identifier; asserted RFC 4122 UUID via `format: uuid`. Stays `string`-typed (format assertion, no materialization); the pinned regex is validated identically across all four languages.
+	// RequestId Optional request identifier; asserted RFC 4122 UUID via `format: uuid`.
+	// Stays `string`-typed (format assertion, no materialization); the pinned regex is
+	// validated identically across all four languages.
 	RequestId *string `json:"requestId,omitempty"`
-	// ContactEmail Optional contact address; asserted ASCII dot-atom `format: email` (single `@`, >=2-label domain, total length <= 254, guard-before-regex).
+	// ContactEmail Optional contact address; asserted ASCII dot-atom `format: email`
+	// (single `@`, >=2-label domain, total length <= 254, guard-before-regex).
 	ContactEmail *string `json:"contactEmail,omitempty"`
-	// Host Optional host name; asserted RFC 1123 `format: hostname` (LDH labels, total length <= 253).
+	// Host Optional host name; asserted RFC 1123 `format: hostname` (LDH labels, total
+	// length <= 253).
 	Host *string `json:"host,omitempty"`
-	// Homepage Optional homepage; asserted RFC 3986 `format: uri` (scheme required, ASCII only; an IP-literal host is validated by the spliced ipv6 grammar).
+	// Homepage Optional homepage; asserted RFC 3986 `format: uri` (scheme required, ASCII
+	// only; an IP-literal host is validated by the spliced ipv6 grammar).
 	Homepage *string `json:"homepage,omitempty"`
 	// Gateway Optional gateway address; asserted dotted-quad IPv4 via format ipv4.
 	Gateway *string `json:"gateway,omitempty"`
-	// Blob Optional binary payload carried as a `contentEncoding: base64` string, materialized to native bytes (Go []byte, TS Uint8Array, Python bytes, Java byte[]). The wire is canonical padded standard base64; a malformed value is rejected by the pinned regex before decode.
+	// Blob Optional binary payload carried as a `contentEncoding: base64` string,
+	// materialized to native bytes (Go []byte, TS Uint8Array, Python bytes, Java byte[]).
+	// The wire is canonical padded standard base64; a malformed value is rejected by the
+	// pinned regex before decode.
 	Blob []byte `json:"blob,omitempty"`
-	// UrlBlob Optional binary payload carried as a `contentEncoding: base64url` string (URL-safe alphabet, unpadded, RFC 4648 §5), materialized to the same native bytes type. The same bytes encode to a different wire than base64 ("Pj4+" vs "Pj4-").
+	// UrlBlob Optional binary payload carried as a `contentEncoding: base64url` string
+	// (URL-safe alphabet, unpadded, RFC 4648 §5), materialized to the same native bytes
+	// type. The same bytes encode to a different wire than base64 ("Pj4+" vs "Pj4-").
 	UrlBlob []byte `json:"urlBlob,omitempty"`
 	// Retries Retry budget
+	//
 	// Optional integer with a schema default.
 	Retries *int64 `json:"retries,omitempty"`
 	// Verbose corresponds to the "verbose" JSON property.
 	Verbose *bool `json:"verbose,omitempty"`
 	// Greeting
+	//
 	// Optional string with a schema default, surfaced on read.
 	Greeting *string `json:"greeting,omitempty"`
 	// Debug flag
+	//
 	// Optional boolean with a schema default.
 	Debug *bool `json:"debug,omitempty"`
-	// LegacyIdGo Deprecated legacy identifier; prefer `requestId`. Exercises the native deprecation marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702 @deprecated). Also exercises the property-level `x-<lang>-name` override (the Stage 4 escape hatch): the emitted member identifier is renamed to the derived name plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`, Java `legacyIdJava`) while the wire name stays `legacyId` (json tag / alias / @JsonProperty).
+	// LegacyIdGo Deprecated legacy identifier; prefer `requestId`. Exercises the native
+	// deprecation marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP
+	// 702 @deprecated). Also exercises the property-level `x-<lang>-name` override (the
+	// Stage 4 escape hatch): the emitted member identifier is renamed to the derived name
+	// plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`,
+	// Java `legacyIdJava`) while the wire name stays `legacyId` (json tag / alias /
+	// @JsonProperty).
 	//
 	// Deprecated: This field is deprecated.
 	LegacyIdGo *string `json:"legacyId,omitempty"`
@@ -2397,27 +2551,69 @@ type Showcase struct {
 	Aliases []string `json:"aliases,omitempty"`
 	// Roles Access roles; must contain between one and two "admin" entries.
 	Roles []string `json:"roles,omitempty"`
-	// IdOrName Disjoint-kind union (oneOf sum type): the wire value is either a string of at least 3 code points or an integer of at least 1, selected by its JSON token. Not a member of a discriminated union — the token itself is the selector. Each branch also carries its **own constraints**: once the token selects a branch, the value is held to everything that branch declares, in both directions, with the union's path on the violation.
+	// IdOrName Disjoint-kind union (oneOf sum type): the wire value is either a string of
+	// at least 3 code points or an integer of at least 1, selected by its JSON token. Not
+	// a member of a discriminated union — the token itself is the selector. Each branch
+	// also carries its **own constraints**: once the token selects a branch, the value is
+	// held to everything that branch declares, in both directions, with the union's path
+	// on the violation.
 	IdOrName ShowcaseIdOrName `json:"idOrName,omitempty"`
-	// Mode A union whose string branch is a **closed value set**: either one of two named modes or an unbounded non-negative integer. The branch narrows to its own admissible values (a Go/Java membership check, a TypeScript literal union, a Python `Literal`), so an unknown string is a Violation while any non-negative integer is accepted.
+	// Mode A union whose string branch is a **closed value set**: either one of two named
+	// modes or an unbounded non-negative integer. The branch narrows to its own admissible
+	// values (a Go/Java membership check, a TypeScript literal union, a Python `Literal`),
+	// so an unknown string is a Violation while any non-negative integer is accepted.
 	Mode ShowcaseMode `json:"mode,omitempty"`
-	// Payload Mixed-kind union whose object branch is an inline free-form object: the wire value is either an arbitrary object (members carried verbatim) or a string, selected by its JSON token. The free-form object is the one object branch that needs no type name — TypeScript and Python carry it structurally, Go and Java wrap it as `<Union>Object`.
+	// Payload Mixed-kind union whose object branch is an inline free-form object: the wire
+	// value is either an arbitrary object (members carried verbatim) or a string, selected
+	// by its JSON token. The free-form object is the one object branch that needs no type
+	// name — TypeScript and Python carry it structurally, Go and Java wrap it as
+	// `<Union>Object`.
 	Payload ShowcasePayload `json:"payload,omitempty"`
-	// Detail Mixed-kind union whose object branch is an inline *structured* object, written directly on the property rather than in `$defs`. It is the only object branch of this union, so it derives its name from the union it belongs to — `ShowcaseDetailObject` — and is emitted as an ordinary model: its members keep their own constraints and it stays open to unknown ones.
+	// Detail Mixed-kind union whose object branch is an inline *structured* object,
+	// written directly on the property rather than in `$defs`. It is the only object
+	// branch of this union, so it derives its name from the union it belongs to —
+	// `ShowcaseDetailObject` — and is emitted as an ordinary model: its members keep their
+	// own constraints and it stays open to unknown ones.
 	Detail ShowcaseDetail `json:"detail,omitempty"`
-	// ShapeOrName Tagged object union mixed with a scalar kind: the two selector layers compose — the JSON token picks object-vs-string, and, for an object, the shared required `kind` const picks Circle-vs-Square. Written inline on the property, so the union itself is named after its position (`ShowcaseShapeOrName` / nested `Showcase.ShapeOrName`), and it reuses the `Circle`/`Square` branches of `shape` — a branch type may belong to more than one union (Go gains a second marker method, Java a second implemented interface). The scalar branch carries a length bound of its own; the object branches validate through their own models.
+	// ShapeOrName Tagged object union mixed with a scalar kind: the two selector layers
+	// compose — the JSON token picks object-vs-string, and, for an object, the shared
+	// required `kind` const picks Circle-vs-Square. Written inline on the property, so the
+	// union itself is named after its position (`ShowcaseShapeOrName` / nested
+	// `Showcase.ShapeOrName`), and it reuses the `Circle`/`Square` branches of `shape` — a
+	// branch type may belong to more than one union (Go gains a second marker method, Java
+	// a second implemented interface). The scalar branch carries a length bound of its
+	// own; the object branches validate through their own models.
 	ShapeOrName ShowcaseShapeOrName `json:"shapeOrName,omitempty"`
-	// Measurements Mixed-kind union with an array branch: the wire value is either a non-empty list of distinct numbers or a lowercase preset name, selected by its JSON token. An array branch has no definition to take a name from, so Go and Java emit it as the synthesized `<Union>Array` variant (a defined type / a `@JsonValue` wrapper) while TypeScript and Python carry it structurally as `number[]` / `list[float]`. Both branches carry their own constraints — the array's `minItems`/`uniqueItems` and the string's `pattern` — so the array-vs-string choice is validated as well as selected.
+	// Measurements Mixed-kind union with an array branch: the wire value is either a
+	// non-empty list of distinct numbers or a lowercase preset name, selected by its JSON
+	// token. An array branch has no definition to take a name from, so Go and Java emit it
+	// as the synthesized `<Union>Array` variant (a defined type / a `@JsonValue` wrapper)
+	// while TypeScript and Python carry it structurally as `number[]` / `list[float]`.
+	// Both branches carry their own constraints — the array's `minItems`/`uniqueItems` and
+	// the string's `pattern` — so the array-vs-string choice is validated as well as
+	// selected.
 	Measurements ShowcaseMeasurements `json:"measurements,omitempty"`
-	// Shapes A list whose element type is a named union: every element is routed to exactly one branch by the union's own selector, and its index carries into the violation path (`shapes[1]`). Go and Java cannot decode a sealed interface as a whole, so the element decodes through the union's dispatcher one at a time.
+	// Shapes A list whose element type is a named union: every element is routed to
+	// exactly one branch by the union's own selector, and its index carries into the
+	// violation path (`shapes[1]`). Go and Java cannot decode a sealed interface as a
+	// whole, so the element decodes through the union's dispatcher one at a time.
 	Shapes []Shape `json:"shapes,omitempty"`
-	// Segments A list whose element union is written **inline**. An element has no name of its own, so the union is named after its position — `ShowcaseSegmentsItem` — moved into `$defs`, and the element becomes a `$ref` at it; from there it is an ordinary named union in every language.
+	// Segments A list whose element union is written **inline**. An element has no name of
+	// its own, so the union is named after its position — `ShowcaseSegmentsItem` — moved
+	// into `$defs`, and the element becomes a `$ref` at it; from there it is an ordinary
+	// named union in every language.
 	Segments []ShowcaseSegmentsItem `json:"segments,omitempty"`
-	// Slots A list of **nullable, constrained scalar elements** — the two-branch nullability `oneOf` rather than a sum type, so nothing is named: the elements themselves become nullable (`[]*string`, `(string | null)[]`, `list[str | None]`, `List<@Nullable String>`) while each present string retains its own minimum length and the list stays a list.
+	// Slots A list of **nullable, constrained scalar elements** — the two-branch
+	// nullability `oneOf` rather than a sum type, so nothing is named: the elements
+	// themselves become nullable (`[]*string`, `(string | null)[]`, `list[str | None]`,
+	// `List<@Nullable String>`) while each present string retains its own minimum length
+	// and the list stays a list.
 	Slots []*string `json:"slots,omitempty"`
-	// Grid A nested array: `items` at depth two. Each level decodes elementwise, so a bad element is reported at its own two-dimensional index (`grid[1][0]`).
+	// Grid A nested array: `items` at depth two. Each level decodes elementwise, so a bad
+	// element is reported at its own two-dimensional index (`grid[1][0]`).
 	Grid [][]int64 `json:"grid,omitempty"`
-	// NumberGrid A nested array of numbers used to prove recursive finite-number validation and two-dimensional indexed aggregation.
+	// NumberGrid A nested array of numbers used to prove recursive finite-number
+	// validation and two-dimensional indexed aggregation.
 	NumberGrid [][]float64 `json:"numberGrid,omitempty"`
 	// Links A list of scalar URI values; every element keeps its format assertion.
 	Links []string `json:"links,omitempty"`
@@ -2437,13 +2633,17 @@ type Showcase struct {
 	Metrics *Metrics `json:"metrics,omitempty"`
 	// MetricOrLabel A finite number branch or a non-empty string branch.
 	MetricOrLabel ShowcaseMetricOrLabel `json:"metricOrLabel,omitempty"`
-	// AddressListOrLabel A union whose array branch contains referenced models, proving that branch conversion uses the ordinary recursive array mapper.
+	// AddressListOrLabel A union whose array branch contains referenced models, proving
+	// that branch conversion uses the ordinary recursive array mapper.
 	AddressListOrLabel ShowcaseAddressListOrLabel `json:"addressListOrLabel,omitempty"`
 	// Location corresponds to the "location" JSON property.
 	Location *ShowcaseLocation `json:"location,omitempty"`
-	// Audit A nullable inline object. The nullability wrapper emits no type of its own, so the object inside it takes the property's name — `ShowcaseAudit`, the same name it would take written plainly: adding or removing nullability never renames the type.
+	// Audit A nullable inline object. The nullability wrapper emits no type of its own, so
+	// the object inside it takes the property's name — `ShowcaseAudit`, the same name it
+	// would take written plainly: adding or removing nullability never renames the type.
 	Audit *ShowcaseAudit `json:"audit,omitempty"`
-	// Rows A list whose element is an inline object, named after its position (`ShowcaseRowsItem`) exactly as an inline element *union* is.
+	// Rows A list whose element is an inline object, named after its position
+	// (`ShowcaseRowsItem`) exactly as an inline element *union* is.
 	Rows []ShowcaseRowsItem `json:"rows,omitempty"`
 	// LedgerGo corresponds to the "ledger" JSON property.
 	LedgerGo *ShowcaseLedger `json:"ledger,omitempty"`
@@ -2618,7 +2818,7 @@ func (m Showcase) Validate() error {
 		if *m.Ratio < 5 {
 			errs = append(errs, Violation{"ratio", fmt.Sprintf("must be >= 5, got %v", *m.Ratio)})
 		}
-		if math.Mod(*m.Ratio, 5) != 0 {
+		if !isJSONMultiple(float64(*m.Ratio), "5") {
 			errs = append(errs, Violation{"ratio", fmt.Sprintf("must be a multiple of 5, got %v", *m.Ratio)})
 		}
 	}
@@ -3024,7 +3224,7 @@ func (m *Showcase) UnmarshalJSON(data []byte) error {
 		if v < 5 {
 			errs = append(errs, Violation{"ratio", fmt.Sprintf("must be >= 5, got %v", v)})
 		}
-		if math.Mod(v, 5) != 0 {
+		if !isJSONMultiple(float64(v), "5") {
 			errs = append(errs, Violation{"ratio", fmt.Sprintf("must be a multiple of 5, got %v", v)})
 		}
 		m.Ratio = &v
@@ -4036,7 +4236,12 @@ func (m ShowcaseDetailObject) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// ShowcaseLedger A typed map written inline on the property: the map itself is named `ShowcaseLedger` and its inline member shape `ShowcaseLedgerValue`, so both the map and its members are ordinary named models. Also exercises the member-name override on a hoisted property — `x-<lang>-name` keeps naming the *member* (Go `LedgerGo`, TS `ledgerTs`, Python `ledger_py`, Java `ledgerJava`) while the type keeps its position-derived name.
+// ShowcaseLedger A typed map written inline on the property: the map itself is named
+// `ShowcaseLedger` and its inline member shape `ShowcaseLedgerValue`, so both the map
+// and its members are ordinary named models. Also exercises the member-name override on
+// a hoisted property — `x-<lang>-name` keeps naming the *member* (Go `LedgerGo`, TS
+// `ledgerTs`, Python `ledger_py`, Java `ledgerJava`) while the type keeps its
+// position-derived name.
 type ShowcaseLedger struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]ShowcaseLedgerValue
@@ -4170,7 +4375,12 @@ func (m ShowcaseLedgerValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// ShowcaseLocation An object written **inline** on the property rather than in `$defs`. It is named after the position it occupies — `ShowcaseLocation` — moved into `$defs`, and the property becomes a `$ref` at it, so it emits as the ordinary named model an authored definition would produce, member constraints and all. Its own nested inline object is named against that name in turn (`ShowcaseLocationGeo`), so nesting needs no `$defs` boilerplate at any depth.
+// ShowcaseLocation An object written **inline** on the property rather than in `$defs`.
+// It is named after the position it occupies — `ShowcaseLocation` — moved into `$defs`,
+// and the property becomes a `$ref` at it, so it emits as the ordinary named model an
+// authored definition would produce, member constraints and all. Its own nested inline
+// object is named against that name in turn (`ShowcaseLocationGeo`), so nesting needs
+// no `$defs` boilerplate at any depth.
 type ShowcaseLocation struct {
 	// City corresponds to the "city" JSON property.
 	City string `json:"city"`
@@ -4347,7 +4557,10 @@ func (m ShowcaseLocationGeo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// ShowcaseMetadata A free-form object written inline. Even this is named (`ShowcaseMetadata`): every object emits as a named aggregate holding its members in a catch-all, so adding `properties` to it later only adds fields rather than changing the emitted type's kind, and its member-count bound rides along with it.
+// ShowcaseMetadata A free-form object written inline. Even this is named
+// (`ShowcaseMetadata`): every object emits as a named aggregate holding its members in
+// a catch-all, so adding `properties` to it later only adds fields rather than changing
+// the emitted type's kind, and its member-count bound rides along with it.
 type ShowcaseMetadata struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]json.RawMessage
@@ -4703,7 +4916,9 @@ func (m TextNote) MarshalJSON() ([]byte, error) {
 
 var tokensValuePattern = regexp.MustCompile("^[a-z]+$")
 
-// Tokens A typed map with a refined *string* member: 2 to 8 code points of lowercase ASCII. Exercises the member-level `minLength`/`maxLength`/`pattern` in every language.
+// Tokens A typed map with a refined *string* member: 2 to 8 code points of lowercase
+// ASCII. Exercises the member-level `minLength`/`maxLength`/`pattern` in every
+// language.
 type Tokens struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]string
@@ -4772,7 +4987,12 @@ func (m Tokens) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// Widget Base-type extension via allOf: WidgetBase is flattened in and the extension branch adds fields, so Widget merges to one standalone object with the union of properties ({id, kind, name, size}) and required ([id, name]). The `size` member is itself an allOf that tightens two numeric bounds to a single interval [10, 20]; a value outside it is rejected by the merged constraint. No allOf survives past the loader.
+// Widget Base-type extension via allOf: WidgetBase is flattened in and the extension
+// branch adds fields, so Widget merges to one standalone object with the union of
+// properties ({id, kind, name, size}) and required ([id, name]). The `size` member is
+// itself an allOf that tightens two numeric bounds to a single interval [10, 20]; a
+// value outside it is rejected by the merged constraint. No allOf survives past the
+// loader.
 type Widget struct {
 	// Id corresponds to the "id" JSON property.
 	Id string `json:"id"`
@@ -4877,7 +5097,8 @@ func (m Widget) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// WidgetBase A base object folded into Widget via allOf. It stays its own type; Widget copies its fields rather than referencing or subtyping it.
+// WidgetBase A base object folded into Widget via allOf. It stays its own type; Widget
+// copies its fields rather than referencing or subtyping it.
 type WidgetBase struct {
 	// Id corresponds to the "id" JSON property.
 	Id string `json:"id"`

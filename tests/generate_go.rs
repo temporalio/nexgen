@@ -2105,6 +2105,409 @@ properties:
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
+/// An object may combine declared properties with a typed catch-all. The
+/// generated catch-all stays native and recursively validated; it is not a
+/// bucket of raw JSON. Declared wire names remain exclusively owned by their
+/// declared fields on serialization.
+#[test]
+fn go_json_mixed_typed_additional_properties_are_native_and_collision_safe() {
+    let temp_dir = unique_output_path("go-json-mixed-typed-extras");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("mixed.yaml");
+    fs::write(
+        &input_path,
+        r##"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+minProperties: 2
+maxProperties: 3
+required: [id]
+properties:
+  id: { type: string }
+additionalProperties:
+  $ref: "#/$defs/Extra"
+$defs:
+  Extra:
+    type: object
+    additionalProperties: false
+    required: [score]
+    properties:
+      score: { type: integer, minimum: 1 }
+"##,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("mixed");
+
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let rendered = fs::read_to_string(output_path.join("mixed.go")).unwrap();
+    assert!(rendered.contains("AdditionalProperties map[string]Extra"));
+
+    fs::write(
+        output_path.join("mixed_test.go"),
+        r#"package mixed
+
+import (
+    "encoding/json"
+    "strings"
+    "testing"
+)
+
+func TestMixedTypedExtras(t *testing.T) {
+    var value Mixed
+    if err := json.Unmarshal([]byte(`{"id":"x","bonus":{"score":2}}`), &value); err != nil {
+        t.Fatal(err)
+    }
+    if value.AdditionalProperties["bonus"].Score != 2 {
+        t.Fatalf("typed extra was not materialized: %#v", value.AdditionalProperties)
+    }
+    if err := json.Unmarshal([]byte(`{"id":"x","bonus":{"score":0}}`), &value); err == nil || !strings.Contains(err.Error(), "bonus.score") {
+        t.Fatalf("expected indexed nested validation path, got %v", err)
+    }
+    value = Mixed{Id: "x", AdditionalProperties: map[string]Extra{
+        "bonus": {Score: 2},
+        "id": {Score: 3},
+    }}
+    if _, err := json.Marshal(value); err == nil || !strings.Contains(err.Error(), "id") {
+        t.Fatalf("expected declared/catch-all collision, got %v", err)
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    let format_status = Command::new("gofmt")
+        .args(["-w", output_path.to_str().unwrap()])
+        .status()
+        .unwrap();
+    assert!(format_status.success());
+    let test_status = Command::new("go")
+        .args(["test", "./..."])
+        .env("GO111MODULE", "off")
+        .current_dir(&output_path)
+        .status()
+        .unwrap();
+    assert!(test_status.success());
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn go_json_scalar_matchers_have_runtime_type_and_decimal_semantics() {
+    let temp_dir = unique_output_path("go-json-matcher-runtime");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("matcher.yaml");
+    fs::write(
+        &input_path,
+        r#"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+required: [integers, decimals, names]
+properties:
+  integers:
+    type: array
+    items: { type: number }
+    contains: { type: integer }
+  decimals:
+    type: array
+    items: { type: number }
+    contains: { type: number, multipleOf: 0.1 }
+  names:
+    type: object
+    additionalProperties: { type: string }
+    propertyNames:
+      type: string
+      minLength: 3
+      pattern: "^[a-z]+$"
+      enum: [api, host]
+      format: hostname
+"#,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("matcher");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    fs::write(
+        output_path.join("matcher_test.go"),
+        r#"package matcher
+
+import (
+    "encoding/json"
+    "strings"
+    "testing"
+)
+
+func decode(t *testing.T, wire string) error {
+    t.Helper()
+    var value Matcher
+    return json.Unmarshal([]byte(wire), &value)
+}
+
+func TestScalarMatchers(t *testing.T) {
+    if err := decode(t, `{"integers":[1.5],"decimals":[0.3],"names":{"api":"x"}}`); err == nil || !strings.Contains(err.Error(), "integers") {
+        t.Fatalf("fractional number matched integer schema: %v", err)
+    }
+    if err := decode(t, `{"integers":[1.5,2],"decimals":[0.3],"names":{"api":"x"}}`); err != nil {
+        t.Fatalf("mathematical decimal multiple rejected: %v", err)
+    }
+    if err := decode(t, `{"integers":[2],"decimals":[0.3],"names":{"Api":"x"}}`); err == nil || !strings.Contains(err.Error(), "Api") {
+        t.Fatalf("property name matcher was not applied: %v", err)
+    }
+}
+"#,
+    )
+    .unwrap();
+    let format_status = Command::new("gofmt")
+        .args(["-w", output_path.to_str().unwrap()])
+        .status()
+        .unwrap();
+    assert!(format_status.success());
+    let test_status = Command::new("go")
+        .args(["test", "./..."])
+        .env("GO111MODULE", "off")
+        .current_dir(&output_path)
+        .status()
+        .unwrap();
+    assert!(test_status.success());
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn go_json_services_render_deprecation_and_one_sided_io() {
+    let temp_dir = unique_output_path("go-json-deprecated-services");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("service.nexusrpc.yaml");
+    fs::write(
+        &input_path,
+        r#"$schema: https://json-schema.org/draft/2020-12/schema
+nexusrpc: "1.0.0"
+services:
+  DeprecatedService:
+    fqn: example.v1.DeprecatedService
+    deprecated: true
+    operations:
+      submit:
+        deprecated: true
+        input:
+          type: object
+          additionalProperties: false
+          required: [value]
+          properties: { value: { type: string } }
+      status:
+        output:
+          type: object
+          additionalProperties: false
+          required: [ok]
+          properties: { ok: { type: boolean } }
+"#,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("service");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let rendered = fs::read_to_string(output_path.join("service.go")).unwrap();
+    assert!(rendered.contains("// Deprecated: This service is deprecated.\nvar DeprecatedService"));
+    assert!(rendered.contains("// Deprecated: This operation is deprecated.\n\tSubmit"));
+    assert!(rendered.contains("nexus.OperationReference[SubmitInput, nexus.NoValue]"));
+    assert!(rendered.contains("nexus.OperationReference[nexus.NoValue, StatusOutput]"));
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn go_json_temporal_constraints_cover_original_and_canonical_wire_values() {
+    let temp_dir = unique_output_path("go-json-temporal-wire-constraints");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("temporal_wire.yaml");
+    fs::write(
+        &input_path,
+        r##"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: false
+required: [day, days, byName]
+properties:
+  day: { type: string, format: date, minLength: 10, pattern: "^2024-" }
+  days:
+    type: array
+    items: { type: string, format: date, pattern: "^2024-" }
+  byName: { $ref: "#/$defs/DateMap" }
+$defs:
+  DateMap:
+    type: object
+    additionalProperties: { type: string, format: date, pattern: "^2024-" }
+"##,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("temporal_wire");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    fs::write(
+        output_path.join("temporal_wire_test.go"),
+        r#"package temporal_wire
+
+import (
+    "encoding/json"
+    "strings"
+    "testing"
+    "time"
+)
+
+func TestTemporalWireConstraints(t *testing.T) {
+    wire := `{"day":"2023-01-01","days":["2023-01-02"],"byName":{"x":"2023-01-03"}}`
+    var parsed TemporalWire
+    if err := json.Unmarshal([]byte(wire), &parsed); err == nil ||
+        !strings.Contains(err.Error(), "day") ||
+        !strings.Contains(err.Error(), "days[0]") ||
+        !strings.Contains(err.Error(), "byName.x") {
+        t.Fatalf("original wire constraints were not aggregated: %v", err)
+    }
+
+    old := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
+    value := TemporalWire{
+        Day: old,
+        Days: []time.Time{old},
+        ByName: DateMap{AdditionalProperties: map[string]time.Time{"x": old}},
+    }
+    if _, err := json.Marshal(value); err == nil ||
+        !strings.Contains(err.Error(), "day") ||
+        !strings.Contains(err.Error(), "days[0]") ||
+        !strings.Contains(err.Error(), "byName.x") {
+        t.Fatalf("canonical wire constraints were not aggregated: %v", err)
+    }
+}
+"#,
+    )
+    .unwrap();
+    let format_status = Command::new("gofmt")
+        .args(["-w", output_path.to_str().unwrap()])
+        .status()
+        .unwrap();
+    assert!(format_status.success());
+    let test_status = Command::new("go")
+        .args(["test", "./..."])
+        .env("GO111MODULE", "off")
+        .current_dir(&output_path)
+        .status()
+        .unwrap();
+    assert!(test_status.success());
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn go_json_materialized_closed_values_and_defaults_stay_native() {
+    let temp_dir = unique_output_path("go-json-native-closed-values");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("native.yaml");
+    fs::write(
+        &input_path,
+        r#"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: false
+required: [epoch, token]
+properties:
+  epoch: { type: string, format: date, const: "2024-01-01" }
+  token: { type: string, contentEncoding: base64, enum: ["YQ==", "Yg=="] }
+  fallbackDay: { type: string, format: date, default: "2024-02-03" }
+  fallbackBytes: { type: string, contentEncoding: base64, default: "Yw==" }
+"#,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("native");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    fs::write(
+        output_path.join("native_test.go"),
+        r#"package native
+
+import (
+    "bytes"
+    "encoding/json"
+    "testing"
+    "time"
+)
+
+func TestNativeClosedValuesAndDefaults(t *testing.T) {
+    var value Native
+    if err := json.Unmarshal([]byte(`{"epoch":"2024-01-01","token":"YQ=="}`), &value); err != nil {
+        t.Fatal(err)
+    }
+    if value.Epoch.Year() != 2024 || !bytes.Equal(value.Token, []byte("a")) {
+        t.Fatalf("closed values were not materialized: %#v", value)
+    }
+    if got := value.FallbackDayOrDefault(); got != time.Date(2024, 2, 3, 0, 0, 0, 0, time.UTC) {
+        t.Fatalf("date default was not native: %v", got)
+    }
+    if got := value.FallbackBytesOrDefault(); !bytes.Equal(got, []byte("c")) {
+        t.Fatalf("byte default was not native: %q", got)
+    }
+    if err := json.Unmarshal([]byte(`{"epoch":"2024-01-02","token":"Yw=="}`), &value); err == nil {
+        t.Fatal("out-of-set materialized values were accepted")
+    }
+}
+"#,
+    )
+    .unwrap();
+    let format_status = Command::new("gofmt")
+        .args(["-w", output_path.to_str().unwrap()])
+        .status()
+        .unwrap();
+    assert!(format_status.success());
+    let test_status = Command::new("go")
+        .args(["test", "./..."])
+        .env("GO111MODULE", "off")
+        .current_dir(&output_path)
+        .status()
+        .unwrap();
+    assert!(test_status.success());
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
 /// The entry file of a two-file closure. `get`'s output is the model the *other*
 /// file declares, and `FindOutput.page` `$ref`s it from a property, so both
 /// cross-module reference shapes are covered.
