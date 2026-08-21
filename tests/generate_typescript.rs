@@ -262,6 +262,103 @@ $defs:
       oldId: { type: string, deprecated: true }
 "##;
 
+const TYPESCRIPT_WAVE3_MATRIX_SCHEMA: &str = r##"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: false
+required:
+  - requiredPlain
+  - requiredNullable
+  - constString
+  - constInteger
+  - constNumber
+  - constBoolean
+  - zeroConst
+  - enumString
+  - enumInteger
+  - enumNumber
+  - enumBoolean
+  - bounded
+  - matchedNumbers
+  - matchedText
+  - matchedBoolean
+  - checkedArray
+  - names
+  - mixed
+properties:
+  requiredPlain: { type: string }
+  requiredNullable:
+    oneOf: [{ type: string }, { type: "null" }]
+  optionalPlain: { type: string }
+  optionalNullable:
+    oneOf: [{ type: string }, { type: "null" }]
+  optionalDefault: { type: string, default: fallback }
+  optionalNullableDefault:
+    oneOf: [{ type: string }, { type: "null" }]
+    default: nullable-fallback
+  constString: { type: string, const: fixed }
+  constInteger: { type: integer, const: 2 }
+  constNumber: { type: number, const: 1.5 }
+  constBoolean: { type: boolean, const: true }
+  zeroConst: { type: number, const: 0 }
+  enumString: { type: string, enum: [a, b] }
+  enumInteger: { type: integer, enum: [1, 2] }
+  enumNumber: { type: number, enum: [1.5, 2.5] }
+  enumBoolean: { type: boolean, enum: [true, false] }
+  bounded: { type: number, exclusiveMaximum: 10, multipleOf: 5 }
+  matchedNumbers:
+    type: array
+    items: { type: number }
+    contains:
+      type: number
+      minimum: -10
+      exclusiveMaximum: 10
+      multipleOf: 5
+      enum: [-5, 5]
+  matchedText:
+    type: array
+    items: { type: string }
+    contains:
+      type: string
+      minLength: 6
+      maxLength: 32
+      pattern: "@example\\.com$"
+      format: email
+      enum: [dev@example.com, ops@example.com]
+  matchedBoolean:
+    type: array
+    items: { type: boolean }
+    contains: { type: boolean, const: true }
+  checkedArray:
+    type: array
+    items: { type: string }
+    minItems: 2
+    maxItems: 3
+    uniqueItems: true
+    contains: { type: string, const: ok }
+    minContains: 1
+    maxContains: 1
+  names:
+    type: object
+    additionalProperties: { type: string }
+    propertyNames:
+      type: string
+      minLength: 6
+      maxLength: 32
+      pattern: "@example\\.com$"
+      format: email
+      enum: [a@example.com, b@example.com]
+  mixed:
+    type: object
+    minProperties: 2
+    maxProperties: 3
+    required: [id]
+    properties:
+      id: { type: string }
+    additionalProperties:
+      type: array
+      items: { type: string, format: date }
+"##;
+
 /// A service whose two operations are each one-sided: one declares only an
 /// `input`, the other only an `output`.
 const ONE_SIDED_OPERATION_SCHEMA: &str = r##"$schema: https://json-schema.org/draft/2020-12/schema
@@ -1986,5 +2083,201 @@ fn typescript_json_deprecates_types_fields_services_and_operations() {
     assert_eq!(services.matches("@deprecated").count(), 2, "{services}");
     assert!(services.contains("export const jobApi"), "{services}");
     assert!(services.contains("  acceptJob:"), "{services}");
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn typescript_json_wave3_pairwise_runtime_matrix() {
+    let temp_dir = unique_typescript_runtime_path("ts-json-wave3-matrix");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("audit.yaml");
+    fs::write(&input_path, TYPESCRIPT_WAVE3_MATRIX_SCHEMA).unwrap();
+    let output_path = temp_dir.join("audit");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::TypeScript,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: nexgen::generator::TsDateTimeTypes::Temporal,
+    })
+    .unwrap();
+
+    let runtime_test = output_path.join("wave3-matrix.ts");
+    fs::write(
+        &runtime_test,
+        r#"import { expect, test } from "vitest";
+import { auditTransferTypeConverter } from "./models.ts";
+import { ValidationError } from "./definitions.ts";
+
+const base = {
+  requiredPlain: "present",
+  requiredNullable: null,
+  constString: "fixed",
+  constInteger: 2,
+  constNumber: 1.5,
+  constBoolean: true,
+  zeroConst: -0,
+  enumString: "a",
+  enumInteger: 1,
+  enumNumber: 1.5,
+  enumBoolean: false,
+  bounded: -1e1,
+  matchedNumbers: [5e0],
+  matchedText: ["dev@example.com"],
+  matchedBoolean: [true],
+  checkedArray: ["ok", "x"],
+  names: { "a@example.com": "x" },
+  mixed: { id: "m", schedule: ["2024-01-01"] },
+};
+
+function violations(fn: () => unknown) {
+  try {
+    fn();
+  } catch (error) {
+    expect(error).toBeInstanceOf(ValidationError);
+    return (error as ValidationError).violations;
+  }
+  throw new Error("expected validation failure");
+}
+
+test("presence, closed scalars, and numeric boundaries agree both ways", () => {
+  const value = auditTransferTypeConverter.fromTransferType(base);
+  expect(value.requiredNullable).toBeNull();
+  expect(value.optionalPlain).toBeUndefined();
+  expect(value.optionalNullable).toBeUndefined();
+  expect(value.optionalDefault).toBeUndefined();
+  expect(value.optionalNullableDefault).toBeUndefined();
+  expect(Object.is(value.zeroConst, -0)).toBe(true);
+  expect(value.mixed.additionalProperties.schedule?.[0]).toBeInstanceOf(Temporal.PlainDate);
+
+  expect(violations(() => auditTransferTypeConverter.fromTransferType({ ...base, requiredPlain: undefined })))
+    .toEqual(expect.arrayContaining([{ path: "requiredPlain", reason: "required" }]));
+  expect(violations(() => auditTransferTypeConverter.fromTransferType({ ...base, requiredNullable: undefined })))
+    .toEqual(expect.arrayContaining([{ path: "requiredNullable", reason: "required" }]));
+  expect(violations(() => auditTransferTypeConverter.fromTransferType({ ...base, optionalPlain: null }))[0]?.reason)
+    .toBe("explicit null not allowed");
+  expect(violations(() => auditTransferTypeConverter.fromTransferType({ ...base, optionalDefault: null }))[0]?.reason)
+    .toBe("explicit null not allowed");
+  expect(auditTransferTypeConverter.fromTransferType({ ...base, optionalNullable: null }).optionalNullable).toBeNull();
+  expect(auditTransferTypeConverter.fromTransferType({ ...base, optionalNullableDefault: null }).optionalNullableDefault).toBeNull();
+
+  for (const [field, replacement] of [
+    ["constString", "wrong"], ["constInteger", 3], ["constNumber", 2.5],
+    ["constBoolean", false], ["enumString", "c"], ["enumInteger", 3],
+    ["enumNumber", 3.5], ["enumBoolean", "no"],
+  ] as const) {
+    expect(violations(() => auditTransferTypeConverter.fromTransferType({ ...base, [field]: replacement }))
+      .some(({ path }) => path === field)).toBe(true);
+  }
+  expect(() => auditTransferTypeConverter.fromTransferType({ ...base, bounded: 10 })).toThrow(/must be < 10/);
+  expect(auditTransferTypeConverter.fromTransferType({ ...base, bounded: -15 }).bounded).toBe(-15);
+
+  const invalidClosed = { ...value, constNumber: 2.5 as unknown as 1.5 };
+  expect(() => auditTransferTypeConverter.toTransferType(invalidClosed)).toThrow(/constNumber/);
+  expect(() => auditTransferTypeConverter.toTransferType({ ...value, bounded: 10 })).toThrow(/must be < 10/);
+});
+
+test("contains, propertyNames, arrays, and typed-extra counts aggregate both ways", () => {
+  for (const replacement of [
+    { matchedNumbers: [1] },
+    { matchedText: ["bad@example.org"] },
+    { matchedBoolean: [false] },
+  ]) {
+    const field = Object.keys(replacement)[0]!;
+    expect(violations(() => auditTransferTypeConverter.fromTransferType({ ...base, ...replacement }))
+      .some(({ path }) => path === field)).toBe(true);
+  }
+  const value = auditTransferTypeConverter.fromTransferType(base);
+  expect(violations(() => auditTransferTypeConverter.toTransferType({ ...value, matchedNumbers: [1] }))
+    .some(({ path }) => path === "matchedNumbers")).toBe(true);
+  expect(violations(() => auditTransferTypeConverter.toTransferType({ ...value, matchedText: ["bad@example.org"] }))
+    .some(({ path }) => path === "matchedText")).toBe(true);
+  expect(violations(() => auditTransferTypeConverter.toTransferType({ ...value, matchedBoolean: [false] }))
+    .some(({ path }) => path === "matchedBoolean")).toBe(true);
+
+  const tooSmall = violations(() => auditTransferTypeConverter.fromTransferType({ ...base, checkedArray: [] }));
+  expect(tooSmall.map(({ path }) => path)).toEqual(["checkedArray", "checkedArray"]);
+  const crowded = violations(() => auditTransferTypeConverter.fromTransferType({
+    ...base, checkedArray: ["ok", "ok", "x", "x"],
+  }));
+  expect(crowded.filter(({ path }) => path === "checkedArray").length).toBeGreaterThanOrEqual(3);
+  expect(() => auditTransferTypeConverter.toTransferType({ ...value, checkedArray: [] })).toThrow(ValidationError);
+  expect(() => auditTransferTypeConverter.toTransferType({ ...value, checkedArray: ["ok", "ok", "x", "x"] })).toThrow(ValidationError);
+
+  for (const key of ["x", "bad key@example.com", "c@example.com"]) {
+    expect(violations(() => auditTransferTypeConverter.fromTransferType({ ...base, names: { [key]: "x" } }))
+      .some(({ path }) => path === `names.${key}`)).toBe(true);
+  }
+  expect(() => auditTransferTypeConverter.toTransferType({
+    ...value, names: { additionalProperties: { "c@example.com": "x" } },
+  })).toThrow(/c@example.com/);
+
+  expect(() => auditTransferTypeConverter.fromTransferType({ ...base, mixed: { id: "m" } })).toThrow(/at least 2 properties/);
+  expect(() => auditTransferTypeConverter.fromTransferType({
+    ...base,
+    mixed: { id: "m", a: ["2024-01-01"], b: ["2024-01-02"], c: ["2024-01-03"] },
+  })).toThrow(/at most 3 properties/);
+  expect(() => auditTransferTypeConverter.toTransferType({
+    ...value, mixed: { ...value.mixed, additionalProperties: {} },
+  })).toThrow(/at least 2 properties/);
+  expect(() => auditTransferTypeConverter.toTransferType({
+    ...value,
+    mixed: {
+      ...value.mixed,
+      additionalProperties: {
+        a: [Temporal.PlainDate.from("2024-01-01")],
+        b: [Temporal.PlainDate.from("2024-01-02")],
+        c: [Temporal.PlainDate.from("2024-01-03")],
+      },
+    },
+  })).toThrow(/at most 3 properties/);
+  expect(() => auditTransferTypeConverter.toTransferType({
+    ...value,
+    mixed: {
+      ...value.mixed,
+      additionalProperties: { id: [Temporal.PlainDate.from("2024-01-01")] },
+    },
+  })).toThrow(/id.*collides with declared property/);
+});
+"#,
+    )
+    .unwrap();
+    let sample_root = samples_typescript_root(&project_root());
+    let runtime_relative = runtime_test.strip_prefix(&sample_root).unwrap();
+    let runtime_config = temp_dir.join("vitest.config.ts");
+    fs::write(
+        &runtime_config,
+        format!(
+            "export default {{ test: {{ include: [{}] }} }};\n",
+            serde_json::to_string(runtime_relative.to_str().unwrap()).unwrap()
+        ),
+    )
+    .unwrap();
+    let typecheck_status = Command::new("npm")
+        .current_dir(&sample_root)
+        .args(["run", "typecheck"])
+        .status()
+        .unwrap();
+    assert!(
+        typecheck_status.success(),
+        "wave 3 output did not typecheck"
+    );
+    let runtime_status = Command::new("npm")
+        .current_dir(&sample_root)
+        .args([
+            "exec",
+            "--",
+            "vitest",
+            "run",
+            "--config",
+            runtime_config.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(runtime_status.success(), "wave 3 runtime matrix failed");
     fs::remove_dir_all(temp_dir).unwrap();
 }

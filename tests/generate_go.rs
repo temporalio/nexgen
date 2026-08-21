@@ -109,6 +109,103 @@ $defs:
       value: { type: number }
 "##;
 
+const GO_WAVE3_MATRIX_SCHEMA: &str = r##"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: false
+required:
+  - requiredPlain
+  - requiredNullable
+  - constString
+  - constInteger
+  - constNumber
+  - constBoolean
+  - zeroConst
+  - enumString
+  - enumInteger
+  - enumNumber
+  - enumBoolean
+  - bounded
+  - matchedNumbers
+  - matchedText
+  - matchedBoolean
+  - checkedArray
+  - names
+  - mixed
+properties:
+  requiredPlain: { type: string }
+  requiredNullable:
+    oneOf: [{ type: string }, { type: "null" }]
+  optionalPlain: { type: string }
+  optionalNullable:
+    oneOf: [{ type: string }, { type: "null" }]
+  optionalDefault: { type: string, default: fallback }
+  optionalNullableDefault:
+    oneOf: [{ type: string }, { type: "null" }]
+    default: nullable-fallback
+  constString: { type: string, const: fixed }
+  constInteger: { type: integer, const: 2 }
+  constNumber: { type: number, const: 1.5 }
+  constBoolean: { type: boolean, const: true }
+  zeroConst: { type: number, const: 0 }
+  enumString: { type: string, enum: [a, b] }
+  enumInteger: { type: integer, enum: [1, 2] }
+  enumNumber: { type: number, enum: [1.5, 2.5] }
+  enumBoolean: { type: boolean, enum: [true, false] }
+  bounded: { type: number, exclusiveMaximum: 10, multipleOf: 5 }
+  matchedNumbers:
+    type: array
+    items: { type: number }
+    contains:
+      type: number
+      minimum: -10
+      exclusiveMaximum: 10
+      multipleOf: 5
+      enum: [-5, 5]
+  matchedText:
+    type: array
+    items: { type: string }
+    contains:
+      type: string
+      minLength: 6
+      maxLength: 32
+      pattern: "@example\\.com$"
+      format: email
+      enum: [dev@example.com, ops@example.com]
+  matchedBoolean:
+    type: array
+    items: { type: boolean }
+    contains: { type: boolean, const: true }
+  checkedArray:
+    type: array
+    items: { type: string }
+    minItems: 2
+    maxItems: 3
+    uniqueItems: true
+    contains: { type: string, const: ok }
+    minContains: 1
+    maxContains: 1
+  names:
+    type: object
+    additionalProperties: { type: string }
+    propertyNames:
+      type: string
+      minLength: 6
+      maxLength: 32
+      pattern: "@example\\.com$"
+      format: email
+      enum: [a@example.com, b@example.com]
+  mixed:
+    type: object
+    minProperties: 2
+    maxProperties: 3
+    required: [id]
+    properties:
+      id: { type: string }
+    additionalProperties:
+      type: array
+      items: { type: string, format: date }
+"##;
+
 fn generate_to_string_with_inputs(
     language: nexgen::language::Language,
     input_paths: &[PathBuf],
@@ -2493,6 +2590,217 @@ func TestNativeClosedValuesAndDefaults(t *testing.T) {
 "#,
     )
     .unwrap();
+    let format_status = Command::new("gofmt")
+        .args(["-w", output_path.to_str().unwrap()])
+        .status()
+        .unwrap();
+    assert!(format_status.success());
+    let test_status = Command::new("go")
+        .args(["test", "./..."])
+        .env("GO111MODULE", "off")
+        .current_dir(&output_path)
+        .status()
+        .unwrap();
+    assert!(test_status.success());
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn go_json_wave3_pairwise_runtime_matrix() {
+    let temp_dir = unique_output_path("go-json-wave3-matrix");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("audit.yaml");
+    fs::write(&input_path, GO_WAVE3_MATRIX_SCHEMA).unwrap();
+    let output_path = temp_dir.join("audit");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    fs::write(
+        output_path.join("wave3_matrix_test.go"),
+        r#"package audit
+
+import (
+    "encoding/json"
+    "math"
+    "strings"
+    "testing"
+    "time"
+)
+
+const base = `{
+  "requiredPlain":"present","requiredNullable":null,
+  "constString":"fixed","constInteger":2,"constNumber":1.5,"constBoolean":true,"zeroConst":-0,
+  "enumString":"a","enumInteger":1,"enumNumber":1.5,"enumBoolean":false,
+  "bounded":-1e1,"matchedNumbers":[5e0],"matchedText":["dev@example.com"],"matchedBoolean":[true],
+  "checkedArray":["ok","x"],"names":{"a@example.com":"x"},
+  "mixed":{"id":"m","schedule":["2024-01-01"]}
+}`
+
+func decode(wire string) (Audit, error) {
+    var value Audit
+    err := json.Unmarshal([]byte(wire), &value)
+    return value, err
+}
+
+func replace(base, old, replacement string) string {
+    return strings.Replace(base, old, replacement, 1)
+}
+
+func TestPresenceClosedScalarsAndNumericBoundaries(t *testing.T) {
+    value, err := decode(base)
+    if err != nil { t.Fatal(err) }
+    if value.RequiredNullable != nil || value.OptionalPlain != nil || value.OptionalNullable != nil ||
+        value.OptionalDefault != nil || value.OptionalNullableDefault != nil {
+        t.Fatalf("unexpected presence state: %#v", value)
+    }
+    if value.OptionalDefaultOrDefault() != "fallback" ||
+        value.OptionalNullableDefaultOrDefault() != "nullable-fallback" {
+        t.Fatal("nullable/non-nullable defaults were not materialized on read")
+    }
+    if !math.Signbit(float64(value.ZeroConst)) {
+        t.Fatal("signed zero was not preserved in memory")
+    }
+    if got := value.Mixed.AdditionalProperties["schedule"]; len(got) != 1 || got[0] != time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC) {
+        t.Fatalf("typed temporal extra was not materialized: %#v", got)
+    }
+    encoded, err := json.Marshal(value)
+    if err != nil { t.Fatal(err) }
+    if !strings.Contains(string(encoded), `"requiredNullable":null`) ||
+        strings.Contains(string(encoded), "optionalDefault") ||
+        strings.Contains(string(encoded), "optionalNullableDefault") {
+        t.Fatalf("presence was not preserved on serialize: %s", encoded)
+    }
+
+    for _, wire := range []string{
+        strings.Replace(base, `"requiredPlain":"present",`, "", 1),
+        strings.Replace(base, `"requiredNullable":null,`, "", 1),
+        replace(base, `"requiredPlain":"present"`, `"requiredPlain":null`),
+        strings.Replace(base, `"requiredPlain":"present"`, `"requiredPlain":"present","optionalPlain":null`, 1),
+        strings.Replace(base, `"requiredPlain":"present"`, `"requiredPlain":"present","optionalDefault":null`, 1),
+    } {
+        if _, err := decode(wire); err == nil { t.Fatalf("invalid presence accepted: %s", wire) }
+    }
+    nullable, err := decode(strings.Replace(base, `"requiredPlain":"present"`, `"requiredPlain":"present","optionalNullable":null,"optionalNullableDefault":null`, 1))
+    if err != nil || nullable.OptionalNullable != nil || nullable.OptionalNullableDefault != nil {
+        t.Fatalf("nullable explicit null rejected: %#v, %v", nullable, err)
+    }
+
+    for field, replacement := range map[string]string{
+        `"constString":"fixed"`: `"constString":"wrong"`,
+        `"constInteger":2`: `"constInteger":3`,
+        `"constNumber":1.5`: `"constNumber":2.5`,
+        `"constBoolean":true`: `"constBoolean":false`,
+        `"enumString":"a"`: `"enumString":"c"`,
+        `"enumInteger":1`: `"enumInteger":3`,
+        `"enumNumber":1.5`: `"enumNumber":3.5`,
+        `"enumBoolean":false`: `"enumBoolean":"no"`,
+    } {
+        if _, err := decode(replace(base, field, replacement)); err == nil || !strings.Contains(err.Error(), strings.Trim(strings.Split(field, ":")[0], `"`)) {
+            t.Fatalf("closed scalar failure missing for %s: %v", field, err)
+        }
+    }
+    if _, err := decode(replace(base, `"bounded":-1e1`, `"bounded":10`)); err == nil || !strings.Contains(err.Error(), "must be < 10") {
+        t.Fatalf("exclusiveMaximum was not enforced: %v", err)
+    }
+    if _, err := decode(replace(base, `"bounded":-1e1`, `"bounded":-15`)); err != nil {
+        t.Fatalf("negative multiple rejected: %v", err)
+    }
+
+    invalid := value
+    invalid.ConstNumber = AuditConstNumber(2.5)
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "constNumber") {
+        t.Fatalf("serialize accepted invalid const: %v", err)
+    }
+    invalid = value
+    invalid.Bounded = 10
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "must be < 10") {
+        t.Fatalf("serialize accepted exclusive maximum: %v", err)
+    }
+}
+
+func TestMatchersArraysPropertyNamesAndTypedExtraCounts(t *testing.T) {
+    for old, replacement := range map[string]string{
+        `"matchedNumbers":[5e0]`: `"matchedNumbers":[1]`,
+        `"matchedText":["dev@example.com"]`: `"matchedText":["bad@example.org"]`,
+        `"matchedBoolean":[true]`: `"matchedBoolean":[false]`,
+    } {
+        if _, err := decode(replace(base, old, replacement)); err == nil || !strings.Contains(err.Error(), strings.Split(old, `"`)[1]) {
+            t.Fatalf("contains failure missing for %s: %v", old, err)
+        }
+    }
+    value, err := decode(base)
+    if err != nil { t.Fatal(err) }
+    invalid := value
+    invalid.MatchedNumbers = []float64{1}
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "matchedNumbers") { t.Fatalf("serialize contains: %v", err) }
+    invalid = value
+    invalid.MatchedText = []string{"bad@example.org"}
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "matchedText") { t.Fatalf("serialize contains: %v", err) }
+    invalid = value
+    invalid.MatchedBoolean = []bool{false}
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "matchedBoolean") { t.Fatalf("serialize contains: %v", err) }
+
+    if _, err := decode(replace(base, `"checkedArray":["ok","x"]`, `"checkedArray":[]`)); err == nil ||
+        !strings.Contains(err.Error(), "at least 2 items") || !strings.Contains(err.Error(), "matching") {
+        t.Fatalf("array failures did not aggregate: %v", err)
+    }
+    crowded := replace(base, `"checkedArray":["ok","x"]`, `"checkedArray":["ok","ok","x","x"]`)
+    if _, err := decode(crowded); err == nil || !strings.Contains(err.Error(), "at most 3 items") ||
+        !strings.Contains(err.Error(), "duplicate") || !strings.Contains(err.Error(), "matching") {
+        t.Fatalf("array upper failures did not aggregate: %v", err)
+    }
+    invalid = value
+    invalid.CheckedArray = nil
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "checkedArray") { t.Fatalf("serialize array: %v", err) }
+
+    for key := range map[string]struct{}{ "x": {}, "bad key@example.com": {}, "c@example.com": {} } {
+        names := replace(base, `"names":{"a@example.com":"x"}`, `"names":{"`+key+`":"x"}`)
+        if _, err := decode(names); err == nil || !strings.Contains(err.Error(), key) {
+            t.Fatalf("propertyNames failure missing for %q: %v", key, err)
+        }
+    }
+    invalid = value
+    invalid.Names.AdditionalProperties = map[string]string{"c@example.com": "x"}
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "c@example.com") {
+        t.Fatalf("serialize propertyNames failure missing: %v", err)
+    }
+
+    if _, err := decode(replace(base, `"mixed":{"id":"m","schedule":["2024-01-01"]}`, `"mixed":{"id":"m"}`)); err == nil || !strings.Contains(err.Error(), "at least 2 properties") {
+        t.Fatalf("mixed minProperties missing: %v", err)
+    }
+    if _, err := decode(replace(base, `"mixed":{"id":"m","schedule":["2024-01-01"]}`, `"mixed":{"id":"m","a":["2024-01-01"],"b":["2024-01-02"],"c":["2024-01-03"]}`)); err == nil || !strings.Contains(err.Error(), "at most 3 properties") {
+        t.Fatalf("mixed maxProperties missing: %v", err)
+    }
+    invalid = value
+    invalid.Mixed.AdditionalProperties = map[string][]time.Time{}
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "at least 2 properties") {
+        t.Fatalf("serialize mixed minProperties missing: %v", err)
+    }
+    invalid, _ = decode(base)
+    day := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+    invalid.Mixed.AdditionalProperties = map[string][]time.Time{"a": {day}, "b": {day}, "c": {day}}
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "at most 3 properties") {
+        t.Fatalf("serialize mixed maxProperties missing: %v", err)
+    }
+    invalid, _ = decode(base)
+    invalid.Mixed.AdditionalProperties = map[string][]time.Time{"id": {day}}
+    if _, err := json.Marshal(invalid); err == nil || !strings.Contains(err.Error(), "id") {
+        t.Fatalf("serialize mixed collision missing: %v", err)
+    }
+}
+"#,
+    )
+    .unwrap();
+
     let format_status = Command::new("gofmt")
         .args(["-w", output_path.to_str().unwrap()])
         .status()
