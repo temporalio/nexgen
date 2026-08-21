@@ -107,10 +107,16 @@ properties:
     items: { type: number }
     contains:
       type: integer
-      minimum: 2
-      maximum: 8
       exclusiveMinimum: 1
       exclusiveMaximum: 10
+      multipleOf: 2
+  inclusiveNumbers:
+    type: array
+    items: { type: number }
+    contains:
+      type: integer
+      minimum: 2
+      maximum: 8
       multipleOf: 2
   flags:
     type: array
@@ -217,6 +223,7 @@ wire = {
     "codes": ["no", "xyz"],
     "emails": ["bad", "a@example.com"],
     "integralNumbers": [1.5, 4],
+    "inclusiveNumbers": [2, 8],
     "day": "2026-08-21",
     "fixedDay": "2026-08-21",
     "dayChoice": "2026-08-22",
