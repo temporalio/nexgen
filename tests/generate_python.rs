@@ -97,7 +97,7 @@ properties:
   codes:
     type: array
     items: { type: string }
-    contains: { type: string, minLength: 2, pattern: "^x" }
+    contains: { type: string, minLength: 2, maxLength: 3, pattern: "^x" }
   emails:
     type: array
     items: { type: string }
@@ -108,6 +108,8 @@ properties:
     contains:
       type: integer
       minimum: 2
+      maximum: 8
+      exclusiveMinimum: 1
       exclusiveMaximum: 10
       multipleOf: 2
   flags:
@@ -148,6 +150,16 @@ properties:
     maxLength: 4
     pattern: "^YQ==$"
     const: "YQ=="
+  edgeNumber:
+    type: number
+    exclusiveMaximum: -1
+    multipleOf: 2e1
+  zeroChoice:
+    type: number
+    enum: [0]
+  boolChoice:
+    type: boolean
+    enum: [true]
 additionalProperties:
   $ref: "#/$defs/Extra"
 minProperties: 1
@@ -155,9 +167,10 @@ $defs:
   Extra:
     type: object
     additionalProperties: false
-    required: [amount]
+    required: [amount, born]
     properties:
       amount: { type: integer, minimum: 0 }
+      born: { type: string, format: date }
   PatternNames:
     type: object
     additionalProperties: { type: string }
@@ -200,7 +213,7 @@ def violations(call):
 
 wire = {
     "known": "ok",
-    "extra": {"amount": 2},
+    "extra": {"amount": 2, "born": "2026-08-20"},
     "codes": ["no", "xyz"],
     "emails": ["bad", "a@example.com"],
     "integralNumbers": [1.5, 4],
@@ -212,6 +225,7 @@ wire = {
 value = converter(Contract).from_transfer_type(wire, Contract)
 assert isinstance(value.additional_properties["extra"], Extra)
 assert value.additional_properties["extra"].amount == 2
+assert value.additional_properties["extra"].born == datetime.date(2026, 8, 20)
 assert value.day == datetime.date(2026, 8, 21)
 assert value.fixed_day == datetime.date(2026, 8, 21)
 assert value.day_choice == datetime.date(2026, 8, 22)
@@ -220,11 +234,48 @@ assert value.maybe_day == datetime.date(2026, 8, 22)
 assert value.fixed_blob == b"a"
 assert converter(Contract).to_transfer_type(value) == wire
 
+collapsed_null_default = converter(Contract).from_transfer_type(
+    {"known": "ok", "maybeDay": None}, Contract
+)
+assert collapsed_null_default.maybe_day == datetime.date(2026, 8, 22)
+assert converter(Contract).to_transfer_type(collapsed_null_default) == {"known": "ok"}
+
+edge = converter(Contract).from_transfer_type(
+    {"known": "ok", "edgeNumber": -20, "zeroChoice": -0.0, "boolChoice": True},
+    Contract,
+)
+assert edge.edge_number == -20
+assert edge.zero_choice == 0.0
+assert edge.bool_choice is True
+assert converter(Contract).to_transfer_type(edge) == {
+    "known": "ok", "edgeNumber": -20, "zeroChoice": -0.0, "boolChoice": True
+}
+
+reported = violations(lambda: converter(Contract).from_transfer_type(
+    {"known": "ok", "edgeNumber": -0.9, "boolChoice": False}, Contract
+))
+assert reported == [
+    ("edgeNumber", "must be < -1, got -0.9"),
+    ("edgeNumber", "must be a multiple of 20.0, got -0.9"),
+    ("boolChoice", "must be one of [true], got false"),
+], reported
+reported = violations(lambda: converter(Contract).to_transfer_type(
+    Contract(known="ok", edge_number=-0.9, bool_choice=False)
+))
+assert reported == [
+    ("edgeNumber", "must be < -1, got -0.9"),
+    ("edgeNumber", "must be a multiple of 20.0, got -0.9"),
+    ("boolChoice", "must be one of [true], got false"),
+], reported
+
 assert violations(lambda: converter(Contract).from_transfer_type(
-    {"known": "ok", "extra": {"amount": -1}}, Contract
+    {"known": "ok", "extra": {"amount": -1, "born": "2026-08-20"}}, Contract
 )) == [("extra.amount", "must be >= 0, got -1")]
 
-collision = Contract(known="ok", additional_properties={"known": Extra(amount=1)})
+collision = Contract(
+    known="ok",
+    additional_properties={"known": Extra(amount=1, born=datetime.date(2026, 8, 20))},
+)
 reported = violations(lambda: converter(Contract).to_transfer_type(collision))
 assert reported == [("known", "additional property collides with declared property")], reported
 

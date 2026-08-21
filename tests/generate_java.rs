@@ -143,6 +143,9 @@ properties:
     contains:
       type: integer
       minimum: 2
+      maximum: 8
+      exclusiveMinimum: 1
+      exclusiveMaximum: 10
       multipleOf: 2
     minContains: 1
   payload:
@@ -155,6 +158,11 @@ properties:
     format: date
     enum: ["2025-01-01"]
     default: "2025-01-01"
+  maybeDay:
+    oneOf:
+      - { type: string, format: date }
+      - { type: "null" }
+    default: "2025-01-02"
   token:
     type: string
     contentEncoding: base64
@@ -169,11 +177,23 @@ properties:
     contains:
       type: string
       minLength: 3
+      maxLength: 12
       pattern: "^api\\."
       format: hostname
       enum: [api.example]
   keyed: { $ref: "#/$defs/Keyed" }
   lists: { $ref: "#/$defs/Lists" }
+  nativeExtras: { $ref: "#/$defs/NativeExtras" }
+  edgeNumber:
+    type: number
+    exclusiveMaximum: -1
+    multipleOf: 2e1
+  zeroChoice:
+    type: number
+    enum: [0]
+  boolChoice:
+    type: boolean
+    enum: [true]
 additionalProperties:
   type: string
   minLength: 2
@@ -197,6 +217,13 @@ $defs:
         type: string
         minLength: 2
         pattern: "^[a-z]+$"
+  NativeExtras:
+    type: object
+    minProperties: 1
+    maxProperties: 2
+    properties:
+      known: { type: string }
+    additionalProperties: { type: string, format: date }
 "##;
 
 const JAVA_DEPRECATED_SERVICE_SCHEMA: &str = r##"$schema: https://json-schema.org/draft/2020-12/schema
@@ -611,17 +638,27 @@ fn java_json_emits_wave2_object_and_matcher_contracts() {
         "wireKeys.add(\"id\")",
         "SpecNumbers.isSpecLong(rawElement)",
         "rawElement.doubleValue() % 2.0 == 0",
+        "rawElement.doubleValue() <= 8.0",
+        "rawElement.doubleValue() > 1.0",
+        "rawElement.doubleValue() < 10.0",
         "Double.isFinite(element) && element == Math.rint(element)",
         "String payloadWire = Base64Support.formatBase64(value.payload)",
         "PAYLOAD_PATTERN.matcher(payloadWire).find()",
         "public LocalDate getDayOrDefault()",
         "LocalDate.parse(\"2025-01-01\")",
+        "public LocalDate getMaybeDayOrDefault()",
+        "LocalDate.parse(\"2025-01-02\")",
         "public byte[] getBlobDefaultOrDefault()",
         "java.util.Base64.getDecoder().decode(\"YQ==\")",
         "must equal \\\"2025-01-01\\\"",
         "Base64Support.formatBase64(value.token)",
         "\"api.example\".equals(element)",
         "element.codePointCount(0, element.length()) >= 3",
+        "element.codePointCount(0, element.length()) <= 12",
+        "value.edgeNumber >= -1.0",
+        "value.edgeNumber % 20.0 != 0",
+        "must equal 0",
+        "must equal true",
         "java.util.regex.Pattern.compile(\"^api\\\\.\")",
     ] {
         assert!(model.contains(expected), "{expected}\n{model}");
@@ -643,6 +680,20 @@ fn java_json_emits_wave2_object_and_matcher_contracts() {
         "validationValue0.codePointCount(0, validationValue0.length())",
     ] {
         assert!(lists.contains(expected), "{expected}\n{lists}");
+    }
+    let native_extras = &rendered[&PathBuf::from("NativeExtras.java")];
+    for expected in [
+        "Map<String, LocalDate> additionalProperties",
+        "TemporalSupport.parseDate(element.textValue(), key, violations)",
+        "TemporalSupport.formatDate(entry.getValue())",
+        "declared property key collision",
+        "wireKeys.size() < 1",
+        "wireKeys.size() > 2",
+    ] {
+        assert!(
+            native_extras.contains(expected),
+            "{expected}\n{native_extras}"
+        );
     }
     fs::remove_dir_all(temp_dir).unwrap();
 }
