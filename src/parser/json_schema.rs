@@ -108,6 +108,67 @@ impl Schema {
 /// per-target lookup).
 const LANG_NAME_KEYWORDS: [&str; 4] = ["x-go-name", "x-ts-name", "x-py-name", "x-java-name"];
 
+/// Keywords admitted by the strict schema-node grammar. This is deliberately
+/// an exact allowlist: supported keywords, specifically rejected keywords, and
+/// generator extensions all have an owner below. Anything else is a typo or a
+/// dialect feature the loader cannot preserve coherently.
+fn schema_extra_keyword_is_known(keyword: &str) -> bool {
+    matches!(
+        keyword,
+        "allOf"
+            | "anyOf"
+            | "not"
+            | "if"
+            | "then"
+            | "else"
+            | "prefixItems"
+            | "unevaluatedProperties"
+            | "unevaluatedItems"
+            | "dependentSchemas"
+            | "patternProperties"
+            | "nullable"
+            | "$anchor"
+            | "$dynamicRef"
+            | "$dynamicAnchor"
+            | "$vocabulary"
+            | "$defs"
+            | "readOnly"
+            | "writeOnly"
+            | "contentMediaType"
+            | "contentSchema"
+            | "minimum"
+            | "maximum"
+            | "exclusiveMinimum"
+            | "exclusiveMaximum"
+            | "multipleOf"
+            | "minLength"
+            | "maxLength"
+            | "pattern"
+            | "format"
+            | "contentEncoding"
+            | "minItems"
+            | "maxItems"
+            | "uniqueItems"
+            | "contains"
+            | "minContains"
+            | "maxContains"
+            | "minProperties"
+            | "maxProperties"
+            | "propertyNames"
+            | "dependentRequired"
+            | "const"
+            | "enum"
+            | "default"
+            | "deprecated"
+            | "$comment"
+            | "examples"
+            | "x-go-const-name"
+            | "x-java-const-name"
+            | "x-go-enum-names"
+            | "x-java-enum-names"
+    ) || LANG_NAME_KEYWORDS.contains(&keyword)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum TypeKey {
     Root(PathBuf),
@@ -484,6 +545,14 @@ fn parse_json_documents(
         docs.insert(canonical(&path), (path, doc));
     }
 
+    // Validate the authored grammar before `allOf` normalization can discard or
+    // override a malformed branch. The semantic validators still run over the
+    // merged schema below; this first walk owns keyword allowlists and raw value
+    // shapes only.
+    for (path, doc) in docs.values() {
+        validate_raw_document_grammar(path, doc)?;
+    }
+
     // Snapshot the raw (pre-merge) schemas so that `allOf` / `$ref`-with-siblings
     // folds can resolve and inline a `$ref` branch's target, then normalize every
     // schema in place (merging/flattening `allOf` into a single materialized
@@ -764,6 +833,348 @@ fn collect_schema_model_refs(
     Ok(())
 }
 
+/// Validates document/service/operation allowlists and recursively validates the
+/// raw schema grammar before normalization. In particular, an invalid `allOf`
+/// branch must not become valid merely because a later branch overrides it.
+fn validate_raw_document_grammar(path: &Path, doc: &Document) -> Result<()> {
+    let reject = |reason: String| {
+        Err(Error::InvalidJsonSchema {
+            path: path.to_path_buf(),
+            reason,
+        })
+    };
+
+    let has_nexus_envelope = doc.nexusrpc.is_some();
+    if has_nexus_envelope {
+        // `description` is the only Schema field belonging to the envelope.
+        // Distinguish an unknown envelope member from a recognized schema
+        // keyword accidentally authored at the document root.
+        if let Some(keyword) = doc
+            .root
+            .extra
+            .keys()
+            .find(|keyword| !schema_extra_keyword_is_known(keyword))
+        {
+            return reject(format!("unknown Nexus envelope keyword `{keyword}`"));
+        }
+        if root_is_schema_shaped(&doc.root) {
+            return reject(
+                "a Nexus JSON schema document root is an envelope, not a model; move the model into `$defs`"
+                    .to_string(),
+            );
+        }
+        validate_annotations(path, &doc.root, "Nexus document")?;
+    } else if root_is_schema_shaped(&doc.root) {
+        validate_raw_schema_grammar(path, &doc.root, "root schema")?;
+    } else {
+        // Definitions-only documents may carry a document description.
+        validate_annotations(path, &doc.root, "document")?;
+    }
+
+    if let Some(defs) = &doc.defs {
+        for (name, schema) in defs {
+            validate_raw_schema_grammar(path, schema, &format!("$defs.{name}"))?;
+        }
+    }
+
+    if let Some(services) = &doc.services {
+        for (service_name, service) in services {
+            if service.endpoint.is_some() {
+                return reject(format!(
+                    "service `{service_name}`: `endpoint` is not supported in a Nexus JSON Schema document; configure the endpoint when registering the generated service"
+                ));
+            }
+            for (keyword, value) in &service.extra {
+                if LANG_NAME_KEYWORDS.contains(&keyword.as_str()) {
+                    continue;
+                }
+                if keyword == "deprecated" {
+                    if !value.is_boolean() {
+                        return reject(format!(
+                            "service `{service_name}`: `deprecated` must be a boolean, got {value}"
+                        ));
+                    }
+                    continue;
+                }
+                return reject(format!(
+                    "service `{service_name}` has unknown keyword `{keyword}`"
+                ));
+            }
+            if service
+                .description
+                .as_ref()
+                .is_some_and(|description| description.trim().is_empty())
+            {
+                return reject(format!(
+                    "service `{service_name}`: `description` must not be empty or whitespace-only"
+                ));
+            }
+
+            for (operation_name, operation) in &service.operations {
+                for (keyword, value) in &operation.extra {
+                    if LANG_NAME_KEYWORDS.contains(&keyword.as_str()) {
+                        continue;
+                    }
+                    if keyword == "deprecated" {
+                        if !value.is_boolean() {
+                            return reject(format!(
+                                "operation `{operation_name}`: `deprecated` must be a boolean, got {value}"
+                            ));
+                        }
+                        continue;
+                    }
+                    return reject(format!(
+                        "operation `{operation_name}` has unknown keyword `{keyword}`"
+                    ));
+                }
+                if operation
+                    .description
+                    .as_ref()
+                    .is_some_and(|description| description.trim().is_empty())
+                {
+                    return reject(format!(
+                        "operation `{operation_name}`: `description` must not be empty or whitespace-only"
+                    ));
+                }
+                for (label, schema) in [
+                    ("input", operation.input.as_ref()),
+                    ("output", operation.output.as_ref()),
+                ] {
+                    if let Some(schema) = schema {
+                        validate_raw_schema_grammar(
+                            path,
+                            schema,
+                            &format!("services.{service_name}.operations.{operation_name}.{label}"),
+                        )?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_schema_keyword_allowlist(path: &Path, schema: &Schema, context: &str) -> Result<()> {
+    for keyword in schema.extra.keys() {
+        if keyword == "discriminator" {
+            return Err(Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!(
+                    "{context}: OpenAPI `discriminator` is not supported; express a closed object union with `oneOf` branches carrying one shared required `const` property"
+                ),
+            });
+        }
+        if !schema_extra_keyword_is_known(keyword) {
+            return Err(Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!("{context}: unknown schema keyword `{keyword}`"),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Parses and recursively validates a raw schema-valued keyword. Boolean
+/// schemas are valid JSON Schema grammar even where this subset later rejects
+/// them for having no useful typed lowering.
+fn validate_raw_subschema_value(
+    path: &Path,
+    value: &Value,
+    context: &str,
+    keyword: &str,
+) -> Result<()> {
+    match value {
+        Value::Bool(_) => Ok(()),
+        Value::Object(_) => {
+            let schema: Schema = serde_json::from_value(value.clone()).map_err(|error| {
+                Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!("{context}: `{keyword}` is not a valid schema: {error}"),
+                }
+            })?;
+            validate_raw_schema_grammar(path, &schema, &format!("{context}.{keyword}"))
+        }
+        _ => Err(Error::InvalidJsonSchema {
+            path: path.to_path_buf(),
+            reason: format!("{context}: `{keyword}` must be a boolean or schema object"),
+        }),
+    }
+}
+
+fn validate_dependent_required_grammar(path: &Path, schema: &Schema, context: &str) -> Result<()> {
+    let Some(value) = schema.extra.get("dependentRequired") else {
+        return Ok(());
+    };
+    let reject = |reason: String| {
+        Err(Error::InvalidJsonSchema {
+            path: path.to_path_buf(),
+            reason,
+        })
+    };
+    let Some(entries) = value.as_object() else {
+        return reject(format!(
+            "{context}: `dependentRequired` must be an object mapping a property to the properties required alongside it"
+        ));
+    };
+    for (trigger, dependents) in entries {
+        let Some(dependents) = dependents.as_array() else {
+            return reject(format!(
+                "{context}: `dependentRequired.{trigger}` must be an array of property-name strings"
+            ));
+        };
+        let mut seen = BTreeSet::new();
+        for dependent in dependents {
+            let Some(dependent) = dependent.as_str() else {
+                return reject(format!(
+                    "{context}: `dependentRequired.{trigger}` must contain only property-name strings"
+                ));
+            };
+            if !seen.insert(dependent) {
+                return reject(format!(
+                    "{context}: `dependentRequired.{trigger}` lists `{dependent}` more than once; entries must be unique"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_raw_schema_grammar(path: &Path, schema: &Schema, context: &str) -> Result<()> {
+    validate_schema_keyword_allowlist(path, schema, context)?;
+    validate_annotations(path, schema, context)?;
+    validate_required_grammar(path, schema, context)?;
+    validate_dependent_required_grammar(path, schema, context)?;
+    validate_default(path, schema, context)?;
+    validate_const_enum(path, schema, context)?;
+
+    if let Some(value) = schema.extra.get("uniqueItems")
+        && !value.is_boolean()
+    {
+        return Err(Error::InvalidJsonSchema {
+            path: path.to_path_buf(),
+            reason: format!("{context}: `uniqueItems` must be a boolean"),
+        });
+    }
+
+    if let Some(properties) = &schema.properties {
+        for (name, property) in properties {
+            validate_raw_schema_grammar(path, property, &format!("{context}.properties.{name}"))?;
+        }
+    }
+    if let Some(items) = &schema.items {
+        validate_raw_schema_grammar(path, items, &format!("{context}.items"))?;
+    }
+    if let Some(branches) = &schema.one_of {
+        for (index, branch) in branches.iter().enumerate() {
+            validate_raw_schema_grammar(path, branch, &format!("{context}.oneOf[{index}]"))?;
+        }
+    }
+    if let Some(additional) = &schema.additional_properties {
+        match additional {
+            Value::Bool(_) => {}
+            Value::Object(_) => {
+                validate_raw_subschema_value(path, additional, context, "additionalProperties")?
+            }
+            _ => {
+                return Err(Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!(
+                        "{context}: `additionalProperties` must be `true`, `false`, or a schema object"
+                    ),
+                });
+            }
+        }
+    }
+
+    if let Some(all_of) = schema.extra.get("allOf") {
+        let Some(branches) = all_of.as_array() else {
+            return Err(Error::InvalidJsonSchema {
+                path: path.to_path_buf(),
+                reason: format!("{context}: `allOf` must be an array of schemas"),
+            });
+        };
+        for (index, branch) in branches.iter().enumerate() {
+            match branch {
+                Value::Bool(_) => {}
+                Value::Object(_) => validate_raw_subschema_value(
+                    path,
+                    branch,
+                    &format!("{context}.allOf[{index}]"),
+                    "branch",
+                )?,
+                _ => {
+                    return Err(Error::InvalidJsonSchema {
+                        path: path.to_path_buf(),
+                        reason: format!(
+                            "{context}.allOf[{index}]: `branch` must be a schema object"
+                        ),
+                    });
+                }
+            }
+        }
+    }
+    if let Some(negated) = schema.extra.get("not") {
+        validate_raw_subschema_value(path, negated, context, "not")?;
+    }
+    // Preserve the more specific subset diagnostics for matcher keywords, but
+    // still recurse into well-formed schema objects so unsupported keywords
+    // cannot hide inside them.
+    for keyword in ["contains", "propertyNames"] {
+        if let Some(value @ Value::Object(_)) = schema.extra.get(keyword) {
+            validate_raw_subschema_value(path, value, context, keyword)?;
+        }
+    }
+    for keyword in [
+        "if",
+        "then",
+        "else",
+        "contentSchema",
+        "unevaluatedProperties",
+        "unevaluatedItems",
+    ] {
+        if let Some(value) = schema.extra.get(keyword) {
+            validate_raw_subschema_value(path, value, context, keyword)?;
+        }
+    }
+    for keyword in ["anyOf", "prefixItems"] {
+        if let Some(value) = schema.extra.get(keyword) {
+            let Some(values) = value.as_array() else {
+                return Err(Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!("{context}: `{keyword}` must be an array of schemas"),
+                });
+            };
+            for (index, value) in values.iter().enumerate() {
+                validate_raw_subschema_value(
+                    path,
+                    value,
+                    &format!("{context}.{keyword}[{index}]"),
+                    "branch",
+                )?;
+            }
+        }
+    }
+    for keyword in ["$defs", "patternProperties", "dependentSchemas"] {
+        if let Some(value) = schema.extra.get(keyword) {
+            let Some(entries) = value.as_object() else {
+                return Err(Error::InvalidJsonSchema {
+                    path: path.to_path_buf(),
+                    reason: format!("{context}: `{keyword}` must be an object of schemas"),
+                });
+            };
+            for (name, value) in entries {
+                validate_raw_subschema_value(
+                    path,
+                    value,
+                    &format!("{context}.{keyword}.{name}"),
+                    "schema",
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_document(path: &Path, doc: &Document) -> Result<()> {
     let has_nexus_envelope = doc.nexusrpc.is_some();
     if has_nexus_envelope && doc.nexusrpc.as_ref().and_then(Value::as_str) != Some("1.0.0") {
@@ -984,6 +1395,7 @@ fn unsupported_keyword_reason(keyword: &str) -> &'static str {
 }
 
 fn validate_schema_common(path: &Path, schema: &Schema, context: &str) -> Result<()> {
+    validate_schema_keyword_allowlist(path, schema, context)?;
     if schema.id.is_some() {
         return Err(Error::InvalidJsonSchema {
             path: path.to_path_buf(),
@@ -1140,13 +1552,16 @@ fn validate_type_presence(path: &Path, schema: &Schema, context: &str) -> Result
     Ok(())
 }
 
-/// Load-time validation of `required` (see `specs/json-schema/features/required.md`):
-/// the value must be an array of unique property-name strings, and every name
-/// must be declared in `properties` (P7.1 — a mandatory member with no declared
-/// shape is undecidable).
-fn validate_required(path: &Path, schema: &Schema, context: &str) -> Result<()> {
+/// Validates the context-independent grammar of `required`, returning its
+/// unique names. Kept separate so raw `allOf` branches can be checked before
+/// their property maps are unioned.
+fn validate_required_grammar(
+    path: &Path,
+    schema: &Schema,
+    context: &str,
+) -> Result<BTreeSet<String>> {
     let Some(value) = &schema.required else {
-        return Ok(());
+        return Ok(BTreeSet::new());
     };
     let reject = |reason: String| {
         Err(Error::InvalidJsonSchema {
@@ -1159,26 +1574,41 @@ fn validate_required(path: &Path, schema: &Schema, context: &str) -> Result<()> 
             "{context}: `required` must be an array of property-name strings"
         ));
     };
-    let mut names: BTreeSet<&str> = BTreeSet::new();
+    let mut names = BTreeSet::new();
     for entry in entries {
         let Some(name) = entry.as_str() else {
             return reject(format!(
                 "{context}: `required` may contain only property-name strings; `{entry}` is not a string"
             ));
         };
-        if !names.insert(name) {
+        if !names.insert(name.to_string()) {
             return reject(format!(
                 "{context}: `required` lists `{name}` more than once; entries must be unique"
             ));
         }
     }
+    Ok(names)
+}
+
+/// Load-time validation of `required` (see `specs/json-schema/features/required.md`):
+/// the value must be an array of unique property-name strings, and every name
+/// must be declared in `properties` (P7.1 — a mandatory member with no declared
+/// shape is undecidable).
+fn validate_required(path: &Path, schema: &Schema, context: &str) -> Result<()> {
+    let names = validate_required_grammar(path, schema, context)?;
+    let reject = |reason: String| {
+        Err(Error::InvalidJsonSchema {
+            path: path.to_path_buf(),
+            reason,
+        })
+    };
     let declared: BTreeSet<&str> = schema
         .properties
         .as_ref()
         .map(|properties| properties.keys().map(String::as_str).collect())
         .unwrap_or_default();
-    for &name in &names {
-        if !declared.contains(name) {
+    for name in &names {
+        if !declared.contains(name.as_str()) {
             return reject(format!(
                 "{context}: `required` names `{name}`, which is not declared in `properties`; add it to `properties` or remove it from `required`"
             ));
@@ -1870,23 +2300,33 @@ fn validate_array_constraints(path: &Path, schema: &Schema, context: &str) -> Re
         ));
     }
 
-    // Each count bound must be a non-negative integer. A `.0`-valued float is
-    // accepted as its integer value (honoring the `1.0`-as-integer rule).
+    // Each count bound must be a non-negative safe integer. The shared cap is
+    // what lets every target represent and compare the count exactly.
+    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
     let bound = |key: &str| -> Result<Option<u64>> {
         match schema.extra.get(key) {
             None => Ok(None),
             Some(Value::Number(number)) => match number.as_f64() {
-                Some(value) if value.is_finite() && value >= 0.0 && value.fract() == 0.0 => {
+                Some(value)
+                    if value.is_finite()
+                        && value >= 0.0
+                        && value <= MAX_SAFE_INTEGER
+                        && value.fract() == 0.0 =>
+                {
                     Ok(Some(value as u64))
                 }
                 _ => Err(Error::InvalidJsonSchema {
                     path: path.to_path_buf(),
-                    reason: format!("{context}: `{key}` must be a non-negative integer"),
+                    reason: format!(
+                        "{context}: `{key}` must be a non-negative integer no greater than 9007199254740991"
+                    ),
                 }),
             },
             Some(_) => Err(Error::InvalidJsonSchema {
                 path: path.to_path_buf(),
-                reason: format!("{context}: `{key}` must be a non-negative integer"),
+                reason: format!(
+                    "{context}: `{key}` must be a non-negative integer no greater than 9007199254740991"
+                ),
             }),
         }
     };
@@ -2130,23 +2570,33 @@ fn validate_object_constraints(path: &Path, schema: &Schema, context: &str) -> R
         })
         .unwrap_or_default();
 
-    // Each count bound must be a non-negative integer. A `.0`-valued float is
-    // accepted as its integer value (honoring the `1.0`-as-integer rule).
+    // Each count bound must be a non-negative safe integer. The shared cap is
+    // what lets every target represent and compare the count exactly.
+    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
     let bound = |key: &str| -> Result<Option<u64>> {
         match schema.extra.get(key) {
             None => Ok(None),
             Some(Value::Number(number)) => match number.as_f64() {
-                Some(value) if value.is_finite() && value >= 0.0 && value.fract() == 0.0 => {
+                Some(value)
+                    if value.is_finite()
+                        && value >= 0.0
+                        && value <= MAX_SAFE_INTEGER
+                        && value.fract() == 0.0 =>
+                {
                     Ok(Some(value as u64))
                 }
                 _ => Err(Error::InvalidJsonSchema {
                     path: path.to_path_buf(),
-                    reason: format!("{context}: `{key}` must be a non-negative integer"),
+                    reason: format!(
+                        "{context}: `{key}` must be a non-negative integer no greater than 9007199254740991"
+                    ),
                 }),
             },
             Some(_) => Err(Error::InvalidJsonSchema {
                 path: path.to_path_buf(),
-                reason: format!("{context}: `{key}` must be a non-negative integer"),
+                reason: format!(
+                    "{context}: `{key}` must be a non-negative integer no greater than 9007199254740991"
+                ),
             }),
         }
     };
@@ -2221,25 +2671,49 @@ fn validate_object_constraints(path: &Path, schema: &Schema, context: &str) -> R
                 "{context}: `propertyNames` must be `type: string` (property names are always strings, so any other type can never match)"
             ));
         }
-        // The subschema must carry a supported string assertion. Only the
-        // string-length keywords (`minLength`/`maxLength`) lower today; a bare
-        // `type: string` asserts nothing (keys are already strings) → reject.
-        let has_length =
-            subschema.extra.contains_key("minLength") || subschema.extra.contains_key("maxLength");
-        if !has_length {
-            for unsupported in ["pattern", "enum", "const", "format"] {
-                if subschema.extra.contains_key(unsupported) {
+        const ASSERTIONS: [&str; 5] = ["minLength", "maxLength", "pattern", "enum", "format"];
+        for keyword in subschema.extra.keys() {
+            if !ASSERTIONS.contains(&keyword.as_str()) {
+                return reject(format!(
+                    "{context}: `propertyNames` with `{keyword}` is not supported; use only `minLength`, `maxLength`, `pattern`, `enum`, or an asserted `format`"
+                ));
+            }
+        }
+        if !ASSERTIONS
+            .iter()
+            .any(|keyword| subschema.extra.contains_key(*keyword))
+        {
+            return reject(format!(
+                "{context}: `propertyNames` asserts nothing (property names are already strings); add `minLength`, `maxLength`, `pattern`, `enum`, or an asserted `format`, or drop the keyword"
+            ));
+        }
+        if let Some(value) = subschema.extra.get("enum") {
+            let Some(values) = value.as_array() else {
+                return reject(format!(
+                    "{context}.propertyNames: `enum` must be an array of strings"
+                ));
+            };
+            if values.is_empty() {
+                return reject(format!("{context}.propertyNames: `enum` must not be empty"));
+            }
+            let mut seen = BTreeSet::new();
+            for value in values {
+                let Some(value) = value.as_str() else {
                     return reject(format!(
-                        "{context}: `propertyNames` with `{unsupported}` is not yet supported; use `minLength`/`maxLength` to constrain key length"
+                        "{context}.propertyNames: `enum` must contain only strings"
+                    ));
+                };
+                if !seen.insert(value) {
+                    return reject(format!(
+                        "{context}.propertyNames: `enum` lists {value:?} more than once"
                     ));
                 }
             }
-            return reject(format!(
-                "{context}: `propertyNames` asserts nothing (property names are already strings); add a `minLength`/`maxLength` key-length constraint or drop the keyword"
-            ));
         }
-        // Reuse the string-length validation for the key subschema.
+        // Reuse the ordinary string predicates over the key subschema. Pattern
+        // was normalized during the recursive normalize pass above.
         validate_string_constraints(path, &subschema, &format!("{context}.propertyNames"))?;
+        validate_format(path, &subschema, &format!("{context}.propertyNames"))?;
     }
 
     // `dependentRequired` — map of trigger → dependents that must also be present.
@@ -2806,7 +3280,7 @@ fn validate_schema_unions(
     models: &BTreeMap<TypeKey, JsonModel>,
 ) -> Result<()> {
     if let Some(one_of) = &schema.one_of {
-        validate_one_of(path, canonical_path, one_of, context, docs, models)?;
+        validate_one_of(path, canonical_path, schema, context, docs, models)?;
         for branch in one_of {
             validate_schema_unions(
                 path,
@@ -3492,11 +3966,15 @@ fn hoist_union_object_branches(
 fn validate_one_of(
     path: &Path,
     canonical_path: &Path,
-    branches: &[Schema],
+    schema: &Schema,
     context: &str,
     docs: &IndexMap<PathBuf, (PathBuf, Document)>,
     models: &BTreeMap<TypeKey, JsonModel>,
 ) -> Result<()> {
+    let branches = schema
+        .one_of
+        .as_deref()
+        .expect("validate_one_of is called only for a oneOf schema");
     let reject = |reason: String| {
         Err(Error::InvalidJsonSchema {
             path: path.to_path_buf(),
@@ -3517,11 +3995,23 @@ fn validate_one_of(
 
     // Classify every branch by kind, resolving `$ref` branches to their target.
     let mut kinds: Vec<BranchKind> = Vec::with_capacity(branches.len());
+    let mut resolved_schemas: Vec<Schema> = Vec::with_capacity(branches.len());
     let mut object_schemas: Vec<Schema> = Vec::new();
     let mut non_object_schemas: Vec<Schema> = Vec::new();
     for branch in branches {
         let resolved = resolve_branch_schema(branch, path, canonical_path, docs, models)?;
         let kind = one_of_branch_kind(branch, &resolved, path, context)?;
+        if kind == BranchKind::Null
+            && branch
+                != &(Schema {
+                    ty: Some(Value::String("null".to_string())),
+                    ..Schema::default()
+                })
+        {
+            return reject(format!(
+                "{context}: a null branch must be exactly `{{type: \"null\"}}` with no sibling keywords"
+            ));
+        }
         if kind != BranchKind::Object && kind != BranchKind::Null {
             non_object_schemas.push(resolved.clone());
         }
@@ -3536,8 +4026,9 @@ fn validate_one_of(
                     "{context}: an inline object `oneOf` branch is not named in this position; make it a free-form object (`type: object` with `additionalProperties: true`), or move it into `$defs` and `$ref` it"
                 ));
             }
-            object_schemas.push(resolved);
+            object_schemas.push(resolved.clone());
         }
+        resolved_schemas.push(resolved);
         kinds.push(kind);
     }
 
@@ -3635,6 +4126,25 @@ fn validate_one_of(
         .iter()
         .filter(|kind| **kind != BranchKind::Null)
         .count();
+    if branches.len() == 2
+        && non_null == 1
+        && let Some(default) = schema.extra.get("default")
+        && let Some((_, non_null_schema)) = kinds
+            .iter()
+            .zip(&resolved_schemas)
+            .find(|(kind, _)| **kind != BranchKind::Null)
+    {
+        let mut schema_with_default = non_null_schema.clone();
+        schema_with_default
+            .extra
+            .insert("default".to_string(), default.clone());
+        validate_schema_node(
+            path,
+            &schema_with_default,
+            &format!("{context}.default"),
+            false,
+        )?;
+    }
     if non_null >= 2 {
         for branch in &non_object_schemas {
             reject_materialized_branch_keyword(path, branch, context)?;
@@ -3763,7 +4273,11 @@ fn build_service(
         operations_class: LanguageStringSpec::default(),
         endpoint: service.endpoint.clone(),
         experimental: false,
-        deprecated: false,
+        deprecated: service
+            .extra
+            .get("deprecated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
         delay_load_temporalio_workflow: false,
         operations,
         resources: Vec::new(),
@@ -3850,7 +4364,11 @@ fn build_operation(
         code_name: language_string_override(language, code_name),
         wire_name: operation.fqn.clone().unwrap_or(operation_name),
         experimental: false,
-        deprecated: false,
+        deprecated: operation
+            .extra
+            .get("deprecated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
         doc: language_string(operation.description.clone()),
         return_doc: LanguageStringSpec::default(),
         input,
@@ -4222,7 +4740,38 @@ fn normalize_children(
                 )
             })?);
     }
+    for keyword in ["contains", "propertyNames"] {
+        if let Some(value) = schema.extra.get(keyword).cloned()
+            && value.is_object()
+        {
+            let subschema: Schema = serde_json::from_value(value).map_err(|error| {
+                merge_reject(
+                    path,
+                    format!("{context}.{keyword} is not a valid schema: {error}"),
+                )
+            })?;
+            let normalized = normalize_schema(
+                path,
+                canonical_path,
+                &subschema,
+                ctx,
+                cycle,
+                &format!("{context}.{keyword}"),
+            )?;
+            schema.extra.insert(
+                keyword.to_string(),
+                serde_json::to_value(normalized).map_err(|error| {
+                    merge_reject(
+                        path,
+                        format!("{context}: failed to preserve `{keyword}`: {error}"),
+                    )
+                })?,
+            );
+        }
+    }
     normalize_pattern(path, &mut schema, context)?;
+    schema.extra.shift_remove("$comment");
+    schema.extra.shift_remove("examples");
     Ok(schema)
 }
 
@@ -4305,6 +4854,10 @@ fn own_conjunct(schema: &Schema) -> Schema {
     let mut own = schema.clone();
     own.reference = None;
     own.extra.shift_remove("allOf");
+    // These annotations are deliberately accepted-and-ignored. Removing them
+    // before the fold prevents inert differences from becoming merge conflicts.
+    own.extra.shift_remove("$comment");
+    own.extra.shift_remove("examples");
     own
 }
 
@@ -4688,6 +5241,9 @@ fn merge_extra_value(
             format!(
                 "{context}: `allOf` branches declare different `contains` matchers; two existential constraints do not merge into one"
             ),
+        )),
+        "deprecated" => Ok(Value::Bool(
+            acc.as_bool().unwrap_or(false) || branch.as_bool().unwrap_or(false),
         )),
         "default" | "title" | "description" => Ok(branch.clone()),
         "dependentRequired" => merge_dependent_required(acc, branch),
@@ -5141,12 +5697,13 @@ fn language_string_override(language: Language, value: Option<String>) -> Langua
 }
 
 fn root_is_schema_shaped(root: &Schema) -> bool {
-    root.reference.is_some()
-        || root.ty.is_some()
-        || root.properties.is_some()
-        || root.additional_properties.is_some()
-        || root.one_of.is_some()
-        || root.items.is_some()
+    // A definitions-only document may carry `description` without declaring a
+    // root model. Every other schema keyword, including one stored in `extra`
+    // (`allOf`, `enum`, constraints, annotations), makes the root a schema.
+    Schema {
+        description: None,
+        ..root.clone()
+    } != Schema::default()
 }
 
 fn root_type_name(path: &Path) -> String {
@@ -6540,7 +7097,6 @@ $schema: https://json-schema.org/draft/2020-12/schema
 services:
   ChatService:
     fqn: example.chat.v1.ChatService
-    endpoint: __chat_service
     operations:
       sendMessage:
         fqn: SendMessage
@@ -6563,7 +7119,7 @@ $defs:
 
         assert!(spec.records().next().is_none());
         assert_eq!(spec.services[0].name, "ChatService");
-        assert_eq!(spec.services[0].endpoint.as_deref(), Some("__chat_service"));
+        assert_eq!(spec.services[0].endpoint, None);
         let operation = &spec.services[0].operations[0];
         assert_eq!(operation.name, "SendMessage");
         assert_eq!(operation.wire_name, "SendMessage");
@@ -6635,6 +7191,24 @@ services:
     }
 
     #[test]
+    fn rejects_endpoint_in_nexus_service() {
+        let error = doc_reject(
+            r##"
+nexusrpc: "1.0.0"
+services:
+  ChatService:
+    endpoint: __chat_service
+    operations:
+      ping: {}
+"##,
+        );
+        assert!(
+            error.contains("endpoint") && error.contains("not supported"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn omitted_operation_io_is_void() {
         let spec = parse(
             r##"
@@ -6651,6 +7225,56 @@ services:
         assert_eq!(operation.name, "Ping");
         assert!(operation.input.is_none());
         assert!(operation.output.is_none());
+    }
+
+    #[test]
+    fn lowers_service_and_operation_deprecation() {
+        let spec = parse(
+            r##"
+nexusrpc: "1.0.0"
+services:
+  ChatService:
+    deprecated: true
+    operations:
+      ping:
+        deprecated: true
+"##,
+        );
+        assert!(spec.services[0].deprecated);
+        assert!(spec.services[0].operations[0].deprecated);
+    }
+
+    #[test]
+    fn rejects_non_boolean_service_and_operation_deprecation() {
+        let service = doc_reject(
+            r##"
+nexusrpc: "1.0.0"
+services:
+  ChatService:
+    deprecated: yes
+    operations:
+      ping: {}
+"##,
+        );
+        assert!(
+            service.contains("`deprecated` must be a boolean"),
+            "{service}"
+        );
+
+        let operation = doc_reject(
+            r##"
+nexusrpc: "1.0.0"
+services:
+  ChatService:
+    operations:
+      ping:
+        deprecated: yes
+"##,
+        );
+        assert!(
+            operation.contains("`deprecated` must be a boolean"),
+            "{operation}"
+        );
     }
 
     #[test]
@@ -6755,6 +7379,72 @@ properties:
 "##,
         );
         assert!(error.contains("envelope"), "{error}");
+    }
+
+    #[test]
+    fn rejects_unknown_nexus_envelope_keyword() {
+        let error = doc_reject(
+            r##"
+nexusrpc: "1.0.0"
+servcies: {}
+"##,
+        );
+        assert!(
+            error.contains("unknown Nexus envelope keyword `servcies`"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_service_and_operation_keywords() {
+        let service_error = doc_reject(
+            r##"
+nexusrpc: "1.0.0"
+services:
+  ChatService:
+    timeout: 5
+    operations:
+      ping: {}
+"##,
+        );
+        assert!(
+            service_error.contains("service `ChatService`")
+                && service_error.contains("unknown keyword `timeout`"),
+            "{service_error}"
+        );
+
+        let operation_error = doc_reject(
+            r##"
+nexusrpc: "1.0.0"
+services:
+  ChatService:
+    operations:
+      ping:
+        timeout: 5
+"##,
+        );
+        assert!(
+            operation_error.contains("operation `ping`")
+                && operation_error.contains("unknown keyword `timeout`"),
+            "{operation_error}"
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_schema_keyword_and_openapi_discriminator() {
+        let unknown = structural_reject("type: string\nminLenght: 2");
+        assert!(
+            unknown.contains("unknown schema keyword `minLenght`"),
+            "{unknown}"
+        );
+
+        let discriminator = structural_reject(
+            "type: object\nproperties: {}\ndiscriminator: { propertyName: kind }",
+        );
+        assert!(
+            discriminator.contains("OpenAPI `discriminator` is not supported"),
+            "{discriminator}"
+        );
     }
 
     #[test]
@@ -7545,6 +8235,17 @@ properties:
     }
 
     #[test]
+    fn rejects_property_count_above_safe_integer_cap() {
+        let error = numeric_reject(
+            "type: object\nadditionalProperties: true\nmaxProperties: 9007199254740992",
+        );
+        assert!(
+            error.contains("maxProperties") && error.contains("9007199254740991"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn rejects_max_properties_below_required_count() {
         let error = numeric_reject(
             "type: object\nproperties: { a: {type: string}, b: {type: string}, c: {type: string} }\nrequired: [a, b, c]\nmaxProperties: 2",
@@ -7567,11 +8268,30 @@ properties:
     }
 
     #[test]
-    fn rejects_unsupported_property_names_assertion() {
-        let error = numeric_reject(
-            "type: object\nadditionalProperties: true\npropertyNames: { type: string, pattern: \"^x\" }",
-        );
-        assert!(error.contains("not yet supported"), "{error}");
+    fn accepts_documented_property_names_assertions() {
+        for matcher in [
+            "{ type: string, minLength: 2, maxLength: 8 }",
+            "{ type: string, pattern: \"^x\" }",
+            "{ type: string, enum: [x, xy] }",
+            "{ type: string, format: hostname }",
+        ] {
+            let input =
+                format!("type: object\nadditionalProperties: true\npropertyNames: {matcher}");
+            let doc = format!(
+                "$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\nproperties:\n  value:\n{}",
+                input
+                    .lines()
+                    .map(|line| format!("    {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
+            parse_api_spec_from_json_schema_for_language(
+                Language::Python,
+                &doc,
+                PathBuf::from("api.yaml"),
+            )
+            .unwrap_or_else(|error| panic!("matcher {matcher} should load: {error}"));
+        }
     }
 
     #[test]
@@ -7861,6 +8581,29 @@ properties:
       - { type: "null" }
 "#,
         );
+    }
+
+    #[test]
+    fn rejects_null_branch_with_sibling_keywords() {
+        let error = structural_reject(
+            "oneOf:\n  - { type: string }\n  - { type: \"null\", description: not exact }",
+        );
+        assert!(
+            error.contains("null branch") && error.contains("exactly `{type: \"null\"}`"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn rejects_nullable_default_invalid_for_non_null_branch() {
+        let wrong_type =
+            structural_reject("oneOf:\n  - { type: string }\n  - { type: \"null\" }\ndefault: 42");
+        assert!(wrong_type.contains("incompatible"), "{wrong_type}");
+
+        let constraint = structural_reject(
+            "oneOf:\n  - { type: string, minLength: 3 }\n  - { type: \"null\" }\ndefault: x",
+        );
+        assert!(constraint.contains("minLength"), "{constraint}");
     }
 
     #[test]
@@ -8292,6 +9035,72 @@ properties:
             "allOf:\n  - { type: integer, minimum: 10 }\n  - { type: integer, maximum: 5 }",
         );
         assert!(error.contains("empty range"), "{error}");
+    }
+
+    #[test]
+    fn all_of_validates_raw_branch_grammar_before_merging() {
+        let required = numeric_reject(
+            "allOf:\n  - { type: object, properties: { a: { type: string } }, required: a }\n  - { type: object, required: [a] }",
+        );
+        assert!(
+            required.contains("`required` must be an array"),
+            "{required}"
+        );
+
+        let dependent = numeric_reject(
+            "allOf:\n  - { type: object, properties: { a: { type: string }, b: { type: string } }, dependentRequired: nope }\n  - { type: object, dependentRequired: { a: [b] } }",
+        );
+        assert!(
+            dependent.contains("`dependentRequired` must be an object"),
+            "{dependent}"
+        );
+
+        let additional = numeric_reject(
+            "allOf:\n  - { type: object, additionalProperties: 5 }\n  - { type: object, additionalProperties: false }",
+        );
+        assert!(
+            additional.contains("additionalProperties") && additional.contains("schema object"),
+            "{additional}"
+        );
+
+        let unique = numeric_reject(
+            "allOf:\n  - { type: array, items: { type: string }, uniqueItems: yes }\n  - { type: array, uniqueItems: true }",
+        );
+        assert!(
+            unique.contains("`uniqueItems` must be a boolean"),
+            "{unique}"
+        );
+
+        let default = numeric_reject(
+            "allOf:\n  - { type: string, default: [bad] }\n  - { type: string, default: good }",
+        );
+        assert!(default.contains("object/array"), "{default}");
+    }
+
+    #[test]
+    fn all_of_merges_deprecated_with_or_and_discards_inert_annotations() {
+        let schema = model_schema(
+            r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  value:
+    allOf:
+      - type: string
+        deprecated: false
+        $comment: first
+        examples: [first]
+      - type: string
+        deprecated: true
+        $comment: second
+        examples: [second]
+"##,
+            "Api",
+        );
+        let value = &schema["properties"]["value"];
+        assert_eq!(value["deprecated"], true);
+        assert!(value.get("$comment").is_none(), "{value}");
+        assert!(value.get("examples").is_none(), "{value}");
     }
 
     #[test]
@@ -10670,6 +11479,27 @@ properties:
     fn rejects_not_double_negation() {
         let error = numeric_reject("not: { not: { type: string } }");
         assert!(error.contains("not supported"), "{error}");
+    }
+
+    #[test]
+    fn validates_not_subschema_before_rejecting_not() {
+        let unknown = numeric_reject("not: { type: string, minLenght: 2 }");
+        assert!(
+            unknown.contains("unknown schema keyword `minLenght`") && unknown.contains(".not"),
+            "{unknown}"
+        );
+
+        let malformed = numeric_reject("not: 5");
+        assert!(
+            malformed.contains("`not` must be a boolean or schema object"),
+            "{malformed}"
+        );
+
+        let invalid_default = numeric_reject("not: { type: string, default: 5 }");
+        assert!(
+            invalid_default.contains("incompatible"),
+            "{invalid_default}"
+        );
     }
 
     // --- unsatisfiable recursion cycles (validate_reference_satisfiability) ---
