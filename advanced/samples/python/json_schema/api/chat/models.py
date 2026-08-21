@@ -384,7 +384,15 @@ class _RoomTransferTypeConverter(
             except ValidationError as error:
                 _collect(violations, "labels", error)
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _ROOM_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out

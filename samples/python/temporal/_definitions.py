@@ -21,6 +21,7 @@ __all__ = [
     "_check_time",
     "_check_unique_items",
     "_collect",
+    "_json_values_equal",
     "_format_base64",
     "_format_base64url",
     "_format_date",

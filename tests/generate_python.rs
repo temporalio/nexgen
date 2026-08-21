@@ -86,6 +86,219 @@ properties:
       - { type: string, enum: [auto, manual] }
 "#;
 
+/// Exercises the Python-specific runtime surface that cannot be inferred from
+/// annotations alone: typed extras on a mixed object, the complete scalar
+/// matcher vocabulary, key-shape validation, and native closed/default values.
+const PYTHON_CONFORMANCE_SCHEMA: &str = r##"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+required: [known]
+properties:
+  known: { type: string }
+  codes:
+    type: array
+    items: { type: string }
+    contains: { type: string, minLength: 2, pattern: "^x" }
+  emails:
+    type: array
+    items: { type: string }
+    contains: { type: string, format: email }
+  integralNumbers:
+    type: array
+    items: { type: number }
+    contains:
+      type: integer
+      minimum: 2
+      exclusiveMaximum: 10
+      multipleOf: 2
+  flags:
+    type: array
+    items: { type: boolean }
+    contains: { const: true }
+  modes:
+    type: array
+    items: { type: string }
+    contains: { enum: [fast, safe] }
+  day:
+    type: string
+    format: date
+    minLength: 10
+    maxLength: 10
+    pattern: "^2026-"
+  fixedDay:
+    type: string
+    format: date
+    const: "2026-08-21"
+  dayChoice:
+    type: string
+    format: date
+    enum: ["2026-08-21", "2026-08-22"]
+  defaultDay:
+    type: string
+    format: date
+    default: "2026-08-21"
+  maybeDay:
+    oneOf:
+      - { type: string, format: date }
+      - { type: "null" }
+    default: "2026-08-22"
+  fixedBlob:
+    type: string
+    contentEncoding: base64
+    minLength: 4
+    maxLength: 4
+    pattern: "^YQ==$"
+    const: "YQ=="
+additionalProperties:
+  $ref: "#/$defs/Extra"
+minProperties: 1
+$defs:
+  Extra:
+    type: object
+    additionalProperties: false
+    required: [amount]
+    properties:
+      amount: { type: integer, minimum: 0 }
+  PatternNames:
+    type: object
+    additionalProperties: { type: string }
+    propertyNames: { type: string, minLength: 2, maxLength: 8, pattern: "^[a-z]+$" }
+  EnumNames:
+    type: object
+    additionalProperties: { type: string }
+    propertyNames: { type: string, enum: [alpha, beta] }
+  FormatNames:
+    type: object
+    additionalProperties: { type: string }
+    propertyNames: { type: string, format: email }
+"##;
+
+const PYTHON_CONFORMANCE_RUNTIME_CHECK: &str = r#"
+import datetime
+import sys
+
+root, package = sys.argv[1], sys.argv[2]
+sys.path.insert(0, root)
+models = __import__(package + ".models", fromlist=["*"])
+definitions = __import__(package + "._definitions", fromlist=["*"])
+
+Contract = models.Contract
+Extra = models.Extra
+PatternNames = models.PatternNames
+EnumNames = models.EnumNames
+FormatNames = models.FormatNames
+ValidationError = definitions.ValidationError
+
+def converter(model):
+    return getattr(model, "__temporal_transfer_type_converter")
+
+def violations(call):
+    try:
+        call()
+    except ValidationError as error:
+        return [(item.path, item.reason) for item in error.violations]
+    raise AssertionError("expected ValidationError")
+
+wire = {
+    "known": "ok",
+    "extra": {"amount": 2},
+    "codes": ["no", "xyz"],
+    "emails": ["bad", "a@example.com"],
+    "integralNumbers": [1.5, 4],
+    "day": "2026-08-21",
+    "fixedDay": "2026-08-21",
+    "dayChoice": "2026-08-22",
+    "fixedBlob": "YQ==",
+}
+value = converter(Contract).from_transfer_type(wire, Contract)
+assert isinstance(value.additional_properties["extra"], Extra)
+assert value.additional_properties["extra"].amount == 2
+assert value.day == datetime.date(2026, 8, 21)
+assert value.fixed_day == datetime.date(2026, 8, 21)
+assert value.day_choice == datetime.date(2026, 8, 22)
+assert value.default_day == datetime.date(2026, 8, 21)
+assert value.maybe_day == datetime.date(2026, 8, 22)
+assert value.fixed_blob == b"a"
+assert converter(Contract).to_transfer_type(value) == wire
+
+assert violations(lambda: converter(Contract).from_transfer_type(
+    {"known": "ok", "extra": {"amount": -1}}, Contract
+)) == [("extra.amount", "must be >= 0, got -1")]
+
+collision = Contract(known="ok", additional_properties={"known": Extra(amount=1)})
+reported = violations(lambda: converter(Contract).to_transfer_type(collision))
+assert reported == [("known", "additional property collides with declared property")], reported
+
+# The matcher must guard the raw item type before applying numeric predicates:
+# bool is an invalid number item and must not count as integer 1.
+reported = violations(lambda: converter(Contract).from_transfer_type(
+    {"known": "ok", "integralNumbers": [True, 3]}, Contract
+))
+assert reported == [
+    ("integralNumbers[0]", "expected number"),
+    ("integralNumbers", "no element matches the required schema"),
+], reported
+
+assert violations(lambda: converter(Contract).from_transfer_type(
+    {"known": "ok", "codes": ["ab", "yellow"]}, Contract
+)) == [("codes", "no element matches the required schema")]
+assert violations(lambda: converter(Contract).to_transfer_type(
+    Contract(known="ok", emails=["bad", "also-bad"])
+)) == [("emails", "no element matches the required schema")]
+assert violations(lambda: converter(Contract).from_transfer_type(
+    {"known": "ok", "flags": [False, False], "modes": ["slow"]}, Contract
+)) == [
+    ("flags", "no element matches the required schema"),
+    ("modes", "no element matches the required schema"),
+]
+
+for model, good in [
+    (PatternNames, {"alpha": "x"}),
+    (EnumNames, {"alpha": "x"}),
+    (FormatNames, {"a@example.com": "x"}),
+]:
+    parsed = converter(model).from_transfer_type(good, model)
+    assert converter(model).to_transfer_type(parsed) == good
+
+reported = violations(lambda: converter(PatternNames).from_transfer_type(
+    {"A": "x", "toolongkey": "y"}, PatternNames
+))
+assert reported == [
+    ("A", 'invalid property name "A": must have length >= 2, got 1'),
+    ("A", r'invalid property name "A": must match pattern ^[a-z]+\Z'),
+    ("toolongkey", 'invalid property name "toolongkey": must have length <= 8, got 10'),
+], reported
+assert violations(lambda: converter(EnumNames).to_transfer_type(
+    EnumNames(additional_properties={"gamma": "x"})
+)) == [("gamma", 'invalid property name "gamma": must equal an allowed value')]
+assert violations(lambda: converter(FormatNames).from_transfer_type(
+    {"bad": "x"}, FormatNames
+)) == [("bad", 'invalid property name "bad": must be a valid email')]
+
+# Sibling string constraints apply to the original wire spelling and to the
+# canonical string produced from a native value.
+assert violations(lambda: converter(Contract).from_transfer_type(
+    {"known": "ok", "day": "2025-08-21"}, Contract
+)) == [("day", 'must match pattern ^2026-, got "2025-08-21"')]
+changed = Contract(known="ok", day=datetime.date(2025, 8, 21))
+assert violations(lambda: converter(Contract).to_transfer_type(changed)) == [
+    ("day", 'must match pattern ^2026-, got "2025-08-21"')
+]
+
+wrong_closed = Contract(
+    known="ok",
+    fixed_day=datetime.date(2026, 8, 22),
+    day_choice=datetime.date(2026, 8, 23),
+    fixed_blob=b"b",
+)
+reported = violations(lambda: converter(Contract).to_transfer_type(wrong_closed))
+assert reported == [
+    ("fixedDay", 'must equal "2026-08-21"'),
+    ("dayChoice", 'must be one of ["2026-08-21", "2026-08-22"], got "2026-08-23"'),
+    ("fixedBlob", r'must match pattern ^YQ==\Z, got "Yg=="'),
+    ("fixedBlob", 'must equal "YQ=="'),
+], reported
+"#;
+
 /// A property-position union whose **last** branch converts through a model's
 /// converter. Nothing in the annotation stops a member holding a value no branch
 /// admits, and the serialize dispatch guards every branch but the last, so that
@@ -1312,6 +1525,110 @@ fn python_json_validates_non_object_union_branch_constraints() {
     assert!(rendered.contains(
         "Violation(path=f'listOrName[{item_index_8}]', reason=f\"must be a finite number, got {item_element_8}\")"
     ));
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn python_json_enforces_remaining_scalar_and_typed_extra_contracts() {
+    let temp_dir = unique_output_path("py-json-conformance");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("contract.yaml");
+    fs::write(&input_path, PYTHON_CONFORMANCE_SCHEMA).unwrap();
+    let output_path = temp_dir.join("contract_package");
+
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Python,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+
+    let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
+    assert!(rendered.contains("additional_properties: dict[str, Extra]"));
+    assert!(rendered.contains("fixed_day: datetime.date | None"));
+    assert!(rendered.contains("day_choice: datetime.date | None"));
+    assert!(rendered.contains("fixed_blob: bytes | None"));
+    assert_python_script_succeeds(
+        PYTHON_CONFORMANCE_RUNTIME_CHECK,
+        &[temp_dir.to_str().unwrap(), "contract_package"],
+    );
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn python_json_services_render_one_sided_io_names_and_deprecation() {
+    let temp_dir = unique_output_path("py-json-services");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("contract.nexusrpc.yaml");
+    fs::write(
+        &input_path,
+        r##"nexusrpc: "1.0.0"
+services:
+  LegacyService:
+    deprecated: true
+    x-py-name: RenamedService
+    operations:
+      fetch:
+        deprecated: true
+        x-py-name: fetch_one
+        output: { $ref: "#/$defs/Output" }
+      submit:
+        input: { $ref: "#/$defs/Input" }
+$defs:
+  Input:
+    type: object
+    additionalProperties: false
+  Output:
+    type: object
+    additionalProperties: false
+"##,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("contract_package");
+
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Python,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: true,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+
+    let services = fs::read_to_string(output_path.join("services.py")).unwrap();
+    assert!(services.contains("import typing_extensions"), "{services}");
+    assert!(services.contains(
+        "@typing_extensions.deprecated(\"This service is deprecated.\", category=None)\n@service(name=\"LegacyService\")\nclass RenamedService:"
+    ));
+    assert!(services.contains("fetch_one: typing.Annotated[Operation["));
+    assert!(services.contains(
+        "], typing_extensions.deprecated(\"This operation is deprecated.\", category=None)] = Operation(name=\"Fetch\", input_type=type(None), output_type=Output)"
+    ));
+    assert!(
+        services.contains("        None,\n        Output,"),
+        "{services}"
+    );
+    assert!(
+        services.contains("        Input,\n        None,"),
+        "{services}"
+    );
+    assert!(!services.contains("\"\"\"\n\n\"\"\""), "{services}");
+
+    assert_python_script_succeeds(
+        "import importlib, sys; sys.path.insert(0, sys.argv[1]); importlib.import_module(sys.argv[2] + '.services')",
+        &[temp_dir.to_str().unwrap(), "contract_package"],
+    );
+
     fs::remove_dir_all(temp_dir).unwrap();
 }
 

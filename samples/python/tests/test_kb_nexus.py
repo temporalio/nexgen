@@ -19,8 +19,9 @@ import shutil
 import typing
 import uuid
 
+import nexusrpc
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
-from temporalio import workflow
+from temporalio import exceptions, workflow
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
@@ -38,6 +39,9 @@ from tests.json_converter_helper import converter_for, load_fixture
 
 SUITE = "kb"
 ENDPOINT = "knowledge-base"
+RAW_GET_PAGE = nexusrpc.Operation[dict[str, typing.Any], Page](
+    name="GetPage", input_type=dict, output_type=Page
+)
 
 
 def parse_fixture(model_type: type[typing.Any], name: str) -> typing.Any:
@@ -102,6 +106,22 @@ class KnowledgeBaseCallerWorkflow:
             GetCategoryTreeInput(root_id="root"),
         )
 
+        # Deliberately bypass the generated input type on the caller. The server
+        # must classify the generated converter's ValidationError as BAD_REQUEST
+        # and must do so before dispatching the user handler.
+        try:
+            _ = await client.execute_operation(RAW_GET_PAGE, {"unexpected": True})
+        except exceptions.NexusOperationError as error:
+            cause = error.__cause__
+            cause_type = getattr(cause, "type", None)
+            invalid_input = {
+                "cause": type(cause).__name__,
+                "message": str(cause),
+                "type": getattr(cause_type, "value", cause_type),
+            }
+        else:
+            raise RuntimeError("invalid Nexus input was accepted")
+
         return {
             "blockId": put_block_output.block_id,
             "categoryChildId": category.children[0].id
@@ -109,6 +129,7 @@ class KnowledgeBaseCallerWorkflow:
             else None,
             "pageId": page.page_id,
             "revision": put_block_output.revision,
+            "invalidInput": invalid_input,
         }
 
 
@@ -146,6 +167,11 @@ async def test_kb_operations_use_real_nexus_client() -> None:
         "categoryChildId": "child",
         "pageId": "page-1",
         "revision": 7,
+        "invalidInput": {
+            "cause": "HandlerError",
+            "message": "Payload converter failed to decode Nexus operation input",
+            "type": "BAD_REQUEST",
+        },
     }
     assert [operation for operation, _ in handler.calls] == [
         "GetPage",

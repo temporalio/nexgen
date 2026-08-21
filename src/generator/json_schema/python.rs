@@ -17,6 +17,7 @@ use crate::generator::python::{
     render_generated_file_header, render_named_python_import, render_optional_python_imports,
     render_python_docstring,
 };
+use crate::json_schema::scalar::{ScalarKind, ScalarMatcher};
 use crate::language::Language;
 use crate::parser::NameManifest;
 use crate::planning::{PlannedFamily, PlannedJsonType, PlannedSpec};
@@ -749,6 +750,7 @@ const JSON_RUNTIME_SYMBOLS: &[&str] = &[
     "_check_time",
     "_check_unique_items",
     "_collect",
+    "_json_values_equal",
     "_format_base64",
     "_format_base64url",
     "_format_date",
@@ -839,6 +841,7 @@ fn render_json_runtime_module() -> String {
         "_check_time",
         "_check_unique_items",
         "_collect",
+        "_json_values_equal",
         "_format_base64",
         "_format_base64url",
         "_format_date",
@@ -1690,7 +1693,7 @@ fn render_py_array_checks(
         ));
     }
     if let Some(matcher) = &schema.contains {
-        let condition = py_matcher_condition(matcher, "element")?;
+        let condition = py_matcher_condition(matcher, schema.items.as_deref(), "element")?;
         let effective_min = schema.min_contains.unwrap_or(1);
         let max_arg = match schema.max_contains {
             Some(max) => max.to_string(),
@@ -1739,14 +1742,19 @@ fn render_py_property_count_checks(
 }
 
 /// Emits the `propertyNames` key-shape predicate over `keys_expr`, applying the
-/// (string-length) key subschema to each key.
+/// supported string matcher vocabulary to each key.
 fn render_py_property_name_checks(
     output: &mut String,
     keys_expr: &str,
     subschema: &Schema,
     indent: &str,
 ) {
-    if subschema.min_length.is_none() && subschema.max_length.is_none() {
+    if subschema.min_length.is_none()
+        && subschema.max_length.is_none()
+        && subschema.pattern.is_none()
+        && subschema.format.is_none()
+        && subschema.enum_values.is_none()
+    {
         return;
     }
     output.push_str(indent);
@@ -1771,6 +1779,55 @@ fn render_py_property_name_checks(
             "key",
             &format!(
                 "f\"invalid property name {{_quote(key)}}: must have length <= {max}, got {{len(key)}}\""
+            ),
+        );
+    }
+    if let Some(pattern) = &subschema.pattern {
+        let rewritten = crate::json_schema::pattern::rewrite_end_anchor(pattern, r"\Z");
+        let const_name = py_pattern_const_name(&rewritten);
+        render_py_violation_if(
+            output,
+            &inner,
+            &format!("{const_name}.search(key) is None"),
+            "key",
+            &format!(
+                "f'invalid property name {{_quote(key)}}: must match pattern {{{const_name}.pattern}}'"
+            ),
+        );
+    }
+    if let Some(values) = &subschema.enum_values {
+        let allowed = values
+            .iter()
+            .filter_map(Value::as_str)
+            .map(python_string_literal)
+            .collect::<Vec<_>>();
+        if !allowed.is_empty() {
+            render_py_violation_if(
+                output,
+                &inner,
+                &format!("key not in {}", py_value_tuple(&allowed)),
+                "key",
+                "f'invalid property name {_quote(key)}: must equal an allowed value'",
+            );
+        }
+    }
+    if let Some(format) = &subschema.format
+        && let Some(check) = crate::json_schema::format::check_for(format)
+    {
+        let rewritten = crate::json_schema::pattern::rewrite_end_anchor(&check.pattern, r"\Z");
+        let const_name = py_pattern_const_name(&rewritten);
+        let length_guard = check
+            .max_code_points
+            .map(|max| format!("len(key) > {max} or "))
+            .unwrap_or_default();
+        render_py_violation_if(
+            output,
+            &inner,
+            &format!("{length_guard}{const_name}.search(key) is None"),
+            "key",
+            &format!(
+                "f'invalid property name {{_quote(key)}}: must be a valid {}'",
+                check.name
             ),
         );
     }
@@ -1911,6 +1968,11 @@ fn py_field_needs_serialize_check(schema: &Schema) -> bool {
 /// building the wire object: any constrained declared field, a constrained
 /// typed-map member, or an object-level count/name/dependency constraint.
 fn py_model_needs_serialize_validation(schema: &Schema) -> Result<bool> {
+    // A mixed declared/catch-all object must reject a programmatically-created
+    // catch-all entry whose wire key is already owned by a declared field.
+    if is_open_object(schema) {
+        return Ok(true);
+    }
     if schema.min_properties.is_some()
         || schema.max_properties.is_some()
         || schema.dependent_required.is_some()
@@ -1918,7 +1980,7 @@ fn py_model_needs_serialize_validation(schema: &Schema) -> Result<bool> {
     {
         return Ok(true);
     }
-    if let Some(value_schema) = typed_map_value_schema(schema)?
+    if let Some(value_schema) = typed_additional_properties_schema(schema)?
         && py_field_needs_serialize_check(&value_schema)
     {
         return Ok(true);
@@ -1972,6 +2034,26 @@ fn render_py_field_checks(
             output.push_str(indent);
             output.push_str(&format!("{check}({value_expr}, {path_expr}, violations)\n"));
         }
+        render_py_materialized_wire_checks(
+            output,
+            schema,
+            &format!("{}({value_expr})", python_temporal_format_fn(kind)),
+            path_expr,
+            indent,
+        )?;
+        return Ok(());
+    }
+    if let Some(encoding) = content_encoding_direct(schema) {
+        render_py_materialized_wire_checks(
+            output,
+            schema,
+            &format!(
+                "{}({value_expr})",
+                python_content_encoding_format_fn(encoding)
+            ),
+            path_expr,
+            indent,
+        )?;
         return Ok(());
     }
     if let Some(const_value) = &schema.const_value {
@@ -2237,6 +2319,9 @@ fn collect_schema_patterns(schema: &Schema, patterns: &mut Vec<String>) {
     }
     if let Some(items) = &schema.items {
         collect_schema_patterns(items, patterns);
+    }
+    if let Some(contains) = &schema.contains {
+        collect_schema_patterns(contains, patterns);
     }
     for branch in schema.one_of.iter().flatten() {
         collect_schema_patterns(branch, patterns);
@@ -3188,7 +3273,7 @@ fn render_model_dataclass(
                     output.push_str(&optional_annotation(&member_type));
                 }
                 output.push_str(" = ");
-                output.push_str(&python_value_literal(const_value)?);
+                output.push_str(&python_typed_value_literal(property, const_value)?);
             } else if required.contains(json_name) {
                 // Required and nullable keeps the `| None` (an explicit null is
                 // the value) but takes no default: the member must be supplied.
@@ -3257,7 +3342,7 @@ fn render_model_init(output: &mut String, schema: &Schema) -> Result<()> {
             }
             if let Some(const_value) = &property.const_value {
                 output.push_str(" = ");
-                output.push_str(&python_value_literal(const_value)?);
+                output.push_str(&python_typed_value_literal(property, const_value)?);
             } else if !required.contains(json_name) {
                 output.push_str(" = None");
             }
@@ -3352,7 +3437,7 @@ fn render_default_properties(output: &mut String, schema: &Schema) -> Result<()>
         );
         output.push_str(&format!(
             "        return self._{field_name} if self._{field_name} is not None else {}\n",
-            python_value_literal(default)?
+            python_typed_value_literal(property, default)?
         ));
         output.push_str(&format!(
             "\n    @{field_name}.setter\n    def {field_name}(self, value: {member_type}) -> None:\n        self._{field_name} = value\n"
@@ -3444,6 +3529,9 @@ fn render_model_parser_body(
     // Object member-count and cross-field constraints over the wire member set
     // (`raw` holds every distinct wire key).
     render_py_property_count_checks(output, "len(raw)", schema, "");
+    if let Some(subschema) = &schema.property_names {
+        render_py_property_name_checks(output, "raw", subschema, "");
+    }
     render_py_dependent_required(output, "raw", schema, "");
 
     output.push_str("if violations:\n");
@@ -3634,12 +3722,37 @@ fn render_model_serializer_body(
     }
     if is_open_object(schema) {
         output.push_str("for key, entry in value.additional_properties.items():\n");
-        output.push_str("    out[key] = entry\n");
+        output.push_str(&format!(
+            "    if key in {}:\n",
+            declared_fields_const_name(&model.model_name)
+        ));
+        output.push_str(
+            "        violations.append(Violation(path=key, reason=\"additional property collides with declared property\"))\n",
+        );
+        output.push_str("    else:\n");
+        match typed_additional_properties_schema(schema)? {
+            Some(value_schema) => {
+                render_py_member_check(output, &value_schema, models, "entry", "key", "        ")?;
+                render_py_serialize_value(
+                    output,
+                    &value_schema,
+                    PySerializeSink::Assign("out[key]"),
+                    "entry",
+                    "key",
+                    "        ",
+                    "entry",
+                )?;
+            }
+            None => output.push_str("        out[key] = entry\n"),
+        }
     }
     if needs_violations {
         // Object member-count and cross-field constraints over the to-be-emitted
         // wire key set (`out` holds every distinct wire key, JSON-named).
         render_py_property_count_checks(output, "len(out)", schema, "");
+        if let Some(subschema) = &schema.property_names {
+            render_py_property_name_checks(output, "out", subschema, "");
+        }
         render_py_dependent_required(output, "out", schema, "");
         output.push_str("if violations:\n");
         output.push_str("    raise ValidationError(violations)\n");
@@ -3668,7 +3781,7 @@ impl PySerializeSink<'_> {
 /// True when any of a model's members converts through a call that can raise, so
 /// its serializer needs the violation list even with no constraint of its own.
 fn py_model_serialize_can_raise(schema: &Schema) -> Result<bool> {
-    if let Some(value_schema) = typed_map_value_schema(schema)?
+    if let Some(value_schema) = typed_additional_properties_schema(schema)?
         && py_serialize_can_raise(&value_schema)
     {
         return Ok(true);
@@ -4080,26 +4193,28 @@ fn render_value_parser(
     if let Some(kind) = temporal_kind_direct(schema) {
         render_py_materialized_parser(
             output,
+            schema,
             python_temporal_parse_fn(kind),
             raw_expr,
             target,
             path_expr,
             indent,
             slot,
-        );
+        )?;
         return Ok(());
     }
     // A materialized `contentEncoding`: the same shape, decoding to `bytes`.
     if let Some(encoding) = content_encoding_direct(schema) {
         render_py_materialized_parser(
             output,
+            schema,
             python_content_encoding_parse_fn(encoding),
             raw_expr,
             target,
             path_expr,
             indent,
             slot,
-        );
+        )?;
         return Ok(());
     }
 
@@ -4240,13 +4355,14 @@ fn render_value_parser(
 /// require, then the helper itself.
 fn render_py_materialized_parser(
     output: &mut String,
+    schema: &Schema,
     parse_fn: &str,
     raw_expr: &str,
     target: &str,
     path_expr: &str,
     indent: &str,
     slot: &str,
-) {
+) -> Result<()> {
     let parsed = format!("{slot}_parsed");
     output.push_str(indent);
     output.push_str(&format!("if not isinstance({raw_expr}, str):\n"));
@@ -4256,6 +4372,13 @@ fn render_py_materialized_parser(
     ));
     output.push_str(indent);
     output.push_str("else:\n");
+    render_py_materialized_wire_checks(
+        output,
+        schema,
+        raw_expr,
+        path_expr,
+        &format!("{indent}    "),
+    )?;
     output.push_str(indent);
     output.push_str(&format!(
         "    {parsed} = {parse_fn}({raw_expr}, {path_expr}, violations)\n"
@@ -4264,6 +4387,64 @@ fn render_py_materialized_parser(
     output.push_str(&format!("    if {parsed} is not None:\n"));
     output.push_str(indent);
     output.push_str(&format!("        {target} = {parsed}\n"));
+    Ok(())
+}
+
+/// Validates constraints expressed over the JSON string of a materialized
+/// temporal or byte value. The parse side calls this before native conversion;
+/// the serialize side calls it over the canonical string produced by the
+/// formatter.
+fn render_py_materialized_wire_checks(
+    output: &mut String,
+    schema: &Schema,
+    wire_expr: &str,
+    path_expr: &str,
+    indent: &str,
+) -> Result<()> {
+    let length = format!("len({wire_expr})");
+    if let Some(min) = schema.min_length {
+        render_py_violation_if(
+            output,
+            indent,
+            &format!("{length} < {min}"),
+            path_expr,
+            &format!("f\"must have length >= {min}, got {{{length}}}\""),
+        );
+    }
+    if let Some(max) = schema.max_length {
+        render_py_violation_if(
+            output,
+            indent,
+            &format!("{length} > {max}"),
+            path_expr,
+            &format!("f\"must have length <= {max}, got {{{length}}}\""),
+        );
+    }
+    if let Some(pattern) = &schema.pattern {
+        render_py_pattern_check(output, wire_expr, path_expr, pattern, indent);
+    }
+    // A temporal format is the materializer itself. For content-encoded values,
+    // `format` remains an independently asserted string constraint.
+    if content_encoding_direct(schema).is_some()
+        && let Some(format) = &schema.format
+    {
+        render_py_format_check(output, wire_expr, path_expr, format, indent);
+    }
+    if let Some(values) = py_closed_value_set(schema) {
+        let literals = values
+            .iter()
+            .map(python_value_literal)
+            .collect::<Result<Vec<_>>>()?;
+        render_py_closed_value_check(
+            output,
+            &literals,
+            wire_expr,
+            path_expr,
+            indent,
+            &py_closed_value_reason(schema, values, wire_expr),
+        );
+    }
+    Ok(())
 }
 
 /// Emits `if not <guard>: <reason> else: <assign>`, the shape every scalar kind's
@@ -4569,6 +4750,8 @@ fn render_open_object_collection(
     model: &PlannedJsonType,
     schema: &Schema,
 ) -> Result<()> {
+    let value_schema = typed_additional_properties_schema(schema)?;
+    let value_annotation = additional_properties_annotation(schema)?;
     output.push_str(&format!(
         "additional_properties: dict[str, {}] = {{}}\n",
         additional_properties_annotation(schema)?
@@ -4578,7 +4761,25 @@ fn render_open_object_collection(
         "    if key not in {}:\n",
         declared_fields_const_name(&model.model_name)
     ));
-    output.push_str("        additional_properties[key] = raw[key]\n");
+    match value_schema {
+        None => output.push_str("        additional_properties[key] = raw[key]\n"),
+        Some(value_schema) => {
+            render_py_slot_declaration(output, "        ", "member", &value_annotation);
+            output.push_str("        member_raw = raw[key]\n");
+            output.push_str("        member_violation_count = len(violations)\n");
+            render_value_parser(
+                output,
+                &value_schema,
+                "member_raw",
+                "member",
+                "key",
+                "        ",
+                "member",
+            )?;
+            output.push_str("        if len(violations) == member_violation_count:\n");
+            output.push_str("            additional_properties[key] = member\n");
+        }
+    }
     Ok(())
 }
 
@@ -4683,6 +4884,13 @@ fn typed_map_value_schema(schema: &Schema) -> Result<Option<Schema>> {
         return Ok(None);
     }
 
+    typed_additional_properties_schema(schema)
+}
+
+/// The declared schema for catch-all members. Unlike `typed_map_value_schema`,
+/// this also applies when an object has declared properties: mixed objects keep
+/// their declared fields and expose all other keys through the typed map.
+fn typed_additional_properties_schema(schema: &Schema) -> Result<Option<Schema>> {
     match &schema.additional_properties {
         Some(Value::Object(_)) => serde_json::from_value(
             schema
@@ -4729,27 +4937,60 @@ fn nullable_member_schema(schema: &Schema) -> Option<&Schema> {
 /// Builds the boolean Python sub-conditions that define "match" for a scalar
 /// `contains` matcher over `elem`. A type-only matcher matches every element, so
 /// an empty condition set renders as the literal `True`.
-fn py_matcher_condition(matcher: &Schema, elem: &str) -> Result<String> {
+fn py_matcher_condition(
+    matcher: &Schema,
+    element_schema: Option<&Schema>,
+    elem: &str,
+) -> Result<String> {
+    let matcher = scalar_matcher(matcher);
+    let kind = matcher.kind.or_else(|| {
+        matcher
+            .const_value
+            .as_ref()
+            .and_then(scalar_kind_for_value)
+            .or_else(|| matcher.enum_values.first().and_then(scalar_kind_for_value))
+            .or_else(|| {
+                element_schema
+                    .and_then(|schema| schema.ty.as_ref())
+                    .and_then(Value::as_str)
+                    .and_then(ScalarKind::from_name)
+            })
+    });
     let mut parts: Vec<String> = Vec::new();
+    if let Some(kind) = kind {
+        parts.push(match kind {
+            ScalarKind::String => format!("isinstance({elem}, str)"),
+            ScalarKind::Boolean => format!("isinstance({elem}, bool)"),
+            ScalarKind::Number => format!(
+                "not isinstance({elem}, bool) and isinstance({elem}, (int, float)) and -{PY_BINARY64_MAX} <= {elem} <= {PY_BINARY64_MAX}"
+            ),
+            ScalarKind::Integer => format!(
+                "not isinstance({elem}, bool) and isinstance({elem}, (int, float)) and abs({elem}) <= {PY_INTEGER_CAP} and float({elem}).is_integer()"
+            ),
+        });
+    }
     if let Some(value) = &matcher.const_value {
-        // The one-member case of the closed set below, and emitted the same way:
-        // a tuple membership test rather than a comparison, which a boolean
-        // matcher would render as the unidiomatic `elem == True` (ruff E712).
         parts.push(format!(
-            "{elem} in {}",
-            py_value_tuple(&[python_value_literal(value)?])
+            "_json_values_equal({elem}, {})",
+            python_value_literal(value)?
         ));
     }
-    if let Some(values) = &matcher.enum_values {
-        let alternatives = values
+    if !matcher.enum_values.is_empty() {
+        let alternatives = matcher
+            .enum_values
             .iter()
-            .map(python_value_literal)
+            .map(|value| {
+                Ok(format!(
+                    "_json_values_equal({elem}, {})",
+                    python_value_literal(value)?
+                ))
+            })
             .collect::<Result<Vec<_>>>()?;
         if !alternatives.is_empty() {
-            parts.push(format!("{elem} in {}", py_value_tuple(&alternatives)));
+            parts.push(format!("({})", alternatives.join(" or ")));
         }
     }
-    let is_integer = matcher.ty.as_ref().and_then(Value::as_str) == Some("integer");
+    let is_integer = kind == Some(ScalarKind::Integer);
     if let Some(min) = &matcher.minimum {
         parts.push(format!("{elem} >= {}", py_bound_literal(min, is_integer)));
     }
@@ -4763,10 +5004,12 @@ fn py_matcher_condition(matcher: &Schema, elem: &str) -> Result<String> {
         parts.push(format!("{elem} < {}", py_bound_literal(max, is_integer)));
     }
     if let Some(divisor) = &matcher.multiple_of {
-        parts.push(format!(
-            "{elem} % {} == 0",
-            py_bound_literal(divisor, is_integer)
-        ));
+        let divisor = py_bound_literal(divisor, is_integer);
+        parts.push(if is_integer {
+            format!("{elem} % {divisor} == 0")
+        } else {
+            format!("math.fmod({elem}, {divisor}) == 0")
+        });
     }
     if let Some(min) = matcher.min_length {
         parts.push(format!("len({elem}) >= {min}"));
@@ -4774,10 +5017,56 @@ fn py_matcher_condition(matcher: &Schema, elem: &str) -> Result<String> {
     if let Some(max) = matcher.max_length {
         parts.push(format!("len({elem}) <= {max}"));
     }
+    if let Some(pattern) = &matcher.pattern {
+        let rewritten = crate::json_schema::pattern::rewrite_end_anchor(pattern, r"\Z");
+        let const_name = py_pattern_const_name(&rewritten);
+        parts.push(format!("{const_name}.search({elem}) is not None"));
+    }
+    if let Some(format) = &matcher.format
+        && let Some(check) = crate::json_schema::format::check_for(format)
+    {
+        let rewritten = crate::json_schema::pattern::rewrite_end_anchor(&check.pattern, r"\Z");
+        let const_name = py_pattern_const_name(&rewritten);
+        if let Some(max) = check.max_code_points {
+            parts.push(format!("len({elem}) <= {max}"));
+        }
+        parts.push(format!("{const_name}.search({elem}) is not None"));
+    }
     if parts.is_empty() {
         Ok("True".to_string())
     } else {
         Ok(parts.join(" and "))
+    }
+}
+
+fn scalar_matcher(schema: &Schema) -> ScalarMatcher {
+    ScalarMatcher {
+        kind: schema
+            .ty
+            .as_ref()
+            .and_then(Value::as_str)
+            .and_then(ScalarKind::from_name),
+        const_value: schema.const_value.clone(),
+        enum_values: schema.enum_values.clone().unwrap_or_default(),
+        minimum: schema.minimum.clone(),
+        maximum: schema.maximum.clone(),
+        exclusive_minimum: schema.exclusive_minimum.clone(),
+        exclusive_maximum: schema.exclusive_maximum.clone(),
+        multiple_of: schema.multiple_of.clone(),
+        min_length: schema.min_length,
+        max_length: schema.max_length,
+        pattern: schema.pattern.clone(),
+        format: schema.format.clone(),
+    }
+}
+
+fn scalar_kind_for_value(value: &Value) -> Option<ScalarKind> {
+    match value {
+        Value::String(_) => Some(ScalarKind::String),
+        Value::Bool(_) => Some(ScalarKind::Boolean),
+        Value::Number(number) if number.is_i64() || number.is_u64() => Some(ScalarKind::Integer),
+        Value::Number(_) => Some(ScalarKind::Number),
+        _ => None,
     }
 }
 
@@ -4827,6 +5116,36 @@ fn python_value_literal(value: &Value) -> Result<String> {
     }
 }
 
+/// Renders a schema value in the same native representation as its public
+/// annotation. Loader validation has already proved defaults and closed values
+/// valid, so the generated helper call is a deterministic construction rather
+/// than another user-visible validation boundary.
+fn python_typed_value_literal(schema: &Schema, value: &Value) -> Result<String> {
+    if value.is_null() {
+        return Ok("None".to_string());
+    }
+    let schema = nullable_member_schema(schema).unwrap_or(schema);
+    if let Some(text) = value.as_str() {
+        let literal = python_string_literal(text);
+        if let Some(kind) = temporal_kind_direct(schema) {
+            return Ok(format!(
+                "typing.cast(\"{}\", {}({}, \"\", []))",
+                python_temporal_type(kind),
+                python_temporal_parse_fn(kind),
+                literal
+            ));
+        }
+        if let Some(encoding) = content_encoding_direct(schema) {
+            return Ok(format!(
+                "typing.cast(\"bytes\", {}({}, \"\", []))",
+                python_content_encoding_parse_fn(encoding),
+                literal
+            ));
+        }
+    }
+    python_value_literal(value)
+}
+
 fn decode_schema(model: &PlannedJsonType) -> Result<Schema> {
     serde_json::from_value(model.schema.clone()).map_err(|error| Error::InvalidJsonSchema {
         path: PathBuf::from("<json-generator>"),
@@ -4864,6 +5183,14 @@ fn content_encoding_direct(
 }
 
 fn annotation(schema: &Schema) -> Result<String> {
+    // Materialization determines the public Python type even when the wire
+    // schema also closes the value with `const` or `enum`.
+    if let Some(kind) = temporal_kind_direct(schema) {
+        return Ok(python_temporal_type(kind).to_string());
+    }
+    if content_encoding_direct(schema).is_some() {
+        return Ok("bytes".to_string());
+    }
     if let Some(const_value) = &schema.const_value
         && let Some(annotation) = python_literal_annotation(const_value)
     {
