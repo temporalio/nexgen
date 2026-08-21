@@ -17,20 +17,24 @@ export function requiredField<T>(
 }
 
 /**
- * A page. One half of the Page <-> Block cross-file cycle. Because the cycle spans two input files, Page and Block hoist together into Python's _recursive.py; the non-cyclic PageMeta helper stays in this module.
+ * A page. One half of the Page <-> Block cross-file cycle. Because the cycle spans two
+ * input files, Page and Block hoist together into Python's _recursive.py; the
+ * non-cyclic PageMeta helper stays in this module.
  */
 export interface Page {
   pageId: string;
   title: string;
   meta: PageMeta;
   /**
-   * Ordered content blocks. Cross-file `$ref` to block.json (same directory); the array is the terminating edge of the cycle.
+   * Ordered content blocks. Cross-file `$ref` to block.json (same directory); the array
+   * is the terminating edge of the cycle.
    */
   blocks?: Block[];
 }
 
 /**
- * Non-cyclic helper. Referenced only by Page, references nothing recursive, so it stays in the content_page module even though Page is hoisted.
+ * Non-cyclic helper. Referenced only by Page, references nothing recursive, so it stays
+ * in the content_page module even though Page is hoisted.
  */
 export interface PageMeta {
   author: string;

@@ -181,6 +181,87 @@ properties:
 required: [slots]
 "#;
 
+/// TypeScript-specific closure for the Wave 2 matcher/materialization surface:
+/// a mixed object with recursively converted typed extras, full scalar
+/// `contains` matchers, the supported `propertyNames` predicates, and sibling
+/// wire-string assertions around materialized temporal/bytes values.
+const TYPESCRIPT_CONFORMANCE_SCHEMA: &str = r#"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+minProperties: 1
+properties:
+  id: { type: string }
+  integral:
+    type: array
+    items: { type: number }
+    contains: { type: integer, minimum: 2, multipleOf: 2 }
+  emails:
+    type: array
+    items: { type: string }
+    contains: { type: string, minLength: 6, pattern: "@example\\.com$", format: email }
+  occurredAt:
+    type: string
+    format: date-time
+    minLength: 20
+    pattern: "^2024-"
+  payload:
+    type: string
+    contentEncoding: base64
+    minLength: 4
+    pattern: "^a"
+additionalProperties:
+  type: array
+  items: { type: string, format: date }
+"#;
+
+const TYPESCRIPT_PROPERTY_NAMES_SCHEMA: &str = r#"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: { type: integer }
+propertyNames:
+  type: string
+  minLength: 6
+  maxLength: 32
+  pattern: "@example\\.com$"
+  format: email
+  enum: [a@example.com, b@example.com]
+"#;
+
+const TYPESCRIPT_MATERIALIZED_CLOSED_SCHEMA: &str = r#"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  fixedBlob:
+    type: string
+    contentEncoding: base64
+    const: aGk=
+  businessDay:
+    type: string
+    format: date
+    enum: [2024-01-01, 2024-01-02]
+  fallbackBlob:
+    oneOf:
+      - { type: string, contentEncoding: base64 }
+      - { type: "null" }
+    default: aGk=
+"#;
+
+const TYPESCRIPT_DEPRECATION_SCHEMA: &str = r##"$schema: https://json-schema.org/draft/2020-12/schema
+nexusrpc: "1.0.0"
+services:
+  Jobs:
+    deprecated: true
+    x-ts-name: jobApi
+    operations:
+      accept:
+        deprecated: true
+        x-ts-name: acceptJob
+        input: { $ref: "#/$defs/LegacyJob" }
+$defs:
+  LegacyJob:
+    type: object
+    deprecated: true
+    properties:
+      oldId: { type: string, deprecated: true }
+"##;
+
 /// A service whose two operations are each one-sided: one declares only an
 /// `input`, the other only an `output`.
 const ONE_SIDED_OPERATION_SCHEMA: &str = r##"$schema: https://json-schema.org/draft/2020-12/schema
@@ -561,6 +642,11 @@ fn unique_output_path(label: &str) -> PathBuf {
         .as_nanos();
     let counter = OUTPUT_COUNTER.fetch_add(1, Ordering::Relaxed);
     std::env::temp_dir().join(format!("nexgen-{label}-{unique}-{counter}"))
+}
+
+fn unique_typescript_runtime_path(label: &str) -> PathBuf {
+    let unique = unique_output_path(label);
+    samples_typescript_root(&project_root()).join(unique.file_name().unwrap())
 }
 
 #[test]
@@ -1661,5 +1747,244 @@ fn typescript_json_service_module_without_own_types_imports_instead_of_reemittin
     ] {
         assert!(services.contains(expected), "{expected}\n{services}");
     }
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn typescript_json_emits_complete_matchers_and_typed_mixed_extras() {
+    let temp_dir = unique_typescript_runtime_path("ts-json-wave2-conformance");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("probe.yaml");
+    fs::write(&input_path, TYPESCRIPT_CONFORMANCE_SCHEMA).unwrap();
+    let output_path = temp_dir.join("probe");
+
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::TypeScript,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: nexgen::generator::TsDateTimeTypes::Temporal,
+    })
+    .unwrap();
+    let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
+
+    assert!(
+        rendered.contains("additionalProperties: Record<string, Temporal.PlainDate[]>;"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("parseTemporalDate(element, `${key}[${index}]`, violations)"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("serializeTemporalDate(element)"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("if (PROBE_DECLARED.has(key))"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("collides with declared property"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("typeof element === 'number' && Number.isSafeInteger(element)"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("PATTERN_") && rendered.contains(".test(element)"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("must be a valid email") || rendered.contains(".test(element)"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains(
+            "const wire = __nexgenDefinitions.serializeTemporalDateTime(value.occurredAt)"
+        ),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("const wire") && rendered.contains("bytesToBase64(value.payload)"),
+        "{rendered}"
+    );
+
+    // This deliberately does not use Vitest's default `.test.ts` suffix. The
+    // full sample suite runs in parallel with this focused test and must not
+    // discover a temporary file that may disappear before it imports it.
+    let runtime_test = output_path.join("wave2-conformance.ts");
+    fs::write(
+        &runtime_test,
+        r#"import { expect, test } from "vitest";
+import { probeTransferTypeConverter } from "./models.ts";
+import { ValidationError } from "./definitions.ts";
+
+test("mixed extras, matchers, and wire-string constraints run both ways", () => {
+  const model = probeTransferTypeConverter.fromTransferType({
+    id: "p1",
+    integral: [1.5, 2],
+    emails: ["dev@example.com"],
+    occurredAt: "2024-01-01T00:00:00Z",
+    payload: "aGk=",
+    schedule: ["2024-01-02"],
+  });
+  expect(model.additionalProperties.schedule?.[0]).toBeInstanceOf(Temporal.PlainDate);
+  expect(probeTransferTypeConverter.toTransferType(model)).toEqual({
+    id: "p1",
+    integral: [1.5, 2],
+    emails: ["dev@example.com"],
+    occurredAt: "2024-01-01T00:00:00Z",
+    payload: "aGk=",
+    schedule: ["2024-01-02"],
+  });
+  expect(() => probeTransferTypeConverter.fromTransferType({ integral: [2.5] })).toThrow(ValidationError);
+  expect(() => probeTransferTypeConverter.fromTransferType({ emails: ["dev@invalid"] })).toThrow(ValidationError);
+  expect(() => probeTransferTypeConverter.fromTransferType({ payload: "Pj4+" })).toThrow(/pattern/);
+  expect(() => probeTransferTypeConverter.toTransferType({
+    ...model,
+    additionalProperties: { id: [Temporal.PlainDate.from("2024-01-02")] },
+  })).toThrow(/id.*collides with declared property/);
+});
+"#,
+    )
+    .unwrap();
+    let sample_root = samples_typescript_root(&project_root());
+    let runtime_relative = runtime_test.strip_prefix(&sample_root).unwrap();
+    let runtime_config = temp_dir.join("vitest.config.ts");
+    fs::write(
+        &runtime_config,
+        format!(
+            "export default {{ test: {{ include: [{}] }} }};\n",
+            serde_json::to_string(runtime_relative.to_str().unwrap()).unwrap()
+        ),
+    )
+    .unwrap();
+    let typecheck_status = Command::new("npm")
+        .current_dir(&sample_root)
+        .args(["run", "typecheck"])
+        .status()
+        .unwrap();
+    assert!(
+        typecheck_status.success(),
+        "focused TypeScript conformance output did not typecheck"
+    );
+    let runtime_status = Command::new("npm")
+        .current_dir(&sample_root)
+        .args([
+            "exec",
+            "--",
+            "vitest",
+            "run",
+            "--config",
+            runtime_config.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(
+        runtime_status.success(),
+        "focused TypeScript runtime test failed"
+    );
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn typescript_json_emits_complete_property_name_matcher() {
+    let temp_dir = unique_output_path("ts-json-property-names-complete");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("names.yaml");
+    fs::write(&input_path, TYPESCRIPT_PROPERTY_NAMES_SCHEMA).unwrap();
+    let output_path = temp_dir.join("names");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::TypeScript,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
+    for expected in [
+        "invalid property name",
+        "PATTERN_",
+        "a@example.com",
+        "b@example.com",
+        "must be a valid email",
+    ] {
+        assert!(rendered.contains(expected), "{expected}\n{rendered}");
+    }
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn typescript_json_materializes_closed_values_and_nullable_defaults() {
+    let temp_dir = unique_output_path("ts-json-materialized-closed");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("closed.yaml");
+    fs::write(&input_path, TYPESCRIPT_MATERIALIZED_CLOSED_SCHEMA).unwrap();
+    let output_path = temp_dir.join("closed");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::TypeScript,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: nexgen::generator::TsDateTimeTypes::Temporal,
+    })
+    .unwrap();
+    let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
+    for expected in [
+        "fixedBlob?: Uint8Array;",
+        "businessDay?: Temporal.PlainDate;",
+        "fallbackBlob?: Uint8Array | null;",
+        "export const DEFAULT_FALLBACK_BLOB = __nexgenDefinitions.base64ToBytes(\"aGk=\", '', [])!;",
+        "must equal \"aGk=\"",
+        "must be one of [\"2024-01-01\", \"2024-01-02\"]",
+        "base64ToBytes(raw.fixedBlob",
+        "bytesToBase64(value.fixedBlob)",
+        "serializeTemporalDate(value.businessDay)",
+    ] {
+        assert!(rendered.contains(expected), "{expected}\n{rendered}");
+    }
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn typescript_json_deprecates_types_fields_services_and_operations() {
+    let temp_dir = unique_output_path("ts-json-deprecation");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("jobs.nexusrpc.yaml");
+    fs::write(&input_path, TYPESCRIPT_DEPRECATION_SCHEMA).unwrap();
+    let output_path = temp_dir.join("jobs");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::TypeScript,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let models = fs::read_to_string(output_path.join("models.ts")).unwrap();
+    let services = fs::read_to_string(output_path.join("services.ts")).unwrap();
+    assert_eq!(models.matches("@deprecated").count(), 2, "{models}");
+    assert_eq!(services.matches("@deprecated").count(), 2, "{services}");
+    assert!(services.contains("export const jobApi"), "{services}");
+    assert!(services.contains("  acceptJob:"), "{services}");
     fs::remove_dir_all(temp_dir).unwrap();
 }

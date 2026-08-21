@@ -6,18 +6,22 @@ import { pageTransferTypeConverter } from "../page/models";
 import type { Page } from "../page/models";
 
 /**
- * A content block. The other half of the Page <-> Block cross-file cycle. The `page` back-reference is optional + nullable, which terminates the cycle so it is satisfiable.
+ * A content block. The other half of the Page <-> Block cross-file cycle. The `page`
+ * back-reference is optional + nullable, which terminates the cycle so it is
+ * satisfiable.
  */
 export interface Block {
   blockId: string;
   /**
-   * Non-negative position within the page. Exercises a numeric `minimum` bound over an integer field.
+   * Non-negative position within the page. Exercises a numeric `minimum` bound over an
+   * integer field.
    */
   order: number;
   text?: string;
   style?: BlockStyle;
   /**
-   * Optional back-reference to the containing page - closes the Page <-> Block cycle. Optional + nullable, so this edge terminates.
+   * Optional back-reference to the containing page - closes the Page <-> Block cycle.
+   * Optional + nullable, so this edge terminates.
    */
   page?: Page | null;
 }

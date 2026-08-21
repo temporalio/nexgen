@@ -17,6 +17,7 @@ use crate::generator::typescript::{
 };
 use crate::generator::{ExternalModelBackend, TsDateTimeTypes};
 use crate::json_schema::format::TemporalKind;
+use crate::json_schema::scalar::{ScalarKind, ScalarMatcher};
 use crate::language::Language;
 use crate::parser::NameManifest;
 use crate::planning::{PlannedFamily, PlannedJsonType, PlannedSpec};
@@ -375,6 +376,20 @@ fn render_ts_string_checks(
     schema: &Schema,
     indent: &str,
 ) {
+    render_ts_string_assertions(output, value_expr, path_expr, schema, indent, true);
+}
+
+/// Emits string assertions over the observable wire string. Materialized
+/// temporals validate their format through the dedicated calendar-aware helper,
+/// so their sibling assertions use this with `include_format = false`.
+fn render_ts_string_assertions(
+    output: &mut String,
+    value_expr: &str,
+    path_expr: &str,
+    schema: &Schema,
+    indent: &str,
+    include_format: bool,
+) {
     let mut emit = |condition: String, reason: String| {
         output.push_str(indent);
         output.push_str("if (");
@@ -406,7 +421,7 @@ fn render_ts_string_checks(
     if let Some(pattern) = &schema.pattern {
         render_ts_pattern_check(output, value_expr, path_expr, pattern, indent);
     }
-    if let Some(format) = &schema.format {
+    if include_format && let Some(format) = &schema.format {
         render_ts_format_check(output, value_expr, path_expr, format, indent);
     }
 }
@@ -539,6 +554,9 @@ fn collect_schema_patterns(schema: &Schema, patterns: &mut Vec<String>) {
     if let Some(items) = &schema.items {
         collect_schema_patterns(items, patterns);
     }
+    if let Some(contains) = &schema.contains {
+        collect_schema_patterns(contains, patterns);
+    }
     for branch in schema.one_of.iter().flatten() {
         collect_schema_patterns(branch, patterns);
     }
@@ -592,7 +610,13 @@ fn render_ts_property_name_checks(
     subschema: &Schema,
     indent: &str,
 ) {
-    if subschema.min_length.is_none() && subschema.max_length.is_none() {
+    let matcher = scalar_matcher(subschema);
+    if matcher.min_length.is_none()
+        && matcher.max_length.is_none()
+        && matcher.pattern.is_none()
+        && matcher.format.is_none()
+        && matcher.enum_values.is_empty()
+    {
         return;
     }
     output.push_str(indent);
@@ -609,17 +633,66 @@ fn render_ts_property_name_checks(
         output.push_str(&inner);
         output.push_str("}\n");
     };
-    if let Some(min) = subschema.min_length {
+    if let Some(min) = matcher.min_length {
         emit(
             format!("{length} < {min}"),
             format!("must have length >= {min}, got ${{{length}}}"),
         );
     }
-    if let Some(max) = subschema.max_length {
+    if let Some(max) = matcher.max_length {
         emit(
             format!("{length} > {max}"),
             format!("must have length <= {max}, got ${{{length}}}"),
         );
+    }
+    if !matcher.enum_values.is_empty() {
+        let literals = matcher
+            .enum_values
+            .iter()
+            .map(|value| typescript_value_literal(value).unwrap_or_else(|_| "undefined".into()))
+            .collect::<Vec<_>>();
+        emit(
+            literals
+                .iter()
+                .map(|literal| format!("key !== {literal}"))
+                .collect::<Vec<_>>()
+                .join(" && "),
+            format!(
+                "must be one of [{}], got ${{JSON.stringify(key)}}",
+                literals.join(", ")
+            ),
+        );
+    }
+    drop(emit);
+    if let Some(pattern) = &matcher.pattern {
+        let const_name = ts_pattern_const_name(pattern);
+        let escaped = ts_template_escape(pattern);
+        output.push_str(&inner);
+        output.push_str(&format!("if (!{const_name}.test(key)) {{\n"));
+        output.push_str(&inner);
+        output.push_str(&format!(
+            "  violations.push({{ path: key, reason: `invalid property name \"${{key}}\": must match pattern {escaped}, got ${{JSON.stringify(key)}}` }});\n"
+        ));
+        output.push_str(&inner);
+        output.push_str("}\n");
+    }
+    if let Some(format) = &matcher.format
+        && let Some(check) = crate::json_schema::format::check_for(format)
+    {
+        let const_name = ts_pattern_const_name(&check.pattern);
+        output.push_str(&inner);
+        output.push_str("if (");
+        if let Some(max) = check.max_code_points {
+            output.push_str(&format!("[...key].length > {max} || "));
+        }
+        output.push_str(&format!("!{const_name}.test(key)) {{\n"));
+        output.push_str(&inner);
+        output.push_str(&format!(
+            "  violations.push({{ path: key, reason: `invalid property name \"${{key}}\": must be a valid {}, got ${{JSON.stringify(key)}}` }});\n",
+            check.name
+        ));
+        output.push_str(&inner);
+        output.push_str("}\n");
     }
     output.push_str(indent);
     output.push_str("}\n");
@@ -671,20 +744,57 @@ fn ts_scalar_literal(value: &Value, element_ty: Option<&str>) -> String {
     }
 }
 
+/// Removes container/applicator details from a decoded node before rendering a
+/// scalar predicate. The loader has already proved this is a supported matcher.
+fn scalar_matcher(schema: &Schema) -> ScalarMatcher {
+    ScalarMatcher {
+        kind: schema
+            .ty
+            .as_ref()
+            .and_then(Value::as_str)
+            .and_then(ScalarKind::from_name),
+        const_value: schema.const_value.clone(),
+        enum_values: schema.enum_values.clone().unwrap_or_default(),
+        minimum: schema.minimum.clone(),
+        maximum: schema.maximum.clone(),
+        exclusive_minimum: schema.exclusive_minimum.clone(),
+        exclusive_maximum: schema.exclusive_maximum.clone(),
+        multiple_of: schema.multiple_of.clone(),
+        min_length: schema.min_length,
+        max_length: schema.max_length,
+        pattern: schema.pattern.clone(),
+        format: schema.format.clone(),
+    }
+}
+
 /// Builds the boolean TypeScript sub-conditions that define "match" for a scalar
 /// `contains` matcher over `elem`. A type-only matcher matches every element, so
 /// an empty condition set renders as the literal `true`.
 fn ts_matcher_condition(matcher: &Schema, elem: &str, element_ty: Option<&str>) -> String {
-    let is_integer = element_ty == Some("integer");
+    let matcher = scalar_matcher(matcher);
+    let is_integer = element_ty == Some("integer")
+        || matcher.kind == Some(ScalarKind::Integer) && element_ty != Some("number");
     let mut parts: Vec<String> = Vec::new();
+    match matcher.kind {
+        Some(ScalarKind::String) => parts.push(format!("typeof {elem} === 'string'")),
+        Some(ScalarKind::Boolean) => parts.push(format!("typeof {elem} === 'boolean'")),
+        Some(ScalarKind::Number) => parts.push(format!(
+            "typeof {elem} === 'number' && Number.isFinite({elem})"
+        )),
+        Some(ScalarKind::Integer) => parts.push(format!(
+            "typeof {elem} === 'number' && Number.isSafeInteger({elem})"
+        )),
+        None => {}
+    }
     if let Some(value) = &matcher.const_value {
         parts.push(format!(
             "{elem} === {}",
             ts_scalar_literal(value, element_ty)
         ));
     }
-    if let Some(values) = &matcher.enum_values {
-        let alternatives = values
+    if !matcher.enum_values.is_empty() {
+        let alternatives = matcher
+            .enum_values
             .iter()
             .map(|value| format!("{elem} === {}", ts_scalar_literal(value, element_ty)))
             .collect::<Vec<_>>()
@@ -716,6 +826,20 @@ fn ts_matcher_condition(matcher: &Schema, elem: &str, element_ty: Option<&str>) 
     }
     if let Some(max) = matcher.max_length {
         parts.push(format!("[...{elem}].length <= {max}"));
+    }
+    if let Some(pattern) = &matcher.pattern {
+        parts.push(format!("{}.test({elem})", ts_pattern_const_name(pattern)));
+    }
+    if let Some(format) = &matcher.format
+        && let Some(check) = crate::json_schema::format::check_for(format)
+    {
+        if let Some(max) = check.max_code_points {
+            parts.push(format!("[...{elem}].length <= {max}"));
+        }
+        parts.push(format!(
+            "{}.test({elem})",
+            ts_pattern_const_name(&check.pattern)
+        ));
     }
     if parts.is_empty() {
         "true".to_string()
@@ -881,7 +1005,12 @@ fn model_needs_serialize_validation(schema: &Schema) -> Result<bool> {
     {
         return Ok(true);
     }
-    if let Some(value_schema) = typed_map_value_schema(schema)?
+    // A mixed object must always reject catch-all keys that collide with a
+    // declared wire property, even when its value schema has no assertions.
+    if is_open_object(schema) {
+        return Ok(true);
+    }
+    if let Some(value_schema) = additional_properties_value_schema(schema)?
         && field_needs_serialize_check(&value_schema)
     {
         return Ok(true);
@@ -924,6 +1053,54 @@ fn render_ts_serialize_closed_check(
     output.push_str("}\n");
 }
 
+fn render_ts_schema_closed_check(
+    output: &mut String,
+    schema: &Schema,
+    value_expr: &str,
+    path_expr: &str,
+    indent: &str,
+) {
+    if let Some(const_value) = &schema.const_value {
+        let literal =
+            typescript_value_literal(const_value).unwrap_or_else(|_| "undefined".to_string());
+        render_ts_serialize_closed_check(
+            output,
+            std::slice::from_ref(&literal),
+            value_expr,
+            path_expr,
+            indent,
+            &format!("must equal {literal}"),
+        );
+    } else if let Some(values) = &schema.enum_values {
+        let literals = values
+            .iter()
+            .map(|value| {
+                typescript_value_literal(value).unwrap_or_else(|_| "undefined".to_string())
+            })
+            .collect::<Vec<_>>();
+        render_ts_serialize_closed_check(
+            output,
+            &literals,
+            value_expr,
+            path_expr,
+            indent,
+            &format!(
+                "must be one of [{}], got ${{JSON.stringify({value_expr})}}",
+                literals.join(", ")
+            ),
+        );
+    }
+}
+
+fn has_materialized_wire_constraints(schema: &Schema, include_format: bool) -> bool {
+    schema.min_length.is_some()
+        || schema.max_length.is_some()
+        || schema.pattern.is_some()
+        || include_format && schema.format.is_some()
+        || schema.const_value.is_some()
+        || schema.enum_values.is_some()
+}
+
 /// Emits the per-field constraint checks over an in-memory `value_expr` for the
 /// serialize path, reusing the same emitters as the parse path (numeric /
 /// string-length / pattern / format / array / enum / const). References,
@@ -962,6 +1139,40 @@ fn render_ts_field_checks_at_depth(
             "{}({value_expr}, {path_expr}, violations);\n",
             ts_temporal_validate_fn(kind)
         ));
+        if has_materialized_wire_constraints(schema, false) {
+            output.push_str(indent);
+            output.push_str("{\n");
+            let inner = format!("{indent}  ");
+            let wire = ts_temporal_serialize_call(kind, active_repr(), value_expr);
+            output.push_str(&inner);
+            output.push_str(&format!("const wire = {wire};\n"));
+            output.push_str(&inner);
+            output.push_str("if (wire !== undefined) {\n");
+            let check_indent = format!("{inner}  ");
+            render_ts_string_assertions(output, "wire", path_expr, schema, &check_indent, false);
+            render_ts_schema_closed_check(output, schema, "wire", path_expr, &check_indent);
+            output.push_str(&inner);
+            output.push_str("}\n");
+            output.push_str(indent);
+            output.push_str("}\n");
+        }
+        return;
+    }
+    if let Some(encoding) = content_encoding_direct(schema) {
+        if has_materialized_wire_constraints(schema, true) {
+            output.push_str(indent);
+            output.push_str("{\n");
+            let inner = format!("{indent}  ");
+            output.push_str(&inner);
+            output.push_str(&format!(
+                "const wire = {}({value_expr});\n",
+                ts_content_encoding_serialize_fn(encoding)
+            ));
+            render_ts_string_assertions(output, "wire", path_expr, schema, &inner, true);
+            render_ts_schema_closed_check(output, schema, "wire", path_expr, &inner);
+            output.push_str(indent);
+            output.push_str("}\n");
+        }
         return;
     }
     if is_ts_union(schema) {
@@ -1350,6 +1561,7 @@ fn render_json_runtime_module() -> String {
     let mut output = String::new();
     output.push_str(crate::generator::typescript::GENERATED_HEADER);
     output.push_str("\n\n");
+    output.push_str("import { HandlerError } from \"nexus-rpc\";\n\n");
     render_validator_core(&mut output);
     output.push('\n');
     render_collect_helper(&mut output);
@@ -1774,14 +1986,14 @@ fn render_validator_core(output: &mut String) {
     output.push_str("  readonly path: string;\n");
     output.push_str("  readonly reason: string;\n");
     output.push_str("}\n\n");
-    output.push_str("export class ValidationError extends Error {\n");
+    output.push_str("export class ValidationError extends HandlerError {\n");
     output.push_str("  public constructor(public readonly violations: Violation[]) {\n");
     output.push_str("    super(\n");
+    output.push_str("      'BAD_REQUEST',\n");
     output.push_str(
         "      `${violations.length} validation error(s): ` + violations.map((v) => `${v.path}: ${v.reason}`).join('; '),\n",
     );
     output.push_str("    );\n");
-    output.push_str("    this.name = 'ValidationError';\n");
     output.push_str("  }\n");
     output.push_str("}\n\n");
     output.push_str(
@@ -1816,7 +2028,7 @@ fn render_default_constants(output: &mut String, models: &[&PlannedJsonType]) ->
                 default_fields.push((
                     model.model_name.clone(),
                     member_ident.clone(),
-                    typescript_value_literal(default)?,
+                    typescript_default_literal(property, default)?,
                 ));
             }
             if let Some(const_value) = &property.const_value {
@@ -1871,6 +2083,25 @@ fn render_default_constants(output: &mut String, models: &[&PlannedJsonType]) ->
         output.push_str(";\n");
     }
     Ok(())
+}
+
+/// Renders a default in the member's in-memory type. Ordinary scalar defaults
+/// stay literals; temporal and content-encoded defaults pass through the same
+/// generated materializer as a present wire value. Loader validation guarantees
+/// these calls succeed, hence the non-null assertion.
+fn typescript_default_literal(schema: &Schema, value: &Value) -> Result<String> {
+    let schema = nullable_non_null_schema(schema).unwrap_or(schema);
+    let wire = typescript_value_literal(value)?;
+    if let Some(kind) = temporal_kind_direct(schema) {
+        return Ok(format!("{}({wire}, '', [])!", ts_temporal_parse_fn(kind)));
+    }
+    if let Some(encoding) = content_encoding_direct(schema) {
+        return Ok(format!(
+            "{}({wire}, '', [])!",
+            ts_content_encoding_parse_fn(encoding)
+        ));
+    }
+    Ok(wire)
 }
 
 // ---------------------------------------------------------------------------
@@ -2676,7 +2907,7 @@ fn render_model_parser_body(
         .as_ref()
         .is_some_and(|properties| !properties.is_empty())
     {
-        render_open_object_collection(output, model);
+        render_open_object_collection(output, model, schema)?;
     }
 
     // Object member-count and cross-field constraints over the wire member set
@@ -2819,7 +3050,19 @@ fn render_model_serializer_body(
         output.push_str(
             "  for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {\n",
         );
-        output.push_str("    out[key] = entry;\n");
+        output.push_str("    if (");
+        output.push_str(&declared_fields_const_name(&model.model_name));
+        output.push_str(".has(key)) {\n");
+        output.push_str("      violations.push({ path: key, reason: 'catch-all key collides with declared property' });\n");
+        output.push_str("      continue;\n");
+        output.push_str("    }\n");
+        if let Some(value_schema) = additional_properties_value_schema(&schema)? {
+            render_ts_member_check(output, &value_schema, "entry", "key", "    ");
+            let entry = serialize_expr_collecting(&value_schema, "entry", "key");
+            output.push_str(&format!("    out[key] = {entry};\n"));
+        } else {
+            output.push_str("    out[key] = entry;\n");
+        }
         output.push_str("  }\n");
     }
     if needs_validation {
@@ -2953,7 +3196,12 @@ fn render_property_value_parser(
 ) -> Result<()> {
     let raw_expr = format!("raw.{json_name}");
     let path_expr = typescript_string_literal(json_name);
-    if let Some(const_value) = &property.const_value {
+    let materialized = temporal_kind_direct(property).is_some()
+        || content_encoding_direct(property).is_some()
+        || nullable_non_null_schema(property).is_some_and(|non_null| {
+            temporal_kind_direct(non_null).is_some() || content_encoding_direct(non_null).is_some()
+        });
+    if !materialized && let Some(const_value) = &property.const_value {
         let const_name = const_const_name(
             &model.model_name,
             field_name,
@@ -2971,7 +3219,7 @@ fn render_property_value_parser(
         );
         return Ok(());
     }
-    if let Some(values) = &property.enum_values {
+    if !materialized && let Some(values) = &property.enum_values {
         render_enum_parser(output, values, &raw_expr, field_name, &path_expr, "    ");
         return Ok(());
     }
@@ -3098,6 +3346,15 @@ fn render_value_parser_at_depth(
         output.push_str(", reason: 'expected string' });\n");
         output.push_str(indent);
         output.push_str("} else {\n");
+        render_ts_string_assertions(
+            output,
+            raw_expr,
+            path_expr,
+            schema,
+            &format!("{indent}  "),
+            false,
+        );
+        render_ts_schema_closed_check(output, schema, raw_expr, path_expr, &format!("{indent}  "));
         output.push_str(indent);
         output.push_str("  const parsed = ");
         output.push_str(&parse_fn);
@@ -3134,6 +3391,15 @@ fn render_value_parser_at_depth(
         output.push_str(", reason: 'expected string' });\n");
         output.push_str(indent);
         output.push_str("} else {\n");
+        render_ts_string_assertions(
+            output,
+            raw_expr,
+            path_expr,
+            schema,
+            &format!("{indent}  "),
+            true,
+        );
+        render_ts_schema_closed_check(output, schema, raw_expr, path_expr, &format!("{indent}  "));
         output.push_str(indent);
         output.push_str("  const parsed = ");
         output.push_str(&parse_fn);
@@ -3586,15 +3852,46 @@ fn render_declared_field_set(output: &mut String, model: &PlannedJsonType, schem
     output.push_str("]);\n");
 }
 
-fn render_open_object_collection(output: &mut String, model: &PlannedJsonType) {
-    output.push_str("  const additionalProperties: Record<string, unknown> = {};\n");
+fn render_open_object_collection(
+    output: &mut String,
+    model: &PlannedJsonType,
+    schema: &Schema,
+) -> Result<()> {
+    let value_schema = additional_properties_value_schema(schema)?;
+    let annotation = value_schema
+        .as_ref()
+        .map(type_annotation)
+        .transpose()?
+        .unwrap_or_else(|| "unknown".to_string());
+    output.push_str("  const additionalProperties: Record<string, ");
+    output.push_str(&annotation);
+    output.push_str("> = {};\n");
     output.push_str("  for (const key of Object.keys(raw)) {\n");
     output.push_str("    if (!");
     output.push_str(&declared_fields_const_name(&model.model_name));
     output.push_str(".has(key)) {\n");
-    output.push_str("      additionalProperties[key] = raw[key];\n");
+    if let Some(value_schema) = &value_schema {
+        output.push_str("      let entry: ");
+        output.push_str(&annotation);
+        output.push_str(" | undefined = undefined;\n");
+        render_value_parser(
+            output,
+            value_schema,
+            "raw[key]",
+            "entry",
+            "key",
+            "      ",
+            true,
+        );
+        output.push_str("      if (entry !== undefined) {\n");
+        output.push_str("        additionalProperties[key] = entry;\n");
+        output.push_str("      }\n");
+    } else {
+        output.push_str("      additionalProperties[key] = raw[key];\n");
+    }
     output.push_str("    }\n");
     output.push_str("  }\n\n");
+    Ok(())
 }
 
 fn render_collect_helper(output: &mut String) {
@@ -3717,15 +4014,7 @@ fn decode_schema(model: &PlannedJsonType) -> Result<Schema> {
     })
 }
 
-fn typed_map_value_schema(schema: &Schema) -> Result<Option<Schema>> {
-    if schema
-        .properties
-        .as_ref()
-        .is_some_and(|properties| !properties.is_empty())
-    {
-        return Ok(None);
-    }
-
+fn additional_properties_value_schema(schema: &Schema) -> Result<Option<Schema>> {
     match &schema.additional_properties {
         Some(Value::Object(_)) => serde_json::from_value(
             schema
@@ -3768,7 +4057,7 @@ fn ts_map_shape(schema: &Schema) -> Result<Option<TsMapShape>> {
     {
         return Ok(None);
     }
-    if let Some(value_schema) = typed_map_value_schema(schema)? {
+    if let Some(value_schema) = additional_properties_value_schema(schema)? {
         let value_annotation = type_annotation(&value_schema)?;
         return Ok(Some(TsMapShape {
             value_schema: Some(value_schema),
@@ -3785,6 +4074,21 @@ fn ts_map_shape(schema: &Schema) -> Result<Option<TsMapShape>> {
 }
 
 fn type_annotation(schema: &Schema) -> Result<String> {
+    if let Some(reference) = &schema.reference {
+        return Ok(reference_model_name(reference));
+    }
+    // A materialized temporal `format` field type (per --date-time-types). The
+    // `oneOf[…, null]` nullable wrapper is handled by the `one_of` join below,
+    // which recurses into this branch for the non-null member.
+    if let Some(kind) = temporal_kind_direct(schema) {
+        return Ok(ts_temporal_type(kind, active_repr()).to_string());
+    }
+    // A materialized `contentEncoding` field type: the idiomatic binary
+    // `Uint8Array` in both the browser and Node. The `oneOf[…, null]` wrapper is
+    // handled by the `one_of` join below.
+    if content_encoding_direct(schema).is_some() {
+        return Ok("Uint8Array".to_string());
+    }
     if let Some(const_value) = &schema.const_value
         && let Some(annotation) = typescript_const_annotation(const_value)
     {
@@ -3801,21 +4105,6 @@ fn type_annotation(schema: &Schema) -> Result<String> {
             .filter_map(typescript_const_annotation)
             .collect::<Vec<_>>();
         return Ok(join_union(literals));
-    }
-    if let Some(reference) = &schema.reference {
-        return Ok(reference_model_name(reference));
-    }
-    // A materialized temporal `format` field type (per --date-time-types). The
-    // `oneOf[…, null]` nullable wrapper is handled by the `one_of` join below,
-    // which recurses into this branch for the non-null member.
-    if let Some(kind) = temporal_kind_direct(schema) {
-        return Ok(ts_temporal_type(kind, active_repr()).to_string());
-    }
-    // A materialized `contentEncoding` field type: the idiomatic binary
-    // `Uint8Array` in both the browser and Node. The `oneOf[…, null]` wrapper is
-    // handled by the `one_of` join below.
-    if content_encoding_direct(schema).is_some() {
-        return Ok("Uint8Array".to_string());
     }
     if let Some(one_of) = &schema.one_of {
         let values = one_of
