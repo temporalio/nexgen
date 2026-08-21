@@ -2047,6 +2047,64 @@ properties:
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
+/// Scalar applicators share the complete normalized matcher vocabulary.
+/// `contains` must not silently drop pattern or asserted-format predicates
+/// after the loader accepts them.
+#[test]
+fn go_json_renders_complete_contains_matchers() {
+    let temp_dir = unique_output_path("go-json-scalar-matchers");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("matchers.yaml");
+    fs::write(
+        &input_path,
+        r#"$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  hosts:
+    type: array
+    items: { type: string }
+    contains:
+      type: string
+      minLength: 5
+      pattern: ^api\.
+      format: hostname
+"#,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("output");
+
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: Vec::new(),
+        output_path: output_path.clone(),
+        format: false,
+        generate_native_api: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let rendered = fs::read_to_string(output_path.join("output.go")).unwrap();
+
+    assert!(rendered.contains("utf8.RuneCountInString(e) >= 5"));
+    assert!(rendered.contains("regexp.MustCompile(\"^api\\\\.\").MatchString(e)"));
+
+    let format_status = Command::new("gofmt")
+        .args(["-w", output_path.to_str().unwrap()])
+        .status()
+        .unwrap();
+    assert!(format_status.success());
+    let test_status = Command::new("go")
+        .args(["test", "./..."])
+        .env("GO111MODULE", "off")
+        .current_dir(&output_path)
+        .status()
+        .unwrap();
+    assert!(test_status.success());
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
 /// The entry file of a two-file closure. `get`'s output is the model the *other*
 /// file declares, and `FindOutput.page` `$ref`s it from a property, so both
 /// cross-module reference shapes are covered.

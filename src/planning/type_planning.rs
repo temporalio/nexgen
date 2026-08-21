@@ -552,6 +552,7 @@ impl<'a> TypePlanningContext<'a> {
             code_name: materialize_selected_text(&operation.code_name),
             wire_name: operation.wire_name.clone(),
             experimental: operation.experimental,
+            deprecated: operation.deprecated,
             doc: materialize_selected_text(&operation.doc),
             return_doc: materialize_selected_text(&operation.return_doc),
             input,
@@ -1455,12 +1456,14 @@ mod tests {
                 operations_class: LanguageStringSpec::default(),
                 endpoint: Some("example".to_string()),
                 experimental: false,
+                deprecated: false,
                 delay_load_temporalio_workflow: false,
                 operations: vec![OperationSpec {
                     name: "example-operation".to_string(),
                     code_name: LanguageStringSpec::default(),
                     wire_name: "ExampleOperation".to_string(),
                     experimental: false,
+                    deprecated: false,
                     doc: LanguageStringSpec::default(),
                     return_doc: LanguageStringSpec::default(),
                     input: Some(TypeSpec::External(ExternalTypeSpec::Proto(Symbol::new(

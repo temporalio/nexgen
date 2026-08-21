@@ -3,3 +3,4 @@
 pub mod content_encoding;
 pub mod format;
 pub mod pattern;
+pub(crate) mod scalar;

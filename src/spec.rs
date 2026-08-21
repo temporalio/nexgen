@@ -536,6 +536,10 @@ pub struct ServiceSpec<F: TypeFamily = AuthoredFamily> {
     pub operations_class: F::Text,
     pub endpoint: Option<String>,
     pub experimental: bool,
+    /// Whether the authored service is deprecated. Parsers carry this
+    /// language-neutral annotation through planning; each backend chooses the
+    /// target-idiomatic marker and documentation syntax.
+    pub deprecated: bool,
     pub delay_load_temporalio_workflow: bool,
     pub operations: Vec<OperationSpec<F>>,
     pub resources: Vec<ResourceSpec<F>>,
@@ -568,6 +572,7 @@ impl<F: TypeFamily> ServiceSpec<F> {
             operations_class: map.map_text(self.operations_class),
             endpoint: self.endpoint,
             experimental: self.experimental,
+            deprecated: self.deprecated,
             delay_load_temporalio_workflow: self.delay_load_temporalio_workflow,
             operations: self
                 .operations
@@ -632,6 +637,9 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     pub code_name: F::Text,
     pub wire_name: String,
     pub experimental: bool,
+    /// Whether the authored operation is deprecated. This is annotation
+    /// metadata only and has no effect on binding or wire behavior.
+    pub deprecated: bool,
     pub doc: F::Text,
     pub return_doc: F::Text,
     pub input: Option<TypeSpec<F>>,
@@ -665,6 +673,7 @@ impl<F: TypeFamily> OperationSpec<F> {
             code_name: map.map_text(self.code_name),
             wire_name: self.wire_name,
             experimental: self.experimental,
+            deprecated: self.deprecated,
             doc: map.map_text(self.doc),
             return_doc: map.map_text(self.return_doc),
             input: self.input.map(|input| input.map_names_with(map)),

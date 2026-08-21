@@ -14,6 +14,7 @@ use crate::generator::go::{
 };
 use crate::generator::json_schema::build_json_name_manifest;
 use crate::generator::json_schema::register_cross_module_ref_names;
+use crate::json_schema::scalar::{ScalarKind, ScalarMatcher};
 use crate::language::Language;
 use crate::parser::NameManifest;
 use crate::planning::{PlannedFamily, PlannedJsonType, PlannedSpec};
@@ -484,12 +485,39 @@ fn go_scalar_literal(value: &Value, element_ty: Option<&str>) -> String {
     }
 }
 
+/// Lowers the generator's decoded schema node to the language-neutral scalar
+/// matcher descriptor. The loader has already normalized and validated these
+/// values; this step only removes applicator/container details before target
+/// rendering.
+fn scalar_matcher(schema: &Schema) -> ScalarMatcher {
+    ScalarMatcher {
+        kind: schema
+            .ty
+            .as_ref()
+            .and_then(Value::as_str)
+            .and_then(ScalarKind::from_name),
+        const_value: schema.const_value.clone(),
+        enum_values: schema.enum_values.clone().unwrap_or_default(),
+        minimum: schema.minimum.clone(),
+        maximum: schema.maximum.clone(),
+        exclusive_minimum: schema.exclusive_minimum.clone(),
+        exclusive_maximum: schema.exclusive_maximum.clone(),
+        multiple_of: schema.multiple_of.clone(),
+        min_length: schema.min_length,
+        max_length: schema.max_length,
+        pattern: schema.pattern.clone(),
+        format: schema.format.clone(),
+    }
+}
+
 /// Builds the boolean Go sub-conditions that define "match" for a scalar
 /// `contains` matcher over `elem` (an element of the array, already of the
 /// element's static type). A type-only matcher matches every element, so an
 /// empty condition set renders as the literal `true`.
 fn go_matcher_condition(matcher: &Schema, elem: &str, element_ty: Option<&str>) -> String {
-    let is_integer = element_ty == Some("integer");
+    let matcher = scalar_matcher(matcher);
+    let is_integer = element_ty == Some("integer")
+        || matcher.kind == Some(ScalarKind::Integer) && element_ty != Some("number");
     let mut parts: Vec<String> = Vec::new();
     if let Some(value) = &matcher.const_value {
         parts.push(format!(
@@ -497,8 +525,9 @@ fn go_matcher_condition(matcher: &Schema, elem: &str, element_ty: Option<&str>) 
             go_scalar_literal(value, element_ty)
         ));
     }
-    if let Some(values) = &matcher.enum_values {
-        let alternatives = values
+    if !matcher.enum_values.is_empty() {
+        let alternatives = matcher
+            .enum_values
             .iter()
             .map(|value| format!("{elem} == {}", go_scalar_literal(value, element_ty)))
             .collect::<Vec<_>>()
@@ -532,6 +561,24 @@ fn go_matcher_condition(matcher: &Schema, elem: &str, element_ty: Option<&str>) 
     }
     if let Some(max) = matcher.max_length {
         parts.push(format!("utf8.RuneCountInString({elem}) <= {max}"));
+    }
+    if let Some(pattern) = &matcher.pattern {
+        parts.push(format!(
+            "regexp.MustCompile({}).MatchString({elem})",
+            go_string_literal(pattern)
+        ));
+    }
+    if let Some(format) = &matcher.format
+        && let Some(check) = crate::json_schema::format::check_for(format)
+    {
+        let length_guard = check
+            .max_code_points
+            .map(|max| format!("utf8.RuneCountInString({elem}) <= {max} && "))
+            .unwrap_or_default();
+        parts.push(format!(
+            "{length_guard}regexp.MustCompile({}).MatchString({elem})",
+            go_string_literal(&check.pattern)
+        ));
     }
     if parts.is_empty() {
         "true".to_string()
@@ -780,7 +827,7 @@ fn render_go_property_count_checks(
 }
 
 /// Emits the `propertyNames` key-shape predicate over the keys of `map_expr`,
-/// applying the (string-length) key subschema to each key `k` and pushing a
+/// applying the supported string key subschema to each key `k` and pushing a
 /// `Violation{k, "invalid property name \"k\": <why>"}` per bad key. Reuses the
 /// string-length assertions applied to keys instead of values. See
 /// `specs/json-schema/features/propertyNames.md`.
@@ -790,7 +837,12 @@ fn render_go_property_name_checks(
     subschema: &Schema,
     indent: &str,
 ) {
-    if subschema.min_length.is_none() && subschema.max_length.is_none() {
+    if subschema.min_length.is_none()
+        && subschema.max_length.is_none()
+        && subschema.pattern.is_none()
+        && subschema.format.is_none()
+        && subschema.enum_values.is_none()
+    {
         return;
     }
     output.push_str(indent);
@@ -820,6 +872,65 @@ fn render_go_property_name_checks(
             &format!("n > {max}"),
             &format!("must have length <= {max}, got %d"),
         );
+    }
+    if let Some(pattern) = &subschema.pattern {
+        output.push_str(&inner);
+        output.push_str(&format!(
+            "if !regexp.MustCompile({}).MatchString(k) {{\n",
+            go_string_literal(pattern)
+        ));
+        output.push_str(&inner);
+        output.push_str(&format!(
+            "\terrs = append(errs, Violation{{k, fmt.Sprintf({}, k)}})\n",
+            go_string_literal(&format!(
+                "invalid property name %q: must match pattern {pattern}"
+            ))
+        ));
+        output.push_str(&inner);
+        output.push_str("}\n");
+    }
+    if let Some(values) = &subschema.enum_values {
+        let alternatives = values
+            .iter()
+            .filter_map(Value::as_str)
+            .map(|value| format!("k == {}", go_string_literal(value)))
+            .collect::<Vec<_>>()
+            .join(" || ");
+        if !alternatives.is_empty() {
+            output.push_str(&inner);
+            output.push_str(&format!("if !({alternatives}) {{\n"));
+            output.push_str(&inner);
+            output.push_str(&format!(
+                "\terrs = append(errs, Violation{{k, fmt.Sprintf({}, k)}})\n",
+                go_string_literal("invalid property name %q: must equal an allowed value")
+            ));
+            output.push_str(&inner);
+            output.push_str("}\n");
+        }
+    }
+    if let Some(format) = &subschema.format
+        && let Some(check) = crate::json_schema::format::check_for(format)
+    {
+        let mut condition = String::new();
+        if let Some(max) = check.max_code_points {
+            condition.push_str(&format!("utf8.RuneCountInString(k) > {max} || "));
+        }
+        condition.push_str(&format!(
+            "!regexp.MustCompile({}).MatchString(k)",
+            go_string_literal(&check.pattern)
+        ));
+        output.push_str(&inner);
+        output.push_str(&format!("if {condition} {{\n"));
+        output.push_str(&inner);
+        output.push_str(&format!(
+            "\terrs = append(errs, Violation{{k, fmt.Sprintf({}, k)}})\n",
+            go_string_literal(&format!(
+                "invalid property name %q: must be a valid {}",
+                check.name
+            ))
+        ));
+        output.push_str(&inner);
+        output.push_str("}\n");
     }
     output.push_str(indent);
     output.push_str("}\n");
