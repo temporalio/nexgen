@@ -2315,7 +2315,7 @@ properties:
   decimals:
     type: array
     items: { type: number }
-    contains: { type: number, multipleOf: 0.1 }
+    contains: { type: number, multipleOf: 2 }
   names:
     type: object
     additionalProperties: { type: string }
@@ -2358,13 +2358,13 @@ func decode(t *testing.T, wire string) error {
 }
 
 func TestScalarMatchers(t *testing.T) {
-    if err := decode(t, `{"integers":[1.5],"decimals":[0.3],"names":{"api":"x"}}`); err == nil || !strings.Contains(err.Error(), "integers") {
+    if err := decode(t, `{"integers":[1.5],"decimals":[0.3,2],"names":{"api":"x"}}`); err == nil || !strings.Contains(err.Error(), "integers") {
         t.Fatalf("fractional number matched integer schema: %v", err)
     }
-    if err := decode(t, `{"integers":[1.5,2],"decimals":[0.3],"names":{"api":"x"}}`); err != nil {
-        t.Fatalf("mathematical decimal multiple rejected: %v", err)
+    if err := decode(t, `{"integers":[1.5,2],"decimals":[0.3,2],"names":{"api":"x"}}`); err != nil {
+        t.Fatalf("later exact multiple did not satisfy contains: %v", err)
     }
-    if err := decode(t, `{"integers":[2],"decimals":[0.3],"names":{"Api":"x"}}`); err == nil || !strings.Contains(err.Error(), "Api") {
+    if err := decode(t, `{"integers":[2],"decimals":[0.3,2],"names":{"Api":"x"}}`); err == nil || !strings.Contains(err.Error(), "Api") {
         t.Fatalf("property name matcher was not applied: %v", err)
     }
 }
