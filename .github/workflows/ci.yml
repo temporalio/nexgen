@@ -112,6 +112,22 @@ jobs:
         working-directory: advanced/samples/typescript
         run: npm exec -- prettier --check .
 
+      - name: Type-check TypeScript (samples)
+        working-directory: samples/typescript
+        run: npm run typecheck
+
+      - name: Type-check TypeScript (advanced)
+        working-directory: advanced/samples/typescript
+        run: npm run typecheck
+
+      - name: Run TypeScript tests (samples)
+        working-directory: samples/typescript
+        run: npm run test
+
+      - name: Run TypeScript tests (advanced)
+        working-directory: advanced/samples/typescript
+        run: npm run test
+
       - name: Check Go formatting
         run: |
           unformatted="$(gofmt -l samples/go advanced/samples/go)"

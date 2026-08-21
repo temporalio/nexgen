@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "recursive-collections",
+      "schema": "samples/schemas/showcase.nexusrpc.yaml",
+      "expected_load": { "result": "accepted" },
+      "accepted_wire_values": [
+        {
+          "fixture": "samples/wire/json_schema/showcase/showcase-recursive-collections.json"
+        }
+      ],
+      "parse_failures": [
+        {
+          "wire_json": "{\"kind\":\"showcase\",\"revision\":1,\"enabled\":true,\"status\":\"active\",\"tier\":1,\"scale\":1.5,\"name\":\"w\",\"count\":1,\"active\":true,\"category\":\"tools\",\"slots\":[\"x\"],\"links\":[\"not a uri\"]}",
+          "expected_paths": ["slots[0]", "links[0]"]
+        }
+      ],
+      "serialize_failures": [
+        {
+          "native_value": "replace numberGrid[0][1] with a non-finite number",
+          "expected_paths": ["numberGrid[0][1]"]
+        }
+      ],
+      "permitted_presence_nullability_collapse": [],
+      "consumers": {
+        "go": {
+          "source": "samples/go/tests/json_schema_showcase_test.go",
+          "anchor": "TestJSONSchemaShowcaseRecursiveCollections"
+        },
+        "typescript": {
+          "source": "samples/typescript/tests/json-schema-showcase.test.ts",
+          "anchor": "recursively converts collections and rejects non-finite numbers"
+        },
+        "python": {
+          "source": "samples/python/tests/test_showcase.py",
+          "anchor": "test_recursive_collections_and_non_finite_positions"
+        },
+        "java": {
+          "source": "samples/java/src/test/java/jsonschema/JsonSchemaShowcaseRoundTripTest.java",
+          "anchor": "recursiveCollectionsRoundTripAndRejectNonFiniteValues"
+        }
+      }
+    },
+    {
+      "id": "mathematical-number-equality",
+      "schema": "samples/schemas/showcase.nexusrpc.yaml",
+      "expected_load": { "result": "accepted" },
+      "accepted_wire_values": [
+        {
+          "fixture": "samples/wire/json_schema/showcase/showcase-number-values.json"
+        }
+      ],
+      "parse_failures": [],
+      "serialize_failures": [],
+      "permitted_presence_nullability_collapse": [],
+      "consumers": {
+        "go": {
+          "source": "samples/go/tests/json_schema_showcase_test.go",
+          "anchor": "TestJSONSchemaShowcaseNumberValueRoundTrip"
+        },
+        "typescript": {
+          "source": "samples/typescript/tests/json-schema-showcase.test.ts",
+          "anchor": "round-trips JSON numbers by mathematical value"
+        },
+        "python": {
+          "source": "samples/python/tests/test_showcase.py",
+          "anchor": "test_number_roundtrip_preserves_mathematical_values"
+        },
+        "java": {
+          "source": "samples/java/src/test/java/jsonschema/JsonSchemaShowcaseRoundTripTest.java",
+          "anchor": "numberSpellingsRoundTripByMathematicalValue"
+        }
+      }
+    },
+    {
+      "id": "year-zero-rejection",
+      "schema": "samples/schemas/temporal.yaml",
+      "expected_load": { "result": "accepted" },
+      "accepted_wire_values": [
+        {
+          "wire_json": "{\"createdAt\":\"0001-01-01T00:00:00Z\",\"birthday\":\"0001-01-01\",\"alarm\":\"00:00:00\",\"timeout\":\"PT0S\"}"
+        }
+      ],
+      "parse_failures": [
+        {
+          "wire_json": "{\"createdAt\":\"0000-01-01T00:00:00Z\",\"birthday\":\"2000-01-01\",\"alarm\":\"09:00:00\",\"timeout\":\"PT0S\"}",
+          "expected_paths": ["createdAt"]
+        },
+        {
+          "wire_json": "{\"createdAt\":\"2021-06-15T12:30:45Z\",\"birthday\":\"0000-01-01\",\"alarm\":\"09:00:00\",\"timeout\":\"PT0S\"}",
+          "expected_paths": ["birthday"]
+        }
+      ],
+      "serialize_failures": [],
+      "permitted_presence_nullability_collapse": [],
+      "consumers": {
+        "go": {
+          "source": "samples/go/tests/json_schema_temporal_test.go",
+          "anchor": "TestJSONSchemaTemporalMaterializedNarrowing"
+        },
+        "typescript": {
+          "source": "samples/typescript/tests/json-schema-temporal.test.ts",
+          "anchor": "materialized narrowing rejects :60, calendar duration, bad date, missing offset"
+        },
+        "python": {
+          "source": "samples/python/tests/test_temporal.py",
+          "anchor": "test_year_zero_is_a_violation_rather_than_a_value_error"
+        },
+        "java": {
+          "source": "samples/java/src/test/java/jsonschema/JsonSchemaTemporalRoundTripTest.java",
+          "anchor": "materializedNarrowingRejects"
+        }
+      }
+    },
+    {
+      "id": "optional-null-presence-collapse",
+      "schema": "samples/schemas/showcase.nexusrpc.yaml",
+      "expected_load": { "result": "accepted" },
+      "accepted_wire_values": [
+        {
+          "fixture": "samples/wire/json_schema/showcase/showcase-nulls.json"
+        }
+      ],
+      "parse_failures": [],
+      "serialize_failures": [],
+      "permitted_presence_nullability_collapse": [
+        {
+          "path": "middleName",
+          "targets": ["go", "python", "java"],
+          "wire_presence": "explicit_null",
+          "serialized_presence": "absent"
+        }
+      ],
+      "consumers": {
+        "go": {
+          "source": "samples/go/tests/json_schema_showcase_test.go",
+          "anchor": "TestJSONSchemaShowcaseRuntime"
+        },
+        "typescript": {
+          "source": "samples/typescript/tests/json-schema-showcase.test.ts",
+          "anchor": "roundtrips canonical wire fixtures through the Temporal converter"
+        },
+        "python": {
+          "source": "samples/python/tests/test_showcase.py",
+          "anchor": "test_canonical_wire_fixtures_roundtrip_through_the_default_converter"
+        },
+        "java": {
+          "source": "samples/java/src/test/java/jsonschema/JsonSchemaShowcaseRoundTripTest.java",
+          "anchor": "showcaseFixturesRoundTrip"
+        }
+      }
+    }
+  ]
+}
