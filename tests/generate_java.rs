@@ -142,12 +142,18 @@ properties:
     items: { type: number }
     contains:
       type: integer
-      minimum: 2
-      maximum: 8
       exclusiveMinimum: 1
       exclusiveMaximum: 10
       multipleOf: 2
     minContains: 1
+  inclusiveDates:
+    type: array
+    items: { type: number }
+    contains:
+      type: integer
+      minimum: 2
+      maximum: 8
+      multipleOf: 2
   payload:
     type: string
     contentEncoding: base64
@@ -638,6 +644,7 @@ fn java_json_emits_wave2_object_and_matcher_contracts() {
         "wireKeys.add(\"id\")",
         "SpecNumbers.isSpecLong(rawElement)",
         "rawElement.doubleValue() % 2.0 == 0",
+        "rawElement.doubleValue() >= 2.0",
         "rawElement.doubleValue() <= 8.0",
         "rawElement.doubleValue() > 1.0",
         "rawElement.doubleValue() < 10.0",
