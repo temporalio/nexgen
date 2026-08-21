@@ -49,6 +49,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- JSON Schema conformance is now enforced end to end: the loader rejects unknown
+  schema and Nexus-envelope members (including `endpoint` and OpenAPI
+  `discriminator`), discovers transitive local `$ref` files and nested RFC 6901
+  `$defs` pointers, and normalizes `allOf` annotations and constraints before
+  generation. Generated Go, TypeScript, Python, and Java APIs now keep mixed
+  declared/typed catch-all objects fully typed, apply complete `contains` and
+  `propertyNames` scalar matchers in both directions, enforce wire-string
+  constraints around temporal/byte materialization, keep closed/default values
+  native, and mark deprecated types, fields, services, and operations
+  idiomatically. Generated documentation also preserves paragraphs, wraps at 88
+  columns, and escapes target comment syntax. These changes add no CLI flags and
+  do not change the JSON wire format.
+
 - JSON Schema numbers round-trip by mathematical JSON value rather than token
   spelling: whitespace, object-member order, and spellings such as `5`, `5.0`,
   and `5e0` are not identity-bearing. Generated Java keeps idiomatic `double`

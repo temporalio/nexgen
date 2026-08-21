@@ -7744,6 +7744,42 @@ services:
     }
 
     #[test]
+    fn rejects_unknown_keywords_in_every_recursive_schema_position() {
+        for (position, schema) in [
+            (
+                "nested property",
+                "type: object\nproperties:\n  child:\n    type: string\n    minLenght: 2",
+            ),
+            (
+                "array items",
+                "type: array\nitems:\n  type: string\n  minLenght: 2",
+            ),
+            (
+                "typed additionalProperties",
+                "type: object\nadditionalProperties:\n  type: string\n  minLenght: 2",
+            ),
+            (
+                "contains matcher",
+                "type: array\nitems: { type: string }\ncontains:\n  type: string\n  minLenght: 2",
+            ),
+            (
+                "propertyNames matcher",
+                "type: object\nadditionalProperties: { type: string }\npropertyNames:\n  type: string\n  minLenght: 2",
+            ),
+            (
+                "allOf branch",
+                "allOf:\n  - { type: string, minLenght: 2 }\n  - { type: string, minLength: 1 }",
+            ),
+        ] {
+            let error = structural_reject(schema);
+            assert!(
+                error.contains("unknown schema keyword `minLenght`"),
+                "{position}: {error}"
+            );
+        }
+    }
+
+    #[test]
     fn rejects_services_without_nexusrpc() {
         let error = doc_reject(
             r##"
