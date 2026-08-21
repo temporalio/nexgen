@@ -21,6 +21,11 @@ from ._support import (
 OutputT = typing.TypeVar("OutputT")
 
 
+@dataclasses.dataclass(slots=True)
+class Outcome(typing.Generic[OutputT]):
+    value: OutcomeValue[OutputT]
+
+
 class _OutcomeTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         "Outcome[typing.Any]", temporalio.api.update.v1.message_pb2.Outcome
@@ -41,12 +46,11 @@ class _OutcomeTransferTypeConverter(
         if _oneof_value_case is None:
             raise ValueError("missing required field Outcome.value")
         elif _oneof_value_case == "success":
-            _oneof_value = (
-                "success",
-                payloads_from_proto(value.success, [output_type])[0],
+            _oneof_value = OutcomeValueSuccess(
+                payloads_from_proto(value.success, [output_type])[0]
             )
         elif _oneof_value_case == "failure":
-            _oneof_value = ("failure", failure_from_proto(value.failure))
+            _oneof_value = OutcomeValueFailure(failure_from_proto(value.failure))
         else:
             raise ValueError(
                 f"unknown protobuf oneof case Outcome.value: {_oneof_value_case}"
@@ -60,27 +64,24 @@ class _OutcomeTransferTypeConverter(
         self,
         value: "Outcome[typing.Any]",
     ) -> temporalio.api.update.v1.message_pb2.Outcome:
+        runtime_value: typing.Any = value
         message = temporalio.api.update.v1.message_pb2.Outcome()
-        if value.value is None:
+        if runtime_value.value is None:
             raise ValueError("missing required field Outcome.value")
-        if value.value[0] == "success":
-            message.success.CopyFrom(payloads_to_proto([value.value[1]]))
-        elif value.value[0] == "failure":
-            message.failure.CopyFrom(failure_to_proto(value.value[1]))
+        _oneof_value_value = runtime_value.value
+        if isinstance(_oneof_value_value, OutcomeValueSuccess):
+            message.success.CopyFrom(payloads_to_proto([_oneof_value_value.value]))
+        elif isinstance(_oneof_value_value, OutcomeValueFailure):
+            message.failure.CopyFrom(failure_to_proto(_oneof_value_value.value))
         else:
-            raise ValueError(
-                f"unknown protobuf oneof tag Outcome.value: {value.value[0]}"
+            raise TypeError(
+                f"unsupported variant case Outcome.value: {_oneof_value_value!r}"
             )
         return message
 
 
-@typing.cast(
-    typing.Any,
-    temporalio.converter.transfer_type_convertible(_OutcomeTransferTypeConverter),
-)
-@dataclasses.dataclass(slots=True)
-class Outcome(typing.Generic[OutputT]):
-    value: OutcomeValue[OutputT]
+# Registration stores the converter on the model; the returned class is unused.
+temporalio.converter.transfer_type_convertible(_OutcomeTransferTypeConverter)(Outcome)  # pyright: ignore[reportUnusedCallResult]
 
 
 class _PauseActivityRequestTransferTypeConverter(
@@ -112,9 +113,9 @@ class _PauseActivityRequestTransferTypeConverter(
         if _oneof_activity_case is None:
             _oneof_activity = None
         elif _oneof_activity_case == "id":
-            _oneof_activity = ("id", value.id)
+            _oneof_activity = ActivitySelectionId(value.id)
         elif _oneof_activity_case == "type":
-            _oneof_activity = ("type", value.type)
+            _oneof_activity = ActivitySelectionType(value.type)
         else:
             raise ValueError(
                 f"unknown protobuf oneof case PauseActivityRequest.activity: {_oneof_activity_case}"
@@ -153,13 +154,14 @@ class _PauseActivityRequestTransferTypeConverter(
             )
         message.identity = value.identity
         if value.activity is not None:
-            if value.activity[0] == "id":
-                message.id = value.activity[1]
-            elif value.activity[0] == "type":
-                message.type = value.activity[1]
+            _oneof_activity_value = typing.cast(typing.Any, value.activity)
+            if isinstance(_oneof_activity_value, ActivitySelectionId):
+                message.id = _oneof_activity_value.value
+            elif isinstance(_oneof_activity_value, ActivitySelectionType):
+                message.type = _oneof_activity_value.value
             else:
-                raise ValueError(
-                    f"unknown protobuf oneof tag PauseActivityRequest.activity: {value.activity[0]}"
+                raise TypeError(
+                    f"unsupported variant case PauseActivityRequest.activity: {_oneof_activity_value!r}"
                 )
         message.reason = value.reason
         message.request_id = value.request_id
@@ -223,12 +225,47 @@ class WorkflowExecution:
     run_id: str
 
 
-OutcomeValue = (
-    tuple[typing.Literal["success"], OutputT]
-    | tuple[typing.Literal["failure"], BaseException]
-)
+@dataclasses.dataclass(slots=True, init=False)
+class OutcomeValueSuccess(typing.Generic[OutputT]):
+    tag: typing.Literal["success"] = dataclasses.field(init=False)
+    value: OutputT
+
+    def __init__(self, value: OutputT) -> None:
+        self.tag = "success"
+        self.value = value
 
 
-ActivitySelection = (
-    tuple[typing.Literal["id"], str] | tuple[typing.Literal["type"], str]
-)
+@dataclasses.dataclass(slots=True, init=False)
+class OutcomeValueFailure:
+    tag: typing.Literal["failure"] = dataclasses.field(init=False)
+    value: BaseException
+
+    def __init__(self, value: BaseException) -> None:
+        self.tag = "failure"
+        self.value = value
+
+
+OutcomeValue = OutcomeValueSuccess[OutputT] | OutcomeValueFailure
+
+
+@dataclasses.dataclass(slots=True, init=False)
+class ActivitySelectionId:
+    tag: typing.Literal["id"] = dataclasses.field(init=False)
+    value: str
+
+    def __init__(self, value: str) -> None:
+        self.tag = "id"
+        self.value = value
+
+
+@dataclasses.dataclass(slots=True, init=False)
+class ActivitySelectionType:
+    tag: typing.Literal["type"] = dataclasses.field(init=False)
+    value: str
+
+    def __init__(self, value: str) -> None:
+        self.tag = "type"
+        self.value = value
+
+
+ActivitySelection = ActivitySelectionId | ActivitySelectionType

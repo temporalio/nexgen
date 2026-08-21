@@ -11,7 +11,12 @@ from temporalio.api.workflowservice.v1 import (
 from temporalio.converter import PayloadConverter
 import temporalio.nexus.system
 
-from wit.proto_oneof import Outcome, PauseActivityRequest
+from wit.proto_oneof import (
+    Outcome,
+    OutcomeValueFailure,
+    OutcomeValueSuccess,
+    PauseActivityRequest,
+)
 from wit.proto_oneof.models import (
     _OutcomeTransferTypeConverter,
     _PauseActivityRequestTransferTypeConverter,
@@ -31,7 +36,7 @@ def test_proto_oneof_success_round_trip(monkeypatch: pytest.MonkeyPatch) -> None
     )
     converter = _OutcomeTransferTypeConverter()
     model: Outcome[SuccessfulOutput] = Outcome(
-        value=("success", SuccessfulOutput(message="hello"))
+        value=OutcomeValueSuccess(SuccessfulOutput(message="hello"))
     )
 
     wire = converter.to_transfer_type(model)
@@ -39,18 +44,63 @@ def test_proto_oneof_success_round_trip(monkeypatch: pytest.MonkeyPatch) -> None
 
     decoded = converter.from_transfer_type(wire, Outcome[SuccessfulOutput])
     assert decoded == model
-    assert isinstance(decoded.value[1], SuccessfulOutput)
+    assert isinstance(decoded.value, OutcomeValueSuccess)
+    assert isinstance(decoded.value.value, SuccessfulOutput)
+
+
+def test_proto_oneof_success_payload_converter_round_trip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        temporalio.nexus.system,
+        "_current_user_payload_converter",
+        lambda: PayloadConverter.default,
+    )
+    converter = PayloadConverter.default
+    model: Outcome[SuccessfulOutput] = Outcome(
+        value=OutcomeValueSuccess(SuccessfulOutput(message="hello"))
+    )
+
+    payload = converter.to_payloads([model])[0]
+
+    assert payload.metadata["encoding"] == b"json/protobuf"
+    assert payload.metadata["messageType"] == b"temporal.api.update.v1.Outcome"
+    decoded = converter.from_payloads([payload], [Outcome[SuccessfulOutput]])[0]
+    assert decoded == model
+    assert isinstance(decoded.value, OutcomeValueSuccess)
+    assert isinstance(decoded.value.value, SuccessfulOutput)
 
 
 def test_required_proto_oneof_failure_round_trip() -> None:
     converter = _OutcomeTransferTypeConverter()
 
-    wire = converter.to_transfer_type(Outcome(value=("failure", RuntimeError("boom"))))
+    wire = converter.to_transfer_type(
+        Outcome(value=OutcomeValueFailure(RuntimeError("boom")))
+    )
     assert wire.WhichOneof("value") == "failure"
     decoded = converter.from_transfer_type(wire, Outcome)
-    assert decoded.value is not None
-    assert decoded.value[0] == "failure"
-    assert str(decoded.value[1]).endswith("boom")
+    assert isinstance(decoded.value, OutcomeValueFailure)
+    assert str(decoded.value.value).endswith("boom")
+
+
+def test_proto_oneof_failure_payload_converter_round_trip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        temporalio.nexus.system,
+        "_current_user_payload_converter",
+        lambda: PayloadConverter.default,
+    )
+    converter = PayloadConverter.default
+    model: Outcome[object] = Outcome(value=OutcomeValueFailure(RuntimeError("boom")))
+
+    payload = converter.to_payloads([model])[0]
+
+    assert payload.metadata["encoding"] == b"json/protobuf"
+    assert payload.metadata["messageType"] == b"temporal.api.update.v1.Outcome"
+    decoded = converter.from_payloads([payload], [Outcome])[0]
+    assert isinstance(decoded.value, OutcomeValueFailure)
+    assert str(decoded.value.value).endswith("boom")
 
 
 def test_required_proto_oneof_rejects_unset_wire_and_runtime_none() -> None:
@@ -85,9 +135,9 @@ def test_optional_proto_oneof_round_trips_unset_as_none() -> None:
     assert converter.from_transfer_type(proto, PauseActivityRequest) == model
 
 
-def test_proto_oneof_rejects_unknown_authored_tag() -> None:
+def test_proto_oneof_rejects_unsupported_public_value() -> None:
     converter = _OutcomeTransferTypeConverter()
-    invalid_value = typing.cast(typing.Any, ("unknown", object()))
+    invalid_value = typing.cast(typing.Any, object())
 
-    with pytest.raises(ValueError, match="unknown protobuf oneof tag Outcome.value"):
+    with pytest.raises(TypeError, match="unsupported variant case Outcome.value"):
         _ = converter.to_transfer_type(Outcome(value=invalid_value))

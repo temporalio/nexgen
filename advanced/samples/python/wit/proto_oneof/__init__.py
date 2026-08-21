@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from .models import (
     ActivitySelection,
+    ActivitySelectionId,
+    ActivitySelectionType,
     Outcome,
     OutcomeValue,
+    OutcomeValueSuccess,
+    OutcomeValueFailure,
     PauseActivityRequest,
     WorkflowExecution,
 )
@@ -13,8 +17,12 @@ from .services import OutcomeClient
 
 __all__ = [
     "ActivitySelection",
+    "ActivitySelectionId",
+    "ActivitySelectionType",
     "Outcome",
     "OutcomeValue",
+    "OutcomeValueSuccess",
+    "OutcomeValueFailure",
     "PauseActivityRequest",
     "WorkflowExecution",
     "OutcomeClient",

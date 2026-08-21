@@ -39,6 +39,15 @@ pub enum Error {
         conflicting_field: String,
     },
 
+    #[error(
+        "Python generated name `{name}` for {generated_by} conflicts with {conflicting_declaration}"
+    )]
+    PythonGeneratedNameConflict {
+        name: String,
+        generated_by: String,
+        conflicting_declaration: String,
+    },
+
     #[error("refusing to overwrite existing path `{path}`")]
     OutputPathExists { path: PathBuf },
 

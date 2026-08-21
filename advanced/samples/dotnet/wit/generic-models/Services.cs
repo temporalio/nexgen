@@ -21,6 +21,10 @@ namespace Nexgen.GenericModelService
         [NexusOperation("Complete")]
         GenericResponse<object, object, object> Complete(GenericRequest<object> request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("ReuseComplete")]
+        ReuseCompletionResult<object> ReuseComplete(GenericRequest<object> request);
+
     }
 
     internal interface INexgenOperationInfo
@@ -57,6 +61,8 @@ namespace Nexgen.GenericModelService
         {
             [("GenericModelService", "Complete")] = new NexgenOperationInfo<GenericRequest<object>, GenericResponse<object, object, object>>(
                 GenericModelServiceServiceDefinition.Operations["Complete"]),
+            [("GenericModelService", "ReuseComplete")] = new NexgenOperationInfo<GenericRequest<object>, ReuseCompletionResult<object>>(
+                GenericModelServiceServiceDefinition.Operations["ReuseComplete"]),
         };
     }
 

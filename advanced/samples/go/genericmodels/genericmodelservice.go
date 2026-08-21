@@ -22,6 +22,12 @@ func complete[ContextT any](ctx workflow.Context, request genericRequest[Context
 	return fut
 }
 
+func reuseComplete[ContextT any](ctx workflow.Context, request genericRequest[ContextT]) workflow.Future {
+	c := workflow.NewNexusClient("generic-models", "GenericModelService")
+	fut := c.ExecuteOperation(ctx, "ReuseComplete", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
 // --- Operations (public API) ---
 
 type OperationCompletionResult[OutputT any] interface {
@@ -29,13 +35,13 @@ type OperationCompletionResult[OutputT any] interface {
 }
 
 type OperationCompletionResultSuccess[OutputT any] struct {
-	Value OperationCompletionSuccess[OutputT]
+	Value OutputT
 }
 
 func (OperationCompletionResultSuccess[OutputT]) isOperationCompletionResult(OutputT) {}
 
 type OperationCompletionResultFailure[OutputT any] struct {
-	Value OperationCompletionFailure
+	Value string
 }
 
 func (OperationCompletionResultFailure[OutputT]) isOperationCompletionResult(OutputT) {}
@@ -54,14 +60,9 @@ type GenericResponse[ContextT any, OutputT any, MetadataT any] struct {
 	Metadata *MetadataT
 }
 
-type OperationCompletionSuccess[OutputT any] struct {
+type ReuseCompletionResult[OutputT any] struct {
 	// Required.
-	Output OutputT
-}
-
-type OperationCompletionFailure struct {
-	// Required.
-	Message string
+	Result OperationCompletionResult[OutputT]
 }
 
 type CompleteOptions[ContextT any] struct {
@@ -77,6 +78,26 @@ type CompleteOptions[ContextT any] struct {
 
 func Complete[ContextT any](ctx workflow.Context, opts CompleteOptions[ContextT]) workflow.Future {
 	return complete(ctx, genericRequest[ContextT]{
+		Context:  opts.Context,
+		Contexts: opts.Contexts,
+		ByName:   opts.ByName,
+		Nested:   opts.Nested,
+	})
+}
+
+type ReuseCompleteOptions[ContextT any] struct {
+	// Required.
+	Context ContextT
+	// Required.
+	Contexts []ContextT
+	// Required.
+	ByName map[string]ContextT
+	// Required.
+	Nested Inner[ContextT]
+}
+
+func ReuseComplete[ContextT any](ctx workflow.Context, opts ReuseCompleteOptions[ContextT]) workflow.Future {
+	return reuseComplete(ctx, genericRequest[ContextT]{
 		Context:  opts.Context,
 		Contexts: opts.Contexts,
 		ByName:   opts.ByName,

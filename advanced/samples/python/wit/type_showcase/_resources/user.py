@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import dataclasses
+import typing
+import typing_extensions
+import temporalio.converter
 import temporalio.workflow
 
 from ..models import (
@@ -12,6 +15,7 @@ from ..models import (
     UserProfile,
     UserStatus,
 )
+from ..models import _UserProfileTransferTypeConverter
 
 
 @dataclasses.dataclass
@@ -52,6 +56,56 @@ class User:
         )
         handle = await _deactivate(request)
         await handle
+
+
+class _UserTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[User, dict[str, typing.Any]]
+):
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: dict[str, typing.Any],
+        type_hint: type[User],
+    ) -> User:
+        _ = type_hint
+        if "user_id" not in value:
+            raise ValueError("missing required field User.user_id")
+        if "email" not in value:
+            raise ValueError("missing required field User.email")
+        if "display_name" not in value:
+            raise ValueError("missing required field User.display_name")
+        if "status" not in value:
+            raise ValueError("missing required field User.status")
+        if "profile" not in value:
+            raise ValueError("missing required field User.profile")
+        return User(
+            user_id=temporalio.converter.value_to_type(str, value["user_id"]),
+            email=temporalio.converter.value_to_type(str, value["email"]),
+            display_name=temporalio.converter.value_to_type(str, value["display_name"]),
+            status=temporalio.converter.value_to_type(UserStatus, value["status"]),
+            profile=_UserProfileTransferTypeConverter().from_transfer_type(
+                value["profile"], UserProfile
+            ),
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: User,
+    ) -> dict[str, typing.Any]:
+        return {
+            "user_id": value.user_id,
+            "email": value.email,
+            "display_name": value.display_name,
+            "status": value.status,
+            "profile": _UserProfileTransferTypeConverter().to_transfer_type(
+                value.profile
+            ),
+        }
+
+
+# Registration stores the converter on the model; the returned class is unused.
+temporalio.converter.transfer_type_convertible(_UserTransferTypeConverter)(User)  # pyright: ignore[reportUnusedCallResult]
 
 
 async def _update_email(

@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - WIT signal-with-start request models now carry Temporal headers while keeping
   them out of generated convenience operation APIs.
+- Python WIT variants now generate one tagged slotted dataclass per case and a
+  union alias over those classes. Generated constructors assign non-init
+  literal tag fields. Direct JSON payloads use adjacent-tagged objects, and
+  concrete records and resources that contain variants register transfer type
+  converters with Temporal's default data converter. Private functions own the
+  nested variant dispatch. Protobuf `oneof` converters construct and match the
+  same public case classes without using the JSON representation.
 - Added grouped protobuf `oneof` authoring and bidirectional Python conversion,
   including required and optional oneofs, scaffolding through `add-rpc` and
   `add-message`, and explicit diagnostics for unsupported target backends.
@@ -85,6 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+- Python WIT variant values now use generated case objects instead of tagged
+  tuples. Existing callers must construct and match the exported case classes.
+  WIT `result<T, E>` and JSON Schema `oneOf` behavior are unchanged.
 - Java: A map-shaped model (a pure typed map — `additionalProperties` with no
   declared `properties`) now names its catch-all member `additionalProperties`,
   matching the struct-shaped POJOs and the other languages (Go
