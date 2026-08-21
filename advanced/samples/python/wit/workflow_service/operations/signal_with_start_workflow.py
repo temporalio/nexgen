@@ -583,14 +583,15 @@ async def signal_with_start_workflow(
             pass a single signal argument that is itself a list, wrap it in another
             list; otherwise the list is interpreted as multiple signal arguments.
         execution_timeout: Total workflow execution timeout, including retries and
-            continue-as-new.
-        run_timeout: Timeout of a single workflow run.
-        task_timeout: Timeout of a single workflow task.
+            continue-as-new. Defaults to unlimited.
+        run_timeout: Timeout of a single workflow run. Defaults to the workflow
+            execution timeout.
+        task_timeout: Timeout of a single workflow task. Defaults to 10 seconds.
         id_reuse_policy: Behavior when a closed workflow with the same ID exists.
             Default is allow-duplicate.
         id_conflict_policy: Behavior when a workflow is currently running with the same
             ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot
-            be set if id-reuse-policy is terminate-if-running.
+            be set if id-reuse-policy is terminate-if-running. Defaults to use-existing.
         retry_policy: Retry policy for the workflow.
         cron_schedule: Cron schedule for recurring workflow executions. See
             https://docs.temporal.io/cron-job.

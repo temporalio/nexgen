@@ -58,32 +58,32 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 		// Get resolves to a StartedWorkflow resource rather than a client.WorkflowRun.
 		future := sw.StartWorkflow(
 			ctx,
-			sw.StartWorkflowOptions{Workflow: "typed-workflow", WorkflowId: "start-id", TaskQueue: "start-queue", WorkflowStartDelay: time.Second},
+			sw.StartWorkflowOptions{Workflow: "typed-workflow", WorkflowID: "start-id", TaskQueue: "start-queue", WorkflowStartDelay: time.Second},
 		)
 		if err := future.Get(ctx, &start); err != nil {
 			return err
 		}
 		var startWithArgs sw.StartedWorkflow
 		if err := sw.StartWorkflow(
-			ctx, sw.StartWorkflowOptions{Workflow: "named-workflow", WorkflowId: "start-args-id", TaskQueue: "start-args-queue"},
+			ctx, sw.StartWorkflowOptions{Workflow: "named-workflow", WorkflowID: "start-args-id", TaskQueue: "start-args-queue"},
 		).Get(ctx, &startWithArgs); err != nil {
 			return err
 		}
 		var restart sw.StartedWorkflow
 		if err := sw.RestartWorkflow(
-			ctx, sw.RestartWorkflowOptions{Workflow: "typed-restart", WorkflowId: "restart-id", TaskQueue: "restart-queue"},
+			ctx, sw.RestartWorkflowOptions{Workflow: "typed-restart", WorkflowID: "restart-id", TaskQueue: "restart-queue"},
 		).Get(ctx, &restart); err != nil {
 			return err
 		}
 		var restartWithArgs sw.StartedWorkflow
 		if err := sw.RestartWorkflow(
-			ctx, sw.RestartWorkflowOptions{Workflow: "named-restart", WorkflowId: "restart-args-id", TaskQueue: "restart-args-queue"},
+			ctx, sw.RestartWorkflowOptions{Workflow: "named-restart", WorkflowID: "restart-args-id", TaskQueue: "restart-args-queue"},
 		).Get(ctx, &restartWithArgs); err != nil {
 			return err
 		}
 		var cancelResult sw.CancelWorkflowResponse
 		if err := sw.CancelWorkflow(ctx, sw.CancelWorkflowOptions{
-			WorkflowExecution: sw.WorkflowExecution{WorkflowId: "cancel-id"}, Reason: "because",
+			WorkflowExecution: sw.WorkflowExecution{WorkflowID: "cancel-id"}, Reason: "because",
 		}).Get(ctx, &cancelResult); err != nil {
 			return err
 		}

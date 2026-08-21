@@ -199,8 +199,8 @@ services:
     x-go-name: Chat              # the Go package is already `chat` — avoid stutter
     fqn: example.chat.v1.ChatService
     operations:
-      getRoomById:
-        x-go-name: GetRoomByID   # keep the `ID` initialism uppercase in Go
+      getRoomByUrl:
+        x-go-name: GetRoomByURL  # keep the `URL` initialism uppercase in Go
         input: { $ref: "#/$defs/GetRoomRequest" }
         output: { $ref: "#/$defs/Room" }
 $defs:

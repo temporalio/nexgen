@@ -70,12 +70,12 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		priority := temporal.Priority{PriorityKey: 7}
 		opts := ws.SignalWithStartWorkflowOptions{
-			Id:                       "workflow-id",
+			ID:                       "workflow-id",
 			TaskQueue:                "my-task-queue",
 			WorkflowExecutionTimeout: 3 * time.Hour,
 			WorkflowRunTimeout:       2 * time.Hour,
 			WorkflowTaskTimeout:      time.Minute,
-			WorkflowIdReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE,
+			WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE,
 			RetryPolicy:              retryPolicy,
 			CronSchedule:             "0 * * * *",
 			Memo:                     map[string]any{"memo-key": "memo-value"},
@@ -155,7 +155,7 @@ func (s *WorkflowServiceIntegrationSuite) TestEmptyPayloadsAreDelegatedToDataCon
 		var result ws.SignalWithStartWorkflowResponse
 		return &result, ws.SignalWithStartWorkflow(
 			ctx,
-			ws.SignalWithStartWorkflowOptions{Id: "workflow-id"},
+			ws.SignalWithStartWorkflowOptions{ID: "workflow-id"},
 			"wake-up",
 			"signal-value",
 			"ExampleWorkflow",
@@ -173,7 +173,7 @@ func (s *WorkflowServiceIntegrationSuite) TestCanceledContextDoesNotScheduleOper
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		ctx, cancel := workflow.WithCancel(ctx)
 		cancel()
-		return ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{Id: "workflow-id"}, "wake-up", "signal-value", signalWithStartWorkflow, "workflow-input").Get(ctx, nil)
+		return ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{ID: "workflow-id"}, "wake-up", "signal-value", signalWithStartWorkflow, "workflow-input").Get(ctx, nil)
 	})
 
 	s.Error(s.env.GetWorkflowError())
@@ -182,7 +182,7 @@ func (s *WorkflowServiceIntegrationSuite) TestCanceledContextDoesNotScheduleOper
 
 func (s *WorkflowServiceIntegrationSuite) TestConversionFailureReturnsReadyFuture() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
-		fut := ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{Id: "workflow-id", Memo: map[string]any{"invalid": func() {}}}, "wake-up", "signal-value", signalWithStartWorkflow, "workflow-input")
+		fut := ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{ID: "workflow-id", Memo: map[string]any{"invalid": func() {}}}, "wake-up", "signal-value", signalWithStartWorkflow, "workflow-input")
 		if !fut.IsReady() {
 			return errors.New("conversion failure future is not ready")
 		}

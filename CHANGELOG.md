@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Go: Changed godoc formatting to better match Temporal SDKs.
 - Protobuf-backed models now consistently generate conversions in both
   directions whenever they are reachable. Go and TypeScript emit previously
   suppressed complementary helpers, operation-free exported models receive the
@@ -85,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+- Go: The word "id" is now capitalized as "ID" instead of "Id".
 - Java: A map-shaped model (a pure typed map — `additionalProperties` with no
   declared `properties`) now names its catch-all member `additionalProperties`,
   matching the struct-shaped POJOs and the other languages (Go

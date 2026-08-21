@@ -24,10 +24,10 @@ func TestJSONSchemaKBRuntime(t *testing.T) {
 	// page.json carries a nested block with page: null (optional+nullable),
 	// which Go collapses on serialize, so verify by deserialization only.
 	page := decodeFixture[kb.Page](t, dc, "kb", "page.json")
-	require.Equal(t, "page-1", page.PageId)
+	require.Equal(t, "page-1", page.PageID)
 	require.Equal(t, "nexgen", page.Meta.Author)
 	require.Len(t, page.Blocks, 1)
-	require.Equal(t, "block-1", page.Blocks[0].BlockId)
+	require.Equal(t, "block-1", page.Blocks[0].BlockID)
 	require.Nil(t, page.Blocks[0].Page)
 	require.NotNil(t, page.Blocks[0].Style)
 	require.NotNil(t, page.Blocks[0].Style.Bold)
@@ -35,7 +35,7 @@ func TestJSONSchemaKBRuntime(t *testing.T) {
 
 	// block.json carries page: null (optional+nullable) — deserialization only.
 	block := decodeFixture[kb.Block](t, dc, "kb", "block.json")
-	require.Equal(t, "block-1", block.BlockId)
+	require.Equal(t, "block-1", block.BlockID)
 	require.Equal(t, int64(0), block.Order)
 	require.Nil(t, block.Page)
 	require.NotNil(t, block.Style)
@@ -43,17 +43,17 @@ func TestJSONSchemaKBRuntime(t *testing.T) {
 	require.True(t, *block.Style.Bold)
 
 	category := roundTripJSONEq[kb.Category](t, dc, "kb", "category-tree.json")
-	require.Equal(t, "root", category.Id)
+	require.Equal(t, "root", category.ID)
 	require.Len(t, category.Children, 1)
-	require.Equal(t, "child", category.Children[0].Id)
+	require.Equal(t, "child", category.Children[0].ID)
 
 	getPage := roundTripJSONEq[kb.GetPageInput](t, dc, "kb", "get-page-input.json")
-	require.Equal(t, "page-1", getPage.PageId)
+	require.Equal(t, "page-1", getPage.PageID)
 
 	getTree := roundTripJSONEq[kb.GetCategoryTreeInput](t, dc, "kb", "get-category-tree-input.json")
-	require.Equal(t, "root", getTree.RootId)
+	require.Equal(t, "root", getTree.RootID)
 
 	putBlock := roundTripJSONEq[kb.PutBlockOutput](t, dc, "kb", "put-block-output.json")
-	require.Equal(t, "block-1", putBlock.BlockId)
+	require.Equal(t, "block-1", putBlock.BlockID)
 	require.Equal(t, int64(7), putBlock.Revision)
 }

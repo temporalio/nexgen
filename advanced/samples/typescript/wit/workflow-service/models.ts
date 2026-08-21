@@ -162,15 +162,16 @@ export type SignalWithStartWorkflowRequest<
      */
     signalArgs?: ReadonlyArray<unknown> | Readonly<SignalArgs>;
     /**
-     * Total workflow execution timeout, including retries and continue-as-new.
+     * Total workflow execution timeout, including retries and continue-as-new. Defaults
+     * to unlimited.
      */
     executionTimeout?: common.Duration;
     /**
-     * Timeout of a single workflow run.
+     * Timeout of a single workflow run. Defaults to the workflow execution timeout.
      */
     runTimeout?: common.Duration;
     /**
-     * Timeout of a single workflow task.
+     * Timeout of a single workflow task. Defaults to 10 seconds.
      */
     taskTimeout?: common.Duration;
     /**
@@ -181,7 +182,7 @@ export type SignalWithStartWorkflowRequest<
     /**
      * Behavior when a workflow is currently running with the same ID. Set to use-existing
      * for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is
-     * terminate-if-running.
+     * terminate-if-running. Defaults to use-existing.
      */
     idConflictPolicy?: common.WorkflowIdConflictPolicy;
     /**
