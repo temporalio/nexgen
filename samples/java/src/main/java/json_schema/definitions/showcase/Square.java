@@ -132,6 +132,18 @@ public final class Square implements ChoicesValue, Shape, Showcase.ShapeOrName {
                     violations.add(new Violation("side", "must be a finite number, got " + value.side));
                 }
             }
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.kind != null) {
+                wireKeys.add("kind");
+            }
+            wireKeys.add("side");
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
             if (!violations.isEmpty()) {
                 throw new ValidationException(violations);
             }

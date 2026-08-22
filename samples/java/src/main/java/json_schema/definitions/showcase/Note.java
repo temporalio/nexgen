@@ -18,7 +18,12 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A tagged union whose object branches are written **inline** rather than `$ref`ed: each branch is emitted as a named type, so each names itself with the per-language `x-<lang>-name` override (two or more inline object branches cannot derive distinguishing names — the discriminator `const` is a wire value, not an identifier). Selection reads the shared required `kind` const, and each branch keeps its own constraints and stays open to unknown members.
+ * A tagged union whose object branches are written **inline** rather than `$ref`ed:
+ * each branch is emitted as a named type, so each names itself with the per-language
+ * `x-&lt;lang&gt;-name` override (two or more inline object branches cannot derive
+ * distinguishing names — the discriminator `const` is a wire value, not an identifier).
+ * Selection reads the shared required `kind` const, and each branch keeps its own
+ * constraints and stays open to unknown members.
  */
 public interface Note {
     static @Nullable Note fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {

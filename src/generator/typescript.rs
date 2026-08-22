@@ -515,6 +515,7 @@ impl<'a> ApiPlanner<'a> {
                 .map(str::to_string)
                 .unwrap_or_else(|| typescript_ident(&operation.name.to_lower_camel_case())),
             experimental: operation.experimental,
+            deprecated: operation.deprecated,
             doc: operation
                 .doc
                 .for_language(Language::TypeScript)
@@ -1933,6 +1934,7 @@ fn generate_leaf(
                     .map(str::to_string),
                 endpoint: service.endpoint.clone(),
                 experimental: service.experimental,
+                deprecated: service.deprecated,
                 operations,
                 resources: service
                     .resources
@@ -2769,6 +2771,7 @@ struct RenderedService<'a> {
     doc: Option<String>,
     endpoint: Option<String>,
     experimental: bool,
+    deprecated: bool,
     operations: Vec<RenderedOperation<'a>>,
     resources: Vec<PlannedResource>,
 }
@@ -2779,6 +2782,7 @@ struct RenderedOperation<'a> {
     wire_name: &'a str,
     attr_name: String,
     experimental: bool,
+    deprecated: bool,
     doc: Option<String>,
     return_doc: Option<String>,
     output_operation_annotation: String,
@@ -3509,7 +3513,7 @@ fn render_index_module(
 }
 
 fn render_endpoint_service_class(output: &mut String, service: &RenderedService<'_>) {
-    let doc_tags = experimental_doc_tag(service.experimental);
+    let doc_tags = declaration_doc_tags(service.experimental, service.deprecated);
     render_typescript_doc_comment(output, "", service.doc.as_deref(), &doc_tags);
     output.push_str("export class ");
     output.push_str(&endpoint_service_class_name(service));
@@ -3556,6 +3560,9 @@ fn render_endpoint_service_operation_method(
             "@experimental".to_string(),
             EXPERIMENTAL_WARNING.to_string(),
         ));
+    }
+    if operation.deprecated {
+        doc_tags.push(("@deprecated".to_string(), String::new()));
     }
     render_typescript_doc_comment(output, "  ", operation.doc.as_deref(), &doc_tags);
     output.push_str("  public async ");
@@ -4743,14 +4750,16 @@ fn with_arguments_args_type_expression(
     args_type_template.replace("Value", type_parameter_name)
 }
 
-fn render_typescript_doc_comment(
+pub(in crate::generator) fn render_typescript_doc_comment(
     output: &mut String,
     indent: &str,
     summary: Option<&str>,
     tags: &[(String, String)],
 ) {
     let has_summary = summary.is_some_and(|summary| !summary.trim().is_empty());
-    let has_tags = tags.iter().any(|(_, doc)| !doc.trim().is_empty());
+    let has_tags = tags
+        .iter()
+        .any(|(tag, doc)| !tag.trim().is_empty() || !doc.trim().is_empty());
     if !has_summary && !has_tags {
         return;
     }
@@ -4767,11 +4776,16 @@ fn render_typescript_doc_comment(
         output.push_str(" *\n");
     }
     for (tag, doc) in tags {
+        let tag = tag.trim();
         let doc = doc.trim();
-        if doc.is_empty() {
+        if tag.is_empty() && doc.is_empty() {
             continue;
         }
-        push_wrapped_typescript_doc_line(output, indent, &format!("{tag} "), "  ", doc);
+        if doc.is_empty() {
+            push_wrapped_typescript_doc_line(output, indent, "", "", tag);
+        } else {
+            push_wrapped_typescript_doc_line(output, indent, &format!("{tag} "), "  ", doc);
+        }
     }
     output.push_str(indent);
     output.push_str(" */\n");
@@ -4786,6 +4800,14 @@ fn experimental_doc_tag(experimental: bool) -> Vec<(String, String)> {
     } else {
         Vec::new()
     }
+}
+
+fn declaration_doc_tags(experimental: bool, deprecated: bool) -> Vec<(String, String)> {
+    let mut tags = experimental_doc_tag(experimental);
+    if deprecated {
+        tags.push(("@deprecated".to_string(), String::new()));
+    }
+    tags
 }
 
 fn push_wrapped_typescript_doc_line(
@@ -4951,7 +4973,7 @@ fn render_model(
 }
 
 fn render_service_definition(output: &mut String, service: &RenderedService<'_>) {
-    let service_doc_tags = experimental_doc_tag(service.experimental);
+    let service_doc_tags = declaration_doc_tags(service.experimental, service.deprecated);
     render_typescript_doc_comment(output, "", service.doc.as_deref(), &service_doc_tags);
     output.push_str("export const ");
     output.push_str(&service.attr_name);
@@ -4959,7 +4981,7 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
     output.push_str(service.wire_name);
     output.push_str("', {\n");
     for operation in &service.operations {
-        let operation_doc_tags = experimental_doc_tag(operation.experimental);
+        let operation_doc_tags = declaration_doc_tags(operation.experimental, operation.deprecated);
         render_typescript_doc_comment(output, "  ", operation.doc.as_deref(), &operation_doc_tags);
         output.push_str("  ");
         output.push_str(&operation.attr_name);
@@ -5723,6 +5745,9 @@ fn render_operation_function(
             "@experimental".to_string(),
             EXPERIMENTAL_WARNING.to_string(),
         ));
+    }
+    if operation.deprecated {
+        doc_tags.push(("@deprecated".to_string(), String::new()));
     }
     render_typescript_doc_comment(output, "", operation.doc.as_deref(), &doc_tags);
     let input_type_parameters = operation

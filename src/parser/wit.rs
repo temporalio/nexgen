@@ -2577,6 +2577,7 @@ fn build_service(
         operations_class,
         endpoint,
         experimental,
+        deprecated: false,
         delay_load_temporalio_workflow,
         operations,
         resources,
@@ -2901,6 +2902,7 @@ fn build_operation(
         code_name: LanguageStringSpec::default(),
         wire_name: wire_operation_name,
         experimental,
+        deprecated: false,
         doc: directive(&directives, "doc", path, &context)?
             .map(directive_language_string)
             .unwrap_or_default(),

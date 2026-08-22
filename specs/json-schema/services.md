@@ -84,6 +84,7 @@ services:                       # map<service-name, service-def>
   ChatService:                  # service name — identifier key
     fqn: "example.v1.ChatService"   # optional wire name (arbitrary chars)
     description: A service for sending chat messages.
+    deprecated: true             # optional annotation; defaults to false
     x-go-name: ChatApi          # optional per-language code identifier; one of
                                 # x-{go,ts,py,java}-name; verbatim, never fqn
     operations:                 # map<operation-name, operation-def> — REQUIRED, non-empty
@@ -91,6 +92,7 @@ services:                       # map<service-name, service-def>
         fqn: "poll-messages"        # optional wire name (arbitrary chars)
         x-go-name: PollNewMessages  # optional per-language code identifier
         description: Poll for new messages.
+        deprecated: true
         input:  { $ref: '#/$defs/PollMessagesInput' }
         output: { $ref: '#/$defs/PollMessagesOutput' }
       sendMessage:
@@ -135,6 +137,9 @@ services:                       # map<service-name, service-def>
   default is the service name as-is, already PascalCase by its regex.)
 - A name violating its regex → **load reject** with a fix-it naming the
   service/operation and the required shape.
+- Service and operation objects use exact allowlists. Unknown members reject,
+  including the undocumented `endpoint` field and OpenAPI's `discriminator`;
+  neither has Nexus envelope semantics in this format.
 - The resolved wire name is **always emitted explicitly** (`name=…` /
   `@Operation(name=…)` / the Go struct field / the TS `name` key), even
   when it equals what the SDK would default to. This is P1 itself: the
@@ -210,6 +215,9 @@ when absent, Go still emits a name-led fallback comment on the service
 binding, client, constructor, and each operation entry/method (every
 exported Go declaration must carry one — PRINCIPLES.md, Go §1). The other
 three languages simply emit no comment, as elsewhere ([[description]]).
+`deprecated: true` is also annotation-only and lowers to each target's native
+service/operation marker and documentation tag; it never changes the wire name,
+signature, validation, or dispatch behavior. A non-boolean value rejects.
 
 | Aspect | Go | TypeScript | Python | Java |
 |---|---|---|---|---|
@@ -219,6 +227,7 @@ three languages simply emit no comment, as elsewhere ([[description]]).
 | Service wire name | `ServiceName` struct field | first arg to `nexus.service` | `service(name=…)` | `@Service(name=…)` |
 | Void output | `nexus.NoValue` | `void` | `None` | `void` return |
 | Void input | `nexus.NoValue` | `void` | `None` | **no-arg method** `Out m()` |
+| Deprecated | godoc `Deprecated:` paragraph | JSDoc `@deprecated` | PEP 702 `typing_extensions.deprecated(..., category=None)` | `@Deprecated` + Javadoc `@deprecated` |
 | Import | `github.com/nexus-rpc/sdk-go/nexus` | `nexus-rpc` | `nexusrpc` | `io.nexusrpc.{Service,Operation}` |
 | File | declaring module's `<module>.go` | `<module>.ts` | `<module>.py` | **own `<Service>.java`** |
 

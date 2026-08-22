@@ -4,19 +4,22 @@ import type { TransferTypeConverter } from "nexus-rpc";
 import * as __nexgenDefinitions from "../../definitions";
 
 /**
- * A node in a self-recursive category tree. The root of this file is itself a type (pure JSON Schema file), named Category from the basename.
+ * A node in a self-recursive category tree. The root of this file is itself a type
+ * (pure JSON Schema file), named Category from the basename.
  */
 export interface Category {
   id: string;
   name: string;
   /**
-   * Sub-categories. A within-file self-cycle via `$ref: '#'`; the possibly-empty array is the terminating edge, so it stays in this module.
+   * Sub-categories. A within-file self-cycle via `$ref: '#'`; the possibly-empty array
+   * is the terminating edge, so it stays in this module.
    */
   children?: Category[];
 }
 
 /**
- * A dead $def - defined but never referenced anywhere. Still generated and exported as intended reusable API surface (see the $ref spec).
+ * A dead $def - defined but never referenced anywhere. Still generated and exported as
+ * intended reusable API surface (see the $ref spec).
  */
 export interface Palette {
   swatches: string[];

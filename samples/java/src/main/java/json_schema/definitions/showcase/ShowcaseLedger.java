@@ -18,7 +18,12 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A typed map written inline on the property: the map itself is named `ShowcaseLedger` and its inline member shape `ShowcaseLedgerValue`, so both the map and its members are ordinary named models. Also exercises the member-name override on a hoisted property — `x-<lang>-name` keeps naming the *member* (Go `LedgerGo`, TS `ledgerTs`, Python `ledger_py`, Java `ledgerJava`) while the type keeps its position-derived name.
+ * A typed map written inline on the property: the map itself is named `ShowcaseLedger`
+ * and its inline member shape `ShowcaseLedgerValue`, so both the map and its members
+ * are ordinary named models. Also exercises the member-name override on a hoisted
+ * property — `x-&lt;lang&gt;-name` keeps naming the *member* (Go `LedgerGo`, TS
+ * `ledgerTs`, Python `ledger_py`, Java `ledgerJava`) while the type keeps its
+ * position-derived name.
  */
 @JsonSerialize(using = ShowcaseLedger.Serializer.class)
 @JsonDeserialize(using = ShowcaseLedger.Deserializer.class)

@@ -6,7 +6,9 @@ import (
 	"fmt"
 )
 
-// Page A page. One half of the Page <-> Block cross-file cycle. Because the cycle spans two input files, Page and Block hoist together into Python's _recursive.py; the non-cyclic PageMeta helper stays in this module.
+// Page A page. One half of the Page <-> Block cross-file cycle. Because the cycle spans
+// two input files, Page and Block hoist together into Python's _recursive.py; the
+// non-cyclic PageMeta helper stays in this module.
 type Page struct {
 	// PageId corresponds to the "pageId" JSON property.
 	PageId string `json:"pageId"`
@@ -14,7 +16,8 @@ type Page struct {
 	Title string `json:"title"`
 	// Meta corresponds to the "meta" JSON property.
 	Meta PageMeta `json:"meta"`
-	// Blocks Ordered content blocks. Cross-file `$ref` to block.json (same directory); the array is the terminating edge of the cycle.
+	// Blocks Ordered content blocks. Cross-file `$ref` to block.json (same directory); the
+	// array is the terminating edge of the cycle.
 	Blocks []Block `json:"blocks,omitempty"`
 }
 
@@ -116,7 +119,8 @@ func (m Page) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// PageMeta Non-cyclic helper. Referenced only by Page, references nothing recursive, so it stays in the content_page module even though Page is hoisted.
+// PageMeta Non-cyclic helper. Referenced only by Page, references nothing recursive, so
+// it stays in the content_page module even though Page is hoisted.
 type PageMeta struct {
 	// Author corresponds to the "author" JSON property.
 	Author string `json:"author"`

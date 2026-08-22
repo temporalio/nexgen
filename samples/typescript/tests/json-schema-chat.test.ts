@@ -94,5 +94,22 @@ describe("json-schema chat generated definitions", () => {
     expect(() => sendMessageOutputTransferTypeConverter.fromTransferType({})).toThrow(
       ValidationError,
     );
+
+    try {
+      messageTransferTypeConverter.fromTransferType({ kind: "image", body: "hi" });
+      throw new Error("expected invalid payload to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ValidationError);
+      expect((error as ValidationError).type).toBe("BAD_REQUEST");
+    }
+
+    expect(() =>
+      roomTransferTypeConverter.toTransferType({
+        roomId: "r1",
+        displayName: "Room",
+        topic: null,
+        additionalProperties: { roomId: "shadow" },
+      }),
+    ).toThrow(/roomId.*collides with declared property/);
   });
 });

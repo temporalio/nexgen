@@ -609,6 +609,7 @@ impl<'a> ApiPlanner<'a> {
                         .map(str::to_string),
                     endpoint: service.endpoint.clone(),
                     experimental: service.experimental,
+                    deprecated: service.deprecated,
                     delay_load_temporalio_workflow: service.delay_load_temporalio_workflow,
                     operations,
                     resources: service
@@ -1344,6 +1345,7 @@ impl<'a> ApiPlanner<'a> {
                 .map(str::to_string)
                 .unwrap_or_else(|| python_ident(&operation.name.to_snake_case())),
             experimental: operation.experimental,
+            deprecated: operation.deprecated,
             doc: operation
                 .doc
                 .for_language(Language::Python)
@@ -2572,6 +2574,7 @@ struct RenderedService<'a> {
     doc: Option<String>,
     endpoint: Option<String>,
     experimental: bool,
+    deprecated: bool,
     delay_load_temporalio_workflow: bool,
     operations: Vec<RenderedOperation<'a>>,
     resources: Vec<PlannedResource>,
@@ -2583,6 +2586,7 @@ struct RenderedOperation<'a> {
     wire_name: &'a str,
     attr_name: String,
     experimental: bool,
+    deprecated: bool,
     doc: Option<String>,
     return_doc: Option<String>,
     input: Option<RenderedOperationInput>,
@@ -4177,6 +4181,15 @@ fn render_service_module(
     if uses_typing || endpoint_client_body.contains("typing.") || needs_type_checking_imports {
         output.push_str("import typing\n");
     }
+    if services.iter().any(|service| {
+        service.deprecated
+            || service
+                .operations
+                .iter()
+                .any(|operation| operation.deprecated)
+    }) {
+        output.push_str("import typing_extensions\n");
+    }
     if needs_temporalio_workflow_runtime {
         output.push_str("import temporalio.workflow\n");
     }
@@ -4757,7 +4770,14 @@ fn render_operation_registry_body(services: &[RenderedService<'_>]) -> String {
 }
 
 fn render_endpoint_service_object(output: &mut String, service: &RenderedService<'_>) {
-    output.push_str("\nclass ");
+    if service.deprecated {
+        output.push_str(
+            "\n@typing_extensions.deprecated(\"This service is deprecated.\", category=None)\n",
+        );
+    } else {
+        output.push('\n');
+    }
+    output.push_str("class ");
     output.push_str(&endpoint_service_object_name(service));
     output.push_str(":\n");
     output.push_str("    def __init__(self, endpoint: str) -> None:\n");
@@ -4790,6 +4810,11 @@ fn render_endpoint_service_object_operation_method(
         return;
     }
 
+    if operation.deprecated {
+        output.push_str(
+            "    @typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
     output.push_str("    async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
@@ -4811,6 +4836,11 @@ fn render_endpoint_service_object_unpacked_method(
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
 ) {
+    if operation.deprecated {
+        output.push_str(
+            "    @typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
     output.push_str("    async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
@@ -4956,6 +4986,11 @@ fn endpoint_service_object_name(service: &RenderedService<'_>) -> String {
 }
 
 fn render_service_definition(output: &mut String, service: &RenderedService<'_>) {
+    if service.deprecated {
+        output.push_str(
+            "@typing_extensions.deprecated(\"This service is deprecated.\", category=None)\n",
+        );
+    }
     if service.wire_name == service.name {
         output.push_str("@service\n");
     } else {
@@ -4991,7 +5026,11 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
         }
         output.push_str("    ");
         output.push_str(&operation.attr_name);
-        output.push_str(": Operation[\n");
+        if operation.deprecated {
+            output.push_str(": typing.Annotated[Operation[\n");
+        } else {
+            output.push_str(": Operation[\n");
+        }
         output.push_str("        ");
         output.push_str(&service_type_ref(
             operation
@@ -5004,8 +5043,31 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
         output.push_str("        ");
         output.push_str(&service_type_ref(&operation.descriptor_output_ref));
         output.push_str(",\n");
-        output.push_str("    ] = Operation(name=");
+        if operation.deprecated {
+            output.push_str(
+                "    ], typing_extensions.deprecated(\"This operation is deprecated.\", category=None)] = Operation(name=",
+            );
+        } else {
+            output.push_str("    ] = Operation(name=");
+        }
         output.push_str(&python_string_literal(operation.wire_name));
+        if operation.deprecated {
+            // `nexusrpc.service` currently ignores `Annotated[Operation[...]]`
+            // while discovering the generic arguments. Supply the same types on
+            // the descriptor value so the PEP 702 metadata remains available to
+            // type checkers without weakening the runtime service definition.
+            let input_type = operation
+                .input
+                .as_ref()
+                .map(|input| input.descriptor_type_ref.as_str())
+                .unwrap_or("None");
+            output.push_str(", input_type=");
+            output.push_str(&service_operation_runtime_type_ref(input_type));
+            output.push_str(", output_type=");
+            output.push_str(&service_operation_runtime_type_ref(
+                &operation.descriptor_output_ref,
+            ));
+        }
         output.push_str(")\n");
         if service.doc.is_some() {
             render_python_docstring(output, "    ", operation.doc.as_deref(), &[], None, false);
@@ -5022,6 +5084,15 @@ fn service_type_ref(type_ref: &str) -> String {
         .strip_prefix("models.")
         .unwrap_or(type_ref)
         .to_string()
+}
+
+fn service_operation_runtime_type_ref(type_ref: &str) -> String {
+    let type_ref = service_type_ref(type_ref);
+    if type_ref == "None" {
+        "type(None)".to_string()
+    } else {
+        type_ref
+    }
 }
 
 fn local_python_model_type_expr(type_ref: &str) -> String {
@@ -5931,6 +6002,11 @@ fn render_function_unpacked_overload(
 ) {
     render_function_unpacked_overload_case_doc(output, unpacked_input, overload_cases);
     output.push_str("@typing.overload\n");
+    if operation.deprecated {
+        output.push_str(
+            "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
     output.push_str("async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
@@ -6487,6 +6563,11 @@ fn render_request_only_operation_function(
 ) {
     let function_name = request_operation_function_name(service, operation);
     let render_request_doc = operation.unpacked_input.is_none();
+    if operation.deprecated {
+        output.push_str(
+            "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
     output.push_str("async def ");
     output.push_str(&function_name);
     output.push_str("(\n");
@@ -6946,6 +7027,11 @@ fn render_unpacked_operation_function(
         return;
     }
 
+    if operation.deprecated {
+        output.push_str(
+            "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
     output.push_str("async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
@@ -7045,6 +7131,11 @@ fn render_function_unpacked_implementation(
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
 ) {
+    if operation.deprecated {
+        output.push_str(
+            "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
     output.push_str("async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");

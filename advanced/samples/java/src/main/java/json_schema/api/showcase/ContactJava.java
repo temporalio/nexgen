@@ -18,7 +18,13 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Contact details with a conditional requirement and a member-count bound: a shipping street requires a shipping zip (dependentRequired), and the object must carry 1 to 3 members (minProperties/maxProperties on a declared-property object). Also exercises the type-level `x-<lang>-name` override (the Stage 4 escape hatch): the emitted type is renamed to the derived name plus a per-language suffix (Go `ContactGo`, TS `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its declaration and at every `$ref`, while the wire `$ref` name stays `Contact`.
+ * Contact details with a conditional requirement and a member-count bound: a shipping
+ * street requires a shipping zip (dependentRequired), and the object must carry 1 to 3
+ * members (minProperties/maxProperties on a declared-property object). Also exercises
+ * the type-level `x-&lt;lang&gt;-name` override (the Stage 4 escape hatch): the emitted
+ * type is renamed to the derived name plus a per-language suffix (Go `ContactGo`, TS
+ * `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its declaration and at every
+ * `$ref`, while the wire `$ref` name stays `Contact`.
  */
 @JsonSerialize(using = ContactJava.Serializer.class)
 @JsonDeserialize(using = ContactJava.Deserializer.class)
@@ -85,24 +91,28 @@ public final class ContactJava {
         @Override
         public void serialize(ContactJava value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             List<Violation> violations = new ArrayList<>();
-            int wireKeyCount = 0;
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
             if (value.email != null) {
-                wireKeyCount++;
+                wireKeys.add("email");
             }
             if (value.shippingStreet != null) {
-                wireKeyCount++;
+                wireKeys.add("shippingStreet");
             }
             if (value.shippingZip != null) {
-                wireKeyCount++;
+                wireKeys.add("shippingZip");
             }
             if (value.additionalProperties != null) {
-                wireKeyCount += value.additionalProperties.size();
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
             }
-            if (wireKeyCount < 1) {
-                violations.add(new Violation("", "must have at least 1 properties, got " + wireKeyCount));
+            if (wireKeys.size() < 1) {
+                violations.add(new Violation("", "must have at least 1 properties, got " + wireKeys.size()));
             }
-            if (wireKeyCount > 3) {
-                violations.add(new Violation("", "must have at most 3 properties, got " + wireKeyCount));
+            if (wireKeys.size() > 3) {
+                violations.add(new Violation("", "must have at most 3 properties, got " + wireKeys.size()));
             }
             if (value.shippingStreet != null) {
                 if (!(value.shippingZip != null)) {

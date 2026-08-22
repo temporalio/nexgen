@@ -1,12 +1,15 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/nexus-rpc/sdk-go/nexus"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
@@ -72,6 +75,42 @@ func (s *KBNexusIntegrationSuite) SetupTest() {
 
 func TestKBNexusIntegrationSuite(t *testing.T) {
 	suite.Run(t, &KBNexusIntegrationSuite{})
+}
+
+func TestKBNexusInvalidGeneratedInputIsBadRequest(t *testing.T) {
+	called := false
+	operation := nexus.NewSyncOperation(kb.KnowledgeBaseService.GetPage.Name(),
+		func(_ context.Context, _ kb.GetPageInput, _ nexus.StartOperationOptions) (kb.Page, error) {
+			called = true
+			return kb.Page{}, nil
+		})
+	service := nexus.NewService(kb.KnowledgeBaseService.ServiceName)
+	require.NoError(t, service.Register(operation))
+	registry := nexus.NewServiceRegistry()
+	require.NoError(t, registry.Register(service))
+	handler, err := registry.NewHandler()
+	require.NoError(t, err)
+
+	input := nexus.NewLazyValue(nexus.DefaultSerializer(), &nexus.Reader{
+		ReadCloser: io.NopCloser(bytes.NewReader([]byte(`{"pageId":null}`))),
+		Header:     nexus.Header{"type": "application/json"},
+	})
+	ctx := nexus.WithHandlerContext(context.Background(), nexus.HandlerInfo{
+		Service:   kb.KnowledgeBaseService.ServiceName,
+		Operation: kb.KnowledgeBaseService.GetPage.Name(),
+	})
+	_, err = handler.StartOperation(
+		ctx,
+		kb.KnowledgeBaseService.ServiceName,
+		kb.KnowledgeBaseService.GetPage.Name(),
+		input,
+		nexus.StartOperationOptions{},
+	)
+	require.Error(t, err)
+	var handlerError *nexus.HandlerError
+	require.ErrorAs(t, err, &handlerError)
+	require.Equal(t, nexus.HandlerErrorTypeBadRequest, handlerError.Type)
+	require.False(t, called, "operation handler must not run for invalid generated input")
 }
 
 type kbResult struct {

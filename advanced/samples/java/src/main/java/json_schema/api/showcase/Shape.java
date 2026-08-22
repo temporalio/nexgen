@@ -18,7 +18,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A closed sum type (discriminated union) of Circle | Square, tagged by the shared required `kind` const. Selection reads `kind` and routes to the matching branch; an unknown tag is a Violation.
+ * A closed sum type (discriminated union) of Circle | Square, tagged by the shared
+ * required `kind` const. Selection reads `kind` and routes to the matching branch; an
+ * unknown tag is a Violation.
  */
 public interface Shape {
     static @Nullable Shape fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {

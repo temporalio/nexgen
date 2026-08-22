@@ -155,6 +155,7 @@ mod tests {
                 operations_class: Default::default(),
                 endpoint: None,
                 experimental: false,
+                deprecated: false,
                 delay_load_temporalio_workflow: false,
                 operations: Vec::new(),
                 resources: Vec::new(),

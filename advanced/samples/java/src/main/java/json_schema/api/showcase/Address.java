@@ -84,6 +84,27 @@ public final class Address {
     public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Address> {
         @Override
         public void serialize(Address value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            List<Violation> violations = new ArrayList<>();
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.street != null) {
+                wireKeys.add("street");
+            }
+            if (value.city != null) {
+                wireKeys.add("city");
+            }
+            if (value.zip != null) {
+                wireKeys.add("zip");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
+            if (!violations.isEmpty()) {
+                throw new ValidationException(violations);
+            }
             gen.writeStartObject();
             if (value.street != null) {
                 gen.writeStringField("street", value.street);

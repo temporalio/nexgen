@@ -18,7 +18,12 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * An object written **inline** on the property rather than in `$defs`. It is named after the position it occupies — `ShowcaseLocation` — moved into `$defs`, and the property becomes a `$ref` at it, so it emits as the ordinary named model an authored definition would produce, member constraints and all. Its own nested inline object is named against that name in turn (`ShowcaseLocationGeo`), so nesting needs no `$defs` boilerplate at any depth.
+ * An object written **inline** on the property rather than in `$defs`. It is named
+ * after the position it occupies — `ShowcaseLocation` — moved into `$defs`, and the
+ * property becomes a `$ref` at it, so it emits as the ordinary named model an authored
+ * definition would produce, member constraints and all. Its own nested inline object is
+ * named against that name in turn (`ShowcaseLocationGeo`), so nesting needs no `$defs`
+ * boilerplate at any depth.
  */
 @JsonSerialize(using = ShowcaseLocation.Serializer.class)
 @JsonDeserialize(using = ShowcaseLocation.Deserializer.class)
@@ -81,6 +86,20 @@ public final class ShowcaseLocation {
                 int length = value.city.codePointCount(0, value.city.length());
                 if (length < 1) {
                     violations.add(new Violation("city", "must have length >= 1, got " + length));
+                }
+            }
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.city != null) {
+                wireKeys.add("city");
+            }
+            if (value.geo != null) {
+                wireKeys.add("geo");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
                 }
             }
             if (!violations.isEmpty()) {

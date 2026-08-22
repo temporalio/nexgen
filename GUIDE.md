@@ -1444,7 +1444,9 @@ Return docs: `python-returns="<text>"` `typescript-returns="<text>"` `go-returns
 
 Adds documentation to generated code. The default text applies to all languages;
 per-language keys override for specific targets. The `returns` key generates
-return-value documentation.
+return-value documentation. Generated documentation preserves paragraph breaks,
+wraps prose to 88 columns, and escapes comment terminators (plus HTML-sensitive
+Javadoc text) so authored content cannot break the generated source.
 
 ```wit
 /// @nexus.doc

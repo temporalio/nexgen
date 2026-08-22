@@ -200,16 +200,59 @@ func formatDuration(d time.Duration) string {
 	return out
 }
 
+func mustParseDateTime(s string) time.Time {
+	var errs []Violation
+	v, ok := parseDateTime("", s, &errs)
+	if !ok {
+		panic(errs[0].Reason)
+	}
+	return v
+}
+
+func mustParseDate(s string) time.Time {
+	var errs []Violation
+	v, ok := parseDate("", s, &errs)
+	if !ok {
+		panic(errs[0].Reason)
+	}
+	return v
+}
+
+func mustParseTime(s string) time.Time {
+	var errs []Violation
+	v, ok := parseTime("", s, &errs)
+	if !ok {
+		panic(errs[0].Reason)
+	}
+	return v
+}
+
+func mustParseDuration(s string) time.Duration {
+	var errs []Violation
+	v, ok := parseDuration("", s, &errs)
+	if !ok {
+		panic(errs[0].Reason)
+	}
+	return v
+}
+
 // Temporal
-// Root object materializing the four RFC 3339 temporal formats as native typed fields: date-time (offset & sub-second precision preserved), date, time (offset preserved when present), and duration (time-only, canonicalized). Covers required, optional, and nullable members of each.
+//
+// Root object materializing the four RFC 3339 temporal formats as native typed fields:
+// date-time (offset & sub-second precision preserved), date, time (offset preserved
+// when present), and duration (time-only, canonicalized). Covers required, optional,
+// and nullable members of each.
 type Temporal struct {
-	// CreatedAt Required event timestamp; materialized date-time (offset required, sub-second precision & offset preserved on round-trip).
+	// CreatedAt Required event timestamp; materialized date-time (offset required,
+	// sub-second precision & offset preserved on round-trip).
 	CreatedAt time.Time `json:"createdAt"`
 	// Birthday Required calendar date; materialized date (YYYY-MM-DD, lossless).
 	Birthday time.Time `json:"birthday"`
-	// Alarm Required wall-clock time; materialized time (offset preserved when present, otherwise offset-less).
+	// Alarm Required wall-clock time; materialized time (offset preserved when present,
+	// otherwise offset-less).
 	Alarm time.Time `json:"alarm"`
-	// Timeout Required time-only duration; materialized duration, canonicalized to PT…H…M…S (e.g. PT90M → PT1H30M).
+	// Timeout Required time-only duration; materialized duration, canonicalized to
+	// PT…H…M…S (e.g. PT90M → PT1H30M).
 	Timeout time.Duration `json:"timeout"`
 	// UpdatedAt Optional date-time.
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
@@ -244,6 +287,10 @@ func (m Temporal) Validate() error {
 		if (*m.ExpiresOn).Year() < 1 {
 			errs = append(errs, Violation{"expiresOn", "year must be >= 1"})
 		}
+	}
+	if m.Reminder != nil {
+	}
+	if m.RetryDelay != nil {
 	}
 	if m.DeletedAt != nil {
 		if (*m.DeletedAt).Year() < 1 {

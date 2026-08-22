@@ -19,6 +19,7 @@ from ._definitions import (
     _format_base64,
     _format_base64url,
     _format_date,
+    _json_values_equal,
     _parse_base64,
     _parse_base64url,
     _parse_date,
@@ -161,6 +162,7 @@ class _AddressTransferTypeConverter(
 
     @typing_extensions.override
     def to_transfer_type(self, value: "Address") -> typing.Any:
+        violations: list[Violation] = []
         out: dict[str, typing.Any] = {}
         out["street"] = value.street
         if value.city is not None:
@@ -168,7 +170,17 @@ class _AddressTransferTypeConverter(
         if value.zip is not None:
             out["zip"] = value.zip
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _ADDRESS_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
+        if violations:
+            raise ValidationError(violations)
         return out
 
 
@@ -492,7 +504,15 @@ class _CircleTransferTypeConverter(
             )
         out["radius"] = value.radius
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _CIRCLE_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -611,7 +631,15 @@ class _ContactPyTransferTypeConverter(
         if value.shipping_zip is not None:
             out["shippingZip"] = value.shipping_zip
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _CONTACT_PY_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if len(out) < 1:
             violations.append(
                 Violation(
@@ -884,7 +912,15 @@ class _LinkNoteTransferTypeConverter(
             )
         out["href"] = value.href
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _LINK_NOTE_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -1916,7 +1952,10 @@ class _ShowcaseTransferTypeConverter(
                             roles_value_list.append(roles_value_item)
                     _check_contains(
                         typing.cast("list[typing.Any]", roles_value_raw),
-                        lambda element: element in ("admin",),
+                        lambda element: (
+                            isinstance(element, str)
+                            and _json_values_equal(element, "admin")
+                        ),
                         1,
                         2,
                         True,
@@ -3186,7 +3225,9 @@ class _ShowcaseTransferTypeConverter(
         if value.roles is not None:
             _check_contains(
                 value.roles,
-                lambda element: element in ("admin",),
+                lambda element: (
+                    isinstance(element, str) and _json_values_equal(element, "admin")
+                ),
                 1,
                 2,
                 True,
@@ -3604,6 +3645,7 @@ class _ShowcaseTransferTypeConverter(
 @dataclasses.dataclass(slots=True, kw_only=True, init=False)
 class Showcase:
     """Showcase
+
     Root object exercising the supported JSON-Schema feature subset: required and
     optional fields of every scalar type, optional+nullable and required+nullable
     members, arrays, a nested object via $ref, a typed-map, a closed object, an open
@@ -3642,6 +3684,7 @@ class Showcase:
 
     name: str
     """Display name
+
     Required human-readable name, 1 to 64 code points.
     """
 
@@ -3710,6 +3753,7 @@ class Showcase:
 
     _retries: int | None = dataclasses.field(default=None, repr=False)
     """Retry budget
+
     Optional integer with a schema default.
     """
 
@@ -3717,11 +3761,13 @@ class Showcase:
 
     _greeting: str | None = dataclasses.field(default=None, repr=False)
     """Greeting
+
     Optional string with a schema default, surfaced on read.
     """
 
     _debug: bool | None = dataclasses.field(default=None, repr=False)
     """Debug flag
+
     Optional boolean with a schema default.
     """
 
@@ -4086,6 +4132,7 @@ class Showcase:
     @property
     def retries(self) -> int:
         """Retry budget
+
         Optional integer with a schema default.
         """
         return self._retries if self._retries is not None else 3
@@ -4101,6 +4148,7 @@ class Showcase:
     @property
     def greeting(self) -> str:
         """Greeting
+
         Optional string with a schema default, surfaced on read.
         """
         return self._greeting if self._greeting is not None else "hello"
@@ -4116,6 +4164,7 @@ class Showcase:
     @property
     def debug(self) -> bool:
         """Debug flag
+
         Optional boolean with a schema default.
         """
         return self._debug if self._debug is not None else False
@@ -4181,7 +4230,15 @@ class _ShowcaseAuditTransferTypeConverter(
             )
         out["by"] = value.by
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _SHOWCASE_AUDIT_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -4265,7 +4322,15 @@ class _ShowcaseDetailObjectTransferTypeConverter(
         if value.hint is not None:
             out["hint"] = value.hint
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _SHOWCASE_DETAIL_OBJECT_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -4391,7 +4456,15 @@ class _ShowcaseLedgerValueTransferTypeConverter(
             )
         out["amount"] = value.amount
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _SHOWCASE_LEDGER_VALUE_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -4486,7 +4559,15 @@ class _ShowcaseLocationTransferTypeConverter(
             except ValidationError as error:
                 _collect(violations, "geo", error)
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _SHOWCASE_LOCATION_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -4611,7 +4692,15 @@ class _ShowcaseLocationGeoTransferTypeConverter(
                 )
             out["lon"] = value.lon
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _SHOWCASE_LOCATION_GEO_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -4736,7 +4825,15 @@ class _ShowcaseRowsItemTransferTypeConverter(
             )
         out["cell"] = value.cell
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _SHOWCASE_ROWS_ITEM_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -4869,7 +4966,15 @@ class _SquareTransferTypeConverter(
             )
         out["side"] = value.side
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _SQUARE_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -4957,7 +5062,15 @@ class _TextNoteTransferTypeConverter(
             )
         out["body"] = value.body
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _TEXT_NOTE_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -5166,7 +5279,15 @@ class _WidgetTransferTypeConverter(
                 )
             out["size"] = value.size
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _WIDGET_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
         if violations:
             raise ValidationError(violations)
         return out
@@ -5245,12 +5366,23 @@ class _WidgetBaseTransferTypeConverter(
 
     @typing_extensions.override
     def to_transfer_type(self, value: "WidgetBase") -> typing.Any:
+        violations: list[Violation] = []
         out: dict[str, typing.Any] = {}
         out["id"] = value.id
         if value.kind is not None:
             out["kind"] = value.kind
         for key, entry in value.additional_properties.items():
-            out[key] = entry
+            if key in _WIDGET_BASE_DECLARED:
+                violations.append(
+                    Violation(
+                        path=key,
+                        reason="additional property collides with declared property",
+                    )
+                )
+            else:
+                out[key] = entry
+        if violations:
+            raise ValidationError(violations)
         return out
 
 

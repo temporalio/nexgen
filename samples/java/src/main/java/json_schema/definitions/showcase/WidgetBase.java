@@ -18,7 +18,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A base object folded into Widget via allOf. It stays its own type; Widget copies its fields rather than referencing or subtyping it.
+ * A base object folded into Widget via allOf. It stays its own type; Widget copies its
+ * fields rather than referencing or subtyping it.
  */
 @JsonSerialize(using = WidgetBase.Serializer.class)
 @JsonDeserialize(using = WidgetBase.Deserializer.class)
@@ -76,6 +77,24 @@ public final class WidgetBase {
     public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<WidgetBase> {
         @Override
         public void serialize(WidgetBase value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            List<Violation> violations = new ArrayList<>();
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.id != null) {
+                wireKeys.add("id");
+            }
+            if (value.kind != null) {
+                wireKeys.add("kind");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
+            if (!violations.isEmpty()) {
+                throw new ValidationException(violations);
+            }
             gen.writeStartObject();
             if (value.id != null) {
                 gen.writeStringField("id", value.id);

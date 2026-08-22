@@ -133,6 +133,20 @@ public final class LinkNote implements Note {
                     violations.add(new Violation("href", "must have length >= 1, got " + length));
                 }
             }
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.kind != null) {
+                wireKeys.add("kind");
+            }
+            if (value.href != null) {
+                wireKeys.add("href");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
             if (!violations.isEmpty()) {
                 throw new ValidationException(violations);
             }

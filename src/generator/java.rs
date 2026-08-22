@@ -12,6 +12,7 @@ use crate::spec::{ApiSpecLeaf, ApiSpecNode};
 use crate::spec::{ExternalTypeSpec, ModulePath, ServiceSpec, TypeSpec};
 
 const DEFAULT_PACKAGE: &str = "generated";
+const JAVA_FORMAT_LINE_LENGTH: usize = 88;
 
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
@@ -203,10 +204,17 @@ fn render_service_file(
     render_service_javadoc(
         &mut body,
         service.doc.for_language(crate::language::Language::Java),
+        service.deprecated,
+        "service",
     );
     body.push_str(&format!(
-        "@Service(name = {})\npublic interface {} {{\n",
+        "@Service(name = {})\n{}public interface {} {{\n",
         java_string_literal(&service.wire_name),
+        if service.deprecated {
+            "@Deprecated\n"
+        } else {
+            ""
+        },
         service
             .code_name
             .for_language(crate::language::Language::Java)
@@ -220,11 +228,16 @@ fn render_service_file(
         render_service_javadoc_indented(
             &mut body,
             operation.doc.for_language(crate::language::Language::Java),
+            operation.deprecated,
+            "operation",
         );
         body.push_str(&format!(
             "    @Operation(name = {})\n",
             java_string_literal(&operation.wire_name)
         ));
+        if operation.deprecated {
+            body.push_str("    @Deprecated\n");
+        }
 
         let output = io_type(operation.output.as_ref(), module, base_package);
         let input = io_type(operation.input.as_ref(), module, base_package);
@@ -285,30 +298,124 @@ fn io_type(
     }
 }
 
-fn render_service_javadoc(output: &mut String, doc: Option<&str>) {
-    let Some(doc) = doc.map(str::trim).filter(|doc| !doc.is_empty()) else {
-        return;
+fn render_service_javadoc(output: &mut String, doc: Option<&str>, deprecated: bool, kind: &str) {
+    let tags = if deprecated {
+        vec![(
+            "@deprecated".to_string(),
+            format!("This {kind} is deprecated."),
+        )]
+    } else {
+        Vec::new()
     };
-    output.push_str("/**\n");
-    for line in doc.lines() {
-        output.push_str(" * ");
-        output.push_str(line.trim());
-        output.push('\n');
+    render_java_doc_comment(output, "", doc, &tags);
+}
+
+fn render_service_javadoc_indented(
+    output: &mut String,
+    doc: Option<&str>,
+    deprecated: bool,
+    kind: &str,
+) {
+    let tags = if deprecated {
+        vec![(
+            "@deprecated".to_string(),
+            format!("This {kind} is deprecated."),
+        )]
+    } else {
+        Vec::new()
+    };
+    render_java_doc_comment(output, "    ", doc, &tags);
+}
+
+pub(in crate::generator) fn render_java_doc_comment(
+    output: &mut String,
+    indent: &str,
+    summary: Option<&str>,
+    tags: &[(String, String)],
+) {
+    let has_summary = summary.is_some_and(|summary| !summary.trim().is_empty());
+    let has_tags = tags
+        .iter()
+        .any(|(tag, doc)| !tag.trim().is_empty() || !doc.trim().is_empty());
+    if !has_summary && !has_tags {
+        return;
     }
+
+    output.push_str(indent);
+    output.push_str("/**\n");
+    if let Some(summary) = summary.map(str::trim).filter(|summary| !summary.is_empty()) {
+        for line in summary.lines() {
+            push_wrapped_java_doc_line(output, indent, "", "", line.trim());
+        }
+    }
+    if has_summary && has_tags {
+        output.push_str(indent);
+        output.push_str(" *\n");
+    }
+    for (tag, doc) in tags {
+        let tag = tag.trim();
+        let doc = doc.trim();
+        if tag.is_empty() && doc.is_empty() {
+            continue;
+        }
+        if doc.is_empty() {
+            push_wrapped_java_doc_line(output, indent, "", "", tag);
+        } else {
+            push_wrapped_java_doc_line(output, indent, &format!("{tag} "), "    ", doc);
+        }
+    }
+    output.push_str(indent);
     output.push_str(" */\n");
 }
 
-fn render_service_javadoc_indented(output: &mut String, doc: Option<&str>) {
-    let Some(doc) = doc.map(str::trim).filter(|doc| !doc.is_empty()) else {
+fn push_wrapped_java_doc_line(
+    output: &mut String,
+    indent: &str,
+    first_prefix: &str,
+    continuation_prefix: &str,
+    text: &str,
+) {
+    let max_width = JAVA_FORMAT_LINE_LENGTH.saturating_sub(indent.chars().count() + 3);
+    if text.trim().is_empty() {
+        output.push_str(indent);
+        output.push_str(" *\n");
         return;
-    };
-    output.push_str("    /**\n");
-    for line in doc.lines() {
-        output.push_str("     * ");
-        output.push_str(line.trim());
-        output.push('\n');
     }
-    output.push_str("     */\n");
+
+    let escaped = text
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace("*/", "* /");
+    let mut prefix = first_prefix;
+    let mut current = String::new();
+    for word in escaped.split_whitespace() {
+        let prefix_width = prefix.chars().count();
+        let current_width = current.chars().count();
+        let word_width = word.chars().count();
+        let separator_width = usize::from(!current.is_empty());
+        if current_width > 0
+            && prefix_width + current_width + separator_width + word_width > max_width
+        {
+            output.push_str(indent);
+            output.push_str(" * ");
+            output.push_str(prefix);
+            output.push_str(&current);
+            output.push('\n');
+            prefix = continuation_prefix;
+            current.clear();
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(word);
+    }
+
+    output.push_str(indent);
+    output.push_str(" * ");
+    output.push_str(prefix);
+    output.push_str(&current);
+    output.push('\n');
 }
 
 fn java_string_literal(value: &str) -> String {

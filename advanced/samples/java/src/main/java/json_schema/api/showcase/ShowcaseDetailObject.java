@@ -80,6 +80,20 @@ public final class ShowcaseDetailObject implements Showcase.Detail {
                     violations.add(new Violation("code", "must have length >= 1, got " + length));
                 }
             }
+            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+            if (value.code != null) {
+                wireKeys.add("code");
+            }
+            if (value.hint != null) {
+                wireKeys.add("hint");
+            }
+            if (value.additionalProperties != null) {
+                for (String key : value.additionalProperties.keySet()) {
+                    if (!wireKeys.add(key)) {
+                        violations.add(new Violation(key, "declared property key collision"));
+                    }
+                }
+            }
             if (!violations.isEmpty()) {
                 throw new ValidationException(violations);
             }

@@ -1,12 +1,21 @@
 package jsonschema;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.protobuf.ByteString;
+import io.nexusrpc.Serializer;
+import io.nexusrpc.handler.HandlerException;
+import io.nexusrpc.handler.HandlerInputContent;
+import io.nexusrpc.handler.OperationContext;
 import io.nexusrpc.handler.OperationHandler;
 import io.nexusrpc.handler.OperationImpl;
+import io.nexusrpc.handler.OperationStartDetails;
+import io.nexusrpc.handler.ServiceHandler;
+import io.nexusrpc.handler.ServiceImplInstance;
 import io.nexusrpc.handler.ServiceImpl;
 import io.temporal.api.common.v1.Payload;
 import io.temporal.client.WorkflowOptions;
@@ -19,8 +28,11 @@ import io.temporal.workflow.NexusServiceOptions;
 import io.temporal.workflow.Workflow;
 import io.temporal.workflow.WorkflowInterface;
 import io.temporal.workflow.WorkflowMethod;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,6 +42,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Disabled;
 
 import json_schema.definitions.kb.content.block.Block;
 import json_schema.definitions.kb.content.page.Page;
@@ -66,6 +79,25 @@ final class JsonSchemaKbNexusTest {
             return CONVERTER.fromPayload(payload, type, type);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Minimal public-API equivalent of Temporal's package-private Nexus payload serializer. */
+    private static final class TestPayloadSerializer implements Serializer {
+        @Override
+        public Content serialize(Object value) {
+            Payload payload = CONVERTER.toPayload(value).orElseThrow(AssertionError::new);
+            Content.Builder content = Content.newBuilder().setData(payload.getData().toByteArray());
+            payload.getMetadataMap().forEach((key, bytes) -> content.putHeader(key, bytes.toStringUtf8()));
+            return content.build();
+        }
+
+        @Override
+        public Object deserialize(Content content, Type type) {
+            Payload.Builder payload = Payload.newBuilder().setData(ByteString.copyFrom(content.getData()));
+            content.getHeaders().forEach((key, value) ->
+                    payload.putMetadata(key, ByteString.copyFromUtf8(value)));
+            return CONVERTER.fromPayload(payload.build(), (Class<?>) type, type);
         }
     }
 
@@ -182,5 +214,51 @@ final class JsonSchemaKbNexusTest {
         } finally {
             env.close();
         }
+    }
+
+    private static void startInvalidGetPage(KnowledgeBaseServiceImpl service) throws Exception {
+        ServiceHandler handler = ServiceHandler.newBuilder()
+                .addInstance(ServiceImplInstance.fromInstance(service))
+                .setSerializer(new TestPayloadSerializer())
+                .build();
+        OperationContext context = OperationContext.newBuilder()
+                .setService("example.kb.v1.KnowledgeBaseService")
+                .setOperation("GetPage")
+                .build();
+        OperationStartDetails details = OperationStartDetails.newBuilder()
+                .setRequestId("invalid-wire")
+                .build();
+        HandlerInputContent input = HandlerInputContent.newBuilder()
+                .setDataStream(new ByteArrayInputStream("{\"pageId\":null}".getBytes(StandardCharsets.UTF_8)))
+                .putHeader("encoding", "json/plain")
+                .build();
+
+        handler.startOperation(context, details, input);
+    }
+
+    @Test
+    void invalidWireIsRejectedBeforeTheNexusOperationRuns() {
+        KnowledgeBaseServiceImpl service = new KnowledgeBaseServiceImpl();
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> startInvalidGetPage(service));
+        assertTrue(messageChain(failure).contains("explicit null not allowed"), messageChain(failure));
+        assertFalse(service.calls.contains("GetPage"));
+    }
+
+    @Disabled("Temporal SDK 1.35 maps Nexus input deserialization failures to INTERNAL, not BAD_REQUEST")
+    @Test
+    void invalidWireShouldSurfaceAsBadRequestAtTheNexusBoundary() {
+        HandlerException failure = assertThrows(
+                HandlerException.class, () -> startInvalidGetPage(new KnowledgeBaseServiceImpl()));
+        assertEquals(HandlerException.ErrorType.BAD_REQUEST, failure.getErrorType());
+    }
+
+    private static String messageChain(Throwable error) {
+        StringBuilder builder = new StringBuilder();
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current.getMessage() != null) {
+                builder.append(current.getMessage()).append('\n');
+            }
+        }
+        return builder.toString();
     }
 }

@@ -59,7 +59,9 @@ export interface AddressBook {
 }
 
 /**
- * A string map with member-count and key-shape constraints: 1 to 3 entries, each key at most 8 code points (minProperties/maxProperties/propertyNames on a map-shaped object).
+ * A string map with member-count and key-shape constraints: 1 to 3 entries, each key at
+ * most 8 code points (minProperties/maxProperties/propertyNames on a map-shaped
+ * object).
  */
 export interface Attributes {
   additionalProperties: Record<string, string>;
@@ -73,7 +75,10 @@ export interface BlobIndex {
 }
 
 /**
- * A map whose *member* type is a union written inline in `additionalProperties`. Like an element union it has no name of its own, so it is named after its position — `ChoicesValue` — and moved into `$defs`; each member then decodes through that union's selector, with the member key carrying into the violation path.
+ * A map whose *member* type is a union written inline in `additionalProperties`. Like
+ * an element union it has no name of its own, so it is named after its position —
+ * `ChoicesValue` — and moved into `$defs`; each member then decodes through that
+ * union's selector, with the member key carrying into the violation path.
  */
 export interface Choices {
   additionalProperties: Record<string, ChoicesValue>;
@@ -91,7 +96,13 @@ export interface Circle {
 }
 
 /**
- * Contact details with a conditional requirement and a member-count bound: a shipping street requires a shipping zip (dependentRequired), and the object must carry 1 to 3 members (minProperties/maxProperties on a declared-property object). Also exercises the type-level `x-<lang>-name` override (the Stage 4 escape hatch): the emitted type is renamed to the derived name plus a per-language suffix (Go `ContactGo`, TS `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its declaration and at every `$ref`, while the wire `$ref` name stays `Contact`.
+ * Contact details with a conditional requirement and a member-count bound: a shipping
+ * street requires a shipping zip (dependentRequired), and the object must carry 1 to 3
+ * members (minProperties/maxProperties on a declared-property object). Also exercises
+ * the type-level `x-<lang>-name` override (the Stage 4 escape hatch): the emitted type
+ * is renamed to the derived name plus a per-language suffix (Go `ContactGo`, TS
+ * `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its declaration and at every
+ * `$ref`, while the wire `$ref` name stays `Contact`.
  */
 export interface ContactTs {
   email?: string;
@@ -108,7 +119,9 @@ export interface DateIndex {
 }
 
 /**
- * A free-form object (`additionalProperties: true` with no declared properties): every member is carried verbatim, bounded to at most 4 members. Members keep their wire form, so large integers survive a round-trip untruncated.
+ * A free-form object (`additionalProperties: true` with no declared properties): every
+ * member is carried verbatim, bounded to at most 4 members. Members keep their wire
+ * form, so large integers survive a round-trip untruncated.
  */
 export interface Extras {
   additionalProperties: Record<string, unknown>;
@@ -138,19 +151,29 @@ export interface Metrics {
 }
 
 /**
- * A typed map of **nullable** members: a member may be an explicit null, which is kept as a null member rather than dropped from the map, while a present member still carries its own constraint.
+ * A typed map of **nullable** members: a member may be an explicit null, which is kept
+ * as a null member rather than dropped from the map, while a present member still
+ * carries its own constraint.
  */
 export interface Nicknames {
   additionalProperties: Record<string, string | null>;
 }
 
 /**
- * A tagged union whose object branches are written **inline** rather than `$ref`ed: each branch is emitted as a named type, so each names itself with the per-language `x-<lang>-name` override (two or more inline object branches cannot derive distinguishing names — the discriminator `const` is a wire value, not an identifier). Selection reads the shared required `kind` const, and each branch keeps its own constraints and stays open to unknown members.
+ * A tagged union whose object branches are written **inline** rather than `$ref`ed:
+ * each branch is emitted as a named type, so each names itself with the per-language
+ * `x-<lang>-name` override (two or more inline object branches cannot derive
+ * distinguishing names — the discriminator `const` is a wire value, not an identifier).
+ * Selection reads the shared required `kind` const, and each branch keeps its own
+ * constraints and stays open to unknown members.
  */
 export type Note = TextNote | LinkNote;
 
 /**
- * A typed map whose members carry their own constraints: every member is a non-negative multiple of 5, at most 100. A member is held to exactly what a declared field of that type is held to, in both directions, with the offending member's key as the violation path.
+ * A typed map whose members carry their own constraints: every member is a non-negative
+ * multiple of 5, at most 100. A member is held to exactly what a declared field of that
+ * type is held to, in both directions, with the offending member's key as the violation
+ * path.
  */
 export interface Quotas {
   additionalProperties: Record<string, number>;
@@ -165,13 +188,19 @@ export interface Settings {
 }
 
 /**
- * A closed sum type (discriminated union) of Circle | Square, tagged by the shared required `kind` const. Selection reads `kind` and routes to the matching branch; an unknown tag is a Violation.
+ * A closed sum type (discriminated union) of Circle | Square, tagged by the shared
+ * required `kind` const. Selection reads `kind` and routes to the matching branch; an
+ * unknown tag is a Violation.
  */
 export type Shape = Circle | Square;
 
 /**
  * Showcase
- * Root object exercising the supported JSON-Schema feature subset: required and optional fields of every scalar type, optional+nullable and required+nullable members, arrays, a nested object via $ref, a typed-map, a closed object, an open (catch-all) object, a string const, a scalar default, and member docs.
+ *
+ * Root object exercising the supported JSON-Schema feature subset: required and
+ * optional fields of every scalar type, optional+nullable and required+nullable
+ * members, arrays, a nested object via $ref, a typed-map, a closed object, an open
+ * (catch-all) object, a string const, a scalar default, and member docs.
  */
 export interface Showcase {
   /**
@@ -179,7 +208,11 @@ export interface Showcase {
    */
   readonly kind: "showcase";
   /**
-   * Integer const; always 1. Also exercises the single-`const` value override: `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the wire value stays `1`. TS/Python are inert here (no const override keyword — the value is emitted as a plain literal type).
+   * Integer const; always 1. Also exercises the single-`const` value override:
+   * `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived
+   * name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the
+   * wire value stays `1`. TS/Python are inert here (no const override keyword — the
+   * value is emitted as a plain literal type).
    */
   readonly revision: 1;
   /**
@@ -187,7 +220,11 @@ export interface Showcase {
    */
   readonly enabled: true;
   /**
-   * Closed string value set. Also exercises the enum value-constant override: `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`) while the wire value stays `active`. TS/Python are inert here (no enum override keyword).
+   * Closed string value set. Also exercises the enum value-constant override:
+   * `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant
+   * to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`)
+   * while the wire value stays `active`. TS/Python are inert here (no enum override
+   * keyword).
    */
   status: "active" | "inactive" | "pending";
   /**
@@ -195,11 +232,13 @@ export interface Showcase {
    */
   tier: 1 | 2 | 3;
   /**
-   * Closed number value set (exercises the Python float exception: emitted as plain float, validated by membership).
+   * Closed number value set (exercises the Python float exception: emitted as plain
+   * float, validated by membership).
    */
   scale: 1.5 | 2.5;
   /**
    * Display name
+   *
    * Required human-readable name, 1 to 64 code points.
    */
   name: string;
@@ -216,31 +255,41 @@ export interface Showcase {
    */
   nickname?: string;
   /**
-   * Optional code, 2 to 5 code points. Counted in Unicode code points, so a multi-byte value (e.g. "a😀b", 3 code points / 6 UTF-8 bytes) is valid.
+   * Optional code, 2 to 5 code points. Counted in Unicode code points, so a multi-byte
+   * value (e.g. "a😀b", 3 code points / 6 UTF-8 bytes) is valid.
    */
   code?: string;
   /**
-   * Optional product code: 2 to 4 uppercase ASCII letters, anchored (`^[A-Z]{2,4}$`). Exercises the RE2-safe `pattern` gate.
+   * Optional product code: 2 to 4 uppercase ASCII letters, anchored (`^[A-Z]{2,4}$`).
+   * Exercises the RE2-safe `pattern` gate.
    */
   sku?: string;
   /**
-   * Optional two-word phrase separated by whitespace (`^\S+\s\S+$`). Exercises the loader's `\s`/`\S` → ASCII-class normalization and the per-target `$` end-anchor rewrite (Python `\Z` / Java `\z`), so a Unicode space (NBSP) and a trailing newline are rejected consistently across all four languages.
+   * Optional two-word phrase separated by whitespace (`^\S+\s\S+$`). Exercises the
+   * loader's `\s`/`\S` → ASCII-class normalization and the per-target `$` end-anchor
+   * rewrite (Python `\Z` / Java `\z`), so a Unicode space (NBSP) and a trailing newline
+   * are rejected consistently across all four languages.
    */
   phrase?: string;
   /**
-   * Optional request identifier; asserted RFC 4122 UUID via `format: uuid`. Stays `string`-typed (format assertion, no materialization); the pinned regex is validated identically across all four languages.
+   * Optional request identifier; asserted RFC 4122 UUID via `format: uuid`. Stays
+   * `string`-typed (format assertion, no materialization); the pinned regex is
+   * validated identically across all four languages.
    */
   requestId?: string;
   /**
-   * Optional contact address; asserted ASCII dot-atom `format: email` (single `@`, >=2-label domain, total length <= 254, guard-before-regex).
+   * Optional contact address; asserted ASCII dot-atom `format: email` (single `@`,
+   * >=2-label domain, total length <= 254, guard-before-regex).
    */
   contactEmail?: string;
   /**
-   * Optional host name; asserted RFC 1123 `format: hostname` (LDH labels, total length <= 253).
+   * Optional host name; asserted RFC 1123 `format: hostname` (LDH labels, total length
+   * <= 253).
    */
   host?: string;
   /**
-   * Optional homepage; asserted RFC 3986 `format: uri` (scheme required, ASCII only; an IP-literal host is validated by the spliced ipv6 grammar).
+   * Optional homepage; asserted RFC 3986 `format: uri` (scheme required, ASCII only; an
+   * IP-literal host is validated by the spliced ipv6 grammar).
    */
   homepage?: string;
   /**
@@ -248,31 +297,46 @@ export interface Showcase {
    */
   gateway?: string;
   /**
-   * Optional binary payload carried as a `contentEncoding: base64` string, materialized to native bytes (Go []byte, TS Uint8Array, Python bytes, Java byte[]). The wire is canonical padded standard base64; a malformed value is rejected by the pinned regex before decode.
+   * Optional binary payload carried as a `contentEncoding: base64` string, materialized
+   * to native bytes (Go []byte, TS Uint8Array, Python bytes, Java byte[]). The wire is
+   * canonical padded standard base64; a malformed value is rejected by the pinned regex
+   * before decode.
    */
   blob?: Uint8Array;
   /**
-   * Optional binary payload carried as a `contentEncoding: base64url` string (URL-safe alphabet, unpadded, RFC 4648 §5), materialized to the same native bytes type. The same bytes encode to a different wire than base64 ("Pj4+" vs "Pj4-").
+   * Optional binary payload carried as a `contentEncoding: base64url` string (URL-safe
+   * alphabet, unpadded, RFC 4648 §5), materialized to the same native bytes type. The
+   * same bytes encode to a different wire than base64 ("Pj4+" vs "Pj4-").
    */
   urlBlob?: Uint8Array;
   /**
    * Retry budget
+   *
    * Optional integer with a schema default.
    */
   retries?: number;
   verbose?: boolean;
   /**
    * Greeting
+   *
    * Optional string with a schema default, surfaced on read.
    */
   greeting?: string;
   /**
    * Debug flag
+   *
    * Optional boolean with a schema default.
    */
   debug?: boolean;
   /**
-   * Deprecated legacy identifier; prefer `requestId`. Exercises the native deprecation marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702 @deprecated). Also exercises the property-level `x-<lang>-name` override (the Stage 4 escape hatch): the emitted member identifier is renamed to the derived name plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`, Java `legacyIdJava`) while the wire name stays `legacyId` (json tag / alias / @JsonProperty).
+   * Deprecated legacy identifier; prefer `requestId`. Exercises the native deprecation
+   * marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702
+   * @deprecated). Also exercises the property-level `x-<lang>-name` override (the Stage
+   * 4 escape hatch): the emitted member identifier is renamed to the derived name plus
+   * a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`,
+   * Java `legacyIdJava`) while the wire name stays `legacyId` (json tag / alias /
+   * @JsonProperty).
+   *
    * @deprecated
    */
   legacyIdTs?: string;
@@ -317,47 +381,90 @@ export interface Showcase {
    */
   roles?: string[];
   /**
-   * Disjoint-kind union (oneOf sum type): the wire value is either a string of at least 3 code points or an integer of at least 1, selected by its JSON token. Not a member of a discriminated union — the token itself is the selector. Each branch also carries its **own constraints**: once the token selects a branch, the value is held to everything that branch declares, in both directions, with the union's path on the violation.
+   * Disjoint-kind union (oneOf sum type): the wire value is either a string of at least
+   * 3 code points or an integer of at least 1, selected by its JSON token. Not a member
+   * of a discriminated union — the token itself is the selector. Each branch also
+   * carries its **own constraints**: once the token selects a branch, the value is held
+   * to everything that branch declares, in both directions, with the union's path on
+   * the violation.
    */
   idOrName?: string | number;
   /**
-   * A union whose string branch is a **closed value set**: either one of two named modes or an unbounded non-negative integer. The branch narrows to its own admissible values (a Go/Java membership check, a TypeScript literal union, a Python `Literal`), so an unknown string is a Violation while any non-negative integer is accepted.
+   * A union whose string branch is a **closed value set**: either one of two named
+   * modes or an unbounded non-negative integer. The branch narrows to its own
+   * admissible values (a Go/Java membership check, a TypeScript literal union, a Python
+   * `Literal`), so an unknown string is a Violation while any non-negative integer is
+   * accepted.
    */
   mode?: "auto" | "manual" | number;
   /**
-   * Mixed-kind union whose object branch is an inline free-form object: the wire value is either an arbitrary object (members carried verbatim) or a string, selected by its JSON token. The free-form object is the one object branch that needs no type name — TypeScript and Python carry it structurally, Go and Java wrap it as `<Union>Object`.
+   * Mixed-kind union whose object branch is an inline free-form object: the wire value
+   * is either an arbitrary object (members carried verbatim) or a string, selected by
+   * its JSON token. The free-form object is the one object branch that needs no type
+   * name — TypeScript and Python carry it structurally, Go and Java wrap it as
+   * `<Union>Object`.
    */
   payload?: Record<string, unknown> | string;
   /**
-   * Mixed-kind union whose object branch is an inline *structured* object, written directly on the property rather than in `$defs`. It is the only object branch of this union, so it derives its name from the union it belongs to — `ShowcaseDetailObject` — and is emitted as an ordinary model: its members keep their own constraints and it stays open to unknown ones.
+   * Mixed-kind union whose object branch is an inline *structured* object, written
+   * directly on the property rather than in `$defs`. It is the only object branch of
+   * this union, so it derives its name from the union it belongs to —
+   * `ShowcaseDetailObject` — and is emitted as an ordinary model: its members keep
+   * their own constraints and it stays open to unknown ones.
    */
   detail?: ShowcaseDetailObject | string;
   /**
-   * Tagged object union mixed with a scalar kind: the two selector layers compose — the JSON token picks object-vs-string, and, for an object, the shared required `kind` const picks Circle-vs-Square. Written inline on the property, so the union itself is named after its position (`ShowcaseShapeOrName` / nested `Showcase.ShapeOrName`), and it reuses the `Circle`/`Square` branches of `shape` — a branch type may belong to more than one union (Go gains a second marker method, Java a second implemented interface). The scalar branch carries a length bound of its own; the object branches validate through their own models.
+   * Tagged object union mixed with a scalar kind: the two selector layers compose — the
+   * JSON token picks object-vs-string, and, for an object, the shared required `kind`
+   * const picks Circle-vs-Square. Written inline on the property, so the union itself
+   * is named after its position (`ShowcaseShapeOrName` / nested
+   * `Showcase.ShapeOrName`), and it reuses the `Circle`/`Square` branches of `shape` —
+   * a branch type may belong to more than one union (Go gains a second marker method,
+   * Java a second implemented interface). The scalar branch carries a length bound of
+   * its own; the object branches validate through their own models.
    */
   shapeOrName?: Circle | Square | string;
   /**
-   * Mixed-kind union with an array branch: the wire value is either a non-empty list of distinct numbers or a lowercase preset name, selected by its JSON token. An array branch has no definition to take a name from, so Go and Java emit it as the synthesized `<Union>Array` variant (a defined type / a `@JsonValue` wrapper) while TypeScript and Python carry it structurally as `number[]` / `list[float]`. Both branches carry their own constraints — the array's `minItems`/`uniqueItems` and the string's `pattern` — so the array-vs-string choice is validated as well as selected.
+   * Mixed-kind union with an array branch: the wire value is either a non-empty list of
+   * distinct numbers or a lowercase preset name, selected by its JSON token. An array
+   * branch has no definition to take a name from, so Go and Java emit it as the
+   * synthesized `<Union>Array` variant (a defined type / a `@JsonValue` wrapper) while
+   * TypeScript and Python carry it structurally as `number[]` / `list[float]`. Both
+   * branches carry their own constraints — the array's `minItems`/`uniqueItems` and the
+   * string's `pattern` — so the array-vs-string choice is validated as well as
+   * selected.
    */
   measurements?: number[] | string;
   /**
-   * A list whose element type is a named union: every element is routed to exactly one branch by the union's own selector, and its index carries into the violation path (`shapes[1]`). Go and Java cannot decode a sealed interface as a whole, so the element decodes through the union's dispatcher one at a time.
+   * A list whose element type is a named union: every element is routed to exactly one
+   * branch by the union's own selector, and its index carries into the violation path
+   * (`shapes[1]`). Go and Java cannot decode a sealed interface as a whole, so the
+   * element decodes through the union's dispatcher one at a time.
    */
   shapes?: Shape[];
   /**
-   * A list whose element union is written **inline**. An element has no name of its own, so the union is named after its position — `ShowcaseSegmentsItem` — moved into `$defs`, and the element becomes a `$ref` at it; from there it is an ordinary named union in every language.
+   * A list whose element union is written **inline**. An element has no name of its
+   * own, so the union is named after its position — `ShowcaseSegmentsItem` — moved into
+   * `$defs`, and the element becomes a `$ref` at it; from there it is an ordinary named
+   * union in every language.
    */
   segments?: ShowcaseSegmentsItem[];
   /**
-   * A list of **nullable, constrained scalar elements** — the two-branch nullability `oneOf` rather than a sum type, so nothing is named: the elements themselves become nullable (`[]*string`, `(string | null)[]`, `list[str | None]`, `List<@Nullable String>`) while each present string retains its own minimum length and the list stays a list.
+   * A list of **nullable, constrained scalar elements** — the two-branch nullability
+   * `oneOf` rather than a sum type, so nothing is named: the elements themselves become
+   * nullable (`[]*string`, `(string | null)[]`, `list[str | None]`, `List<@Nullable
+   * String>`) while each present string retains its own minimum length and the list
+   * stays a list.
    */
   slots?: (string | null)[];
   /**
-   * A nested array: `items` at depth two. Each level decodes elementwise, so a bad element is reported at its own two-dimensional index (`grid[1][0]`).
+   * A nested array: `items` at depth two. Each level decodes elementwise, so a bad
+   * element is reported at its own two-dimensional index (`grid[1][0]`).
    */
   grid?: number[][];
   /**
-   * A nested array of numbers used to prove recursive finite-number validation and two-dimensional indexed aggregation.
+   * A nested array of numbers used to prove recursive finite-number validation and
+   * two-dimensional indexed aggregation.
    */
   numberGrid?: number[][];
   /**
@@ -385,16 +492,20 @@ export interface Showcase {
    */
   metricOrLabel?: number | string;
   /**
-   * A union whose array branch contains referenced models, proving that branch conversion uses the ordinary recursive array mapper.
+   * A union whose array branch contains referenced models, proving that branch
+   * conversion uses the ordinary recursive array mapper.
    */
   addressListOrLabel?: Address[] | string;
   location?: ShowcaseLocation;
   /**
-   * A nullable inline object. The nullability wrapper emits no type of its own, so the object inside it takes the property's name — `ShowcaseAudit`, the same name it would take written plainly: adding or removing nullability never renames the type.
+   * A nullable inline object. The nullability wrapper emits no type of its own, so the
+   * object inside it takes the property's name — `ShowcaseAudit`, the same name it
+   * would take written plainly: adding or removing nullability never renames the type.
    */
   audit?: ShowcaseAudit | null;
   /**
-   * A list whose element is an inline object, named after its position (`ShowcaseRowsItem`) exactly as an inline element *union* is.
+   * A list whose element is an inline object, named after its position
+   * (`ShowcaseRowsItem`) exactly as an inline element *union* is.
    */
   rows?: ShowcaseRowsItem[];
   ledgerTs?: ShowcaseLedger;
@@ -425,7 +536,12 @@ export interface ShowcaseDetailObject {
 }
 
 /**
- * A typed map written inline on the property: the map itself is named `ShowcaseLedger` and its inline member shape `ShowcaseLedgerValue`, so both the map and its members are ordinary named models. Also exercises the member-name override on a hoisted property — `x-<lang>-name` keeps naming the *member* (Go `LedgerGo`, TS `ledgerTs`, Python `ledger_py`, Java `ledgerJava`) while the type keeps its position-derived name.
+ * A typed map written inline on the property: the map itself is named `ShowcaseLedger`
+ * and its inline member shape `ShowcaseLedgerValue`, so both the map and its members
+ * are ordinary named models. Also exercises the member-name override on a hoisted
+ * property — `x-<lang>-name` keeps naming the *member* (Go `LedgerGo`, TS `ledgerTs`,
+ * Python `ledger_py`, Java `ledgerJava`) while the type keeps its position-derived
+ * name.
  */
 export interface ShowcaseLedger {
   additionalProperties: Record<string, ShowcaseLedgerValue>;
@@ -437,7 +553,12 @@ export interface ShowcaseLedgerValue {
 }
 
 /**
- * An object written **inline** on the property rather than in `$defs`. It is named after the position it occupies — `ShowcaseLocation` — moved into `$defs`, and the property becomes a `$ref` at it, so it emits as the ordinary named model an authored definition would produce, member constraints and all. Its own nested inline object is named against that name in turn (`ShowcaseLocationGeo`), so nesting needs no `$defs` boilerplate at any depth.
+ * An object written **inline** on the property rather than in `$defs`. It is named
+ * after the position it occupies — `ShowcaseLocation` — moved into `$defs`, and the
+ * property becomes a `$ref` at it, so it emits as the ordinary named model an authored
+ * definition would produce, member constraints and all. Its own nested inline object is
+ * named against that name in turn (`ShowcaseLocationGeo`), so nesting needs no `$defs`
+ * boilerplate at any depth.
  */
 export interface ShowcaseLocation {
   city: string;
@@ -452,7 +573,10 @@ export interface ShowcaseLocationGeo {
 }
 
 /**
- * A free-form object written inline. Even this is named (`ShowcaseMetadata`): every object emits as a named aggregate holding its members in a catch-all, so adding `properties` to it later only adds fields rather than changing the emitted type's kind, and its member-count bound rides along with it.
+ * A free-form object written inline. Even this is named (`ShowcaseMetadata`): every
+ * object emits as a named aggregate holding its members in a catch-all, so adding
+ * `properties` to it later only adds fields rather than changing the emitted type's
+ * kind, and its member-count bound rides along with it.
  */
 export interface ShowcaseMetadata {
   additionalProperties: Record<string, unknown>;
@@ -488,14 +612,19 @@ export interface TextNote {
 }
 
 /**
- * A typed map with a refined *string* member: 2 to 8 code points of lowercase ASCII. Exercises the member-level `minLength`/`maxLength`/`pattern` in every language.
+ * A typed map with a refined *string* member: 2 to 8 code points of lowercase ASCII.
+ * Exercises the member-level `minLength`/`maxLength`/`pattern` in every language.
  */
 export interface Tokens {
   additionalProperties: Record<string, string>;
 }
 
 /**
- * Base-type extension via allOf: WidgetBase is flattened in and the extension branch adds fields, so Widget merges to one standalone object with the union of properties ({id, kind, name, size}) and required ([id, name]). The `size` member is itself an allOf that tightens two numeric bounds to a single interval [10, 20]; a value outside it is rejected by the merged constraint. No allOf survives past the loader.
+ * Base-type extension via allOf: WidgetBase is flattened in and the extension branch
+ * adds fields, so Widget merges to one standalone object with the union of properties
+ * ({id, kind, name, size}) and required ([id, name]). The `size` member is itself an
+ * allOf that tightens two numeric bounds to a single interval [10, 20]; a value outside
+ * it is rejected by the merged constraint. No allOf survives past the loader.
  */
 export interface Widget {
   id: string;
@@ -509,7 +638,8 @@ export interface Widget {
 }
 
 /**
- * A base object folded into Widget via allOf. It stays its own type; Widget copies its fields rather than referencing or subtyping it.
+ * A base object folded into Widget via allOf. It stays its own type; Widget copies its
+ * fields rather than referencing or subtyping it.
  */
 export interface WidgetBase {
   id: string;
@@ -640,6 +770,7 @@ export const addressTransferTypeConverter =
     }
 
     public toTransferType(value: Address): unknown {
+      const violations: __nexgenDefinitions.Violation[] = [];
       const out: Record<string, unknown> = {};
       out.street = value.street;
       if (value.city !== undefined) {
@@ -649,7 +780,17 @@ export const addressTransferTypeConverter =
         out.zip = value.zip;
       }
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (ADDRESS_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
+      }
+      if (violations.length) {
+        throw new __nexgenDefinitions.ValidationError(violations);
       }
       return out;
     }
@@ -998,6 +1139,13 @@ export const circleTransferTypeConverter =
       }
       out.radius = value.radius;
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (CIRCLE_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -1113,6 +1261,13 @@ export const contactTsTransferTypeConverter =
         out.shippingZip = value.shippingZip;
       }
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (CONTACT_TS_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (Object.keys(out).length < 1) {
@@ -1365,6 +1520,13 @@ export const linkNoteTransferTypeConverter =
       }
       out.href = value.href;
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (LINK_NOTE_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -4334,6 +4496,13 @@ export const showcaseAuditTransferTypeConverter =
       }
       out.by = value.by;
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (SHOWCASE_AUDIT_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -4414,6 +4583,13 @@ export const showcaseDetailObjectTransferTypeConverter =
         out.hint = value.hint;
       }
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (SHOWCASE_DETAIL_OBJECT_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -4526,6 +4702,13 @@ export const showcaseLedgerValueTransferTypeConverter =
       }
       out.amount = value.amount;
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (SHOWCASE_LEDGER_VALUE_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -4615,6 +4798,13 @@ export const showcaseLocationTransferTypeConverter =
         })();
       }
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (SHOWCASE_LOCATION_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -4712,6 +4902,13 @@ export const showcaseLocationGeoTransferTypeConverter =
         out.lon = value.lon;
       }
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (SHOWCASE_LOCATION_GEO_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -4822,6 +5019,13 @@ export const showcaseRowsItemTransferTypeConverter =
       }
       out.cell = value.cell;
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (SHOWCASE_ROWS_ITEM_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -5000,6 +5204,13 @@ export const squareTransferTypeConverter =
       }
       out.side = value.side;
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (SQUARE_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -5080,6 +5291,13 @@ export const textNoteTransferTypeConverter =
       }
       out.body = value.body;
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (TEXT_NOTE_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -5267,6 +5485,13 @@ export const widgetTransferTypeConverter =
         out.size = value.size;
       }
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (WIDGET_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {
@@ -5328,13 +5553,24 @@ export const widgetBaseTransferTypeConverter =
     }
 
     public toTransferType(value: WidgetBase): unknown {
+      const violations: __nexgenDefinitions.Violation[] = [];
       const out: Record<string, unknown> = {};
       out.id = value.id;
       if (value.kind !== undefined) {
         out.kind = value.kind;
       }
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (WIDGET_BASE_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
+      }
+      if (violations.length) {
+        throw new __nexgenDefinitions.ValidationError(violations);
       }
       return out;
     }

@@ -398,6 +398,13 @@ export const roomTransferTypeConverter =
         })();
       }
       for (const [key, entry] of Object.entries(value.additionalProperties ?? {})) {
+        if (ROOM_DECLARED.has(key)) {
+          violations.push({
+            path: key,
+            reason: "catch-all key collides with declared property",
+          });
+          continue;
+        }
         out[key] = entry;
       }
       if (violations.length) {

@@ -18,7 +18,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A string map with member-count and key-shape constraints: 1 to 3 entries, each key at most 8 code points (minProperties/maxProperties/propertyNames on a map-shaped object).
+ * A string map with member-count and key-shape constraints: 1 to 3 entries, each key at
+ * most 8 code points (minProperties/maxProperties/propertyNames on a map-shaped
+ * object).
  */
 @JsonSerialize(using = Attributes.Serializer.class)
 @JsonDeserialize(using = Attributes.Deserializer.class)

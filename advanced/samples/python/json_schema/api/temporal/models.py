@@ -267,6 +267,7 @@ class _TemporalTransferTypeConverter(
 @dataclasses.dataclass(slots=True, kw_only=True)
 class Temporal:
     """Temporal
+
     Root object materializing the four RFC 3339 temporal formats as native typed fields:
     date-time (offset & sub-second precision preserved), date, time (offset preserved
     when present), and duration (time-only, canonicalized). Covers required, optional,

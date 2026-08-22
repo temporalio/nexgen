@@ -16,11 +16,16 @@ export function requiredField<T>(
 
 /**
  * Temporal
- * Root object materializing the four RFC 3339 temporal formats as native typed fields: date-time (offset & sub-second precision preserved), date, time (offset preserved when present), and duration (time-only, canonicalized). Covers required, optional, and nullable members of each.
+ *
+ * Root object materializing the four RFC 3339 temporal formats as native typed fields:
+ * date-time (offset & sub-second precision preserved), date, time (offset preserved
+ * when present), and duration (time-only, canonicalized). Covers required, optional,
+ * and nullable members of each.
  */
 export interface Temporal {
   /**
-   * Required event timestamp; materialized date-time (offset required, sub-second precision & offset preserved on round-trip).
+   * Required event timestamp; materialized date-time (offset required, sub-second
+   * precision & offset preserved on round-trip).
    */
   createdAt: Date;
   /**
@@ -28,11 +33,13 @@ export interface Temporal {
    */
   birthday: string;
   /**
-   * Required wall-clock time; materialized time (offset preserved when present, otherwise offset-less).
+   * Required wall-clock time; materialized time (offset preserved when present,
+   * otherwise offset-less).
    */
   alarm: string;
   /**
-   * Required time-only duration; materialized duration, canonicalized to PT…H…M…S (e.g. PT90M → PT1H30M).
+   * Required time-only duration; materialized duration, canonicalized to PT…H…M…S (e.g.
+   * PT90M → PT1H30M).
    */
   timeout: string;
   /**
