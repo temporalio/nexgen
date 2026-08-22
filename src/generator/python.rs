@@ -14,7 +14,7 @@ use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedOperationResourceReturn,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedRecordType, PlannedResource,
     PlannedResourceMethod, PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind,
-    PlannedSpec, PlannedType, PlannedWireFieldBinding, message_model_name, operation_input_model,
+    PlannedSpec, PlannedType, message_model_name, operation_input_model,
     operation_output_direct_result,
 };
 use crate::planning::{RequestPlan, ResolvedResourceBindingSource};
@@ -235,44 +235,20 @@ fn branch_export_names(
     names
 }
 
-fn python_proto_backed_variant_names(plan: &PlannedSpec) -> BTreeSet<String> {
-    plan.records()
-        .filter(|(_, record)| record.data.proto.is_some())
-        .flat_map(|(_, record)| record.fields.values())
-        .filter(|field| {
-            matches!(
-                field.data.wire_binding,
-                Some(PlannedWireFieldBinding::VariantMembers { .. })
-            )
-        })
-        .filter_map(
-            |field| match field.field_type.without_option().validation_type() {
-                PlannedType::Variant(variant) => Some(variant.full_name.clone()),
-                _ => None,
-            },
-        )
-        .collect()
-}
-
 fn leaf_export_names(
     plan: &PlannedSpec,
     model_hoists: &PythonModelHoists,
     mode: GenerationMode,
 ) -> BTreeSet<String> {
-    let proto_backed_variants = python_proto_backed_variant_names(plan);
+    let variant_companion_names = PythonExternalModels::variant_companion_names(plan);
     let mut model_names = plan
         .enums()
         .map(|(_, enumeration)| enumeration.name.clone())
         .chain(plan.flags().map(|(_, flag_set)| flag_set.name.clone()))
         .chain(plan.variants().flat_map(|(full_name, variant)| {
             let mut names = vec![variant.name.clone()];
-            if proto_backed_variants.contains(full_name) {
-                names.extend(
-                    variant
-                        .cases
-                        .iter()
-                        .map(|case| python_variant_case_class_name(&variant.name, &case.name)),
-                );
+            if let Some(companion_names) = variant_companion_names.get(full_name) {
+                names.extend(companion_names.iter().cloned());
             }
             names
         }))
@@ -334,7 +310,7 @@ fn leaf_export_names(
 }
 
 fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
-    let proto_backed_variants = python_proto_backed_variant_names(plan);
+    let variant_companion_names = PythonExternalModels::variant_companion_names(plan);
     let mut names = plan
         .types
         .values()
@@ -354,15 +330,16 @@ fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
         let TypeDeclSpec::Variant(variant) = &entry.declaration else {
             return None;
         };
-        proto_backed_variants
-            .contains(&variant.full_name)
+        variant_companion_names
+            .contains_key(&variant.full_name)
             .then_some(variant)
     }) {
         names.extend(
-            variant
-                .cases
-                .iter()
-                .map(|case| python_variant_case_class_name(&variant.name, &case.name)),
+            variant_companion_names
+                .get(&variant.full_name)
+                .into_iter()
+                .flatten()
+                .cloned(),
         );
     }
     names
@@ -391,7 +368,6 @@ struct ApiPlanner<'a> {
     flags: IndexMap<String, RenderedFlags>,
     variants: IndexMap<String, RenderedVariant>,
     models: IndexMap<String, RenderedModel>,
-    proto_backed_variants: BTreeSet<String>,
 }
 
 #[derive(Debug, Default)]
@@ -401,6 +377,10 @@ struct PythonExternalModels {
 }
 
 impl PythonExternalModels {
+    fn variant_companion_names(api_plan: &PlannedSpec) -> BTreeMap<String, Vec<String>> {
+        python_proto::variant_companion_names(api_plan)
+    }
+
     fn new(api_plan: &PlannedSpec) -> Result<Self> {
         let mut this = Self::default();
         this.prepare(api_plan)?;
@@ -507,6 +487,18 @@ impl PythonExternalModels {
                 resolve_python_value_type(api_plan, self, value_type)
             })
     }
+
+    fn render_variant_block(
+        &self,
+        full_name: &str,
+        variant: &RenderedVariant,
+    ) -> Option<RenderedVariantBlock> {
+        self.proto.render_variant_block(full_name, variant)
+    }
+
+    fn generated_names(&self, api_plan: &PlannedSpec) -> Vec<PythonGeneratedName> {
+        self.proto.generated_names(api_plan)
+    }
 }
 
 impl ExternalModelBackend for PythonExternalModels {
@@ -572,13 +564,12 @@ impl<'a> ApiPlanner<'a> {
         inline_model_rebuilds: bool,
         model_hoists: Option<&'a PythonModelHoists>,
     ) -> Result<Self> {
-        let proto_backed_variants = python_proto_backed_variant_names(api_plan);
-        validate_python_variant_case_names(api_plan, &proto_backed_variants)?;
         let external_models = if let Some(model_hoists) = model_hoists {
             PythonExternalModels::new_with_hoists(api_plan, model_hoists)?
         } else {
             PythonExternalModels::new(api_plan)?
         };
+        validate_python_generated_names(api_plan, &external_models.generated_names(api_plan))?;
         Ok(Self {
             api_plan,
             inline_model_rebuilds,
@@ -589,7 +580,6 @@ impl<'a> ApiPlanner<'a> {
             flags: IndexMap::new(),
             variants: IndexMap::new(),
             models: IndexMap::new(),
-            proto_backed_variants,
         })
     }
 
@@ -672,13 +662,11 @@ impl<'a> ApiPlanner<'a> {
             .values()
             .map(|enumeration| enumeration.name.clone())
             .chain(self.flags.values().map(|flag_set| flag_set.name.clone()))
-            .chain(self.variants.values().flat_map(|variant| {
-                let mut names = vec![variant.name.clone()];
-                if variant.proto_backed {
-                    names.extend(variant.cases.iter().map(|case| case.class_name.clone()));
-                }
-                names
-            }))
+            .chain(
+                self.variants
+                    .values()
+                    .flat_map(RenderedVariant::exported_names),
+            )
             .chain(model_fragments.exported_names.iter().cloned())
             .collect::<BTreeSet<_>>()
             .into_iter()
@@ -1695,7 +1683,6 @@ impl<'a> ApiPlanner<'a> {
             .map(|case| -> Result<_> {
                 Ok(RenderedVariantCase {
                     name: case.name.clone(),
-                    class_name: python_variant_case_class_name(&variant_spec.name, &case.name),
                     type_parameters: case
                         .payload
                         .as_ref()
@@ -1718,20 +1705,22 @@ impl<'a> ApiPlanner<'a> {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        self.variants.insert(
-            variant_spec.full_name.clone(),
-            RenderedVariant {
-                name: variant_spec.name.clone(),
-                proto_backed: self.proto_backed_variants.contains(&variant_spec.full_name),
-                type_parameters: self
-                    .api_plan
-                    .variant_type_parameters(&variant_spec.full_name, Language::Python)
-                    .into_iter()
-                    .map(|usage| usage.parameter.name)
-                    .collect(),
-                cases,
-            },
-        );
+        let mut rendered_variant = RenderedVariant {
+            name: variant_spec.name.clone(),
+            type_parameters: self
+                .api_plan
+                .variant_type_parameters(&variant_spec.full_name, Language::Python)
+                .into_iter()
+                .map(|usage| usage.parameter.name)
+                .collect(),
+            cases,
+            block: None,
+        };
+        rendered_variant.block = self
+            .external_models
+            .render_variant_block(&variant_spec.full_name, &rendered_variant);
+        self.variants
+            .insert(variant_spec.full_name.clone(), rendered_variant);
         Ok(())
     }
 
@@ -2663,34 +2652,56 @@ struct RenderedFlag {
 }
 
 #[derive(Debug)]
-struct RenderedVariant {
-    name: String,
-    proto_backed: bool,
-    type_parameters: Vec<String>,
-    cases: Vec<RenderedVariantCase>,
+pub(in crate::generator) struct RenderedVariant {
+    pub(in crate::generator) name: String,
+    pub(in crate::generator) type_parameters: Vec<String>,
+    pub(in crate::generator) cases: Vec<RenderedVariantCase>,
+    block: Option<RenderedVariantBlock>,
 }
 
 #[derive(Debug)]
-struct RenderedVariantCase {
-    name: String,
-    class_name: String,
-    type_parameters: Vec<String>,
-    payload_annotation: Option<String>,
+pub(in crate::generator) struct RenderedVariantCase {
+    pub(in crate::generator) name: String,
+    pub(in crate::generator) type_parameters: Vec<String>,
+    pub(in crate::generator) payload_annotation: Option<String>,
+}
+
+#[derive(Debug)]
+pub(in crate::generator) struct RenderedVariantBlock {
+    pub(in crate::generator) body: String,
+    pub(in crate::generator) companion_names: Vec<String>,
+}
+
+#[derive(Debug)]
+pub(in crate::generator) struct PythonGeneratedName {
+    pub(in crate::generator) name: String,
+    pub(in crate::generator) generated_by: String,
+}
+
+impl RenderedVariant {
+    fn exported_names(&self) -> Vec<String> {
+        let mut names = vec![self.name.clone()];
+        if let Some(block) = &self.block {
+            names.extend(block.companion_names.iter().cloned());
+        }
+        names
+    }
 }
 
 fn sort_python_model_names(names: &mut [String], variants: &IndexMap<String, RenderedVariant>) {
     names.sort_by_key(|name| {
         variants
             .values()
-            .filter(|variant| variant.proto_backed)
             .find_map(|variant| {
                 if name == &variant.name {
                     return Some((variant.name.clone(), 0));
                 }
                 variant
-                    .cases
+                    .block
+                    .as_ref()?
+                    .companion_names
                     .iter()
-                    .position(|case| name == &case.class_name)
+                    .position(|companion_name| name == companion_name)
                     .map(|index| (variant.name.clone(), index + 1))
             })
             .unwrap_or_else(|| (name.clone(), 0))
@@ -5087,8 +5098,8 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 }
 
 fn render_variant(output: &mut String, variant: &RenderedVariant) {
-    if variant.proto_backed {
-        render_proto_backed_variant(output, variant);
+    if let Some(block) = &variant.block {
+        output.push_str(&block.body);
         return;
     }
 
@@ -5113,53 +5124,6 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
             output.push_str(payload_annotation);
         }
         output.push(']');
-    }
-    if variant.cases.len() > 1 {
-        output.push_str("\n)");
-    }
-    output.push('\n');
-}
-
-fn render_proto_backed_variant(output: &mut String, variant: &RenderedVariant) {
-    for case in &variant.cases {
-        output.push_str("@dataclasses.dataclass(slots=True)\n");
-        output.push_str("class ");
-        output.push_str(&case.class_name);
-        if !case.type_parameters.is_empty() {
-            output.push_str("(typing.Generic[");
-            output.push_str(&case.type_parameters.join(", "));
-            output.push_str("])");
-        }
-        output.push_str(":\n");
-        if let Some(payload_annotation) = &case.payload_annotation {
-            output.push_str("    value: ");
-            output.push_str(payload_annotation);
-            output.push('\n');
-        } else {
-            output.push_str("    pass\n");
-        }
-        output.push_str("\n\n");
-    }
-
-    output.push_str(&variant.name);
-    output.push_str(" = ");
-    if variant.cases.is_empty() {
-        output.push_str("typing.Never\n");
-        return;
-    }
-    if variant.cases.len() > 1 {
-        output.push_str("(\n    ");
-    }
-    for (index, case) in variant.cases.iter().enumerate() {
-        if index > 0 {
-            output.push_str("\n    | ");
-        }
-        output.push_str(&case.class_name);
-        if !case.type_parameters.is_empty() {
-            output.push('[');
-            output.push_str(&case.type_parameters.join(", "));
-            output.push(']');
-        }
     }
     if variant.cases.len() > 1 {
         output.push_str("\n)");
@@ -7474,16 +7438,9 @@ fn python_ident(name: &str) -> String {
     }
 }
 
-pub(in crate::generator) fn python_variant_case_class_name(
-    variant_name: &str,
-    case_name: &str,
-) -> String {
-    format!("{variant_name}{}", case_name.to_upper_camel_case())
-}
-
-fn validate_python_variant_case_names(
+fn validate_python_generated_names(
     api_plan: &PlannedSpec,
-    proto_backed_variants: &BTreeSet<String>,
+    generated_names: &[PythonGeneratedName],
 ) -> Result<()> {
     let mut declarations = BTreeMap::<String, String>::new();
     for entry in api_plan.types.values() {
@@ -7527,22 +7484,18 @@ fn validate_python_variant_case_names(
         }
     }
 
-    for (full_name, variant) in api_plan
-        .variants()
-        .filter(|(full_name, _)| proto_backed_variants.contains(*full_name))
-    {
-        for case in &variant.cases {
-            let class_name = python_variant_case_class_name(&variant.name, &case.name);
-            let generated_by = format!("variant case `{full_name}.{}`", case.name);
-            if let Some(conflicting_declaration) = declarations.get(&class_name) {
-                return Err(Error::PythonGeneratedNameConflict {
-                    name: class_name,
-                    generated_by,
-                    conflicting_declaration: conflicting_declaration.clone(),
-                });
-            }
-            declarations.insert(class_name, generated_by);
+    for generated_name in generated_names {
+        if let Some(conflicting_declaration) = declarations.get(&generated_name.name) {
+            return Err(Error::PythonGeneratedNameConflict {
+                name: generated_name.name.clone(),
+                generated_by: generated_name.generated_by.clone(),
+                conflicting_declaration: conflicting_declaration.clone(),
+            });
         }
+        declarations.insert(
+            generated_name.name.clone(),
+            generated_name.generated_by.clone(),
+        );
     }
     Ok(())
 }

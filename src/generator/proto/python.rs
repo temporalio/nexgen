@@ -1,11 +1,14 @@
-use heck::ToSnakeCase;
+use std::collections::{BTreeMap, BTreeSet};
+
+use heck::{ToSnakeCase, ToUpperCamelCase};
 
 use crate::error::{Error, Result};
 use crate::generator::ExternalModelBackend;
 use crate::generator::python::{
-    PythonFieldDefaultKind, PythonImports, RenderedField, RenderedModel, RenderedModelFragments,
-    RenderedRecordWireBlock, ResolvedFieldKind, ResolvedFieldType, WireValueConversion,
-    python_authored_type_annotation, python_string_literal, python_variant_case_class_name,
+    PythonFieldDefaultKind, PythonGeneratedName, PythonImports, RenderedField, RenderedModel,
+    RenderedModelFragments, RenderedRecordWireBlock, RenderedVariant, RenderedVariantBlock,
+    ResolvedFieldKind, ResolvedFieldType, WireValueConversion, python_authored_type_annotation,
+    python_string_literal,
 };
 use crate::language::Language;
 use crate::planning::{
@@ -58,13 +61,16 @@ struct ProtoField {
 }
 
 #[derive(Debug, Default)]
-pub(in crate::generator) struct ModelBackend;
+pub(in crate::generator) struct ModelBackend {
+    variant_names: BTreeSet<String>,
+}
 
 impl ExternalModelBackend for ModelBackend {
     type ModelFragments = RenderedModelFragments;
     type WireConversion = WireValueConversion;
 
-    fn prepare(&mut self, _api_plan: &PlannedSpec) -> Result<()> {
+    fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
+        self.variant_names = oneof_variant_names(api_plan);
         Ok(())
     }
 
@@ -110,6 +116,110 @@ impl ExternalModelBackend for ModelBackend {
             .or_else(|| {
                 planned_record.and_then(|record| generated_wire_conversion(model_type, record))
             })
+    }
+}
+
+fn oneof_variant_names(api_plan: &PlannedSpec) -> BTreeSet<String> {
+    api_plan
+        .records()
+        .filter(|(_, record)| record.data.proto.is_some())
+        .flat_map(|(_, record)| record.fields.values())
+        .filter(|field| {
+            matches!(
+                field.data.wire_binding,
+                Some(PlannedWireFieldBinding::VariantMembers { .. })
+            )
+        })
+        .filter_map(
+            |field| match field.field_type.without_option().validation_type() {
+                PlannedType::Variant(variant) => Some(variant.full_name.clone()),
+                _ => None,
+            },
+        )
+        .collect()
+}
+
+pub(in crate::generator) fn variant_companion_names(
+    api_plan: &PlannedSpec,
+) -> BTreeMap<String, Vec<String>> {
+    let variant_names = oneof_variant_names(api_plan);
+    api_plan
+        .variants()
+        .filter(|(full_name, _)| variant_names.contains(*full_name))
+        .map(|(full_name, variant)| {
+            (
+                full_name.to_string(),
+                variant
+                    .cases
+                    .iter()
+                    .map(|case| variant_case_class_name(&variant.name, &case.name))
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
+fn variant_case_class_name(variant_name: &str, case_name: &str) -> String {
+    format!("{variant_name}{}", case_name.to_upper_camel_case())
+}
+
+fn render_oneof_variant_block(variant: &RenderedVariant) -> RenderedVariantBlock {
+    let companion_names = variant
+        .cases
+        .iter()
+        .map(|case| variant_case_class_name(&variant.name, &case.name))
+        .collect::<Vec<_>>();
+    let mut body = String::new();
+    for (case, class_name) in variant.cases.iter().zip(&companion_names) {
+        body.push_str("@dataclasses.dataclass(slots=True)\n");
+        body.push_str("class ");
+        body.push_str(class_name);
+        if !case.type_parameters.is_empty() {
+            body.push_str("(typing.Generic[");
+            body.push_str(&case.type_parameters.join(", "));
+            body.push_str("])");
+        }
+        body.push_str(":\n");
+        if let Some(payload_annotation) = &case.payload_annotation {
+            body.push_str("    value: ");
+            body.push_str(payload_annotation);
+            body.push('\n');
+        } else {
+            body.push_str("    pass\n");
+        }
+        body.push_str("\n\n");
+    }
+
+    body.push_str(&variant.name);
+    body.push_str(" = ");
+    if variant.cases.is_empty() {
+        body.push_str("typing.Never\n");
+        return RenderedVariantBlock {
+            body,
+            companion_names,
+        };
+    }
+    if variant.cases.len() > 1 {
+        body.push_str("(\n    ");
+    }
+    for (index, (case, class_name)) in variant.cases.iter().zip(&companion_names).enumerate() {
+        if index > 0 {
+            body.push_str("\n    | ");
+        }
+        body.push_str(class_name);
+        if !case.type_parameters.is_empty() {
+            body.push('[');
+            body.push_str(&case.type_parameters.join(", "));
+            body.push(']');
+        }
+    }
+    if variant.cases.len() > 1 {
+        body.push_str("\n)");
+    }
+    body.push('\n');
+    RenderedVariantBlock {
+        body,
+        companion_names,
     }
 }
 
@@ -165,7 +275,7 @@ fn build_oneof(
                 reason: format!("planned variant case `{}` has no payload", case.name),
             })?;
         cases.push(ProtoOneofCase {
-            class_name: python_variant_case_class_name(&variant.name, &case.name),
+            class_name: variant_case_class_name(&variant.name, &case.name),
             proto_name: member.wire_name.clone(),
             payload_type: resolve_type(&payload)?,
             generic_carrier: matches!(payload.validation_type(), PlannedType::TypeParameter(_))
@@ -237,6 +347,32 @@ impl ModelBackend {
         resolve_type: &impl Fn(&PlannedType) -> Result<ResolvedFieldType>,
     ) -> Result<Option<RenderedRecordWireBlock>> {
         render_record_wire_block(api_plan, model, planned_model, resolve_type)
+    }
+
+    pub(in crate::generator) fn render_variant_block(
+        &self,
+        full_name: &str,
+        variant: &RenderedVariant,
+    ) -> Option<RenderedVariantBlock> {
+        self.variant_names
+            .contains(full_name)
+            .then(|| render_oneof_variant_block(variant))
+    }
+
+    pub(in crate::generator) fn generated_names(
+        &self,
+        api_plan: &PlannedSpec,
+    ) -> Vec<PythonGeneratedName> {
+        api_plan
+            .variants()
+            .filter(|(full_name, _)| self.variant_names.contains(*full_name))
+            .flat_map(|(full_name, variant)| {
+                variant.cases.iter().map(move |case| PythonGeneratedName {
+                    name: variant_case_class_name(&variant.name, &case.name),
+                    generated_by: format!("variant case `{full_name}.{}`", case.name),
+                })
+            })
+            .collect()
     }
 
     pub(in crate::generator) fn service_wire_model_ref(
