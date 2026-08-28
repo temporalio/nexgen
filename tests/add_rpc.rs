@@ -273,9 +273,9 @@ fn add_rpc_can_extend_an_existing_wit_file() {
     assert!(generated.contains("signal-name: string,"));
     assert!(generated.contains("input: option<payloads>,"));
     assert!(generated.contains("workflow-execution: option<workflow-execution>,"));
-    assert!(
-        generated.contains("/// @nexus.endpoint \"temporal-system\" python=\"__temporal_system\"")
-    );
+    assert!(generated.contains(
+        "/// @nexus.endpoint \"temporal-system\" go=\"__temporal_system\" python=\"__temporal_system\""
+    ));
     assert!(!generated.contains("/// @nexus.endpoint \"__REPLACE_ME__\""));
     assert!(!generated.contains("package temporal:nexus@1.0.0;\n\npackage temporal:nexus@1.0.0;"));
 
@@ -316,9 +316,9 @@ fn add_rpc_can_update_existing_signal_with_start_operation() {
     assert!(!generated.contains("record link-nexus-operation"));
     assert!(!generated.contains("record link-workflow"));
     assert!(!generated.contains("record link {"));
-    assert!(
-        generated.contains("/// @nexus.endpoint \"temporal-system\" python=\"__temporal_system\"")
-    );
+    assert!(generated.contains(
+        "/// @nexus.endpoint \"temporal-system\" go=\"__temporal_system\" python=\"__temporal_system\""
+    ));
     assert!(!generated.contains("/// @nexus.endpoint \"__REPLACE_ME__\""));
 
     let parsed = parse(Language::Python, &generated, "updated-existing-input.wit");
