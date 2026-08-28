@@ -322,3 +322,14 @@ func versioningOverrideFromProto(_ workflow.Context, versioningOverride *workflo
 	}
 	return &value, nil
 }
+
+func workflowFunctionName(ctx workflow.Context, value any) string {
+	name, err := internal.GetWorkflowFunctionName(
+		internal.GetWorkflowEnvironment(ctx).GetRegistry(),
+		value,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return name
+}
