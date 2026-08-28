@@ -9,7 +9,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 
-	"advanced/samples/go/userservice"
+	"go.temporal.io/sdk/advanced/samples/go/userservice"
 )
 
 const userServiceName = "UserService"
