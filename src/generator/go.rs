@@ -1102,7 +1102,9 @@ impl<'a> ApiPlanner<'a> {
         self.populate_model_wire_conversions()?;
         self.populate_operation_bindings(&mut services)?;
 
-        let needs_function_name_inlining = services.iter().any(service_uses_function_name_inlining);
+        let needs_manual_function_name_inlining = services
+            .iter()
+            .any(service_uses_manual_function_name_inlining);
 
         // Operation wrapper functions require the workflow package.
         let has_operations = services.iter().any(|s| !s.operations.is_empty());
@@ -1131,7 +1133,7 @@ impl<'a> ApiPlanner<'a> {
         {
             self.imports.insert("fmt".to_string());
         }
-        if needs_function_name_inlining {
+        if needs_manual_function_name_inlining {
             self.imports.insert("reflect".to_string());
             self.imports.insert("runtime".to_string());
             self.imports.insert("strings".to_string());
@@ -1725,12 +1727,15 @@ impl<'a> ApiPlanner<'a> {
     }
 }
 
-fn service_uses_function_name_inlining(service: &RenderedService<'_>) -> bool {
+fn service_uses_manual_function_name_inlining(service: &RenderedService<'_>) -> bool {
     service.operations.iter().any(|operation| {
         operation.unpacked_input.as_ref().is_some_and(|params| {
-            params
-                .iter()
-                .any(|param| param.required && param.function.is_some())
+            params.iter().any(|param| {
+                param.required
+                    && param.function.as_ref().is_some_and(|function| {
+                        !is_go_signal_function(function) && function.name_extractor.is_none()
+                    })
+            })
         })
     })
 }
@@ -4578,6 +4583,9 @@ fn render_function_name_inline_assignment_named(
     param: &RenderedUnpackedParam,
     name_var: &str,
 ) {
+    if render_function_name_extractor_assignment(output, param, name_var) {
+        return;
+    }
     let accepts_alternate = param
         .function
         .as_ref()
@@ -4615,6 +4623,28 @@ fn render_function_name_inline_assignment_named(
     output.push_str("\t}\n");
 }
 
+fn render_function_name_extractor_assignment(
+    output: &mut String,
+    param: &RenderedUnpackedParam,
+    name_var: &str,
+) -> bool {
+    let Some(name_extractor) = param
+        .function
+        .as_ref()
+        .and_then(|function| function.name_extractor.as_deref())
+    else {
+        return false;
+    };
+    output.push('\t');
+    output.push_str(name_var);
+    output.push_str(" := ");
+    output.push_str(name_extractor);
+    output.push_str("(ctx, ");
+    output.push_str(&param.param_name);
+    output.push_str(")\n");
+    true
+}
+
 fn function_name_local_var(param: &RenderedUnpackedParam) -> String {
     format!("{}Name", param.param_name)
 }
@@ -4644,6 +4674,9 @@ fn function_name_local_var_for_params(
 
 fn render_exact_function_name_assignment(output: &mut String, param: &RenderedUnpackedParam) {
     let name_var = function_name_local_var(param);
+    if render_function_name_extractor_assignment(output, param, &name_var) {
+        return;
+    }
     output.push('\t');
     output.push_str(&name_var);
     output.push_str(" := \"\"\n\t{\n");

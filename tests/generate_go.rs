@@ -1204,18 +1204,20 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
         rendered.contains("\tsignal string,\n\tsignalArg any,\n\tworkflow any,\n\targs ...any,\n")
     );
     assert!(rendered.contains("\targs ...any,\n"));
-    assert!(rendered.contains("switch rv := reflect.ValueOf(workflow); rv.Kind()"));
-    assert_eq!(
-        rendered
-            .matches("switch rv := reflect.ValueOf(workflow); rv.Kind()")
-            .count(),
-        1
-    );
-    assert!(!rendered.contains("switch rv := reflect.ValueOf(signal); rv.Kind()"));
     assert!(rendered.contains("\t\tWorkflow: workflowName,\n"));
     assert!(rendered.contains("\t\tSignal: signal,\n"));
     assert!(rendered.contains("\t\tArgs: args,\n"));
     assert!(rendered.contains("\t\tSignalArgs: []any{signalArg},\n"));
+    assert!(!rendered.contains("\"reflect\""));
+    assert!(!rendered.contains("\"runtime\""));
+    assert!(!rendered.contains("\"strings\""));
+    assert!(!rendered.contains("runtime.FuncForPC"));
+    assert_eq!(
+        rendered
+            .matches("workflowName := workflowFunctionName(ctx, workflow)")
+            .count(),
+        2
+    );
     assert!(rendered.contains(
         "c := newSystemNexusClient(\"temporal.api.workflowservice.v1.WorkflowService\")"
     ));
