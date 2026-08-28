@@ -229,6 +229,10 @@ namespace Temporalio.Workflows
             {
                 proto.WorkflowIdReusePolicy = idReusePolicy;
             }
+            else
+            {
+                proto.WorkflowIdReusePolicy = Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate;
+            }
             if (IdConflictPolicy is { } idConflictPolicy)
             {
                 proto.WorkflowIdConflictPolicy = idConflictPolicy;

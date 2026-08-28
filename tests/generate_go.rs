@@ -1202,6 +1202,9 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
     assert!(rendered.contains("\t\tSignal: signal,\n"));
     assert!(rendered.contains("\t\tArgs: args,\n"));
     assert!(rendered.contains("\t\tSignalArgs: []any{signalArg},\n"));
+    assert!(rendered.contains(
+        "\tif m.WorkflowIDReusePolicy != nil {\n\t\tmessage.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy((*m.WorkflowIDReusePolicy))\n\t} else {\n\t\tmessage.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy(1)\n\t}"
+    ));
     assert!(!rendered.contains("\"reflect\""));
     assert!(!rendered.contains("\"runtime\""));
     assert!(!rendered.contains("\"strings\""));

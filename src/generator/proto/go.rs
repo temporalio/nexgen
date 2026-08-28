@@ -1514,11 +1514,13 @@ fn build_field_conversion(
         PlannedFieldKind::Singular(value) => {
             let conversion = go_value_conversion(value, api_plan, backend, &backend.package)?;
             let field_is_pointer = native_go_type.starts_with('*');
+            let default_expr = default_enum_proto_expr(field, backend)?;
             let to_lines = singular_to_proto_lines(
                 &conversion,
                 &receiver,
                 &proto_field,
                 field_is_pointer,
+                default_expr.as_deref(),
                 "return nil, err",
             );
             let mut from_lines = singular_from_proto_lines(
@@ -1728,6 +1730,24 @@ fn build_sourced_conversion(
     }
 }
 
+fn default_enum_proto_expr(
+    field: &crate::generator::go::PlannedField,
+    backend: &ModelBackend,
+) -> GoConversionResult<Option<String>> {
+    let Some(default) = &field.default_value else {
+        return Ok(None);
+    };
+    let PlannedFieldKind::Singular(value) = &field.kind else {
+        return Err("a default can only be applied to a singular enum field".to_string());
+    };
+    let enum_value = field
+        .default_enum_value
+        .as_ref()
+        .ok_or_else(|| format!("default enum case `{}` was not resolved", default.enum_case))?;
+    let proto_type = backend.value_proto_type(value)?;
+    Ok(Some(format!("{proto_type}({})", enum_value.number)))
+}
+
 /// `ToProto` lines for a singular field.
 ///
 /// `field_is_pointer` indicates whether the native struct field is rendered as
@@ -1739,6 +1759,7 @@ fn singular_to_proto_lines(
     receiver: &str,
     proto_field: &str,
     field_is_pointer: bool,
+    default_expr: Option<&str>,
     error_return: &str,
 ) -> Vec<String> {
     let assign = |converted: &str| format!("message.{proto_field} = {converted}");
@@ -1774,7 +1795,7 @@ fn singular_to_proto_lines(
         GoConversionKind::Scalar | GoConversionKind::Enum | GoConversionKind::ModelConverter => {
             if field_is_pointer {
                 let converted = (conversion.to_proto)(&format!("(*{receiver})"));
-                if conversion.fallible {
+                let mut lines = if conversion.fallible {
                     vec![
                         format!("if {receiver} != nil {{"),
                         format!("\tconverted, err := {converted}"),
@@ -1782,15 +1803,19 @@ fn singular_to_proto_lines(
                         format!("\t\t{error_return}"),
                         "\t}".to_string(),
                         format!("\t{}", assign("converted")),
-                        "}".to_string(),
                     ]
                 } else {
                     vec![
                         format!("if {receiver} != nil {{"),
                         format!("\t{}", assign(&converted)),
-                        "}".to_string(),
                     ]
+                };
+                if let Some(default_expr) = default_expr {
+                    lines.push("} else {".to_string());
+                    lines.push(format!("\t{}", assign(default_expr)));
                 }
+                lines.push("}".to_string());
+                lines
             } else {
                 let converted = (conversion.to_proto)(receiver);
                 if conversion.fallible {

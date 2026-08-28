@@ -324,7 +324,10 @@ fn collect_symbol_module_import(
 }
 
 use super::*;
-use crate::spec::{FunctionTypeDescriptorSpec, OperationOutputTransformSpec, ResourceResultSpec};
+use crate::spec::{
+    EnumValueSpec, FunctionTypeDescriptorSpec, OperationOutputTransformSpec, ResourceResultSpec,
+};
+use heck::ToShoutySnakeCase;
 
 pub(super) struct TypePlanningContext<'a> {
     pub(super) spec: ApiSpec<OperationLoweredFamily>,
@@ -469,11 +472,21 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
         field_name: &str,
         _data: (),
     ) -> PlannedFieldData {
-        self.source_spec
-            .record(record_full_name)
-            .cloned()
-            .and_then(|record| proto::planned_record_field_data(&record, field_name, self.planner))
-            .unwrap_or_default()
+        let Some(record) = self.source_spec.record(record_full_name).cloned() else {
+            return PlannedFieldData::default();
+        };
+        let mut data =
+            proto::planned_record_field_data(&record, field_name, self.planner).unwrap_or_default();
+        if let Some(field) = record.fields.get(field_name)
+            && let Some(default) = &field.default_value
+        {
+            data.default_enum_value = self.planner.resolve_default_enum_value(
+                self.source_spec,
+                &field.field_type,
+                &default.enum_case,
+            );
+        }
+        data
     }
 
     fn map_text(&mut self, text: SelectedTextSpec) -> SelectedTextSpec {
@@ -534,6 +547,40 @@ impl<'a> TypePlanningContext<'a> {
                             )
                         });
             }
+        }
+    }
+
+    fn resolve_default_enum_value(
+        &self,
+        source_spec: &ApiSpec<OperationLoweredFamily>,
+        field_type: &TypeSpec<OperationLoweredFamily>,
+        case_name: &str,
+    ) -> Option<EnumValueSpec> {
+        match field_type.without_option() {
+            TypeSpec::Enum(enum_name) => source_spec
+                .enum_decl(enum_name.as_str())?
+                .values
+                .iter()
+                .find(|value| value.wire_name == case_name)
+                .cloned(),
+            TypeSpec::External(ExternalTypeSpec::Proto(enum_name)) => {
+                let enumeration = self.descriptors.enumeration(enum_name.as_str())?;
+                let expected = case_name.to_shouty_snake_case();
+                let value = enumeration.descriptor.value.iter().find(|value| {
+                    value.name.as_deref().is_some_and(|name| {
+                        name == expected || name.ends_with(&format!("_{expected}"))
+                    })
+                })?;
+                Some(EnumValueSpec {
+                    wire_name: value.name.clone()?,
+                    name: case_name.to_upper_camel_case(),
+                    number: value.number?,
+                })
+            }
+            TypeSpec::External(ExternalTypeSpec::Alias(alias)) => {
+                self.resolve_default_enum_value(source_spec, alias.target.as_ref(), case_name)
+            }
+            _ => None,
         }
     }
 
