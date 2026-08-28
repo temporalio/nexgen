@@ -4172,7 +4172,14 @@ pub(in crate::generator) fn render_operation_future_adapter(
     output.push_str("\treturn result\n");
 }
 
-fn new_nexus_client_expr(endpoint: &str, service_name: &str, package: &GoPackageContext) -> String {
+pub(in crate::generator) fn new_nexus_client_expr(
+    endpoint: &str,
+    service_name: &str,
+    package: &GoPackageContext,
+) -> String {
+    if endpoint == "__temporal_system" {
+        return format!("newSystemNexusClient({})", go_string_literal(service_name));
+    }
     format!(
         "{}({}, {})",
         package.new_nexus_client(),

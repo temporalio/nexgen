@@ -16,7 +16,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 
-	tr "advanced/samples/go/typeroundtrip"
+	tr "go.temporal.io/sdk/advanced/samples/go/typeroundtrip"
 )
 
 const typeRoundtripServiceName = "TypeRoundtripService"

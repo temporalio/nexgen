@@ -1216,6 +1216,11 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
     assert!(rendered.contains("\t\tSignal: signal,\n"));
     assert!(rendered.contains("\t\tArgs: args,\n"));
     assert!(rendered.contains("\t\tSignalArgs: []any{signalArg},\n"));
+    assert!(rendered.contains(
+        "c := newSystemNexusClient(\"temporal.api.workflowservice.v1.WorkflowService\")"
+    ));
+    assert!(!rendered.contains("workflow.NewNexusClient(\"__temporal_system\""));
+    assert!(rendered.contains("func newSystemNexusClient(service string) workflow.NexusClient"));
 }
 
 #[test]
