@@ -1,7 +1,7 @@
 // Test-only bridge for generated System Nexus bindings that are placed inside
 // the workflow package. The real SDK supplies this module from its source tree.
-// Remove this bridge once the TypeScript SDK release used by these examples
-// exports startSystemNexusOperation.
+// Remove the declaration below once the TypeScript SDK release used by these
+// examples exports startSystemNexusOperation.
 export * from '@temporalio/workflow';
 
 export declare function startSystemNexusOperation<T>(input: {
