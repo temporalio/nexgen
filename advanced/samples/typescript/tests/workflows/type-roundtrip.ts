@@ -6,22 +6,6 @@ import {
 
 const TASK_QUEUE = "demo-task-queue";
 
-function durationSecondsToMillis(
-  seconds:
-    { low?: number; toNumber?: () => number } | number | string | null | undefined,
-): number | undefined {
-  if (seconds == null) {
-    return undefined;
-  }
-  if (typeof seconds === "object") {
-    if (seconds.toNumber != null) {
-      return seconds.toNumber() * 1000;
-    }
-    return seconds.low == null ? undefined : seconds.low * 1000;
-  }
-  return Number(seconds) * 1000;
-}
-
 export async function typeRoundtripCaller(): Promise<{
   failureCauseMessage: string | undefined;
   failureDetails: unknown[] | undefined;
@@ -30,7 +14,7 @@ export async function typeRoundtripCaller(): Promise<{
   failureType: string | undefined;
   priorityKey: number | undefined;
   retryMaximumAttempts: number | undefined;
-  scheduleToCloseTimeout: number | undefined;
+  scheduleToCloseTimeout: common.Duration | undefined;
   taskQueue: string | undefined;
 }> {
   const retryPolicy: common.RetryPolicy = { maximumAttempts: 3 };
@@ -45,7 +29,6 @@ export async function typeRoundtripCaller(): Promise<{
     },
   });
   const activityRoundTrip = await activityHandle.result();
-  const scheduleToCloseSeconds = activityRoundTrip.scheduleToCloseTimeout?.seconds;
   const failureHandle = await failureOperation({
     failure: common.ApplicationFailure.create({
       message: "outer failure",
@@ -69,7 +52,7 @@ export async function typeRoundtripCaller(): Promise<{
     failureType: applicationFailure?.type ?? undefined,
     priorityKey: activityRoundTrip.priority?.priorityKey ?? undefined,
     retryMaximumAttempts: activityRoundTrip.retryPolicy?.maximumAttempts ?? undefined,
-    scheduleToCloseTimeout: durationSecondsToMillis(scheduleToCloseSeconds),
+    scheduleToCloseTimeout: activityRoundTrip.scheduleToCloseTimeout,
     taskQueue: activityRoundTrip.taskQueue ?? undefined,
   };
 }
