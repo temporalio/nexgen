@@ -2,13 +2,14 @@
 
 import * as workflow from "@temporalio/workflow";
 import { startWorkflowService } from "../services";
-import { cancelWorkflowRequestToProto } from "../models";
 import type { CancelWorkflowResponse, CancelWorkflowRequest } from "../models";
 import { workflowNamespace } from "../support";
 
-type CancelWorkflowInput = Omit<CancelWorkflowRequest, "namespace"> & {
-  namespace?: never;
-};
+type CancelWorkflowInput = CancelWorkflowRequest extends infer Input
+  ? Input extends unknown
+    ? Omit<Input, "namespace"> & { namespace?: never }
+    : never
+  : never;
 
 /**
  * @param request - Request for the operation.
@@ -26,6 +27,6 @@ export async function cancelWorkflow(
   });
   return await client.startOperation(
     startWorkflowService.operations.cancelWorkflow,
-    cancelWorkflowRequestToProto(request) ?? {},
+    request,
   );
 }

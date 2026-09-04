@@ -2,7 +2,6 @@
 
 import * as workflow from "@temporalio/workflow";
 import { typeRoundtripService } from "../services";
-import { activityOptionsToProto } from "../models";
 import type { ActivityOptions } from "../models";
 
 /**
@@ -17,6 +16,6 @@ export async function activityOptionsOperation(
   });
   return await client.startOperation(
     typeRoundtripService.operations.activityOptionsOperation,
-    activityOptionsToProto(request) ?? {},
+    request,
   );
 }

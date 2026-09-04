@@ -25,10 +25,9 @@ export class UserServiceClient {
    * @param request - Request for the operation.
    */
   public async getUser(request: GetUserRequest): Promise<User> {
-    const requestProto = request;
     const handle = await this.client.startOperation(
       userService.operations.getUser,
-      requestProto,
+      request,
     );
     const resource = await handle.result();
     return bindUserClient(resource, this.client);
@@ -38,10 +37,9 @@ export class UserServiceClient {
    * @param request - Request for the operation.
    */
   public async updateEmail(request: UpdateEmailRequest): Promise<User> {
-    const requestProto = request;
     const handle = await this.client.startOperation(
       userService.operations.updateEmail,
-      requestProto,
+      request,
     );
     const resource = await handle.result();
     return bindUserClient(resource, this.client);

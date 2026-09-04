@@ -3836,16 +3836,13 @@ fn render_endpoint_service_operation_body(
         return;
     }
 
-    output.push_str("    const requestProto = ");
-    output.push_str(&typescript_operation_input_expr(operation));
-    output.push_str(";\n");
     output.push_str("    const handle = await this.client.startOperation(\n");
     output.push_str("      ");
     output.push_str(&service.attr_name);
     output.push_str(".operations.");
     output.push_str(&operation.attr_name);
     output.push_str(",\n");
-    output.push_str("      requestProto,\n");
+    output.push_str("      request,\n");
     output.push_str("    );\n");
     if let Some(transform_expr) = &operation.output_transform_expr {
         output.push_str("    const result = await handle.result();\n");
@@ -4027,16 +4024,18 @@ fn render_models_module(
     if mode == GenerationMode::NativeApi {
         render_required_field(&mut body, true);
     }
-    let uses_function_payload_helpers = models.iter().any(|model| {
-        model.fields.iter().any(|field| {
-            field.to_wire_expr.contains("requestArgsToPayloads(")
-                || field.from_wire_expr.contains("requestArgsFromPayloads(")
-                || field.flattened_fields.iter().any(|field| {
-                    field.to_wire_expr.contains("requestArgsToPayloads(")
-                        || field.from_wire_expr.contains("requestArgsFromPayloads(")
-                })
-        })
-    });
+    let uses_function_payload_helpers = support_exports.is_some()
+        && mode == GenerationMode::NativeApi
+        && models.iter().any(|model| {
+            model.fields.iter().any(|field| {
+                field.to_wire_expr.contains("requestArgsToPayloads(")
+                    || field.from_wire_expr.contains("requestArgsFromPayloads(")
+                    || field.flattened_fields.iter().any(|field| {
+                        field.to_wire_expr.contains("requestArgsToPayloads(")
+                            || field.from_wire_expr.contains("requestArgsFromPayloads(")
+                    })
+            })
+        });
     if uses_function_payload_helpers {
         body.push('\n');
         render_function_runtime_helpers(
@@ -5331,11 +5330,14 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
                 .input
                 .as_ref()
                 .map(|input| {
-                    input
-                        .model_name
-                        .as_deref()
-                        .unwrap_or(&input.operation_annotation)
+                    input.model_name.as_ref().map_or_else(
+                        || input.operation_annotation.clone(),
+                        |model_name| {
+                            typescript_erased_model_annotation(model_name, &input.type_parameters)
+                        },
+                    )
                 })
+                .as_deref()
                 .unwrap_or("void"),
         );
         output.push_str(",\n");
@@ -5892,18 +5894,8 @@ fn render_resource_method_operation_body(
 
     if returns_direct {
         output.push_str(&indent_str);
-        output.push_str("const requestProto = ");
-        output.push_str(&typescript_operation_input_expr(operation));
-        output.push_str(";\n");
-        output.push_str(&indent_str);
         output.push_str("const handle = await ");
-        render_resource_start_operation(
-            &mut output,
-            service,
-            operation,
-            &client_expr,
-            "requestProto",
-        );
+        render_resource_start_operation(&mut output, service, operation, &client_expr, "request");
         if let Some(transform_expr) = &operation.output_transform_expr {
             output.push_str(&indent_str);
             output.push_str("const result = await handle.result();\n");
@@ -6019,7 +6011,7 @@ fn resource_return_binding_expr_typescript(
         } => {
             if *hidden {
                 let expr = format!(
-                    "requestProto.{}",
+                    "request.{}",
                     typescript_generated_field_name(proto_field_name)
                 );
                 if binding.optional {
@@ -6208,16 +6200,13 @@ fn render_operation_function(
     output.push_str(&typescript_service_endpoint_expr(service));
     output.push_str(",\n");
     output.push_str("  });\n");
-    output.push_str("  const requestProto = ");
-    output.push_str(&typescript_operation_input_expr(operation));
-    output.push_str(";\n");
     output.push_str("  const handle = await client.startOperation(\n");
     output.push_str("    ");
     output.push_str(&service.attr_name);
     output.push_str(".operations.");
     output.push_str(&operation.attr_name);
     output.push_str(",\n");
-    output.push_str("    requestProto,\n");
+    output.push_str("    request,\n");
     output.push_str("  );\n");
     if let Some(transform_expr) = &operation.output_transform_expr {
         output.push_str("  const result = await handle.result();\n");
@@ -6315,9 +6304,9 @@ fn render_operation_input_alias(
     output.push_str("type ");
     output.push_str(&operation_input_alias_name(service, operation));
     output.push_str(&render_type_parameter_list(&input.type_parameters));
-    output.push_str(" = Omit<");
+    output.push_str(" = ");
     output.push_str(&input.annotation);
-    output.push_str(", ");
+    output.push_str(" extends infer Input\n  ? Input extends unknown\n    ? Omit<Input, ");
     output.push_str(
         &input
             .api_omitted_fields
@@ -6326,8 +6315,7 @@ fn render_operation_input_alias(
             .collect::<Vec<_>>()
             .join(" | "),
     );
-    output.push_str("> ");
-    output.push_str(" & { ");
+    output.push_str("> & { ");
     for (index, field) in input.api_omitted_fields.iter().enumerate() {
         if index > 0 {
             output.push_str("; ");
@@ -6335,7 +6323,7 @@ fn render_operation_input_alias(
         output.push_str(field);
         output.push_str("?: never");
     }
-    output.push_str(" };\n\n");
+    output.push_str(" }\n    : never\n  : never;\n\n");
 }
 
 fn render_resource_constructor(
@@ -6412,10 +6400,11 @@ fn typescript_service_endpoint_expr(service: &RenderedService<'_>) -> String {
 }
 
 fn typescript_operation_input_expr(operation: &RenderedOperation<'_>) -> String {
-    let Some(input) = &operation.input else {
-        return "undefined".to_string();
-    };
-    input.to_wire_expr.clone()
+    if operation.input.is_some() {
+        "request".to_string()
+    } else {
+        "undefined".to_string()
+    }
 }
 
 pub(in crate::generator) fn required_field_expr(

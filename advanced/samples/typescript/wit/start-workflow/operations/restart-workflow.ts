@@ -2,14 +2,16 @@
 
 import * as workflow from "@temporalio/workflow";
 import { startWorkflowService } from "../services";
-import { requiredField, startWorkflowRequestToProto } from "../models";
+import { requiredField } from "../models";
 import type { StartWorkflowRequest } from "../models";
 import { workflowNamespace } from "../support";
 import { StartedWorkflow } from "../resources";
 
-type RestartWorkflowInput = Omit<StartWorkflowRequest, "namespace"> & {
-  namespace?: never;
-};
+type RestartWorkflowInput = StartWorkflowRequest extends infer Input
+  ? Input extends unknown
+    ? Omit<Input, "namespace"> & { namespace?: never }
+    : never
+  : never;
 
 /**
  * @param request - Request for the operation.
@@ -25,14 +27,13 @@ export async function restartWorkflow(
     service: startWorkflowService,
     endpoint: "temporal-system",
   });
-  const requestProto = startWorkflowRequestToProto(request) ?? {};
   const handle = await client.startOperation(
     startWorkflowService.operations.restartWorkflow,
-    requestProto,
+    request,
   );
   const result = await handle.result();
   return new StartedWorkflow(
-    requiredField(requestProto.namespace, "resource", "namespace"),
+    requiredField(request.namespace, "resource", "namespace"),
     request.workflowId,
     result.runId ?? undefined,
   );

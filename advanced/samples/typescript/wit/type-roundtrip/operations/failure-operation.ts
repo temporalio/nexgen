@@ -2,7 +2,6 @@
 
 import * as workflow from "@temporalio/workflow";
 import { typeRoundtripService } from "../services";
-import { failureContainerToProto } from "../models";
 import type { FailureContainer } from "../models";
 
 /**
@@ -17,6 +16,6 @@ export async function failureOperation(
   });
   return await client.startOperation(
     typeRoundtripService.operations.failureOperation,
-    failureContainerToProto(request) ?? {},
+    request,
   );
 }

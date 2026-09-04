@@ -105,16 +105,16 @@ if (false) {
     cronSchedule,
     staticSummary: "Workflow summary",
     staticDetails: "Workflow details",
+    namespace: "default",
   };
 
   // @ts-expect-error flattened user metadata fields should be strings
   request.staticSummary = 7;
 
-  // @ts-expect-error sourced fields are not part of the generated request surface
   request.namespace;
 
   // @ts-expect-error missing workflow args for a callable workflow
-  signalWithStartWorkflow({
+  signalWithStartWorkflow<typeof exampleWorkflow, typeof wakeUpSignal>({
     workflow: exampleWorkflow,
     id: "missing-workflow-input",
     taskQueue,
@@ -123,7 +123,7 @@ if (false) {
   });
 
   // @ts-expect-error workflow args must match the workflow callable
-  signalWithStartWorkflow({
+  signalWithStartWorkflow<typeof exampleWorkflow, typeof wakeUpSignal>({
     workflow: exampleWorkflow,
     args: [3, 4],
     id: "bad-workflow-input",
@@ -133,7 +133,7 @@ if (false) {
   });
 
   // @ts-expect-error missing signal args for a signal definition
-  signalWithStartWorkflow({
+  signalWithStartWorkflow<typeof exampleWorkflow, typeof wakeUpSignal>({
     workflow: "ExampleWorkflow",
     id: "missing-signal-input",
     taskQueue,
@@ -142,7 +142,7 @@ if (false) {
   });
 
   // @ts-expect-error signal args must match the signal definition
-  signalWithStartWorkflow({
+  signalWithStartWorkflow<typeof exampleWorkflow, typeof wakeUpSignal>({
     workflow: "ExampleWorkflow",
     id: "bad-signal-input",
     taskQueue,

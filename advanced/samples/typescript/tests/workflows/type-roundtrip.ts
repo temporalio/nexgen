@@ -3,7 +3,6 @@ import {
   activityOptionsOperation,
   failureOperation,
 } from "../../wit/type-roundtrip/index.ts";
-import { failureFromProto } from "../../wit/type-roundtrip/support.ts";
 
 const TASK_QUEUE = "demo-task-queue";
 
@@ -59,11 +58,8 @@ export async function typeRoundtripCaller(): Promise<{
     }),
   });
   const failureRoundTrip = await failureHandle.result();
-  const convertedFailure =
-    failureRoundTrip.failure == null
-      ? undefined
-      : failureFromProto(failureRoundTrip.failure);
-  const applicationFailure = convertedFailure as common.ApplicationFailure | undefined;
+  const applicationFailure = failureRoundTrip.failure as
+    common.ApplicationFailure | undefined;
 
   return {
     failureCauseMessage: applicationFailure?.cause?.message,
@@ -74,6 +70,6 @@ export async function typeRoundtripCaller(): Promise<{
     priorityKey: activityRoundTrip.priority?.priorityKey ?? undefined,
     retryMaximumAttempts: activityRoundTrip.retryPolicy?.maximumAttempts ?? undefined,
     scheduleToCloseTimeout: durationSecondsToMillis(scheduleToCloseSeconds),
-    taskQueue: activityRoundTrip.taskQueue?.name ?? undefined,
+    taskQueue: activityRoundTrip.taskQueue ?? undefined,
   };
 }
