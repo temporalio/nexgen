@@ -33,7 +33,7 @@ export async function signalWithStartWorkflow<
 >(
   request: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,
 ): Promise<workflow.ExternalWorkflowHandle> {
-  const result =
+  const handle =
     await workflow.startSystemNexusOperation<temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse>(
       {
         service: "temporal.api.workflowservice.v1.WorkflowService",
@@ -48,5 +48,6 @@ export async function signalWithStartWorkflow<
         specificInterceptor: "signalWithStartWorkflow",
       },
     );
+  const result = await handle.result();
   return workflow.getExternalWorkflowHandle(request.id, result.runId ?? undefined);
 }

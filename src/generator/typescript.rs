@@ -5955,6 +5955,13 @@ fn render_operation_function(
             output.push_str(",\n    input: request,\n    toProto: (input) => ");
             output
                 .push_str(&typescript_operation_input_expr(operation).replace("request", "input"));
+            if let Some(serialization_context) = &operation.serialization_context_expr {
+                output.push_str(",\n    serializationContext: (input) => ");
+                output.push_str(serialization_context);
+                output.push_str(
+                    "({ namespace: workflow.workflowInfo().namespace, workflowId: input.id })",
+                );
+            }
             output.push_str(",\n    specificInterceptor: ");
             output.push_str(&typescript_string_literal(&operation.attr_name));
             output.push_str(",\n  });\n}\n");
@@ -5982,7 +5989,7 @@ fn render_operation_function(
         return;
     }
     if crate::nexgen_config::current().system_nexus && service.endpoint.is_some() {
-        output.push_str("  const result = await workflow.startSystemNexusOperation<");
+        output.push_str("  const handle = await workflow.startSystemNexusOperation<");
         output.push_str(&operation.output_operation_annotation);
         output.push_str(">({\n");
         output.push_str("    service: ");
@@ -6002,6 +6009,7 @@ fn render_operation_function(
         output.push_str("    specificInterceptor: ");
         output.push_str(&typescript_string_literal(&operation.attr_name));
         output.push_str(",\n  });\n");
+        output.push_str("  const result = await handle.result();\n");
         if let Some(transform_expr) = &operation.output_transform_expr {
             output.push_str("  return ");
             output.push_str(transform_expr);
@@ -6796,6 +6804,57 @@ interface example-service {
         assert!(output.contains(
             " * Runs example.\n *\n * @param request - Request for the operation.\n * @experimental This API is experimental and subject to change."
         ));
+    }
+
+    #[test]
+    fn system_nexus_non_direct_operations_return_a_handle() {
+        let wit = r#"
+package temporal:nexus@1.0.0;
+
+world system {
+  export workflow-service;
+}
+
+/// @nexus.endpoint "__temporal_system"
+interface workflow-service {
+  record request {
+    id: string,
+  }
+
+  record response {
+    value: string,
+  }
+
+  /// @nexus.serialization-context typescript="operationSerializationContext"
+  deferred-operation: func(request: request) -> response;
+}
+"#;
+        let spec = crate::parser::parse_api_spec_from_wit_for_language(
+            Language::TypeScript,
+            wit,
+            PathBuf::from("inline.wit"),
+        )
+        .unwrap();
+        let descriptors = DescriptorIndex::load(
+            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("advanced/samples/descriptors/temporal_api.bin"),
+        )
+        .unwrap();
+        let _scope = scope(NexgenConfig {
+            system_nexus: true,
+            ..current()
+        });
+        let output = generate_source(
+            Language::TypeScript,
+            spec,
+            &descriptors,
+            &SupportFiles::default(),
+        )
+        .unwrap();
+
+        assert!(output.contains("Promise<workflow.NexusOperationHandle<Response>>"));
+        assert!(output.contains("return await workflow.startSystemNexusOperation({"));
+        assert!(output.contains("serializationContext: (input) => operationSerializationContext({ namespace: workflow.workflowInfo().namespace, workflowId: input.id })"));
     }
 
     #[test]
