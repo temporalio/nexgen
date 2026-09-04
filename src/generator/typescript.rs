@@ -3758,9 +3758,11 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
         body.push_str("  readonly operation: string;\n");
         body.push_str("  readonly inputType: string;\n");
         body.push_str("  readonly outputType: string;\n");
-        body.push_str(
-            "  /** Context for payloads owned by the operation target, when applicable. */\n",
-        );
+        body.push_str("  /** Generated payload visitor for the input protobuf envelope. */\n");
+        body.push_str("  readonly inputPayloadVisitor: string;\n");
+        body.push_str("  /** Generated payload visitor for the output protobuf envelope. */\n");
+        body.push_str("  readonly outputPayloadVisitor: string;\n");
+        body.push_str("  /** Context for nested payloads, determined by the operation. */\n");
         body.push_str("  readonly serializationContext?: (input: Input) => import('@temporalio/common').SerializationContext;\n");
         body.push_str("}\n\n");
     }
@@ -3785,6 +3787,27 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
             body.push_str(",\n");
             body.push_str("    outputType: ");
             body.push_str(&typescript_string_literal(&operation.output_type_id));
+            body.push_str(",\n");
+            let input_type = operation
+                .input
+                .as_ref()
+                .map(|input| input.type_id.as_str())
+                .unwrap_or("void");
+            body.push_str("    inputPayloadVisitor: ");
+            body.push_str(&typescript_string_literal(&format!(
+                "walk{}",
+                input_type.rsplit('.').next().unwrap_or(input_type)
+            )));
+            body.push_str(",\n");
+            body.push_str("    outputPayloadVisitor: ");
+            body.push_str(&typescript_string_literal(&format!(
+                "walk{}",
+                operation
+                    .output_type_id
+                    .rsplit('.')
+                    .next()
+                    .unwrap_or(&operation.output_type_id)
+            )));
             body.push_str(",\n");
             if let Some(serialization_context) = &operation.serialization_context_expr {
                 body.push_str("    serializationContext: ");
