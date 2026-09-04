@@ -359,39 +359,23 @@ impl<'a> ApiPlanner<'a> {
         let input = operation_input_model(operation);
         let output_transform = operation.output_transform.as_ref();
         let output_resource_return = operation.data.output_resource_return.clone();
-        let (output_operation_annotation, output_annotation_default) = match operation.output_type()
-        {
+        let output_annotation_default = match operation.output_type() {
             Some(
                 output @ (PlannedType::External(ExternalTypeSpec::Proto(
                     PlannedProtoType::Message(_),
                 ))
                 | PlannedType::External(ExternalTypeSpec::Json(_))
                 | PlannedType::Record(_)),
-            ) => {
-                if output_transform.is_none()
-                    && output_resource_return.is_none()
-                    && !operation.output_direct_result()
-                    && matches!(output, PlannedType::Record(_))
-                {
-                    let _output_conversion = self.resolve_message_value_conversion(output);
-                }
-                (
-                    self.operation_type_annotation(output),
-                    self.resolve_output_annotation(output),
-                )
-            }
+            ) => self.resolve_output_annotation(output),
             Some(PlannedType::Resource(resource)) => {
                 if let Some(output) = &resource.wire_type {
                     let output = PlannedType::External(output.clone());
-                    (
-                        self.operation_type_annotation(&output),
-                        self.resolve_output_annotation(&output),
-                    )
+                    self.resolve_output_annotation(&output)
                 } else {
-                    (resource.type_name.clone(), resource.type_name.clone())
+                    resource.type_name.clone()
                 }
             }
-            None => ("void".to_string(), "void".to_string()),
+            None => "void".to_string(),
             Some(_) => {
                 panic!("planned operation output should be proto, record, resource, or none")
             }
@@ -458,6 +442,15 @@ impl<'a> ApiPlanner<'a> {
             }
         });
 
+        // The final public return annotation may already contain type arguments.
+        // Service definitions and operation handles apply their own arguments, so
+        // start from the generated model's unparameterized transfer annotation.
+        let output_transfer_annotation = match operation.output_type() {
+            Some(PlannedType::Record(output)) => self
+                .resolve_message_value_conversion(&PlannedType::Record(output.clone()))
+                .annotation,
+            _ => output_annotation_default.clone(),
+        };
         let output_annotation_default = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_operation_output_annotation(
                 &output_annotation_default,
@@ -467,27 +460,27 @@ impl<'a> ApiPlanner<'a> {
                 input,
                 self.api_plan,
             ),
-            _ => output_annotation_default,
+            _ => output_annotation_default.clone(),
         };
         let service_output_operation_annotation = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_erased_record_annotation(
-                &output_operation_annotation,
+                &output_transfer_annotation,
                 &self
                     .api_plan
                     .record_type_parameters(&record.full_name, Language::TypeScript),
             ),
-            _ => output_operation_annotation.clone(),
+            _ => output_transfer_annotation.clone(),
         };
         let output_operation_annotation = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_operation_output_annotation(
-                &output_operation_annotation,
+                &output_transfer_annotation,
                 &self
                     .api_plan
                     .record_type_parameters(&record.full_name, Language::TypeScript),
                 input,
                 self.api_plan,
             ),
-            _ => output_operation_annotation,
+            _ => output_transfer_annotation.clone(),
         };
         Ok(RenderedOperation {
             name: operation.name.as_str(),
@@ -534,9 +527,20 @@ impl<'a> ApiPlanner<'a> {
             output_model_name: operation
                 .output_type()
                 .and_then(|output| self.locally_defined_model_name(output)),
-            output_transfer_type_converter: operation
-                .output_type()
-                .and_then(|output| self.external_models.transfer_type_converter(output)),
+            output_transfer_type_converter: operation.output_type().and_then(|output| match output {
+                PlannedType::Record(_) => self
+                    .resolve_message_value_conversion(output)
+                    .wire_function_names
+                    .map(|_| {
+                        format!(
+                            "{}TransferTypeConverter",
+                            self.locally_defined_model_name(output)
+                                .expect("wire-convertible operation output should have a model name")
+                                .to_lower_camel_case()
+                        )
+                    }),
+                _ => self.external_models.transfer_type_converter(output),
+            }),
             serialization_context_expr: operation
                 .serialization_context
                 .for_language(Language::TypeScript)
