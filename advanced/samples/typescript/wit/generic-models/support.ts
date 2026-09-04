@@ -99,6 +99,21 @@ export function workflowNamespace(): string {
   return workflow.workflowInfo().namespace;
 }
 
+/** Serialization context for payloads owned by a signal-with-start target workflow. */
+export function signalWithStartWorkflowSerializationContext(request: {
+  namespace?: string | null;
+  workflowId?: string | null;
+}): common.WorkflowSerializationContext {
+  if (request.namespace == null || request.workflowId == null) {
+    throw new TypeError("signal-with-start request is missing namespace or workflowId");
+  }
+  return {
+    type: "workflow",
+    namespace: request.namespace,
+    workflowId: request.workflowId,
+  };
+}
+
 export function payloadFromProto(
   payload: temporal.api.common.v1.IPayload,
 ): common.Payload {

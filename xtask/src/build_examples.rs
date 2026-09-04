@@ -385,7 +385,7 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
     let generate_request = GenerateRequest {
         config: NexgenConfig {
             mode: GenerationMode::NativeApi,
-            system_nexus: matches!(language, Language::Dotnet | Language::Python)
+            system_nexus: matches!(language, Language::Python | Language::TypeScript)
                 && example_id == "workflow-service",
         },
         language,

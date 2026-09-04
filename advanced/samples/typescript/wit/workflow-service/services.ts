@@ -2,6 +2,8 @@
 
 import * as nexus from "nexus-rpc";
 import type { temporal } from "@temporalio/proto";
+import { signalWithStartWorkflowSerializationContext } from "./support";
+import type { SignalWithStartWorkflowRequest } from "./models";
 
 /**
  * @experimental This API is experimental and subject to change.
@@ -21,6 +23,17 @@ export const workflowService = nexus.service(
   },
 );
 
+export interface OperationRegistryEntry<Input = unknown> {
+  readonly service: string;
+  readonly operation: string;
+  readonly inputType: string;
+  readonly outputType: string;
+  /** Context for payloads owned by the operation target, when applicable. */
+  readonly serializationContext?: (
+    input: Input,
+  ) => import("@temporalio/common").SerializationContext;
+}
+
 export const operationRegistry = [
   {
     service: "temporal.api.workflowservice.v1.WorkflowService",
@@ -29,5 +42,12 @@ export const operationRegistry = [
       "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest",
     outputType:
       "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse",
+    serializationContext: signalWithStartWorkflowSerializationContext,
   },
 ] as const;
+export interface SystemNexusWorkflowOutboundCallsInterceptor {
+  signalWithStartWorkflow?: (
+    input: SignalWithStartWorkflowRequest,
+    next: (input: SignalWithStartWorkflowRequest) => Promise<unknown>,
+  ) => Promise<unknown>;
+}

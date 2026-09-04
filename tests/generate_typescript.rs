@@ -675,6 +675,9 @@ fn generate_formatted_typescript_output(root: &Path, example_id: &str, output_pa
             output_path.to_str().unwrap(),
             "--native-api",
         ]);
+    if example_id == PRIMARY_EXAMPLE_ID {
+        command.arg("--system-nexus");
+    }
     let status = command.status().unwrap();
     assert!(status.success());
 

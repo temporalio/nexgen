@@ -19,13 +19,14 @@ function configuredPayloadConverter(): common.PayloadConverter {
     globalThis as typeof globalThis & {
       __TEMPORAL_ACTIVATOR__?: {
         payloadConverter?: common.PayloadConverter;
+        systemNexusPayloadConverter?: common.PayloadConverter;
       };
     }
   ).__TEMPORAL_ACTIVATOR__;
   if (activator?.payloadConverter == null) {
     throw new Error("payload converter is unavailable outside workflow context");
   }
-  return activator.payloadConverter;
+  return activator.systemNexusPayloadConverter ?? activator.payloadConverter;
 }
 
 function requestArgsFromPayloads(

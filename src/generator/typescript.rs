@@ -533,6 +533,10 @@ impl<'a> ApiPlanner<'a> {
             output_transfer_type_converter: operation
                 .output_type()
                 .and_then(|output| self.external_models.transfer_type_converter(output)),
+            serialization_context_expr: operation
+                .serialization_context
+                .for_language(Language::TypeScript)
+                .map(str::to_string),
         })
     }
 
@@ -2845,6 +2849,7 @@ struct RenderedOperation<'a> {
     output_direct_result: bool,
     output_model_name: Option<String>,
     output_transfer_type_converter: Option<String>,
+    serialization_context_expr: Option<String>,
 }
 
 #[derive(Debug)]
@@ -3184,6 +3189,7 @@ fn render_module_files(
                 &module_model_names,
                 services,
                 language_imports,
+                support_exports.as_ref(),
                 mode == GenerationMode::NativeApi,
                 api_plan,
             ),
@@ -3742,6 +3748,22 @@ fn render_endpoint_service_operation_body(
 
 fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String {
     let mut body = String::new();
+    let has_serialization_context = services
+        .iter()
+        .flat_map(|service| &service.operations)
+        .any(|operation| operation.serialization_context_expr.is_some());
+    if has_serialization_context {
+        body.push_str("export interface OperationRegistryEntry<Input = unknown> {\n");
+        body.push_str("  readonly service: string;\n");
+        body.push_str("  readonly operation: string;\n");
+        body.push_str("  readonly inputType: string;\n");
+        body.push_str("  readonly outputType: string;\n");
+        body.push_str(
+            "  /** Context for payloads owned by the operation target, when applicable. */\n",
+        );
+        body.push_str("  readonly serializationContext?: (input: Input) => import('@temporalio/common').SerializationContext;\n");
+        body.push_str("}\n\n");
+    }
     body.push_str("export const operationRegistry = [\n");
     for service in services {
         for operation in &service.operations {
@@ -3764,10 +3786,53 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
             body.push_str("    outputType: ");
             body.push_str(&typescript_string_literal(&operation.output_type_id));
             body.push_str(",\n");
+            if let Some(serialization_context) = &operation.serialization_context_expr {
+                body.push_str("    serializationContext: ");
+                body.push_str(serialization_context);
+                body.push_str(",\n");
+            }
             body.push_str("  },\n");
         }
     }
     body.push_str("] as const;\n");
+    body
+}
+
+/// Renders the operation-specific interception surface consumed by the SDK's
+/// workflow outbound interceptor. It deliberately remains separate from the
+/// generic System Nexus hook, as it does in the other SDKs.
+fn render_system_nexus_interceptor_interface(services: &[RenderedService<'_>]) -> String {
+    let operations = services
+        .iter()
+        .filter(|service| service.endpoint.is_some())
+        .flat_map(|service| service.operations.iter())
+        .collect::<Vec<_>>();
+    if operations.is_empty() {
+        return String::new();
+    }
+    let mut body = String::from("export interface SystemNexusWorkflowOutboundCallsInterceptor {\n");
+    for operation in operations {
+        let input = operation
+            .input
+            .as_ref()
+            .and_then(|input| input.model_name.as_deref())
+            .or_else(|| {
+                operation
+                    .input
+                    .as_ref()
+                    .map(|input| input.annotation.as_str())
+            })
+            .unwrap_or("undefined");
+        body.push_str("  ");
+        body.push_str(&operation.attr_name);
+        body.push_str("?: ");
+        body.push_str("(input: ");
+        body.push_str(input);
+        body.push_str(", next: (input: ");
+        body.push_str(input);
+        body.push_str(") => Promise<unknown>) => Promise<unknown>;\n");
+    }
+    body.push_str("}\n\n");
     body
 }
 
@@ -3971,6 +4036,7 @@ fn render_service_module(
     external_model_names: &BTreeSet<String>,
     services: &[RenderedService<'_>],
     language_imports: &[LanguageImportSpec],
+    support_exports: Option<&SupportExports>,
     include_native_api: bool,
     api_plan: &PlannedSpec,
 ) -> String {
@@ -3985,6 +4051,9 @@ fn render_service_module(
     }
     if include_native_api {
         body.push_str(&render_operation_registry_module(services));
+        if crate::nexgen_config::current().system_nexus {
+            body.push_str(&render_system_nexus_interceptor_interface(services));
+        }
     }
     let mut imports = String::new();
     render_typescript_namespace_imports(
@@ -3993,6 +4062,8 @@ fn render_service_module(
         language_imports,
         &[("nexus", "nexus-rpc"), ("workflow", "@temporalio/workflow")],
     );
+    render_typescript_default_type_import_if_used(&mut imports, &body, "Long", "long");
+    render_support_imports(&mut imports, support_exports, "./support", &body);
     // Operation type info references converter *values*, so they import alongside
     // (and before) the type-only model imports.
     render_value_imports(
@@ -4398,6 +4469,7 @@ fn render_configured_payload_converter(output: &mut String) {
     output.push_str("    globalThis as typeof globalThis & {\n");
     output.push_str("      __TEMPORAL_ACTIVATOR__?: {\n");
     output.push_str("        payloadConverter?: common.PayloadConverter;\n");
+    output.push_str("        systemNexusPayloadConverter?: common.PayloadConverter;\n");
     output.push_str("      };\n");
     output.push_str("    }\n");
     output.push_str("  ).__TEMPORAL_ACTIVATOR__;\n");
@@ -4406,7 +4478,9 @@ fn render_configured_payload_converter(output: &mut String) {
         "    throw new Error('payload converter is unavailable outside workflow context');\n",
     );
     output.push_str("  }\n");
-    output.push_str("  return activator.payloadConverter;\n");
+    output.push_str(
+        "  return activator.systemNexusPayloadConverter ?? activator.payloadConverter;\n",
+    );
     output.push_str("}\n");
 }
 
@@ -5872,6 +5946,20 @@ fn render_operation_function(
         output.push_str("): Promise<workflow.NexusOperationHandle<");
         output.push_str(&operation.output_operation_annotation);
         output.push_str(">> {\n");
+        if crate::nexgen_config::current().system_nexus && service.endpoint.is_some() {
+            output.push_str("  return await workflow.startSystemNexusOperation({\n");
+            output.push_str("    service: ");
+            output.push_str(&typescript_string_literal(service.wire_name));
+            output.push_str(",\n    operation: ");
+            output.push_str(&typescript_string_literal(operation.wire_name));
+            output.push_str(",\n    input: request,\n    toProto: (input) => ");
+            output
+                .push_str(&typescript_operation_input_expr(operation).replace("request", "input"));
+            output.push_str(",\n    specificInterceptor: ");
+            output.push_str(&typescript_string_literal(&operation.attr_name));
+            output.push_str(",\n  });\n}\n");
+            return;
+        }
         output.push_str("  const client = workflow.createNexusServiceClient({\n");
         output.push_str("    service: ");
         output.push_str(&service.attr_name);
@@ -5890,6 +5978,39 @@ fn render_operation_function(
         output.push_str(&typescript_operation_input_expr(operation));
         output.push_str(",\n");
         output.push_str("  );\n");
+        output.push_str("}\n");
+        return;
+    }
+    if crate::nexgen_config::current().system_nexus && service.endpoint.is_some() {
+        output.push_str("  const result = await workflow.startSystemNexusOperation<");
+        output.push_str(&operation.output_operation_annotation);
+        output.push_str(">({\n");
+        output.push_str("    service: ");
+        output.push_str(&typescript_string_literal(service.wire_name));
+        output.push_str(",\n    operation: ");
+        output.push_str(&typescript_string_literal(operation.wire_name));
+        output.push_str(",\n    input: request,\n    toProto: (input) => ");
+        output.push_str(&typescript_operation_input_expr(operation).replace("request", "input"));
+        output.push_str(",\n");
+        if let Some(serialization_context) = &operation.serialization_context_expr {
+            output.push_str("    serializationContext: (input) => ");
+            output.push_str(serialization_context);
+            output.push_str(
+                "({ namespace: workflow.workflowInfo().namespace, workflowId: input.id }),\n",
+            );
+        }
+        output.push_str("    specificInterceptor: ");
+        output.push_str(&typescript_string_literal(&operation.attr_name));
+        output.push_str(",\n  });\n");
+        if let Some(transform_expr) = &operation.output_transform_expr {
+            output.push_str("  return ");
+            output.push_str(transform_expr);
+            output.push_str(";\n");
+        } else {
+            output.push_str("  return result as ");
+            output.push_str(&operation.output_annotation);
+            output.push_str(";\n");
+        }
         output.push_str("}\n");
         return;
     }
@@ -6202,6 +6323,7 @@ mod tests {
     };
     use crate::language::Language;
     use crate::planning::PlannedType;
+    use crate::nexgen_config::{NexgenConfig, current, scope};
     use crate::spec::ApiSpecTree;
     use crate::spec::IntSpec;
     use crate::spec::SupportFragmentSpec;
@@ -6302,6 +6424,10 @@ mod tests {
             DescriptorIndex::load(&root.join("advanced/samples/descriptors/temporal_api.bin"))
                 .unwrap();
         let support = sample_support_files(&root);
+        let _scope = scope(NexgenConfig {
+            system_nexus: true,
+            ..current()
+        });
         let generated = generate_files_for_tree_with_mode_and_options(
             Language::TypeScript,
             ApiSpecTree::single(spec.clone()),
