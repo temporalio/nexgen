@@ -3255,7 +3255,34 @@ fn render_module_files(
         rendered_support.files,
         GeneratedFileOrigin::fixed("generated TypeScript external-model runtime"),
     )?;
+    files.map_contents(relativize_output_root_imports);
     Ok(files)
+}
+
+const OUTPUT_ROOT_IMPORT_PREFIX: &str = "__nexgen_output_root__:";
+
+/// WIT relative TypeScript imports are rooted at the generated output directory.
+/// Relativize them for each emitted module, whose depth may differ (e.g. operations).
+fn relativize_output_root_imports(path: &Path, contents: &str) -> String {
+    let source_depth = path
+        .parent()
+        .map_or(0, |parent| parent.components().count());
+    let mut output = contents.to_string();
+    while let Some(start) = output.find(OUTPUT_ROOT_IMPORT_PREFIX) {
+        let target_start = start + OUTPUT_ROOT_IMPORT_PREFIX.len();
+        let target_end = output[target_start..]
+            .find('\'')
+            .map(|offset| target_start + offset)
+            .expect("generated output-root import must end with a quote");
+        let target = &output[target_start..target_end];
+        let mut relative = "../".repeat(source_depth);
+        relative.push_str(target);
+        if !relative.starts_with('.') {
+            relative.insert_str(0, "./");
+        }
+        output.replace_range(start..target_end, &relative);
+    }
+    output
 }
 
 fn support_source(support_fragments: &[SupportFragmentSpec]) -> Option<String> {
@@ -3353,15 +3380,30 @@ fn render_typescript_namespace_imports(
         }
         output.push_str(&namespace);
         output.push_str(" from '");
-        output.push_str(&package);
+        output.push_str(&typescript_output_root_import(&package));
         output.push_str("';\n");
     }
     for (package, imports) in named_type_imports {
         output.push_str("import type { ");
         output.push_str(&imports.into_iter().collect::<Vec<_>>().join(", "));
         output.push_str(" } from '");
-        output.push_str(&package);
+        output.push_str(&typescript_output_root_import(&package));
         output.push_str("';\n");
+    }
+}
+
+fn typescript_output_root_import(package: &str) -> String {
+    package
+        .starts_with('.')
+        .then(|| format!("{OUTPUT_ROOT_IMPORT_PREFIX}{package}"))
+        .unwrap_or_else(|| package.to_string())
+}
+
+fn typescript_workflow_module() -> &'static str {
+    if crate::nexgen_config::current().system_nexus {
+        "../workflow-exports"
+    } else {
+        "@temporalio/workflow"
     }
 }
 
@@ -3936,11 +3978,16 @@ fn render_models_module(
         body.push_str(&model_fragments.body);
     }
     let mut imports = String::new();
-    let generated_value_imports = if uses_configured_payload_converter {
+    let mut generated_value_imports = if uses_configured_payload_converter {
         vec![("common", "@temporalio/common")]
     } else {
         Vec::new()
     };
+    if crate::nexgen_config::current().system_nexus
+        && contains_qualified_identifier(&body, "workflow")
+    {
+        generated_value_imports.push(("workflow", typescript_workflow_module()));
+    }
     let mut model_language_imports = language_imports.to_vec();
     if uses_invocation_models {
         model_language_imports.push(LanguageImportSpec {
@@ -4083,7 +4130,10 @@ fn render_service_module(
         &mut imports,
         &body,
         language_imports,
-        &[("nexus", "nexus-rpc"), ("workflow", "@temporalio/workflow")],
+        &[
+            ("nexus", "nexus-rpc"),
+            ("workflow", typescript_workflow_module()),
+        ],
     );
     render_typescript_default_type_import_if_used(&mut imports, &body, "Long", "long");
     render_support_imports(&mut imports, support_exports, "./support", &body);
@@ -4163,7 +4213,7 @@ fn render_resources_module(
         &mut imports,
         &body,
         language_imports,
-        &[("workflow", "@temporalio/workflow")],
+        &[("workflow", typescript_workflow_module())],
     );
     render_typescript_requirement_imports(&mut imports, requirements);
     render_type_imports(
@@ -4227,7 +4277,7 @@ fn render_operation_module(
         &mut imports,
         &body,
         language_imports,
-        &[("workflow", "@temporalio/workflow")],
+        &[("workflow", typescript_workflow_module())],
     );
     render_value_imports(&mut imports, "../services", &[service.attr_name.clone()]);
     let mut model_values = model_to_wire_function_names(models);

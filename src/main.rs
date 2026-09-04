@@ -198,23 +198,23 @@ fn main() -> ExitCode {
         Commands::Typescript(args) => {
             #[cfg(feature = "advanced")]
             {
-            let system_nexus = args.common.system_nexus;
-            let config = NexgenConfig {
-                mode: if args.common.generate_native_api {
-                    nexgen::generator::GenerationMode::NativeApi
-                } else {
-                    nexgen::generator::GenerationMode::DefinitionsOnly
-                },
-                system_nexus,
-            };
-            let mut request = generate_request(
-                Language::TypeScript,
-                args.common,
-                args.ts_date_time_types.into(),
-                None,
-            );
-            request.config = config;
-            generate_to_file(&request)
+                let system_nexus = args.common.system_nexus;
+                let config = NexgenConfig {
+                    mode: if args.common.generate_native_api {
+                        nexgen::generator::GenerationMode::NativeApi
+                    } else {
+                        nexgen::generator::GenerationMode::DefinitionsOnly
+                    },
+                    system_nexus,
+                };
+                let mut request = generate_request(
+                    Language::TypeScript,
+                    args.common,
+                    args.ts_date_time_types.into(),
+                    None,
+                );
+                request.config = config;
+                generate_to_file(&request)
             }
             #[cfg(not(feature = "advanced"))]
             {
