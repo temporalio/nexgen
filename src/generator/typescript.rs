@@ -3285,6 +3285,22 @@ fn render_module_files(
     }
     if crate::nexgen_config::current().system_nexus && !services.is_empty() {
         files.insert(
+            "registry.ts",
+            render_operation_registry_module(
+                enums,
+                flags,
+                variants,
+                models,
+                &module_model_names,
+                services,
+                support_exports.as_ref(),
+                api_plan,
+            ),
+            GeneratedFileOrigin::fixed("generated TypeScript System Nexus operation registry"),
+        )?;
+    }
+    if crate::nexgen_config::current().system_nexus && !services.is_empty() {
+        files.insert(
             "interceptors.ts",
             render_system_nexus_interceptors_module(
                 enums,
@@ -3412,13 +3428,16 @@ fn render_typescript_namespace_imports(
     source: &str,
     source_dir: &Path,
     language_imports: &[LanguageImportSpec],
-    generated_value_imports: &[(&str, &str)],
+    generated_imports: &[(&str, &str, bool)],
 ) {
     let mut namespace_imports = BTreeMap::<(String, String), bool>::new();
     let mut named_type_imports = BTreeMap::<String, BTreeSet<String>>::new();
-    for (namespace, package) in generated_value_imports {
+    for (namespace, package, type_only) in generated_imports {
         if contains_qualified_identifier(source, namespace) {
-            namespace_imports.insert(((*namespace).to_string(), (*package).to_string()), true);
+            namespace_imports.insert(
+                ((*namespace).to_string(), (*package).to_string()),
+                !type_only,
+            );
         }
     }
     for import in language_imports {
@@ -3461,23 +3480,37 @@ fn render_typescript_namespace_imports(
         }
     }
 
+    let mut rendered_imports = Vec::new();
     for ((namespace, package), needs_value_import) in namespace_imports {
+        let package = typescript_relative_import(source_dir, &package);
+        let mut import = String::new();
         if needs_value_import {
-            output.push_str("import * as ");
+            import.push_str("import * as ");
         } else {
-            output.push_str("import type * as ");
+            import.push_str("import type * as ");
         }
-        output.push_str(&namespace);
-        output.push_str(" from '");
-        output.push_str(&typescript_relative_import(source_dir, &package));
-        output.push_str("';\n");
+        import.push_str(&namespace);
+        import.push_str(" from '");
+        import.push_str(&package);
+        import.push_str("';\n");
+        rendered_imports.push((package, import));
     }
     for (package, imports) in named_type_imports {
-        output.push_str("import type { ");
-        output.push_str(&imports.into_iter().collect::<Vec<_>>().join(", "));
-        output.push_str(" } from '");
-        output.push_str(&typescript_relative_import(source_dir, &package));
-        output.push_str("';\n");
+        let package = typescript_relative_import(source_dir, &package);
+        let mut import = String::from("import type { ");
+        import.push_str(&imports.into_iter().collect::<Vec<_>>().join(", "));
+        import.push_str(" } from '");
+        import.push_str(&package);
+        import.push_str("';\n");
+        rendered_imports.push((package, import));
+    }
+    rendered_imports.sort_by(|(left, _), (right, _)| {
+        left.starts_with('.')
+            .cmp(&right.starts_with('.'))
+            .then_with(|| left.cmp(right))
+    });
+    for (_, import) in rendered_imports {
+        output.push_str(&import);
     }
 }
 
@@ -3874,7 +3907,16 @@ fn render_endpoint_service_operation_body(
     }
 }
 
-fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String {
+fn render_operation_registry_module(
+    enums: &[&RenderedEnum],
+    flags: &[&RenderedFlags],
+    variants: &[&RenderedVariant],
+    models: &[&RenderedModel],
+    external_model_names: &BTreeSet<String>,
+    services: &[RenderedService<'_>],
+    support_exports: Option<&SupportExports>,
+    api_plan: &PlannedSpec,
+) -> String {
     let mut body = String::new();
     let system_nexus = crate::nexgen_config::current().system_nexus;
     let has_serialization_context = services
@@ -3943,7 +3985,32 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
         }
     }
     body.push_str("] as const;\n");
-    body
+
+    let mut imports = String::new();
+    if system_nexus && body.contains("workflow.") {
+        imports.push_str("import type * as workflow from '../workflow-exports';\n");
+    }
+    render_support_imports(&mut imports, support_exports, "./support", &body);
+    render_type_imports(
+        &mut imports,
+        "./models",
+        &used_import_names(
+            &body,
+            &model_type_names(enums, flags, variants, models, external_model_names),
+        ),
+    );
+    render_cross_module_model_type_imports(
+        &mut imports,
+        &api_plan.module_path.to_path_buf(),
+        api_plan,
+        &body,
+    );
+    if system_nexus && body.contains("SystemNexusWorkflowOutboundCallsInterceptor") {
+        imports.push_str(
+            "import type { SystemNexusWorkflowOutboundCallsInterceptor } from './interceptors';\n",
+        );
+    }
+    render_generated_module(imports, body)
 }
 
 /// Renders the operation-specific interception surface consumed by the SDK's
@@ -4002,7 +4069,7 @@ fn render_system_nexus_interceptors_module(
         &body,
         &api_plan.module_path.to_path_buf(),
         language_imports,
-        &[("workflow", typescript_workflow_module())],
+        &[("workflow", typescript_workflow_module(), true)],
     );
     render_type_imports(
         &mut imports,
@@ -4103,7 +4170,7 @@ fn render_models_module(
     if crate::nexgen_config::current().system_nexus
         && contains_qualified_identifier(&body, "workflow")
     {
-        generated_value_imports.push(("workflow", typescript_workflow_module()));
+        generated_value_imports.push(("workflow", typescript_workflow_module(), true));
     }
     let mut model_language_imports = language_imports.to_vec();
     let value_namespace_imports = models
@@ -4252,9 +4319,6 @@ fn render_service_module(
             body.push('\n');
         }
     }
-    if include_native_api {
-        body.push_str(&render_operation_registry_module(services));
-    }
     let mut imports = String::new();
     render_typescript_namespace_imports(
         &mut imports,
@@ -4262,8 +4326,8 @@ fn render_service_module(
         &api_plan.module_path.to_path_buf(),
         language_imports,
         &[
-            ("nexus", "nexus-rpc"),
-            ("workflow", typescript_workflow_module()),
+            ("nexus", "nexus-rpc", false),
+            ("workflow", typescript_workflow_module(), false),
         ],
     );
     render_support_imports(&mut imports, support_exports, "./support", &body);
@@ -4314,13 +4378,6 @@ fn render_service_module(
         "./resources",
         &used_import_names(&body, &resource_type_names(services)),
     );
-    if include_native_api && crate::nexgen_config::current().system_nexus {
-        render_type_imports(
-            &mut imports,
-            "./interceptors",
-            &["SystemNexusWorkflowOutboundCallsInterceptor".to_string()],
-        );
-    }
     let resource_client_binders = services
         .iter()
         .filter(|service| include_native_api && service.endpoint.is_none())
@@ -4360,7 +4417,7 @@ fn render_resources_module(
         &body,
         &api_plan.module_path.to_path_buf(),
         language_imports,
-        &[("workflow", typescript_workflow_module())],
+        &[("workflow", typescript_workflow_module(), false)],
     );
     render_typescript_requirement_imports(&mut imports, requirements);
     render_type_imports(
@@ -4425,7 +4482,7 @@ fn render_operation_module(
         &body,
         &api_plan.module_path.to_path_buf().join("operations"),
         language_imports,
-        &[("workflow", typescript_workflow_module())],
+        &[("workflow", typescript_workflow_module(), false)],
     );
     render_value_imports(&mut imports, "../services", &[service.attr_name.clone()]);
     let mut model_values = model_to_wire_function_names(models);
