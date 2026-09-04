@@ -368,12 +368,6 @@ impl GeneratedFileMap {
         Ok(())
     }
 
-    pub(crate) fn map_contents(&mut self, mut map: impl FnMut(&Path, &str) -> String) {
-        for (path, file) in &mut self.files {
-            file.contents = map(path, &file.contents);
-        }
-    }
-
     pub(crate) fn prefix(self, prefix: impl AsRef<Path>) -> Result<Self> {
         let mut prefixed = Self::default();
         for (path, file) in self.files {

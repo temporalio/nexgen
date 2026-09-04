@@ -1564,6 +1564,7 @@ impl<'a> ApiPlanner<'a> {
                     resolved.annotation = annotation.to_string();
                     resolved.requirements = TypeScriptRequirements {
                         long: annotation == "Long",
+                        ..TypeScriptRequirements::default()
                     };
                 }
                 resolved
@@ -3284,7 +3285,7 @@ fn render_module_files(
     }
     if crate::nexgen_config::current().system_nexus && !services.is_empty() {
         files.insert(
-            "interceptors.ts".into(),
+            "interceptors.ts",
             render_system_nexus_interceptors_module(
                 enums,
                 flags,
@@ -3295,7 +3296,8 @@ fn render_module_files(
                 language_imports,
                 api_plan,
             ),
-        );
+            GeneratedFileOrigin::fixed("generated TypeScript System Nexus interceptors"),
+        )?;
     }
     if services.iter().any(|service| !service.resources.is_empty()) {
         files.insert(
@@ -3356,34 +3358,7 @@ fn render_module_files(
         rendered_support.files,
         GeneratedFileOrigin::fixed("generated TypeScript external-model runtime"),
     )?;
-    files.map_contents(relativize_output_root_imports);
     Ok(files)
-}
-
-const OUTPUT_ROOT_IMPORT_PREFIX: &str = "__nexgen_output_root__:";
-
-/// WIT relative TypeScript imports are rooted at the generated output directory.
-/// Relativize them for each emitted module, whose depth may differ (e.g. operations).
-fn relativize_output_root_imports(path: &Path, contents: &str) -> String {
-    let source_depth = path
-        .parent()
-        .map_or(0, |parent| parent.components().count());
-    let mut output = contents.to_string();
-    while let Some(start) = output.find(OUTPUT_ROOT_IMPORT_PREFIX) {
-        let target_start = start + OUTPUT_ROOT_IMPORT_PREFIX.len();
-        let target_end = output[target_start..]
-            .find('\'')
-            .map(|offset| target_start + offset)
-            .expect("generated output-root import must end with a quote");
-        let target = &output[target_start..target_end];
-        let mut relative = "../".repeat(source_depth);
-        relative.push_str(target);
-        if !relative.starts_with('.') {
-            relative.insert_str(0, "./");
-        }
-        output.replace_range(start..target_end, &relative);
-    }
-    output
 }
 
 fn support_source(support_fragments: &[SupportFragmentSpec]) -> Option<String> {
@@ -3435,6 +3410,7 @@ fn export_name<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
 fn render_typescript_namespace_imports(
     output: &mut String,
     source: &str,
+    source_dir: &Path,
     language_imports: &[LanguageImportSpec],
     generated_value_imports: &[(&str, &str)],
 ) {
@@ -3493,22 +3469,22 @@ fn render_typescript_namespace_imports(
         }
         output.push_str(&namespace);
         output.push_str(" from '");
-        output.push_str(&typescript_output_root_import(&package));
+        output.push_str(&typescript_relative_import(source_dir, &package));
         output.push_str("';\n");
     }
     for (package, imports) in named_type_imports {
         output.push_str("import type { ");
         output.push_str(&imports.into_iter().collect::<Vec<_>>().join(", "));
         output.push_str(" } from '");
-        output.push_str(&typescript_output_root_import(&package));
+        output.push_str(&typescript_relative_import(source_dir, &package));
         output.push_str("';\n");
     }
 }
 
-fn typescript_output_root_import(package: &str) -> String {
+fn typescript_relative_import(source_dir: &Path, package: &str) -> String {
     package
         .starts_with('.')
-        .then(|| format!("{OUTPUT_ROOT_IMPORT_PREFIX}{package}"))
+        .then(|| relative_module_path(source_dir, Path::new(package)))
         .unwrap_or_else(|| package.to_string())
 }
 
@@ -4024,6 +4000,7 @@ fn render_system_nexus_interceptors_module(
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf(),
         language_imports,
         &[("workflow", typescript_workflow_module())],
     );
@@ -4157,6 +4134,7 @@ fn render_models_module(
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf(),
         &model_language_imports,
         &generated_value_imports,
     );
@@ -4281,13 +4259,13 @@ fn render_service_module(
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf(),
         language_imports,
         &[
             ("nexus", "nexus-rpc"),
             ("workflow", typescript_workflow_module()),
         ],
     );
-    render_typescript_default_type_import_if_used(&mut imports, &body, "Long", "long");
     render_support_imports(&mut imports, support_exports, "./support", &body);
     // Operation type info references converter *values*, so they import alongside
     // (and before) the type-only model imports.
@@ -4380,6 +4358,7 @@ fn render_resources_module(
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf(),
         language_imports,
         &[("workflow", typescript_workflow_module())],
     );
@@ -4444,6 +4423,7 @@ fn render_operation_module(
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf().join("operations"),
         language_imports,
         &[("workflow", typescript_workflow_module())],
     );
@@ -6549,8 +6529,8 @@ mod tests {
         generate_files_for_tree_with_mode_and_options, generate_source,
     };
     use crate::language::Language;
-    use crate::planning::PlannedType;
     use crate::nexgen_config::{NexgenConfig, current, scope};
+    use crate::planning::PlannedType;
     use crate::spec::ApiSpecTree;
     use crate::spec::IntSpec;
     use crate::spec::SupportFragmentSpec;
