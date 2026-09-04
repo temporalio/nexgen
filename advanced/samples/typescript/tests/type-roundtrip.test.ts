@@ -4,10 +4,7 @@ import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import * as nexus from "nexus-rpc";
 
-import type {
-  ActivityOptions,
-  FailureContainer,
-} from "../wit/type-roundtrip/index.ts";
+import type { ActivityOptions, FailureContainer } from "../wit/type-roundtrip/index.ts";
 import { typeRoundtripService } from "../wit/type-roundtrip/services.ts";
 import { failureFromProto, failureToProto } from "../wit/type-roundtrip/support.ts";
 import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts";
