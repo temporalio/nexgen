@@ -29,17 +29,9 @@ export const operationRegistry = [
   {
     service: "TypeRoundtripService",
     operation: "ActivityOptionsOperation",
-    inputType: "temporal.api.activity.v1.ActivityOptions",
-    outputType: "temporal.api.activity.v1.ActivityOptions",
-    inputPayloadVisitor: "walkActivityOptions",
-    outputPayloadVisitor: "walkActivityOptions",
   },
   {
     service: "TypeRoundtripService",
     operation: "FailureOperation",
-    inputType: "temporal.api.command.v1.FailWorkflowExecutionCommandAttributes",
-    outputType: "temporal.api.command.v1.FailWorkflowExecutionCommandAttributes",
-    inputPayloadVisitor: "walkFailWorkflowExecutionCommandAttributes",
-    outputPayloadVisitor: "walkFailWorkflowExecutionCommandAttributes",
   },
 ] as const;

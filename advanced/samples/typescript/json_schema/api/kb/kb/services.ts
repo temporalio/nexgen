@@ -108,25 +108,13 @@ export const operationRegistry = [
   {
     service: "example.kb.v1.KnowledgeBaseService",
     operation: "GetPage",
-    inputType: "kb#KnowledgeBaseService.GetPageInput",
-    outputType: "content/page#Page",
-    inputPayloadVisitor: "walkGetPageInput",
-    outputPayloadVisitor: "walkcontent/page#Page",
   },
   {
     service: "example.kb.v1.KnowledgeBaseService",
     operation: "PutBlock",
-    inputType: "content/block#Block",
-    outputType: "kb#KnowledgeBaseService.PutBlockOutput",
-    inputPayloadVisitor: "walkcontent/block#Block",
-    outputPayloadVisitor: "walkPutBlockOutput",
   },
   {
     service: "example.kb.v1.KnowledgeBaseService",
     operation: "GetCategoryTree",
-    inputType: "kb#KnowledgeBaseService.GetCategoryTreeInput",
-    outputType: "tree/category#Category",
-    inputPayloadVisitor: "walkGetCategoryTreeInput",
-    outputPayloadVisitor: "walktree/category#Category",
   },
 ] as const;

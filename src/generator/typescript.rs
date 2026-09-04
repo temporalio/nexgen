@@ -359,49 +359,43 @@ impl<'a> ApiPlanner<'a> {
         let input = operation_input_model(operation);
         let output_transform = operation.output_transform.as_ref();
         let output_resource_return = operation.data.output_resource_return.clone();
-        let (output_operation_annotation, output_type_id, output_annotation_default) =
-            match operation.output_type() {
-                Some(
-                    output @ (PlannedType::External(ExternalTypeSpec::Proto(
-                        PlannedProtoType::Message(_),
-                    ))
-                    | PlannedType::External(ExternalTypeSpec::Json(_))
-                    | PlannedType::Record(_)),
-                ) => {
-                    if output_transform.is_none()
-                        && output_resource_return.is_none()
-                        && !operation.output_direct_result()
-                        && matches!(output, PlannedType::Record(_))
-                    {
-                        let _output_conversion = self.resolve_message_value_conversion(output);
-                    }
+        let (output_operation_annotation, output_annotation_default) = match operation.output_type()
+        {
+            Some(
+                output @ (PlannedType::External(ExternalTypeSpec::Proto(
+                    PlannedProtoType::Message(_),
+                ))
+                | PlannedType::External(ExternalTypeSpec::Json(_))
+                | PlannedType::Record(_)),
+            ) => {
+                if output_transform.is_none()
+                    && output_resource_return.is_none()
+                    && !operation.output_direct_result()
+                    && matches!(output, PlannedType::Record(_))
+                {
+                    let _output_conversion = self.resolve_message_value_conversion(output);
+                }
+                (
+                    self.operation_type_annotation(output),
+                    self.resolve_output_annotation(output),
+                )
+            }
+            Some(PlannedType::Resource(resource)) => {
+                if let Some(output) = &resource.wire_type {
+                    let output = PlannedType::External(output.clone());
                     (
-                        self.operation_type_annotation(output),
-                        self.operation_wire_type_identifier(output),
-                        self.resolve_output_annotation(output),
+                        self.operation_type_annotation(&output),
+                        self.resolve_output_annotation(&output),
                     )
+                } else {
+                    (resource.type_name.clone(), resource.type_name.clone())
                 }
-                Some(PlannedType::Resource(resource)) => {
-                    if let Some(output) = &resource.wire_type {
-                        let output = PlannedType::External(output.clone());
-                        (
-                            self.operation_type_annotation(&output),
-                            self.operation_wire_type_identifier(&output),
-                            self.resolve_output_annotation(&output),
-                        )
-                    } else {
-                        (
-                            resource.type_name.clone(),
-                            resource.type_name.clone(),
-                            resource.type_name.clone(),
-                        )
-                    }
-                }
-                None => ("void".to_string(), "void".to_string(), "void".to_string()),
-                Some(_) => {
-                    panic!("planned operation output should be proto, record, resource, or none")
-                }
-            };
+            }
+            None => ("void".to_string(), "void".to_string()),
+            Some(_) => {
+                panic!("planned operation output should be proto, record, resource, or none")
+            }
+        };
         let input_full_name = input.and_then(|input| match input {
             PlannedType::Record(record) => Some(record.full_name.as_str()),
             _ => None,
@@ -433,7 +427,6 @@ impl<'a> ApiPlanner<'a> {
                     &self.operation_type_annotation(input),
                     &type_parameters,
                 ),
-                type_id: self.operation_wire_type_identifier(input),
                 model_name: model_name.clone(),
                 type_parameters,
                 annotation,
@@ -516,7 +509,6 @@ impl<'a> ApiPlanner<'a> {
                 .map(str::to_string),
             output_operation_annotation,
             service_output_operation_annotation,
-            output_type_id,
             input: rendered_input,
             output_annotation: output_transform
                 .and_then(|transform| {
@@ -2871,7 +2863,6 @@ struct RenderedOperation<'a> {
     return_doc: Option<String>,
     output_operation_annotation: String,
     service_output_operation_annotation: String,
-    output_type_id: String,
     input: Option<RenderedOperationInput>,
     output_annotation: String,
     output_transform_expr: Option<String>,
@@ -2885,7 +2876,6 @@ struct RenderedOperation<'a> {
 #[derive(Debug)]
 struct RenderedOperationInput {
     operation_annotation: String,
-    type_id: String,
     model_name: Option<String>,
     type_parameters: Vec<RenderedTypeParameter>,
     annotation: String,
@@ -3843,12 +3833,6 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
         body.push_str("export interface OperationRegistryEntry<Input = unknown> {\n");
         body.push_str("  readonly service: string;\n");
         body.push_str("  readonly operation: string;\n");
-        body.push_str("  readonly inputType: string;\n");
-        body.push_str("  readonly outputType: string;\n");
-        body.push_str("  /** Generated payload visitor for the input protobuf envelope. */\n");
-        body.push_str("  readonly inputPayloadVisitor: string;\n");
-        body.push_str("  /** Generated payload visitor for the output protobuf envelope. */\n");
-        body.push_str("  readonly outputPayloadVisitor: string;\n");
         body.push_str("  /** Context for nested payloads, determined by the operation. */\n");
         body.push_str("  readonly serializationContext?: (input: Input) => import('@temporalio/common').SerializationContext;\n");
         body.push_str("}\n\n");
@@ -3862,39 +3846,6 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
             body.push_str(",\n");
             body.push_str("    operation: ");
             body.push_str(&typescript_string_literal(operation.wire_name));
-            body.push_str(",\n");
-            body.push_str("    inputType: ");
-            body.push_str(&typescript_string_literal(
-                operation
-                    .input
-                    .as_ref()
-                    .map(|input| input.type_id.as_str())
-                    .unwrap_or("void"),
-            ));
-            body.push_str(",\n");
-            body.push_str("    outputType: ");
-            body.push_str(&typescript_string_literal(&operation.output_type_id));
-            body.push_str(",\n");
-            let input_type = operation
-                .input
-                .as_ref()
-                .map(|input| input.type_id.as_str())
-                .unwrap_or("void");
-            body.push_str("    inputPayloadVisitor: ");
-            body.push_str(&typescript_string_literal(&format!(
-                "walk{}",
-                input_type.rsplit('.').next().unwrap_or(input_type)
-            )));
-            body.push_str(",\n");
-            body.push_str("    outputPayloadVisitor: ");
-            body.push_str(&typescript_string_literal(&format!(
-                "walk{}",
-                operation
-                    .output_type_id
-                    .rsplit('.')
-                    .next()
-                    .unwrap_or(&operation.output_type_id)
-            )));
             body.push_str(",\n");
             if let Some(serialization_context) = &operation.serialization_context_expr {
                 body.push_str("    serializationContext: ");
@@ -6061,6 +6012,11 @@ fn render_operation_function(
             output.push_str(".operations.");
             output.push_str(&operation.attr_name);
             output.push_str(".inputType!,");
+            output.push_str("\n    outputType: ");
+            output.push_str(&service.attr_name);
+            output.push_str(".operations.");
+            output.push_str(&operation.attr_name);
+            output.push_str(".outputType,");
             if let Some(serialization_context) = &operation.serialization_context_expr {
                 output.push_str(",\n    serializationContext: (input) => ");
                 output.push_str(serialization_context);
@@ -6107,6 +6063,11 @@ fn render_operation_function(
         output.push_str(".operations.");
         output.push_str(&operation.attr_name);
         output.push_str(".inputType!,\n");
+        output.push_str("    outputType: ");
+        output.push_str(&service.attr_name);
+        output.push_str(".operations.");
+        output.push_str(&operation.attr_name);
+        output.push_str(".outputType,\n");
         if let Some(serialization_context) = &operation.serialization_context_expr {
             output.push_str("    serializationContext: (input) => ");
             output.push_str(serialization_context);

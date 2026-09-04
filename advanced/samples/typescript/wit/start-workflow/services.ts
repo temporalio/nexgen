@@ -36,26 +36,13 @@ export const operationRegistry = [
   {
     service: "StartWorkflowService",
     operation: "StartWorkflow",
-    inputType: "temporal.api.workflowservice.v1.StartWorkflowExecutionRequest",
-    outputType: "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse",
-    inputPayloadVisitor: "walkStartWorkflowExecutionRequest",
-    outputPayloadVisitor: "walkStartWorkflowExecutionResponse",
   },
   {
     service: "StartWorkflowService",
     operation: "RestartWorkflow",
-    inputType: "temporal.api.workflowservice.v1.StartWorkflowExecutionRequest",
-    outputType: "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse",
-    inputPayloadVisitor: "walkStartWorkflowExecutionRequest",
-    outputPayloadVisitor: "walkStartWorkflowExecutionResponse",
   },
   {
     service: "StartWorkflowService",
     operation: "CancelWorkflow",
-    inputType: "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest",
-    outputType:
-      "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse",
-    inputPayloadVisitor: "walkRequestCancelWorkflowExecutionRequest",
-    outputPayloadVisitor: "walkRequestCancelWorkflowExecutionResponse",
   },
 ] as const;

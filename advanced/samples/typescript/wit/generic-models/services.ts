@@ -13,9 +13,5 @@ export const operationRegistry = [
   {
     service: "GenericModelService",
     operation: "Complete",
-    inputType: "generic-model-service.generic-request",
-    outputType: "generic-model-service.generic-response",
-    inputPayloadVisitor: "walkgeneric-request",
-    outputPayloadVisitor: "walkgeneric-response",
   },
 ] as const;
