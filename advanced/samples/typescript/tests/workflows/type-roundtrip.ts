@@ -9,11 +9,7 @@ const TASK_QUEUE = "demo-task-queue";
 
 function durationSecondsToMillis(
   seconds:
-    | { low?: number; toNumber?: () => number }
-    | number
-    | string
-    | null
-    | undefined,
+    { low?: number; toNumber?: () => number } | number | string | null | undefined,
 ): number | undefined {
   if (seconds == null) {
     return undefined;

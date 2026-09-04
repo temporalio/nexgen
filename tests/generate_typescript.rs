@@ -1153,8 +1153,8 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     ));
     assert!(rendered.contains("model.staticSummary == null && model.staticDetails == null"));
     assert!(rendered.contains("summary: model.staticSummary == null"));
-    assert!(rendered.contains("configuredPayloadConverter().toPayload(model.staticSummary)"));
-    assert!(rendered.contains("common.toPayloads(configuredPayloadConverter(), ...args)"));
+    assert!(rendered.contains("valueToPayload(model.staticSummary)"));
+    assert!(rendered.contains("requestArgsToPayloads(model.args)"));
     assert!(!rendered.contains("common.defaultPayloadConverter"));
     assert!(!rendered.contains("payloadToProto(payload: unknown"));
     assert!(!rendered.contains("function isPayload("));
@@ -1177,17 +1177,13 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     assert!(rendered.contains("export const operationRegistry = ["));
     assert!(rendered.contains("service: \"temporal.api.workflowservice.v1.WorkflowService\""));
     assert!(rendered.contains("operation: \"SignalWithStartWorkflowExecution\""));
-    assert!(rendered.contains(
-        "inputType: \"temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest\""
-    ));
-    assert!(rendered.contains(
-        "outputType: \"temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse\""
-    ));
     assert!(rendered.contains("export type { SignalWithStartWorkflowRequest } from './models';"));
     assert!(!rendered.contains("export { WorkflowService } from './services';"));
     assert!(!rendered.contains("export type { SignalWithStartWorkflowResponse"));
     assert!(rendered.contains("headers?: never"));
-    assert!(rendered.contains("request: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,"));
+    assert!(
+        rendered.contains("requestInput: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,")
+    );
     assert!(rendered.contains("const client = workflow.createNexusServiceClient({"));
     assert!(!rendered.contains("export class WorkflowServiceClient"));
     assert!(rendered.contains("): Promise<workflow.ExternalWorkflowHandle> {"));

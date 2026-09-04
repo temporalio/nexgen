@@ -66,8 +66,7 @@ describe("start-workflow generated output", () => {
 
       expect(calls).toHaveLength(3);
       const startRequest = calls[0]?.[1] as
-        | temporal.api.workflowservice.v1.IStartWorkflowExecutionRequest
-        | undefined;
+        temporal.api.workflowservice.v1.IStartWorkflowExecutionRequest | undefined;
       expect(startRequest?.namespace).toBe("default");
       expect(startRequest?.workflowId).toBe("workflow-id");
       expect(startRequest?.workflowType?.name).toBe("exampleWorkflow");
@@ -75,8 +74,7 @@ describe("start-workflow generated output", () => {
       expect(startRequest?.input).toBeUndefined();
 
       const restartRequest = calls[1]?.[1] as
-        | temporal.api.workflowservice.v1.IStartWorkflowExecutionRequest
-        | undefined;
+        temporal.api.workflowservice.v1.IStartWorkflowExecutionRequest | undefined;
       expect(restartRequest?.namespace).toBe("default");
       expect(restartRequest?.workflowId).toBe("workflow-id");
       expect(restartRequest?.workflowType?.name).toBe("exampleWorkflow");

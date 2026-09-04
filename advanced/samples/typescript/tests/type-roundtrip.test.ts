@@ -125,8 +125,7 @@ describe("type-roundtrip generated output", () => {
       expect(calls).toHaveLength(2);
 
       const activityRequest = calls[0]?.[1] as
-        | temporal.api.activity.v1.IActivityOptions
-        | undefined;
+        temporal.api.activity.v1.IActivityOptions | undefined;
       expect(activityRequest?.taskQueue?.name).toBe("demo-task-queue");
       expect(activityRequest?.retryPolicy?.maximumAttempts).toBe(3);
       expect(activityRequest?.scheduleToCloseTimeout?.seconds).toMatchObject({
@@ -135,8 +134,7 @@ describe("type-roundtrip generated output", () => {
       expect(activityRequest?.priority?.priorityKey).toBe(4);
 
       const failureRequest = calls[1]?.[1] as
-        | temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes
-        | undefined;
+        temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes | undefined;
       expect(failureRequest?.failure?.message).toBe("outer failure");
       expect(failureRequest?.failure?.applicationFailureInfo?.type).toBe(
         "OuterFailure",
