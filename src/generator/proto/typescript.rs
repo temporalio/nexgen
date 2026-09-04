@@ -132,8 +132,44 @@ impl ModelBackend {
         render_model_from_proto_function(output, model, planned_record, &names.from_wire);
         output.push('\n');
         render_model_to_proto_function(output, model, planned_record, &names.to_wire);
+        output.push('\n');
+        render_model_transfer_type_converter(output, model, planned_record, names);
         true
     }
+}
+
+/// Render the transfer-type adapter for a WIT model backed by a protobuf
+/// message. This keeps the public operation input in its generated TypeScript
+/// model form while letting the payload converter transport its protobuf
+/// envelope representation.
+fn render_model_transfer_type_converter(
+    output: &mut String,
+    model: &RenderedModel,
+    planned_record: &RecordSpec<PlannedFamily>,
+    names: &WireFunctionNames,
+) {
+    let proto = planned_record
+        .data
+        .proto
+        .as_ref()
+        .expect("wire functions require a protobuf-backed record");
+    let converter_name = format!("{}TransferTypeConverter", model.name.to_lower_camel_case());
+    let proto_type = message_typescript_interface_ref(proto);
+    output.push_str("export const ");
+    output.push_str(&converter_name);
+    output.push_str(" = {\n  fromTransferType(value: ");
+    output.push_str(&proto_type);
+    output.push_str("): ");
+    output.push_str(&model.name);
+    output.push_str(" {\n    return ");
+    output.push_str(&names.from_wire);
+    output.push_str("(value)!;\n  },\n\n  toTransferType(value: ");
+    output.push_str(&model.name);
+    output.push_str("): ");
+    output.push_str(&proto_type);
+    output.push_str(" {\n    return ");
+    output.push_str(&names.to_wire);
+    output.push_str("(value) ?? {};\n  },\n};");
 }
 
 pub(crate) fn message_typescript_interface_ref(proto: &PlannedProtoTypeInfo) -> String {

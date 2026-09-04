@@ -434,7 +434,7 @@ impl<'a> ApiPlanner<'a> {
                     &type_parameters,
                 ),
                 type_id: self.operation_wire_type_identifier(input),
-                model_name,
+                model_name: model_name.clone(),
                 type_parameters,
                 annotation,
                 api_omitted_fields: input_full_name
@@ -449,7 +449,19 @@ impl<'a> ApiPlanner<'a> {
                     })
                     .unwrap_or_default(),
                 to_wire_expr: input_conversion.to_wire_expr("request"),
-                transfer_type_converter: self.external_models.transfer_type_converter(input),
+                transfer_type_converter: input_conversion
+                    .wire_function_names
+                    .as_ref()
+                    .map(|_| {
+                        format!(
+                            "{}TransferTypeConverter",
+                            model_name
+                                .as_deref()
+                                .expect("wire-convertible operation input should have a model name")
+                                .to_lower_camel_case()
+                        )
+                    })
+                    .or_else(|| self.external_models.transfer_type_converter(input)),
             }
         });
 
@@ -3909,7 +3921,7 @@ fn render_system_nexus_interceptor_interface(services: &[RenderedService<'_>]) -
         body.push_str(input);
         body.push_str(") => Promise<unknown>) => Promise<unknown>;\n");
     }
-    body.push_str("}\n\n");
+    body.push_str("}\n");
     body
 }
 
@@ -3938,7 +3950,16 @@ fn render_models_module(
         || models
             .iter()
             .any(|model| model_uses_configured_payload_converter(model));
-    if uses_configured_payload_converter {
+    // A support file may provide the configured converter for generated model
+    // helpers. System Nexus uses this to supply its operation-scoped user
+    // converter; ordinary generated modules retain the default implementation.
+    let support_provides_configured_payload_converter = support_exports.is_some_and(|exports| {
+        exports
+            .value_names
+            .iter()
+            .any(|name| name == "configuredPayloadConverter")
+    });
+    if uses_configured_payload_converter && !support_provides_configured_payload_converter {
         body.push('\n');
         render_configured_payload_converter(&mut body);
     }
@@ -4156,9 +4177,18 @@ fn render_service_module(
         "./models",
         &used_import_names(
             &body,
-            &external_model_names
+            &models
                 .iter()
-                .map(|name| typescript_json::ts_transfer_type_converter_name(name))
+                .filter_map(|model| {
+                    model.wire_function_names.as_ref().map(|_| {
+                        format!("{}TransferTypeConverter", model.name.to_lower_camel_case())
+                    })
+                })
+                .chain(
+                    external_model_names
+                        .iter()
+                        .map(|name| typescript_json::ts_transfer_type_converter_name(name)),
+                )
                 .collect::<Vec<_>>(),
         ),
     );
@@ -4554,7 +4584,6 @@ fn render_configured_payload_converter(output: &mut String) {
     output.push_str("    globalThis as typeof globalThis & {\n");
     output.push_str("      __TEMPORAL_ACTIVATOR__?: {\n");
     output.push_str("        payloadConverter?: common.PayloadConverter;\n");
-    output.push_str("        systemNexusPayloadConverter?: common.PayloadConverter;\n");
     output.push_str("      };\n");
     output.push_str("    }\n");
     output.push_str("  ).__TEMPORAL_ACTIVATOR__;\n");
@@ -4563,9 +4592,7 @@ fn render_configured_payload_converter(output: &mut String) {
         "    throw new Error('payload converter is unavailable outside workflow context');\n",
     );
     output.push_str("  }\n");
-    output.push_str(
-        "  return activator.systemNexusPayloadConverter ?? activator.payloadConverter;\n",
-    );
+    output.push_str("  return activator.payloadConverter;\n");
     output.push_str("}\n");
 }
 
@@ -5233,7 +5260,12 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
             operation
                 .input
                 .as_ref()
-                .map(|input| input.operation_annotation.as_str())
+                .map(|input| {
+                    input
+                        .model_name
+                        .as_deref()
+                        .unwrap_or(&input.operation_annotation)
+                })
                 .unwrap_or("void"),
         );
         output.push_str(",\n");
@@ -5260,7 +5292,7 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
         );
         output.push_str(" }),\n");
     }
-    output.push_str("});\n\n");
+    output.push_str("});\n");
 }
 
 fn render_operation_type_info(output: &mut String, field: &str, converter: Option<&str>) {
@@ -6037,9 +6069,11 @@ fn render_operation_function(
             output.push_str(&typescript_string_literal(service.wire_name));
             output.push_str(",\n    operation: ");
             output.push_str(&typescript_string_literal(operation.wire_name));
-            output.push_str(",\n    input: request,\n    toProto: (input) => ");
-            output
-                .push_str(&typescript_operation_input_expr(operation).replace("request", "input"));
+            output.push_str(",\n    input: request,\n    inputType: ");
+            output.push_str(&service.attr_name);
+            output.push_str(".operations.");
+            output.push_str(&operation.attr_name);
+            output.push_str(".inputType!,");
             if let Some(serialization_context) = &operation.serialization_context_expr {
                 output.push_str(",\n    serializationContext: (input) => ");
                 output.push_str(serialization_context);
@@ -6081,9 +6115,11 @@ fn render_operation_function(
         output.push_str(&typescript_string_literal(service.wire_name));
         output.push_str(",\n    operation: ");
         output.push_str(&typescript_string_literal(operation.wire_name));
-        output.push_str(",\n    input: request,\n    toProto: (input) => ");
-        output.push_str(&typescript_operation_input_expr(operation).replace("request", "input"));
-        output.push_str(",\n");
+        output.push_str(",\n    input: request,\n    inputType: ");
+        output.push_str(&service.attr_name);
+        output.push_str(".operations.");
+        output.push_str(&operation.attr_name);
+        output.push_str(".inputType!,\n");
         if let Some(serialization_context) = &operation.serialization_context_expr {
             output.push_str("    serializationContext: (input) => ");
             output.push_str(serialization_context);
