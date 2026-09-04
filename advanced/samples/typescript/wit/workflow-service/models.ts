@@ -14,6 +14,10 @@ import {
   workflowNamespace,
   payloadFromProto,
   payloadToProto,
+  payloadsToProto,
+  payloadsFromProto,
+  valueToPayload,
+  payloadToValue,
   memoFromProto,
   memoToProto,
   headerFromProto,
@@ -43,28 +47,13 @@ export function requiredField<T>(
   return value;
 }
 
-function configuredPayloadConverter(): common.PayloadConverter {
-  const activator = (
-    globalThis as typeof globalThis & {
-      __TEMPORAL_ACTIVATOR__?: {
-        payloadConverter?: common.PayloadConverter;
-        systemNexusPayloadConverter?: common.PayloadConverter;
-      };
-    }
-  ).__TEMPORAL_ACTIVATOR__;
-  if (activator?.payloadConverter == null) {
-    throw new Error("payload converter is unavailable outside workflow context");
-  }
-  return activator.systemNexusPayloadConverter ?? activator.payloadConverter;
-}
-
 function requestArgsFromPayloads(
   payloads: temporal.api.common.v1.IPayloads | null | undefined,
 ): unknown[] | undefined {
   if (payloads == null) {
     return undefined;
   }
-  return common.arrayFromPayloads(configuredPayloadConverter(), payloads.payloads);
+  return payloadsFromProto(payloads);
 }
 
 function requestArgsToPayloads(
@@ -73,8 +62,7 @@ function requestArgsToPayloads(
   if (args == null) {
     return undefined;
   }
-  const payloads = common.toPayloads(configuredPayloadConverter(), ...args);
-  return payloads == null ? undefined : { payloads };
+  return payloadsToProto(args);
 }
 
 /**
@@ -120,6 +108,19 @@ export function signalWithStartWorkflowResponseToProto(
   };
 }
 
+export const signalWithStartWorkflowResponseTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse,
+  ): SignalWithStartWorkflowResponse {
+    return signalWithStartWorkflowResponseFromProto(value)!;
+  },
+
+  toTransferType(
+    value: SignalWithStartWorkflowResponse,
+  ): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse {
+    return signalWithStartWorkflowResponseToProto(value) ?? {};
+  },
+};
 export type ReplaceSignalWithStartWorkflowRequest<Base, New> = Omit<
   Base,
   "args" | "signal" | "signalArgs" | "workflow"
@@ -405,7 +406,7 @@ export function signalWithStartWorkflowRequestFromProto<
           ? undefined
           : (payloadFromProto(proto.userMetadata.summary) as common.Payload) == null
             ? undefined
-            : configuredPayloadConverter().fromPayload<string>(
+            : payloadToValue<string>(
                 (proto.userMetadata.summary == null
                   ? undefined
                   : (payloadFromProto(proto.userMetadata.summary) as common.Payload))!,
@@ -417,7 +418,7 @@ export function signalWithStartWorkflowRequestFromProto<
           ? undefined
           : (payloadFromProto(proto.userMetadata.details) as common.Payload) == null
             ? undefined
-            : configuredPayloadConverter().fromPayload<string>(
+            : payloadToValue<string>(
                 (proto.userMetadata.details == null
                   ? undefined
                   : (payloadFromProto(proto.userMetadata.details) as common.Payload))!,
@@ -448,8 +449,7 @@ export function signalWithStartWorkflowRequestToProto<
     | null
     | undefined,
 ):
-  | temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest
-  | undefined {
+  temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest | undefined {
   if (model == null) {
     return undefined;
   }
@@ -505,17 +505,30 @@ export function signalWithStartWorkflowRequestToProto<
             summary:
               model.staticSummary == null
                 ? undefined
-                : configuredPayloadConverter().toPayload(model.staticSummary),
+                : valueToPayload(model.staticSummary),
             details:
               model.staticDetails == null
                 ? undefined
-                : configuredPayloadConverter().toPayload(model.staticDetails),
+                : valueToPayload(model.staticDetails),
           },
     header: model.headers == null ? undefined : headerToProto(model.headers),
     namespace: workflowNamespace(),
   };
 }
 
+export const signalWithStartWorkflowRequestTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest,
+  ): SignalWithStartWorkflowRequest {
+    return signalWithStartWorkflowRequestFromProto(value)!;
+  },
+
+  toTransferType(
+    value: SignalWithStartWorkflowRequest,
+  ): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest {
+    return signalWithStartWorkflowRequestToProto(value) ?? {};
+  },
+};
 /**
  * @experimental This API is experimental and subject to change.
  */
@@ -564,3 +577,13 @@ export function userMetadataToProto(
       model.staticDetails == null ? undefined : payloadToProto(model.staticDetails),
   };
 }
+
+export const userMetadataTransferTypeConverter = {
+  fromTransferType(value: temporal.api.sdk.v1.IUserMetadata): UserMetadata {
+    return userMetadataFromProto(value)!;
+  },
+
+  toTransferType(value: UserMetadata): temporal.api.sdk.v1.IUserMetadata {
+    return userMetadataToProto(value) ?? {};
+  },
+};

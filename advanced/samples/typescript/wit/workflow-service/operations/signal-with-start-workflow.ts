@@ -3,7 +3,6 @@
 import * as workflow from "../../workflow-exports";
 import type { temporal } from "@temporalio/proto";
 import { workflowService } from "../services";
-import { signalWithStartWorkflowRequestToProto } from "../models";
 import type { SignalWithStartWorkflowRequest } from "../models";
 import { signalWithStartWorkflowSerializationContext } from "../support";
 
@@ -39,7 +38,7 @@ export async function signalWithStartWorkflow<
         service: "temporal.api.workflowservice.v1.WorkflowService",
         operation: "SignalWithStartWorkflowExecution",
         input: request,
-        toProto: (input) => signalWithStartWorkflowRequestToProto(input) ?? {},
+        inputType: workflowService.operations.signalWithStartWorkflow.inputType!,
         serializationContext: (input) =>
           signalWithStartWorkflowSerializationContext({
             namespace: workflow.workflowInfo().namespace,

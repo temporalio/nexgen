@@ -2,17 +2,27 @@
 
 import * as nexus from "nexus-rpc";
 import type { temporal } from "@temporalio/proto";
-import type { ActivityOptions } from "./models";
+import {
+  activityOptionsTransferTypeConverter,
+  failureContainerTransferTypeConverter,
+} from "./models";
+import type { ActivityOptions, FailureContainer } from "./models";
 
 export const typeRoundtripService = nexus.service("TypeRoundtripService", {
   activityOptionsOperation: nexus.operation<
-    temporal.api.activity.v1.IActivityOptions,
+    ActivityOptions,
     temporal.api.activity.v1.IActivityOptions
-  >({ name: "ActivityOptionsOperation" }),
+  >({
+    name: "ActivityOptionsOperation",
+    inputType: { transferTypeConverter: activityOptionsTransferTypeConverter },
+  }),
   failureOperation: nexus.operation<
-    temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes,
+    FailureContainer,
     temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes
-  >({ name: "FailureOperation" }),
+  >({
+    name: "FailureOperation",
+    inputType: { transferTypeConverter: failureContainerTransferTypeConverter },
+  }),
 });
 
 export const operationRegistry = [
@@ -21,11 +31,15 @@ export const operationRegistry = [
     operation: "ActivityOptionsOperation",
     inputType: "temporal.api.activity.v1.ActivityOptions",
     outputType: "temporal.api.activity.v1.ActivityOptions",
+    inputPayloadVisitor: "walkActivityOptions",
+    outputPayloadVisitor: "walkActivityOptions",
   },
   {
     service: "TypeRoundtripService",
     operation: "FailureOperation",
     inputType: "temporal.api.command.v1.FailWorkflowExecutionCommandAttributes",
     outputType: "temporal.api.command.v1.FailWorkflowExecutionCommandAttributes",
+    inputPayloadVisitor: "walkFailWorkflowExecutionCommandAttributes",
+    outputPayloadVisitor: "walkFailWorkflowExecutionCommandAttributes",
   },
 ] as const;

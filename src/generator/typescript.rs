@@ -1060,6 +1060,7 @@ impl<'a> ApiPlanner<'a> {
         }
 
         if let Some(default_value) = &field.default_value {
+            let mut requirements = resolved_type.requirements.clone();
             return RenderedField {
                 name: generated_field_name.to_string(),
                 wire_name: wire_field_name.to_string(),
@@ -1073,14 +1074,16 @@ impl<'a> ApiPlanner<'a> {
                     &resolved_type,
                     wire_field_expr,
                     &default_value.enum_case,
+                    &mut requirements,
                 ),
                 to_wire_expr: defaulted_enum_to_wire_expr(
                     &resolved_type,
                     &generated_field_name,
                     &default_value.enum_case,
+                    &mut requirements,
                 ),
                 flattened_fields: Vec::new(),
-                requirements: resolved_type.requirements,
+                requirements,
             };
         }
 
@@ -1207,11 +1210,9 @@ impl<'a> ApiPlanner<'a> {
         if field.annotation == "common.Payload" && annotation != field.annotation {
             let value_expr = format!("model.{}", field.name);
             if field.optional {
-                return format!(
-                    "{value_expr} == null ? undefined : configuredPayloadConverter().toPayload({value_expr})"
-                );
+                return format!("{value_expr} == null ? undefined : valueToPayload({value_expr})");
             }
-            return format!("configuredPayloadConverter().toPayload({value_expr})");
+            return format!("valueToPayload({value_expr})");
         }
         field.to_wire_expr.clone()
     }
@@ -1311,7 +1312,10 @@ impl<'a> ApiPlanner<'a> {
             PlannedType::Int(IntSpec::I64) => ResolvedFieldType {
                 annotation: "Long".to_string(),
                 kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements { long: true },
+                requirements: TypeScriptRequirements {
+                    long: true,
+                    ..Default::default()
+                },
                 wire_conversion: None,
             },
             PlannedType::Bool => ResolvedFieldType {
@@ -1727,8 +1731,9 @@ fn defaulted_enum_from_wire_expr(
     resolved_type: &ResolvedFieldType,
     wire_value_expr: &str,
     enum_case: &str,
+    requirements: &mut TypeScriptRequirements,
 ) -> String {
-    let default_expr = enum_default_expr(resolved_type, enum_case);
+    let default_expr = enum_default_expr(resolved_type, enum_case, requirements);
     format!(
         "{wire_value_expr} == null ? {default_expr} : {}",
         enum_from_wire_expr(resolved_type, wire_value_expr)
@@ -1745,7 +1750,7 @@ fn flattened_field_from_wire_expr(
         && flattened_annotation != nested_annotation
     {
         format!(
-            "{nested_field_from_wire_expr} == null ? undefined : configuredPayloadConverter().fromPayload<{flattened_annotation}>(({nested_field_from_wire_expr})!)"
+            "{nested_field_from_wire_expr} == null ? undefined : payloadToValue<{flattened_annotation}>(({nested_field_from_wire_expr})!)"
         )
     } else {
         nested_field_from_wire_expr.to_string()
@@ -1779,9 +1784,10 @@ fn defaulted_enum_to_wire_expr(
     resolved_type: &ResolvedFieldType,
     field_name: &str,
     enum_case: &str,
+    requirements: &mut TypeScriptRequirements,
 ) -> String {
     let value_expr = format!("model.{field_name}");
-    let default_expr = enum_default_expr(resolved_type, enum_case);
+    let default_expr = enum_default_expr(resolved_type, enum_case, requirements);
     enum_to_wire_expr(
         resolved_type,
         &format!("({value_expr} == null ? {default_expr} : {value_expr})"),
@@ -1855,7 +1861,19 @@ fn enum_from_wire_expr(resolved_type: &ResolvedFieldType, expr: &str) -> String 
     }
 }
 
-fn enum_default_expr(resolved_type: &ResolvedFieldType, enum_case: &str) -> String {
+fn enum_default_expr(
+    resolved_type: &ResolvedFieldType,
+    enum_case: &str,
+    requirements: &mut TypeScriptRequirements,
+) -> String {
+    // Defaults are emitted as runtime enum-member references. Record the namespace
+    // here, where that runtime use is introduced, so its WIT import is promoted from
+    // `import type` to an ordinary namespace import when rendering the module.
+    if let Some((namespace, _)) = resolved_type.annotation.split_once('.') {
+        requirements
+            .value_namespace_imports
+            .insert(namespace.to_string());
+    }
     let value_name = if resolved_type.wire_conversion.is_some() {
         enum_case.to_shouty_snake_case()
     } else {
@@ -3013,11 +3031,14 @@ struct RenderedWithArgumentsField {
 #[derive(Debug, Clone, Default)]
 pub(in crate::generator) struct TypeScriptRequirements {
     pub(in crate::generator) long: bool,
+    value_namespace_imports: BTreeSet<String>,
 }
 
 impl TypeScriptRequirements {
     fn merge(&mut self, other: &TypeScriptRequirements) {
         self.long |= other.long;
+        self.value_namespace_imports
+            .extend(other.value_namespace_imports.iter().cloned());
     }
 }
 
@@ -3943,27 +3964,17 @@ fn render_models_module(
     if mode == GenerationMode::NativeApi {
         render_required_field(&mut body, true);
     }
-    let uses_invocation_models = models
-        .iter()
-        .any(|model| !model.functions.is_empty() || !model.with_arguments.is_empty());
-    let uses_configured_payload_converter = uses_invocation_models
-        || models
-            .iter()
-            .any(|model| model_uses_configured_payload_converter(model));
-    // A support file may provide the configured converter for generated model
-    // helpers. System Nexus uses this to supply its operation-scoped user
-    // converter; ordinary generated modules retain the default implementation.
-    let support_provides_configured_payload_converter = support_exports.is_some_and(|exports| {
-        exports
-            .value_names
-            .iter()
-            .any(|name| name == "configuredPayloadConverter")
+    let uses_function_payload_helpers = models.iter().any(|model| {
+        model.fields.iter().any(|field| {
+            field.to_wire_expr.contains("requestArgsToPayloads(")
+                || field.from_wire_expr.contains("requestArgsFromPayloads(")
+                || field.flattened_fields.iter().any(|field| {
+                    field.to_wire_expr.contains("requestArgsToPayloads(")
+                        || field.from_wire_expr.contains("requestArgsFromPayloads(")
+                })
+        })
     });
-    if uses_configured_payload_converter && !support_provides_configured_payload_converter {
-        body.push('\n');
-        render_configured_payload_converter(&mut body);
-    }
-    if uses_invocation_models {
+    if uses_function_payload_helpers {
         body.push('\n');
         render_function_runtime_helpers(
             &mut body,
@@ -4011,18 +4022,29 @@ fn render_models_module(
         body.push_str(&model_fragments.body);
     }
     let mut imports = String::new();
-    let mut generated_value_imports = if uses_configured_payload_converter {
-        vec![("common", "@temporalio/common")]
-    } else {
-        Vec::new()
-    };
+    let mut generated_value_imports = Vec::new();
     if crate::nexgen_config::current().system_nexus
         && contains_qualified_identifier(&body, "workflow")
     {
         generated_value_imports.push(("workflow", typescript_workflow_module()));
     }
     let mut model_language_imports = language_imports.to_vec();
-    if uses_invocation_models {
+    let value_namespace_imports = models
+        .iter()
+        .flat_map(|model| model.fields.iter())
+        .flat_map(|field| field.requirements.value_namespace_imports.iter())
+        .collect::<BTreeSet<_>>();
+    for import in &mut model_language_imports {
+        if import.type_only
+            && import
+                .name
+                .as_ref()
+                .is_some_and(|name| value_namespace_imports.contains(name))
+        {
+            import.type_only = false;
+        }
+    }
+    if uses_function_payload_helpers {
         model_language_imports.push(LanguageImportSpec {
             language: Language::TypeScript,
             reference: "temporal".to_string(),
@@ -4548,9 +4570,7 @@ fn render_function_runtime_helpers(output: &mut String, render_from: bool) {
         output.push_str("  if (payloads == null) {\n");
         output.push_str("    return undefined;\n");
         output.push_str("  }\n");
-        output.push_str(
-            "  return common.arrayFromPayloads(configuredPayloadConverter(), payloads.payloads);\n",
-        );
+        output.push_str("  return payloadsFromProto(payloads);\n");
         output.push_str("}\n\n");
     }
     output.push_str("function requestArgsToPayloads(\n");
@@ -4559,40 +4579,7 @@ fn render_function_runtime_helpers(output: &mut String, render_from: bool) {
     output.push_str("  if (args == null) {\n");
     output.push_str("    return undefined;\n");
     output.push_str("  }\n");
-    output
-        .push_str("  const payloads = common.toPayloads(configuredPayloadConverter(), ...args);\n");
-    output.push_str("  return payloads == null ? undefined : { payloads };\n");
-    output.push_str("}\n");
-}
-
-fn model_uses_configured_payload_converter(model: &RenderedModel) -> bool {
-    model.fields.iter().any(|field| {
-        field.to_wire_expr.contains("configuredPayloadConverter()")
-            || field
-                .flattened_fields
-                .iter()
-                .any(|field| field.to_wire_expr.contains("configuredPayloadConverter()"))
-    }) || model
-        .sourced_fields
-        .iter()
-        .any(|field| field.to_wire_expr.contains("configuredPayloadConverter()"))
-}
-
-fn render_configured_payload_converter(output: &mut String) {
-    output.push_str("function configuredPayloadConverter(): common.PayloadConverter {\n");
-    output.push_str("  const activator = (\n");
-    output.push_str("    globalThis as typeof globalThis & {\n");
-    output.push_str("      __TEMPORAL_ACTIVATOR__?: {\n");
-    output.push_str("        payloadConverter?: common.PayloadConverter;\n");
-    output.push_str("      };\n");
-    output.push_str("    }\n");
-    output.push_str("  ).__TEMPORAL_ACTIVATOR__;\n");
-    output.push_str("  if (activator?.payloadConverter == null) {\n");
-    output.push_str(
-        "    throw new Error('payload converter is unavailable outside workflow context');\n",
-    );
-    output.push_str("  }\n");
-    output.push_str("  return activator.payloadConverter;\n");
+    output.push_str("  return payloadsToProto(args);\n");
     output.push_str("}\n");
 }
 
@@ -6667,6 +6654,8 @@ mod tests {
         assert!(output.contains("runTimeout?: common.Duration;"));
         assert!(output.contains("idReusePolicy?: common.WorkflowIdReusePolicy;"));
         assert!(output.contains("common.WorkflowIdReusePolicy.ALLOW_DUPLICATE"));
+        assert!(output.contains("import * as common from '@temporalio/common';"));
+        assert!(!output.contains("import type * as common from '@temporalio/common';"));
         assert!(output.contains("idConflictPolicy?: common.WorkflowIdConflictPolicy;"));
         assert!(output.contains("workflowIdConflictPolicy:"));
         assert!(output.contains("model.idConflictPolicy == null"));
@@ -6704,8 +6693,8 @@ mod tests {
         ));
         assert!(output.contains("model.staticSummary == null && model.staticDetails == null"));
         assert!(output.contains("summary: model.staticSummary == null"));
-        assert!(output.contains("configuredPayloadConverter().toPayload(model.staticSummary)"));
-        assert!(output.contains("common.toPayloads(configuredPayloadConverter(), ...args)"));
+        assert!(output.contains("valueToPayload(model.staticSummary)"));
+        assert!(output.contains("return payloadsToProto(args);"));
         assert!(!output.contains("common.defaultPayloadConverter"));
         assert!(!output.contains("payloadToProto(payload: unknown"));
         assert!(!output.contains("function isPayload("));

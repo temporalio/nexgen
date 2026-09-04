@@ -3,6 +3,7 @@
 import * as nexus from "nexus-rpc";
 import type { temporal } from "@temporalio/proto";
 import { signalWithStartWorkflowSerializationContext } from "./support";
+import { signalWithStartWorkflowRequestTransferTypeConverter } from "./models";
 import type { SignalWithStartWorkflowRequest } from "./models";
 
 /**
@@ -17,9 +18,14 @@ export const workflowService = nexus.service(
      * @experimental This API is experimental and subject to change.
      */
     signalWithStartWorkflow: nexus.operation<
-      temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest,
+      SignalWithStartWorkflowRequest,
       temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse
-    >({ name: "SignalWithStartWorkflowExecution" }),
+    >({
+      name: "SignalWithStartWorkflowExecution",
+      inputType: {
+        transferTypeConverter: signalWithStartWorkflowRequestTransferTypeConverter,
+      },
+    }),
   },
 );
 

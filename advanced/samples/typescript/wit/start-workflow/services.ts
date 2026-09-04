@@ -2,20 +2,34 @@
 
 import * as nexus from "nexus-rpc";
 import type { temporal } from "@temporalio/proto";
+import {
+  startWorkflowRequestTransferTypeConverter,
+  cancelWorkflowRequestTransferTypeConverter,
+} from "./models";
+import type { StartWorkflowRequest, CancelWorkflowRequest } from "./models";
 
 export const startWorkflowService = nexus.service("StartWorkflowService", {
   startWorkflow: nexus.operation<
-    temporal.api.workflowservice.v1.IStartWorkflowExecutionRequest,
+    StartWorkflowRequest,
     temporal.api.workflowservice.v1.IStartWorkflowExecutionResponse
-  >({ name: "StartWorkflow" }),
+  >({
+    name: "StartWorkflow",
+    inputType: { transferTypeConverter: startWorkflowRequestTransferTypeConverter },
+  }),
   restartWorkflow: nexus.operation<
-    temporal.api.workflowservice.v1.IStartWorkflowExecutionRequest,
+    StartWorkflowRequest,
     temporal.api.workflowservice.v1.IStartWorkflowExecutionResponse
-  >({ name: "RestartWorkflow" }),
+  >({
+    name: "RestartWorkflow",
+    inputType: { transferTypeConverter: startWorkflowRequestTransferTypeConverter },
+  }),
   cancelWorkflow: nexus.operation<
-    temporal.api.workflowservice.v1.IRequestCancelWorkflowExecutionRequest,
+    CancelWorkflowRequest,
     temporal.api.workflowservice.v1.IRequestCancelWorkflowExecutionResponse
-  >({ name: "CancelWorkflow" }),
+  >({
+    name: "CancelWorkflow",
+    inputType: { transferTypeConverter: cancelWorkflowRequestTransferTypeConverter },
+  }),
 });
 
 export const operationRegistry = [
@@ -24,12 +38,16 @@ export const operationRegistry = [
     operation: "StartWorkflow",
     inputType: "temporal.api.workflowservice.v1.StartWorkflowExecutionRequest",
     outputType: "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse",
+    inputPayloadVisitor: "walkStartWorkflowExecutionRequest",
+    outputPayloadVisitor: "walkStartWorkflowExecutionResponse",
   },
   {
     service: "StartWorkflowService",
     operation: "RestartWorkflow",
     inputType: "temporal.api.workflowservice.v1.StartWorkflowExecutionRequest",
     outputType: "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse",
+    inputPayloadVisitor: "walkStartWorkflowExecutionRequest",
+    outputPayloadVisitor: "walkStartWorkflowExecutionResponse",
   },
   {
     service: "StartWorkflowService",
@@ -37,5 +55,7 @@ export const operationRegistry = [
     inputType: "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest",
     outputType:
       "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse",
+    inputPayloadVisitor: "walkRequestCancelWorkflowExecutionRequest",
+    outputPayloadVisitor: "walkRequestCancelWorkflowExecutionResponse",
   },
 ] as const;

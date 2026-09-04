@@ -54,11 +54,15 @@ export const operationRegistry = [
     operation: "GetUser",
     inputType: "user-service.get-user-request",
     outputType: "User",
+    inputPayloadVisitor: "walkget-user-request",
+    outputPayloadVisitor: "walkUser",
   },
   {
     service: "UserService",
     operation: "UpdateEmail",
     inputType: "user-service.update-email-request",
     outputType: "User",
+    inputPayloadVisitor: "walkupdate-email-request",
+    outputPayloadVisitor: "walkUser",
   },
 ] as const;

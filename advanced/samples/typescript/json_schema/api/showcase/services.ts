@@ -76,5 +76,7 @@ export const operationRegistry = [
     operation: "GetShowcase",
     inputType: "ShowcaseService.GetShowcaseInput",
     outputType: "Showcase",
+    inputPayloadVisitor: "walkGetShowcaseInput",
+    outputPayloadVisitor: "walkShowcase",
   },
 ] as const;

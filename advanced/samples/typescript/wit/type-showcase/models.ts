@@ -24,9 +24,7 @@ export enum UserCapability {
 }
 
 export type NotificationTarget =
-  | { tag: "email"; value: string }
-  | { tag: "sms"; value: string }
-  | { tag: "none" };
+  { tag: "email"; value: string } | { tag: "sms"; value: string } | { tag: "none" };
 
 export interface GetUserRequest {
   userId: string;

@@ -4,7 +4,7 @@ import * as nexus from "nexus-rpc";
 import type { GenericResponse, GenericRequest } from "./models";
 
 export const genericModelService = nexus.service("GenericModelService", {
-  complete: nexus.operation<GenericRequest<any>, GenericResponse<any, any, any>>({
+  complete: nexus.operation<GenericRequest, GenericResponse<any, any, any>>({
     name: "Complete",
   }),
 });
@@ -15,5 +15,7 @@ export const operationRegistry = [
     operation: "Complete",
     inputType: "generic-model-service.generic-request",
     outputType: "generic-model-service.generic-response",
+    inputPayloadVisitor: "walkgeneric-request",
+    outputPayloadVisitor: "walkgeneric-response",
   },
 ] as const;
