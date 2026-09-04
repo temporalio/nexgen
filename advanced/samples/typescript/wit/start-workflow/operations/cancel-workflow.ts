@@ -4,13 +4,22 @@ import * as workflow from "@temporalio/workflow";
 import { startWorkflowService } from "../services";
 import { cancelWorkflowRequestToProto } from "../models";
 import type { CancelWorkflowResponse, CancelWorkflowRequest } from "../models";
+import { workflowNamespace } from "../support";
+
+type CancelWorkflowInput = Omit<CancelWorkflowRequest, "namespace"> & {
+  namespace?: never;
+};
 
 /**
  * @param request - Request for the operation.
  */
 export async function cancelWorkflow(
-  request: CancelWorkflowRequest,
+  requestInput: CancelWorkflowInput,
 ): Promise<workflow.NexusOperationHandle<CancelWorkflowResponse>> {
+  const request = {
+    ...requestInput,
+    namespace: workflowNamespace(),
+  } as CancelWorkflowRequest;
   const client = workflow.createNexusServiceClient({
     service: startWorkflowService,
     endpoint: "temporal-system",

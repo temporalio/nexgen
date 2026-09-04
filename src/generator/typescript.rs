@@ -453,9 +453,10 @@ impl<'a> ApiPlanner<'a> {
         // Service definitions and operation handles apply their own arguments, so
         // start from the generated model's unparameterized transfer annotation.
         let output_transfer_annotation = match operation.output_type() {
-            Some(PlannedType::Record(output)) => self
-                .resolve_message_value_conversion(&PlannedType::Record(output.clone()))
-                .annotation,
+            Some(PlannedType::Record(output)) => {
+                self.resolve_message_value_conversion(&PlannedType::Record(output.clone()))
+                    .annotation
+            }
             _ => output_annotation_default.clone(),
         };
         let output_annotation_default = match operation.output_type() {
@@ -534,20 +535,24 @@ impl<'a> ApiPlanner<'a> {
             output_model_name: operation
                 .output_type()
                 .and_then(|output| self.locally_defined_model_name(output)),
-            output_transfer_type_converter: operation.output_type().and_then(|output| match output {
-                PlannedType::Record(_) => self
-                    .resolve_message_value_conversion(output)
-                    .wire_function_names
-                    .map(|_| {
-                        format!(
-                            "{}TransferTypeConverter",
-                            self.locally_defined_model_name(output)
-                                .expect("wire-convertible operation output should have a model name")
-                                .to_lower_camel_case()
-                        )
-                    }),
-                _ => self.external_models.transfer_type_converter(output),
-            }),
+            output_transfer_type_converter: operation.output_type().and_then(
+                |output| match output {
+                    PlannedType::Record(_) => self
+                        .resolve_message_value_conversion(output)
+                        .wire_function_names
+                        .map(|_| {
+                            format!(
+                                "{}TransferTypeConverter",
+                                self.locally_defined_model_name(output)
+                                    .expect(
+                                        "wire-convertible operation output should have a model name"
+                                    )
+                                    .to_lower_camel_case()
+                            )
+                        }),
+                    _ => self.external_models.transfer_type_converter(output),
+                },
+            ),
             serialization_context_expr: operation
                 .serialization_context
                 .for_language(Language::TypeScript)
@@ -6112,7 +6117,11 @@ fn render_operation_function(
         output.push_str("  endpoint: string,\n");
     }
     if let Some(input) = &operation.input {
-        output.push_str("  requestInput: ");
+        output.push_str(if input.sourced_fields.is_empty() {
+            "  request: "
+        } else {
+            "  requestInput: "
+        });
         if input.api_omitted_fields.is_empty() {
             output.push_str(&input.annotation);
         } else {
@@ -6130,9 +6139,7 @@ fn render_operation_function(
         output.push_str(">> {\n");
     }
     if let Some(input) = &operation.input {
-        if input.sourced_fields.is_empty() {
-            output.push_str("  const request = requestInput;\n");
-        } else {
+        if !input.sourced_fields.is_empty() {
             output.push_str("  const request = {\n    ...requestInput,\n");
             for field in &input.sourced_fields {
                 output.push_str("    ");

@@ -3,6 +3,7 @@
 import * as workflow from "../../workflow-exports";
 import { workflowService } from "../services";
 import type { SignalWithStartWorkflowRequest } from "../models";
+import { workflowNamespace } from "../support";
 
 type SignalWithStartWorkflowInput<
   WorkflowFn extends (...args: any[]) => Promise<any> = (
@@ -11,7 +12,10 @@ type SignalWithStartWorkflowInput<
   SignalValue extends workflow.SignalDefinition<any[]> = workflow.SignalDefinition<
     any[]
   >,
-> = SignalWithStartWorkflowRequest<WorkflowFn, SignalValue> & { headers?: never };
+> = Omit<
+  SignalWithStartWorkflowRequest<WorkflowFn, SignalValue>,
+  "headers" | "namespace"
+> & { headers?: never; namespace?: never };
 
 /**
  * Signal a workflow, starting it first if needed.
@@ -28,11 +32,15 @@ export async function signalWithStartWorkflow<
     any[]
   >,
 >(
-  request: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,
+  requestInput: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,
 ): Promise<workflow.ExternalWorkflowHandle> {
+  const request = {
+    ...requestInput,
+    namespace: workflowNamespace(),
+  } as SignalWithStartWorkflowRequest<WorkflowFn, SignalValue>;
   const client = workflow.createNexusServiceClient({
     service: workflowService,
-    endpoint: "__temporal_system",
+    endpoint: "temporal-system",
   });
   const handle = await client.startOperation(
     workflowService.operations.signalWithStartWorkflow,

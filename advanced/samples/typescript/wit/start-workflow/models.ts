@@ -68,6 +68,7 @@ export interface StartWorkflowRequest {
   workflowId: string;
   taskQueue: string;
   workflowStartDelay?: common.Duration;
+  namespace: string;
 }
 
 export function startWorkflowRequestFromProto(
@@ -101,6 +102,11 @@ export function startWorkflowRequestFromProto(
       proto.workflowStartDelay == null
         ? undefined
         : (durationFromProto(proto.workflowStartDelay) as common.Duration),
+    namespace: requiredField(
+      proto.namespace === "" ? undefined : proto.namespace,
+      "sourced field",
+      "namespace",
+    ),
   };
 }
 
@@ -122,7 +128,7 @@ export function startWorkflowRequestToProto(
       model.workflowStartDelay == null
         ? undefined
         : durationToProto(model.workflowStartDelay),
-    namespace: workflowNamespace(),
+    namespace: model.namespace ?? workflowNamespace(),
   };
 }
 
@@ -178,6 +184,7 @@ export const cancelWorkflowResponseTransferTypeConverter = {
 export interface CancelWorkflowRequest {
   workflowExecution: WorkflowExecution;
   reason?: string;
+  namespace: string;
 }
 
 export function cancelWorkflowRequestFromProto(
@@ -202,6 +209,11 @@ export function cancelWorkflowRequestFromProto(
       "workflowExecution",
     ),
     reason: proto.reason ?? undefined,
+    namespace: requiredField(
+      proto.namespace === "" ? undefined : proto.namespace,
+      "sourced field",
+      "namespace",
+    ),
   };
 }
 
@@ -221,7 +233,7 @@ export function cancelWorkflowRequestToProto(
         ),
       ) ?? {},
     reason: model.reason,
-    namespace: workflowNamespace(),
+    namespace: model.namespace ?? workflowNamespace(),
   };
 }
 

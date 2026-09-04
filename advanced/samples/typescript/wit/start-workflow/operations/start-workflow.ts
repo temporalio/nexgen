@@ -4,14 +4,23 @@ import * as workflow from "@temporalio/workflow";
 import { startWorkflowService } from "../services";
 import { requiredField, startWorkflowRequestToProto } from "../models";
 import type { StartWorkflowRequest } from "../models";
+import { workflowNamespace } from "../support";
 import { StartedWorkflow } from "../resources";
+
+type StartWorkflowInput = Omit<StartWorkflowRequest, "namespace"> & {
+  namespace?: never;
+};
 
 /**
  * @param request - Request for the operation.
  */
 export async function startWorkflow(
-  request: StartWorkflowRequest,
+  requestInput: StartWorkflowInput,
 ): Promise<StartedWorkflow> {
+  const request = {
+    ...requestInput,
+    namespace: workflowNamespace(),
+  } as StartWorkflowRequest;
   const client = workflow.createNexusServiceClient({
     service: startWorkflowService,
     endpoint: "temporal-system",
