@@ -514,7 +514,7 @@ fn render_model_from_proto_function(
     output.push_str("  if (proto == null) {\n");
     output.push_str("    return undefined;\n");
     output.push_str("  }\n");
-    if model.fields.is_empty() {
+    if model.fields.is_empty() && model.sourced_fields.is_empty() {
         output.push_str("  return {};\n");
     } else {
         output.push_str("  return {\n");
@@ -534,6 +534,13 @@ fn render_model_from_proto_function(
                     output.push_str(",\n");
                 }
             }
+        }
+        for field in &model.sourced_fields {
+            output.push_str("    ");
+            output.push_str(&field.name);
+            output.push_str(": ");
+            output.push_str(&from_proto_expr(&field.from_wire_expr));
+            output.push_str(",\n");
         }
         output.push_str("  };\n");
     }

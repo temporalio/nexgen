@@ -417,15 +417,22 @@ impl<'a> ApiPlanner<'a> {
                 api_omitted_fields: input_full_name
                     .and_then(|name| self.api_plan.record(name))
                     .map(|record| {
-                        record
+                        let mut fields = record
                             .fields
                             .values()
                             .filter(|field| field.visibility == RecordFieldVisibility::ApiOmitted)
                             .map(|field| field.name.clone())
-                            .collect()
+                            .collect::<Vec<_>>();
+                        fields.extend(record.sourced_fields().map(|(name, _, _)| name.to_string()));
+                        fields.sort();
+                        fields.dedup();
+                        fields
                     })
                     .unwrap_or_default(),
                 to_wire_expr: input_conversion.to_wire_expr("request"),
+                sourced_fields: input_model
+                    .map(|model| model.sourced_fields.clone())
+                    .unwrap_or_default(),
                 transfer_type_converter: input_conversion
                     .wire_function_names
                     .as_ref()
@@ -1238,11 +1245,30 @@ impl<'a> ApiPlanner<'a> {
     ) -> RenderedSourcedField {
         let field_name = typescript_generated_field_name(field_name);
 
+        let default_source_expr = source_expr.to_string();
+        let source_expr = format!("model.{field_name} ?? ({source_expr})");
+        let doc = field
+            .doc
+            .as_ref()
+            .and_then(|doc| doc.for_language(Language::TypeScript))
+            .map(str::to_string);
+
         if let PlannedType::Map(_, value) = &field.field_type {
             let value_type = self.resolve_planned_value_type(value);
             return RenderedSourcedField {
                 name: field_name.clone(),
-                to_wire_expr: map_value_to_wire_expr_from_expr(&value_type, source_expr),
+                annotation: Self::typescript_field_annotation(
+                    field,
+                    format!("Record<string, {}>", value_type.annotation),
+                ),
+                doc,
+                source_expr: default_source_expr,
+                visible: true,
+                from_wire_expr: map_value_from_wire_expr(
+                    &value_type,
+                    &format!("{{wire}}.{field_name}"),
+                ),
+                to_wire_expr: map_value_to_wire_expr_from_expr(&value_type, &source_expr),
             };
         }
 
@@ -1255,13 +1281,35 @@ impl<'a> ApiPlanner<'a> {
         if repeated {
             return RenderedSourcedField {
                 name: field_name.clone(),
-                to_wire_expr: repeated_to_wire_expr_from_expr(&resolved_type, source_expr),
+                annotation: Self::typescript_field_annotation(
+                    field,
+                    typescript_array_annotation(&resolved_type.annotation),
+                ),
+                doc,
+                source_expr: default_source_expr,
+                visible: true,
+                from_wire_expr: format!(
+                    "{} ?? []",
+                    repeated_from_wire_expr(&resolved_type, &format!("{{wire}}.{field_name}"))
+                ),
+                to_wire_expr: repeated_to_wire_expr_from_expr(&resolved_type, &source_expr),
             };
         }
 
         RenderedSourcedField {
-            name: field_name,
-            to_wire_expr: optional_to_wire_expr_from_expr(&resolved_type, source_expr),
+            name: field_name.clone(),
+            annotation: Self::typescript_field_annotation(field, resolved_type.annotation.clone()),
+            doc,
+            source_expr: default_source_expr,
+            visible: true,
+            from_wire_expr: required_from_wire_expr(
+                &resolved_type,
+                "sourced field",
+                &format!("{{wire}}.{field_name}"),
+                &field_name,
+                field,
+            ),
+            to_wire_expr: optional_to_wire_expr_from_expr(&resolved_type, &source_expr),
         }
     }
 
@@ -2884,6 +2932,7 @@ struct RenderedOperationInput {
     type_parameters: Vec<RenderedTypeParameter>,
     annotation: String,
     api_omitted_fields: Vec<String>,
+    sourced_fields: Vec<RenderedSourcedField>,
     to_wire_expr: String,
     transfer_type_converter: Option<String>,
 }
@@ -2969,9 +3018,14 @@ pub(in crate::generator) struct RenderedFlattenedField {
     to_wire_expr: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(in crate::generator) struct RenderedSourcedField {
     pub(in crate::generator) name: String,
+    annotation: String,
+    doc: Option<String>,
+    source_expr: String,
+    visible: bool,
+    pub(in crate::generator) from_wire_expr: String,
     pub(in crate::generator) to_wire_expr: String,
 }
 
@@ -3829,6 +3883,7 @@ fn render_endpoint_service_operation_body(
 
 fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String {
     let mut body = String::new();
+    let system_nexus = crate::nexgen_config::current().system_nexus;
     let has_serialization_context = services
         .iter()
         .flat_map(|service| &service.operations)
@@ -3840,6 +3895,15 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
         body.push_str("  /** Context for nested payloads, determined by the operation. */\n");
         body.push_str("  readonly serializationContext?: (input: Input) => import('@temporalio/common').SerializationContext;\n");
         body.push_str("}\n\n");
+    }
+    if system_nexus {
+        body.push_str("export type SystemNexusSpecificInterceptor = (\n");
+        body.push_str("  interceptor: SystemNexusWorkflowOutboundCallsInterceptor,\n");
+        body.push_str("  input: unknown,\n");
+        body.push_str(
+            "  next: (input: unknown) => Promise<workflow.NexusOperationHandle<unknown>>\n",
+        );
+        body.push_str(") => Promise<workflow.NexusOperationHandle<unknown>>;\n\n");
     }
     body.push_str("export const operationRegistry = [\n");
     for service in services {
@@ -3855,6 +3919,41 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
                 body.push_str("    serializationContext: ");
                 body.push_str(serialization_context);
                 body.push_str(",\n");
+            }
+            if system_nexus {
+                let input = operation
+                    .input
+                    .as_ref()
+                    .and_then(|input| input.model_name.as_deref())
+                    .or_else(|| {
+                        operation
+                            .input
+                            .as_ref()
+                            .map(|input| input.annotation.as_str())
+                    })
+                    .unwrap_or("undefined");
+                let output = &operation.output_operation_annotation;
+                body.push_str("    specificInterceptor: (\n");
+                body.push_str("      interceptor: SystemNexusWorkflowOutboundCallsInterceptor,\n");
+                body.push_str("      input: unknown,\n");
+                body.push_str("      next: (input: unknown) => Promise<workflow.NexusOperationHandle<unknown>>\n");
+                body.push_str("    ) => {\n");
+                body.push_str("      const hook = interceptor.");
+                body.push_str(&operation.attr_name);
+                body.push_str(";\n");
+                body.push_str("      return hook == null\n");
+                body.push_str("        ? next(input)\n");
+                body.push_str("        : hook(\n");
+                body.push_str("            input as ");
+                body.push_str(input);
+                body.push_str(",\n");
+                body.push_str("            next as (input: ");
+                body.push_str(input);
+                body.push_str(") => Promise<workflow.NexusOperationHandle<");
+                body.push_str(output);
+                body.push_str(">>\n");
+                body.push_str("          ) as Promise<workflow.NexusOperationHandle<unknown>>;\n");
+                body.push_str("    },\n");
             }
             body.push_str("  },\n");
         }
@@ -3895,7 +3994,11 @@ fn render_system_nexus_interceptor_interface(services: &[RenderedService<'_>]) -
         body.push_str(input);
         body.push_str(", next: (input: ");
         body.push_str(input);
-        body.push_str(") => Promise<unknown>) => Promise<unknown>;\n");
+        body.push_str(") => Promise<workflow.NexusOperationHandle<");
+        body.push_str(&operation.output_operation_annotation);
+        body.push_str(">>) => Promise<workflow.NexusOperationHandle<");
+        body.push_str(&operation.output_operation_annotation);
+        body.push_str(">>;\n");
     }
     body.push_str("}\n");
     body
@@ -4666,6 +4769,16 @@ fn render_invocation_model_base_type(output: &mut String, model: &RenderedModel)
     for field in &model.fields {
         render_invocation_model_base_property(output, model, field);
     }
+    for field in model.sourced_fields.iter().filter(|field| field.visible) {
+        render_typescript_type_property(
+            output,
+            "  ",
+            &field.name,
+            false,
+            &field.annotation,
+            field.doc.as_deref(),
+        );
+    }
     output.push('}');
 }
 
@@ -5160,6 +5273,16 @@ fn render_model(
                 } else {
                     render_flattened_type_properties(output, "  ", &field.flattened_fields);
                 }
+            }
+            for field in model.sourced_fields.iter().filter(|field| field.visible) {
+                render_typescript_type_property(
+                    output,
+                    "  ",
+                    &field.name,
+                    false,
+                    &field.annotation,
+                    field.doc.as_deref(),
+                );
             }
             output.push_str("}\n\n");
         }
@@ -5989,7 +6112,7 @@ fn render_operation_function(
         output.push_str("  endpoint: string,\n");
     }
     if let Some(input) = &operation.input {
-        output.push_str("  request: ");
+        output.push_str("  requestInput: ");
         if input.api_omitted_fields.is_empty() {
             output.push_str(&input.annotation);
         } else {
@@ -6005,6 +6128,25 @@ fn render_operation_function(
         output.push_str("): Promise<workflow.NexusOperationHandle<");
         output.push_str(&operation.output_operation_annotation);
         output.push_str(">> {\n");
+    }
+    if let Some(input) = &operation.input {
+        if input.sourced_fields.is_empty() {
+            output.push_str("  const request = requestInput;\n");
+        } else {
+            output.push_str("  const request = {\n    ...requestInput,\n");
+            for field in &input.sourced_fields {
+                output.push_str("    ");
+                output.push_str(&field.name);
+                output.push_str(": ");
+                output.push_str(&field.source_expr);
+                output.push_str(",\n");
+            }
+            output.push_str("  } as ");
+            output.push_str(&input.annotation);
+            output.push_str(";\n");
+        }
+    }
+    if !returns_direct {
         output.push_str("  const client = workflow.createNexusServiceClient({\n");
         output.push_str("    service: ");
         output.push_str(&service.attr_name);
@@ -6035,7 +6177,9 @@ fn render_operation_function(
         output.push_str(&service.attr_name);
         output.push_str(".operations.");
         output.push_str(&operation.attr_name);
-        output.push_str(",\n    request,\n  );\n");
+        output.push_str(",\n    ");
+        output.push_str("request");
+        output.push_str(",\n  );\n");
         output.push_str("  const result = await handle.result();\n");
         if let Some(transform_expr) = &operation.output_transform_expr {
             output.push_str("  return ");
@@ -6164,8 +6308,18 @@ fn render_operation_input_alias(
     output.push_str("type ");
     output.push_str(&operation_input_alias_name(service, operation));
     output.push_str(&render_type_parameter_list(&input.type_parameters));
-    output.push_str(" = ");
+    output.push_str(" = Omit<");
     output.push_str(&input.annotation);
+    output.push_str(", ");
+    output.push_str(
+        &input
+            .api_omitted_fields
+            .iter()
+            .map(|field| typescript_string_literal(field))
+            .collect::<Vec<_>>()
+            .join(" | "),
+    );
+    output.push_str("> ");
     output.push_str(" & { ");
     for (index, field) in input.api_omitted_fields.iter().enumerate() {
         if index > 0 {
@@ -6589,8 +6743,8 @@ mod tests {
         assert!(output.contains("staticSummary?: string;"));
         assert!(output.contains("staticDetails?: string;"));
         assert!(!output.contains("userMetadata?: UserMetadata;"));
-        assert!(!output.contains("namespace?: string;"));
-        assert!(output.contains("namespace: workflowNamespace(),"));
+        assert!(output.contains("namespace: string;"));
+        assert!(output.contains("namespace: model.namespace ?? (workflowNamespace()),"));
         assert!(output.contains("workflowType: workflowTypeToProto("));
         assert!(output.contains("workflowFunctionName("));
         assert!(output.contains("input: requestArgsToPayloads(model.args),"));
@@ -6644,7 +6798,10 @@ mod tests {
         assert!(output.contains("export async function signalWithStartWorkflow<"));
         assert!(output.contains("type SignalWithStartWorkflowInput<WorkflowFn extends"));
         assert!(output.contains("headers?: never"));
-        assert!(output.contains("request: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,"));
+        assert!(
+            output.contains("requestInput: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,")
+        );
+        assert!(output.contains("namespace: workflowNamespace(),"));
         assert!(output.contains("const client = workflow.createNexusServiceClient({"));
         assert!(!output.contains("export class WorkflowServiceClient"));
         assert!(!output.contains("from './temporal_model_converters.ts'"));
