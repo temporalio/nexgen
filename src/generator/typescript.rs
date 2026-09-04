@@ -6005,34 +6005,6 @@ fn render_operation_function(
         output.push_str("): Promise<workflow.NexusOperationHandle<");
         output.push_str(&operation.output_operation_annotation);
         output.push_str(">> {\n");
-        if crate::nexgen_config::current().system_nexus && service.endpoint.is_some() {
-            output.push_str("  return await workflow.startSystemNexusOperation({\n");
-            output.push_str("    service: ");
-            output.push_str(&typescript_string_literal(service.wire_name));
-            output.push_str(",\n    operation: ");
-            output.push_str(&typescript_string_literal(operation.wire_name));
-            output.push_str(",\n    input: request,\n    inputType: ");
-            output.push_str(&service.attr_name);
-            output.push_str(".operations.");
-            output.push_str(&operation.attr_name);
-            output.push_str(".inputType!,");
-            output.push_str("\n    outputType: ");
-            output.push_str(&service.attr_name);
-            output.push_str(".operations.");
-            output.push_str(&operation.attr_name);
-            output.push_str(".outputType,");
-            if let Some(serialization_context) = &operation.serialization_context_expr {
-                output.push_str(",\n    serializationContext: (input) => ");
-                output.push_str(serialization_context);
-                output.push_str(
-                    "({ namespace: workflow.workflowInfo().namespace, workflowId: input.id })",
-                );
-            }
-            output.push_str(",\n    specificInterceptor: ");
-            output.push_str(&typescript_string_literal(&operation.attr_name));
-            output.push_str(",\n  });\n}\n");
-            return;
-        }
         output.push_str("  const client = workflow.createNexusServiceClient({\n");
         output.push_str("    service: ");
         output.push_str(&service.attr_name);
@@ -6055,33 +6027,15 @@ fn render_operation_function(
         return;
     }
     if crate::nexgen_config::current().system_nexus && service.endpoint.is_some() {
-        output.push_str("  const handle = await workflow.startSystemNexusOperation<");
-        output.push_str(&operation.output_operation_annotation);
-        output.push_str(">({\n");
-        output.push_str("    service: ");
-        output.push_str(&typescript_string_literal(service.wire_name));
-        output.push_str(",\n    operation: ");
-        output.push_str(&typescript_string_literal(operation.wire_name));
-        output.push_str(",\n    input: request,\n    inputType: ");
+        output.push_str("  const client = workflow.createNexusServiceClient({\n    service: ");
+        output.push_str(&service.attr_name);
+        output.push_str(",\n    endpoint: ");
+        output.push_str(&typescript_service_endpoint_expr(service));
+        output.push_str(",\n  });\n  const handle = await client.startOperation(\n    ");
         output.push_str(&service.attr_name);
         output.push_str(".operations.");
         output.push_str(&operation.attr_name);
-        output.push_str(".inputType!,\n");
-        output.push_str("    outputType: ");
-        output.push_str(&service.attr_name);
-        output.push_str(".operations.");
-        output.push_str(&operation.attr_name);
-        output.push_str(".outputType,\n");
-        if let Some(serialization_context) = &operation.serialization_context_expr {
-            output.push_str("    serializationContext: (input) => ");
-            output.push_str(serialization_context);
-            output.push_str(
-                "({ namespace: workflow.workflowInfo().namespace, workflowId: input.id }),\n",
-            );
-        }
-        output.push_str("    specificInterceptor: ");
-        output.push_str(&typescript_string_literal(&operation.attr_name));
-        output.push_str(",\n  });\n");
+        output.push_str(",\n    request,\n  );\n");
         output.push_str("  const result = await handle.result();\n");
         if let Some(transform_expr) = &operation.output_transform_expr {
             output.push_str("  return ");
@@ -6928,8 +6882,8 @@ interface workflow-service {
         .unwrap();
 
         assert!(output.contains("Promise<workflow.NexusOperationHandle<Response>>"));
-        assert!(output.contains("return await workflow.startSystemNexusOperation({"));
-        assert!(output.contains("serializationContext: (input) => operationSerializationContext({ namespace: workflow.workflowInfo().namespace, workflowId: input.id })"));
+        assert!(output.contains("return await client.startOperation("));
+        assert!(output.contains("__temporal_system"));
     }
 
     #[test]
