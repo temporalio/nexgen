@@ -101,6 +101,7 @@ interface model {
   ///   dotnet-call-extractor="TemporalFunctionNames.ExtractCall"
   ///   typescript-value-type="workflow.SignalDefinition<any[]>"
   ///   typescript-args-type="Value extends workflow.SignalDefinition<infer Args, any> ? Args : never"
+  ///   typescript-import="@temporalio/workflow"
   /// @nexus.add-rpc-compatible-with "string"
   type signal-function = placeholder;
 

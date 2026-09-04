@@ -3350,7 +3350,19 @@ fn render_typescript_namespace_imports(
         }
         match import.import_style {
             LanguageImportStyle::Namespace => {
-                let key = (import.reference.clone(), import.module.clone());
+                // System Nexus output lives inside @temporalio/workflow. Its
+                // workflow helpers are imported through the local bridge, so
+                // WIT annotations authored for the public package must resolve
+                // to that same binding rather than introduce a duplicate
+                // `workflow` namespace import.
+                let module = if crate::nexgen_config::current().system_nexus
+                    && import.module == "@temporalio/workflow"
+                {
+                    typescript_workflow_module().to_string()
+                } else {
+                    import.module.clone()
+                };
+                let key = (import.reference.clone(), module);
                 let needs_value_import = !import.type_only;
                 namespace_imports
                     .entry(key)
