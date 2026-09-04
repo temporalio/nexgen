@@ -524,6 +524,12 @@ impl<'a> ApiPlanner<'a> {
                         .map(|resource| resource.resource_type_name.clone())
                 })
                 .unwrap_or(output_annotation_default),
+            output_transform_type_import: output_transform.and_then(|transform| {
+                transform
+                    .type_import
+                    .for_language(Language::TypeScript)
+                    .map(str::to_string)
+            }),
             output_transform_expr: output_transform.and_then(|transform| {
                 transform
                     .transform
@@ -2923,6 +2929,7 @@ struct RenderedOperation<'a> {
     service_output_operation_annotation: String,
     input: Option<RenderedOperationInput>,
     output_annotation: String,
+    output_transform_type_import: Option<String>,
     output_transform_expr: Option<String>,
     output_resource_return: Option<PlannedOperationResourceReturn>,
     output_direct_result: bool,
@@ -3452,6 +3459,10 @@ fn render_typescript_namespace_imports(
                 // to that same binding rather than introduce a duplicate
                 // `workflow` namespace import.
                 let module = if crate::nexgen_config::current().system_nexus
+                    && import.reference == "workflowHandle"
+                {
+                    "../../../workflow-handle".to_string()
+                } else if crate::nexgen_config::current().system_nexus
                     && import.module == "@temporalio/workflow"
                 {
                     typescript_workflow_module().to_string()
@@ -3523,7 +3534,7 @@ fn typescript_relative_import(source_dir: &Path, package: &str) -> String {
 
 fn typescript_workflow_module() -> &'static str {
     if crate::nexgen_config::current().system_nexus {
-        "../workflow-exports"
+        "../../../workflow"
     } else {
         "@temporalio/workflow"
     }
@@ -3962,7 +3973,7 @@ fn render_operation_registry_module(
                 body.push_str("    specificInterceptor: (\n");
                 body.push_str("      interceptor: SystemNexusWorkflowOutboundCallsInterceptor,\n");
                 body.push_str("      input: unknown,\n");
-                body.push_str("      next: (input: unknown) => Promise<workflow.NexusOperationHandle<unknown>>\n");
+                body.push_str("      next: (input: unknown) => Promise<nexus.NexusOperationHandle<unknown>>\n");
                 body.push_str("    ) => {\n");
                 body.push_str("      const hook = interceptor.");
                 body.push_str(&operation.attr_name);
@@ -3975,10 +3986,10 @@ fn render_operation_registry_module(
                 body.push_str(",\n");
                 body.push_str("            next as (input: ");
                 body.push_str(input);
-                body.push_str(") => Promise<workflow.NexusOperationHandle<");
+                body.push_str(") => Promise<nexus.NexusOperationHandle<");
                 body.push_str(output);
                 body.push_str(">>\n");
-                body.push_str("          ) as Promise<workflow.NexusOperationHandle<unknown>>;\n");
+                body.push_str("          ) as Promise<nexus.NexusOperationHandle<unknown>>;\n");
                 body.push_str("    },\n");
             }
             body.push_str("  },\n");
@@ -3987,8 +3998,8 @@ fn render_operation_registry_module(
     body.push_str("] as const;\n");
 
     let mut imports = String::new();
-    if system_nexus && body.contains("workflow.") {
-        imports.push_str("import type * as workflow from '../workflow-exports';\n");
+    if system_nexus && body.contains("nexus.") {
+        imports.push_str("import type * as nexus from '../../../nexus';\n");
     }
     render_support_imports(&mut imports, support_exports, "./support", &body);
     render_type_imports(
@@ -4034,8 +4045,8 @@ fn render_system_nexus_interceptors_module(
     let mut body = String::from("export type SystemNexusSpecificInterceptor = (\n");
     body.push_str("  interceptor: SystemNexusWorkflowOutboundCallsInterceptor,\n");
     body.push_str("  input: unknown,\n");
-    body.push_str("  next: (input: unknown) => Promise<workflow.NexusOperationHandle<unknown>>\n");
-    body.push_str(") => Promise<workflow.NexusOperationHandle<unknown>>;\n\n");
+    body.push_str("  next: (input: unknown) => Promise<nexus.NexusOperationHandle<unknown>>\n");
+    body.push_str(") => Promise<nexus.NexusOperationHandle<unknown>>;\n\n");
     body.push_str("export interface SystemNexusWorkflowOutboundCallsInterceptor {\n");
     for operation in operations {
         let input = operation
@@ -4056,9 +4067,9 @@ fn render_system_nexus_interceptors_module(
         body.push_str(input);
         body.push_str(", next: (input: ");
         body.push_str(input);
-        body.push_str(") => Promise<workflow.NexusOperationHandle<");
+        body.push_str(") => Promise<nexus.NexusOperationHandle<");
         body.push_str(&operation.output_operation_annotation);
-        body.push_str(">>) => Promise<workflow.NexusOperationHandle<");
+        body.push_str(">>) => Promise<nexus.NexusOperationHandle<");
         body.push_str(&operation.output_operation_annotation);
         body.push_str(">>;\n");
     }
@@ -4069,7 +4080,7 @@ fn render_system_nexus_interceptors_module(
         &body,
         &api_plan.module_path.to_path_buf(),
         language_imports,
-        &[("workflow", typescript_workflow_module(), true)],
+        &[("nexus", "../../../nexus", true)],
     );
     render_type_imports(
         &mut imports,
@@ -4482,7 +4493,10 @@ fn render_operation_module(
         &body,
         &api_plan.module_path.to_path_buf().join("operations"),
         language_imports,
-        &[("workflow", typescript_workflow_module(), false)],
+        &[
+            ("workflow", typescript_workflow_module(), false),
+            ("nexus", "../../../nexus", false),
+        ],
     );
     render_value_imports(&mut imports, "../services", &[service.attr_name.clone()]);
     let mut model_values = model_to_wire_function_names(models);
@@ -4508,6 +4522,9 @@ fn render_operation_module(
         api_plan,
         &body,
     );
+    if let Some(path) = &operation.output_transform_type_import {
+        render_type_imports(&mut imports, path, &[operation.output_annotation.clone()]);
+    }
     render_support_imports(&mut imports, support_exports, "../support", &body);
     let resources = used_import_names(&body, &resource_type_names(services));
     let value_resources = resources
@@ -6135,6 +6152,11 @@ fn render_operation_function(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
+    let client_namespace = if crate::nexgen_config::current().system_nexus {
+        "nexus"
+    } else {
+        "workflow"
+    };
     let returns_direct = operation.output_transform_expr.is_some()
         || operation.output_resource_return.is_some()
         || operation.output_direct_result;
@@ -6205,7 +6227,9 @@ fn render_operation_function(
         output.push_str(&operation.output_annotation);
         output.push_str("> {\n");
     } else {
-        output.push_str("): Promise<workflow.NexusOperationHandle<");
+        output.push_str(&format!(
+            "): Promise<{client_namespace}.NexusOperationHandle<"
+        ));
         output.push_str(&operation.output_operation_annotation);
         output.push_str(">> {\n");
     }
@@ -6225,7 +6249,9 @@ fn render_operation_function(
         }
     }
     if !returns_direct {
-        output.push_str("  const client = workflow.createNexusServiceClient({\n");
+        output.push_str(&format!(
+            "  const client = {client_namespace}.createNexusServiceClient({{\n"
+        ));
         output.push_str("    service: ");
         output.push_str(&service.attr_name);
         output.push_str(",\n");
@@ -6247,7 +6273,9 @@ fn render_operation_function(
         return;
     }
     if crate::nexgen_config::current().system_nexus && service.endpoint.is_some() {
-        output.push_str("  const client = workflow.createNexusServiceClient({\n    service: ");
+        output.push_str(&format!(
+            "  const client = {client_namespace}.createNexusServiceClient({{\n    service: "
+        ));
         output.push_str(&service.attr_name);
         output.push_str(",\n    endpoint: ");
         output.push_str(&typescript_service_endpoint_expr(service));
@@ -6271,7 +6299,9 @@ fn render_operation_function(
         output.push_str("}\n");
         return;
     }
-    output.push_str("  const client = workflow.createNexusServiceClient({\n");
+    output.push_str(&format!(
+        "  const client = {client_namespace}.createNexusServiceClient({{\n"
+    ));
     output.push_str("    service: ");
     output.push_str(&service.attr_name);
     output.push_str(",\n");
@@ -7113,7 +7143,7 @@ interface workflow-service {
         )
         .unwrap();
 
-        assert!(output.contains("Promise<workflow.NexusOperationHandle<Response>>"));
+        assert!(output.contains("Promise<nexus.NexusOperationHandle<Response>>"));
         assert!(output.contains("return await client.startOperation("));
         assert!(output.contains("__temporal_system"));
     }

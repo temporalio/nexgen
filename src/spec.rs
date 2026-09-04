@@ -1121,6 +1121,7 @@ impl<F: TypeFamily> VariantCaseSpec<F> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OperationOutputTransformSpec<F: TypeFamily = AuthoredFamily> {
     pub type_name: F::Text,
+    pub type_import: F::Text,
     pub transform: F::Text,
 }
 
@@ -1131,6 +1132,7 @@ impl<F: TypeFamily> OperationOutputTransformSpec<F> {
     ) -> OperationOutputTransformSpec<G> {
         OperationOutputTransformSpec {
             type_name: map.map_text(self.type_name),
+            type_import: map.map_text(self.type_import),
             transform: map.map_text(self.transform),
         }
     }
