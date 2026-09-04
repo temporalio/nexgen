@@ -3282,6 +3282,21 @@ fn render_module_files(
             module_origin.clone(),
         )?;
     }
+    if crate::nexgen_config::current().system_nexus && !services.is_empty() {
+        files.insert(
+            "interceptors.ts".into(),
+            render_system_nexus_interceptors_module(
+                enums,
+                flags,
+                variants,
+                models,
+                &module_model_names,
+                services,
+                language_imports,
+                api_plan,
+            ),
+        );
+    }
     if services.iter().any(|service| !service.resources.is_empty()) {
         files.insert(
             "resources.ts",
@@ -3898,15 +3913,6 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
         body.push_str("  readonly serializationContext?: (input: Input) => import('@temporalio/common').SerializationContext;\n");
         body.push_str("}\n\n");
     }
-    if system_nexus {
-        body.push_str("export type SystemNexusSpecificInterceptor = (\n");
-        body.push_str("  interceptor: SystemNexusWorkflowOutboundCallsInterceptor,\n");
-        body.push_str("  input: unknown,\n");
-        body.push_str(
-            "  next: (input: unknown) => Promise<workflow.NexusOperationHandle<unknown>>\n",
-        );
-        body.push_str(") => Promise<workflow.NexusOperationHandle<unknown>>;\n\n");
-    }
     body.push_str("export const operationRegistry = [\n");
     for service in services {
         for operation in &service.operations {
@@ -3967,16 +3973,27 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
 /// Renders the operation-specific interception surface consumed by the SDK's
 /// workflow outbound interceptor. It deliberately remains separate from the
 /// generic System Nexus hook, as it does in the other SDKs.
-fn render_system_nexus_interceptor_interface(services: &[RenderedService<'_>]) -> String {
+fn render_system_nexus_interceptors_module(
+    enums: &[&RenderedEnum],
+    flags: &[&RenderedFlags],
+    variants: &[&RenderedVariant],
+    models: &[&RenderedModel],
+    external_model_names: &BTreeSet<String>,
+    services: &[RenderedService<'_>],
+    language_imports: &[LanguageImportSpec],
+    api_plan: &PlannedSpec,
+) -> String {
     let operations = services
         .iter()
         .filter(|service| service.endpoint.is_some())
         .flat_map(|service| service.operations.iter())
         .collect::<Vec<_>>();
-    if operations.is_empty() {
-        return String::new();
-    }
-    let mut body = String::from("export interface SystemNexusWorkflowOutboundCallsInterceptor {\n");
+    let mut body = String::from("export type SystemNexusSpecificInterceptor = (\n");
+    body.push_str("  interceptor: SystemNexusWorkflowOutboundCallsInterceptor,\n");
+    body.push_str("  input: unknown,\n");
+    body.push_str("  next: (input: unknown) => Promise<workflow.NexusOperationHandle<unknown>>\n");
+    body.push_str(") => Promise<workflow.NexusOperationHandle<unknown>>;\n\n");
+    body.push_str("export interface SystemNexusWorkflowOutboundCallsInterceptor {\n");
     for operation in operations {
         let input = operation
             .input
@@ -4003,7 +4020,28 @@ fn render_system_nexus_interceptor_interface(services: &[RenderedService<'_>]) -
         body.push_str(">>;\n");
     }
     body.push_str("}\n");
-    body
+    let mut imports = String::new();
+    render_typescript_namespace_imports(
+        &mut imports,
+        &body,
+        language_imports,
+        &[("workflow", typescript_workflow_module())],
+    );
+    render_type_imports(
+        &mut imports,
+        "./models",
+        &used_import_names(
+            &body,
+            &model_type_names(enums, flags, variants, models, external_model_names),
+        ),
+    );
+    render_cross_module_model_type_imports(
+        &mut imports,
+        &api_plan.module_path.to_path_buf(),
+        api_plan,
+        &body,
+    );
+    render_generated_module(imports, body)
 }
 
 fn render_models_module(
@@ -4238,9 +4276,6 @@ fn render_service_module(
     }
     if include_native_api {
         body.push_str(&render_operation_registry_module(services));
-        if crate::nexgen_config::current().system_nexus {
-            body.push_str(&render_system_nexus_interceptor_interface(services));
-        }
     }
     let mut imports = String::new();
     render_typescript_namespace_imports(
@@ -4301,6 +4336,13 @@ fn render_service_module(
         "./resources",
         &used_import_names(&body, &resource_type_names(services)),
     );
+    if include_native_api && crate::nexgen_config::current().system_nexus {
+        render_type_imports(
+            &mut imports,
+            "./interceptors",
+            &["SystemNexusWorkflowOutboundCallsInterceptor".to_string()],
+        );
+    }
     let resource_client_binders = services
         .iter()
         .filter(|service| include_native_api && service.endpoint.is_none())
