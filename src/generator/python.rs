@@ -454,18 +454,6 @@ impl ExternalModelBackend for PythonExternalModels {
         }
     }
 
-    fn wire_type_identifier(&self, model_type: &PlannedType) -> Option<String> {
-        match model_type {
-            PlannedType::External(ExternalTypeSpec::Proto(_)) | PlannedType::Record(_) => {
-                self.proto.wire_type_identifier(model_type)
-            }
-            PlannedType::External(ExternalTypeSpec::Json(json_type)) => {
-                self.json.wire_type_identifier(json_type)
-            }
-            _ => None,
-        }
-    }
-
     fn wire_conversion(
         &self,
         model_type: &PlannedType,

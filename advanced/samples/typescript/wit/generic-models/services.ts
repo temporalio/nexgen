@@ -8,10 +8,3 @@ export const genericModelService = nexus.service("GenericModelService", {
     name: "Complete",
   }),
 });
-
-export const operationRegistry = [
-  {
-    service: "GenericModelService",
-    operation: "Complete",
-  },
-] as const;

@@ -19,30 +19,3 @@ export const typeShowcase = nexus.service("TypeShowcase", {
   recordSync: nexus.operation<RecordSyncRequest, void>({ name: "RecordSync" }),
   deactivate: nexus.operation<DeactivateRequest, void>({ name: "Deactivate" }),
 });
-
-export const operationRegistry = [
-  {
-    service: "TypeShowcase",
-    operation: "GetUser",
-  },
-  {
-    service: "TypeShowcase",
-    operation: "UpdateEmail",
-  },
-  {
-    service: "TypeShowcase",
-    operation: "Rename",
-  },
-  {
-    service: "TypeShowcase",
-    operation: "SetProfile",
-  },
-  {
-    service: "TypeShowcase",
-    operation: "RecordSync",
-  },
-  {
-    service: "TypeShowcase",
-    operation: "Deactivate",
-  },
-] as const;

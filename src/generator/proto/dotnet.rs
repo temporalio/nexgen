@@ -44,16 +44,6 @@ impl ModelBackend {
         })
     }
 
-    pub(in crate::generator) fn wire_type_identifier(
-        &self,
-        proto_type: &PlannedProtoType,
-    ) -> Option<String> {
-        match proto_type {
-            PlannedProtoType::Message(message) => Some(message.proto.full_name.clone()),
-            PlannedProtoType::Enum(_) => None,
-        }
-    }
-
     pub(in crate::generator) fn wire_conversion(
         &self,
         model_type: &PlannedType,

@@ -285,9 +285,9 @@ export const pageMetaTransferTypeConverter =
         if (value.wordCount === null) {
           violations.push({ path: "wordCount", reason: "explicit null not allowed" });
         } else {
-          if (
-            !(typeof value.wordCount === "number" && Number.isInteger(value.wordCount))
-          ) {
+          if (!(
+            typeof value.wordCount === "number" && Number.isInteger(value.wordCount)
+          )) {
             violations.push({ path: "wordCount", reason: "expected integer" });
           } else {
             if (!Number.isSafeInteger(value.wordCount)) {

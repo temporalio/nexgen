@@ -1053,7 +1053,7 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     assert!(rendered.contains("> = ReplaceSignalWithStartWorkflowRequest<"));
     assert!(
         rendered.contains(
-            "SignalValue extends workflow.SignalDefinition<infer Args, any> ? Args : never"
+            "SignalValue extends workflow.SignalDefinition<infer Args extends any[], any> ? Args : never"
         )
     );
     assert!(rendered.contains("SignalArgs extends any[] = SignalValue extends"));
@@ -1174,9 +1174,6 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     assert!(rendered.contains(
         "export { signalWithStartWorkflow } from './operations/signal-with-start-workflow';"
     ));
-    assert!(rendered.contains("export const operationRegistry = ["));
-    assert!(rendered.contains("service: \"temporal.api.workflowservice.v1.WorkflowService\""));
-    assert!(rendered.contains("operation: \"SignalWithStartWorkflowExecution\""));
     assert!(rendered.contains("export type { SignalWithStartWorkflowRequest } from './models';"));
     assert!(!rendered.contains("export { WorkflowService } from './services';"));
     assert!(!rendered.contains("export type { SignalWithStartWorkflowResponse"));

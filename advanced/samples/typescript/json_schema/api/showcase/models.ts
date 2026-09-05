@@ -1364,8 +1364,7 @@ export const contactTsTransferTypeConverter =
       }
 
       let shippingStreet: string | undefined = undefined as unknown as
-        | string
-        | undefined;
+        string | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "shippingStreet") &&
         raw["shippingStreet"] === null
@@ -2332,9 +2331,9 @@ export const settingsTransferTypeConverter =
         if (value.fontSize === null) {
           violations.push({ path: "fontSize", reason: "explicit null not allowed" });
         } else {
-          if (
-            !(typeof value.fontSize === "number" && Number.isInteger(value.fontSize))
-          ) {
+          if (!(
+            typeof value.fontSize === "number" && Number.isInteger(value.fontSize)
+          )) {
             violations.push({ path: "fontSize", reason: "expected integer" });
           } else {
             if (!Number.isSafeInteger(value.fontSize)) {
@@ -2458,9 +2457,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let status: "active" | "inactive" | "pending" = undefined as unknown as
-        | "active"
-        | "inactive"
-        | "pending";
+        "active" | "inactive" | "pending";
       if (
         !Object.prototype.hasOwnProperty.call(raw, "status") ||
         raw["status"] === null
@@ -2777,8 +2774,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let urlBlob: Uint8Array | undefined = undefined as unknown as
-        | Uint8Array
-        | undefined;
+        Uint8Array | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "urlBlob") &&
         raw["urlBlob"] === null
@@ -2870,9 +2866,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let middleName: string | null | undefined = undefined as unknown as
-        | string
-        | null
-        | undefined;
+        string | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "middleName")) {
         if (raw["middleName"] === null) {
           middleName = null;
@@ -3122,9 +3116,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let idOrName: string | number | undefined = undefined as unknown as
-        | string
-        | number
-        | undefined;
+        string | number | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "idOrName") &&
         raw["idOrName"] === null
@@ -3154,12 +3146,10 @@ export const showcaseTransferTypeConverter =
           Number.isSafeInteger(raw["idOrName"])
         ) {
           idOrName = raw["idOrName"] as number;
-          if (
-            !(
-              typeof (idOrName as number) === "number" &&
-              Number.isInteger(idOrName as number)
-            )
-          ) {
+          if (!(
+            typeof (idOrName as number) === "number" &&
+            Number.isInteger(idOrName as number)
+          )) {
             violations.push({ path: "idOrName", reason: "expected integer" });
           } else {
             if (!Number.isSafeInteger(idOrName as number)) {
@@ -3185,10 +3175,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let mode: "auto" | "manual" | number | undefined = undefined as unknown as
-        | "auto"
-        | "manual"
-        | number
-        | undefined;
+        "auto" | "manual" | number | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "mode") && raw["mode"] === null) {
         violations.push({ path: "mode", reason: "explicit null not allowed" });
       } else if (Object.prototype.hasOwnProperty.call(raw, "mode")) {
@@ -3212,9 +3199,9 @@ export const showcaseTransferTypeConverter =
           Number.isSafeInteger(raw["mode"])
         ) {
           mode = raw["mode"] as number;
-          if (
-            !(typeof (mode as number) === "number" && Number.isInteger(mode as number))
-          ) {
+          if (!(
+            typeof (mode as number) === "number" && Number.isInteger(mode as number)
+          )) {
             violations.push({ path: "mode", reason: "expected integer" });
           } else {
             if (!Number.isSafeInteger(mode as number)) {
@@ -3260,9 +3247,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let detail: ShowcaseDetailObject | string | undefined = undefined as unknown as
-        | ShowcaseDetailObject
-        | string
-        | undefined;
+        ShowcaseDetailObject | string | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "detail") &&
         raw["detail"] === null
@@ -3291,10 +3276,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let shapeOrName: Circle | Square | string | undefined = undefined as unknown as
-        | Circle
-        | Square
-        | string
-        | undefined;
+        Circle | Square | string | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "shapeOrName") &&
         raw["shapeOrName"] === null
@@ -3348,9 +3330,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let measurements: number[] | string | undefined = undefined as unknown as
-        | number[]
-        | string
-        | undefined;
+        number[] | string | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "measurements") &&
         raw["measurements"] === null
@@ -3452,8 +3432,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let segments: ShowcaseSegmentsItem[] | undefined = undefined as unknown as
-        | ShowcaseSegmentsItem[]
-        | undefined;
+        ShowcaseSegmentsItem[] | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "segments") &&
         raw["segments"] === null
@@ -3481,8 +3460,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let slots: (string | null)[] | undefined = undefined as unknown as
-        | (string | null)[]
-        | undefined;
+        (string | null)[] | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "slots") && raw["slots"] === null) {
         violations.push({ path: "slots", reason: "explicit null not allowed" });
       } else if (Object.prototype.hasOwnProperty.call(raw, "slots")) {
@@ -3554,8 +3532,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let numberGrid: number[][] | undefined = undefined as unknown as
-        | number[][]
-        | undefined;
+        number[][] | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "numberGrid") &&
         raw["numberGrid"] === null
@@ -3632,8 +3609,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let addresses: Address[] | undefined = undefined as unknown as
-        | Address[]
-        | undefined;
+        Address[] | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "addresses") &&
         raw["addresses"] === null
@@ -3659,8 +3635,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let addressBook: AddressBook | undefined = undefined as unknown as
-        | AddressBook
-        | undefined;
+        AddressBook | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "addressBook") &&
         raw["addressBook"] === null
@@ -3706,8 +3681,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let dateIndex: DateIndex | undefined = undefined as unknown as
-        | DateIndex
-        | undefined;
+        DateIndex | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "dateIndex") &&
         raw["dateIndex"] === null
@@ -3722,8 +3696,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let blobs: Uint8Array[] | undefined = undefined as unknown as
-        | Uint8Array[]
-        | undefined;
+        Uint8Array[] | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "blobs") && raw["blobs"] === null) {
         violations.push({ path: "blobs", reason: "explicit null not allowed" });
       } else if (Object.prototype.hasOwnProperty.call(raw, "blobs")) {
@@ -3753,8 +3726,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let blobIndex: BlobIndex | undefined = undefined as unknown as
-        | BlobIndex
-        | undefined;
+        BlobIndex | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "blobIndex") &&
         raw["blobIndex"] === null
@@ -3783,9 +3755,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let metricOrLabel: number | string | undefined = undefined as unknown as
-        | number
-        | string
-        | undefined;
+        number | string | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "metricOrLabel") &&
         raw["metricOrLabel"] === null
@@ -3831,9 +3801,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let addressListOrLabel: Address[] | string | undefined = undefined as unknown as
-        | Address[]
-        | string
-        | undefined;
+        Address[] | string | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "addressListOrLabel") &&
         raw["addressListOrLabel"] === null
@@ -3902,8 +3870,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let location: ShowcaseLocation | undefined = undefined as unknown as
-        | ShowcaseLocation
-        | undefined;
+        ShowcaseLocation | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "location") &&
         raw["location"] === null
@@ -3920,9 +3887,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let audit: ShowcaseAudit | null | undefined = undefined as unknown as
-        | ShowcaseAudit
-        | null
-        | undefined;
+        ShowcaseAudit | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "audit")) {
         if (raw["audit"] === null) {
           audit = null;
@@ -3936,8 +3901,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let rows: ShowcaseRowsItem[] | undefined = undefined as unknown as
-        | ShowcaseRowsItem[]
-        | undefined;
+        ShowcaseRowsItem[] | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "rows") && raw["rows"] === null) {
         violations.push({ path: "rows", reason: "explicit null not allowed" });
       } else if (Object.prototype.hasOwnProperty.call(raw, "rows")) {
@@ -3960,8 +3924,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let ledgerTs: ShowcaseLedger | undefined = undefined as unknown as
-        | ShowcaseLedger
-        | undefined;
+        ShowcaseLedger | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "ledger") &&
         raw["ledger"] === null
@@ -3978,8 +3941,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let metadata: ShowcaseMetadata | undefined = undefined as unknown as
-        | ShowcaseMetadata
-        | undefined;
+        ShowcaseMetadata | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "metadata") &&
         raw["metadata"] === null
@@ -4024,8 +3986,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let nicknames: Nicknames | undefined = undefined as unknown as
-        | Nicknames
-        | undefined;
+        Nicknames | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "nicknames") &&
         raw["nicknames"] === null
@@ -4132,8 +4093,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let attributes: Attributes | undefined = undefined as unknown as
-        | Attributes
-        | undefined;
+        Attributes | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "attributes") &&
         raw["attributes"] === null
@@ -4150,8 +4110,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let contact: ContactTs | undefined = undefined as unknown as
-        | ContactTs
-        | undefined;
+        ContactTs | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "contact") &&
         raw["contact"] === null
@@ -4166,9 +4125,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let nullableCount: number | null | undefined = undefined as unknown as
-        | number
-        | null
-        | undefined;
+        number | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "nullableCount")) {
         if (raw["nullableCount"] === null) {
           nullableCount = null;
@@ -4197,9 +4154,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let nullableRatio: number | null | undefined = undefined as unknown as
-        | number
-        | null
-        | undefined;
+        number | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "nullableRatio")) {
         if (raw["nullableRatio"] === null) {
           nullableRatio = null;
@@ -4226,9 +4181,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let nullableFlag: boolean | null | undefined = undefined as unknown as
-        | boolean
-        | null
-        | undefined;
+        boolean | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "nullableFlag")) {
         if (raw["nullableFlag"] === null) {
           nullableFlag = null;
@@ -4242,9 +4195,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let nullableTags: string[] | null | undefined = undefined as unknown as
-        | string[]
-        | null
-        | undefined;
+        string[] | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "nullableTags")) {
         if (raw["nullableTags"] === null) {
           nullableTags = null;
@@ -4291,10 +4242,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let nullableMode: "auto" | "manual" | null | undefined = undefined as unknown as
-        | "auto"
-        | "manual"
-        | null
-        | undefined;
+        "auto" | "manual" | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "nullableMode")) {
         if (raw["nullableMode"] === null) {
           nullableMode = null;
@@ -4316,8 +4264,7 @@ export const showcaseTransferTypeConverter =
       }
 
       let integralMeasurements: number[] | undefined = undefined as unknown as
-        | number[]
-        | undefined;
+        number[] | undefined;
       if (
         Object.prototype.hasOwnProperty.call(raw, "integralMeasurements") &&
         raw["integralMeasurements"] === null
@@ -5163,9 +5110,9 @@ export const showcaseTransferTypeConverter =
         if (value.priority === null) {
           violations.push({ path: "priority", reason: "explicit null not allowed" });
         } else {
-          if (
-            !(typeof value.priority === "number" && Number.isInteger(value.priority))
-          ) {
+          if (!(
+            typeof value.priority === "number" && Number.isInteger(value.priority)
+          )) {
             violations.push({ path: "priority", reason: "expected integer" });
           } else {
             if (!Number.isSafeInteger(value.priority)) {
@@ -5405,12 +5352,10 @@ export const showcaseTransferTypeConverter =
             typeof value.idOrName === "number" &&
             Number.isSafeInteger(value.idOrName)
           ) {
-            if (
-              !(
-                typeof (value.idOrName as number) === "number" &&
-                Number.isInteger(value.idOrName as number)
-              )
-            ) {
+            if (!(
+              typeof (value.idOrName as number) === "number" &&
+              Number.isInteger(value.idOrName as number)
+            )) {
               violations.push({ path: "idOrName", reason: "expected integer" });
             } else {
               if (!Number.isSafeInteger(value.idOrName as number)) {
@@ -5451,12 +5396,10 @@ export const showcaseTransferTypeConverter =
             }
           }
           if (typeof value.mode === "number" && Number.isSafeInteger(value.mode)) {
-            if (
-              !(
-                typeof (value.mode as number) === "number" &&
-                Number.isInteger(value.mode as number)
-              )
-            ) {
+            if (!(
+              typeof (value.mode as number) === "number" &&
+              Number.isInteger(value.mode as number)
+            )) {
               violations.push({ path: "mode", reason: "expected integer" });
             } else {
               if (!Number.isSafeInteger(value.mode as number)) {
@@ -6312,12 +6255,10 @@ export const showcaseTransferTypeConverter =
       }
       if (value.nullableCount !== undefined) {
         if (value.nullableCount !== null) {
-          if (
-            !(
-              typeof value.nullableCount === "number" &&
-              Number.isInteger(value.nullableCount)
-            )
-          ) {
+          if (!(
+            typeof value.nullableCount === "number" &&
+            Number.isInteger(value.nullableCount)
+          )) {
             violations.push({ path: "nullableCount", reason: "expected integer" });
           } else {
             if (!Number.isSafeInteger(value.nullableCount)) {
@@ -6922,8 +6863,7 @@ export const showcaseLocationTransferTypeConverter =
       }
 
       let geo: ShowcaseLocationGeo | undefined = undefined as unknown as
-        | ShowcaseLocationGeo
-        | undefined;
+        ShowcaseLocationGeo | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "geo") && raw["geo"] === null) {
         violations.push({ path: "geo", reason: "explicit null not allowed" });
       } else if (Object.prototype.hasOwnProperty.call(raw, "geo")) {
@@ -7358,9 +7298,9 @@ export const showcaseSegmentsItemTransferTypeConverter =
         }
       }
       if (typeof value === "number" && Number.isSafeInteger(value)) {
-        if (
-          !(typeof (value as number) === "number" && Number.isInteger(value as number))
-        ) {
+        if (!(
+          typeof (value as number) === "number" && Number.isInteger(value as number)
+        )) {
           violations.push({ path: "", reason: "expected integer" });
         } else {
           if (!Number.isSafeInteger(value as number)) {

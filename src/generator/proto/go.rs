@@ -211,14 +211,6 @@ impl ExternalModelBackend<PlannedValueType> for ModelBackend {
         }
     }
 
-    fn wire_type_identifier(&self, model_type: &PlannedValueType) -> Option<String> {
-        match model_type {
-            PlannedValueType::Message(message) => Some(message.info.full_name.clone()),
-            PlannedValueType::Enum(_) => None,
-            _ => None,
-        }
-    }
-
     fn wire_conversion(
         &self,
         model_type: &PlannedValueType,

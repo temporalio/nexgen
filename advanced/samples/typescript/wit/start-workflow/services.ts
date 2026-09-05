@@ -31,18 +31,3 @@ export const startWorkflowService = nexus.service("StartWorkflowService", {
     outputType: { transferTypeConverter: cancelWorkflowResponseTransferTypeConverter },
   }),
 });
-
-export const operationRegistry = [
-  {
-    service: "StartWorkflowService",
-    operation: "StartWorkflow",
-  },
-  {
-    service: "StartWorkflowService",
-    operation: "RestartWorkflow",
-  },
-  {
-    service: "StartWorkflowService",
-    operation: "CancelWorkflow",
-  },
-] as const;

@@ -9,7 +9,7 @@ use crate::error::{Error, Result};
 use crate::generator::json_schema::typescript as typescript_json;
 use crate::generator::proto::typescript as typescript_proto;
 use crate::generator::proto::typescript::{
-    model_typescript_interface_ref, model_typescript_type_id, typescript_replacement_type_name,
+    model_typescript_interface_ref, typescript_replacement_type_name,
 };
 use crate::generator::render_request_plan;
 use crate::generator::{
@@ -271,18 +271,6 @@ impl ExternalModelBackend for TypeScriptExternalModels {
         }
     }
 
-    fn wire_type_identifier(&self, model_type: &PlannedType) -> Option<String> {
-        match model_type {
-            PlannedType::External(ExternalTypeSpec::Proto(_)) => {
-                self.proto.wire_type_identifier(model_type)
-            }
-            PlannedType::External(ExternalTypeSpec::Json(json_type)) => {
-                self.json.wire_type_identifier(json_type)
-            }
-            _ => None,
-        }
-    }
-
     fn wire_conversion(
         &self,
         model_type: &PlannedType,
@@ -429,7 +417,6 @@ impl<'a> ApiPlanner<'a> {
                         fields
                     })
                     .unwrap_or_default(),
-                to_wire_expr: input_conversion.to_wire_expr("request"),
                 sourced_fields: input_model
                     .map(|model| model.sourced_fields.clone())
                     .unwrap_or_default(),
@@ -598,13 +585,6 @@ impl<'a> ApiPlanner<'a> {
             .model_type_annotation(model_type)
             .or_else(|| model_typescript_interface_ref(model_type, self.api_plan))
             .expect("operation type ref should be model-shaped")
-    }
-
-    fn operation_wire_type_identifier(&self, model_type: &PlannedType) -> String {
-        self.external_models
-            .wire_type_identifier(model_type)
-            .or_else(|| model_typescript_type_id(model_type, self.api_plan))
-            .expect("operation type id should be model-shaped")
     }
 
     fn resolve_output_annotation(&mut self, model_type: &PlannedType) -> String {
@@ -2946,7 +2926,6 @@ struct RenderedOperationInput {
     annotation: String,
     api_omitted_fields: Vec<String>,
     sourced_fields: Vec<RenderedSourcedField>,
-    to_wire_expr: String,
     transfer_type_converter: Option<String>,
 }
 
@@ -6814,7 +6793,7 @@ mod tests {
         ));
         assert!(output.contains("> = ReplaceSignalWithStartWorkflowRequest<"));
         assert!(output.contains(
-            "SignalValue extends workflow.SignalDefinition<infer Args, any> ? Args : never"
+            "SignalValue extends workflow.SignalDefinition<infer Args extends any[], any> ? Args : never"
         ));
         assert!(output.contains("SignalArgs extends any[] = SignalValue extends"));
         assert!(output.contains("signalArgs: SignalArgs | Readonly<SignalArgs>;"));

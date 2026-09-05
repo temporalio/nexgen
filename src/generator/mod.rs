@@ -424,9 +424,6 @@ pub(crate) trait ExternalModelBackend<ModelType = PlannedType> {
     /// Return the target-language type annotation/name for a model reference.
     fn model_type_annotation(&self, model_type: &ModelType) -> Option<String>;
 
-    /// Return the stable wire/runtime type identifier for a model reference.
-    fn wire_type_identifier(&self, model_type: &ModelType) -> Option<String>;
-
     /// Return conversion templates between public model values and wire values.
     ///
     /// `planned_record` is present when the type has already resolved to a planned

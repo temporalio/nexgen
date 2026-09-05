@@ -19,14 +19,3 @@ export const typeRoundtripService = nexus.service("TypeRoundtripService", {
     outputType: { transferTypeConverter: failureContainerTransferTypeConverter },
   }),
 });
-
-export const operationRegistry = [
-  {
-    service: "TypeRoundtripService",
-    operation: "ActivityOptionsOperation",
-  },
-  {
-    service: "TypeRoundtripService",
-    operation: "FailureOperation",
-  },
-] as const;

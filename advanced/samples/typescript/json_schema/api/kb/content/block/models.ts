@@ -100,8 +100,7 @@ export const blockTransferTypeConverter =
       }
 
       let style: BlockStyle | undefined = undefined as unknown as
-        | BlockStyle
-        | undefined;
+        BlockStyle | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "style") && raw["style"] === null) {
         violations.push({ path: "style", reason: "explicit null not allowed" });
       } else if (Object.prototype.hasOwnProperty.call(raw, "style")) {
@@ -113,9 +112,7 @@ export const blockTransferTypeConverter =
       }
 
       let page: Page | null | undefined = undefined as unknown as
-        | Page
-        | null
-        | undefined;
+        Page | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "page")) {
         if (raw["page"] === null) {
           page = null;

@@ -49,16 +49,6 @@ impl ExternalModelBackend for ModelBackend {
         }
     }
 
-    fn wire_type_identifier(&self, model_type: &PlannedType) -> Option<String> {
-        match model_type {
-            PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(proto))) => {
-                Some(proto.proto.full_name.clone())
-            }
-            PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => None,
-            _ => None,
-        }
-    }
-
     fn wire_conversion(
         &self,
         model_type: &PlannedType,
@@ -197,21 +187,6 @@ pub(crate) fn model_typescript_interface_ref(
         PlannedType::Record(record) => record_proto_info(model_type, api_plan)
             .map(message_typescript_interface_ref)
             .or_else(|| Some(record.model_name.clone())),
-        _ => None,
-    }
-}
-
-pub(crate) fn model_typescript_type_id(
-    model_type: &PlannedType,
-    api_plan: &PlannedSpec,
-) -> Option<String> {
-    match model_type {
-        PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(proto))) => {
-            Some(proto.proto.full_name.clone())
-        }
-        PlannedType::Record(record) => record_proto_info(model_type, api_plan)
-            .map(|proto| proto.full_name.clone())
-            .or_else(|| Some(record.full_name.clone())),
         _ => None,
     }
 }

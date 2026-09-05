@@ -241,9 +241,7 @@ export const messageTransferTypeConverter =
       }
 
       let replyToId: string | null | undefined = undefined as unknown as
-        | string
-        | null
-        | undefined;
+        string | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "replyToId")) {
         if (raw["replyToId"] === null) {
           replyToId = null;
@@ -342,9 +340,9 @@ export const messageTransferTypeConverter =
         if (value.priority === null) {
           violations.push({ path: "priority", reason: "explicit null not allowed" });
         } else {
-          if (
-            !(typeof value.priority === "number" && Number.isInteger(value.priority))
-          ) {
+          if (!(
+            typeof value.priority === "number" && Number.isInteger(value.priority)
+          )) {
             violations.push({ path: "priority", reason: "expected integer" });
           } else {
             if (!Number.isSafeInteger(value.priority)) {
