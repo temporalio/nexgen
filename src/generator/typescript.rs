@@ -3914,7 +3914,6 @@ fn render_operation_registry_module(
     api_plan: &PlannedSpec,
 ) -> String {
     let mut body = String::new();
-    let system_nexus = crate::nexgen_config::current().system_nexus;
     let has_serialization_context = services
         .iter()
         .flat_map(|service| &service.operations)
@@ -3942,54 +3941,16 @@ fn render_operation_registry_module(
                 body.push_str(serialization_context);
                 body.push_str(",\n");
             }
-            if system_nexus {
-                let input = operation
-                    .input
-                    .as_ref()
-                    .and_then(|input| input.model_name.as_deref())
-                    .or_else(|| {
-                        operation
-                            .input
-                            .as_ref()
-                            .map(|input| input.annotation.as_str())
-                    })
-                    .unwrap_or("undefined");
-                let output = &operation.output_operation_annotation;
-                body.push_str("    specificInterceptor: (\n");
-                body.push_str("      interceptor: SystemNexusWorkflowOutboundCallsInterceptor,\n");
-                body.push_str("      input: unknown,\n");
-                body.push_str("      next: (input: unknown) => Promise<nexus.NexusOperationHandle<unknown>>\n");
-                body.push_str("    ) => {\n");
-                body.push_str("      const hook = interceptor.");
-                body.push_str(&operation.attr_name);
-                body.push_str(";\n");
-                body.push_str("      return hook == null\n");
-                body.push_str("        ? next(input)\n");
-                body.push_str("        : hook(\n");
-                body.push_str("            input as ");
-                body.push_str(input);
-                body.push_str(",\n");
-                body.push_str("            next as (input: ");
-                body.push_str(input);
-                body.push_str(") => Promise<nexus.NexusOperationHandle<");
-                body.push_str(output);
-                body.push_str(">>\n");
-                body.push_str("          ) as Promise<nexus.NexusOperationHandle<unknown>>;\n");
-                body.push_str("    },\n");
-            }
             body.push_str("  },\n");
         }
     }
     if has_serialization_context {
-        body.push_str("] as const satisfies readonly OperationRegistryEntry[];\n");
+        body.push_str("] as const satisfies readonly OperationRegistryEntry<any>[];\n");
     } else {
         body.push_str("] as const;\n");
     }
 
     let mut imports = String::new();
-    if system_nexus && body.contains("nexus.") {
-        imports.push_str("import type * as nexus from '../../../nexus';\n");
-    }
     render_support_imports(&mut imports, support_exports, "./support", &body);
     render_type_imports(
         &mut imports,
@@ -4005,11 +3966,6 @@ fn render_operation_registry_module(
         api_plan,
         &body,
     );
-    if system_nexus && body.contains("SystemNexusWorkflowOutboundCallsInterceptor") {
-        imports.push_str(
-            "import type { SystemNexusWorkflowOutboundCallsInterceptor } from './interceptors';\n",
-        );
-    }
     render_generated_module(imports, body)
 }
 
@@ -4029,15 +3985,15 @@ fn render_system_nexus_interceptors_module(
     let operations = services
         .iter()
         .filter(|service| service.endpoint.is_some())
-        .flat_map(|service| service.operations.iter())
+        .flat_map(|service| {
+            service
+                .operations
+                .iter()
+                .map(move |operation| (service, operation))
+        })
         .collect::<Vec<_>>();
-    let mut body = String::from("export type SystemNexusSpecificInterceptor = (\n");
-    body.push_str("  interceptor: SystemNexusWorkflowOutboundCallsInterceptor,\n");
-    body.push_str("  input: unknown,\n");
-    body.push_str("  next: (input: unknown) => Promise<nexus.NexusOperationHandle<unknown>>\n");
-    body.push_str(") => Promise<nexus.NexusOperationHandle<unknown>>;\n\n");
-    body.push_str("export interface SystemNexusWorkflowOutboundCallsInterceptor {\n");
-    for operation in operations {
+    let mut body = String::from("export interface SystemNexusWorkflowOutboundCallsInterceptor {\n");
+    for (_, operation) in &operations {
         let input = operation
             .input
             .as_ref()
@@ -4062,6 +4018,62 @@ fn render_system_nexus_interceptors_module(
         body.push_str(&operation.output_operation_annotation);
         body.push_str(">>;\n");
     }
+    body.push_str("}\n");
+    body.push_str("\ninterface SystemNexusSpecificInterceptorAdapter {\n");
+    body.push_str("  start?: (\n");
+    body.push_str("    input: unknown,\n");
+    body.push_str("    next: (input: unknown) => Promise<nexus.NexusOperationHandle<unknown>>\n");
+    body.push_str("  ) => Promise<nexus.NexusOperationHandle<unknown>>;\n");
+    body.push_str("}\n");
+    body.push_str("\n/** Selects adapters for the operation-specific interceptor chain. */\n");
+    body.push_str("export function systemNexusSpecificInterceptorAdapters(\n");
+    body.push_str("  service: string,\n");
+    body.push_str("  operation: string,\n");
+    body.push_str("  interceptors: readonly SystemNexusWorkflowOutboundCallsInterceptor[]\n");
+    body.push_str("): SystemNexusSpecificInterceptorAdapter[] {\n");
+    body.push_str("  switch (`${service}/${operation}`) {\n");
+    for (service, operation) in operations {
+        let input = operation
+            .input
+            .as_ref()
+            .and_then(|input| input.model_name.as_deref())
+            .or_else(|| {
+                operation
+                    .input
+                    .as_ref()
+                    .map(|input| input.annotation.as_str())
+            })
+            .unwrap_or("undefined");
+        body.push_str("    case ");
+        body.push_str(&typescript_string_literal(&format!(
+            "{}/{}",
+            service.wire_name, operation.wire_name
+        )));
+        body.push_str(":\n");
+        body.push_str("      return interceptors.map((interceptor) => {\n");
+        body.push_str("        const hook = interceptor.");
+        body.push_str(&operation.attr_name);
+        body.push_str(";\n");
+        body.push_str("        return hook == null\n");
+        body.push_str("          ? {}\n");
+        body.push_str("          : {\n");
+        body.push_str("              start: (input, next) =>\n");
+        body.push_str("                hook(\n");
+        body.push_str("                  input as ");
+        body.push_str(input);
+        body.push_str(",\n");
+        body.push_str("                  next as (input: ");
+        body.push_str(input);
+        body.push_str(") => Promise<nexus.NexusOperationHandle<");
+        body.push_str(&operation.output_operation_annotation);
+        body.push_str(">>\n");
+        body.push_str("                ) as Promise<nexus.NexusOperationHandle<unknown>>,\n");
+        body.push_str("            };\n");
+        body.push_str("      });\n");
+    }
+    body.push_str("    default:\n");
+    body.push_str("      return [];\n");
+    body.push_str("  }\n");
     body.push_str("}\n");
     let mut imports = String::new();
     render_typescript_namespace_imports(
@@ -6873,7 +6885,7 @@ mod tests {
         assert!(output.contains(
             "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest | undefined {"
         ));
-        assert!(output.contains("headers?: Record<string, unknown>;"));
+        assert!(output.contains("headers?: common.Headers;"));
         assert!(!output.contains("export interface Header"));
         assert!(!output.contains("export interface WorkflowType"));
         assert!(!output.contains("export interface TaskQueue"));

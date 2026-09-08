@@ -6,12 +6,6 @@ import type {
   SignalWithStartWorkflowRequest,
 } from "./models";
 
-export type SystemNexusSpecificInterceptor = (
-  interceptor: SystemNexusWorkflowOutboundCallsInterceptor,
-  input: unknown,
-  next: (input: unknown) => Promise<nexus.NexusOperationHandle<unknown>>,
-) => Promise<nexus.NexusOperationHandle<unknown>>;
-
 export interface SystemNexusWorkflowOutboundCallsInterceptor {
   signalWithStartWorkflow?: (
     input: SignalWithStartWorkflowRequest,
@@ -19,4 +13,40 @@ export interface SystemNexusWorkflowOutboundCallsInterceptor {
       input: SignalWithStartWorkflowRequest,
     ) => Promise<nexus.NexusOperationHandle<SignalWithStartWorkflowResponse>>,
   ) => Promise<nexus.NexusOperationHandle<SignalWithStartWorkflowResponse>>;
+}
+
+interface SystemNexusSpecificInterceptorAdapter {
+  start?: (
+    input: unknown,
+    next: (input: unknown) => Promise<nexus.NexusOperationHandle<unknown>>,
+  ) => Promise<nexus.NexusOperationHandle<unknown>>;
+}
+
+/** Selects adapters for the operation-specific interceptor chain. */
+export function systemNexusSpecificInterceptorAdapters(
+  service: string,
+  operation: string,
+  interceptors: readonly SystemNexusWorkflowOutboundCallsInterceptor[],
+): SystemNexusSpecificInterceptorAdapter[] {
+  switch (`${service}/${operation}`) {
+    case "temporal.api.workflowservice.v1.WorkflowService/SignalWithStartWorkflowExecution":
+      return interceptors.map((interceptor) => {
+        const hook = interceptor.signalWithStartWorkflow;
+        return hook == null
+          ? {}
+          : {
+              start: (input, next) =>
+                hook(
+                  input as SignalWithStartWorkflowRequest,
+                  next as (
+                    input: SignalWithStartWorkflowRequest,
+                  ) => Promise<
+                    nexus.NexusOperationHandle<SignalWithStartWorkflowResponse>
+                  >,
+                ) as Promise<nexus.NexusOperationHandle<unknown>>,
+            };
+      });
+    default:
+      return [];
+  }
 }

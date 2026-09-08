@@ -234,7 +234,7 @@ export type SignalWithStartWorkflowRequest<
     /**
      * Headers for the request.
      */
-    headers?: Record<string, unknown>;
+    headers?: common.Headers;
     /**
      * Namespace of the workflow execution.
      */
@@ -425,7 +425,7 @@ export function signalWithStartWorkflowRequestFromProto<
     headers:
       proto.header == null
         ? undefined
-        : (headerFromProto(proto.header) as Record<string, unknown>),
+        : (headerFromProto(proto.header) as common.Headers),
     namespace: requiredField(
       proto.namespace === "" ? undefined : proto.namespace,
       "sourced field",
