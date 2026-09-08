@@ -1,6 +1,6 @@
 [package]
 name = "nexgen"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 description = "Generate language-specific Nexus operation bindings from WIT"
 license = "MIT"
