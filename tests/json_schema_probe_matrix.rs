@@ -904,7 +904,7 @@ fn check_typescript(
                 "skipLibCheck": true,
                 "esModuleInterop": true,
             },
-            "include": ["shims/**/*.d.ts", "**/*.ts"],
+            "include": ["**/*.ts"],
         }))
         .expect("render tsconfig"),
     )
@@ -914,19 +914,6 @@ fn check_typescript(
         "{\n  \"name\": \"nexgen-probe-matrix\",\n  \"private\": true,\n  \"type\": \"module\"\n}\n",
     )
     .expect("write package.json");
-    let shims = root.join("shims");
-    fs::create_dir_all(&shims).expect("create shims directory");
-    for entry in fs::read_dir(samples.join("shims"))
-        .into_iter()
-        .flatten()
-        .flatten()
-    {
-        let path = entry.path();
-        if path.is_file() {
-            fs::copy(&path, shims.join(path.file_name().expect("shim name"))).expect("copy shim");
-        }
-    }
-
     for probe in probes {
         compiled.insert((probe.id.to_string(), Target::TypeScript));
     }

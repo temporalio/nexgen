@@ -1,5 +1,10 @@
 import { readFileSync } from "node:fs";
-import { ApplicationFailure, defaultPayloadConverter } from "@temporalio/common";
+import {
+  ApplicationFailure,
+  defaultPayloadConverter,
+  fromPayloadWithTypeInfo,
+  toPayloadWithTypeInfo,
+} from "@temporalio/common";
 import type { TransferTypeConverter } from "nexus-rpc";
 
 const encoder = new TextEncoder();
@@ -66,8 +71,12 @@ export function decodeFixture<T>(
   converter: TransferTypeConverter<T>,
   bytes: Uint8Array,
 ): T {
-  const transfer = defaultPayloadConverter.fromPayload(jsonPayload(bytes));
-  return converter.fromTransferType(transfer);
+  return fromPayloadWithTypeInfo(
+    defaultPayloadConverter,
+    jsonPayload(bytes),
+    undefined,
+    { transferTypeConverter: converter },
+  );
 }
 
 /**
@@ -75,7 +84,9 @@ export function decodeFixture<T>(
  * re-encoded JSON as a generic parsed value (for JSON-equality assertions).
  */
 export function encodeModel<T>(converter: TransferTypeConverter<T>, value: T): unknown {
-  const payload = defaultPayloadConverter.toPayload(converter.toTransferType(value));
+  const payload = toPayloadWithTypeInfo(defaultPayloadConverter, value, undefined, {
+    transferTypeConverter: converter,
+  });
   if (payload?.data == null) {
     throw new Error("payload converter produced no data");
   }

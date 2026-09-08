@@ -20,7 +20,7 @@ flattened**. Inside each per-input directory:
   emitted **only if it declares any** (see [[services]]).
 
 Schema-independent runtime intended for cross-model reuse — `Violation`, any
-target-owned payload-validation compatibility helper, and each target's shared
+target-owned payload-validation helper, and each target's shared
 numeric or (de)serialization helpers — is defined **once** at the package root
 (the shared `definitions` file, below), never duplicated per module. A target
 may still inline a leaf check when it has no shared runtime primitive for it;
@@ -149,10 +149,12 @@ generator-internal rather than part of the package's surface.
   type `PayloadValidationError`, and the language's `Violation` list as its
   first detail. Python calls
   `temporalio.converter.create_payload_validation_error` directly and requires
-  Temporal SDK 1.32.0 or newer. The generated TypeScript and Go helpers carry
-  TODOs to use their corresponding SDK factories once those factories are
-  available in supported releases. Java inlines the application-failure call
-  with the equivalent TODO at each throw site. Nested aggregation casts the
+  Temporal SDK 1.32.0 or newer. TypeScript calls
+  `createPayloadValidationError` from `@temporalio/common` and requires Temporal
+  SDK 1.23.0 or newer. The generated Go helper carries a TODO to use its SDK
+  factory once that factory is available in a supported release. Java inlines
+  the application-failure call with the equivalent TODO at each throw site.
+  Nested aggregation casts the
   locally retained first detail back to the generated violation-list type; the
   cast is cheap and performs no serialization (P11).
 - Spec-number helpers — `parseSpecInteger` (Go), `_parse_spec_integer`
@@ -456,8 +458,9 @@ bindings:
 - **TypeScript** — `index.ts` per directory: per-input barrels
   `export … from './models'` (and `./services`), intermediate barrels
   `export * from './<child>'`, and the root barrel re-exports the tree plus
-  the `Violation` type from `./definitions`. Runtime helpers such as
-  `payloadValidationError` remain internal to the generated modules.
+  the `Violation` type from `./definitions`. Runtime helpers such as `collect`
+  remain internal to the generated modules; model modules call the SDK's
+  payload-validation factory directly.
 - **Go** — no aggregator; capitalized identifiers are exported from the one
   flat package.
 - **Java** — `public` class per file; runtime classes public too.

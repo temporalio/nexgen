@@ -244,14 +244,14 @@ signature, validation, or dispatch behavior. A non-boolean value rejects.
   `type OperationReference[I, O any] interface { Name() string; … }`,
   `func NewOperationReference[I, O any](name string) OperationReference[I, O]`,
   `type NoValue *struct{}`.
-- **TypeScript** (`nexus-rpc`): `nexus.service(name, operations)`,
+- **TypeScript** (`nexus-rpc` 0.0.3 or newer): `nexus.service(name, operations)`,
   `nexus.operation<In, Out>({ name, inputType?, outputType? })` where both
   type-info fields are `TypeInfo<T, unknown>` and
   `interface TypeInfo<T = unknown, D = T> { transferTypeConverter?:
   TransferTypeConverter<T, D> }`,
   `interface TransferTypeConverter<T, D = unknown> { fromTransferType(value:
-  D): T; toTransferType(value: T): D }` — confirmed by the existing
-  generator's compiling output.
+  D): T; toTransferType(value: T): D }`. The converter contract is exported
+  directly by `nexus-rpc` 0.0.3 or newer.
 - **Python** (`nexusrpc`): `@service` /
   `@service(name=…)` (name defaults to the class name);
   `Operation[InputT, OutputT]` dataclass, `Operation(name=…)`. **No
@@ -517,7 +517,7 @@ types' converters: each non-void side carries
 `inputType`/`outputType` = `{ transferTypeConverter: <side>TransferTypeConverter }`,
 the model's exported converter instance (PRINCIPLES TS §4). This is
 metadata, not behavior — nexus-rpc carries it verbatim and interprets
-nothing; a protocol integration applies the conversion when transferring
+nothing; Temporal SDK 1.23.0 or newer applies the conversion when transferring
 the value. It exists because TS is the only target whose conversion is
 *not* discoverable from the type: Go reaches it through
 `MarshalJSON`/`UnmarshalJSON` on the model, Python through the model's

@@ -8,16 +8,6 @@ export interface Violation {
   readonly reason: string;
 }
 
-/** Creates the Temporal failure used for payload validation errors. */
-export function payloadValidationError(violations: Violation[]): ApplicationFailure {
-  // TODO: Use createPayloadValidationError from @temporalio/common once it is available in an SDK release.
-  return ApplicationFailure.nonRetryable(
-    "Payload validation failed",
-    "PayloadValidationError",
-    violations,
-  );
-}
-
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

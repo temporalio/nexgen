@@ -1938,8 +1938,15 @@ fn render_external_models(
         render_model_transfer_type_converter(&mut output, model, json_models)?;
     }
 
+    let uses_payload_validation_factory = json_models
+        .iter()
+        .any(|model| bare_ref_target(model).is_none());
     Ok(RenderedExternalModelFragments {
-        imports: render_json_model_imports(runtime_import_module, &output),
+        imports: render_json_model_imports(
+            runtime_import_module,
+            &output,
+            uses_payload_validation_factory,
+        ),
         body: output,
         type_exported_names: json_models
             .iter()
@@ -2000,19 +2007,27 @@ fn converter_dependency_order<'a>(
 
 /// The namespace under which every generated `models.ts` imports its sibling
 /// `definitions.ts` runtime module, so the generated file doesn't pollute its
-/// own module namespace with generic names (`payloadValidationError`, `collect`, …)
-/// that could collide with user-authored identifiers.
+/// own module namespace with generic names (`collect`, `isPlainObject`, …) that
+/// could collide with user-authored identifiers.
 const DEFINITIONS_NAMESPACE: &str = "__nexgenDefinitions";
 
-fn render_json_model_imports(runtime_import_module: &str, body: &str) -> String {
+fn render_json_model_imports(
+    runtime_import_module: &str,
+    body: &str,
+    uses_payload_validation_factory: bool,
+) -> String {
     let mut imports = String::new();
     // Every model gets a converter, so the SDK contract it implements is always
-    // referenced. Type-only: nexus-rpc contributes no runtime code to `models.ts`.
+    // referenced. Type-only: nexus-rpc contributes no runtime code to
+    // `models.ts`.
     imports.push_str("import type { TransferTypeConverter } from \"nexus-rpc\";\n");
+    if uses_payload_validation_factory {
+        imports.push_str("import { createPayloadValidationError } from \"@temporalio/common\";\n");
+    }
     // Temporal-repr models reference the ambient global `Temporal.*` types
     // (TS 6's `esnext.temporal` lib) — no import required (P4).
-    // `payloadValidationError`/`isPlainObject`/`Violation` are referenced by every
-    // generated model's parser, so the import is always live.
+    // `isPlainObject`/`Violation` are referenced by every generated model's
+    // parser, so the import is always live.
     if body.contains(DEFINITIONS_NAMESPACE) {
         imports.push_str("import * as ");
         imports.push_str(DEFINITIONS_NAMESPACE);
@@ -2543,17 +2558,6 @@ fn render_validator_core(output: &mut String) {
     output.push_str("export interface Violation {\n");
     output.push_str("  readonly path: string;\n");
     output.push_str("  readonly reason: string;\n");
-    output.push_str("}\n\n");
-    output.push_str("/** Creates the Temporal failure used for payload validation errors. */\n");
-    output.push_str(
-        "export function payloadValidationError(violations: Violation[]): ApplicationFailure {\n",
-    );
-    output.push_str("  // TODO: Use createPayloadValidationError from @temporalio/common once it is available in an SDK release.\n");
-    output.push_str("  return ApplicationFailure.nonRetryable(\n");
-    output.push_str("    'Payload validation failed',\n");
-    output.push_str("    'PayloadValidationError',\n");
-    output.push_str("    violations,\n");
-    output.push_str("  );\n");
     output.push_str("}\n\n");
     output.push_str(
         "export function isPlainObject(value: unknown): value is Record<string, unknown> {\n",
@@ -3239,7 +3243,7 @@ fn render_ts_union_serialize(output: &mut String, union: &TsUnion, value_expr: &
             let root_path = typescript_string_literal("");
             let serialized = serialize_expr_collecting(&variant.schema, &member, &root_path);
             output.push_str(&format!(
-                "  if (Array.isArray({value_expr})) {{\n    const out = {serialized};\n    if (violations.length) {{\n      throw {DEFINITIONS_NAMESPACE}.payloadValidationError(violations);\n    }}\n    return out;\n  }}\n"
+                "  if (Array.isArray({value_expr})) {{\n    const out = {serialized};\n    if (violations.length) {{\n      throw createPayloadValidationError(violations);\n    }}\n    return out;\n  }}\n"
             ));
         } else if variant.is_integer {
             output.push_str(&format!(
@@ -3257,7 +3261,7 @@ fn render_ts_union_serialize(output: &mut String, union: &TsUnion, value_expr: &
         ));
     }
     output.push_str(&format!(
-        "  throw {DEFINITIONS_NAMESPACE}.payloadValidationError([{{ path: '', reason: 'expected one of: {}' }}]);\n",
+        "  throw createPayloadValidationError([{{ path: '', reason: 'expected one of: {}' }}]);\n",
         union.admissible()
     ));
 }
@@ -3455,7 +3459,7 @@ fn render_model_transfer_type_converter(
         render_ts_union_parse(output, &union, "raw", "out", "''", "    ");
         output.push_str("    if (violations.length) {\n");
         output.push_str(&format!(
-            "      throw {DEFINITIONS_NAMESPACE}.payloadValidationError(violations);\n"
+            "      throw createPayloadValidationError(violations);\n"
         ));
         output.push_str("    }\n");
         output.push_str("    return out;\n");
@@ -3471,7 +3475,7 @@ fn render_model_transfer_type_converter(
             output.push_str(&checks);
             output.push_str("    if (violations.length) {\n");
             output.push_str(&format!(
-                "      throw {DEFINITIONS_NAMESPACE}.payloadValidationError(violations);\n"
+                "      throw createPayloadValidationError(violations);\n"
             ));
             output.push_str("    }\n");
         }
@@ -3513,7 +3517,7 @@ fn render_model_parser_body(
         "  if (!{DEFINITIONS_NAMESPACE}.isPlainObject(raw)) {{\n"
     ));
     output.push_str(&format!(
-        "    throw {DEFINITIONS_NAMESPACE}.payloadValidationError([{{ path: '', reason: 'expected object' }}]);\n"
+        "    throw createPayloadValidationError([{{ path: '', reason: 'expected object' }}]);\n"
     ));
     output.push_str("  }\n\n");
 
@@ -3556,7 +3560,7 @@ fn render_model_parser_body(
 
     output.push_str("  if (violations.length) {\n");
     output.push_str(&format!(
-        "    throw {DEFINITIONS_NAMESPACE}.payloadValidationError(violations);\n"
+        "    throw createPayloadValidationError(violations);\n"
     ));
     output.push_str("  }\n");
     // An optional member is assigned after the literal is built, which a
@@ -3622,7 +3626,7 @@ fn render_model_serializer_body(
     // the remainder of the serializer, which erases the model member types.
     output.push_str("  const candidate: unknown = value;\n");
     output.push_str(&format!(
-        "  if (!{DEFINITIONS_NAMESPACE}.isPlainObject(candidate)) {{\n    throw {DEFINITIONS_NAMESPACE}.payloadValidationError([{{ path: '', reason: 'expected object' }}]);\n  }}\n"
+        "  if (!{DEFINITIONS_NAMESPACE}.isPlainObject(candidate)) {{\n    throw createPayloadValidationError([{{ path: '', reason: 'expected object' }}]);\n  }}\n"
     ));
     let needs_validation = model_needs_serialize_validation(&schema)?;
     if needs_validation {
@@ -3636,7 +3640,7 @@ fn render_model_serializer_body(
 
     if let Some(shape) = ts_map_shape(&schema)? {
         output.push_str(&format!(
-            "  if (!{DEFINITIONS_NAMESPACE}.isPlainObject(value.additionalProperties)) {{\n    throw {DEFINITIONS_NAMESPACE}.payloadValidationError([{{ path: '', reason: 'expected object' }}]);\n  }}\n"
+            "  if (!{DEFINITIONS_NAMESPACE}.isPlainObject(value.additionalProperties)) {{\n    throw createPayloadValidationError([{{ path: '', reason: 'expected object' }}]);\n  }}\n"
         ));
         output.push_str(
             "  for (const [key, entry] of Object.entries(value.additionalProperties)) {\n",
@@ -3682,7 +3686,7 @@ fn render_model_serializer_body(
             }
             output.push_str("  if (violations.length) {\n");
             output.push_str(&format!(
-                "    throw {DEFINITIONS_NAMESPACE}.payloadValidationError(violations);\n"
+                "    throw createPayloadValidationError(violations);\n"
             ));
             output.push_str("  }\n");
         }
@@ -3832,7 +3836,7 @@ fn render_model_serializer_body(
         render_ts_dependent_required(output, "out", &schema, "  ");
         output.push_str("  if (violations.length) {\n");
         output.push_str(&format!(
-            "    throw {DEFINITIONS_NAMESPACE}.payloadValidationError(violations);\n"
+            "    throw createPayloadValidationError(violations);\n"
         ));
         output.push_str("  }\n");
     }
@@ -3882,7 +3886,7 @@ fn render_map_parser_body(output: &mut String, schema: &Schema, shape: &TsMapSha
     output.push_str("  }\n");
     output.push_str("  if (violations.length) {\n");
     output.push_str(&format!(
-        "    throw {DEFINITIONS_NAMESPACE}.payloadValidationError(violations);\n"
+        "    throw createPayloadValidationError(violations);\n"
     ));
     output.push_str("  }\n");
     output.push_str("  return { additionalProperties };\n");

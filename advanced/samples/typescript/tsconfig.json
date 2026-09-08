@@ -10,5 +10,5 @@
     "allowImportingTsExtensions": true,
     "esModuleInterop": true
   },
-  "include": ["shims/**/*.d.ts", "wit/**/*.ts", "json_schema/**/*.ts", "tests/**/*.ts"]
+  "include": ["wit/**/*.ts", "json_schema/**/*.ts", "tests/**/*.ts"]
 }

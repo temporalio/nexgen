@@ -46,6 +46,43 @@ Download the archive for your platform from the
 Extract the archive, then move `nexgen` (`nexgen.exe` on Windows) to a directory
 on your `PATH`.
 
+## SDK requirements
+
+Generated code requires at least these Temporal SDK and Nexus SDK versions:
+
+| Language | Temporal SDK | Nexus SDK |
+| --- | --- | --- |
+| Go | `go.temporal.io/sdk` v1.48.0 | `github.com/nexus-rpc/sdk-go` v0.7.0 |
+| Java | `io.temporal:temporal-sdk` 1.39.0 | `io.nexusrpc:nexus-sdk` 0.6.0-alpha |
+| Python | `temporalio` 1.32.0 | `nexus-rpc` 1.4.0 |
+| TypeScript | `@temporalio/*` 1.23.0 | `nexus-rpc` 0.0.3 |
+
+Keep all TypeScript `@temporalio/*` packages on the same version. Python's
+`temporalio` package installs its compatible `nexus-rpc` version transitively;
+declare `nexus-rpc` directly only if your dependency tooling requires it.
+
+Generated Java source uses JSpecify's `@NullMarked` and `@Nullable`
+annotations. Add JSpecify 1.0.0 to the compile classpath; it is not needed at
+runtime. For Gradle:
+
+```groovy
+dependencies {
+    compileOnly 'org.jspecify:jspecify:1.0.0'
+    testCompileOnly 'org.jspecify:jspecify:1.0.0'
+}
+```
+
+For Maven, use a `provided` dependency:
+
+```xml
+<dependency>
+  <groupId>org.jspecify</groupId>
+  <artifactId>jspecify</artifactId>
+  <version>1.0.0</version>
+  <scope>provided</scope>
+</dependency>
+```
+
 ## Usage
 
 ```
@@ -95,28 +132,6 @@ Java requires `--package-name`, whose last dot-separated segment must match the
 ```bash
 nexgen java samples/schemas/showcase.nexusrpc.yaml \
   --output ./gen/com/example/showcase --package-name com.example.showcase
-```
-
-Generated Java source uses JSpecify's `@NullMarked` and `@Nullable`
-annotations. Add JSpecify 1.0.0 to the compile classpath; it is not needed at
-runtime. For Gradle:
-
-```groovy
-dependencies {
-    compileOnly 'org.jspecify:jspecify:1.0.0'
-    testCompileOnly 'org.jspecify:jspecify:1.0.0'
-}
-```
-
-For Maven, use a `provided` dependency:
-
-```xml
-<dependency>
-  <groupId>org.jspecify</groupId>
-  <artifactId>jspecify</artifactId>
-  <version>1.0.0</version>
-  <scope>provided</scope>
-</dependency>
 ```
 
 Choose how TypeScript represents temporal `format` fields (date-time, date, time,

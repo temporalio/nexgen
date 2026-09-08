@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Generated JSON Schema TypeScript packages now require Temporal SDK 1.23.0 or
+  newer and nexus-rpc 0.0.3 or newer. They use the SDK's
+  `createPayloadValidationError` factory, and the SDK automatically applies
+  their operation transfer type converters at Nexus payload boundaries. Models
+  import the `TransferTypeConverter` contract directly from `nexus-rpc`.
 - JSON and YAML schema loading no longer performs a separate lossless numeric
   lexeme preflight. Fractional `const`, `default`, or `enum` literals that round
   to integral binary64 values may therefore be accepted in `integer` positions;

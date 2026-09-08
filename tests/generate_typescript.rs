@@ -1466,6 +1466,27 @@ fn typescript_json_detects_nested_runtime_support() {
     })
     .unwrap();
     let definitions = fs::read_to_string(output_path.join("definitions.ts")).unwrap();
+    let models = fs::read_to_string(output_path.join("models.ts")).unwrap();
+    assert!(
+        definitions.contains("import { ApplicationFailure } from \"@temporalio/common\";"),
+        "{definitions}"
+    );
+    assert!(
+        !definitions.contains("payloadValidationError"),
+        "{definitions}"
+    );
+    assert!(
+        models.contains("import { createPayloadValidationError } from \"@temporalio/common\";"),
+        "{models}"
+    );
+    assert!(
+        models.contains("throw createPayloadValidationError(violations);"),
+        "{models}"
+    );
+    assert!(
+        models.contains("import type { TransferTypeConverter } from \"nexus-rpc\";"),
+        "{models}"
+    );
     assert!(definitions.contains("parseTemporalDate("), "{definitions}");
     assert!(
         definitions.contains("parseTemporalDateTime("),
@@ -2649,7 +2670,7 @@ fn typecheck_generated_typescript(output_path: &Path, label: &str) {
 
     let sample_root = samples_typescript_root(&project_root());
     ensure_typescript_dependencies(&sample_root);
-    let mut files = vec![sample_root.join("shims/nexus-rpc-type-info.d.ts")];
+    let mut files = Vec::new();
     collect(output_path, &mut files);
     let mut command = Command::new("npm");
     command.current_dir(&sample_root).args([

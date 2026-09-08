@@ -9121,9 +9121,9 @@ fn validate_service_file_scopes(
 ///   `models.ts` only through the namespace import `__nexgenDefinitions`, but
 ///   the package barrel re-exports it from `./definitions` beside `export *` of
 ///   the model modules, so a user binding of the same name is silently shadowed
-///   out of the package surface (P7). The runtime helpers
-///   (`payloadValidationError`, `isPlainObject`, `collect`, …) remain internal to
-///   `definitions.ts` and are not re-exported from the package barrel.
+///   out of the package surface (P7). Runtime helpers (`isPlainObject`,
+///   `collect`, …) remain internal to `definitions.ts` and are not re-exported
+///   from the package barrel.
 /// - Python (`src/generator/json/python.rs`): `Violation` (dataclass) is imported
 ///   by bare name into every model module and re-exported by the root package
 ///   barrel; the other runtime helpers
@@ -15198,7 +15198,7 @@ $defs:
     }
 
     #[test]
-    fn typescript_service_may_use_internal_payload_validation_helper_name() {
+    fn typescript_service_may_use_removed_payload_validation_helper_name() {
         let input = r##"
 $schema: https://json-schema.org/draft/2020-12/schema
 nexusrpc: "1.0.0"
@@ -15214,7 +15214,7 @@ $defs:
       value: { type: string }
 "##;
         parse_for(Language::TypeScript, input)
-            .expect("the internal payloadValidationError helper is not part of the package barrel");
+            .expect("payloadValidationError is not part of the generated package");
     }
 
     /// A name synthesized *from a member* follows that member's override (P15).

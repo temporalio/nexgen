@@ -265,9 +265,6 @@ fn typescript_hostile_documentation_is_wrapped_escaped_and_typechecks() {
     for path in read_files(&output, "ts").keys() {
         command.arg(output.join(path));
     }
-    for shim in read_files(&typescript_root.join("shims"), "ts").keys() {
-        command.arg(typescript_root.join("shims").join(shim));
-    }
     assert!(
         command.status().unwrap().success(),
         "hostile TypeScript did not typecheck"

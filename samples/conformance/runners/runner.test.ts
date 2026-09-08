@@ -13,7 +13,13 @@
  * case's failure instead of blinding the whole target.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { ApplicationFailure } from "@temporalio/common";
+import {
+  ApplicationFailure,
+  defaultPayloadConverter,
+  fromPayloadWithTypeInfo,
+  toPayloadWithTypeInfo,
+} from "@temporalio/common";
+import type { TransferTypeConverter } from "nexus-rpc";
 import { test } from "vitest";
 // eslint-disable-next-line import/no-unresolved -- written by the Rust driver
 import { REGISTRY } from "./registry";
@@ -96,6 +102,31 @@ function converterOf(module: Record<string, unknown>, model: string): any {
   throw new Error(
     `no converter for ${model}; exports: ${candidates.join(", ")}`,
   );
+}
+
+function decodeWithTypeInfo(
+  converter: TransferTypeConverter<unknown>,
+  wire: string,
+): unknown {
+  const payload = defaultPayloadConverter.toPayload(JSON.parse(wire));
+  return fromPayloadWithTypeInfo(defaultPayloadConverter, payload, undefined, {
+    transferTypeConverter: converter,
+  });
+}
+
+function encodeWithTypeInfo(
+  converter: TransferTypeConverter<unknown>,
+  model: unknown,
+): unknown {
+  const payload = toPayloadWithTypeInfo(
+    defaultPayloadConverter,
+    model,
+    undefined,
+    {
+      transferTypeConverter: converter,
+    },
+  );
+  return defaultPayloadConverter.fromPayload(payload);
 }
 
 type Step = { kind: "field"; name: string } | { kind: "index"; at: number };
@@ -224,10 +255,13 @@ function applyMutation(model: any, mutation: Mutation): void {
   write(owner, last, value);
 }
 
-function runProbe(converter: any, probe: Probe): Verdict {
+function runProbe(
+  converter: TransferTypeConverter<unknown>,
+  probe: Probe,
+): Verdict {
   let model: unknown;
   try {
-    model = converter.fromTransferType(JSON.parse(probe.wire));
+    model = decodeWithTypeInfo(converter, probe.wire);
   } catch (error) {
     const violations = violationsOf(error);
     return violations === null
@@ -252,7 +286,7 @@ function runProbe(converter: any, probe: Probe): Verdict {
   }
   let transfer: unknown;
   try {
-    transfer = converter.toTransferType(model);
+    transfer = encodeWithTypeInfo(converter, model);
   } catch (error) {
     const violations = violationsOf(error);
     return violations === null
@@ -277,7 +311,7 @@ test("json-schema conformance probes", async () => {
   for (const testCase of plan.cases) {
     const probes: Record<string, Verdict> = {};
     results[testCase.id] = probes;
-    let converter: any;
+    let converter: TransferTypeConverter<unknown>;
     try {
       const entry = REGISTRY[testCase.id];
       if (!entry) {

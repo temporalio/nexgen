@@ -67,39 +67,25 @@ describe("json-schema KB generated Nexus service", () => {
   });
 
   // Register a handler bound to the generated service definition, then run a
-  // workflow that calls every operation through the SDK's Nexus client. Both
-  // sides bridge the Nexus wire payloads through the generated transfer type
-  // converters: the handler validates each request with `fromTransferType` and
-  // projects each response with `toTransferType`, exercising the generated
-  // service/operation definitions end-to-end over a real Temporal + Nexus
-  // endpoint.
+  // workflow that calls every operation through the SDK's Nexus client. The SDK
+  // applies the generated operation type info at both ends of the Nexus boundary,
+  // so application code receives and returns typed models without naming their
+  // transfer type converters.
   test("drives every operation through a real Nexus client", async () => {
     await withWorkflowEnvironment(async (env) => {
       const calls: Array<[string, unknown]> = [];
       const handler = nexus.serviceHandler(knowledgeBaseService, {
         async getPage(_ctx, input) {
-          calls.push([
-            "GetPage",
-            getPageInputTransferTypeConverter.fromTransferType(input),
-          ]);
-          return pageTransferTypeConverter.toTransferType(
-            loadFixture<Page>("page.json"),
-          ) as Page;
+          calls.push(["GetPage", input]);
+          return loadFixture<Page>("page.json");
         },
         async putBlock(_ctx, input) {
-          calls.push(["PutBlock", blockTransferTypeConverter.fromTransferType(input)]);
-          return putBlockOutputTransferTypeConverter.toTransferType(
-            loadFixture<PutBlockOutput>("put-block-output.json"),
-          ) as PutBlockOutput;
+          calls.push(["PutBlock", input]);
+          return loadFixture<PutBlockOutput>("put-block-output.json");
         },
         async getCategoryTree(_ctx, input) {
-          calls.push([
-            "GetCategoryTree",
-            getCategoryTreeInputTransferTypeConverter.fromTransferType(input),
-          ]);
-          return categoryTransferTypeConverter.toTransferType(
-            loadFixture<Category>("category-tree.json"),
-          ) as Category;
+          calls.push(["GetCategoryTree", input]);
+          return loadFixture<Category>("category-tree.json");
         },
       });
 

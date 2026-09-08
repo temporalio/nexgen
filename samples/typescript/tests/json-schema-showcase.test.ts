@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { TransferTypeConverter } from "nexus-rpc";
 import { ApplicationFailure } from "@temporalio/common";
+import type { TransferTypeConverter } from "nexus-rpc";
 
 import {
   addressTransferTypeConverter,

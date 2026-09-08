@@ -127,7 +127,7 @@ samples, which are golden snapshots.
 | `runner.go` | a generated `registry.go` maps a case to a `reflect.Type` (Go cannot look a type up by name), then reflection |
 | `Runner.java` | `Class.forName` + Jackson, configured like Temporal's default converter |
 | `runner.py` | `importlib` + the registered `TransferTypeConverter` |
-| `runner.test.ts` | a generated `registry.ts` of lazy `import()`s, run under vitest (whose transform resolves the generator's extension-less imports) |
+| `runner.test.ts` | a generated `registry.ts` of lazy `import()`s plus Temporal SDK `TypeInfo` conversion, run under vitest (whose transform resolves the generator's extension-less imports) |
 
 `smoke.py` and `smoke.test.ts` are the import-only variants used by
 `tests/json_schema_probe_matrix.rs`.
