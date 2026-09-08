@@ -1048,14 +1048,12 @@ fn typescript_renders_required_fields_and_custom_message_types() {
         "WorkflowFn extends (...args: any[]) => Promise<any> = (...args: any[]) => Promise<any>,"
     ));
     assert!(rendered.contains(
-        "SignalValue extends workflow.SignalDefinition<any[]> = workflow.SignalDefinition<any[]>"
+        "SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>"
     ));
     assert!(rendered.contains("> = ReplaceSignalWithStartWorkflowRequest<"));
-    assert!(
-        rendered.contains(
-            "SignalValue extends workflow.SignalDefinition<infer Args extends any[], any> ? Args : never"
-        )
-    );
+    assert!(rendered.contains(
+        "SignalValue extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
+    ));
     assert!(rendered.contains("SignalArgs extends any[] = SignalValue extends"));
     assert!(rendered.contains("signalArgs: SignalArgs | Readonly<SignalArgs>;"));
     assert!(rendered.contains("signalArgs?: SignalArgs | Readonly<SignalArgs>;"));

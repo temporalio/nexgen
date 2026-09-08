@@ -2,7 +2,6 @@
 
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
-import type * as workflow from "../../../workflow";
 import {
   retryPolicyFromProto,
   retryPolicyToProto,
@@ -134,10 +133,8 @@ export type SignalWithStartWorkflowRequest<
   WorkflowFn extends (...args: any[]) => Promise<any> = (
     ...args: any[]
   ) => Promise<any>,
-  SignalValue extends workflow.SignalDefinition<any[]> = workflow.SignalDefinition<
-    any[]
-  >,
-  SignalArgs extends any[] = SignalValue extends workflow.SignalDefinition<
+  SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
+  SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
     infer Args extends any[],
     any
   >
@@ -237,7 +234,7 @@ export type SignalWithStartWorkflowRequest<
     /**
      * Headers for the request.
      */
-    headers?: common.Headers;
+    headers?: Record<string, unknown>;
     /**
      * Namespace of the workflow execution.
      */
@@ -309,10 +306,8 @@ export function signalWithStartWorkflowRequestFromProto<
   WorkflowFn extends (...args: any[]) => Promise<any> = (
     ...args: any[]
   ) => Promise<any>,
-  SignalValue extends workflow.SignalDefinition<any[]> = workflow.SignalDefinition<
-    any[]
-  >,
-  SignalArgs extends any[] = SignalValue extends workflow.SignalDefinition<
+  SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
+  SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
     infer Args extends any[],
     any
   >
@@ -430,7 +425,7 @@ export function signalWithStartWorkflowRequestFromProto<
     headers:
       proto.header == null
         ? undefined
-        : (headerFromProto(proto.header) as common.Headers),
+        : (headerFromProto(proto.header) as Record<string, unknown>),
     namespace: requiredField(
       proto.namespace === "" ? undefined : proto.namespace,
       "sourced field",
@@ -443,10 +438,8 @@ export function signalWithStartWorkflowRequestToProto<
   WorkflowFn extends (...args: any[]) => Promise<any> = (
     ...args: any[]
   ) => Promise<any>,
-  SignalValue extends workflow.SignalDefinition<any[]> = workflow.SignalDefinition<
-    any[]
-  >,
-  SignalArgs extends any[] = SignalValue extends workflow.SignalDefinition<
+  SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
+  SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
     infer Args extends any[],
     any
   >

@@ -4334,7 +4334,7 @@ interface workflow-service {
                 .type_descriptor
                 .as_ref()
                 .and_then(|descriptor| descriptor.value_type.for_language(Language::TypeScript)),
-            Some("workflow.SignalDefinition<any[]>")
+            Some("common.SignalDefinition<any[]>")
         );
     }
 

@@ -6795,11 +6795,11 @@ mod tests {
             "WorkflowFn extends (...args: any[]) => Promise<any> = (...args: any[]) => Promise<any>,"
         ));
         assert!(output.contains(
-            "SignalValue extends workflow.SignalDefinition<any[]> = workflow.SignalDefinition<any[]>"
+            "SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>"
         ));
         assert!(output.contains("> = ReplaceSignalWithStartWorkflowRequest<"));
         assert!(output.contains(
-            "SignalValue extends workflow.SignalDefinition<infer Args extends any[], any> ? Args : never"
+            "SignalValue extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
         ));
         assert!(output.contains("SignalArgs extends any[] = SignalValue extends"));
         assert!(output.contains("signalArgs: SignalArgs | Readonly<SignalArgs>;"));
@@ -6818,7 +6818,7 @@ mod tests {
         assert!(output.contains("idReusePolicy?: common.WorkflowIdReusePolicy;"));
         assert!(output.contains("common.WorkflowIdReusePolicy.ALLOW_DUPLICATE"));
         assert!(output.contains("import * as common from '@temporalio/common';"));
-        assert!(!output.contains("import type * as common from '@temporalio/common';"));
+        assert!(output.contains("import type * as common from '@temporalio/common';"));
         assert!(output.contains("idConflictPolicy?: common.WorkflowIdConflictPolicy;"));
         assert!(output.contains("workflowIdConflictPolicy:"));
         assert!(output.contains("model.idConflictPolicy == null"));
@@ -6869,7 +6869,7 @@ mod tests {
         assert!(output.contains(
             "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest | undefined {"
         ));
-        assert!(output.contains("headers?: common.Headers;"));
+        assert!(output.contains("headers?: Record<string, unknown>;"));
         assert!(!output.contains("export interface Header"));
         assert!(!output.contains("export interface WorkflowType"));
         assert!(!output.contains("export interface TaskQueue"));
