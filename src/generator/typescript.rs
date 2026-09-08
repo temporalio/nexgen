@@ -3920,7 +3920,7 @@ fn render_operation_registry_module(
         .flat_map(|service| &service.operations)
         .any(|operation| operation.serialization_context_expr.is_some());
     if has_serialization_context {
-        body.push_str("export interface OperationRegistryEntry<Input = unknown> {\n");
+        body.push_str("interface OperationRegistryEntry<Input = unknown> {\n");
         body.push_str("  readonly service: string;\n");
         body.push_str("  readonly operation: string;\n");
         body.push_str("  /** Context for nested payloads, determined by the operation. */\n");
@@ -3980,7 +3980,11 @@ fn render_operation_registry_module(
             body.push_str("  },\n");
         }
     }
-    body.push_str("] as const;\n");
+    if has_serialization_context {
+        body.push_str("] as const satisfies readonly OperationRegistryEntry[];\n");
+    } else {
+        body.push_str("] as const;\n");
+    }
 
     let mut imports = String::new();
     if system_nexus && body.contains("nexus.") {

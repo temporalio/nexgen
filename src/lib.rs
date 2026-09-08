@@ -322,15 +322,10 @@ fn formatter_command(
                 output_path,
             ],
         )),
-        Language::TypeScript => Ok((
-            "prettier",
-            vec![
-                "--write".to_string(),
-                "--print-width".to_string(),
-                "88".to_string(),
-                output_path,
-            ],
-        )),
+        // Let the generated package choose its own Prettier configuration. In
+        // particular, the TypeScript SDK uses Prettier's default width while
+        // Nexgen's standalone examples configure a wider width themselves.
+        Language::TypeScript => Ok(("prettier", vec!["--write".to_string(), output_path])),
         _ => Err(error::Error::UnsupportedLanguage { language }),
     }
 }
@@ -462,11 +457,8 @@ mod tests {
     fn chooses_typescript_formatter_command() {
         let (program, args) = formatter_command(Language::TypeScript, Path::new("output")).unwrap();
         assert_eq!(program, "prettier");
-        assert_eq!(args, vec!["--write", "--print-width", "88", "output"]);
-        assert_eq!(
-            format_formatter_command(program, &args),
-            "prettier --write --print-width 88 output"
-        );
+        assert_eq!(args, vec!["--write", "output"]);
+        assert_eq!(format_formatter_command(program, &args), "prettier --write output");
     }
 
     #[test]
