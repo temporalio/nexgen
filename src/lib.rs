@@ -458,7 +458,10 @@ mod tests {
         let (program, args) = formatter_command(Language::TypeScript, Path::new("output")).unwrap();
         assert_eq!(program, "prettier");
         assert_eq!(args, vec!["--write", "output"]);
-        assert_eq!(format_formatter_command(program, &args), "prettier --write output");
+        assert_eq!(
+            format_formatter_command(program, &args),
+            "prettier --write output"
+        );
     }
 
     #[test]

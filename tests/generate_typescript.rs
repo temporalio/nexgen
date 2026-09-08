@@ -1181,7 +1181,7 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     );
     assert!(rendered.contains("const client = workflow.createNexusServiceClient({"));
     assert!(!rendered.contains("export class WorkflowServiceClient"));
-    assert!(rendered.contains("): Promise<workflow.ExternalWorkflowHandle> {"));
+    assert!(rendered.contains("): Promise<ExternalWorkflowHandle> {"));
     assert!(!rendered.contains("SignalWithStartWorkflowRequest = {\n  fromProto("));
     assert!(!rendered.contains("export interface SignalWithStartWorkflowRequest {"));
     assert!(!rendered.contains("export interface RetryPolicy"));
