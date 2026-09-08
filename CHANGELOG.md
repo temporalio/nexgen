@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Breaking Changes
+
+### Fixed
+
+### Security
+
+## [0.2.5] - 2026-09-08
+
+### Added
+
 - .NET System Nexus bindings now generate operation-specific workflow outbound
   interceptor points when invoked with `--system-nexus --native-api`.
 - JSON Schema file roots and `$defs` entries that consist solely of a `$ref`
@@ -40,8 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `maxProperties` cap below the union of always-required keys and a
   `dependentRequired` closure. Generated Java count comparisons also suffix
   bounds above the 32-bit literal range with `L`.
-
-### Deprecated
 
 ### Breaking Changes
 
@@ -77,8 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   operation I/O types that actually enter that file. Unrelated models named
   `Operation` or `Service` remain valid, while using them as Python or Java
   operation I/O reports a load-time collision.
-
-### Security
 
 ## [0.2.4] - 2026-09-02
 
