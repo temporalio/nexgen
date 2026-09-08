@@ -3714,9 +3714,15 @@ fn render_index_module(
         .iter()
         .flat_map(|service| {
             service.operations.iter().flat_map(|operation| {
-                let output_model_name = service
-                    .endpoint
-                    .is_none()
+                // Endpoint operations normally expose their input model through
+                // the operation function, while service operations expose both
+                // input and output through their client method. System Nexus
+                // additionally exposes endpoint-operation input and raw output
+                // models in its public interceptor contract. Export those
+                // models from the module barrel so SDK consumers never need to
+                // reach into generated implementation paths.
+                let output_model_name = (service.endpoint.is_none()
+                    || crate::nexgen_config::current().system_nexus)
                     .then(|| operation.output_model_name.as_deref())
                     .flatten();
                 operation
@@ -7125,6 +7131,7 @@ interface workflow-service {
         assert!(output.contains("Promise<nexus.NexusOperationHandle<Response>>"));
         assert!(output.contains("return await client.startOperation("));
         assert!(output.contains("__temporal_system"));
+        assert!(output.contains("export type { Request, Response } from './models';"));
     }
 
     #[test]
