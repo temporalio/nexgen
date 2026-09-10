@@ -2,17 +2,16 @@ package startworkflow
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	common "go.temporal.io/api/common/v1"
-	deploymentpb "go.temporal.io/api/deployment/v1"
 	enums "go.temporal.io/api/enums/v1"
 	failurepb "go.temporal.io/api/failure/v1"
 	taskqueue "go.temporal.io/api/taskqueue/v1"
 	workflowpb "go.temporal.io/api/workflow/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
+	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
@@ -42,7 +41,7 @@ func taskQueueToProto(_ workflow.Context, name *string) (*taskqueue.TaskQueue, e
 	if name == nil {
 		return nil, nil
 	}
-	return &taskqueue.TaskQueue{Name: *name}, nil
+	return &taskqueue.TaskQueue{Name: *name, Kind: enums.TASK_QUEUE_KIND_NORMAL}, nil
 }
 
 func taskQueueFromProto(_ workflow.Context, tq *taskqueue.TaskQueue) (*string, error) {
@@ -56,21 +55,7 @@ func taskQueueFromProto(_ workflow.Context, tq *taskqueue.TaskQueue) (*string, e
 // --- RetryPolicy (temporal.api.common.v1.RetryPolicy) ---
 
 func retryPolicyToProto(_ workflow.Context, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {
-	if p == nil {
-		return nil, nil
-	}
-	proto := &common.RetryPolicy{
-		BackoffCoefficient:     p.BackoffCoefficient,
-		MaximumAttempts:        p.MaximumAttempts,
-		NonRetryableErrorTypes: p.NonRetryableErrorTypes,
-	}
-	if p.InitialInterval != 0 {
-		proto.InitialInterval = durationpb.New(p.InitialInterval)
-	}
-	if p.MaximumInterval != 0 {
-		proto.MaximumInterval = durationpb.New(p.MaximumInterval)
-	}
-	return proto, nil
+	return internal.ConvertToPBRetryPolicy(p), nil
 }
 
 func retryPolicyFromProto(_ workflow.Context, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {
@@ -97,11 +82,7 @@ func priorityToProto(_ workflow.Context, p *temporal.Priority) (*common.Priority
 	if p == nil {
 		return nil, nil
 	}
-	return &common.Priority{
-		PriorityKey:    int32(p.PriorityKey),
-		FairnessKey:    p.FairnessKey,
-		FairnessWeight: p.FairnessWeight,
-	}, nil
+	return internal.ConvertToPBPriority(*p), nil
 }
 
 func priorityFromProto(_ workflow.Context, p *common.Priority) (*temporal.Priority, error) {
@@ -134,7 +115,7 @@ func workflowTypeFromProto(_ workflow.Context, t *common.WorkflowType) (*string,
 
 // --- Payload / Payloads (temporal.api.common.v1.Payload[s]) ---
 func payloadToProto(ctx workflow.Context, value any) (*common.Payload, error) {
-	return getWorkflowDataConverter(ctx).ToPayload(value)
+	return internal.GetDataConverterFromWorkflowContext(ctx).ToPayload(value)
 }
 
 func payloadFromProto(ctx workflow.Context, payload *common.Payload) (any, error) {
@@ -142,14 +123,14 @@ func payloadFromProto(ctx workflow.Context, payload *common.Payload) (any, error
 		return nil, nil
 	}
 	var value any
-	if err := getWorkflowDataConverter(ctx).FromPayload(payload, &value); err != nil {
+	if err := internal.GetDataConverterFromWorkflowContext(ctx).FromPayload(payload, &value); err != nil {
 		return nil, err
 	}
 	return value, nil
 }
 
 func payloadsToProto(ctx workflow.Context, values []any) (*common.Payloads, error) {
-	return getWorkflowDataConverter(ctx).ToPayloads(values...)
+	return internal.GetDataConverterFromWorkflowContext(ctx).ToPayloads(values...)
 }
 
 func payloadsFromProto(ctx workflow.Context, payloads *common.Payloads) ([]any, error) {
@@ -167,33 +148,11 @@ func payloadsFromProto(ctx workflow.Context, payloads *common.Payloads) ([]any, 
 	return values, nil
 }
 
-func getWorkflowDataConverter(ctx workflow.Context) converter.DataConverter {
-	dataConverter := converter.GetDefaultDataConverter()
-	if options := ctx.Value("wfEnvOptions"); options != nil {
-		optionsValue := reflect.ValueOf(options)
-		if optionsValue.Kind() == reflect.Pointer && !optionsValue.IsNil() {
-			optionsValue = optionsValue.Elem()
-		}
-		if optionsValue.Kind() == reflect.Struct {
-			field := optionsValue.FieldByName("DataConverter")
-			if field.IsValid() && field.CanInterface() && !field.IsNil() {
-				if value, ok := field.Interface().(converter.DataConverter); ok {
-					dataConverter = value
-				}
-			}
-		}
-	}
-	if contextAware, ok := dataConverter.(workflow.ContextAware); ok {
-		return contextAware.WithWorkflowContext(ctx)
-	}
-	return dataConverter
-}
-
 // --- Failure (temporal.api.failure.v1.Failure) ---
 
 func failureToProto(ctx workflow.Context, value error) (*failurepb.Failure, error) {
 	failureConverter := temporal.NewDefaultFailureConverter(temporal.DefaultFailureConverterOptions{
-		DataConverter: getWorkflowDataConverter(ctx),
+		DataConverter: internal.GetDataConverterFromWorkflowContext(ctx),
 	})
 	return failureConverter.ErrorToFailure(value), nil
 }
@@ -203,7 +162,7 @@ func failureFromProto(ctx workflow.Context, failure *failurepb.Failure) (error, 
 		return nil, nil
 	}
 	failureConverter := temporal.NewDefaultFailureConverter(temporal.DefaultFailureConverterOptions{
-		DataConverter: getWorkflowDataConverter(ctx),
+		DataConverter: internal.GetDataConverterFromWorkflowContext(ctx),
 	})
 	return failureConverter.FailureToError(failure), nil
 }
@@ -211,18 +170,11 @@ func failureFromProto(ctx workflow.Context, failure *failurepb.Failure) (error, 
 // --- Memo (temporal.api.common.v1.Memo) ---
 
 func memoToProto(ctx workflow.Context, memo map[string]any) (*common.Memo, error) {
-	if memo == nil {
-		return nil, nil
-	}
-	fields := make(map[string]*common.Payload, len(memo))
-	for key, value := range memo {
-		payload, err := payloadToProto(ctx, value)
-		if err != nil {
-			return nil, fmt.Errorf("encode workflow memo error: %v", err)
-		}
-		fields[key] = payload
-	}
-	return &common.Memo{Fields: fields}, nil
+	return internal.GetWorkflowMemo(
+		memo,
+		internal.GetDataConverterFromWorkflowContext(ctx),
+		internal.GetWorkflowEnvironment(ctx).TryUse(internal.SDKFlagMemoUserDCEncode),
+	)
 }
 
 func memoFromProto(ctx workflow.Context, memo *common.Memo) (map[string]any, error) {
@@ -276,22 +228,7 @@ func searchAttributesToProto(_ workflow.Context, searchAttributes *temporal.Sear
 	if searchAttributes == nil {
 		return nil, nil
 	}
-
-	fields := make(map[string]*common.Payload, searchAttributes.Size())
-	for key, value := range searchAttributes.GetUntypedValues() {
-		payload, err := converter.GetDefaultDataConverter().ToPayload(value)
-		if err != nil {
-			return nil, fmt.Errorf("encode search attribute [%s] error: %v", key, err)
-		}
-		if payload.GetData() != nil {
-			if payload.Metadata == nil {
-				payload.Metadata = map[string][]byte{}
-			}
-			payload.Metadata["type"] = []byte(key.GetValueType().String())
-		}
-		fields[key.GetName()] = payload
-	}
-	return &common.SearchAttributes{IndexedFields: fields}, nil
+	return internal.SerializeSearchAttributes(nil, *searchAttributes)
 }
 
 func searchAttributesFromProto(_ workflow.Context, searchAttributes *common.SearchAttributes) (*temporal.SearchAttributes, error) {
@@ -348,39 +285,10 @@ func searchAttributesFromProto(_ workflow.Context, searchAttributes *common.Sear
 // --- VersioningOverride (temporal.api.workflow.v1.VersioningOverride) ---
 
 func versioningOverrideToProto(_ workflow.Context, versioningOverride *client.VersioningOverride) (*workflowpb.VersioningOverride, error) {
-	if versioningOverride == nil || *versioningOverride == nil {
+	if versioningOverride == nil {
 		return nil, nil
 	}
-
-	switch v := (*versioningOverride).(type) {
-	case *client.PinnedVersioningOverride:
-		return &workflowpb.VersioningOverride{
-			Behavior:      enums.VERSIONING_BEHAVIOR_PINNED,
-			PinnedVersion: v.Version.DeploymentName + "." + v.Version.BuildID,
-			Deployment: &deploymentpb.Deployment{
-				SeriesName: v.Version.DeploymentName,
-				BuildId:    v.Version.BuildID,
-			},
-			Override: &workflowpb.VersioningOverride_Pinned{
-				Pinned: &workflowpb.VersioningOverride_PinnedOverride{
-					Behavior: workflowpb.VersioningOverride_PINNED_OVERRIDE_BEHAVIOR_PINNED,
-					Version: &deploymentpb.WorkerDeploymentVersion{
-						DeploymentName: v.Version.DeploymentName,
-						BuildId:        v.Version.BuildID,
-					},
-				},
-			},
-		}, nil
-	case *client.AutoUpgradeVersioningOverride:
-		return &workflowpb.VersioningOverride{
-			Behavior: enums.VERSIONING_BEHAVIOR_AUTO_UPGRADE,
-			Override: &workflowpb.VersioningOverride_AutoUpgrade{
-				AutoUpgrade: true,
-			},
-		}, nil
-	default:
-		return nil, nil
-	}
+	return internal.VersioningOverrideToProto(*versioningOverride), nil
 }
 
 func versioningOverrideFromProto(_ workflow.Context, versioningOverride *workflowpb.VersioningOverride) (*client.VersioningOverride, error) {
@@ -413,4 +321,8 @@ func versioningOverrideFromProto(_ workflow.Context, versioningOverride *workflo
 		}
 	}
 	return &value, nil
+}
+
+func newSystemNexusClient(service string) workflow.NexusClient {
+	return internal.NewSystemNexusClient(service)
 }

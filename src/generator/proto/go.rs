@@ -18,10 +18,10 @@ use crate::generator::go::{
     GoPackageContext, PlannedEnumType, PlannedFieldKind, PlannedMessageSource, PlannedMessageType,
     PlannedOperationOutput, PlannedOperationResourceReturn, PlannedScalarType, PlannedTypeInfo,
     PlannedValueType, RenderedModel, RenderedService, go_authored_type_annotation, go_field_name,
-    go_replacement_type_name, go_string_literal, go_unexported_name, operation_output,
-    planned_field, planned_field_kind, planned_message_type, public_default_punning_zero_for_field,
-    record_for_model_key, render_operation_future_adapter, render_operation_future_return_type,
-    resolve_resource_field_kind, split_go_type_decl_name,
+    go_replacement_type_name, go_string_literal, go_unexported_name, new_nexus_client_expr,
+    operation_output, planned_field, planned_field_kind, planned_message_type,
+    public_default_punning_zero_for_field, record_for_model_key, render_operation_future_adapter,
+    render_operation_future_return_type, resolve_resource_field_kind, split_go_type_decl_name,
 };
 
 #[derive(Debug, Default)]
@@ -866,12 +866,8 @@ pub(in crate::generator) fn render_operation_function_proto(
         .as_deref()
         .expect("operations require endpoint");
     output.push_str("\tc := ");
-    output.push_str(&package.new_nexus_client());
-    output.push('(');
-    output.push_str(&go_string_literal(endpoint));
-    output.push_str(", ");
-    output.push_str(&go_string_literal(service.wire_name));
-    output.push_str(")\n");
+    output.push_str(&new_nexus_client_expr(endpoint, service.wire_name, package));
+    output.push('\n');
     output.push_str("\tfut := c.ExecuteOperation(ctx, ");
     output.push_str(&operation_name);
     output.push_str(", requestProto");
