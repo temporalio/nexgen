@@ -4,9 +4,6 @@ package workflowservice
 
 import (
 	"fmt"
-	"reflect"
-	"runtime"
-	"strings"
 	"time"
 
 	enums "go.temporal.io/api/enums/v1"
@@ -535,20 +532,7 @@ func SignalWithStartWorkflow(
 	if opts.StartDelay != 0 {
 		startDelay = &opts.StartDelay
 	}
-	workflowName := ""
-	{
-		switch rv := reflect.ValueOf(workflow); rv.Kind() {
-		case reflect.String:
-			workflowName = rv.String()
-		case reflect.Func:
-			fullName := runtime.FuncForPC(rv.Pointer()).Name()
-			elements := strings.Split(fullName, ".")
-			shortName := elements[len(elements)-1]
-			workflowName = strings.TrimSuffix(shortName, "-fm")
-		default:
-			panic("nexgen function name requires string or function")
-		}
-	}
+	workflowName := workflowFunctionName(ctx, workflow)
 	return signalWithStartWorkflow(ctx, signalWithStartWorkflowRequest{
 		Workflow:                 workflowName,
 		Args:                     args,
@@ -616,14 +600,7 @@ func SignalWithStartWorkflowTyped[WorkflowArg any, WorkflowResult any](
 	if opts.StartDelay != 0 {
 		startDelay = &opts.StartDelay
 	}
-	workflowName := ""
-	{
-		rv := reflect.ValueOf(workflow)
-		fullName := runtime.FuncForPC(rv.Pointer()).Name()
-		elements := strings.Split(fullName, ".")
-		shortName := elements[len(elements)-1]
-		workflowName = strings.TrimSuffix(shortName, "-fm")
-	}
+	workflowName := workflowFunctionName(ctx, workflow)
 	return signalWithStartWorkflow(ctx, signalWithStartWorkflowRequest{
 		Workflow:                 workflowName,
 		Args:                     []any{arg},
