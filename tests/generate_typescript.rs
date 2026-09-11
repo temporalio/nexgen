@@ -1098,8 +1098,10 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     assert!(index_rendered.contains("function signalWithStartWorkflowRequestToProto<"));
     assert!(rendered.contains("workflowType: workflowTypeToProto("));
     assert!(rendered.contains("workflowFunctionName("));
-    assert!(rendered.contains("input: requestArgsToPayloads(model.args),"));
-    assert!(rendered.contains("signalInput: requestArgsToPayloads(model.signalArgs),"));
+    assert!(rendered.contains("input: requestArgsToPayloads(model.args, model.workflow),"));
+    assert!(
+        rendered.contains("signalInput: requestArgsToPayloads(model.signalArgs, model.signal),")
+    );
     assert!(!rendered.contains("_RequestArgsToPayloads"));
     let signal_request_to_proto = rendered
         .split("function signalWithStartWorkflowRequestToProto<")
@@ -1113,7 +1115,7 @@ fn typescript_renders_required_fields_and_custom_message_types() {
         .find("workflowType: workflowTypeToProto(")
         .expect("workflow type should be serialized");
     let input_index = signal_request_to_proto
-        .find("input: requestArgsToPayloads(model.args),")
+        .find("input: requestArgsToPayloads(model.args, model.workflow),")
         .expect("workflow args should be serialized");
     let workflow_id_index = signal_request_to_proto
         .find("workflowId: requiredField(")
@@ -1152,7 +1154,7 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     assert!(rendered.contains("model.staticSummary == null && model.staticDetails == null"));
     assert!(rendered.contains("summary: model.staticSummary == null"));
     assert!(rendered.contains("valueToPayload(model.staticSummary)"));
-    assert!(rendered.contains("requestArgsToPayloads(model.args)"));
+    assert!(rendered.contains("requestArgsToPayloads(model.args, model.workflow)"));
     assert!(!rendered.contains("common.defaultPayloadConverter"));
     assert!(!rendered.contains("payloadToProto(payload: unknown"));
     assert!(!rendered.contains("function isPayload("));

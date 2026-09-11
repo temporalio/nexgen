@@ -1018,7 +1018,17 @@ impl<'a> ApiPlanner<'a> {
             };
         }
 
-        if record.function_for_args_field(field_name).is_some() {
+        if let Some((function_field_name, _)) = record.functions().find(|(_, function)| {
+            function
+                .arg_fields
+                .iter()
+                .any(|arg_field| arg_field == field_name)
+        }) {
+            let function_field_name = typescript_generated_field_name(
+                record
+                    .field_name_override(function_field_name)
+                    .unwrap_or(function_field_name),
+            );
             return RenderedField {
                 name: generated_field_name.to_string(),
                 wire_name: wire_field_name.to_string(),
@@ -1029,7 +1039,7 @@ impl<'a> ApiPlanner<'a> {
                 to_wire_expr: if field.required {
                     required_to_wire_expr(&resolved_type, &owner_name, &generated_field_name)
                 } else {
-                    optional_function_args_to_wire_expr(&resolved_type, &generated_field_name)
+                    optional_function_args_to_wire_expr(&generated_field_name, &function_field_name)
                 },
                 flattened_fields: Vec::new(),
                 requirements: resolved_type.requirements,
@@ -1867,11 +1877,8 @@ fn optional_function_name_to_wire_expr(
     )
 }
 
-fn optional_function_args_to_wire_expr(
-    _resolved_type: &ResolvedFieldType,
-    field_name: &str,
-) -> String {
-    format!("requestArgsToPayloads(model.{field_name})")
+fn optional_function_args_to_wire_expr(field_name: &str, function_field_name: &str) -> String {
+    format!("requestArgsToPayloads(model.{field_name}, model.{function_field_name})")
 }
 
 fn field_has_presence(field: &RecordFieldSpec<PlannedFamily>) -> bool {
@@ -4018,20 +4025,18 @@ fn render_system_nexus_interceptors_module(
         body.push_str(&operation.output_operation_annotation);
         body.push_str(">>;\n");
     }
-    body.push_str("}\n");
-    body.push_str("\ninterface SystemNexusSpecificInterceptorAdapter {\n");
-    body.push_str("  start?: (\n");
-    body.push_str("    input: unknown,\n");
-    body.push_str("    next: (input: unknown) => Promise<nexus.NexusOperationHandle<unknown>>\n");
-    body.push_str("  ) => Promise<nexus.NexusOperationHandle<unknown>>;\n");
-    body.push_str("}\n");
-    body.push_str("\n/** Selects adapters for the operation-specific interceptor chain. */\n");
-    body.push_str("export function systemNexusSpecificInterceptorAdapters(\n");
+    body.push_str("}\n\n");
+    body.push_str("/** Dispatches the operation-specific interceptor chain selected by service and operation. */\n");
+    body.push_str("export function dispatchSystemNexusSpecificInterceptors(\n");
     body.push_str("  service: string,\n");
     body.push_str("  operation: string,\n");
-    body.push_str("  interceptors: readonly SystemNexusWorkflowOutboundCallsInterceptor[]\n");
-    body.push_str("): SystemNexusSpecificInterceptorAdapter[] {\n");
-    body.push_str("  switch (`${service}/${operation}`) {\n");
+    body.push_str("  interceptors: SystemNexusWorkflowOutboundCallsInterceptor[],\n");
+    body.push_str("  input: unknown,\n");
+    body.push_str(
+        "  next: <Input, Output>(input: Input) => Promise<nexus.NexusOperationHandle<Output>>\n",
+    );
+    body.push_str("): Promise<nexus.NexusOperationHandle<unknown>> {\n");
+    body.push_str("  switch (service) {\n");
     for (service, operation) in operations {
         let input = operation
             .input
@@ -4045,37 +4050,27 @@ fn render_system_nexus_interceptors_module(
             })
             .unwrap_or("undefined");
         body.push_str("    case ");
-        body.push_str(&typescript_string_literal(&format!(
-            "{}/{}",
-            service.wire_name, operation.wire_name
-        )));
+        body.push_str(&typescript_string_literal(service.wire_name));
+        body.push_str(":\n      switch (operation) {\n");
+        body.push_str("        case ");
+        body.push_str(&typescript_string_literal(operation.wire_name));
         body.push_str(":\n");
-        body.push_str("      return interceptors.map((interceptor) => {\n");
-        body.push_str("        const hook = interceptor.");
-        body.push_str(&operation.attr_name);
-        body.push_str(";\n");
-        body.push_str("        return hook == null\n");
-        body.push_str("          ? {}\n");
-        body.push_str("          : {\n");
-        body.push_str("              start: (input, next) =>\n");
-        body.push_str("                hook(\n");
-        body.push_str("                  input as ");
+        body.push_str("          return composeInterceptors(interceptors, ");
+        body.push_str(&typescript_string_literal(&operation.attr_name));
+        body.push_str(", (request) =>\n");
+        body.push_str("            next<");
         body.push_str(input);
-        body.push_str(",\n");
-        body.push_str("                  next as (input: ");
-        body.push_str(input);
-        body.push_str(") => Promise<nexus.NexusOperationHandle<");
+        body.push_str(", ");
         body.push_str(&operation.output_operation_annotation);
-        body.push_str(">>\n");
-        body.push_str("                ) as Promise<nexus.NexusOperationHandle<unknown>>,\n");
-        body.push_str("            };\n");
-        body.push_str("      });\n");
+        body.push_str(">(request)\n");
+        body.push_str("          )(input as ");
+        body.push_str(input);
+        body.push_str(") as Promise<nexus.NexusOperationHandle<unknown>>;\n");
+        body.push_str("        default:\n          return next(input);\n      }\n");
     }
-    body.push_str("    default:\n");
-    body.push_str("      return [];\n");
-    body.push_str("  }\n");
-    body.push_str("}\n");
+    body.push_str("    default:\n      return next(input);\n  }\n}\n");
     let mut imports = String::new();
+    imports.push_str("import { composeInterceptors } from '../../../interceptor-composition';\n");
     render_typescript_namespace_imports(
         &mut imports,
         &body,
@@ -4734,11 +4729,12 @@ fn render_function_runtime_helpers(output: &mut String, render_from: bool) {
     }
     output.push_str("function requestArgsToPayloads(\n");
     output.push_str("  args: ReadonlyArray<unknown> | undefined,\n");
+    output.push_str("  functionValue: unknown,\n");
     output.push_str("): temporal.api.common.v1.IPayloads | undefined {\n");
     output.push_str("  if (args == null) {\n");
     output.push_str("    return undefined;\n");
     output.push_str("  }\n");
-    output.push_str("  return payloadsToProto(args);\n");
+    output.push_str("  return payloadsToProto(args, functionInputTypes(functionValue));\n");
     output.push_str("}\n");
 }
 
@@ -6853,8 +6849,10 @@ mod tests {
         assert!(output.contains("namespace: model.namespace ?? (workflowNamespace()),"));
         assert!(output.contains("workflowType: workflowTypeToProto("));
         assert!(output.contains("workflowFunctionName("));
-        assert!(output.contains("input: requestArgsToPayloads(model.args),"));
-        assert!(output.contains("signalInput: requestArgsToPayloads(model.signalArgs),"));
+        assert!(output.contains("input: requestArgsToPayloads(model.args, model.workflow),"));
+        assert!(
+            output.contains("signalInput: requestArgsToPayloads(model.signalArgs, model.signal),")
+        );
         assert!(!output.contains("_RequestArgsToPayloads"));
         assert!(output.contains("signalName: signalFunctionName("));
         assert!(!output.contains("signalName: ((value) =>"));
@@ -6873,7 +6871,9 @@ mod tests {
         assert!(output.contains("model.staticSummary == null && model.staticDetails == null"));
         assert!(output.contains("summary: model.staticSummary == null"));
         assert!(output.contains("valueToPayload(model.staticSummary)"));
-        assert!(output.contains("return payloadsToProto(args);"));
+        assert!(
+            output.contains("return payloadsToProto(args, functionInputTypes(functionValue));")
+        );
         assert!(!output.contains("common.defaultPayloadConverter"));
         assert!(!output.contains("payloadToProto(payload: unknown"));
         assert!(!output.contains("function isPayload("));
