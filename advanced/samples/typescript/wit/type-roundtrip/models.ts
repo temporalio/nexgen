@@ -81,15 +81,22 @@ export function activityOptionsToProto(
   };
 }
 
+export const activityOptionsTransferTypeConverter = {
+  fromTransferType(value: temporal.api.activity.v1.IActivityOptions): ActivityOptions {
+    return activityOptionsFromProto(value)!;
+  },
+
+  toTransferType(value: ActivityOptions): temporal.api.activity.v1.IActivityOptions {
+    return activityOptionsToProto(value) ?? {};
+  },
+};
 export interface FailureContainer {
   failure?: Error;
 }
 
 export function failureContainerFromProto(
   proto:
-    | temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes
-    | null
-    | undefined,
+    temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes | null | undefined,
 ): FailureContainer | undefined {
   if (proto == null) {
     return undefined;
@@ -110,3 +117,17 @@ export function failureContainerToProto(
     failure: model.failure == null ? undefined : failureToProto(model.failure),
   };
 }
+
+export const failureContainerTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes,
+  ): FailureContainer {
+    return failureContainerFromProto(value)!;
+  },
+
+  toTransferType(
+    value: FailureContainer,
+  ): temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes {
+    return failureContainerToProto(value) ?? {};
+  },
+};

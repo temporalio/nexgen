@@ -13,13 +13,13 @@
     "@temporalio/testing": "^1.23.0",
     "@temporalio/worker": "^1.23.0",
     "@temporalio/workflow": "^1.23.0",
-    "long": "5.2.3",
+    "long": "5.3.2",
     "nexus-rpc": "^0.0.3"
   },
   "devDependencies": {
-    "prettier": "^3.8.3",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.0"
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   },
   "engines": {
     "node": ">=26"

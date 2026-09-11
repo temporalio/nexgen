@@ -1295,16 +1295,6 @@ impl ExternalModelBackend<PlannedValueType> for ModelBackend {
             .or_else(|| Some(message.model_name.clone()))
     }
 
-    fn wire_type_identifier(&self, model_type: &PlannedValueType) -> Option<String> {
-        let PlannedValueType::Message(message) = model_type else {
-            return None;
-        };
-        if message.source != PlannedMessageSource::Json {
-            return None;
-        }
-        Some(message.info.full_name.clone())
-    }
-
     fn wire_conversion(
         &self,
         _model_type: &PlannedValueType,

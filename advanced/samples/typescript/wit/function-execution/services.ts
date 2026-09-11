@@ -35,36 +35,3 @@ export const functionExecution = nexus.service("FunctionExecution", {
     ExecuteNamedVarargsFunctionResult
   >({ name: "ExecuteNamedVarargsFunction" }),
 });
-
-export const operationRegistry = [
-  {
-    service: "FunctionExecution",
-    operation: "ExecuteFunction",
-    inputType: "function-execution.execute-function-request",
-    outputType: "function-execution.execute-function-result",
-  },
-  {
-    service: "FunctionExecution",
-    operation: "ExecuteCountedFunction",
-    inputType: "function-execution.execute-counted-function-request",
-    outputType: "function-execution.execute-counted-function-result",
-  },
-  {
-    service: "FunctionExecution",
-    operation: "ExecuteNamedFunction",
-    inputType: "function-execution.execute-named-function-request",
-    outputType: "function-execution.execute-named-function-result",
-  },
-  {
-    service: "FunctionExecution",
-    operation: "ExecuteVarargsFunction",
-    inputType: "function-execution.execute-varargs-function-request",
-    outputType: "function-execution.execute-varargs-function-result",
-  },
-  {
-    service: "FunctionExecution",
-    operation: "ExecuteNamedVarargsFunction",
-    inputType: "function-execution.execute-named-varargs-function-request",
-    outputType: "function-execution.execute-named-varargs-function-result",
-  },
-] as const;

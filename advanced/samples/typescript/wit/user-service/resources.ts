@@ -15,10 +15,9 @@ export class User {
 
   public async updateEmail(email: string): Promise<User> {
     const request = { userId: this.userId, email: email };
-    const requestProto = request;
     const handle = await requireUserClient(this).startOperation(
       userService.operations.updateEmail,
-      requestProto,
+      request,
     );
     const resource = await handle.result();
     return bindUserClient(resource, requireUserClient(this));

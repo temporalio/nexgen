@@ -612,6 +612,7 @@ impl<'a> TypePlanningContext<'a> {
             output_transform: operation.output_transform.as_ref().map(|transform| {
                 OperationOutputTransformSpec {
                     type_name: materialize_selected_text(&transform.type_name),
+                    type_import: materialize_selected_text(&transform.type_import),
                     transform: materialize_selected_text(&transform.transform),
                 }
             }),

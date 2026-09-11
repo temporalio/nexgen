@@ -95,17 +95,6 @@ impl ExternalModelBackend for ModelBackend {
         }
     }
 
-    fn wire_type_identifier(&self, model_type: &PlannedType) -> Option<String> {
-        match model_type {
-            PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message))) => {
-                Some(message.proto.full_name.clone())
-            }
-            PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => None,
-            PlannedType::Record(record) => Some(record.full_name.clone()),
-            _ => None,
-        }
-    }
-
     fn wire_conversion(
         &self,
         model_type: &PlannedType,

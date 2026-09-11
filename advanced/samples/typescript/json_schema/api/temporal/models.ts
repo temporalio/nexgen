@@ -246,9 +246,7 @@ export const temporalTransferTypeConverter =
       }
 
       let deletedAt: string | null | undefined = undefined as unknown as
-        | string
-        | null
-        | undefined;
+        string | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "deletedAt")) {
         if (raw["deletedAt"] === null) {
           deletedAt = null;
@@ -269,9 +267,7 @@ export const temporalTransferTypeConverter =
       }
 
       let archivedOn: string | null | undefined = undefined as unknown as
-        | string
-        | null
-        | undefined;
+        string | null | undefined;
       if (Object.prototype.hasOwnProperty.call(raw, "archivedOn")) {
         if (raw["archivedOn"] === null) {
           archivedOn = null;

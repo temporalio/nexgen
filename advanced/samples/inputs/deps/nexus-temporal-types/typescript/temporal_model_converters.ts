@@ -98,6 +98,21 @@ export function workflowNamespace(): string {
   return workflow.workflowInfo().namespace;
 }
 
+/** Serialization context for payloads owned by a signal-with-start target workflow. */
+export function signalWithStartWorkflowSerializationContext(request: {
+  namespace?: string | null;
+  workflowId?: string | null;
+}): common.WorkflowSerializationContext {
+  if (request.namespace == null || request.workflowId == null) {
+    throw new TypeError("signal-with-start request is missing namespace or workflowId");
+  }
+  return {
+    type: "workflow",
+    namespace: request.namespace,
+    workflowId: request.workflowId,
+  };
+}
+
 export function payloadFromProto(
   payload: temporal.api.common.v1.IPayload,
 ): common.Payload {
@@ -124,6 +139,30 @@ function configuredPayloadConverter(): common.PayloadConverter {
     );
   }
   return activator.payloadConverter;
+}
+
+/** Convert application values to the protobuf payload-list representation. */
+export function payloadsToProto(
+  values: ReadonlyArray<unknown>,
+): temporal.api.common.v1.IPayloads {
+  return { payloads: common.toPayloads(configuredPayloadConverter(), ...values) ?? [] };
+}
+
+/** Convert a protobuf payload-list representation to application values. */
+export function payloadsFromProto(
+  proto: temporal.api.common.v1.IPayloads,
+): unknown[] {
+  return common.arrayFromPayloads(configuredPayloadConverter(), proto.payloads) ?? [];
+}
+
+/** Convert one application value to a protobuf payload. */
+export function valueToPayload(value: unknown): common.Payload {
+  return configuredPayloadConverter().toPayload(value);
+}
+
+/** Convert one protobuf payload to an application value. */
+export function payloadToValue<T>(payload: common.Payload): T {
+  return configuredPayloadConverter().fromPayload<T>(payload);
 }
 
 export function failureFromProto(

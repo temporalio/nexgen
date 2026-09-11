@@ -3159,6 +3159,7 @@ fn build_operation_output_transform(
     };
 
     let type_name = directive_prefixed_language_string(directive, "type");
+    let type_import = directive_prefixed_language_string(directive, "type-import");
     let transform = directive_language_string(directive);
 
     if type_name.is_empty() && transform.is_empty() {
@@ -3166,6 +3167,7 @@ fn build_operation_output_transform(
     } else if !type_name.is_empty() && !transform.is_empty() {
         Ok(Some(OperationOutputTransformSpec {
             type_name,
+            type_import,
             transform,
         }))
     } else {
@@ -4332,7 +4334,7 @@ interface workflow-service {
                 .type_descriptor
                 .as_ref()
                 .and_then(|descriptor| descriptor.value_type.for_language(Language::TypeScript)),
-            Some("workflow.SignalDefinition<any[]>")
+            Some("common.SignalDefinition<any[]>")
         );
     }
 

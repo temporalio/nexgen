@@ -2120,18 +2120,6 @@ impl ExternalModelBackend for DotNetExternalModels {
         }
     }
 
-    fn wire_type_identifier(&self, model_type: &PlannedType) -> Option<String> {
-        match model_type {
-            PlannedType::External(ExternalTypeSpec::Proto(proto_type)) => {
-                self.proto.wire_type_identifier(proto_type)
-            }
-            PlannedType::External(ExternalTypeSpec::Json(json_type)) => {
-                self.json.wire_type_identifier(json_type)
-            }
-            _ => None,
-        }
-    }
-
     fn wire_conversion(
         &self,
         model_type: &PlannedType,

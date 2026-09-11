@@ -13,10 +13,9 @@ export async function updateEmail(request: UpdateEmailRequest): Promise<User> {
     service: typeShowcase,
     endpoint: "type-showcase",
   });
-  const requestProto = request;
   const handle = await client.startOperation(
     typeShowcase.operations.updateEmail,
-    requestProto,
+    request,
   );
   const resource = await handle.result();
   return new User(

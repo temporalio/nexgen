@@ -13,11 +13,7 @@ export async function rename(request: RenameRequest): Promise<User> {
     service: typeShowcase,
     endpoint: "type-showcase",
   });
-  const requestProto = request;
-  const handle = await client.startOperation(
-    typeShowcase.operations.rename,
-    requestProto,
-  );
+  const handle = await client.startOperation(typeShowcase.operations.rename, request);
   const resource = await handle.result();
   return new User(
     resource.userId,

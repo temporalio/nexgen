@@ -1295,10 +1295,6 @@ impl ExternalModelBackend<PlannedJsonType> for ModelBackend {
         Some(json_type.model_name.clone())
     }
 
-    fn wire_type_identifier(&self, json_type: &PlannedJsonType) -> Option<String> {
-        Some(json_type.full_name.clone())
-    }
-
     fn wire_conversion(
         &self,
         _json_type: &PlannedJsonType,

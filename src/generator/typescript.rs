@@ -9,7 +9,7 @@ use crate::error::{Error, Result};
 use crate::generator::json_schema::typescript as typescript_json;
 use crate::generator::proto::typescript as typescript_proto;
 use crate::generator::proto::typescript::{
-    model_typescript_interface_ref, model_typescript_type_id, typescript_replacement_type_name,
+    model_typescript_interface_ref, typescript_replacement_type_name,
 };
 use crate::generator::render_request_plan;
 use crate::generator::{
@@ -271,18 +271,6 @@ impl ExternalModelBackend for TypeScriptExternalModels {
         }
     }
 
-    fn wire_type_identifier(&self, model_type: &PlannedType) -> Option<String> {
-        match model_type {
-            PlannedType::External(ExternalTypeSpec::Proto(_)) => {
-                self.proto.wire_type_identifier(model_type)
-            }
-            PlannedType::External(ExternalTypeSpec::Json(json_type)) => {
-                self.json.wire_type_identifier(json_type)
-            }
-            _ => None,
-        }
-    }
-
     fn wire_conversion(
         &self,
         model_type: &PlannedType,
@@ -359,49 +347,27 @@ impl<'a> ApiPlanner<'a> {
         let input = operation_input_model(operation);
         let output_transform = operation.output_transform.as_ref();
         let output_resource_return = operation.data.output_resource_return.clone();
-        let (output_operation_annotation, output_type_id, output_annotation_default) =
-            match operation.output_type() {
-                Some(
-                    output @ (PlannedType::External(ExternalTypeSpec::Proto(
-                        PlannedProtoType::Message(_),
-                    ))
-                    | PlannedType::External(ExternalTypeSpec::Json(_))
-                    | PlannedType::Record(_)),
-                ) => {
-                    if output_transform.is_none()
-                        && output_resource_return.is_none()
-                        && !operation.output_direct_result()
-                        && matches!(output, PlannedType::Record(_))
-                    {
-                        let _output_conversion = self.resolve_message_value_conversion(output);
-                    }
-                    (
-                        self.operation_type_annotation(output),
-                        self.operation_wire_type_identifier(output),
-                        self.resolve_output_annotation(output),
-                    )
+        let output_annotation_default = match operation.output_type() {
+            Some(
+                output @ (PlannedType::External(ExternalTypeSpec::Proto(
+                    PlannedProtoType::Message(_),
+                ))
+                | PlannedType::External(ExternalTypeSpec::Json(_))
+                | PlannedType::Record(_)),
+            ) => self.resolve_output_annotation(output),
+            Some(PlannedType::Resource(resource)) => {
+                if let Some(output) = &resource.wire_type {
+                    let output = PlannedType::External(output.clone());
+                    self.resolve_output_annotation(&output)
+                } else {
+                    resource.type_name.clone()
                 }
-                Some(PlannedType::Resource(resource)) => {
-                    if let Some(output) = &resource.wire_type {
-                        let output = PlannedType::External(output.clone());
-                        (
-                            self.operation_type_annotation(&output),
-                            self.operation_wire_type_identifier(&output),
-                            self.resolve_output_annotation(&output),
-                        )
-                    } else {
-                        (
-                            resource.type_name.clone(),
-                            resource.type_name.clone(),
-                            resource.type_name.clone(),
-                        )
-                    }
-                }
-                None => ("void".to_string(), "void".to_string(), "void".to_string()),
-                Some(_) => {
-                    panic!("planned operation output should be proto, record, resource, or none")
-                }
-            };
+            }
+            None => "void".to_string(),
+            Some(_) => {
+                panic!("planned operation output should be proto, record, resource, or none")
+            }
+        };
         let input_full_name = input.and_then(|input| match input {
             PlannedType::Record(record) => Some(record.full_name.as_str()),
             _ => None,
@@ -433,26 +399,53 @@ impl<'a> ApiPlanner<'a> {
                     &self.operation_type_annotation(input),
                     &type_parameters,
                 ),
-                type_id: self.operation_wire_type_identifier(input),
-                model_name,
+                model_name: model_name.clone(),
                 type_parameters,
                 annotation,
                 api_omitted_fields: input_full_name
                     .and_then(|name| self.api_plan.record(name))
                     .map(|record| {
-                        record
+                        let mut fields = record
                             .fields
                             .values()
                             .filter(|field| field.visibility == RecordFieldVisibility::ApiOmitted)
                             .map(|field| field.name.clone())
-                            .collect()
+                            .collect::<Vec<_>>();
+                        fields.extend(record.sourced_fields().map(|(name, _, _)| name.to_string()));
+                        fields.sort();
+                        fields.dedup();
+                        fields
                     })
                     .unwrap_or_default(),
-                to_wire_expr: input_conversion.to_wire_expr("request"),
-                transfer_type_converter: self.external_models.transfer_type_converter(input),
+                sourced_fields: input_model
+                    .map(|model| model.sourced_fields.clone())
+                    .unwrap_or_default(),
+                transfer_type_converter: input_conversion
+                    .wire_function_names
+                    .as_ref()
+                    .map(|_| {
+                        format!(
+                            "{}TransferTypeConverter",
+                            model_name
+                                .as_deref()
+                                .expect("wire-convertible operation input should have a model name")
+                                .to_lower_camel_case()
+                        )
+                    })
+                    .or_else(|| self.external_models.transfer_type_converter(input)),
             }
         });
 
+        // The final public return annotation may already contain type arguments.
+        // Service definitions and operation handles apply their own arguments, so
+        // start from the generated model's unparameterized transfer annotation.
+        let output_transfer_annotation = match operation.output_type() {
+            Some(PlannedType::Record(output)) => {
+                self.resolve_message_value_conversion(&PlannedType::Record(output.clone()))
+                    .annotation
+            }
+            _ => output_annotation_default.clone(),
+        };
         let output_annotation_default = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_operation_output_annotation(
                 &output_annotation_default,
@@ -462,27 +455,27 @@ impl<'a> ApiPlanner<'a> {
                 input,
                 self.api_plan,
             ),
-            _ => output_annotation_default,
+            _ => output_annotation_default.clone(),
         };
         let service_output_operation_annotation = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_erased_record_annotation(
-                &output_operation_annotation,
+                &output_transfer_annotation,
                 &self
                     .api_plan
                     .record_type_parameters(&record.full_name, Language::TypeScript),
             ),
-            _ => output_operation_annotation.clone(),
+            _ => output_transfer_annotation.clone(),
         };
         let output_operation_annotation = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_operation_output_annotation(
-                &output_operation_annotation,
+                &output_transfer_annotation,
                 &self
                     .api_plan
                     .record_type_parameters(&record.full_name, Language::TypeScript),
                 input,
                 self.api_plan,
             ),
-            _ => output_operation_annotation,
+            _ => output_transfer_annotation.clone(),
         };
         Ok(RenderedOperation {
             name: operation.name.as_str(),
@@ -504,7 +497,6 @@ impl<'a> ApiPlanner<'a> {
                 .map(str::to_string),
             output_operation_annotation,
             service_output_operation_annotation,
-            output_type_id,
             input: rendered_input,
             output_annotation: output_transform
                 .and_then(|transform| {
@@ -519,6 +511,12 @@ impl<'a> ApiPlanner<'a> {
                         .map(|resource| resource.resource_type_name.clone())
                 })
                 .unwrap_or(output_annotation_default),
+            output_transform_type_import: output_transform.and_then(|transform| {
+                transform
+                    .type_import
+                    .for_language(Language::TypeScript)
+                    .map(str::to_string)
+            }),
             output_transform_expr: output_transform.and_then(|transform| {
                 transform
                     .transform
@@ -530,9 +528,28 @@ impl<'a> ApiPlanner<'a> {
             output_model_name: operation
                 .output_type()
                 .and_then(|output| self.locally_defined_model_name(output)),
-            output_transfer_type_converter: operation
-                .output_type()
-                .and_then(|output| self.external_models.transfer_type_converter(output)),
+            output_transfer_type_converter: operation.output_type().and_then(
+                |output| match output {
+                    PlannedType::Record(_) => self
+                        .resolve_message_value_conversion(output)
+                        .wire_function_names
+                        .map(|_| {
+                            format!(
+                                "{}TransferTypeConverter",
+                                self.locally_defined_model_name(output)
+                                    .expect(
+                                        "wire-convertible operation output should have a model name"
+                                    )
+                                    .to_lower_camel_case()
+                            )
+                        }),
+                    _ => self.external_models.transfer_type_converter(output),
+                },
+            ),
+            serialization_context_expr: operation
+                .serialization_context
+                .for_language(Language::TypeScript)
+                .map(str::to_string),
         })
     }
 
@@ -568,13 +585,6 @@ impl<'a> ApiPlanner<'a> {
             .model_type_annotation(model_type)
             .or_else(|| model_typescript_interface_ref(model_type, self.api_plan))
             .expect("operation type ref should be model-shaped")
-    }
-
-    fn operation_wire_type_identifier(&self, model_type: &PlannedType) -> String {
-        self.external_models
-            .wire_type_identifier(model_type)
-            .or_else(|| model_typescript_type_id(model_type, self.api_plan))
-            .expect("operation type id should be model-shaped")
     }
 
     fn resolve_output_annotation(&mut self, model_type: &PlannedType) -> String {
@@ -1008,7 +1018,17 @@ impl<'a> ApiPlanner<'a> {
             };
         }
 
-        if record.function_for_args_field(field_name).is_some() {
+        if let Some((function_field_name, _)) = record.functions().find(|(_, function)| {
+            function
+                .arg_fields
+                .iter()
+                .any(|arg_field| arg_field == field_name)
+        }) {
+            let function_field_name = typescript_generated_field_name(
+                record
+                    .field_name_override(function_field_name)
+                    .unwrap_or(function_field_name),
+            );
             return RenderedField {
                 name: generated_field_name.to_string(),
                 wire_name: wire_field_name.to_string(),
@@ -1019,7 +1039,7 @@ impl<'a> ApiPlanner<'a> {
                 to_wire_expr: if field.required {
                     required_to_wire_expr(&resolved_type, &owner_name, &generated_field_name)
                 } else {
-                    optional_function_args_to_wire_expr(&resolved_type, &generated_field_name)
+                    optional_function_args_to_wire_expr(&generated_field_name, &function_field_name)
                 },
                 flattened_fields: Vec::new(),
                 requirements: resolved_type.requirements,
@@ -1044,6 +1064,7 @@ impl<'a> ApiPlanner<'a> {
         }
 
         if let Some(default_value) = &field.default_value {
+            let mut requirements = resolved_type.requirements.clone();
             return RenderedField {
                 name: generated_field_name.to_string(),
                 wire_name: wire_field_name.to_string(),
@@ -1057,14 +1078,16 @@ impl<'a> ApiPlanner<'a> {
                     &resolved_type,
                     wire_field_expr,
                     &default_value.enum_case,
+                    &mut requirements,
                 ),
                 to_wire_expr: defaulted_enum_to_wire_expr(
                     &resolved_type,
                     &generated_field_name,
                     &default_value.enum_case,
+                    &mut requirements,
                 ),
                 flattened_fields: Vec::new(),
-                requirements: resolved_type.requirements,
+                requirements,
             };
         }
 
@@ -1191,11 +1214,9 @@ impl<'a> ApiPlanner<'a> {
         if field.annotation == "common.Payload" && annotation != field.annotation {
             let value_expr = format!("model.{}", field.name);
             if field.optional {
-                return format!(
-                    "{value_expr} == null ? undefined : configuredPayloadConverter().toPayload({value_expr})"
-                );
+                return format!("{value_expr} == null ? undefined : valueToPayload({value_expr})");
             }
-            return format!("configuredPayloadConverter().toPayload({value_expr})");
+            return format!("valueToPayload({value_expr})");
         }
         field.to_wire_expr.clone()
     }
@@ -1225,11 +1246,30 @@ impl<'a> ApiPlanner<'a> {
     ) -> RenderedSourcedField {
         let field_name = typescript_generated_field_name(field_name);
 
+        let default_source_expr = source_expr.to_string();
+        let source_expr = format!("model.{field_name} ?? ({source_expr})");
+        let doc = field
+            .doc
+            .as_ref()
+            .and_then(|doc| doc.for_language(Language::TypeScript))
+            .map(str::to_string);
+
         if let PlannedType::Map(_, value) = &field.field_type {
             let value_type = self.resolve_planned_value_type(value);
             return RenderedSourcedField {
                 name: field_name.clone(),
-                to_wire_expr: map_value_to_wire_expr_from_expr(&value_type, source_expr),
+                annotation: Self::typescript_field_annotation(
+                    field,
+                    format!("Record<string, {}>", value_type.annotation),
+                ),
+                doc,
+                source_expr: default_source_expr,
+                visible: true,
+                from_wire_expr: map_value_from_wire_expr(
+                    &value_type,
+                    &format!("{{wire}}.{field_name}"),
+                ),
+                to_wire_expr: map_value_to_wire_expr_from_expr(&value_type, &source_expr),
             };
         }
 
@@ -1242,13 +1282,35 @@ impl<'a> ApiPlanner<'a> {
         if repeated {
             return RenderedSourcedField {
                 name: field_name.clone(),
-                to_wire_expr: repeated_to_wire_expr_from_expr(&resolved_type, source_expr),
+                annotation: Self::typescript_field_annotation(
+                    field,
+                    typescript_array_annotation(&resolved_type.annotation),
+                ),
+                doc,
+                source_expr: default_source_expr,
+                visible: true,
+                from_wire_expr: format!(
+                    "{} ?? []",
+                    repeated_from_wire_expr(&resolved_type, &format!("{{wire}}.{field_name}"))
+                ),
+                to_wire_expr: repeated_to_wire_expr_from_expr(&resolved_type, &source_expr),
             };
         }
 
         RenderedSourcedField {
-            name: field_name,
-            to_wire_expr: optional_to_wire_expr_from_expr(&resolved_type, source_expr),
+            name: field_name.clone(),
+            annotation: Self::typescript_field_annotation(field, resolved_type.annotation.clone()),
+            doc,
+            source_expr: default_source_expr,
+            visible: true,
+            from_wire_expr: required_from_wire_expr(
+                &resolved_type,
+                "sourced field",
+                &format!("{{wire}}.{field_name}"),
+                &field_name,
+                field,
+            ),
+            to_wire_expr: optional_to_wire_expr_from_expr(&resolved_type, &source_expr),
         }
     }
 
@@ -1295,7 +1357,10 @@ impl<'a> ApiPlanner<'a> {
             PlannedType::Int(IntSpec::I64) => ResolvedFieldType {
                 annotation: "Long".to_string(),
                 kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements { long: true },
+                requirements: TypeScriptRequirements {
+                    long: true,
+                    ..Default::default()
+                },
                 wire_conversion: None,
             },
             PlannedType::Bool => ResolvedFieldType {
@@ -1495,6 +1560,7 @@ impl<'a> ApiPlanner<'a> {
                     resolved.annotation = annotation.to_string();
                     resolved.requirements = TypeScriptRequirements {
                         long: annotation == "Long",
+                        ..TypeScriptRequirements::default()
                     };
                 }
                 resolved
@@ -1711,8 +1777,9 @@ fn defaulted_enum_from_wire_expr(
     resolved_type: &ResolvedFieldType,
     wire_value_expr: &str,
     enum_case: &str,
+    requirements: &mut TypeScriptRequirements,
 ) -> String {
-    let default_expr = enum_default_expr(resolved_type, enum_case);
+    let default_expr = enum_default_expr(resolved_type, enum_case, requirements);
     format!(
         "{wire_value_expr} == null ? {default_expr} : {}",
         enum_from_wire_expr(resolved_type, wire_value_expr)
@@ -1729,7 +1796,7 @@ fn flattened_field_from_wire_expr(
         && flattened_annotation != nested_annotation
     {
         format!(
-            "{nested_field_from_wire_expr} == null ? undefined : configuredPayloadConverter().fromPayload<{flattened_annotation}>(({nested_field_from_wire_expr})!)"
+            "{nested_field_from_wire_expr} == null ? undefined : payloadToValue<{flattened_annotation}>(({nested_field_from_wire_expr})!)"
         )
     } else {
         nested_field_from_wire_expr.to_string()
@@ -1763,9 +1830,10 @@ fn defaulted_enum_to_wire_expr(
     resolved_type: &ResolvedFieldType,
     field_name: &str,
     enum_case: &str,
+    requirements: &mut TypeScriptRequirements,
 ) -> String {
     let value_expr = format!("model.{field_name}");
-    let default_expr = enum_default_expr(resolved_type, enum_case);
+    let default_expr = enum_default_expr(resolved_type, enum_case, requirements);
     enum_to_wire_expr(
         resolved_type,
         &format!("({value_expr} == null ? {default_expr} : {value_expr})"),
@@ -1809,11 +1877,8 @@ fn optional_function_name_to_wire_expr(
     )
 }
 
-fn optional_function_args_to_wire_expr(
-    _resolved_type: &ResolvedFieldType,
-    field_name: &str,
-) -> String {
-    format!("requestArgsToPayloads(model.{field_name})")
+fn optional_function_args_to_wire_expr(field_name: &str, function_field_name: &str) -> String {
+    format!("requestArgsToPayloads(model.{field_name}, model.{function_field_name})")
 }
 
 fn field_has_presence(field: &RecordFieldSpec<PlannedFamily>) -> bool {
@@ -1839,7 +1904,19 @@ fn enum_from_wire_expr(resolved_type: &ResolvedFieldType, expr: &str) -> String 
     }
 }
 
-fn enum_default_expr(resolved_type: &ResolvedFieldType, enum_case: &str) -> String {
+fn enum_default_expr(
+    resolved_type: &ResolvedFieldType,
+    enum_case: &str,
+    requirements: &mut TypeScriptRequirements,
+) -> String {
+    // Defaults are emitted as runtime enum-member references. Record the namespace
+    // here, where that runtime use is introduced, so its WIT import is promoted from
+    // `import type` to an ordinary namespace import when rendering the module.
+    if let Some((namespace, _)) = resolved_type.annotation.split_once('.') {
+        requirements
+            .value_namespace_imports
+            .insert(namespace.to_string());
+    }
     let value_name = if resolved_type.wire_conversion.is_some() {
         enum_case.to_shouty_snake_case()
     } else {
@@ -2837,25 +2914,25 @@ struct RenderedOperation<'a> {
     return_doc: Option<String>,
     output_operation_annotation: String,
     service_output_operation_annotation: String,
-    output_type_id: String,
     input: Option<RenderedOperationInput>,
     output_annotation: String,
+    output_transform_type_import: Option<String>,
     output_transform_expr: Option<String>,
     output_resource_return: Option<PlannedOperationResourceReturn>,
     output_direct_result: bool,
     output_model_name: Option<String>,
     output_transfer_type_converter: Option<String>,
+    serialization_context_expr: Option<String>,
 }
 
 #[derive(Debug)]
 struct RenderedOperationInput {
     operation_annotation: String,
-    type_id: String,
     model_name: Option<String>,
     type_parameters: Vec<RenderedTypeParameter>,
     annotation: String,
     api_omitted_fields: Vec<String>,
-    to_wire_expr: String,
+    sourced_fields: Vec<RenderedSourcedField>,
     transfer_type_converter: Option<String>,
 }
 
@@ -2940,9 +3017,14 @@ pub(in crate::generator) struct RenderedFlattenedField {
     to_wire_expr: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(in crate::generator) struct RenderedSourcedField {
     pub(in crate::generator) name: String,
+    annotation: String,
+    doc: Option<String>,
+    source_expr: String,
+    visible: bool,
+    pub(in crate::generator) from_wire_expr: String,
     pub(in crate::generator) to_wire_expr: String,
 }
 
@@ -2996,11 +3078,14 @@ struct RenderedWithArgumentsField {
 #[derive(Debug, Clone, Default)]
 pub(in crate::generator) struct TypeScriptRequirements {
     pub(in crate::generator) long: bool,
+    value_namespace_imports: BTreeSet<String>,
 }
 
 impl TypeScriptRequirements {
     fn merge(&mut self, other: &TypeScriptRequirements) {
         self.long |= other.long;
+        self.value_namespace_imports
+            .extend(other.value_namespace_imports.iter().cloned());
     }
 }
 
@@ -3184,10 +3269,43 @@ fn render_module_files(
                 &module_model_names,
                 services,
                 language_imports,
+                support_exports.as_ref(),
                 mode == GenerationMode::NativeApi,
                 api_plan,
             ),
             module_origin.clone(),
+        )?;
+    }
+    if crate::nexgen_config::current().system_nexus && !services.is_empty() {
+        files.insert(
+            "registry.ts",
+            render_operation_registry_module(
+                enums,
+                flags,
+                variants,
+                models,
+                &module_model_names,
+                services,
+                support_exports.as_ref(),
+                api_plan,
+            ),
+            GeneratedFileOrigin::fixed("generated TypeScript System Nexus operation registry"),
+        )?;
+    }
+    if crate::nexgen_config::current().system_nexus && !services.is_empty() {
+        files.insert(
+            "interceptors.ts",
+            render_system_nexus_interceptors_module(
+                enums,
+                flags,
+                variants,
+                models,
+                &module_model_names,
+                services,
+                language_imports,
+                api_plan,
+            ),
+            GeneratedFileOrigin::fixed("generated TypeScript System Nexus interceptors"),
         )?;
     }
     if services.iter().any(|service| !service.resources.is_empty()) {
@@ -3301,14 +3419,18 @@ fn export_name<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
 fn render_typescript_namespace_imports(
     output: &mut String,
     source: &str,
+    source_dir: &Path,
     language_imports: &[LanguageImportSpec],
-    generated_value_imports: &[(&str, &str)],
+    generated_imports: &[(&str, &str, bool)],
 ) {
     let mut namespace_imports = BTreeMap::<(String, String), bool>::new();
     let mut named_type_imports = BTreeMap::<String, BTreeSet<String>>::new();
-    for (namespace, package) in generated_value_imports {
+    for (namespace, package, type_only) in generated_imports {
         if contains_qualified_identifier(source, namespace) {
-            namespace_imports.insert(((*namespace).to_string(), (*package).to_string()), true);
+            namespace_imports.insert(
+                ((*namespace).to_string(), (*package).to_string()),
+                !type_only,
+            );
         }
     }
     for import in language_imports {
@@ -3317,7 +3439,23 @@ fn render_typescript_namespace_imports(
         }
         match import.import_style {
             LanguageImportStyle::Namespace => {
-                let key = (import.reference.clone(), import.module.clone());
+                // System Nexus output lives inside @temporalio/workflow. Its
+                // workflow helpers are imported through the local bridge, so
+                // WIT annotations authored for the public package must resolve
+                // to that same binding rather than introduce a duplicate
+                // `workflow` namespace import.
+                let module = if crate::nexgen_config::current().system_nexus
+                    && import.reference == "workflowHandle"
+                {
+                    "../../../workflow-handle".to_string()
+                } else if crate::nexgen_config::current().system_nexus
+                    && import.module == "@temporalio/workflow"
+                {
+                    typescript_workflow_module().to_string()
+                } else {
+                    import.module.clone()
+                };
+                let key = (import.reference.clone(), module);
                 let needs_value_import = !import.type_only;
                 namespace_imports
                     .entry(key)
@@ -3339,23 +3477,52 @@ fn render_typescript_namespace_imports(
         }
     }
 
+    let mut rendered_imports = Vec::new();
     for ((namespace, package), needs_value_import) in namespace_imports {
+        let package = typescript_relative_import(source_dir, &package);
+        let mut import = String::new();
         if needs_value_import {
-            output.push_str("import * as ");
+            import.push_str("import * as ");
         } else {
-            output.push_str("import type * as ");
+            import.push_str("import type * as ");
         }
-        output.push_str(&namespace);
-        output.push_str(" from '");
-        output.push_str(&package);
-        output.push_str("';\n");
+        import.push_str(&namespace);
+        import.push_str(" from '");
+        import.push_str(&package);
+        import.push_str("';\n");
+        rendered_imports.push((package, import));
     }
     for (package, imports) in named_type_imports {
-        output.push_str("import type { ");
-        output.push_str(&imports.into_iter().collect::<Vec<_>>().join(", "));
-        output.push_str(" } from '");
-        output.push_str(&package);
-        output.push_str("';\n");
+        let package = typescript_relative_import(source_dir, &package);
+        let mut import = String::from("import type { ");
+        import.push_str(&imports.into_iter().collect::<Vec<_>>().join(", "));
+        import.push_str(" } from '");
+        import.push_str(&package);
+        import.push_str("';\n");
+        rendered_imports.push((package, import));
+    }
+    rendered_imports.sort_by(|(left, _), (right, _)| {
+        left.starts_with('.')
+            .cmp(&right.starts_with('.'))
+            .then_with(|| left.cmp(right))
+    });
+    for (_, import) in rendered_imports {
+        output.push_str(&import);
+    }
+}
+
+fn typescript_relative_import(source_dir: &Path, package: &str) -> String {
+    package
+        .starts_with('.')
+        .then(|| relative_module_path(source_dir, Path::new(package)))
+        .unwrap_or_else(|| package.to_string())
+}
+
+fn typescript_workflow_module() -> &'static str {
+    if crate::nexgen_config::current().system_nexus {
+        "../../../workflow"
+    } else {
+        "@temporalio/workflow"
     }
 }
 
@@ -3554,9 +3721,15 @@ fn render_index_module(
         .iter()
         .flat_map(|service| {
             service.operations.iter().flat_map(|operation| {
-                let output_model_name = service
-                    .endpoint
-                    .is_none()
+                // Endpoint operations normally expose their input model through
+                // the operation function, while service operations expose both
+                // input and output through their client method. System Nexus
+                // additionally exposes endpoint-operation input and raw output
+                // models in its public interceptor contract. Export those
+                // models from the module barrel so SDK consumers never need to
+                // reach into generated implementation paths.
+                let output_model_name = (service.endpoint.is_none()
+                    || crate::nexgen_config::current().system_nexus)
                     .then(|| operation.output_model_name.as_deref())
                     .flatten();
                 operation
@@ -3690,16 +3863,13 @@ fn render_endpoint_service_operation_body(
         return;
     }
 
-    output.push_str("    const requestProto = ");
-    output.push_str(&typescript_operation_input_expr(operation));
-    output.push_str(";\n");
     output.push_str("    const handle = await this.client.startOperation(\n");
     output.push_str("      ");
     output.push_str(&service.attr_name);
     output.push_str(".operations.");
     output.push_str(&operation.attr_name);
     output.push_str(",\n");
-    output.push_str("      requestProto,\n");
+    output.push_str("      request,\n");
     output.push_str("    );\n");
     if let Some(transform_expr) = &operation.output_transform_expr {
         output.push_str("    const result = await handle.result();\n");
@@ -3740,8 +3910,29 @@ fn render_endpoint_service_operation_body(
     }
 }
 
-fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String {
+fn render_operation_registry_module(
+    enums: &[&RenderedEnum],
+    flags: &[&RenderedFlags],
+    variants: &[&RenderedVariant],
+    models: &[&RenderedModel],
+    external_model_names: &BTreeSet<String>,
+    services: &[RenderedService<'_>],
+    support_exports: Option<&SupportExports>,
+    api_plan: &PlannedSpec,
+) -> String {
     let mut body = String::new();
+    let has_serialization_context = services
+        .iter()
+        .flat_map(|service| &service.operations)
+        .any(|operation| operation.serialization_context_expr.is_some());
+    if has_serialization_context {
+        body.push_str("interface OperationRegistryEntry<Input = unknown> {\n");
+        body.push_str("  readonly service: string;\n");
+        body.push_str("  readonly operation: string;\n");
+        body.push_str("  /** Context for nested payloads, determined by the operation. */\n");
+        body.push_str("  readonly serializationContext?: (input: Input) => import('@temporalio/common').SerializationContext;\n");
+        body.push_str("}\n\n");
+    }
     body.push_str("export const operationRegistry = [\n");
     for service in services {
         for operation in &service.operations {
@@ -3752,23 +3943,156 @@ fn render_operation_registry_module(services: &[RenderedService<'_>]) -> String 
             body.push_str("    operation: ");
             body.push_str(&typescript_string_literal(operation.wire_name));
             body.push_str(",\n");
-            body.push_str("    inputType: ");
-            body.push_str(&typescript_string_literal(
-                operation
-                    .input
-                    .as_ref()
-                    .map(|input| input.type_id.as_str())
-                    .unwrap_or("void"),
-            ));
-            body.push_str(",\n");
-            body.push_str("    outputType: ");
-            body.push_str(&typescript_string_literal(&operation.output_type_id));
-            body.push_str(",\n");
+            if let Some(serialization_context) = &operation.serialization_context_expr {
+                body.push_str("    serializationContext: ");
+                body.push_str(serialization_context);
+                body.push_str(",\n");
+            }
             body.push_str("  },\n");
         }
     }
-    body.push_str("] as const;\n");
-    body
+    if has_serialization_context {
+        body.push_str("] as const satisfies readonly OperationRegistryEntry<any>[];\n");
+    } else {
+        body.push_str("] as const;\n");
+    }
+
+    let mut imports = String::new();
+    render_support_imports(&mut imports, support_exports, "./support", &body);
+    render_type_imports(
+        &mut imports,
+        "./models",
+        &used_import_names(
+            &body,
+            &model_type_names(enums, flags, variants, models, external_model_names),
+        ),
+    );
+    render_cross_module_model_type_imports(
+        &mut imports,
+        &api_plan.module_path.to_path_buf(),
+        api_plan,
+        &body,
+    );
+    render_generated_module(imports, body)
+}
+
+/// Renders the operation-specific interception surface consumed by the SDK's
+/// workflow outbound interceptor. It deliberately remains separate from the
+/// generic System Nexus hook, as it does in the other SDKs.
+fn render_system_nexus_interceptors_module(
+    enums: &[&RenderedEnum],
+    flags: &[&RenderedFlags],
+    variants: &[&RenderedVariant],
+    models: &[&RenderedModel],
+    external_model_names: &BTreeSet<String>,
+    services: &[RenderedService<'_>],
+    language_imports: &[LanguageImportSpec],
+    api_plan: &PlannedSpec,
+) -> String {
+    let operations = services
+        .iter()
+        .filter(|service| service.endpoint.is_some())
+        .flat_map(|service| {
+            service
+                .operations
+                .iter()
+                .map(move |operation| (service, operation))
+        })
+        .collect::<Vec<_>>();
+    let mut body = String::from("export interface SystemNexusWorkflowOutboundCallsInterceptor {\n");
+    for (_, operation) in &operations {
+        let input = operation
+            .input
+            .as_ref()
+            .and_then(|input| input.model_name.as_deref())
+            .or_else(|| {
+                operation
+                    .input
+                    .as_ref()
+                    .map(|input| input.annotation.as_str())
+            })
+            .unwrap_or("undefined");
+        body.push_str("  ");
+        body.push_str(&operation.attr_name);
+        body.push_str("?: ");
+        body.push_str("(input: ");
+        body.push_str(input);
+        body.push_str(", next: (input: ");
+        body.push_str(input);
+        body.push_str(") => Promise<nexus.NexusOperationHandle<");
+        body.push_str(&operation.output_operation_annotation);
+        body.push_str(">>) => Promise<nexus.NexusOperationHandle<");
+        body.push_str(&operation.output_operation_annotation);
+        body.push_str(">>;\n");
+    }
+    body.push_str("}\n\n");
+    body.push_str("/** Dispatches the operation-specific interceptor chain selected by service and operation. */\n");
+    body.push_str("export function dispatchSystemNexusSpecificInterceptors(\n");
+    body.push_str("  service: string,\n");
+    body.push_str("  operation: string,\n");
+    body.push_str("  interceptors: SystemNexusWorkflowOutboundCallsInterceptor[],\n");
+    body.push_str("  input: unknown,\n");
+    body.push_str(
+        "  next: <Input, Output>(input: Input) => Promise<nexus.NexusOperationHandle<Output>>\n",
+    );
+    body.push_str("): Promise<nexus.NexusOperationHandle<unknown>> {\n");
+    body.push_str("  switch (service) {\n");
+    for (service, operation) in operations {
+        let input = operation
+            .input
+            .as_ref()
+            .and_then(|input| input.model_name.as_deref())
+            .or_else(|| {
+                operation
+                    .input
+                    .as_ref()
+                    .map(|input| input.annotation.as_str())
+            })
+            .unwrap_or("undefined");
+        body.push_str("    case ");
+        body.push_str(&typescript_string_literal(service.wire_name));
+        body.push_str(":\n      switch (operation) {\n");
+        body.push_str("        case ");
+        body.push_str(&typescript_string_literal(operation.wire_name));
+        body.push_str(":\n");
+        body.push_str("          return composeInterceptors(interceptors, ");
+        body.push_str(&typescript_string_literal(&operation.attr_name));
+        body.push_str(", (request) =>\n");
+        body.push_str("            next<");
+        body.push_str(input);
+        body.push_str(", ");
+        body.push_str(&operation.output_operation_annotation);
+        body.push_str(">(request)\n");
+        body.push_str("          )(input as ");
+        body.push_str(input);
+        body.push_str(") as Promise<nexus.NexusOperationHandle<unknown>>;\n");
+        body.push_str("        default:\n          return next(input);\n      }\n");
+    }
+    body.push_str("    default:\n      return next(input);\n  }\n}\n");
+    let mut imports = String::new();
+    imports.push_str("import { composeInterceptors } from '../../../interceptor-composition';\n");
+    render_typescript_namespace_imports(
+        &mut imports,
+        &body,
+        &api_plan.module_path.to_path_buf(),
+        language_imports,
+        &[("nexus", "../../../nexus", true)],
+    );
+    render_type_imports(
+        &mut imports,
+        "./models",
+        &used_import_names(
+            &body,
+            &model_type_names(enums, flags, variants, models, external_model_names),
+        ),
+    );
+    render_cross_module_model_type_imports(
+        &mut imports,
+        &api_plan.module_path.to_path_buf(),
+        api_plan,
+        &body,
+    );
+    render_generated_module(imports, body)
 }
 
 fn render_models_module(
@@ -3789,18 +4113,19 @@ fn render_models_module(
     if mode == GenerationMode::NativeApi {
         render_required_field(&mut body, true);
     }
-    let uses_invocation_models = models
-        .iter()
-        .any(|model| !model.functions.is_empty() || !model.with_arguments.is_empty());
-    let uses_configured_payload_converter = uses_invocation_models
-        || models
-            .iter()
-            .any(|model| model_uses_configured_payload_converter(model));
-    if uses_configured_payload_converter {
-        body.push('\n');
-        render_configured_payload_converter(&mut body);
-    }
-    if uses_invocation_models {
+    let uses_function_payload_helpers = support_exports.is_some()
+        && mode == GenerationMode::NativeApi
+        && models.iter().any(|model| {
+            model.fields.iter().any(|field| {
+                field.to_wire_expr.contains("requestArgsToPayloads(")
+                    || field.from_wire_expr.contains("requestArgsFromPayloads(")
+                    || field.flattened_fields.iter().any(|field| {
+                        field.to_wire_expr.contains("requestArgsToPayloads(")
+                            || field.from_wire_expr.contains("requestArgsFromPayloads(")
+                    })
+            })
+        });
+    if uses_function_payload_helpers {
         body.push('\n');
         render_function_runtime_helpers(
             &mut body,
@@ -3848,13 +4173,29 @@ fn render_models_module(
         body.push_str(&model_fragments.body);
     }
     let mut imports = String::new();
-    let generated_value_imports = if uses_configured_payload_converter {
-        vec![("common", "@temporalio/common")]
-    } else {
-        Vec::new()
-    };
+    let mut generated_value_imports = Vec::new();
+    if crate::nexgen_config::current().system_nexus
+        && contains_qualified_identifier(&body, "workflow")
+    {
+        generated_value_imports.push(("workflow", typescript_workflow_module(), true));
+    }
     let mut model_language_imports = language_imports.to_vec();
-    if uses_invocation_models {
+    let value_namespace_imports = models
+        .iter()
+        .flat_map(|model| model.fields.iter())
+        .flat_map(|field| field.requirements.value_namespace_imports.iter())
+        .collect::<BTreeSet<_>>();
+    for import in &mut model_language_imports {
+        if import.type_only
+            && import
+                .name
+                .as_ref()
+                .is_some_and(|name| value_namespace_imports.contains(name))
+        {
+            import.type_only = false;
+        }
+    }
+    if uses_function_payload_helpers {
         model_language_imports.push(LanguageImportSpec {
             language: Language::TypeScript,
             reference: "temporal".to_string(),
@@ -3867,6 +4208,7 @@ fn render_models_module(
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf(),
         &model_language_imports,
         &generated_value_imports,
     );
@@ -3971,6 +4313,7 @@ fn render_service_module(
     external_model_names: &BTreeSet<String>,
     services: &[RenderedService<'_>],
     language_imports: &[LanguageImportSpec],
+    support_exports: Option<&SupportExports>,
     include_native_api: bool,
     api_plan: &PlannedSpec,
 ) -> String {
@@ -3983,16 +4326,18 @@ fn render_service_module(
             body.push('\n');
         }
     }
-    if include_native_api {
-        body.push_str(&render_operation_registry_module(services));
-    }
     let mut imports = String::new();
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf(),
         language_imports,
-        &[("nexus", "nexus-rpc"), ("workflow", "@temporalio/workflow")],
+        &[
+            ("nexus", "nexus-rpc", false),
+            ("workflow", typescript_workflow_module(), false),
+        ],
     );
+    render_support_imports(&mut imports, support_exports, "./support", &body);
     // Operation type info references converter *values*, so they import alongside
     // (and before) the type-only model imports.
     render_value_imports(
@@ -4000,9 +4345,18 @@ fn render_service_module(
         "./models",
         &used_import_names(
             &body,
-            &external_model_names
+            &models
                 .iter()
-                .map(|name| typescript_json::ts_transfer_type_converter_name(name))
+                .filter_map(|model| {
+                    model.wire_function_names.as_ref().map(|_| {
+                        format!("{}TransferTypeConverter", model.name.to_lower_camel_case())
+                    })
+                })
+                .chain(
+                    external_model_names
+                        .iter()
+                        .map(|name| typescript_json::ts_transfer_type_converter_name(name)),
+                )
                 .collect::<Vec<_>>(),
         ),
     );
@@ -4068,8 +4422,9 @@ fn render_resources_module(
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf(),
         language_imports,
-        &[("workflow", "@temporalio/workflow")],
+        &[("workflow", typescript_workflow_module(), false)],
     );
     render_typescript_requirement_imports(&mut imports, requirements);
     render_type_imports(
@@ -4132,8 +4487,12 @@ fn render_operation_module(
     render_typescript_namespace_imports(
         &mut imports,
         &body,
+        &api_plan.module_path.to_path_buf().join("operations"),
         language_imports,
-        &[("workflow", "@temporalio/workflow")],
+        &[
+            ("workflow", typescript_workflow_module(), false),
+            ("nexus", "../../../nexus", false),
+        ],
     );
     render_value_imports(&mut imports, "../services", &[service.attr_name.clone()]);
     let mut model_values = model_to_wire_function_names(models);
@@ -4159,6 +4518,9 @@ fn render_operation_module(
         api_plan,
         &body,
     );
+    if let Some(path) = &operation.output_transform_type_import {
+        render_type_imports(&mut imports, path, &[operation.output_annotation.clone()]);
+    }
     render_support_imports(&mut imports, support_exports, "../support", &body);
     let resources = used_import_names(&body, &resource_type_names(services));
     let value_resources = resources
@@ -4362,51 +4724,17 @@ fn render_function_runtime_helpers(output: &mut String, render_from: bool) {
         output.push_str("  if (payloads == null) {\n");
         output.push_str("    return undefined;\n");
         output.push_str("  }\n");
-        output.push_str(
-            "  return common.arrayFromPayloads(configuredPayloadConverter(), payloads.payloads);\n",
-        );
+        output.push_str("  return payloadsFromProto(payloads);\n");
         output.push_str("}\n\n");
     }
     output.push_str("function requestArgsToPayloads(\n");
     output.push_str("  args: ReadonlyArray<unknown> | undefined,\n");
+    output.push_str("  functionValue: unknown,\n");
     output.push_str("): temporal.api.common.v1.IPayloads | undefined {\n");
     output.push_str("  if (args == null) {\n");
     output.push_str("    return undefined;\n");
     output.push_str("  }\n");
-    output
-        .push_str("  const payloads = common.toPayloads(configuredPayloadConverter(), ...args);\n");
-    output.push_str("  return payloads == null ? undefined : { payloads };\n");
-    output.push_str("}\n");
-}
-
-fn model_uses_configured_payload_converter(model: &RenderedModel) -> bool {
-    model.fields.iter().any(|field| {
-        field.to_wire_expr.contains("configuredPayloadConverter()")
-            || field
-                .flattened_fields
-                .iter()
-                .any(|field| field.to_wire_expr.contains("configuredPayloadConverter()"))
-    }) || model
-        .sourced_fields
-        .iter()
-        .any(|field| field.to_wire_expr.contains("configuredPayloadConverter()"))
-}
-
-fn render_configured_payload_converter(output: &mut String) {
-    output.push_str("function configuredPayloadConverter(): common.PayloadConverter {\n");
-    output.push_str("  const activator = (\n");
-    output.push_str("    globalThis as typeof globalThis & {\n");
-    output.push_str("      __TEMPORAL_ACTIVATOR__?: {\n");
-    output.push_str("        payloadConverter?: common.PayloadConverter;\n");
-    output.push_str("      };\n");
-    output.push_str("    }\n");
-    output.push_str("  ).__TEMPORAL_ACTIVATOR__;\n");
-    output.push_str("  if (activator?.payloadConverter == null) {\n");
-    output.push_str(
-        "    throw new Error('payload converter is unavailable outside workflow context');\n",
-    );
-    output.push_str("  }\n");
-    output.push_str("  return activator.payloadConverter;\n");
+    output.push_str("  return payloadsToProto(args, functionInputTypes(functionValue));\n");
     output.push_str("}\n");
 }
 
@@ -4537,6 +4865,16 @@ fn render_invocation_model_base_type(output: &mut String, model: &RenderedModel)
     output.push_str("{\n");
     for field in &model.fields {
         render_invocation_model_base_property(output, model, field);
+    }
+    for field in model.sourced_fields.iter().filter(|field| field.visible) {
+        render_typescript_type_property(
+            output,
+            "  ",
+            &field.name,
+            false,
+            &field.annotation,
+            field.doc.as_deref(),
+        );
     }
     output.push('}');
 }
@@ -5033,6 +5371,16 @@ fn render_model(
                     render_flattened_type_properties(output, "  ", &field.flattened_fields);
                 }
             }
+            for field in model.sourced_fields.iter().filter(|field| field.visible) {
+                render_typescript_type_property(
+                    output,
+                    "  ",
+                    &field.name,
+                    false,
+                    &field.annotation,
+                    field.doc.as_deref(),
+                );
+            }
             output.push_str("}\n\n");
         }
     } else {
@@ -5074,7 +5422,15 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
             operation
                 .input
                 .as_ref()
-                .map(|input| input.operation_annotation.as_str())
+                .map(|input| {
+                    input.model_name.as_ref().map_or_else(
+                        || input.operation_annotation.clone(),
+                        |model_name| {
+                            typescript_erased_model_annotation(model_name, &input.type_parameters)
+                        },
+                    )
+                })
+                .as_deref()
                 .unwrap_or("void"),
         );
         output.push_str(",\n");
@@ -5101,7 +5457,7 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
         );
         output.push_str(" }),\n");
     }
-    output.push_str("});\n\n");
+    output.push_str("});\n");
 }
 
 fn render_operation_type_info(output: &mut String, field: &str, converter: Option<&str>) {
@@ -5631,18 +5987,8 @@ fn render_resource_method_operation_body(
 
     if returns_direct {
         output.push_str(&indent_str);
-        output.push_str("const requestProto = ");
-        output.push_str(&typescript_operation_input_expr(operation));
-        output.push_str(";\n");
-        output.push_str(&indent_str);
         output.push_str("const handle = await ");
-        render_resource_start_operation(
-            &mut output,
-            service,
-            operation,
-            &client_expr,
-            "requestProto",
-        );
+        render_resource_start_operation(&mut output, service, operation, &client_expr, "request");
         if let Some(transform_expr) = &operation.output_transform_expr {
             output.push_str(&indent_str);
             output.push_str("const result = await handle.result();\n");
@@ -5758,7 +6104,7 @@ fn resource_return_binding_expr_typescript(
         } => {
             if *hidden {
                 let expr = format!(
-                    "requestProto.{}",
+                    "request.{}",
                     typescript_generated_field_name(proto_field_name)
                 );
                 if binding.optional {
@@ -5803,6 +6149,11 @@ fn render_operation_function(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
+    let client_namespace = if crate::nexgen_config::current().system_nexus {
+        "nexus"
+    } else {
+        "workflow"
+    };
     let returns_direct = operation.output_transform_expr.is_some()
         || operation.output_resource_return.is_some()
         || operation.output_direct_result;
@@ -5856,7 +6207,11 @@ fn render_operation_function(
         output.push_str("  endpoint: string,\n");
     }
     if let Some(input) = &operation.input {
-        output.push_str("  request: ");
+        output.push_str(if input.sourced_fields.is_empty() {
+            "  request: "
+        } else {
+            "  requestInput: "
+        });
         if input.api_omitted_fields.is_empty() {
             output.push_str(&input.annotation);
         } else {
@@ -5869,10 +6224,31 @@ fn render_operation_function(
         output.push_str(&operation.output_annotation);
         output.push_str("> {\n");
     } else {
-        output.push_str("): Promise<workflow.NexusOperationHandle<");
+        output.push_str(&format!(
+            "): Promise<{client_namespace}.NexusOperationHandle<"
+        ));
         output.push_str(&operation.output_operation_annotation);
         output.push_str(">> {\n");
-        output.push_str("  const client = workflow.createNexusServiceClient({\n");
+    }
+    if let Some(input) = &operation.input {
+        if !input.sourced_fields.is_empty() {
+            output.push_str("  const request = {\n    ...requestInput,\n");
+            for field in &input.sourced_fields {
+                output.push_str("    ");
+                output.push_str(&field.name);
+                output.push_str(": ");
+                output.push_str(&field.source_expr);
+                output.push_str(",\n");
+            }
+            output.push_str("  } as ");
+            output.push_str(&input.annotation);
+            output.push_str(";\n");
+        }
+    }
+    if !returns_direct {
+        output.push_str(&format!(
+            "  const client = {client_namespace}.createNexusServiceClient({{\n"
+        ));
         output.push_str("    service: ");
         output.push_str(&service.attr_name);
         output.push_str(",\n");
@@ -5893,7 +6269,36 @@ fn render_operation_function(
         output.push_str("}\n");
         return;
     }
-    output.push_str("  const client = workflow.createNexusServiceClient({\n");
+    if crate::nexgen_config::current().system_nexus && service.endpoint.is_some() {
+        output.push_str(&format!(
+            "  const client = {client_namespace}.createNexusServiceClient({{\n    service: "
+        ));
+        output.push_str(&service.attr_name);
+        output.push_str(",\n    endpoint: ");
+        output.push_str(&typescript_service_endpoint_expr(service));
+        output.push_str(",\n  });\n  const handle = await client.startOperation(\n    ");
+        output.push_str(&service.attr_name);
+        output.push_str(".operations.");
+        output.push_str(&operation.attr_name);
+        output.push_str(",\n    ");
+        output.push_str("request");
+        output.push_str(",\n  );\n");
+        output.push_str("  const result = await handle.result();\n");
+        if let Some(transform_expr) = &operation.output_transform_expr {
+            output.push_str("  return ");
+            output.push_str(transform_expr);
+            output.push_str(";\n");
+        } else {
+            output.push_str("  return result as ");
+            output.push_str(&operation.output_annotation);
+            output.push_str(";\n");
+        }
+        output.push_str("}\n");
+        return;
+    }
+    output.push_str(&format!(
+        "  const client = {client_namespace}.createNexusServiceClient({{\n"
+    ));
     output.push_str("    service: ");
     output.push_str(&service.attr_name);
     output.push_str(",\n");
@@ -5901,16 +6306,13 @@ fn render_operation_function(
     output.push_str(&typescript_service_endpoint_expr(service));
     output.push_str(",\n");
     output.push_str("  });\n");
-    output.push_str("  const requestProto = ");
-    output.push_str(&typescript_operation_input_expr(operation));
-    output.push_str(";\n");
     output.push_str("  const handle = await client.startOperation(\n");
     output.push_str("    ");
     output.push_str(&service.attr_name);
     output.push_str(".operations.");
     output.push_str(&operation.attr_name);
     output.push_str(",\n");
-    output.push_str("    requestProto,\n");
+    output.push_str("    request,\n");
     output.push_str("  );\n");
     if let Some(transform_expr) = &operation.output_transform_expr {
         output.push_str("  const result = await handle.result();\n");
@@ -6010,7 +6412,16 @@ fn render_operation_input_alias(
     output.push_str(&render_type_parameter_list(&input.type_parameters));
     output.push_str(" = ");
     output.push_str(&input.annotation);
-    output.push_str(" & { ");
+    output.push_str(" extends infer Input\n  ? Input extends unknown\n    ? Omit<Input, ");
+    output.push_str(
+        &input
+            .api_omitted_fields
+            .iter()
+            .map(|field| typescript_string_literal(field))
+            .collect::<Vec<_>>()
+            .join(" | "),
+    );
+    output.push_str("> & { ");
     for (index, field) in input.api_omitted_fields.iter().enumerate() {
         if index > 0 {
             output.push_str("; ");
@@ -6018,7 +6429,7 @@ fn render_operation_input_alias(
         output.push_str(field);
         output.push_str("?: never");
     }
-    output.push_str(" };\n\n");
+    output.push_str(" }\n    : never\n  : never;\n\n");
 }
 
 fn render_resource_constructor(
@@ -6095,10 +6506,11 @@ fn typescript_service_endpoint_expr(service: &RenderedService<'_>) -> String {
 }
 
 fn typescript_operation_input_expr(operation: &RenderedOperation<'_>) -> String {
-    let Some(input) = &operation.input else {
-        return "undefined".to_string();
-    };
-    input.to_wire_expr.clone()
+    if operation.input.is_some() {
+        "request".to_string()
+    } else {
+        "undefined".to_string()
+    }
 }
 
 pub(in crate::generator) fn required_field_expr(
@@ -6201,6 +6613,7 @@ mod tests {
         generate_files_for_tree_with_mode_and_options, generate_source,
     };
     use crate::language::Language;
+    use crate::nexgen_config::{NexgenConfig, current, scope};
     use crate::planning::PlannedType;
     use crate::spec::ApiSpecTree;
     use crate::spec::IntSpec;
@@ -6302,6 +6715,10 @@ mod tests {
             DescriptorIndex::load(&root.join("advanced/samples/descriptors/temporal_api.bin"))
                 .unwrap();
         let support = sample_support_files(&root);
+        let _scope = scope(NexgenConfig {
+            system_nexus: true,
+            ..current()
+        });
         let generated = generate_files_for_tree_with_mode_and_options(
             Language::TypeScript,
             ApiSpecTree::single(spec.clone()),
@@ -6390,11 +6807,11 @@ mod tests {
             "WorkflowFn extends (...args: any[]) => Promise<any> = (...args: any[]) => Promise<any>,"
         ));
         assert!(output.contains(
-            "SignalValue extends workflow.SignalDefinition<any[]> = workflow.SignalDefinition<any[]>"
+            "SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>"
         ));
         assert!(output.contains("> = ReplaceSignalWithStartWorkflowRequest<"));
         assert!(output.contains(
-            "SignalValue extends workflow.SignalDefinition<infer Args, any> ? Args : never"
+            "SignalValue extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
         ));
         assert!(output.contains("SignalArgs extends any[] = SignalValue extends"));
         assert!(output.contains("signalArgs: SignalArgs | Readonly<SignalArgs>;"));
@@ -6412,6 +6829,8 @@ mod tests {
         assert!(output.contains("runTimeout?: common.Duration;"));
         assert!(output.contains("idReusePolicy?: common.WorkflowIdReusePolicy;"));
         assert!(output.contains("common.WorkflowIdReusePolicy.ALLOW_DUPLICATE"));
+        assert!(output.contains("import * as common from '@temporalio/common';"));
+        assert!(output.contains("import type * as common from '@temporalio/common';"));
         assert!(output.contains("idConflictPolicy?: common.WorkflowIdConflictPolicy;"));
         assert!(output.contains("workflowIdConflictPolicy:"));
         assert!(output.contains("model.idConflictPolicy == null"));
@@ -6426,12 +6845,14 @@ mod tests {
         assert!(output.contains("staticSummary?: string;"));
         assert!(output.contains("staticDetails?: string;"));
         assert!(!output.contains("userMetadata?: UserMetadata;"));
-        assert!(!output.contains("namespace?: string;"));
-        assert!(output.contains("namespace: workflowNamespace(),"));
+        assert!(output.contains("namespace: string;"));
+        assert!(output.contains("namespace: model.namespace ?? (workflowNamespace()),"));
         assert!(output.contains("workflowType: workflowTypeToProto("));
         assert!(output.contains("workflowFunctionName("));
-        assert!(output.contains("input: requestArgsToPayloads(model.args),"));
-        assert!(output.contains("signalInput: requestArgsToPayloads(model.signalArgs),"));
+        assert!(output.contains("input: requestArgsToPayloads(model.args, model.workflow),"));
+        assert!(
+            output.contains("signalInput: requestArgsToPayloads(model.signalArgs, model.signal),")
+        );
         assert!(!output.contains("_RequestArgsToPayloads"));
         assert!(output.contains("signalName: signalFunctionName("));
         assert!(!output.contains("signalName: ((value) =>"));
@@ -6449,8 +6870,10 @@ mod tests {
         ));
         assert!(output.contains("model.staticSummary == null && model.staticDetails == null"));
         assert!(output.contains("summary: model.staticSummary == null"));
-        assert!(output.contains("configuredPayloadConverter().toPayload(model.staticSummary)"));
-        assert!(output.contains("common.toPayloads(configuredPayloadConverter(), ...args)"));
+        assert!(output.contains("valueToPayload(model.staticSummary)"));
+        assert!(
+            output.contains("return payloadsToProto(args, functionInputTypes(functionValue));")
+        );
         assert!(!output.contains("common.defaultPayloadConverter"));
         assert!(!output.contains("payloadToProto(payload: unknown"));
         assert!(!output.contains("function isPayload("));
@@ -6481,7 +6904,10 @@ mod tests {
         assert!(output.contains("export async function signalWithStartWorkflow<"));
         assert!(output.contains("type SignalWithStartWorkflowInput<WorkflowFn extends"));
         assert!(output.contains("headers?: never"));
-        assert!(output.contains("request: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,"));
+        assert!(
+            output.contains("requestInput: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,")
+        );
+        assert!(output.contains("namespace: workflowNamespace(),"));
         assert!(output.contains("const client = workflow.createNexusServiceClient({"));
         assert!(!output.contains("export class WorkflowServiceClient"));
         assert!(!output.contains("from './temporal_model_converters.ts'"));
@@ -6670,6 +7096,58 @@ interface example-service {
         assert!(output.contains(
             " * Runs example.\n *\n * @param request - Request for the operation.\n * @experimental This API is experimental and subject to change."
         ));
+    }
+
+    #[test]
+    fn system_nexus_non_direct_operations_return_a_handle() {
+        let wit = r#"
+package temporal:nexus@1.0.0;
+
+world system {
+  export workflow-service;
+}
+
+/// @nexus.endpoint "__temporal_system"
+interface workflow-service {
+  record request {
+    id: string,
+  }
+
+  record response {
+    value: string,
+  }
+
+  /// @nexus.serialization-context typescript="operationSerializationContext"
+  deferred-operation: func(request: request) -> response;
+}
+"#;
+        let spec = crate::parser::parse_api_spec_from_wit_for_language(
+            Language::TypeScript,
+            wit,
+            PathBuf::from("inline.wit"),
+        )
+        .unwrap();
+        let descriptors = DescriptorIndex::load(
+            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("advanced/samples/descriptors/temporal_api.bin"),
+        )
+        .unwrap();
+        let _scope = scope(NexgenConfig {
+            system_nexus: true,
+            ..current()
+        });
+        let output = generate_source(
+            Language::TypeScript,
+            spec,
+            &descriptors,
+            &SupportFiles::default(),
+        )
+        .unwrap();
+
+        assert!(output.contains("Promise<nexus.NexusOperationHandle<Response>>"));
+        assert!(output.contains("return await client.startOperation("));
+        assert!(output.contains("__temporal_system"));
+        assert!(output.contains("export type { Request, Response } from './models';"));
     }
 
     #[test]

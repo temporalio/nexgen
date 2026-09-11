@@ -1,10 +1,10 @@
 import { fileURLToPath } from "node:url";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import * as nexus from "nexus-rpc";
 
-import type { ActivityOptions } from "../wit/type-roundtrip/index.ts";
+import type { ActivityOptions, FailureContainer } from "../wit/type-roundtrip/index.ts";
 import { typeRoundtripService } from "../wit/type-roundtrip/services.ts";
 import { failureFromProto, failureToProto } from "../wit/type-roundtrip/support.ts";
 import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts";
@@ -12,6 +12,28 @@ import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts"
 const workflowsPath = fileURLToPath(
   new URL("./workflows/type-roundtrip.ts", import.meta.url),
 );
+
+// The handler is only a test transport. Give its copy of the generated
+// converters a fixed converter; the Workflow bundle imports the real module
+// and continues to obtain its converter from the activation context.
+vi.mock("../wit/type-roundtrip/support.ts", async (importOriginal) => {
+  const support =
+    await importOriginal<typeof import("../wit/type-roundtrip/support.ts")>();
+  const common = await import("@temporalio/common");
+  return {
+    ...support,
+    failureFromProto: (failure: temporal.api.failure.v1.IFailure) =>
+      common.defaultFailureConverter.failureToError(
+        failure,
+        common.defaultPayloadConverter,
+      ),
+    failureToProto: (failure: Error) =>
+      common.defaultFailureConverter.errorToFailure(
+        failure,
+        common.defaultPayloadConverter,
+      ),
+  };
+});
 
 describe("type-roundtrip generated output", () => {
   test("exposes type roundtrip service metadata", () => {
@@ -102,7 +124,7 @@ describe("type-roundtrip generated output", () => {
         failureType: string | undefined;
         priorityKey: number | undefined;
         retryMaximumAttempts: number | undefined;
-        scheduleToCloseTimeout: number | undefined;
+        scheduleToCloseTimeout: common.Duration | undefined;
         taskQueue: string | undefined;
       }>(env, {
         endpoint: "temporal-system",
@@ -124,25 +146,18 @@ describe("type-roundtrip generated output", () => {
       });
       expect(calls).toHaveLength(2);
 
-      const activityRequest = calls[0]?.[1] as
-        | temporal.api.activity.v1.IActivityOptions
-        | undefined;
-      expect(activityRequest?.taskQueue?.name).toBe("demo-task-queue");
+      const activityRequest = calls[0]?.[1] as ActivityOptions | undefined;
+      expect(activityRequest?.taskQueue).toBe("demo-task-queue");
       expect(activityRequest?.retryPolicy?.maximumAttempts).toBe(3);
-      expect(activityRequest?.scheduleToCloseTimeout?.seconds).toMatchObject({
-        low: 7,
-      });
+      expect(activityRequest?.scheduleToCloseTimeout).toBe(7_000);
       expect(activityRequest?.priority?.priorityKey).toBe(4);
 
-      const failureRequest = calls[1]?.[1] as
-        | temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes
-        | undefined;
-      expect(failureRequest?.failure?.message).toBe("outer failure");
-      expect(failureRequest?.failure?.applicationFailureInfo?.type).toBe(
-        "OuterFailure",
-      );
-      expect(failureRequest?.failure?.applicationFailureInfo?.nonRetryable).toBe(true);
-      expect(failureRequest?.failure?.cause?.message).toBe("inner failure");
+      const failureRequest = calls[1]?.[1] as FailureContainer | undefined;
+      const failure = failureRequest?.failure as common.ApplicationFailure | undefined;
+      expect(failure?.message).toBe("outer failure");
+      expect(failure?.type).toBe("OuterFailure");
+      expect(failure?.nonRetryable).toBe(true);
+      expect(failure?.cause?.message).toBe("inner failure");
     });
   });
 });
