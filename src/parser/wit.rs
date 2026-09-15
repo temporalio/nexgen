@@ -4215,13 +4215,22 @@ interface workflow-service {
             model.field_name_override("workflow_execution_timeout"),
             Some("workflow-execution-timeout")
         );
-        assert_eq!(
-            go.record_for_proto(
+        let go_model = go
+            .record_for_proto(
                 "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest",
             )
-            .unwrap()
-            .field_name_override("workflow_execution_timeout"),
+            .unwrap();
+        assert_eq!(
+            go_model.field_name_override("workflow_execution_timeout"),
             Some("WorkflowExecutionTimeout")
+        );
+        assert_eq!(
+            go_model
+                .function("workflow_type")
+                .unwrap()
+                .name_extractor
+                .as_deref(),
+            Some("workflowFunctionName")
         );
         assert_eq!(model.field_name_override("input"), Some("args"));
         assert_eq!(
