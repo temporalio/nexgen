@@ -1402,6 +1402,8 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
     let package_init = package
         .get(&PathBuf::from("__init__.py"))
         .expect("standalone Python package should include __init__.py");
+    assert!(!package.contains_key(&PathBuf::from("services.py")));
+    assert!(!package_init.contains("OutcomeClient"));
 
     let outcome_model = models
         .find("class Outcome(typing.Generic[OutputT]):")
@@ -1478,6 +1480,24 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
     assert!(package_init.contains("OutcomeValueSuccess,"));
     assert!(package_init.contains("OutcomeValueFailure,"));
     assert!(package_init.contains("PauseActivityRequest,"));
+}
+
+#[test]
+fn python_notification_models_do_not_emit_an_empty_service() {
+    let root = project_root();
+    let package = generate_python_package_files(
+        &example_input_paths(&root, "notification-service"),
+        &[descriptor_path(&root)],
+    );
+    let package_init = package
+        .get(&PathBuf::from("__init__.py"))
+        .expect("notification package should include __init__.py");
+
+    assert!(package.contains_key(&PathBuf::from("models.py")));
+    assert!(!package.contains_key(&PathBuf::from("services.py")));
+    assert!(package_init.contains("OnCompleteRequest,"));
+    assert!(package_init.contains("OnCompleteResponse,"));
+    assert!(!package_init.contains("OnCompleteRequestClient"));
 }
 
 #[test]

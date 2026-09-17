@@ -9,3 +9,6 @@ languages = ["python"]
 
 [proto-oneof]
 languages = ["python"]
+
+[notification-service]
+languages = ["python"]

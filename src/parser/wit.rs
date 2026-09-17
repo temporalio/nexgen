@@ -106,6 +106,7 @@ fn api_spec_from_wit(
                     entry.module_export = crate::spec::ModuleExport::Owned;
                 }
             }
+            continue;
         }
         services.push(service);
     }
@@ -3737,6 +3738,7 @@ interface types {
         assert_eq!(variant.cases[1].name, "type");
         assert_eq!(variant.cases[1].wire_name, "type");
         assert!(spec.types["types.choice"].is_module_export());
+        assert!(spec.services.is_empty());
 
         let service = parse(
             Language::Python,
@@ -5005,6 +5007,8 @@ interface workflow-service {
     heartbeat-timeout: placeholder,
     /// @nexus.omit
     priority: placeholder,
+    /// @nexus.omit
+    start-delay: placeholder,
   }
 
   run: func(request: request) -> request;
@@ -5244,6 +5248,8 @@ interface workflow-service {
     run-id: option<string>,
     started: option<bool>,
     /// @nexus.omit
+    first-execution-run-id: placeholder,
+    /// @nexus.omit
     signal-link: placeholder,
   }
 
@@ -5312,6 +5318,8 @@ interface workflow-service {
     heartbeat-timeout: placeholder,
     /// @nexus.omit
     priority: placeholder,
+    /// @nexus.omit
+    start-delay: placeholder,
   }
 
   activity-options-operation: func(request: activity-options) -> activity-options;

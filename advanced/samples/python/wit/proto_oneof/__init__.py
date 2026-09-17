@@ -13,7 +13,6 @@ from .models import (
     PauseActivityRequest,
     WorkflowExecution,
 )
-from .services import OutcomeClient
 
 __all__ = [
     "ActivitySelection",
@@ -25,5 +24,4 @@ __all__ = [
     "OutcomeValueFailure",
     "PauseActivityRequest",
     "WorkflowExecution",
-    "OutcomeClient",
 ]

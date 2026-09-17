@@ -51,6 +51,7 @@ generated code, and tests.
 - [`start-workflow`](samples/inputs/start-workflow.wit): a proto-backed Temporal workflow-start API that returns a generated resource handle with follow-up operations such as cancel, restart, and get-result.
 - [`workflow-service`](samples/inputs/workflow-service.wit): a proto-backed `SignalWithStartWorkflowExecution` example showing flattened APIs, function arguments, sourced fields, support converters, and output transforms.
 - [`type-roundtrip`](samples/inputs/type-roundtrip.wit): a proto-backed type roundtrip example for focused native/proto conversion coverage, including retry policies, activity options, durations, task queues, and priority.
+- [`notification-service`](samples/inputs/notification-service.wit): a proto-backed notification completion payload with generic source-context and output values, currently generated for Python.
 
 Rebuild the checked-in example outputs:
 
@@ -311,7 +312,7 @@ Python also preserves concrete runtime type arguments while decoding nested
 proto-backed generic records. A type parameter represented by Temporal's
 single-value `Payload` carrier is passed to the payload converter as its type
 hint; `Payloads` continues to decode as a sequence. The
-`proto-generic-python` sample exercises this Python-only exception without
+`proto-generic-python` sample exercises this Python-specific implementation without
 making the cross-language `generic-models` sample depend on protobuf support.
 
 Generate WIT for a proto RPC from a descriptor set:

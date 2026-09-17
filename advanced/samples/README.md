@@ -66,6 +66,11 @@ For the beginner-friendly JSON Schema definitions samples, see
 - Python: [`python/wit/type_roundtrip/`](python/wit/type_roundtrip/), [`python/tests/test_type_roundtrip.py`](python/tests/test_type_roundtrip.py)
 - TypeScript: [`typescript/wit/type-roundtrip/`](typescript/wit/type-roundtrip/), [`typescript/tests/type-roundtrip.test.ts`](typescript/tests/type-roundtrip.test.ts)
 
+### `notification-service`
+
+- WIT: [`inputs/notification-service.wit`](inputs/notification-service.wit)
+- Currently generated for Python: [`python/wit/notification_service/`](python/wit/notification_service/)
+
 ## Supporting files
 
 - [`inputs/deps/`](inputs/deps/): reusable Temporal semantic/common type WIT inputs linked into proto-backed example generation.

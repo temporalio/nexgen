@@ -257,7 +257,7 @@ interface models {
     );
     let rendered = add_message_to_string(
         &[descriptor_path(&root)],
-        "WorkflowExecution",
+        "temporal.api.common.v1.WorkflowExecution",
         &[input_path.clone(), linked_inputs_path(&root)],
     )
     .unwrap();
@@ -278,7 +278,7 @@ interface models {
     );
     let rendered = add_message_to_string(
         &[descriptor_path(&root)],
-        "WorkflowExecution",
+        "temporal.api.common.v1.WorkflowExecution",
         &[input_path, linked_inputs_path(&root)],
     )
     .unwrap();

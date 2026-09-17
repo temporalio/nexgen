@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Operation-free WIT interfaces now generate their public models without an
+  empty service definition or client.
+
 ### Deprecated
 
 ### Breaking Changes
