@@ -10,4 +10,4 @@ heck = "0.5"
 nexgen = { path = ".." }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
-toml = "0.9"
+toml = "1.1"
