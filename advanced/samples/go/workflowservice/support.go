@@ -322,7 +322,3 @@ func versioningOverrideFromProto(_ workflow.Context, versioningOverride *workflo
 	}
 	return &value, nil
 }
-
-func newSystemNexusClient(service string) workflow.NexusClient {
-	return internal.NewSystemNexusClient(service)
-}

@@ -1154,10 +1154,26 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
     assert!(rendered.contains("\t\tArgs: args,\n"));
     assert!(rendered.contains("\t\tSignalArgs: []any{signalArg},\n"));
     assert!(rendered.contains(
-        "c := newSystemNexusClient(\"temporal.api.workflowservice.v1.WorkflowService\")"
+        "c := internal.NewSystemNexusClient(\"temporal.api.workflowservice.v1.WorkflowService\")"
     ));
     assert!(!rendered.contains("workflow.NewNexusClient(\"__temporal_system\""));
-    assert!(rendered.contains("func newSystemNexusClient(service string) workflow.NexusClient"));
+    assert!(!rendered.contains("func newSystemNexusClient(service string) workflow.NexusClient"));
+}
+
+#[test]
+fn go_system_nexus_operations_import_internal_without_support_fragments() {
+    let root = project_root();
+    let rendered = generate_to_string_with_inputs(
+        nexgen::language::Language::Go,
+        &example_input_paths(&root, "multi-operation-service"),
+        &[],
+    )
+    .unwrap();
+
+    assert!(rendered.contains("\t\"go.temporal.io/sdk/internal\"\n"));
+    assert!(rendered.contains("c := internal.NewSystemNexusClient(\"InterceptorService\")"));
+    assert!(!rendered.contains("workflow.NewNexusClient(\"__temporal_system\""));
+    assert!(!rendered.contains("### support.go"));
 }
 
 #[test]
