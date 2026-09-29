@@ -3,6 +3,8 @@
 package workflowservice
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -41,6 +43,7 @@ type signalWithStartWorkflowRequest struct {
 	StartDelay               *time.Duration
 	UserMetadata             *UserMetadata
 	Headers                  map[string]any
+	namespace                string
 }
 
 func (m signalWithStartWorkflowRequest) toProto(ctx workflow.Context) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
@@ -161,7 +164,7 @@ func (m signalWithStartWorkflowRequest) toProto(ctx workflow.Context) (*workflow
 		}
 		message.Header = converted
 	}
-	message.Namespace = workflow.GetInfo(ctx).Namespace
+	message.Namespace = m.namespace
 	return message, nil
 }
 
@@ -294,29 +297,52 @@ func signalWithStartWorkflowRequestFromProto(ctx workflow.Context, proto *workfl
 		}
 		value.Headers = converted
 	}
+	value.namespace = proto.GetNamespace()
 	return value, nil
+}
+
+var errSignalWithStartWorkflowRequestNeedsWorkflowContext = errors.New("nexgen: signalWithStartWorkflowRequest can only be converted inside a workflow")
+
+var signalWithStartWorkflowRequestTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[signalWithStartWorkflowRequest, workflowservice.SignalWithStartWorkflowExecutionRequest](
+	func(*signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
+		return nil, errSignalWithStartWorkflowRequestNeedsWorkflowContext
+	},
+	func(*workflowservice.SignalWithStartWorkflowExecutionRequest, *signalWithStartWorkflowRequest) error {
+		return errSignalWithStartWorkflowRequestNeedsWorkflowContext
+	},
+	func(context.Context, *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
+		return nil, errSignalWithStartWorkflowRequestNeedsWorkflowContext
+	},
+	func(context.Context, *workflowservice.SignalWithStartWorkflowExecutionRequest, *signalWithStartWorkflowRequest) error {
+		return errSignalWithStartWorkflowRequestNeedsWorkflowContext
+	},
+	func(ctx workflow.Context, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
+		return m.toProto(ctx)
+	},
+	func(ctx workflow.Context, message *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
+		value, err := signalWithStartWorkflowRequestFromProto(ctx, message)
+		if err != nil {
+			return err
+		}
+		*out = value
+		return nil
+	},
+)
+
+func (signalWithStartWorkflowRequest) TransferTypeConverter() workflow.TransferTypeConverter {
+	return signalWithStartWorkflowRequestTransferTypeConverter
 }
 
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
-	requestProto, err := request.toProto(ctx)
-	if err != nil {
-		result, resultSettable := workflow.NewFuture(ctx)
-		resultSettable.SetError(err)
-		return result
-	}
+	request.namespace = workflow.GetInfo(ctx).Namespace
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
-	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", requestProto, workflow.NexusOperationOptions{})
+	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
-		var result workflowservice.SignalWithStartWorkflowExecutionResponse
-		if err := fut.Get(ctx, &result); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		value, err := signalWithStartWorkflowResponseFromProto(ctx, &result)
-		if err != nil {
+		var value SignalWithStartWorkflowResponse
+		if err := fut.Get(ctx, &value); err != nil {
 			resultSettable.SetError(err)
 			return
 		}
@@ -420,6 +446,38 @@ func signalWithStartWorkflowResponseFromProto(ctx workflow.Context, proto *workf
 		value.Started = &converted
 	}
 	return value, nil
+}
+
+var errSignalWithStartWorkflowResponseNeedsWorkflowContext = errors.New("nexgen: SignalWithStartWorkflowResponse can only be converted inside a workflow")
+
+var signalWithStartWorkflowResponseTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[SignalWithStartWorkflowResponse, workflowservice.SignalWithStartWorkflowExecutionResponse](
+	func(*SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
+		return nil, errSignalWithStartWorkflowResponseNeedsWorkflowContext
+	},
+	func(*workflowservice.SignalWithStartWorkflowExecutionResponse, *SignalWithStartWorkflowResponse) error {
+		return errSignalWithStartWorkflowResponseNeedsWorkflowContext
+	},
+	func(context.Context, *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
+		return nil, errSignalWithStartWorkflowResponseNeedsWorkflowContext
+	},
+	func(context.Context, *workflowservice.SignalWithStartWorkflowExecutionResponse, *SignalWithStartWorkflowResponse) error {
+		return errSignalWithStartWorkflowResponseNeedsWorkflowContext
+	},
+	func(ctx workflow.Context, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
+		return m.toProto(ctx)
+	},
+	func(ctx workflow.Context, message *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
+		value, err := signalWithStartWorkflowResponseFromProto(ctx, message)
+		if err != nil {
+			return err
+		}
+		*out = value
+		return nil
+	},
+)
+
+func (SignalWithStartWorkflowResponse) TransferTypeConverter() workflow.TransferTypeConverter {
+	return signalWithStartWorkflowResponseTransferTypeConverter
 }
 
 type SignalWithStartWorkflowOptions struct {

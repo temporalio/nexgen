@@ -3,6 +3,8 @@
 package typeroundtrip
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	activity "go.temporal.io/api/activity/v1"
@@ -14,23 +16,12 @@ import (
 // --- Operations (internal) ---
 
 func activityOptionsOperation(ctx workflow.Context, request ActivityOptions) workflow.Future {
-	requestProto, err := request.toProto(ctx)
-	if err != nil {
-		result, resultSettable := workflow.NewFuture(ctx)
-		resultSettable.SetError(err)
-		return result
-	}
 	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
-	fut := c.ExecuteOperation(ctx, "ActivityOptionsOperation", requestProto, workflow.NexusOperationOptions{})
+	fut := c.ExecuteOperation(ctx, "ActivityOptionsOperation", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
-		var result activity.ActivityOptions
-		if err := fut.Get(ctx, &result); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		value, err := activityOptionsFromProto(ctx, &result)
-		if err != nil {
+		var value ActivityOptions
+		if err := fut.Get(ctx, &value); err != nil {
 			resultSettable.SetError(err)
 			return
 		}
@@ -40,23 +31,12 @@ func activityOptionsOperation(ctx workflow.Context, request ActivityOptions) wor
 }
 
 func failureOperation(ctx workflow.Context, request FailureContainer) workflow.Future {
-	requestProto, err := request.toProto(ctx)
-	if err != nil {
-		result, resultSettable := workflow.NewFuture(ctx)
-		resultSettable.SetError(err)
-		return result
-	}
 	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
-	fut := c.ExecuteOperation(ctx, "FailureOperation", requestProto, workflow.NexusOperationOptions{})
+	fut := c.ExecuteOperation(ctx, "FailureOperation", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
-		var result command.FailWorkflowExecutionCommandAttributes
-		if err := fut.Get(ctx, &result); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		value, err := failureContainerFromProto(ctx, &result)
-		if err != nil {
+		var value FailureContainer
+		if err := fut.Get(ctx, &value); err != nil {
 			resultSettable.SetError(err)
 			return
 		}
@@ -146,6 +126,38 @@ func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOpti
 	return value, nil
 }
 
+var errActivityOptionsNeedsWorkflowContext = errors.New("nexgen: ActivityOptions can only be converted inside a workflow")
+
+var activityOptionsTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[ActivityOptions, activity.ActivityOptions](
+	func(*ActivityOptions) (*activity.ActivityOptions, error) {
+		return nil, errActivityOptionsNeedsWorkflowContext
+	},
+	func(*activity.ActivityOptions, *ActivityOptions) error {
+		return errActivityOptionsNeedsWorkflowContext
+	},
+	func(context.Context, *ActivityOptions) (*activity.ActivityOptions, error) {
+		return nil, errActivityOptionsNeedsWorkflowContext
+	},
+	func(context.Context, *activity.ActivityOptions, *ActivityOptions) error {
+		return errActivityOptionsNeedsWorkflowContext
+	},
+	func(ctx workflow.Context, m *ActivityOptions) (*activity.ActivityOptions, error) {
+		return m.toProto(ctx)
+	},
+	func(ctx workflow.Context, message *activity.ActivityOptions, out *ActivityOptions) error {
+		value, err := activityOptionsFromProto(ctx, message)
+		if err != nil {
+			return err
+		}
+		*out = value
+		return nil
+	},
+)
+
+func (ActivityOptions) TransferTypeConverter() workflow.TransferTypeConverter {
+	return activityOptionsTransferTypeConverter
+}
+
 type FailureContainer struct {
 	// Failure - Optional.
 	Failure error
@@ -173,6 +185,38 @@ func failureContainerFromProto(ctx workflow.Context, proto *command.FailWorkflow
 		value.Failure = converted
 	}
 	return value, nil
+}
+
+var errFailureContainerNeedsWorkflowContext = errors.New("nexgen: FailureContainer can only be converted inside a workflow")
+
+var failureContainerTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[FailureContainer, command.FailWorkflowExecutionCommandAttributes](
+	func(*FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
+		return nil, errFailureContainerNeedsWorkflowContext
+	},
+	func(*command.FailWorkflowExecutionCommandAttributes, *FailureContainer) error {
+		return errFailureContainerNeedsWorkflowContext
+	},
+	func(context.Context, *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
+		return nil, errFailureContainerNeedsWorkflowContext
+	},
+	func(context.Context, *command.FailWorkflowExecutionCommandAttributes, *FailureContainer) error {
+		return errFailureContainerNeedsWorkflowContext
+	},
+	func(ctx workflow.Context, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
+		return m.toProto(ctx)
+	},
+	func(ctx workflow.Context, message *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
+		value, err := failureContainerFromProto(ctx, message)
+		if err != nil {
+			return err
+		}
+		*out = value
+		return nil
+	},
+)
+
+func (FailureContainer) TransferTypeConverter() workflow.TransferTypeConverter {
+	return failureContainerTransferTypeConverter
 }
 
 type ActivityOptionsOperationOptions struct {
