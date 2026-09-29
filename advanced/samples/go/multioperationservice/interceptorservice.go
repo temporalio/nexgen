@@ -3,6 +3,7 @@
 package multioperationservice
 
 import (
+	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -15,13 +16,13 @@ type request struct {
 // --- Operations (internal) ---
 
 func firstOperation(ctx workflow.Context, request request) workflow.Future {
-	c := workflow.NewNexusClient("__temporal_system", "InterceptorService")
+	c := internal.NewSystemNexusClient("InterceptorService")
 	fut := c.ExecuteOperation(ctx, "FirstOperation", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
 func secondOperation(ctx workflow.Context, request request) workflow.Future {
-	c := workflow.NewNexusClient("__temporal_system", "InterceptorService")
+	c := internal.NewSystemNexusClient("InterceptorService")
 	fut := c.ExecuteOperation(ctx, "SecondOperation", request, workflow.NexusOperationOptions{})
 	return fut
 }

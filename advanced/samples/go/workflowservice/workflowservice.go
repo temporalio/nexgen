@@ -13,6 +13,7 @@ import (
 	sdk "go.temporal.io/api/sdk/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -305,7 +306,7 @@ func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkfl
 		resultSettable.SetError(err)
 		return result
 	}
-	c := workflow.NewNexusClient("temporal-system", "temporal.api.workflowservice.v1.WorkflowService")
+	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", requestProto, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {

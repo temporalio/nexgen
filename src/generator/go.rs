@@ -1106,6 +1106,14 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
+        let has_system_operations = services.iter().any(|service| {
+            service.endpoint.as_deref() == Some("__temporal_system")
+                && !service.operations.is_empty()
+        });
+        if has_system_operations && !self.package.is_self_import("go.temporal.io/sdk/internal") {
+            self.imports
+                .insert("go.temporal.io/sdk/internal".to_string());
+        }
         if services
             .iter()
             .flat_map(|service| &service.operations)
@@ -4185,7 +4193,17 @@ pub(in crate::generator) fn render_operation_future_adapter(
     output.push_str("\treturn result\n");
 }
 
-fn new_nexus_client_expr(endpoint: &str, service_name: &str, package: &GoPackageContext) -> String {
+pub(in crate::generator) fn new_nexus_client_expr(
+    endpoint: &str,
+    service_name: &str,
+    package: &GoPackageContext,
+) -> String {
+    if endpoint == "__temporal_system" {
+        return format!(
+            "internal.NewSystemNexusClient({})",
+            go_string_literal(service_name)
+        );
+    }
     format!(
         "{}({}, {})",
         package.new_nexus_client(),

@@ -16,7 +16,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 
-	ws "advanced/samples/go/workflowservice"
+	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice"
 )
 
 const workflowServiceName = "temporal.api.workflowservice.v1.WorkflowService"
