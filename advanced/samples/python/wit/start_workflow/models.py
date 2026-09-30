@@ -84,9 +84,9 @@ class _StartWorkflowRequestTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _StartWorkflowRequestTransferTypeConverter
-)(StartWorkflowRequest)
+)(StartWorkflowRequest)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -128,9 +128,9 @@ class _StartWorkflowResultTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _StartWorkflowResultTransferTypeConverter
-)(StartWorkflowResult)
+)(StartWorkflowResult)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True, kw_only=True)
@@ -191,9 +191,9 @@ class _CancelWorkflowRequestTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _CancelWorkflowRequestTransferTypeConverter
-)(CancelWorkflowRequest)
+)(CancelWorkflowRequest)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -237,9 +237,9 @@ class _WorkflowExecutionTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
-    _WorkflowExecutionTransferTypeConverter
-)(WorkflowExecution)
+temporalio.converter.transfer_type_convertible(_WorkflowExecutionTransferTypeConverter)(
+    WorkflowExecution
+)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -277,6 +277,6 @@ class _CancelWorkflowResponseTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _CancelWorkflowResponseTransferTypeConverter
-)(CancelWorkflowResponse)
+)(CancelWorkflowResponse)  # pyright: ignore[reportUnusedCallResult]
