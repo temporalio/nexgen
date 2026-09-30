@@ -1761,6 +1761,479 @@ world api {
     assert!(status.success(), "generated Go model runtime tests failed");
 }
 
+// Keep these fixtures independent of the authored examples: helper selection and
+// invalid references must be exercised without changing shared sample inputs.
+fn render_go_serialization_context(
+    directive: &str,
+    proto_backed: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let temp_dir = unique_output_path("go-serialization-context");
+    fs::create_dir_all(&temp_dir)?;
+    let wit_path = temp_dir.join("serialization-context.wit");
+    let proto = if proto_backed {
+        "/// @nexus.proto \"temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest\""
+    } else {
+        ""
+    };
+    fs::write(
+        &wit_path,
+        format!(
+            r#"/// @nexus.support go="context.go"
+package temporal:serialization-context@1.0.0;
+
+world system {{
+  export sample-service;
+}}
+
+/// @nexus.endpoint "sample-service"
+interface sample-service {{
+  type placeholder = string;
+
+  {proto}
+  record cancel-request {{
+    /// @nexus.source go="workflow.GetInfo(ctx).Namespace"
+    namespace: string,
+    /// @nexus.omit
+    workflow-execution: placeholder,
+    /// @nexus.omit
+    reason: placeholder,
+    /// @nexus.omit
+    identity: placeholder,
+    /// @nexus.omit
+    request-id: placeholder,
+    /// @nexus.omit
+    first-execution-run-id: placeholder,
+    /// @nexus.omit
+    links: placeholder,
+  }}
+
+  {directive}
+  cancel: func(request: cancel-request);
+}}
+"#
+        ),
+    )?;
+    fs::write(
+        temp_dir.join("context.go"),
+        "package generated\n\nimport \"go.temporal.io/sdk/converter\"\n\nfunc requestContext(request cancelRequest) converter.SerializationContext { return nil }\n",
+    )?;
+    let result = generate_to_string_with_inputs(
+        nexgen::language::Language::Go,
+        &[wit_path],
+        &[descriptor_path(&project_root())],
+    );
+    fs::remove_dir_all(temp_dir)?;
+    result
+}
+
+#[test]
+fn go_serialization_context_is_only_emitted_for_a_selected_helper() {
+    for directive in [
+        "",
+        "/// @nexus.serialization-context python=\"python_context\" typescript=\"typescriptContext\"",
+    ] {
+        let rendered = render_go_serialization_context(directive, true).unwrap();
+        assert!(!rendered.contains("### serialization_context.go"));
+        assert!(!rendered.contains("nexgenWithSerializationContext"));
+        assert!(!rendered.contains("nexgenPayloadContext"));
+        assert!(rendered.contains("return m.toProto(ctx)"));
+    }
+}
+
+#[test]
+fn go_serialization_context_prefers_go_helper_over_default() {
+    for (directive, helper) in [
+        (
+            "/// @nexus.serialization-context \"requestContext\"",
+            "requestContext",
+        ),
+        (
+            "/// @nexus.serialization-context \"defaultContext\" go=\"requestContext\" python=\"python_context\"",
+            "requestContext",
+        ),
+    ] {
+        let rendered = render_go_serialization_context(directive, true).unwrap();
+        assert!(rendered.contains(&format!(
+            "ctx = nexgenWithSerializationContext(ctx, {helper}(request))"
+        )));
+        assert!(!rendered.contains("defaultContext(request)"));
+        assert!(!rendered.contains("python_context(request)"));
+    }
+}
+
+#[test]
+fn go_serialization_context_accepts_only_go_helper_references() {
+    for helper in [
+        "requestContext",
+        "helpers.Context",
+        "_requestContext",
+        "Context2",
+    ] {
+        let directive = format!("/// @nexus.serialization-context go=\"{helper}\"");
+        let rendered = render_go_serialization_context(&directive, true).unwrap();
+        assert!(rendered.contains("### serialization_context.go"));
+        assert!(rendered.contains(&format!(
+            "ctx = nexgenWithSerializationContext(ctx, {helper}(request))"
+        )));
+    }
+    for helper in [
+        "_",
+        "break",
+        "default",
+        "func",
+        "interface",
+        "select",
+        "case",
+        "defer",
+        "go",
+        "map",
+        "struct",
+        "chan",
+        "else",
+        "goto",
+        "package",
+        "switch",
+        "const",
+        "fallthrough",
+        "if",
+        "range",
+        "type",
+        "continue",
+        "for",
+        "import",
+        "return",
+        "var",
+        "helpers._",
+        "helpers.func",
+        "_.Context",
+        "type.Context",
+        "helpers.nested.Context",
+        "requestContext()",
+        "helpers/Context",
+        "1context",
+        "helpers.1context",
+        "request-context",
+    ] {
+        let directive = format!("/// @nexus.serialization-context go=\"{helper}\"");
+        let error = render_go_serialization_context(&directive, true)
+            .expect_err(&format!("invalid Go helper {helper:?} must be rejected"))
+            .to_string();
+        assert!(error.contains("serialization-context"), "{helper}: {error}");
+        assert!(error.contains(helper), "{helper}: {error}");
+    }
+}
+
+#[test]
+fn go_serialization_context_scopes_both_transfer_directions_after_sourced_fields() {
+    let rendered = render_go_serialization_context(
+        "/// @nexus.serialization-context go=\"requestContext\"",
+        true,
+    )
+    .unwrap();
+    let sourced = rendered
+        .find("request.namespace = workflow.GetInfo(ctx).Namespace")
+        .unwrap();
+    let selected = rendered
+        .find("ctx = nexgenWithSerializationContext(ctx, requestContext(request))")
+        .unwrap();
+    let execute = rendered
+        .find("c.ExecuteOperation(ctx, \"Cancel\", request,")
+        .unwrap();
+    assert!(sourced < selected && selected < execute);
+    assert!(rendered.contains("\tnamespace string\n"));
+    assert!(rendered.contains("return m.toProto(nexgenPayloadContext(ctx))"));
+    assert!(rendered.contains("cancelRequestFromProto(nexgenPayloadContext(ctx), message)"));
+
+    // Scope at the transfer boundary, not inside a nested model conversion.
+    let to_proto = rendered
+        .split("func (m cancelRequest) toProto(")
+        .nth(1)
+        .unwrap();
+    let to_proto_body = to_proto.split("\n}\n").next().unwrap();
+    assert!(!to_proto_body.contains("nexgenPayloadContext"));
+    assert!(!to_proto_body.contains("nexgenWithSerializationContext"));
+    assert!(!rendered.contains("ExecuteOperation(nexgenPayloadContext(ctx)"));
+    assert!(!rendered.contains("serializationContextRegistry"));
+
+    let runtime = rendered
+        .split("### serialization_context.go\n")
+        .nth(1)
+        .unwrap();
+    let runtime = runtime.split("\n### ").next().unwrap();
+    assert!(runtime.contains("converter.SerializationContext"));
+    assert!(runtime.contains("internal.WithRootDataConverterSerializationContext"));
+    assert!(runtime.contains("workflow.WithValue"));
+    assert!(runtime.contains("workflow.WithDataConverter"));
+    assert!(runtime.contains("func nexgenPayloadContext("));
+    assert!(runtime.contains("if sc == nil {\n\t\treturn ctx\n\t}"));
+}
+
+#[test]
+fn go_serialization_context_rejects_non_proto_operation_requests() {
+    let error = render_go_serialization_context(
+        "/// @nexus.serialization-context go=\"requestContext\"",
+        false,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("serialization-context"), "{error}");
+    assert!(
+        error.contains("unsupported") || error.contains("proto"),
+        "{error}"
+    );
+}
+
+#[test]
+fn go_serialization_context_keeps_runtime_imports_separate_from_merged_support() {
+    let root = project_root();
+    // workflow-service and its temporal-types dependency both supply support
+    // fragments. Runtime imports must belong to serialization_context.go rather
+    // than relying on another file's imports or duplicating support declarations.
+    let rendered = generate_to_string_with_inputs(
+        nexgen::language::Language::Go,
+        &example_input_paths(&root, "workflow-service"),
+        &[descriptor_path(&root)],
+    )
+    .unwrap();
+    assert_eq!(rendered.matches("### serialization_context.go").count(), 1);
+    assert_eq!(
+        rendered
+            .matches("func nexgenWithSerializationContext(")
+            .count(),
+        1
+    );
+    let runtime = rendered
+        .split("### serialization_context.go\n")
+        .nth(1)
+        .unwrap();
+    let runtime = runtime.split("\n### ").next().unwrap();
+    for import in [
+        "go.temporal.io/sdk/converter",
+        "go.temporal.io/sdk/internal",
+        "go.temporal.io/sdk/workflow",
+    ] {
+        assert_eq!(
+            runtime.matches(&format!("\"{import}\"")).count(),
+            1,
+            "{runtime}"
+        );
+    }
+    let support = rendered.split("### support.go\n").nth(1).unwrap();
+    let support = support.split("\n### ").next().unwrap();
+    assert!(support.contains("func signalWithStartWorkflowSerializationContext("));
+    assert!(support.contains("func retryPolicyToProto("));
+    assert_eq!(
+        support.matches("\"go.temporal.io/sdk/converter\"").count(),
+        1
+    );
+    assert!(!support.contains("func nexgenPayloadContext("));
+}
+
+fn render_go_serialization_context_fixture(
+    declarations: &str,
+    operations: &str,
+    support: &str,
+) -> BTreeMap<PathBuf, String> {
+    let temp_dir = unique_output_path("go-serialization-context-conversions");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let wit_path = temp_dir.join("conversions.wit");
+    fs::write(
+        &wit_path,
+        format!(
+            r#"/// @nexus.support go="context.go"
+package temporal:context-conversions@1.0.0;
+world system {{ export sample-service; }}
+/// @nexus.endpoint "sample-service"
+interface sample-service {{
+  {declarations}
+  {operations}
+}}
+"#
+        ),
+    )
+    .unwrap();
+    fs::write(temp_dir.join("context.go"), support).unwrap();
+    let output_path = temp_dir.join("output");
+    generate_to_file(&GenerateRequest {
+        config: nexgen::nexgen_config::NexgenConfig {
+            mode: nexgen::generator::GenerationMode::NativeApi,
+            ..Default::default()
+        },
+        language: nexgen::language::Language::Go,
+        input_paths: vec![wit_path],
+        support_paths: Vec::new(),
+        descriptor_paths: vec![descriptor_path(&project_root())],
+        output_path: output_path.clone(),
+        // Run gofmt over every file to check the IIFE's Go syntax as well as
+        // inspecting its pointer types and context scope below.
+        format: true,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let files = read_go_output_files(&output_path);
+    fs::remove_dir_all(temp_dir).unwrap();
+    files
+}
+
+const GO_CONTEXT_OVERRIDE_TYPES: &str = r#"
+  type placeholder = string;
+  /// @nexus.proto "temporal.api.common.v1.RetryPolicy"
+  /// @nexus.type go="go.temporal.io/sdk/temporal.RetryPolicy"
+  type retry-policy = placeholder;
+"#;
+
+const GO_CONTEXT_OVERRIDE_SUPPORT: &str = r#"package generated
+
+import (
+    common "go.temporal.io/api/common/v1"
+    "go.temporal.io/sdk/converter"
+    "go.temporal.io/sdk/temporal"
+    "go.temporal.io/sdk/workflow"
+)
+
+func requestContext(request temporal.RetryPolicy) converter.SerializationContext { return nil }
+func retryPolicyToProto(ctx workflow.Context, value *temporal.RetryPolicy) (*common.RetryPolicy, error) {
+    return &common.RetryPolicy{}, nil
+}
+func retryPolicyFromProto(ctx workflow.Context, value *common.RetryPolicy) (*temporal.RetryPolicy, error) {
+    return &temporal.RetryPolicy{}, nil
+}
+func transformPolicy(ctx workflow.Context, value *common.RetryPolicy) (string, error) {
+    return "transformed", nil
+}
+"#;
+
+#[test]
+fn go_serialization_context_scopes_eager_override_input_and_output() {
+    let files = render_go_serialization_context_fixture(
+        GO_CONTEXT_OVERRIDE_TYPES,
+        r#"/// @nexus.serialization-context go="requestContext"
+        roundtrip: func(request: retry-policy) -> retry-policy;"#,
+        GO_CONTEXT_OVERRIDE_SUPPORT,
+    );
+    let operation = &files[Path::new("sampleservice.go")];
+    let compact = operation.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(compact.contains(
+        "requestProto, err := func(ctx workflow.Context) (*common.RetryPolicy, error) { return retryPolicyToProto(ctx, &request) }(nexgenPayloadContext(ctx))"
+    ), "{operation}");
+    assert!(compact.contains(
+        "value, err := func(ctx workflow.Context) (*temporal.RetryPolicy, error) { return retryPolicyFromProto(ctx, &result) }(nexgenPayloadContext(ctx))"
+    ), "{operation}");
+    let selected = operation
+        .find("ctx = nexgenWithSerializationContext(ctx, requestContext(request))")
+        .unwrap();
+    let input = operation.find("requestProto, err :=").unwrap();
+    let execute = operation
+        .find("c.ExecuteOperation(ctx, \"Roundtrip\", requestProto,")
+        .unwrap();
+    let decode = operation.find("fut.Get(ctx, &result)").unwrap();
+    let output = operation.find("value, err :=").unwrap();
+    assert!(selected < input && input < execute && execute < decode && decode < output);
+    assert!(operation.contains("var result common.RetryPolicy"));
+    assert!(
+        operation.contains("resultSettable.Set(*value, nil)"),
+        "{operation}"
+    );
+    assert_eq!(operation.matches("}(nexgenPayloadContext(ctx))").count(), 2);
+    assert!(!operation.contains("ctx = nexgenPayloadContext(ctx)"));
+    assert!(!operation.contains("TransferTypeConverter"));
+}
+
+#[test]
+fn go_serialization_context_scopes_output_transform_expression() {
+    let files = render_go_serialization_context_fixture(
+        GO_CONTEXT_OVERRIDE_TYPES,
+        r#"/// @nexus.serialization-context go="requestContext"
+        /// @nexus.output-transform go-type="string" go="transformPolicy(ctx, &result)"
+        transform: func(request: retry-policy) -> retry-policy;"#,
+        GO_CONTEXT_OVERRIDE_SUPPORT,
+    );
+    let operation = &files[Path::new("sampleservice.go")];
+    let compact = operation.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(compact.contains(
+        "value, err := func(ctx workflow.Context) (string, error) { return transformPolicy(ctx, &result) }(nexgenPayloadContext(ctx))"
+    ), "{operation}");
+    assert!(operation.contains("var result common.RetryPolicy"));
+    let decode = operation.find("fut.Get(ctx, &result)").unwrap();
+    let transform = operation
+        .find("return transformPolicy(ctx, &result)")
+        .unwrap();
+    assert!(decode < transform);
+    assert!(operation.contains("c.ExecuteOperation(ctx, \"Transform\", requestProto,"));
+    assert!(operation.contains("resultSettable.Set(value, nil)"));
+    assert!(!operation.contains("retryPolicyFromProto("));
+    assert!(!operation.contains("ctx = nexgenPayloadContext(ctx)"));
+}
+
+#[test]
+fn go_serialization_context_scopes_resource_return_callback_after_decode() {
+    let files = render_go_serialization_context_fixture(
+        r#"/// @nexus.proto "temporal.api.common.v1.WorkflowType"
+        record start-request { name: string }
+        resource started-workflow {
+          constructor(name: string, run-id: string);
+        }
+        /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
+        type start-response = own<started-workflow>;"#,
+        r#"/// @nexus.serialization-context go="requestContext"
+        start: func(request: start-request) -> start-response;"#,
+        r#"package generated
+import "go.temporal.io/sdk/converter"
+func requestContext(request startRequest) converter.SerializationContext { return nil }
+"#,
+    );
+    let operation = &files[Path::new("sampleservice.go")];
+    let execute = operation
+        .find("c.ExecuteOperation(ctx, \"Start\", request,")
+        .unwrap();
+    let callback = operation[execute..]
+        .find("workflow.Go(ctx, func(ctx workflow.Context) {")
+        .unwrap()
+        + execute;
+    let decode = operation[callback..].find("fut.Get(ctx, &result)").unwrap() + callback;
+    let scoped = operation.find("ctx = nexgenPayloadContext(ctx)").unwrap();
+    let construct = operation
+        .find("value := NewStartedWorkflow(request.Name, result.GetRunId())")
+        .unwrap();
+    assert!(execute < callback && callback < decode && decode < scoped && scoped < construct);
+    assert_eq!(
+        operation.matches("ctx = nexgenPayloadContext(ctx)").count(),
+        1
+    );
+    assert!(operation.contains("var result common.WorkflowExecution"));
+    assert!(operation.contains("resultSettable.Set(value, nil)"));
+}
+
+#[test]
+fn go_serialization_context_imports_qualified_helper_alias_in_operation_file() {
+    let files = render_go_serialization_context_fixture(
+        GO_CONTEXT_OVERRIDE_TYPES,
+        r#"/// @nexus.serialization-context go="helpers.Context"
+        roundtrip: func(request: retry-policy) -> retry-policy;"#,
+        &GO_CONTEXT_OVERRIDE_SUPPORT
+            .replace(
+                "import (",
+                "import (\n    helpers \"example.com/contexthelpers\"",
+            )
+            .replace("return nil }", "return helpers.Context(request) }"),
+    );
+    let operation = &files[Path::new("sampleservice.go")];
+    assert!(
+        operation.contains("helpers \"example.com/contexthelpers\""),
+        "{operation}"
+    );
+    assert_eq!(
+        operation.matches("\"example.com/contexthelpers\"").count(),
+        1
+    );
+    assert!(
+        operation.contains("ctx = nexgenWithSerializationContext(ctx, helpers.Context(request))")
+    );
+    assert!(files[Path::new("support.go")].contains("helpers \"example.com/contexthelpers\""));
+    assert!(!files[Path::new("serialization_context.go")].contains("example.com/contexthelpers"));
+}
+
 #[test]
 fn go_proto_resource_return_converts_request_and_constructs_resource() {
     let root = project_root();

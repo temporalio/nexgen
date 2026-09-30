@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transfer-type converters and require `Temporalio` 1.19.0 or newer. The
   `notification-service`, `proto-oneof`, and `proto-generic` (previously
   `proto-generic-python`) examples are now generated for .NET.
+- The `@nexus.serialization-context` directive now supports Go.
 
 ### Changed
 

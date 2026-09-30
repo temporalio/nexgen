@@ -2,8 +2,6 @@ package workflowservice
 
 import (
 	"fmt"
-	"time"
-
 	common "go.temporal.io/api/common/v1"
 	enums "go.temporal.io/api/enums/v1"
 	failurepb "go.temporal.io/api/failure/v1"
@@ -15,6 +13,7 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/worker"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"time"
 )
 
 // --- Duration (google.protobuf.Duration) ---
@@ -320,4 +319,11 @@ func versioningOverrideFromProto(_ converter.DataConverter, versioningOverride *
 		}
 	}
 	return &value, nil
+}
+
+func signalWithStartWorkflowSerializationContext(request signalWithStartWorkflowRequest) converter.WorkflowSerializationContext {
+	return converter.WorkflowSerializationContext{
+		Namespace:  request.namespace,
+		WorkflowID: request.ID,
+	}
 }
