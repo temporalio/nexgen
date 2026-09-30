@@ -1,4 +1,4 @@
-/// @nexus.support dotnet="dotnet/WorkflowServiceSupport.cs"
+/// @nexus.support dotnet="dotnet/WorkflowServiceSupport.cs" go="go/WorkflowServiceSupport.go"
 /// @nexus.support-namespace dotnet="Nexgen.Support"
 package temporal:nexus@1.0.0;
 
@@ -136,7 +136,7 @@ interface workflow-service {
   ///   dotnet-type="Temporalio.Workflows.ExternalWorkflowHandle"
   ///   dotnet="Temporalio.Workflows.Workflow.GetExternalWorkflowHandle(request.Id, result.RunId)"
   /// @nexus.operation name="SignalWithStartWorkflowExecution"
-  /// @nexus.serialization-context python="signal_with_start_workflow_serialization_context" typescript="signalWithStartWorkflowSerializationContext" dotnet="WorkflowServiceSerializationContexts.SignalWithStartWorkflow"
+  /// @nexus.serialization-context python="signal_with_start_workflow_serialization_context" typescript="signalWithStartWorkflowSerializationContext" dotnet="WorkflowServiceSerializationContexts.SignalWithStartWorkflow" go="signalWithStartWorkflowSerializationContext"
   /// @nexus.experimental
   signal-with-start-workflow: func(
     request: signal-with-start-workflow-request,

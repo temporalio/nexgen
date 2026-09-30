@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	enums "go.temporal.io/api/enums/v1"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/converter"
+	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
@@ -50,12 +52,14 @@ type recordingDataConverter struct {
 	converter.DataConverter
 	serializationContext converter.SerializationContext
 	recorded             *[]recordedEncode
+	mu                   *sync.Mutex
 }
 
 func newRecordingDataConverter() recordingDataConverter {
 	return recordingDataConverter{
 		DataConverter: converter.GetDefaultDataConverter(),
 		recorded:      &[]recordedEncode{},
+		mu:            &sync.Mutex{},
 	}
 }
 
@@ -64,26 +68,55 @@ func (c recordingDataConverter) WithSerializationContext(ctx converter.Serializa
 		DataConverter:        converter.WithDataConverterSerializationContext(c.DataConverter, ctx),
 		serializationContext: ctx,
 		recorded:             c.recorded,
+		mu:                   c.mu,
 	}
 }
 
 func (c recordingDataConverter) ToPayload(value any) (*common.Payload, error) {
+	c.mu.Lock()
 	*c.recorded = append(*c.recorded, recordedEncode{c.serializationContext, value})
+	c.mu.Unlock()
 	return c.DataConverter.ToPayload(value)
 }
 
 func (c recordingDataConverter) ToPayloads(values ...any) (*common.Payloads, error) {
+	c.mu.Lock()
 	for _, value := range values {
 		*c.recorded = append(*c.recorded, recordedEncode{c.serializationContext, value})
 	}
+	c.mu.Unlock()
 	return c.DataConverter.ToPayloads(values...)
+}
+
+func (c recordingDataConverter) snapshot() []recordedEncode {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]recordedEncode(nil), (*c.recorded)...)
+}
+
+// Binding hides WithSerializationContext, so a bound converter cannot be scoped
+// again. The generated operation must select its converter from the root.
+type oneShotRecordingDataConverter struct {
+	recordingDataConverter
+}
+
+func (c oneShotRecordingDataConverter) WithSerializationContext(ctx converter.SerializationContext) converter.DataConverter {
+	return struct{ converter.DataConverter }{c.recordingDataConverter.WithSerializationContext(ctx)}
+}
+
+func nexusOperationSerializationContext() converter.NexusSerializationContext {
+	return converter.NexusSerializationContext{
+		Endpoint: "__temporal_system", Service: workflowServiceName,
+		Operation: "SignalWithStartWorkflowExecution",
+	}
 }
 
 type WorkflowServiceIntegrationSuite struct {
 	suite.Suite
 	testsuite.WorkflowTestSuite
-	env   *testsuite.TestWorkflowEnvironment
-	calls []*workflowservicepb.SignalWithStartWorkflowExecutionRequest
+	env     *testsuite.TestWorkflowEnvironment
+	calls   []*workflowservicepb.SignalWithStartWorkflowExecutionRequest
+	callsMu sync.Mutex
 }
 
 func (s *WorkflowServiceIntegrationSuite) SetupTest() {
@@ -92,7 +125,9 @@ func (s *WorkflowServiceIntegrationSuite) SetupTest() {
 
 	signalWithStart := nexus.NewSyncOperation("SignalWithStartWorkflowExecution",
 		func(ctx context.Context, input *workflowservicepb.SignalWithStartWorkflowExecutionRequest, opts nexus.StartOperationOptions) (*workflowservicepb.SignalWithStartWorkflowExecutionResponse, error) {
+			s.callsMu.Lock()
 			s.calls = append(s.calls, input)
+			s.callsMu.Unlock()
 			return &workflowservicepb.SignalWithStartWorkflowExecutionResponse{}, nil
 		})
 
@@ -242,29 +277,67 @@ func (s *WorkflowServiceIntegrationSuite) TestConversionFailureSurfacesOnTheFutu
 // TestModelIsConvertedInsideThePayloadConverter is the acceptance test for the
 // transfer-type port. The generated code no longer builds the proto itself;
 // the SDK's transfer-type machinery does it during payload conversion. The
-// observable consequence is that the model's inner user payloads (Args,
-// SignalArgs) are encoded by the data converter -- and under the serialization
-// context -- that the SDK selected for the Nexus operation.
+// inner user payloads use the target workflow context, while the outer proto
+// uses the Nexus operation context.
 func (s *WorkflowServiceIntegrationSuite) TestModelIsConvertedInsideThePayloadConverter() {
+	s.checkSerializationContexts(false)
+}
+
+func (s *WorkflowServiceIntegrationSuite) TestOneShotConverterIsRescopedFromRoot() {
+	s.checkSerializationContexts(true)
+}
+
+func (s *WorkflowServiceIntegrationSuite) checkSerializationContexts(oneShot bool) {
 	recorder := newRecordingDataConverter()
-	s.env.SetDataConverter(recorder)
+	if oneShot {
+		root := oneShotRecordingDataConverter{recorder}
+		bound := root.WithSerializationContext(converter.WorkflowSerializationContext{})
+		_, canRescope := bound.(converter.DataConverterWithSerializationContext)
+		s.Require().False(canRescope, "test converter must not allow rebinding")
+		s.env.SetDataConverter(root)
+	} else {
+		s.env.SetDataConverter(recorder)
+	}
 
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
-		return ws.SignalWithStartWorkflow(
+		err := ws.SignalWithStartWorkflow(
 			ctx,
-			ws.SignalWithStartWorkflowOptions{ID: "target-workflow-id", TaskQueue: "my-task-queue"},
+			ws.SignalWithStartWorkflowOptions{
+				ID: "target-workflow-id", TaskQueue: "my-task-queue",
+				Memo:         map[string]any{"memo-key": "target-memo"},
+				UserMetadata: ws.UserMetadata{StaticSummary: "target-summary", StaticDetails: "target-details"},
+			},
 			"wake-up",
 			"signal-value",
 			"ExampleWorkflow",
 			"workflow-input",
 		).Get(ctx, nil)
+		if err != nil {
+			return err
+		}
+		_, err = internal.GetDataConverterFromWorkflowContext(ctx).ToPayload("caller-after")
+		return err
 	})
 
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 	s.Require().Len(s.calls, 1)
+	s.Equal("default-test-namespace", s.calls[0].GetNamespace())
+	s.Equal("target-workflow-id", s.calls[0].GetWorkflowId())
+	// Headers are API-omitted and have no source in this sample.
+	s.Nil(s.calls[0].GetHeader())
+	for value, payload := range map[string]*common.Payload{
+		"target-memo":    s.calls[0].GetMemo().GetFields()["memo-key"],
+		"target-summary": s.calls[0].GetUserMetadata().GetSummary(),
+		"target-details": s.calls[0].GetUserMetadata().GetDetails(),
+	} {
+		s.Require().NotNil(payload, value)
+		var decoded string
+		s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(payload, &decoded))
+		s.Equal(value, decoded)
+	}
 
-	recorded := *recorder.recorded
+	recorded := recorder.snapshot()
 	indexOf := func(match func(recordedEncode) bool) int {
 		for i, entry := range recorded {
 			if match(entry) {
@@ -299,22 +372,116 @@ func (s *WorkflowServiceIntegrationSuite) TestModelIsConvertedInsideThePayloadCo
 	// The transfer value -- the proto envelope -- is encoded under the Nexus
 	// operation's serialization context.
 	s.Equal(
-		converter.NexusSerializationContext{
-			Endpoint:  "__temporal_system",
-			Service:   workflowServiceName,
-			Operation: "SignalWithStartWorkflowExecution",
-		},
+		nexusOperationSerializationContext(),
 		recorded[request].Context,
 	)
 
-	// The inner user payloads are encoded under the workflow serialization
-	// context reachable from the workflow.Context handed to the transfer
-	// converter. That context is the *calling* workflow's today; redirecting it
-	// to the target workflow is what @nexus.serialization-context will do.
-	callerContext := converter.WorkflowSerializationContext{
+	targetContext := converter.WorkflowSerializationContext{
 		Namespace:  "default-test-namespace",
-		WorkflowID: "default-test-workflow-id",
+		WorkflowID: "target-workflow-id",
 	}
-	s.Equal(callerContext, recorded[workflowArg].Context)
-	s.Equal(callerContext, recorded[signalArg].Context)
+	s.Equal(targetContext, recorded[workflowArg].Context)
+	s.Equal(targetContext, recorded[signalArg].Context)
+	// Memo uses the user converter with the current SDK memo flag enabled;
+	// this sample's metadata helper also uses the workflow-context converter.
+	for _, value := range []string{"target-memo", "target-summary", "target-details"} {
+		i := stringAt(value)
+		s.Require().NotEqual(-1, i, "%s was not encoded by the user converter", value)
+		s.Less(i, request)
+		s.Equal(targetContext, recorded[i].Context, value)
+	}
+	caller := stringAt("caller-after")
+	s.Require().NotEqual(-1, caller)
+	s.Equal(converter.WorkflowSerializationContext{
+		Namespace: "default-test-namespace", WorkflowID: "default-test-workflow-id",
+	}, recorded[caller].Context, "operation must not change the caller's converter")
+}
+
+func (s *WorkflowServiceIntegrationSuite) TestConcurrentOperationsKeepTargetContextsIsolated() {
+	recorder := newRecordingDataConverter()
+	s.env.SetDataConverter(oneShotRecordingDataConverter{recorder})
+	targets := []string{"target-a", "target-b"}
+
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		futures := make([]workflow.Future, 0, len(targets))
+		// Schedule both operations before awaiting either, then await in reverse
+		// order to catch accidental reuse of the last operation's context.
+		for _, target := range targets {
+			futures = append(futures, ws.SignalWithStartWorkflow(ctx,
+				ws.SignalWithStartWorkflowOptions{
+					ID:   target,
+					Memo: map[string]any{"memo-key": target + "-memo"},
+					UserMetadata: ws.UserMetadata{
+						StaticSummary: target + "-summary", StaticDetails: target + "-details",
+					},
+				},
+				"wake-up", target+"-signal", "ExampleWorkflow", target+"-input",
+			))
+		}
+		for i := len(futures) - 1; i >= 0; i-- {
+			var result ws.SignalWithStartWorkflowResponse
+			if err := futures[i].Get(ctx, &result); err != nil {
+				return err
+			}
+		}
+		_, err := internal.GetDataConverterFromWorkflowContext(ctx).ToPayload("caller-after")
+		return err
+	})
+
+	s.True(s.env.IsWorkflowCompleted())
+	s.Require().NoError(s.env.GetWorkflowError())
+	s.Require().Len(s.calls, 2)
+	var calledTargets []string
+	for _, call := range s.calls {
+		calledTargets = append(calledTargets, call.GetWorkflowId())
+		s.Equal("default-test-namespace", call.GetNamespace())
+		var input, signal string
+		s.Require().NoError(converter.GetDefaultDataConverter().FromPayloads(call.GetInput(), &input))
+		s.Require().NoError(converter.GetDefaultDataConverter().FromPayloads(call.GetSignalInput(), &signal))
+		s.Equal(call.GetWorkflowId()+"-input", input)
+		s.Equal(call.GetWorkflowId()+"-signal", signal)
+	}
+	s.ElementsMatch(targets, calledTargets)
+
+	want := map[string]converter.SerializationContext{
+		"caller-after": converter.WorkflowSerializationContext{
+			Namespace: "default-test-namespace", WorkflowID: "default-test-workflow-id",
+		},
+	}
+	for _, target := range targets {
+		for _, suffix := range []string{"-input", "-signal", "-memo", "-summary", "-details"} {
+			want[target+suffix] = converter.WorkflowSerializationContext{
+				Namespace: "default-test-namespace", WorkflowID: target,
+			}
+		}
+	}
+	seen := make(map[string]int)
+	envelopes := make(map[string]int)
+	for _, entry := range recorder.snapshot() {
+		switch value := entry.Value.(type) {
+		case string:
+			if expected, ok := want[value]; ok {
+				s.Equal(expected, entry.Context, value)
+				seen[value]++
+			}
+		case *workflowservicepb.SignalWithStartWorkflowExecutionRequest:
+			target := value.GetWorkflowId()
+			s.Contains(targets, target)
+			if _, ok := entry.Context.(converter.NexusSerializationContext); ok {
+				s.Equal(nexusOperationSerializationContext(), entry.Context, target)
+				envelopes[target]++
+			} else {
+				// testNexusHandler.StartOperation rebuilds the decoded input as
+				// a LazyValue using the test environment's caller-scoped converter.
+				// This is separate from the real outer operation encoding above.
+				s.Equal(want["caller-after"], entry.Context, "test harness re-encode for %s", target)
+			}
+		}
+	}
+	for value := range want {
+		s.Equal(1, seen[value], "%s must be encoded once in its own context", value)
+	}
+	for _, target := range targets {
+		s.Equal(1, envelopes[target], "outer operation envelope for %s must be encoded once in the Nexus context", target)
+	}
 }

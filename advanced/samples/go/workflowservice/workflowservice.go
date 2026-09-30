@@ -317,10 +317,10 @@ var signalWithStartWorkflowRequestTransferTypeConverter = workflow.NewContextAwa
 		return errSignalWithStartWorkflowRequestNeedsWorkflowContext
 	},
 	func(ctx workflow.Context, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
-		return m.toProto(ctx)
+		return m.toProto(nexgenPayloadContext(ctx))
 	},
 	func(ctx workflow.Context, message *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
-		value, err := signalWithStartWorkflowRequestFromProto(ctx, message)
+		value, err := signalWithStartWorkflowRequestFromProto(nexgenPayloadContext(ctx), message)
 		if err != nil {
 			return err
 		}
@@ -337,6 +337,7 @@ func (signalWithStartWorkflowRequest) TransferTypeConverter() workflow.TransferT
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
 	request.namespace = workflow.GetInfo(ctx).Namespace
+	ctx = nexgenWithSerializationContext(ctx, signalWithStartWorkflowSerializationContext(request))
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -464,10 +465,10 @@ var signalWithStartWorkflowResponseTransferTypeConverter = workflow.NewContextAw
 		return errSignalWithStartWorkflowResponseNeedsWorkflowContext
 	},
 	func(ctx workflow.Context, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
-		return m.toProto(ctx)
+		return m.toProto(nexgenPayloadContext(ctx))
 	},
 	func(ctx workflow.Context, message *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
-		value, err := signalWithStartWorkflowResponseFromProto(ctx, message)
+		value, err := signalWithStartWorkflowResponseFromProto(nexgenPayloadContext(ctx), message)
 		if err != nil {
 			return err
 		}

@@ -503,6 +503,7 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
 pub(in crate::generator) struct GoPackageContext {
     package_name: String,
     import_path: Option<String>,
+    pub(in crate::generator) has_serialization_context: bool,
 }
 
 impl GoPackageContext {
@@ -540,6 +541,16 @@ impl GoPackageContext {
         Ok(Self {
             package_name,
             import_path,
+            has_serialization_context: api_plan
+                .services
+                .iter()
+                .flat_map(|service| &service.operations)
+                .any(|operation| {
+                    operation
+                        .serialization_context
+                        .for_language(Language::Go)
+                        .is_some()
+                }),
         })
     }
 
@@ -1074,6 +1085,14 @@ impl<'a> ApiPlanner<'a> {
         primary_origin: GeneratedFileOrigin,
     ) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
+        if self.package.has_serialization_context
+            && self.external_models.renders_operation_references()
+        {
+            return Err(Error::UnsupportedGoProtoConversion {
+                context: "Go serialization context".to_string(),
+                reason: "serialization-context requires proto-backed operation wrappers, not operation references".to_string(),
+            });
+        }
         if !self.external_models.renders_operation_references() {
             for service in &self.api_plan.services {
                 let mut operations = Vec::new();
@@ -1128,6 +1147,14 @@ impl<'a> ApiPlanner<'a> {
         // so the backend renders final Go names directly.
         self.populate_model_wire_conversions()?;
         self.populate_operation_bindings(&mut services)?;
+        for operation in services.iter().flat_map(|service| &service.operations) {
+            if operation.serialization_context_expr.is_some() && operation.wire_binding.is_none() {
+                return Err(Error::UnsupportedGoProtoConversion {
+                    context: format!("operation `{}`", operation.name),
+                    reason: "serialization-context requires a proto-backed operation".to_string(),
+                });
+            }
+        }
 
         let needs_function_name_inlining = services.iter().any(service_uses_function_name_inlining);
 
@@ -1203,7 +1230,38 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
-        let external_imports = self.external_models.imports();
+        let mut external_imports = self.external_models.imports();
+        // Go imports are file-scoped. A qualified helper's support import must
+        // also be available in the file that invokes it.
+        let helper_packages: BTreeSet<_> = services
+            .iter()
+            .flat_map(|service| &service.operations)
+            .filter_map(|operation| {
+                operation
+                    .serialization_context_expr?
+                    .split_once('.')
+                    .map(|(package, _)| package)
+            })
+            .collect();
+        for fragment in support_fragments {
+            for import in parse_support_fragment(&fragment.contents).imports {
+                let (alias, path) = import.split_once('"').unwrap_or(("", ""));
+                let path = path.split('"').next().unwrap_or_default();
+                let alias = if alias.trim().is_empty() {
+                    path.rsplit('/').next().unwrap_or_default()
+                } else {
+                    alias.trim()
+                };
+                if helper_packages.contains(alias)
+                    && !self.package.is_self_import(path)
+                    && !external_imports
+                        .iter()
+                        .any(|(existing, _)| existing == path)
+                {
+                    external_imports.push((path.to_string(), alias.to_string()));
+                }
+            }
+        }
         let output = render_file(
             &self.package,
             &self.imports,
@@ -1229,6 +1287,13 @@ impl<'a> ApiPlanner<'a> {
             go_api_file_name(self.api_plan)
         };
         files.insert(file_name, output, primary_origin)?;
+        if self.package.has_serialization_context {
+            files.insert(
+                PathBuf::from("serialization_context.go"),
+                render_serialization_context_support(&self.package),
+                GeneratedFileOrigin::fixed("generated Go serialization context support"),
+            )?;
+        }
 
         // Emit hand-written support fragments (e.g. proto converter functions)
         // in one support file. Like the TypeScript backend, all fragments are
@@ -1384,6 +1449,10 @@ impl<'a> ApiPlanner<'a> {
                 .collect()
         });
 
+        let serialization_context_expr = operation.serialization_context.for_language(Language::Go);
+        if let Some(helper) = serialization_context_expr {
+            validate_go_serialization_context_helper(helper, &operation.name)?;
+        }
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
@@ -1394,6 +1463,7 @@ impl<'a> ApiPlanner<'a> {
             model_type_parameters,
             output_type,
             raw_output_type,
+            serialization_context_expr,
             output_transform_expr: go_output_transform.map(|(_, expr)| expr),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
@@ -1820,6 +1890,82 @@ fn go_api_file_name(api_plan: &PlannedSpec) -> PathBuf {
     PathBuf::from(format!("{stem}.go"))
 }
 
+fn validate_go_serialization_context_helper(helper: &str, operation: &str) -> Result<()> {
+    let parts: Vec<_> = helper.split('.').collect();
+    if parts.len() > 2
+        || parts.iter().any(|part| {
+            part.is_empty()
+                || *part == "_"
+                || is_go_keyword(part)
+                || !part
+                    .as_bytes()
+                    .first()
+                    .is_some_and(|byte| is_go_ident_start(*byte))
+                || !part.bytes().all(is_go_ident_continue)
+        })
+    {
+        return Err(Error::InvalidWitDirective {
+            path: PathBuf::from("<go-plan>"),
+            context: format!("operation `{operation}`"),
+            directive: "@nexus.serialization-context".to_string(),
+            reason: format!("Go support helper `{helper}` must be an identifier or pkg.Func"),
+        });
+    }
+    Ok(())
+}
+
+fn render_serialization_context_support(package: &GoPackageContext) -> String {
+    let mut output = format!(
+        "{GENERATED_HEADER}\n\npackage {}\n\nimport (\n",
+        package.package_name
+    );
+    for import in [
+        "go.temporal.io/sdk/converter",
+        "go.temporal.io/sdk/internal",
+        "go.temporal.io/sdk/workflow",
+    ] {
+        if !package.is_self_import(import) {
+            output.push_str(&format!("\t\"{import}\"\n"));
+        }
+    }
+    output.push_str(")\n\n");
+    let context = package.workflow_context_type();
+    let sc = package.qualified_expr(
+        "go.temporal.io/sdk/converter",
+        "converter.SerializationContext",
+    );
+    let dc = package.qualified_expr("go.temporal.io/sdk/converter", "converter.DataConverter");
+    let select = package.qualified_expr(
+        "go.temporal.io/sdk/internal",
+        "internal.WithRootDataConverterSerializationContext",
+    );
+    let with_value = package.qualified_expr("go.temporal.io/sdk/workflow", "workflow.WithValue");
+    let with_converter =
+        package.qualified_expr("go.temporal.io/sdk/workflow", "workflow.WithDataConverter");
+    output.push_str(&format!(
+        r#"type nexgenSerializationContextKey struct{{}}
+
+// Keep the inner converter separate from the root used for the Nexus envelope.
+// The SDK retains this context for both input and result transfer conversion.
+func nexgenWithSerializationContext(ctx {context}, sc {sc}) {context} {{
+	if sc == nil {{
+		return ctx
+	}}
+	return {with_value}(ctx, nexgenSerializationContextKey{{}}, {select}(ctx, sc))
+}}
+
+// Only model conversion uses this derived context; never pass it to ExecuteOperation.
+func nexgenPayloadContext(ctx {context}) {context} {{
+	if dc, ok := ctx.Value(nexgenSerializationContextKey{{}}).({dc}); ok {{
+		return {with_converter}(ctx, dc)
+	}}
+	return ctx
+}}
+"#
+    ));
+    output
+}
+
 fn render_support_file(fragments: &[SupportFragmentSpec], package_name: &str) -> String {
     if let [fragment] = fragments {
         return rewrite_support_package(&fragment.contents, package_name);
@@ -2004,6 +2150,8 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// The expression is rendered with `request` and raw `result` in scope and
     /// must evaluate to `(output_transform_type, error)`.
     pub(in crate::generator) output_transform_expr: Option<&'a str>,
+    /// Helper selecting the context for user payloads nested in this operation.
+    pub(in crate::generator) serialization_context_expr: Option<&'a str>,
     /// Go return type for an `@nexus.output-transform`, with any embedded
     /// import path stripped from the WIT annotation.
     pub(in crate::generator) output_transform_type: Option<String>,
