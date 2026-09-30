@@ -9,6 +9,7 @@ import (
 
 	common "go.temporal.io/api/common/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
+	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -258,6 +259,7 @@ func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.
 			resultSettable.SetError(err)
 			return
 		}
+		ctx = internal.NexusOperationPayloadContext(ctx, fut)
 		value := NewStartedWorkflow(request.namespace, request.WorkflowID, result.GetRunId())
 		resultSettable.Set(value, nil)
 	})
@@ -275,6 +277,7 @@ func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflo
 			resultSettable.SetError(err)
 			return
 		}
+		ctx = internal.NexusOperationPayloadContext(ctx, fut)
 		value := NewStartedWorkflow(request.namespace, request.WorkflowID, result.GetRunId())
 		resultSettable.Set(value, nil)
 	})

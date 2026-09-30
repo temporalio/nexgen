@@ -88,7 +88,6 @@ pub(in crate::generator) struct ModelBackend {
     /// therefore need a [`workflow.TransferTypeConverter`] so the SDK performs
     /// model<->proto conversion inside the payload converter.
     transfer_models: RefCell<BTreeSet<String>>,
-    serialization_contexts: RefCell<BTreeMap<String, String>>,
 }
 
 impl ModelBackend {
@@ -99,7 +98,6 @@ impl ModelBackend {
             proto_models: BTreeMap::new(),
             wire_models: RefCell::new(BTreeMap::new()),
             transfer_models: RefCell::new(BTreeSet::new()),
-            serialization_contexts: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -221,12 +219,6 @@ impl ModelBackend {
         render_model_wire_methods(output, model, wire, &self.package);
         if self.transfer_models.borrow().contains(key) {
             render_model_transfer_type_converter(output, model, wire, &self.package);
-        }
-        if let Some(helper) = self.serialization_contexts.borrow().get(key) {
-            let context_type = self.package.serialization_context_type();
-            let provider_type = self.package.serialization_context_provider_type();
-            let name = &model.name;
-            output.push_str(&format!("\n// SerializationContext selects the context for nested Nexus payloads.\nfunc (m {name}) SerializationContext() {context_type} {{\n\treturn {helper}(m)\n}}\n\nvar _ {provider_type} = {name}{{}}\n"));
         }
     }
 }
@@ -660,6 +652,16 @@ impl OperationBinding {
         self.output_from_proto.is_some() || self.resource_return.is_some()
     }
 
+    pub(in crate::generator) fn registry_input_converter(
+        &self,
+        input_type: &str,
+        context_type: &str,
+    ) -> Option<String> {
+        self.input_to_proto.as_ref().map(|expression| {
+            format!("func(ctx {context_type}, input any) (any, error) {{\n\t\trequest := input.({input_type})\n\t\treturn {expression}\n\t}}")
+        })
+    }
+
     pub(in crate::generator) fn requires_fmt(&self) -> bool {
         self.output_returns_pointer
     }
@@ -732,55 +734,7 @@ impl ModelBackend {
         &self,
         api_plan: &PlannedSpec,
         services: &mut [RenderedService<'_>],
-        models: &IndexMap<String, RenderedModel>,
     ) -> Result<()> {
-        // The Go backend emits one model per proto/model key. Include absent
-        // annotations so a provider cannot silently affect an unannotated operation.
-        let mut policies: BTreeMap<String, (Option<&str>, String)> = BTreeMap::new();
-        for service in &api_plan.services {
-            for operation in &service.operations {
-                let Some(input) = operation
-                    .input
-                    .as_ref()
-                    .and_then(|input| planned_message_type(input, api_plan))
-                else {
-                    continue;
-                };
-                let helper = operation.serialization_context.for_language(Language::Go);
-                let origin = format!("{}.{}", service.name, operation.name);
-                let key = &input.info.full_name;
-                if let Some((previous, previous_origin)) = policies.get(key) {
-                    if *previous != helper {
-                        return Err(Error::UnsupportedGoProtoConversion {
-                            context: format!("request model `{key}`"),
-                            reason: format!(
-                                "conflicting serialization-context policies: `{previous_origin}` selects `{}` but `{origin}` selects `{}`; all operations sharing a request model must select the same Go helper or all omit it",
-                                previous.unwrap_or("<none>"),
-                                helper.unwrap_or("<none>")
-                            ),
-                        });
-                    }
-                } else {
-                    policies.insert(key.clone(), (helper, origin));
-                }
-                if helper.is_some()
-                    && models.get(key).is_some_and(|model| {
-                        model
-                            .fields
-                            .iter()
-                            .any(|field| field.name == "SerializationContext")
-                    })
-                {
-                    return Err(Error::UnsupportedGoProtoConversion {
-                        context: format!("request model `{key}`"),
-                        reason: format!(
-                            "field `SerializationContext` on `{}` conflicts with the generated SerializationContext method; rename the Go field",
-                            models[key].name
-                        ),
-                    });
-                }
-            }
-        }
         for (service, planned_service) in services.iter_mut().zip(api_plan.services.iter()) {
             for (rendered_op, planned_op) in service
                 .operations
@@ -795,31 +749,17 @@ impl ModelBackend {
                     continue;
                 };
                 let output = operation_output(planned_op, api_plan);
-                let Some((_input_wire_type, input_conv)) =
+                let Some((_, input_conv)) =
                     operation_message_binding(&input, &planned_op.name, "input", self)?
                 else {
                     continue;
                 };
-                if let Some(helper) = rendered_op.serialization_context_expr {
-                    if input_conv.kind != GoConversionKind::ModelConverter
-                        || self.model_proto_info(&input.info.full_name).is_none()
-                    {
-                        return Err(Error::UnsupportedGoProtoConversion {
-                            context: format!("operation `{}` input", planned_op.name),
-                            reason: format!(
-                                "serialization-context requires a generated request model; Go cannot add the SerializationContext method to externally owned request type `{}`",
-                                rendered_op.input_type
-                            ),
-                        });
-                    }
-                    self.serialization_contexts
-                        .borrow_mut()
-                        .insert(input.info.full_name.clone(), helper.to_string());
-                }
+
                 // Generated models carry a transfer-type converter, so the SDK
                 // converts them to proto inside the payload converter. Anything
                 // else (hand-written override converters over types nexgen does
-                // not own) still converts eagerly here.
+                // not own) uses an eager converter, either here or in the SDK's
+                // registry callback when the operation selects a policy.
                 let input_to_proto = if input_conv.kind == GoConversionKind::ModelConverter {
                     self.mark_transfer_model_checked(api_plan, &input, &planned_op.name, "input")?;
                     None
@@ -1028,7 +968,7 @@ pub(in crate::generator) fn render_operation_function_proto(
     }
 
     let input_arg = match binding.input_to_proto.as_deref() {
-        Some(input_to_proto) => {
+        Some(input_to_proto) if !service.defers_input_to_registry(operation) => {
             output.push_str("\trequestProto, err := ");
             output.push_str(input_to_proto);
             output.push('\n');
@@ -1041,9 +981,9 @@ pub(in crate::generator) fn render_operation_function_proto(
             output.push_str("\t}\n");
             "requestProto"
         }
-        // The request model implements `workflow.ValueWithTransferTypeConverter`,
-        // so the SDK converts it to proto while encoding the payload.
-        None => "request",
+        // The SDK converts native requests through their transfer converter or
+        // the registered system operation's InputToTransfer callback.
+        _ => "request",
     };
     let endpoint = service
         .endpoint
@@ -1086,7 +1026,7 @@ pub(in crate::generator) fn render_operation_function_proto(
             output.push_str("\t\t\treturn\n");
             output.push_str("\t\t}\n");
             output.push_str("\t\tvalue, err := ");
-            render_conversion_expr(output, transform_expr, transform_type, operation, package);
+            render_conversion_expr(output, transform_expr, transform_type, package);
             output.push('\n');
             output.push_str("\t\tif err != nil {\n");
             output.push_str("\t\t\tresultSettable.SetError(err)\n");
@@ -1133,7 +1073,7 @@ pub(in crate::generator) fn render_operation_function_proto(
                 } else {
                     output_type.clone()
                 };
-                render_conversion_expr(output, from_proto, &result_type, operation, package);
+                render_conversion_expr(output, from_proto, &result_type, package);
                 output.push('\n');
                 output.push_str("\t\tif err != nil {\n");
                 output.push_str("\t\t\tresultSettable.SetError(err)\n");
@@ -1161,9 +1101,10 @@ pub(in crate::generator) fn render_operation_function_proto(
                 output.push_str("\t\t\tresultSettable.SetError(err)\n");
                 output.push_str("\t\t\treturn\n");
                 output.push_str("\t\t}\n");
-                if operation.serialization_context_expr.is_some() {
-                    output.push_str("\t\tctx = nexgenPayloadContext(ctx, fut)\n");
-                }
+                output.push_str(&format!(
+                    "\t\tctx = {}(ctx, fut)\n",
+                    package.nexus_operation_payload_context()
+                ));
                 for line in &resource_return.local_lines {
                     output.push_str("\t\t");
                     output.push_str(line);
@@ -1194,15 +1135,12 @@ fn render_conversion_expr(
     output: &mut String,
     expression: &str,
     result_type: &str,
-    operation: &crate::generator::go::RenderedOperation<'_>,
+
     package: &GoPackageContext,
 ) {
-    if operation.serialization_context_expr.is_some() {
-        let context = package.workflow_context_type();
-        output.push_str(&format!("func(ctx {context}) ({result_type}, error) {{\n\t\treturn {expression}\n\t}}(nexgenPayloadContext(ctx, fut))"));
-    } else {
-        output.push_str(expression);
-    }
+    let context = package.workflow_context_type();
+    let payload_context = package.nexus_operation_payload_context();
+    output.push_str(&format!("func(ctx {context}) ({result_type}, error) {{\n\t\treturn {expression}\n\t}}({payload_context}(ctx, fut))"));
 }
 
 /// Computes the backend binding for an operation message: the wire type
@@ -1806,6 +1744,7 @@ fn render_model_transfer_type_converter(
     let new_converter = package.new_context_aware_transfer_type_converter();
     let converter_type = package.transfer_type_converter_type();
     let errors_new = package.errors_new();
+    let conversion_context = "ctx";
 
     output.push('\n');
     output.push_str(&format!(
@@ -1829,13 +1768,13 @@ fn render_model_transfer_type_converter(
         "\tfunc({context_context}, {proto_ptr_type}, *{model_ident}) error {{\n\t\treturn {error_var}\n\t}},\n"
     ));
     output.push_str(&format!(
-        "\tfunc(ctx {workflow_context}, m *{model_ident}) ({proto_ptr_type}, error) {{\n\t\treturn m.toProto(ctx)\n\t}},\n"
+        "\tfunc(ctx {workflow_context}, m *{model_ident}) ({proto_ptr_type}, error) {{\n\t\treturn m.toProto({conversion_context})\n\t}},\n"
     ));
     output.push_str(&format!(
         "\tfunc(ctx {workflow_context}, message {proto_ptr_type}, out *{model_ident}) error {{\n"
     ));
     output.push_str(&format!(
-        "\t\tvalue, err := {from_proto_fn}(ctx, message)\n"
+        "\t\tvalue, err := {from_proto_fn}({conversion_context}, message)\n"
     ));
     output.push_str("\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n");
     output.push_str("\t\t*out = value\n\t\treturn nil\n\t},\n");

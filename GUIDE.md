@@ -1519,8 +1519,9 @@ by the target workflow.
 
 Python stores the helper alongside the operation definition in the generated
 operation registry. The SDK uses that entry to call the helper with the operation
-request before converting user payloads. Go emits a `SerializationContext()`
-method on the generated request model that forwards to the helper.
+request before converting user payloads. Go also emits an operation registry;
+generated package initialization registers it with the Go SDK, which owns policy
+selection and conversion scope.
 
 The helper is invoked with the actual generated operation request model. In
 Python examples below, the request is annotated as `typing.Any` because support
@@ -1556,18 +1557,18 @@ The referenced helper must be provided through `@nexus.support`.
 
 #### Go helpers and conversion scope
 
-Go supports this directive for generator-owned, proto-backed request models.
-Externally owned or overridden request types are rejected because the generator
-cannot add methods to them. Non-proto and JSON requests remain unsupported.
-A Go-specific helper takes precedence over the default helper; a directive that
-selects only another language's helper does not enable Go support.
+Go supports this directive for proto-backed requests, including externally owned
+request types selected by a Go type override. Non-proto and JSON requests remain
+unsupported. A Go-specific helper takes precedence over the default helper; a
+directive that selects only another language's helper does not enable Go support.
+No `--system-nexus` flag is required when the service declares a system endpoint.
+Only system-endpoint operations contribute registry entries; annotations on
+ordinary-endpoint operations do not register global policies.
 
-All operations using the same generated proto request model, including aliases
-and uses across services, must select the same helper or all omit it. A helper
-conflicts with an absent selection. The Go generator keys models by protobuf
-identity, so even different authored records backed by the same protobuf cannot
-select distinct policies. A model field named `SerializationContext` also
-conflicts with the generated method.
+Policies belong to operations, not request models. Operations sharing a model,
+an alias, or a protobuf identity can select different helpers or omit the
+helper, including across services. The generator adds no model methods or
+provider interface assertions, so a field named `SerializationContext` is allowed.
 
 A Go helper reference must be a function identifier, such as
 `signalWithStartWorkflowSerializationContext`, or a package-qualified function,
@@ -1575,8 +1576,8 @@ such as `helpers.Context`. Each component must be a valid Go identifier, not a
 keyword or the blank identifier `_`. Calls, deeper selector chains, and arbitrary
 expressions are not accepted. For a qualified helper, supply the package import
 in a Go support fragment unless the generated model already imports that package.
-The generator copies the matching import into the model file and preserves
-an explicit alias. For example, `helpers.Context` can use
+The generator copies the matching import into `registry.go`, not the model or
+runtime helper file, and preserves an explicit alias. For example, `helpers.Context` can use
 `import helpers "example.com/helpers"` from a support fragment.
 
 For example, add the Go helper to the operation directive:
@@ -1603,46 +1604,83 @@ func signalWithStartWorkflowSerializationContext(
 }
 ```
 
-Generated operations assign sourced fields before passing the request to the SDK. In this example, the sourced namespace is the unexported field
+Generated operations assign sourced fields before passing the native request to
+the SDK. After workflow interceptors run, the SDK invokes the helper with that
+native input, not a converted protobuf. For this generated model, the input is a
+value, not a pointer. In this example,
+the sourced namespace is the unexported field
 `request.namespace`, not `request.Namespace`. Support code is emitted in the same
 Go package, so it can access that field. Helpers return a
 `converter.SerializationContext` (or a concrete type implementing it). Returning
 `nil` leaves the converter unchanged.
 
-The generated value-receiver method implements
-`converter.SerializationContextProvider`:
+If a rendered system-endpoint operation in a Go package selects a helper, the
+generator emits `registry.go`. No generated serialization-context runtime file is
+needed. The registry includes rendered system-endpoint operations in that package,
+not ordinary-endpoint operations, keyed by exported
+`NexusOperationKey{Service, Operation}` using wire names. `NexusOperationKey`
+aliases `internal.NexusOperationKey`; the generated `NexusOperationInfo` name
+aliases `internal.NexusOperationRegistryEntry`. Values have a
+`SerializationContext func(any) converter.SerializationContext` field. An operation
+without a selected helper has a nil field. Package `init` calls
+`internal.RegisterNexusOperationRegistry`; import the generated package so that
+registration runs before workflows start. Duplicate wire keys are rejected,
+including collisions with other registered packages. The SDK retains the map;
+treat entries and callbacks as immutable once registered.
 
-```go
-func (m signalWithStartWorkflowRequest) SerializationContext() converter.SerializationContext {
-    return signalWithStartWorkflowSerializationContext(m)
-}
-```
+Annotated entries use `nexgenOperationInfo(helper)`. This generic adapter accepts
+`helper func(I) C`, where `C` implements `converter.SerializationContext`, and
+sets the optional `InputType reflect.Type` field to `reflect.TypeFor[I]()` before
+calling `helper(request.(I))`. Helpers can therefore return the interface or a
+concrete implementation without adding methods to the request type. The SDK uses
+`InputType` to skip both policy selection and `InputToTransfer` for nonmatching
+inputs, preserving raw protobuf calls. A nil `InputType` opts out of this guard;
+directly invoking the typed callback still requires an input compatible with `I`.
 
-The SDK inspects the original request at the Nexus call and binds the selected
-data converter to the transfer-conversion context. The SDK captures the policy
-once at scheduling, and the future retains that converter for response conversion. Transfer callbacks use the SDK's
-context directly; generated operation wrappers do not select the converter.
-The root converter remains available for the outer Nexus payload and other
-operations.
+The SDK looks up the wire key only for endpoint `__temporal_system` or its legacy
+name, `temporal-system`. Emitting a registry without `--system-nexus` does not
+enable selection on other endpoints. Selection runs once, after workflow
+interceptors, using the final operation and native input. A missing entry or
+nonmatching input preserves existing conversion behavior. A nil helper or nil
+returned context preserves the caller's converter scope but does not skip a
+matching entry's `InputToTransfer` callback. Helpers must be deterministic and
+safe for concurrent workflow executions.
 
-Raw Nexus calls also support this contract when passed the original model rather
-than a preconverted protobuf. Callers must populate any required sourced fields;
-the sample request model is currently private to its generated package.
+The SDK scopes the root data converter for inner payloads and supplies that scope
+to transfer callbacks in both directions. For external native inputs without a
+transfer converter, the registry's `InputToTransfer` callback performs conversion
+with the selected scope before envelope encoding, or in caller scope when no
+context is selected. Ordinary-endpoint wrappers retain eager external-input
+conversion rather than relying on a global registry entry. No generated workflow context
+key or model policy method is needed. The SDK future retains the selected scope
+for result conversion, and the operation retains its selected failure converter;
+neither is reselected when the result is awaited. Eager generated result adapters
+recover the scope with `internal.NexusOperationPayloadContext(ctx, fut)`. The
+helper recognizes the optional method
+`NexusOperationPayloadContext() workflow.Context`. An interceptor's future wrapper
+must explicitly forward this method to preserve scope for eager result adapters.
+This is not a change to the public `workflow.NexusOperationFuture` interface, and
+arbitrary wrappers do not forward the scope automatically. Without a carrier or
+with a nil carried context, the helper returns its supplied `ctx`.
 
-Only eager output conversion, output transforms, and resource returns need the
-generated `serialization_context.go` helper. Its
-`nexgenPayloadContext(ctx, fut)` retrieves the captured converter through
-`internal.GetNexusOperationInnerDataConverter(fut)` and applies
-`workflow.WithDataConverter` for that conversion only. It never calls the request's
-provider again, so request mutation or interceptor replacement cannot change the
-captured policy during response conversion. Future wrappers can optionally forward
-the converter getter; if none is available, the helper leaves `ctx` unchanged.
+Direct `NexusClient.ExecuteOperation` calls also select the registered policy
+when they use a system endpoint, the registered wire key, and the expected native
+request type. SDK-hosted callers use `internal.NewSystemNexusClient` for the
+reserved `__temporal_system` endpoint; the public constructor rejects that prefix.
+Raw callers using native models must supply sourced fields themselves. Already
+converted protobuf inputs remain supported: their nonmatching type bypasses the
+generated policy and external-input callback, so their existing payloads are not
+reconverted under the native model's policy.
 
-**SDK prerequisite:** No published Go SDK version provides this new
-`converter.SerializationContextProvider` support yet. Eager conversion also
-requires `internal.GetNexusOperationInnerDataConverter`; its internal
-import restricts that generated support to SDK-hosted packages. This is not full
-Python envelope or failure-conversion parity.
+**SDK prerequisite and limits:** This support requires an SDK checkout with the
+internal registry and future-context APIs. Their internal imports restrict
+generated integration to SDK-hosted packages. The existing Go outer Nexus
+envelope still uses the Nexus serialization context; there is no special envelope
+bypass. Python system-envelope marking and codec-visitor parity are not
+implemented. The SDK selects the operation's failure converter for the target
+context, but authored nested-failure helpers still construct a default failure
+converter with the scoped data converter rather than using the configured failure
+converter. Full failure-conversion parity is not provided.
 
 ---
 

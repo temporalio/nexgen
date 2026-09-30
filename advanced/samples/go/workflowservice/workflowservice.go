@@ -15,7 +15,6 @@ import (
 	sdk "go.temporal.io/api/sdk/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -333,13 +332,6 @@ var signalWithStartWorkflowRequestTransferTypeConverter = workflow.NewContextAwa
 func (signalWithStartWorkflowRequest) TransferTypeConverter() workflow.TransferTypeConverter {
 	return signalWithStartWorkflowRequestTransferTypeConverter
 }
-
-// SerializationContext selects the context for nested Nexus payloads.
-func (m signalWithStartWorkflowRequest) SerializationContext() converter.SerializationContext {
-	return signalWithStartWorkflowSerializationContext(m)
-}
-
-var _ converter.SerializationContextProvider = signalWithStartWorkflowRequest{}
 
 // --- Operations (internal) ---
 
