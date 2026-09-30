@@ -314,13 +314,6 @@ func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.Transfe
 	)
 }
 
-// SerializationContext selects the context for nested Nexus payloads.
-func (m signalWithStartWorkflowRequest) SerializationContext() converter.SerializationContext {
-	return signalWithStartWorkflowSerializationContext(m)
-}
-
-var _ converter.SerializationContextProvider = signalWithStartWorkflowRequest{}
-
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
