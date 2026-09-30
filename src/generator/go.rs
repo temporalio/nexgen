@@ -636,6 +636,20 @@ impl GoPackageContext {
         self.qualified_expr("errors", "errors.New")
     }
 
+    pub(in crate::generator) fn serialization_context_type(&self) -> String {
+        self.qualified_expr(
+            "go.temporal.io/sdk/converter",
+            "converter.SerializationContext",
+        )
+    }
+
+    pub(in crate::generator) fn serialization_context_provider_type(&self) -> String {
+        self.qualified_expr(
+            "go.temporal.io/sdk/converter",
+            "converter.SerializationContextProvider",
+        )
+    }
+
     fn qualified_expr(&self, import_path: &str, code_expr: &str) -> String {
         if self.is_self_import(import_path) {
             self.unqualify_self_expr(code_expr)
@@ -995,10 +1009,11 @@ impl GoExternalModels {
         &self,
         api_plan: &PlannedSpec,
         services: &mut [RenderedService<'_>],
+        models: &IndexMap<String, RenderedModel>,
     ) -> Result<()> {
         match self {
             Self::Json(_) => Ok(()),
-            Self::Proto(backend) => backend.populate_operation_bindings(api_plan, services),
+            Self::Proto(backend) => backend.populate_operation_bindings(api_plan, services, models),
         }
     }
 
@@ -1156,6 +1171,23 @@ impl<'a> ApiPlanner<'a> {
             }
         }
 
+        let needs_eager_serialization_context = services
+            .iter()
+            .flat_map(|service| &service.operations)
+            .any(|operation| {
+                operation.serialization_context_expr.is_some()
+                    && (operation.output_transform_expr.is_some()
+                        || operation
+                            .wire_binding
+                            .as_ref()
+                            .is_some_and(proto::OperationBinding::has_eager_output))
+            });
+        if self.package.has_serialization_context
+            && !self.package.is_self_import("go.temporal.io/sdk/converter")
+        {
+            self.imports
+                .insert("go.temporal.io/sdk/converter".to_string());
+        }
         let needs_function_name_inlining = services.iter().any(service_uses_function_name_inlining);
 
         // Operation wrapper functions require the workflow package.
@@ -1287,7 +1319,7 @@ impl<'a> ApiPlanner<'a> {
             go_api_file_name(self.api_plan)
         };
         files.insert(file_name, output, primary_origin)?;
-        if self.package.has_serialization_context {
+        if needs_eager_serialization_context {
             files.insert(
                 PathBuf::from("serialization_context.go"),
                 render_serialization_context_support(&self.package),
@@ -1856,7 +1888,7 @@ impl<'a> ApiPlanner<'a> {
 
     fn populate_operation_bindings(&self, services: &mut [RenderedService<'_>]) -> Result<()> {
         self.external_models
-            .populate_operation_bindings(self.api_plan, services)
+            .populate_operation_bindings(self.api_plan, services, &self.models)
     }
 }
 
@@ -1919,44 +1951,29 @@ fn render_serialization_context_support(package: &GoPackageContext) -> String {
         "{GENERATED_HEADER}\n\npackage {}\n\nimport (\n",
         package.package_name
     );
-    for import in [
-        "go.temporal.io/sdk/converter",
-        "go.temporal.io/sdk/internal",
-        "go.temporal.io/sdk/workflow",
-    ] {
+    for import in ["go.temporal.io/sdk/internal", "go.temporal.io/sdk/workflow"] {
         if !package.is_self_import(import) {
             output.push_str(&format!("\t\"{import}\"\n"));
         }
     }
     output.push_str(")\n\n");
     let context = package.workflow_context_type();
-    let sc = package.qualified_expr(
-        "go.temporal.io/sdk/converter",
-        "converter.SerializationContext",
+    let future = package.qualified_expr(
+        "go.temporal.io/sdk/workflow",
+        "workflow.NexusOperationFuture",
     );
-    let dc = package.qualified_expr("go.temporal.io/sdk/converter", "converter.DataConverter");
-    let select = package.qualified_expr(
+    let get_converter = package.qualified_expr(
         "go.temporal.io/sdk/internal",
-        "internal.WithRootDataConverterSerializationContext",
+        "internal.GetNexusOperationInnerDataConverter",
     );
-    let with_value = package.qualified_expr("go.temporal.io/sdk/workflow", "workflow.WithValue");
+
     let with_converter =
         package.qualified_expr("go.temporal.io/sdk/workflow", "workflow.WithDataConverter");
     output.push_str(&format!(
-        r#"type nexgenSerializationContextKey struct{{}}
-
-// Keep the inner converter separate from the root used for the Nexus envelope.
-// The SDK retains this context for both input and result transfer conversion.
-func nexgenWithSerializationContext(ctx {context}, sc {sc}) {context} {{
-	if sc == nil {{
-		return ctx
-	}}
-	return {with_value}(ctx, nexgenSerializationContextKey{{}}, {select}(ctx, sc))
-}}
-
-// Only model conversion uses this derived context; never pass it to ExecuteOperation.
-func nexgenPayloadContext(ctx {context}) {context} {{
-	if dc, ok := ctx.Value(nexgenSerializationContextKey{{}}).({dc}); ok {{
+        r#"// Eager result conversion runs outside the SDK's transfer-converter callbacks.
+// Reuse the SDK's captured selection rather than reevaluating the request policy.
+func nexgenPayloadContext(ctx {context}, future {future}) {context} {{
+	if dc := {get_converter}(future); dc != nil {{
 		return {with_converter}(ctx, dc)
 	}}
 	return ctx

@@ -15,6 +15,7 @@ import (
 	sdk "go.temporal.io/api/sdk/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -317,10 +318,10 @@ var signalWithStartWorkflowRequestTransferTypeConverter = workflow.NewContextAwa
 		return errSignalWithStartWorkflowRequestNeedsWorkflowContext
 	},
 	func(ctx workflow.Context, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
-		return m.toProto(nexgenPayloadContext(ctx))
+		return m.toProto(ctx)
 	},
 	func(ctx workflow.Context, message *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
-		value, err := signalWithStartWorkflowRequestFromProto(nexgenPayloadContext(ctx), message)
+		value, err := signalWithStartWorkflowRequestFromProto(ctx, message)
 		if err != nil {
 			return err
 		}
@@ -333,11 +334,17 @@ func (signalWithStartWorkflowRequest) TransferTypeConverter() workflow.TransferT
 	return signalWithStartWorkflowRequestTransferTypeConverter
 }
 
+// SerializationContext selects the context for nested Nexus payloads.
+func (m signalWithStartWorkflowRequest) SerializationContext() converter.SerializationContext {
+	return signalWithStartWorkflowSerializationContext(m)
+}
+
+var _ converter.SerializationContextProvider = signalWithStartWorkflowRequest{}
+
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
 	request.namespace = workflow.GetInfo(ctx).Namespace
-	ctx = nexgenWithSerializationContext(ctx, signalWithStartWorkflowSerializationContext(request))
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -465,10 +472,10 @@ var signalWithStartWorkflowResponseTransferTypeConverter = workflow.NewContextAw
 		return errSignalWithStartWorkflowResponseNeedsWorkflowContext
 	},
 	func(ctx workflow.Context, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
-		return m.toProto(nexgenPayloadContext(ctx))
+		return m.toProto(ctx)
 	},
 	func(ctx workflow.Context, message *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
-		value, err := signalWithStartWorkflowResponseFromProto(nexgenPayloadContext(ctx), message)
+		value, err := signalWithStartWorkflowResponseFromProto(ctx, message)
 		if err != nil {
 			return err
 		}
