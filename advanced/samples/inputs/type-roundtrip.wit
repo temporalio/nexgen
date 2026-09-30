@@ -27,6 +27,8 @@ interface type-roundtrip-service {
     start-to-close-timeout: placeholder,
     /// @nexus.omit
     heartbeat-timeout: placeholder,
+    /// @nexus.omit
+    start-delay: placeholder,
   }
 
   /// @nexus.proto "temporal.api.command.v1.FailWorkflowExecutionCommandAttributes" typescript-import="@temporalio/proto"

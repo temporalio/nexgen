@@ -119,6 +119,8 @@ interface workflow-service {
     /// @nexus.doc "Whether the workflow was started."
     started: option<bool>,
     /// @nexus.omit
+    first-execution-run-id: placeholder,
+    /// @nexus.omit
     signal-link: placeholder,
   }
 

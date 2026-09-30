@@ -7,11 +7,9 @@ from .models import (
     PayloadBackedEnvelope,
     PayloadBackedOutput,
 )
-from .services import ProtoGenericPythonClient
 
 __all__ = [
     "PayloadBackedContext",
     "PayloadBackedEnvelope",
     "PayloadBackedOutput",
-    "ProtoGenericPythonClient",
 ]

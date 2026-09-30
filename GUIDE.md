@@ -79,6 +79,10 @@ user = await get_user(user_id="abc")
 const user = await getUser({ userId: "abc" });
 ```
 
+An exported interface with no operations or resources acts as a model-only
+module. Its declared types remain public, but the generator does not emit an
+empty service definition or client.
+
 ---
 
 ## Type Mappings

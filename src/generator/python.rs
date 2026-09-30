@@ -8556,6 +8556,8 @@ interface workflow-service {
     run-id: option<string>,
     started: option<bool>,
     /// @nexus.omit
+    first-execution-run-id: placeholder,
+    /// @nexus.omit
     signal-link: placeholder,
   }
 
