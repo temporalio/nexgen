@@ -318,6 +318,7 @@ func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.Transfe
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
 	request.namespace = workflow.GetInfo(ctx).Namespace
+	ctx = nexgenWithSerializationContext(ctx, signalWithStartWorkflowSerializationContext(request))
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)

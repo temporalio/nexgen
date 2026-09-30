@@ -642,6 +642,7 @@ pub(in crate::generator) struct OperationBinding {
     /// converter -- the SDK then performs the conversion inside the payload
     /// converter, and the model is passed to `ExecuteOperation` as-is.
     input_to_proto: Option<String>,
+    input_proto_type: String,
     /// Assignments that populate the request model's `@nexus.source` fields
     /// from their source expressions, emitted at the top of the operation
     /// function where `ctx` is in scope.
@@ -765,7 +766,7 @@ impl ModelBackend {
                     continue;
                 };
                 let output = operation_output(planned_op, api_plan);
-                let Some((_input_wire_type, input_conv)) =
+                let Some((input_wire_type, input_conv)) =
                     operation_message_binding(&input, &planned_op.name, "input", self)?
                 else {
                     continue;
@@ -893,6 +894,7 @@ impl ModelBackend {
 
                 rendered_op.wire_binding = Some(OperationBinding {
                     input_to_proto,
+                    input_proto_type: input_wire_type,
                     input_sourced_assignments,
                     output_proto_type,
                     output_model_type,
@@ -953,8 +955,8 @@ fn is_proto_generic_carrier(kind: &PlannedType) -> bool {
     )
 }
 
-/// Renders an operation function that serializes its request to proto before
-/// the SDK call and deserializes the proto response afterwards.
+/// Renders an operation function using transfer converters where available,
+/// with eager conversion for externally owned models and transformed results.
 pub(in crate::generator) fn render_operation_function_proto(
     output: &mut String,
     service: &crate::generator::go::RenderedService<'_>,
@@ -979,10 +981,21 @@ pub(in crate::generator) fn render_operation_function_proto(
         output.push_str(assignment);
         output.push('\n');
     }
+    if let Some(helper) = operation.serialization_context_expr {
+        output.push_str(&format!(
+            "\tctx = nexgenWithSerializationContext(ctx, {helper}(request))\n"
+        ));
+    }
     let input_arg = match binding.input_to_proto.as_deref() {
         Some(input_to_proto) => {
             output.push_str("\trequestProto, err := ");
-            output.push_str(input_to_proto);
+            render_conversion_expr(
+                output,
+                input_to_proto,
+                &binding.input_proto_type,
+                operation,
+                package,
+            );
             output.push('\n');
             output.push_str("\tif err != nil {\n");
             output.push_str("\t\tresult, resultSettable := ");
@@ -1038,7 +1051,7 @@ pub(in crate::generator) fn render_operation_function_proto(
             output.push_str("\t\t\treturn\n");
             output.push_str("\t\t}\n");
             output.push_str("\t\tvalue, err := ");
-            output.push_str(transform_expr);
+            render_conversion_expr(output, transform_expr, transform_type, operation, package);
             output.push('\n');
             output.push_str("\t\tif err != nil {\n");
             output.push_str("\t\t\tresultSettable.SetError(err)\n");
@@ -1080,7 +1093,12 @@ pub(in crate::generator) fn render_operation_function_proto(
                 output.push_str("\t\t\treturn\n");
                 output.push_str("\t\t}\n");
                 output.push_str("\t\tvalue, err := ");
-                output.push_str(from_proto);
+                let result_type = if binding.output_returns_pointer {
+                    format!("*{output_type}")
+                } else {
+                    output_type.clone()
+                };
+                render_conversion_expr(output, from_proto, &result_type, operation, package);
                 output.push('\n');
                 output.push_str("\t\tif err != nil {\n");
                 output.push_str("\t\t\tresultSettable.SetError(err)\n");
@@ -1108,6 +1126,9 @@ pub(in crate::generator) fn render_operation_function_proto(
                 output.push_str("\t\t\tresultSettable.SetError(err)\n");
                 output.push_str("\t\t\treturn\n");
                 output.push_str("\t\t}\n");
+                if operation.serialization_context_expr.is_some() {
+                    output.push_str("\t\tctx = nexgenPayloadContext(ctx)\n");
+                }
                 for line in &resource_return.local_lines {
                     output.push_str("\t\t");
                     output.push_str(line);
@@ -1129,6 +1150,24 @@ pub(in crate::generator) fn render_operation_function_proto(
         output.push_str("\treturn fut\n");
     }
     output.push_str("}\n");
+}
+
+// Override converters and output transforms take `ctx` in their authored
+// expressions. Scope that parameter to conversion without changing the context
+// retained by the Nexus future.
+fn render_conversion_expr(
+    output: &mut String,
+    expression: &str,
+    result_type: &str,
+    operation: &crate::generator::go::RenderedOperation<'_>,
+    package: &GoPackageContext,
+) {
+    if operation.serialization_context_expr.is_some() {
+        let context = package.workflow_context_type();
+        output.push_str(&format!("func(ctx {context}) ({result_type}, error) {{\n\t\treturn {expression}\n\t}}(nexgenPayloadContext(ctx))"));
+    } else {
+        output.push_str(expression);
+    }
 }
 
 /// Computes the backend binding for an operation message: the wire type
