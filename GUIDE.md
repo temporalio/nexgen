@@ -1562,8 +1562,8 @@ by the target workflow.
 
 Python stores the helper alongside the operation definition in the generated
 operation registry. The SDK uses that entry to call the helper with the operation
-request before converting user payloads. Go invokes the helper directly from the
-generated operation function; it does not emit a serialization-context registry.
+request before converting user payloads. Go emits a `SerializationContext()`
+method on the generated request model that forwards to the helper.
 
 The helper is invoked with the actual generated operation request model. In
 Python examples below, the request is annotated as `typing.Any` because support
@@ -1599,10 +1599,18 @@ The referenced helper must be provided through `@nexus.support`.
 
 #### Go helpers and conversion scope
 
-Go supports this directive for proto-backed operation requests. Non-proto and
-JSON operation references with a selected Go helper are rejected as unsupported,
-not silently ignored. A directive that selects only another language's helper
-does not enable Go serialization-context support.
+Go supports this directive for generator-owned, proto-backed request models.
+Externally owned or overridden request types are rejected because the generator
+cannot add methods to them. Non-proto and JSON requests remain unsupported.
+A Go-specific helper takes precedence over the default helper; a directive that
+selects only another language's helper does not enable Go support.
+
+All operations using the same generated proto request model, including aliases
+and uses across services, must select the same helper or all omit it. A helper
+conflicts with an absent selection. The Go generator keys models by protobuf
+identity, so even different authored records backed by the same protobuf cannot
+select distinct policies. A model field named `SerializationContext` also
+conflicts with the generated method.
 
 A Go helper reference must be a function identifier, such as
 `signalWithStartWorkflowSerializationContext`, or a package-qualified function,
@@ -1610,7 +1618,7 @@ such as `helpers.Context`. Each component must be a valid Go identifier, not a
 keyword or the blank identifier `_`. Calls, deeper selector chains, and arbitrary
 expressions are not accepted. For a qualified helper, supply the package import
 in a Go support fragment unless the generated model already imports that package.
-The generator copies the matching import into the operation file and preserves
+The generator copies the matching import into the model file and preserves
 an explicit alias. For example, `helpers.Context` can use
 `import helpers "example.com/helpers"` from a support fragment.
 
@@ -1638,33 +1646,46 @@ func signalWithStartWorkflowSerializationContext(
 }
 ```
 
-The helper receives the generated request model after sourced fields have been
-assigned. In this example, the sourced namespace is the unexported field
+Generated operations assign sourced fields before passing the request to the SDK. In this example, the sourced namespace is the unexported field
 `request.namespace`, not `request.Namespace`. Support code is emitted in the same
 Go package, so it can access that field. Helpers return a
 `converter.SerializationContext` (or a concrete type implementing it). Returning
 `nil` leaves the converter unchanged.
 
-When a Go helper is selected, the generator emits `serialization_context.go`.
-The operation calls
-`ctx = nexgenWithSerializationContext(ctx, helper(request))` after sourced
-assignments. This stores a converter selected from the workflow's root data
-converter in `workflow.WithValue`; it does not replace the data converter on the
-context passed to `ExecuteOperation`. The outer Nexus payload keeps its Nexus
-serialization context.
+The generated value-receiver method implements
+`converter.SerializationContextProvider`:
 
-Both transfer-converter callbacks use `nexgenPayloadContext(ctx)` to derive a
-local conversion context. Nested `toProto` methods use that context without
-selecting another converter. Eager input and output conversions, override
-converters, and output transforms also use a conversion-scoped context; resource
-returns scope their callback context. These local contexts do not change the
-root converter used for other operations.
+```go
+func (m signalWithStartWorkflowRequest) SerializationContext() converter.SerializationContext {
+    return signalWithStartWorkflowSerializationContext(m)
+}
+```
 
-**SDK prerequisite:** SDK-hosted Go support requires
-`internal.WithRootDataConverterSerializationContext` from the Go SDK change that
-follows the transfer-type-converter PR. No published SDK version provides this
-helper yet. The generated code imports `go.temporal.io/sdk/internal`, so this
-support is intended for SDK-hosted packages, not arbitrary external Go modules.
+The SDK inspects the original request at the Nexus call and binds the selected
+data converter to the transfer-conversion context. The SDK captures the policy
+once at scheduling, and the future retains that converter for response conversion. Transfer callbacks use the SDK's
+context directly; generated operation wrappers do not select the converter.
+The root converter remains available for the outer Nexus payload and other
+operations.
+
+Raw Nexus calls also support this contract when passed the original model rather
+than a preconverted protobuf. Callers must populate any required sourced fields;
+the sample request model is currently private to its generated package.
+
+Only eager output conversion, output transforms, and resource returns need the
+generated `serialization_context.go` helper. Its
+`nexgenPayloadContext(ctx, fut)` retrieves the captured converter through
+`internal.GetNexusOperationInnerDataConverter(fut)` and applies
+`workflow.WithDataConverter` for that conversion only. It never calls the request's
+provider again, so request mutation or interceptor replacement cannot change the
+captured policy during response conversion. Future wrappers can optionally forward
+the converter getter; if none is available, the helper leaves `ctx` unchanged.
+
+**SDK prerequisite:** No published Go SDK version provides this new
+`converter.SerializationContextProvider` support yet. Eager conversion also
+requires `internal.GetNexusOperationInnerDataConverter`; its internal
+import restricts that generated support to SDK-hosted packages. This is not full
+Python envelope or failure-conversion parity.
 
 ---
 
