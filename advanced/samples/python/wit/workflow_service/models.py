@@ -230,9 +230,9 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _SignalWithStartWorkflowRequestTransferTypeConverter
-)(SignalWithStartWorkflowRequest)
+)(SignalWithStartWorkflowRequest)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -283,9 +283,9 @@ class _UserMetadataTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(_UserMetadataTransferTypeConverter)(
+temporalio.converter.transfer_type_convertible(_UserMetadataTransferTypeConverter)(
     UserMetadata
-)
+)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -336,6 +336,6 @@ class _SignalWithStartWorkflowResponseTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _SignalWithStartWorkflowResponseTransferTypeConverter
-)(SignalWithStartWorkflowResponse)
+)(SignalWithStartWorkflowResponse)  # pyright: ignore[reportUnusedCallResult]

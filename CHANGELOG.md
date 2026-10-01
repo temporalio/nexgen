@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Operation-free WIT interfaces now generate their public models without an
   empty service definition or client.
+- Generated Python protobuf model converters now encode and decode oneof
+  variants with `match` statements over the typed field and the protobuf
+  `WhichOneof` case, and trust their static types. Serializing a value that is
+  not one of the declared variants, or decoding a oneof case unknown to the
+  generated model, no longer raises a dedicated `ValueError`/`TypeError`.
 
 ### Deprecated
 

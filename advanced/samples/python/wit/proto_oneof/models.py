@@ -42,21 +42,18 @@ class _OutcomeTransferTypeConverter(
         type_hint: type[Outcome[OutputT]],
     ) -> Outcome[OutputT]:
         (output_type,) = typing.get_args(type_hint) or (typing.Any,)
-        _oneof_value_case = value.WhichOneof("value")
-        if _oneof_value_case is None:
-            raise ValueError("missing required field Outcome.value")
-        elif _oneof_value_case == "success":
-            _oneof_value = OutcomeValueSuccess(
-                typing.cast(
-                    OutputT, payloads_from_proto(value.success, [output_type])[0]
+        _oneof_value: OutcomeValueSuccess[OutputT] | OutcomeValueFailure
+        match value.WhichOneof("value"):
+            case "success":
+                _oneof_value = OutcomeValueSuccess(
+                    typing.cast(
+                        OutputT, payloads_from_proto(value.success, [output_type])[0]
+                    )
                 )
-            )
-        elif _oneof_value_case == "failure":
-            _oneof_value = OutcomeValueFailure(failure_from_proto(value.failure))
-        else:
-            raise ValueError(
-                f"unknown protobuf oneof case Outcome.value: {_oneof_value_case}"
-            )
+            case "failure":
+                _oneof_value = OutcomeValueFailure(failure_from_proto(value.failure))
+            case None:
+                raise ValueError("missing required field Outcome.value")
         return Outcome(
             value=_oneof_value,
         )
@@ -66,25 +63,18 @@ class _OutcomeTransferTypeConverter(
         self,
         value: Outcome[OutputT],
     ) -> temporalio.api.update.v1.message_pb2.Outcome:
-        runtime_value: typing.Any = value
         message = temporalio.api.update.v1.message_pb2.Outcome()
-        if runtime_value.value is None:
-            raise ValueError("missing required field Outcome.value")
-        _oneof_value_value = runtime_value.value
-        if isinstance(_oneof_value_value, OutcomeValueSuccess):
-            message.success.CopyFrom(payloads_to_proto([_oneof_value_value.value]))
-        elif isinstance(_oneof_value_value, OutcomeValueFailure):
-            message.failure.CopyFrom(failure_to_proto(_oneof_value_value.value))
-        else:
-            raise TypeError(
-                f"unsupported variant case Outcome.value: {_oneof_value_value!r}"
-            )
+        match value.value:
+            case OutcomeValueSuccess():
+                message.success.CopyFrom(payloads_to_proto([value.value.value]))
+            case OutcomeValueFailure():
+                message.failure.CopyFrom(failure_to_proto(value.value.value))
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _OutcomeTransferTypeConverter[typing.Any]
-)(Outcome)
+)(Outcome)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True, kw_only=True)
@@ -122,17 +112,14 @@ class _PauseActivityRequestTransferTypeConverter(
         if not value.identity:
             raise ValueError("missing required field PauseActivityRequest.identity")
         identity = value.identity
-        _oneof_activity_case = value.WhichOneof("activity")
-        if _oneof_activity_case is None:
-            _oneof_activity = None
-        elif _oneof_activity_case == "id":
-            _oneof_activity = ActivitySelectionId(value.id)
-        elif _oneof_activity_case == "type":
-            _oneof_activity = ActivitySelectionType(value.type)
-        else:
-            raise ValueError(
-                f"unknown protobuf oneof case PauseActivityRequest.activity: {_oneof_activity_case}"
-            )
+        _oneof_activity: ActivitySelectionId | ActivitySelectionType | None
+        match value.WhichOneof("activity"):
+            case "id":
+                _oneof_activity = ActivitySelectionId(value.id)
+            case "type":
+                _oneof_activity = ActivitySelectionType(value.type)
+            case None:
+                _oneof_activity = None
         if not value.reason:
             raise ValueError("missing required field PauseActivityRequest.reason")
         reason = value.reason
@@ -167,23 +154,19 @@ class _PauseActivityRequestTransferTypeConverter(
             )
         message.identity = value.identity
         if value.activity is not None:
-            _oneof_activity_value = typing.cast(typing.Any, value.activity)
-            if isinstance(_oneof_activity_value, ActivitySelectionId):
-                message.id = _oneof_activity_value.value
-            elif isinstance(_oneof_activity_value, ActivitySelectionType):
-                message.type = _oneof_activity_value.value
-            else:
-                raise TypeError(
-                    f"unsupported variant case PauseActivityRequest.activity: {_oneof_activity_value!r}"
-                )
+            match value.activity:
+                case ActivitySelectionId():
+                    message.id = value.activity.value
+                case ActivitySelectionType():
+                    message.type = value.activity.value
         message.reason = value.reason
         message.request_id = value.request_id
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _PauseActivityRequestTransferTypeConverter
-)(PauseActivityRequest)
+)(PauseActivityRequest)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -229,9 +212,9 @@ class _WorkflowExecutionTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
-    _WorkflowExecutionTransferTypeConverter
-)(WorkflowExecution)
+temporalio.converter.transfer_type_convertible(_WorkflowExecutionTransferTypeConverter)(
+    WorkflowExecution
+)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)

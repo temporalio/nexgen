@@ -49,21 +49,20 @@ class _OnCompleteRequestTransferTypeConverter(
             typing.Any,
             typing.Any,
         )
-        _oneof_result_case = value.WhichOneof("result")
-        if _oneof_result_case is None:
-            raise ValueError("missing required field OnCompleteRequest.result")
-        elif _oneof_result_case == "success":
-            _oneof_result = OnCompleteRequestResultSuccess(
-                typing.cast(OutputT, payload_from_proto(value.success, output_type))
-            )
-        elif _oneof_result_case == "failure":
-            _oneof_result = OnCompleteRequestResultFailure(
-                failure_from_proto(value.failure)
-            )
-        else:
-            raise ValueError(
-                f"unknown protobuf oneof case OnCompleteRequest.result: {_oneof_result_case}"
-            )
+        _oneof_result: (
+            OnCompleteRequestResultSuccess[OutputT] | OnCompleteRequestResultFailure
+        )
+        match value.WhichOneof("result"):
+            case "success":
+                _oneof_result = OnCompleteRequestResultSuccess(
+                    typing.cast(OutputT, payload_from_proto(value.success, output_type))
+                )
+            case "failure":
+                _oneof_result = OnCompleteRequestResultFailure(
+                    failure_from_proto(value.failure)
+                )
+            case None:
+                raise ValueError("missing required field OnCompleteRequest.result")
         if not value.HasField("source_context"):
             raise ValueError("missing required field OnCompleteRequest.source_context")
         source_context = typing.cast(
@@ -80,26 +79,19 @@ class _OnCompleteRequestTransferTypeConverter(
         self,
         value: OnCompleteRequest[OutputT, SourceContextT],
     ) -> temporalio.api.notificationservice.v1.request_response_pb2.OnCompleteRequest:
-        runtime_value: typing.Any = value
         message = temporalio.api.notificationservice.v1.request_response_pb2.OnCompleteRequest()
-        if runtime_value.result is None:
-            raise ValueError("missing required field OnCompleteRequest.result")
-        _oneof_result_value = runtime_value.result
-        if isinstance(_oneof_result_value, OnCompleteRequestResultSuccess):
-            message.success.CopyFrom(payload_to_proto(_oneof_result_value.value))
-        elif isinstance(_oneof_result_value, OnCompleteRequestResultFailure):
-            message.failure.CopyFrom(failure_to_proto(_oneof_result_value.value))
-        else:
-            raise TypeError(
-                f"unsupported variant case OnCompleteRequest.result: {_oneof_result_value!r}"
-            )
-        message.source_context.CopyFrom(payload_to_proto(runtime_value.source_context))
+        match value.result:
+            case OnCompleteRequestResultSuccess():
+                message.success.CopyFrom(payload_to_proto(value.result.value))
+            case OnCompleteRequestResultFailure():
+                message.failure.CopyFrom(failure_to_proto(value.result.value))
+        message.source_context.CopyFrom(payload_to_proto(value.source_context))
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _OnCompleteRequestTransferTypeConverter[typing.Any, typing.Any]
-)(OnCompleteRequest)
+)(OnCompleteRequest)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -137,9 +129,9 @@ class _OnCompleteResponseTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _OnCompleteResponseTransferTypeConverter
-)(OnCompleteResponse)
+)(OnCompleteResponse)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)

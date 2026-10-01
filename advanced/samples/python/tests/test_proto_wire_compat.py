@@ -39,8 +39,10 @@ def assert_activity_options_model(decoded: object) -> None:
     )
 
 
-def test_activity_options_intermediate_conversion_delegates_payload_encoding() -> None:
-    converter = DataConverter.default.payload_converter
+async def test_activity_options_intermediate_conversion_delegates_payload_encoding() -> (
+    None
+):
+    converter = DataConverter.default
     activity_options = ActivityOptions(
         retry_policy=temporalio.common.RetryPolicy(maximum_attempts=3),
         task_queue="demo-task-queue",
@@ -52,7 +54,7 @@ def test_activity_options_intermediate_conversion_delegates_payload_encoding() -
         ),
     )
 
-    payload = converter.to_payloads([activity_options])[0]
+    payload = (await converter.encode([activity_options]))[0]
     assert payload.metadata["encoding"] == b"json/protobuf"
     assert (
         payload.metadata["messageType"] == b"temporal.api.activity.v1.ActivityOptions"
@@ -63,12 +65,12 @@ def test_activity_options_intermediate_conversion_delegates_payload_encoding() -
     assert encoded["taskQueue"]["name"] == "demo-task-queue"
     assert encoded["retryPolicy"]["maximumAttempts"] == 3
 
-    decoded = converter.from_payloads([payload], [ActivityOptions])[0]
+    decoded = (await converter.decode([payload], [ActivityOptions]))[0]
     assert_activity_options_model(decoded)
 
 
-def test_activity_options_fixtures_decode_to_user_type() -> None:
-    converter = DataConverter.default.payload_converter
+async def test_activity_options_fixtures_decode_to_user_type() -> None:
+    converter = DataConverter.default
     for fixture_name in (
         "activity-options.python.payload.json",
         "activity-options.dotnet.payload.json",
@@ -79,5 +81,5 @@ def test_activity_options_fixtures_decode_to_user_type() -> None:
             payload.metadata["messageType"]
             == b"temporal.api.activity.v1.ActivityOptions"
         )
-        decoded = converter.from_payloads([payload], [ActivityOptions])[0]
+        decoded = (await converter.decode([payload], [ActivityOptions]))[0]
         assert_activity_options_model(decoded)
