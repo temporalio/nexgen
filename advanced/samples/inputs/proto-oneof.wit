@@ -1,11 +1,11 @@
-/// Python protobuf-oneof generation and runtime fixture.
+/// Protobuf-oneof generation and runtime fixture.
 package temporal:nexus@1.0.0;
 
 world system {
-  export outcome;
+  export proto-oneof;
 }
 
-interface outcome {
+interface proto-oneof {
   use nexus:temporal-types/model@1.0.0.{
     failure,
     payloads,

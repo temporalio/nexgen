@@ -161,6 +161,7 @@ mod tests {
                 resources: Vec::new(),
                 data: (),
             }],
+            model_scope: None,
             types: BTreeMap::new(),
         };
         let tree = LanguageSelectionPass::new(Language::Python)
@@ -186,6 +187,7 @@ mod tests {
                 version: "1".to_string(),
                 support: SupportSpec::default(),
                 services: vec![],
+                model_scope: None,
                 types: BTreeMap::new(),
             },
             Language::Go,

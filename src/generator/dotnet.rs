@@ -85,7 +85,7 @@ impl<'a> ApiPlanner<'a> {
         ];
         if models.iter().any(|model| {
             self.external_models
-                .model_transfer_converter_attribute(model)
+                .model_transfer_converter_attribute(model, self.api_plan)
                 .is_some()
         }) {
             imports.push("Temporalio.Converters");
@@ -614,7 +614,7 @@ impl<'a> ApiPlanner<'a> {
         render_xml_summary(output, "", dotnet_doc(model.doc()), model.experimental);
         if let Some(attribute) = self
             .external_models
-            .model_transfer_converter_attribute(model)
+            .model_transfer_converter_attribute(model, self.api_plan)
         {
             output.push_str(&attribute);
             output.push('\n');
@@ -1965,8 +1965,13 @@ impl DotNetExternalModels {
         self.proto.model_needs_wire_method(model)
     }
 
-    fn model_transfer_converter_attribute(&self, model: &PlannedModel) -> Option<String> {
-        self.proto.model_transfer_converter_attribute(model)
+    fn model_transfer_converter_attribute(
+        &self,
+        model: &PlannedModel,
+        api_plan: &PlannedSpec,
+    ) -> Option<String> {
+        self.proto
+            .model_transfer_converter_attribute(model, api_plan)
     }
 
     fn model_uses_support_extensions(&self, model: &PlannedModel, api_plan: &PlannedSpec) -> bool {
@@ -3923,15 +3928,21 @@ fn dotnet_namespace(api_plan: &PlannedSpec) -> String {
         return dotnet_module_namespace(&api_plan.module_path);
     }
     api_plan
-        .services
-        .first()
-        .and_then(|service| service.namespace.for_language(Language::Dotnet))
+        .primary_namespace()
+        .and_then(|namespace| namespace.for_language(Language::Dotnet))
         .map(ToOwned::to_owned)
         .or_else(|| {
             api_plan
                 .services
                 .first()
-                .map(|service| format!("Nexgen.{}", csharp_type_name(&service.name)))
+                .map(|service| service.name.as_str())
+                .or_else(|| {
+                    api_plan
+                        .model_scope
+                        .as_ref()
+                        .map(|scope| scope.name.as_str())
+                })
+                .map(|name| format!("Nexgen.{}", csharp_type_name(name)))
         })
         .unwrap_or_else(|| "Nexgen.Generated".to_string())
 }

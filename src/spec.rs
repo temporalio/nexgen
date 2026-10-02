@@ -12,7 +12,30 @@ pub struct ApiSpec<F: TypeFamily = AuthoredFamily> {
     pub version: String,
     pub support: F::Support,
     pub services: Vec<ServiceSpec<F>>,
+    /// The authored scope that owns this input's models when it defines no
+    /// services, such as an operation-free WIT interface. Backends use it to
+    /// name generated output that would otherwise be named after a service.
+    pub model_scope: Option<ModelScopeSpec<F>>,
     pub types: BTreeMap<String, TypeDeclEntry<F>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModelScopeSpec<F: TypeFamily = AuthoredFamily> {
+    pub name: String,
+    pub namespace: F::Text,
+}
+
+impl<F: TypeFamily> ModelScopeSpec<F> {
+    fn map_names_with<G, M>(self, map: &mut M) -> ModelScopeSpec<G>
+    where
+        G: TypeFamily,
+        M: ApiSpecTransform<F, G>,
+    {
+        ModelScopeSpec {
+            name: self.name,
+            namespace: map.map_text(self.namespace),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -267,6 +290,15 @@ pub type AuthoredApiSpec = ApiSpec<AuthoredFamily>;
 pub type AuthoredTypeSpec = TypeSpec<AuthoredFamily>;
 
 impl<F: TypeFamily> ApiSpec<F> {
+    /// Returns the authored namespace text of the first service or, for an
+    /// input without services, of its model scope.
+    pub fn primary_namespace(&self) -> Option<&F::Text> {
+        self.services
+            .first()
+            .map(|service| &service.namespace)
+            .or_else(|| self.model_scope.as_ref().map(|scope| &scope.namespace))
+    }
+
     pub fn external_type_binding(&self, type_name: &str) -> Option<&ExternalTypeBindingSpec<F>> {
         match self.types.get(type_name.trim_start_matches('.')) {
             Some(TypeDeclEntry {
@@ -385,6 +417,7 @@ impl<F: TypeFamily> ApiSpec<F> {
                 .into_iter()
                 .map(|service| service.map_names_with(map))
                 .collect(),
+            model_scope: self.model_scope.map(|scope| scope.map_names_with(map)),
             types: self
                 .types
                 .into_iter()

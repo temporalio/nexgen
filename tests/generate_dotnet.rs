@@ -776,3 +776,123 @@ interface workflow-service {
     assert!(!rendered.contains("WorkflowServiceOperations"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
+
+#[test]
+fn dotnet_notification_models_convert_generic_oneofs_without_service() {
+    let root = project_root();
+    let files = generate_dotnet_files(
+        &example_input_paths(&root, "notification-service"),
+        &[descriptor_path(&root)],
+    );
+    let models = files
+        .get(&PathBuf::from("Models.cs"))
+        .expect("notification output should include Models.cs");
+
+    assert!(!files.contains_key(&PathBuf::from("Services.cs")));
+    assert!(!files.contains_key(&PathBuf::from("Operations.cs")));
+    assert!(models.contains("namespace Nexgen.NotificationService\n{"));
+    assert!(models.contains(
+        "[Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteRequest<,>.TransferTypeConverter))]"
+    ));
+    assert!(models.contains("public record OnCompleteRequest<OutputT, SourceContextT>"));
+    assert!(models.contains(
+        "internal static OnCompleteRequest<OutputT, SourceContextT> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)"
+    ));
+    assert!(models.contains(
+        "wire.ResultCase switch { Temporalio.Api.NotificationService.V1.OnCompleteRequest.ResultOneofCase.Success => (OnCompleteRequestResult<OutputT>)new OnCompleteRequestResult<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayload<OutputT>(wire.Success))"
+    ));
+    assert!(models.contains(
+        "_ => throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.Result\") }"
+    ));
+    assert!(models.contains(
+        "Nexgen.Support.ProtoExtensions.FromPayload<SourceContextT>(wire.SourceContext ?? throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.SourceContext\"))"
+    ));
+    assert!(models.contains("case OnCompleteRequestResult<OutputT>.Failure failureCase:"));
+    assert!(models.contains(
+        "proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);"
+    ));
+    assert!(models.contains(
+        "proto.SourceContext = Nexgen.Support.ProtoExtensions.ToPayload(SourceContext);"
+    ));
+    assert!(models.contains(
+        "public object? ToTransferType(object? value) => value is null ? null : ((OnCompleteRequest<OutputT, SourceContextT>)value).ToTransferType();"
+    ));
+}
+
+#[test]
+fn dotnet_proto_oneofs_convert_payloads_and_optional_groups() {
+    let root = project_root();
+    let files = generate_dotnet_files(
+        &example_input_paths(&root, "proto-oneof"),
+        &[descriptor_path(&root)],
+    );
+    let models = files
+        .get(&PathBuf::from("Models.cs"))
+        .expect("proto oneof output should include Models.cs");
+
+    assert!(models.contains("typeof(Outcome<>.TransferTypeConverter)"));
+    assert!(models.contains(
+        "new OutcomeValue<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<OutputT>(wire.Success)[0])"
+    ));
+    assert!(models.contains(
+        "proto.Success = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { successCase.Value });"
+    ));
+    assert!(models.contains(
+        "Activity = wire.ActivityCase switch { Temporalio.Api.WorkflowService.V1.PauseActivityRequest.ActivityOneofCase.Id => (ActivitySelection)new ActivitySelection.Id(wire.Id), Temporalio.Api.WorkflowService.V1.PauseActivityRequest.ActivityOneofCase.Type => (ActivitySelection)new ActivitySelection.Type(wire.Type), _ => null },"
+    ));
+    assert!(models.contains("case ActivitySelection.Type typeCase:"));
+    assert!(models.contains("proto.Type = typeCase.Value;"));
+}
+
+#[test]
+fn dotnet_generic_proto_models_reference_nested_generic_converters() {
+    let root = project_root();
+    let files = generate_dotnet_files(
+        &example_input_paths(&root, "proto-generic"),
+        &[descriptor_path(&root)],
+    );
+    let models = files
+        .get(&PathBuf::from("Models.cs"))
+        .expect("proto generic output should include Models.cs");
+
+    assert!(models.contains("typeof(PayloadBackedEnvelope<,>.TransferTypeConverter)"));
+    assert!(models.contains(
+        "return new PayloadBackedEnvelope<OutputT, ContextT>(PayloadBackedOutput<OutputT>.FromTransferType(wire.Provider), PayloadBackedContext<ContextT>.FromTransferType(wire.Scaler));"
+    ));
+    assert!(models.contains(
+        "proto.Provider = (Temporalio.Api.Compute.V1.ComputeProvider)Provider.ToTransferType();"
+    ));
+}
+
+#[test]
+fn dotnet_model_only_interfaces_use_their_namespace_directive() {
+    let temp_dir = unique_output_path("dotnet-model-only-namespace");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("models.wit");
+    fs::write(
+        &input_path,
+        r#"package test:models@1.0.0;
+
+world system {
+  export notification-models;
+}
+
+/// @nexus.namespace dotnet="Acme.Notifications"
+interface notification-models {
+  record notification {
+    message: string,
+  }
+}
+"#,
+    )
+    .unwrap();
+
+    let files = generate_dotnet_files(&[input_path], &[]);
+    fs::remove_dir_all(temp_dir).unwrap();
+    let models = files
+        .get(&PathBuf::from("Models.cs"))
+        .expect("model-only output should include Models.cs");
+
+    assert!(models.contains("namespace Acme.Notifications\n{"));
+    assert!(models.contains("public record Notification"));
+}

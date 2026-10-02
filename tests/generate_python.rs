@@ -1497,7 +1497,7 @@ fn python_notification_models_do_not_emit_an_empty_service() {
     assert!(!package.contains_key(&PathBuf::from("services.py")));
     assert!(package_init.contains("OnCompleteRequest,"));
     assert!(package_init.contains("OnCompleteResponse,"));
-    assert!(!package_init.contains("OnCompleteRequestClient"));
+    assert!(!package_init.contains("NotificationServiceClient"));
 }
 
 #[test]
@@ -1562,7 +1562,7 @@ fn python_rejects_proto_variant_case_class_name_collisions() {
 fn python_proto_generics_propagate_payload_type_hints() {
     let root = project_root();
     let package = generate_python_package_files(
-        &example_input_paths(&root, "proto-generic-python"),
+        &example_input_paths(&root, "proto-generic"),
         &[descriptor_path(&root)],
     );
     let models = package
