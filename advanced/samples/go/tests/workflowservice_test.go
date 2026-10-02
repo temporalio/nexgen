@@ -36,6 +36,49 @@ func (c emptyPayloadsDataConverter) ToPayloads(values ...interface{}) (*common.P
 	return c.DataConverter.ToPayloads(values...)
 }
 
+// recordedEncode captures one value handed to the data converter along with the
+// serialization context that was active at the time.
+type recordedEncode struct {
+	Context converter.SerializationContext
+	Value   any
+}
+
+// recordingDataConverter records every value it is asked to encode. It also
+// implements [converter.DataConverterWithSerializationContext] so that the
+// recorded entries show which serialization context the SDK applied.
+type recordingDataConverter struct {
+	converter.DataConverter
+	serializationContext converter.SerializationContext
+	recorded             *[]recordedEncode
+}
+
+func newRecordingDataConverter() recordingDataConverter {
+	return recordingDataConverter{
+		DataConverter: converter.GetDefaultDataConverter(),
+		recorded:      &[]recordedEncode{},
+	}
+}
+
+func (c recordingDataConverter) WithSerializationContext(ctx converter.SerializationContext) converter.DataConverter {
+	return recordingDataConverter{
+		DataConverter:        converter.WithDataConverterSerializationContext(c.DataConverter, ctx),
+		serializationContext: ctx,
+		recorded:             c.recorded,
+	}
+}
+
+func (c recordingDataConverter) ToPayload(value any) (*common.Payload, error) {
+	*c.recorded = append(*c.recorded, recordedEncode{c.serializationContext, value})
+	return c.DataConverter.ToPayload(value)
+}
+
+func (c recordingDataConverter) ToPayloads(values ...any) (*common.Payloads, error) {
+	for _, value := range values {
+		*c.recorded = append(*c.recorded, recordedEncode{c.serializationContext, value})
+	}
+	return c.DataConverter.ToPayloads(values...)
+}
+
 type WorkflowServiceIntegrationSuite struct {
 	suite.Suite
 	testsuite.WorkflowTestSuite
@@ -180,12 +223,12 @@ func (s *WorkflowServiceIntegrationSuite) TestCanceledContextDoesNotScheduleOper
 	s.Empty(s.calls)
 }
 
-func (s *WorkflowServiceIntegrationSuite) TestConversionFailureReturnsReadyFuture() {
+func (s *WorkflowServiceIntegrationSuite) TestConversionFailureSurfacesOnTheFuture() {
+	// Model->proto conversion now runs inside the SDK's payload converter, so a
+	// conversion failure resolves the operation future with an error instead of
+	// failing synchronously before the operation is scheduled.
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		fut := ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{ID: "workflow-id", Memo: map[string]any{"invalid": func() {}}}, "wake-up", "signal-value", signalWithStartWorkflow, "workflow-input")
-		if !fut.IsReady() {
-			return errors.New("conversion failure future is not ready")
-		}
 		if err := fut.Get(ctx, nil); err == nil {
 			return errors.New("conversion failure future returned no error")
 		}
@@ -194,4 +237,84 @@ func (s *WorkflowServiceIntegrationSuite) TestConversionFailureReturnsReadyFutur
 
 	s.NoError(s.env.GetWorkflowError())
 	s.Empty(s.calls)
+}
+
+// TestModelIsConvertedInsideThePayloadConverter is the acceptance test for the
+// transfer-type port. The generated code no longer builds the proto itself;
+// the SDK's transfer-type machinery does it during payload conversion. The
+// observable consequence is that the model's inner user payloads (Args,
+// SignalArgs) are encoded by the data converter -- and under the serialization
+// context -- that the SDK selected for the Nexus operation.
+func (s *WorkflowServiceIntegrationSuite) TestModelIsConvertedInsideThePayloadConverter() {
+	recorder := newRecordingDataConverter()
+	s.env.SetDataConverter(recorder)
+
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		return ws.SignalWithStartWorkflow(
+			ctx,
+			ws.SignalWithStartWorkflowOptions{ID: "target-workflow-id", TaskQueue: "my-task-queue"},
+			"wake-up",
+			"signal-value",
+			"ExampleWorkflow",
+			"workflow-input",
+		).Get(ctx, nil)
+	})
+
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+	s.Require().Len(s.calls, 1)
+
+	recorded := *recorder.recorded
+	indexOf := func(match func(recordedEncode) bool) int {
+		for i, entry := range recorded {
+			if match(entry) {
+				return i
+			}
+		}
+		return -1
+	}
+	stringAt := func(want string) int {
+		return indexOf(func(entry recordedEncode) bool {
+			value, ok := entry.Value.(string)
+			return ok && value == want
+		})
+	}
+
+	workflowArg := stringAt("workflow-input")
+	signalArg := stringAt("signal-value")
+	request := indexOf(func(entry recordedEncode) bool {
+		_, ok := entry.Value.(*workflowservicepb.SignalWithStartWorkflowExecutionRequest)
+		return ok
+	})
+
+	s.Require().NotEqual(-1, workflowArg, "workflow argument was not encoded by the SDK's data converter")
+	s.Require().NotEqual(-1, signalArg, "signal argument was not encoded by the SDK's data converter")
+	s.Require().NotEqual(-1, request, "the SDK's data converter never received the transfer value")
+
+	// The inner user payloads are encoded while the SDK converts the model,
+	// i.e. strictly before the resulting proto reaches the data converter.
+	s.Less(workflowArg, request)
+	s.Less(signalArg, request)
+
+	// The transfer value -- the proto envelope -- is encoded under the Nexus
+	// operation's serialization context.
+	s.Equal(
+		converter.NexusSerializationContext{
+			Endpoint:  "__temporal_system",
+			Service:   workflowServiceName,
+			Operation: "SignalWithStartWorkflowExecution",
+		},
+		recorded[request].Context,
+	)
+
+	// The inner user payloads are encoded under the workflow serialization
+	// context reachable from the workflow.Context handed to the transfer
+	// converter. That context is the *calling* workflow's today; redirecting it
+	// to the target workflow is what @nexus.serialization-context will do.
+	callerContext := converter.WorkflowSerializationContext{
+		Namespace:  "default-test-namespace",
+		WorkflowID: "default-test-workflow-id",
+	}
+	s.Equal(callerContext, recorded[workflowArg].Context)
+	s.Equal(callerContext, recorded[signalArg].Context)
 }

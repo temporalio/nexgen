@@ -601,13 +601,20 @@ interface namespace-service {
     )
     .unwrap();
 
-    // The sourced map is bound to a field-unique local, evaluated once, and
-    // copied into a properly typed proto map.
-    assert!(rendered.contains("sourcedData := NamespaceData()"));
-    assert!(rendered.contains("if len(sourcedData) > 0 {"));
-    assert!(rendered.contains("message.Data = make(map[string]string, len(sourcedData))"));
-    assert!(rendered.contains("for k, v := range sourcedData {"));
+    // Sourced fields live on the model as unexported fields, populated by the
+    // operation function where `workflow.Context` is in scope.
+    assert!(
+        rendered
+            .contains("type namespaceInfo struct {\n\tName *string\n\tdata map[string]string\n}")
+    );
+    assert!(rendered.contains("\trequest.data = NamespaceData()\n"));
+    // The sourced map is then converted like any other model field, and it now
+    // round-trips back out of the proto as well.
+    assert!(rendered.contains("if len(m.data) > 0 {"));
+    assert!(rendered.contains("message.Data = make(map[string]string, len(m.data))"));
+    assert!(rendered.contains("for k, v := range m.data {"));
     assert!(rendered.contains("message.Data[k] = v"));
+    assert!(rendered.contains("value.data = make(map[string]string, len(proto.GetData()))"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -1400,14 +1407,25 @@ fn go_type_roundtrip_generates_proto_conversions() {
         rendered.contains("converted, err := retryPolicyFromProto(ctx, proto.GetRetryPolicy())")
     );
     assert!(rendered.contains("value.RetryPolicy = *converted"));
-    // Operation functions convert the request to proto before the SDK call and
-    // decode the proto response afterwards.
-    assert!(rendered.contains("requestProto, err := request.toProto(ctx)"));
+    // The model advertises a package-level transfer-type converter, so the SDK
+    // runs model<->proto conversion inside the payload converter.
     assert!(rendered.contains(
-        "fut := c.ExecuteOperation(ctx, \"ActivityOptionsOperation\", requestProto, workflow.NexusOperationOptions{})"
+        "var activityOptionsTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[ActivityOptions, activity.ActivityOptions]("
     ));
-    assert!(rendered.contains("var result activity.ActivityOptions"));
-    assert!(rendered.contains("value, err := activityOptionsFromProto(ctx, &result)"));
+    assert!(rendered.contains(
+        "func (ActivityOptions) TransferTypeConverter() workflow.TransferTypeConverter {\n\treturn activityOptionsTransferTypeConverter\n}"
+    ));
+    assert!(rendered.contains("\t\treturn m.toProto(ctx)\n"));
+    assert!(rendered.contains("\t\tvalue, err := activityOptionsFromProto(ctx, message)\n"));
+    // Operation functions therefore hand the model straight to the SDK and
+    // decode the response back into a model.
+    assert!(!rendered.contains("requestProto, err := request.toProto(ctx)"));
+    assert!(rendered.contains(
+        "fut := c.ExecuteOperation(ctx, \"ActivityOptionsOperation\", request, workflow.NexusOperationOptions{})"
+    ));
+    assert!(rendered.contains(
+        "\t\tvar value ActivityOptions\n\t\tif err := fut.Get(ctx, &value); err != nil {"
+    ));
 
     // The hand-written support fragment is emitted alongside the generated
     // service file with the pointer-in/pointer-out converter contract.
@@ -1422,6 +1440,59 @@ fn go_type_roundtrip_generates_proto_conversions() {
 }
 
 #[test]
+fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
+    let root = project_root();
+    let rendered = generate_to_string_with_inputs(
+        nexgen::language::Language::Go,
+        &example_input_paths(&root, "workflow-service"),
+        &[descriptor_path(&root)],
+    )
+    .unwrap();
+
+    // Sourced fields become unexported model fields so they survive payload
+    // conversion without widening the public API.
+    assert!(rendered.contains("\tnamespace string\n"));
+    assert!(rendered.contains("\tmessage.Namespace = m.namespace\n"));
+    assert!(rendered.contains("\tvalue.namespace = proto.GetNamespace()\n"));
+    assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
+
+    // The converter is a package-level singleton: the SDK caches it by
+    // reflect.Type, so a fresh value per call would defeat the cache.
+    assert!(rendered.contains(
+        "var signalWithStartWorkflowRequestTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[signalWithStartWorkflowRequest, workflowservice.SignalWithStartWorkflowExecutionRequest]("
+    ));
+    // Value receiver, so both the model and a pointer to it opt in.
+    assert!(rendered.contains(
+        "func (signalWithStartWorkflowRequest) TransferTypeConverter() workflow.TransferTypeConverter {\n\treturn signalWithStartWorkflowRequestTransferTypeConverter\n}"
+    ));
+
+    // Conversion needs a workflow.Context, so the context-free and
+    // context.Context variants fail loudly instead of silently misconverting.
+    assert!(rendered.contains(
+        "var errSignalWithStartWorkflowRequestNeedsWorkflowContext = errors.New(\"nexgen: signalWithStartWorkflowRequest can only be converted inside a workflow\")"
+    ));
+    assert!(rendered.contains(
+        "\tfunc(*signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {\n\t\treturn nil, errSignalWithStartWorkflowRequestNeedsWorkflowContext\n\t},\n"
+    ));
+    assert!(rendered.contains(
+        "\tfunc(context.Context, *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {\n\t\treturn nil, errSignalWithStartWorkflowRequestNeedsWorkflowContext\n\t},\n"
+    ));
+    assert!(rendered.contains(
+        "\tfunc(ctx workflow.Context, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {\n\t\treturn m.toProto(ctx)\n\t},\n"
+    ));
+
+    // Operation responses decode into the model, not the proto.
+    assert!(rendered.contains(
+        "func (SignalWithStartWorkflowResponse) TransferTypeConverter() workflow.TransferTypeConverter {"
+    ));
+    assert!(rendered.contains("\t\tvar value SignalWithStartWorkflowResponse\n"));
+    assert!(!rendered.contains("requestProto"));
+
+    // The converters pull in `context` and `errors`.
+    assert!(rendered.contains("\t\"context\"\n\t\"errors\"\n"));
+}
+
+#[test]
 fn go_proto_resource_return_converts_request_and_constructs_resource() {
     let root = project_root();
     let rendered = generate_to_string_with_inputs(
@@ -1431,16 +1502,16 @@ fn go_proto_resource_return_converts_request_and_constructs_resource() {
     )
     .unwrap();
 
-    assert!(rendered.contains("\trequestProto, err := request.toProto(ctx)\n"));
+    assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
     assert!(rendered.contains(
-        "\tif err != nil {\n\t\tresult, resultSettable := workflow.NewFuture(ctx)\n\t\tresultSettable.SetError(err)\n\t\treturn result\n\t}\n"
+        "fut := c.ExecuteOperation(ctx, \"StartWorkflow\", request, workflow.NexusOperationOptions{})"
     ));
-    assert!(rendered.contains(
-        "fut := c.ExecuteOperation(ctx, \"StartWorkflow\", requestProto, workflow.NexusOperationOptions{})"
-    ));
+    // Resource returns keep decoding the raw proto response: the planner emits
+    // no model for the resource type, so there is nothing to decode into.
     assert!(rendered.contains("\tvar result workflowservice.StartWorkflowExecutionResponse\n"));
+    // Sourced constructor arguments are read off the model instead of the proto.
     assert!(rendered.contains(
-        "value := NewStartedWorkflow(requestProto.GetNamespace(), request.WorkflowID, result.GetRunId())"
+        "value := NewStartedWorkflow(request.namespace, request.WorkflowID, result.GetRunId())"
     ));
     assert!(rendered.contains(
         "type StartedWorkflow struct {\n\t// Namespace - Required.\n\tNamespace string\n\t// WorkflowID - Required.\n\tWorkflowID string\n\t// RunID - Optional.\n\tRunID *string\n}"
@@ -1449,7 +1520,7 @@ fn go_proto_resource_return_converts_request_and_constructs_resource() {
         "func NewStartedWorkflow(namespace string, workflowID string, runID string) StartedWorkflow"
     ));
     assert!(rendered.contains(
-        "fut := c.ExecuteOperation(ctx, \"RestartWorkflow\", requestProto, workflow.NexusOperationOptions{})"
+        "fut := c.ExecuteOperation(ctx, \"RestartWorkflow\", request, workflow.NexusOperationOptions{})"
     ));
     assert!(rendered.contains("func StartWorkflow("));
     assert!(rendered.contains(
@@ -1528,10 +1599,7 @@ interface workflow-service {
     )
     .unwrap();
 
-    assert!(
-        rendered
-            .contains("value := NewSignalResult(requestProto.GetNamespace(), result.GetStarted())")
-    );
+    assert!(rendered.contains("value := NewSignalResult(request.namespace, result.GetStarted())"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
