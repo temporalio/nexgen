@@ -503,6 +503,7 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
 pub(in crate::generator) struct GoPackageContext {
     package_name: String,
     import_path: Option<String>,
+    pub(in crate::generator) has_serialization_context: bool,
 }
 
 impl GoPackageContext {
@@ -540,6 +541,16 @@ impl GoPackageContext {
         Ok(Self {
             package_name,
             import_path,
+            has_serialization_context: api_plan
+                .services
+                .iter()
+                .flat_map(|service| &service.operations)
+                .any(|operation| {
+                    operation
+                        .serialization_context
+                        .for_language(Language::Go)
+                        .is_some()
+                }),
         })
     }
 
@@ -623,6 +634,20 @@ impl GoPackageContext {
 
     pub(in crate::generator) fn errors_new(&self) -> String {
         self.qualified_expr("errors", "errors.New")
+    }
+
+    pub(in crate::generator) fn nexus_operation_payload_context(&self) -> String {
+        self.qualified_expr(
+            "go.temporal.io/sdk/internal",
+            "internal.NexusOperationPayloadContext",
+        )
+    }
+
+    pub(in crate::generator) fn serialization_context_type(&self) -> String {
+        self.qualified_expr(
+            "go.temporal.io/sdk/converter",
+            "converter.SerializationContext",
+        )
     }
 
     fn qualified_expr(&self, import_path: &str, code_expr: &str) -> String {
@@ -1074,6 +1099,14 @@ impl<'a> ApiPlanner<'a> {
         primary_origin: GeneratedFileOrigin,
     ) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
+        if self.package.has_serialization_context
+            && self.external_models.renders_operation_references()
+        {
+            return Err(Error::UnsupportedGoProtoConversion {
+                context: "Go serialization context".to_string(),
+                reason: "serialization-context requires proto-backed operation wrappers, not operation references".to_string(),
+            });
+        }
         if !self.external_models.renders_operation_references() {
             for service in &self.api_plan.services {
                 let mut operations = Vec::new();
@@ -1128,6 +1161,14 @@ impl<'a> ApiPlanner<'a> {
         // so the backend renders final Go names directly.
         self.populate_model_wire_conversions()?;
         self.populate_operation_bindings(&mut services)?;
+        for operation in services.iter().flat_map(|service| &service.operations) {
+            if operation.serialization_context_expr.is_some() && operation.wire_binding.is_none() {
+                return Err(Error::UnsupportedGoProtoConversion {
+                    context: format!("operation `{}`", operation.name),
+                    reason: "serialization-context requires a proto-backed operation".to_string(),
+                });
+            }
+        }
 
         let needs_function_name_inlining = services.iter().any(service_uses_function_name_inlining);
 
@@ -1141,7 +1182,18 @@ impl<'a> ApiPlanner<'a> {
             service.endpoint.as_deref() == Some("__temporal_system")
                 && !service.operations.is_empty()
         });
-        if has_system_operations && !self.package.is_self_import("go.temporal.io/sdk/internal") {
+        let has_eager_outputs =
+            services
+                .iter()
+                .flat_map(|service| &service.operations)
+                .any(|operation| {
+                    operation.wire_binding.as_ref().is_some_and(|binding| {
+                        operation.output_transform_expr.is_some() || binding.has_eager_output()
+                    })
+                });
+        if (has_system_operations || has_eager_outputs)
+            && !self.package.is_self_import("go.temporal.io/sdk/internal")
+        {
             self.imports
                 .insert("go.temporal.io/sdk/internal".to_string());
         }
@@ -1229,6 +1281,19 @@ impl<'a> ApiPlanner<'a> {
             go_api_file_name(self.api_plan)
         };
         files.insert(file_name, output, primary_origin)?;
+        if self.package.has_serialization_context {
+            files.insert(
+                PathBuf::from("registry.go"),
+                render_operation_registry(
+                    &self.package,
+                    &services,
+                    &self.imports,
+                    &external_imports,
+                    support_fragments,
+                )?,
+                GeneratedFileOrigin::fixed("generated Go Nexus operation registry"),
+            )?;
+        }
 
         // Emit hand-written support fragments (e.g. proto converter functions)
         // in one support file. Like the TypeScript backend, all fragments are
@@ -1384,6 +1449,10 @@ impl<'a> ApiPlanner<'a> {
                 .collect()
         });
 
+        let serialization_context_expr = operation.serialization_context.for_language(Language::Go);
+        if let Some(helper) = serialization_context_expr {
+            validate_go_serialization_context_helper(helper, &operation.name)?;
+        }
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
@@ -1394,6 +1463,7 @@ impl<'a> ApiPlanner<'a> {
             model_type_parameters,
             output_type,
             raw_output_type,
+            serialization_context_expr,
             output_transform_expr: go_output_transform.map(|(_, expr)| expr),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
@@ -1820,6 +1890,211 @@ fn go_api_file_name(api_plan: &PlannedSpec) -> PathBuf {
     PathBuf::from(format!("{stem}.go"))
 }
 
+fn validate_go_serialization_context_helper(helper: &str, operation: &str) -> Result<()> {
+    let parts: Vec<_> = helper.split('.').collect();
+    if parts.len() > 2
+        || parts.iter().any(|part| {
+            part.is_empty()
+                || *part == "_"
+                || is_go_keyword(part)
+                || !part
+                    .as_bytes()
+                    .first()
+                    .is_some_and(|byte| is_go_ident_start(*byte))
+                || !part.bytes().all(is_go_ident_continue)
+        })
+    {
+        return Err(Error::InvalidWitDirective {
+            path: PathBuf::from("<go-plan>"),
+            context: format!("operation `{operation}`"),
+            directive: "@nexus.serialization-context".to_string(),
+            reason: format!("Go support helper `{helper}` must be an identifier or pkg.Func"),
+        });
+    }
+    Ok(())
+}
+
+fn render_operation_registry(
+    package: &GoPackageContext,
+    services: &[RenderedService<'_>],
+    model_imports: &BTreeSet<String>,
+    external_imports: &[(String, String)],
+    support_fragments: &[SupportFragmentSpec],
+) -> Result<String> {
+    let services: Vec<_> = services
+        .iter()
+        .filter(|service| service.is_system_endpoint())
+        .collect();
+    let has_helpers = services
+        .iter()
+        .flat_map(|service| &service.operations)
+        .any(|operation| operation.serialization_context_expr.is_some());
+    let helper_packages: BTreeSet<_> = services
+        .iter()
+        .flat_map(|service| &service.operations)
+        .filter_map(|operation| {
+            operation
+                .serialization_context_expr?
+                .split_once('.')
+                .map(|(name, _)| name)
+        })
+        .collect();
+    let input_context = package.qualified_expr("go.temporal.io/sdk/internal", "internal.Context");
+    let input_converters: BTreeMap<_, _> = services
+        .iter()
+        .flat_map(|service| {
+            service.operations.iter().filter_map(|operation| {
+                if !service.defers_input_to_registry(operation) {
+                    return None;
+                }
+                let callback = operation
+                    .wire_binding
+                    .as_ref()?
+                    .registry_input_converter(&operation.input_type, &input_context)?;
+                Some(((service.wire_name, operation.wire_name), callback))
+            })
+        })
+        .collect();
+    let mut candidates = external_imports.to_vec();
+    candidates.extend(model_imports.iter().map(|path| {
+        (
+            path.clone(),
+            path.rsplit('/').next().unwrap_or(path).to_string(),
+        )
+    }));
+    for fragment in support_fragments {
+        for import in parse_support_fragment(&fragment.contents).imports {
+            let (alias, path) = import.split_once('"').unwrap_or(("", ""));
+            let path = path.split('"').next().unwrap_or_default();
+            let alias = if alias.trim().is_empty() {
+                path.rsplit('/').next().unwrap_or_default()
+            } else {
+                alias.trim()
+            };
+            candidates.push((path.to_string(), alias.to_string()));
+        }
+    }
+    let mut imports = BTreeMap::new();
+    if has_helpers && !package.is_self_import("reflect") {
+        imports.insert("reflect".to_string(), "reflect".to_string());
+    }
+    if has_helpers && !package.is_self_import("go.temporal.io/sdk/converter") {
+        imports.insert(
+            "converter".to_string(),
+            "go.temporal.io/sdk/converter".to_string(),
+        );
+    }
+    if !package.is_self_import("go.temporal.io/sdk/internal") {
+        imports.insert(
+            "internal".to_string(),
+            "go.temporal.io/sdk/internal".to_string(),
+        );
+    }
+    for (path, alias) in candidates {
+        let used_by_input = input_converters
+            .values()
+            .any(|callback| callback.contains(&format!("{alias}.")));
+        if (!helper_packages.contains(alias.as_str()) && !used_by_input)
+            || package.is_self_import(&path)
+        {
+            continue;
+        }
+        if let Some(previous) = imports.insert(alias.clone(), path.clone()) {
+            if previous != path {
+                return Err(Error::InvalidWitDirective {
+                    path: PathBuf::from("<go-plan>"),
+                    context: "Go operation registry".to_string(),
+                    directive: "@nexus.serialization-context".to_string(),
+                    reason: format!(
+                        "helper qualifier `{alias}` refers to both `{previous}` and `{path}`"
+                    ),
+                });
+            }
+        }
+    }
+    let mut output = format!("{GENERATED_HEADER}\n\npackage {}\n", package.package_name);
+    if !imports.is_empty() {
+        output.push_str("\nimport (\n");
+        for (alias, path) in imports {
+            output.push_str(&format!("\t{alias} \"{path}\"\n"));
+        }
+        output.push_str(")\n");
+    }
+    let sc = package.serialization_context_type();
+    let key = package.qualified_expr("go.temporal.io/sdk/internal", "internal.NexusOperationKey");
+    let info = package.qualified_expr(
+        "go.temporal.io/sdk/internal",
+        "internal.NexusOperationRegistryEntry",
+    );
+    output.push_str(&format!(
+        r#"
+// NexusOperationKey identifies an operation by its service and operation wire names.
+type NexusOperationKey = {key}
+
+// NexusOperationInfo describes the serialization policy for an operation's nested payloads.
+type NexusOperationInfo = {info}
+"#
+    ));
+    if has_helpers {
+        let type_for = package.qualified_expr("reflect", "reflect.TypeFor");
+        output.push_str(&format!(
+            r#"
+func nexgenOperationInfo[I any, C {sc}](helper func(I) C) NexusOperationInfo {{
+    return NexusOperationInfo{{
+        InputType: {type_for}[I](),
+        SerializationContext: func(request any) {sc} {{
+            return helper(request.(I))
+        }},
+    }}
+}}
+"#
+        ));
+    }
+    output.push_str("\n// NexusOperationRegistry contains system operation metadata for this generated package.\n// Treat it as read-only once workflows are running.\nvar NexusOperationRegistry = map[NexusOperationKey]NexusOperationInfo{\n");
+    let mut keys = BTreeSet::new();
+    for service in services {
+        for operation in &service.operations {
+            if !keys.insert((service.wire_name, operation.wire_name)) {
+                return Err(Error::InvalidWitDirective {
+                    path: PathBuf::from("<go-plan>"),
+                    context: "Go operation registry".to_string(),
+                    directive: "@nexus.serialization-context".to_string(),
+                    reason: format!(
+                        "duplicate registry key: service `{}`, operation `{}`",
+                        service.wire_name, operation.wire_name
+                    ),
+                });
+            }
+            let service_name = go_string_literal(service.wire_name);
+            let operation_name = go_string_literal(operation.wire_name);
+            let info = operation
+                .serialization_context_expr
+                .map(|helper| {
+                    if let Some(callback) = input_converters.get(&(service.wire_name, operation.wire_name)) {
+                        format!("func() NexusOperationInfo {{\n\t\tinfo := nexgenOperationInfo({helper})\n\t\tinfo.InputToTransfer = {callback}\n\t\treturn info\n\t}}()")
+                    } else {
+                        format!("nexgenOperationInfo({helper})")
+                    }
+                })
+                .unwrap_or_else(|| "{}".to_string());
+            output.push_str(&format!(
+                "\t{{Service: {service_name}, Operation: {operation_name}}}: {info},\n"
+            ));
+        }
+    }
+    output.push_str("}\n");
+    if !keys.is_empty() {
+        let register = package.qualified_expr(
+            "go.temporal.io/sdk/internal",
+            "internal.RegisterNexusOperationRegistry",
+        );
+        output.push_str(&format!(
+            "\nfunc init() {{\n\t{register}(NexusOperationRegistry)\n}}\n"
+        ));
+    }
+    Ok(output)
+}
+
 fn render_support_file(fragments: &[SupportFragmentSpec], package_name: &str) -> String {
     if let [fragment] = fragments {
         return rewrite_support_package(&fragment.contents, package_name);
@@ -1972,6 +2247,22 @@ pub(in crate::generator) struct RenderedService<'a> {
     pub(in crate::generator) resources: Vec<PlannedResource>,
 }
 
+impl RenderedService<'_> {
+    fn is_system_endpoint(&self) -> bool {
+        matches!(
+            self.endpoint.as_deref(),
+            Some("__temporal_system" | "temporal-system")
+        )
+    }
+
+    pub(in crate::generator) fn defers_input_to_registry(
+        &self,
+        operation: &RenderedOperation<'_>,
+    ) -> bool {
+        operation.serialization_context_expr.is_some() && self.is_system_endpoint()
+    }
+}
+
 /// A resolved Nexus operation with enough information to render the operation
 /// constant and an unexported caller function.
 #[derive(Debug)]
@@ -2004,6 +2295,8 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// The expression is rendered with `request` and raw `result` in scope and
     /// must evaluate to `(output_transform_type, error)`.
     pub(in crate::generator) output_transform_expr: Option<&'a str>,
+    /// Helper selecting the context for user payloads nested in this operation.
+    pub(in crate::generator) serialization_context_expr: Option<&'a str>,
     /// Go return type for an `@nexus.output-transform`, with any embedded
     /// import path stripped from the WIT annotation.
     pub(in crate::generator) output_transform_type: Option<String>,
@@ -3244,6 +3537,7 @@ fn render_file(
         output.push_str(")\n");
     }
 
+    let body_start = output.len();
     if let Some(operation_references) = operation_references {
         if !operation_references.is_empty() {
             output.push('\n');
@@ -3446,6 +3740,21 @@ fn render_file(
         }
     }
 
+    // An external input converter can move entirely into registry.go. Its proto
+    // package is then unused here unless another model or output references it.
+    let unused_external_imports: Vec<_> = external_imports
+        .iter()
+        .filter(|(_, alias)| !output[body_start..].contains(&format!("{alias}.")))
+        .collect();
+    for (path, alias) in unused_external_imports {
+        let default_alias = path.rsplit('/').next().unwrap_or(path);
+        let import = if alias == default_alias {
+            format!("\t\"{path}\"\n")
+        } else {
+            format!("\t{alias} \"{path}\"\n")
+        };
+        output = output.replacen(&import, "", 1);
+    }
     output
 }
 
