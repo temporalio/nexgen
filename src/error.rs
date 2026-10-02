@@ -140,11 +140,6 @@ pub enum Error {
         field: String,
     },
 
-    #[error(
-        "{language} protobuf transfer-type conversion does not yet support generic model `{message}`"
-    )]
-    UnsupportedProtoGenericModelTransferConversion { language: Language, message: String },
-
     #[error("Java code generation does not support protobuf-backed model `{message}`")]
     UnsupportedJavaProtoModel { message: String },
 

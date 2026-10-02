@@ -69,7 +69,20 @@ For the beginner-friendly JSON Schema definitions samples, see
 ### `notification-service`
 
 - WIT: [`inputs/notification-service.wit`](inputs/notification-service.wit)
-- Currently generated for Python: [`python/wit/notification_service/`](python/wit/notification_service/)
+- .NET: [`dotnet/wit/notification-service/`](dotnet/wit/notification-service/), [`dotnet/tests/NotificationServiceChecks.cs`](dotnet/tests/NotificationServiceChecks.cs)
+- Python: [`python/wit/notification_service/`](python/wit/notification_service/), [`python/tests/test_notification_service.py`](python/tests/test_notification_service.py)
+
+### `proto-oneof`
+
+- WIT: [`inputs/proto-oneof.wit`](inputs/proto-oneof.wit)
+- .NET: [`dotnet/wit/proto-oneof/`](dotnet/wit/proto-oneof/), [`dotnet/tests/ProtoOneofChecks.cs`](dotnet/tests/ProtoOneofChecks.cs)
+- Python: [`python/wit/proto_oneof/`](python/wit/proto_oneof/), [`python/tests/test_proto_oneof.py`](python/tests/test_proto_oneof.py)
+
+### `proto-generic`
+
+- WIT: [`inputs/proto-generic.wit`](inputs/proto-generic.wit)
+- .NET: [`dotnet/wit/proto-generic/`](dotnet/wit/proto-generic/), [`dotnet/tests/ProtoGenericChecks.cs`](dotnet/tests/ProtoGenericChecks.cs)
+- Python: [`python/wit/proto_generic/`](python/wit/proto_generic/), [`python/tests/test_proto_generic.py`](python/tests/test_proto_generic.py)
 
 ## Supporting files
 

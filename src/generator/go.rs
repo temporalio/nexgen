@@ -514,9 +514,8 @@ impl GoPackageContext {
         // generated code is a self-reference, not an import, and must be
         // unqualified accordingly.
         let import_path = api_plan
-            .services
-            .first()
-            .and_then(|service| service.namespace.for_language(Language::Go))
+            .primary_namespace()
+            .and_then(|namespace| namespace.for_language(Language::Go))
             .map(str::to_string);
         let package_name = Self::derive_package_name(&options.output_dir_name)?;
 

@@ -1434,7 +1434,7 @@ mod tests {
             Some("temporal.api.update.v1.Outcome")
         );
         let variant = plan
-            .variant("outcome.outcome-value")
+            .variant("proto-oneof.outcome-value")
             .expect("oneof variant should be planned");
         let Some(source) = &variant.source else {
             panic!("oneof variant should retain its protobuf source");
@@ -1588,6 +1588,7 @@ mod tests {
                 resources: Vec::new(),
                 data: (),
             }],
+            model_scope: None,
             types: BTreeMap::new(),
         }
     }

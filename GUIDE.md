@@ -81,7 +81,11 @@ const user = await getUser({ userId: "abc" });
 
 An exported interface with no operations or resources acts as a model-only
 module. Its declared types remain public, but the generator does not emit an
-empty service definition or client.
+empty service definition or client. The interface still names the generated
+output where a target would otherwise use the service: its
+`@nexus.namespace` directive selects the .NET namespace or Go import path, and
+.NET otherwise uses `Nexgen.<InterfaceName>`, such as
+`Nexgen.NotificationService` for `interface notification-service`.
 
 ---
 
@@ -726,7 +730,8 @@ export const ActivityOptions = {
 
 Required fields are validated in `from_proto` -- missing required proto fields
 raise a `ValueError` (Python) or throw an `Error` (TypeScript). .NET output
-requires `Temporalio` 1.18.0 or newer.
+requires `Temporalio` 1.18.0 or newer, or 1.19.0 or newer for generic
+proto-backed models.
 
 ### Sourced Fields
 
@@ -1297,6 +1302,12 @@ variant above generates `OutcomeSuccess(value)` and `OutcomeFailure(value)`.
 The containing record's protobuf conversion constructs and matches those case
 classes.
 
+.NET uses the variant's nested case records, such as `Outcome.Success(Value)`.
+The containing record's transfer-type conversion switches over the protobuf
+`<Oneof>Case` property when decoding and pattern-matches the case records when
+encoding. An unset required oneof throws `InvalidOperationException`; an unset
+`option<variant>` decodes to `null`.
+
 Other targets reject a reachable model containing a oneof they cannot convert.
 Unreachable declarations and omitted oneofs remain valid.
 
@@ -1329,19 +1340,23 @@ field occurrence and therefore removes it from generic inference for that
 target.
 
 Type parameters are not currently supported in proto-backed records except in
-Python when a field or oneof member maps to Temporal's protobuf `Payload` or
-`Payloads` carrier. When decoding a parameterized Python model, concrete type
-arguments propagate through nested proto-backed records and become type hints
-for single-value `Payload` fields. An unparameterized model decodes those fields
-as `typing.Any`. `Payloads` fields continue to decode as untyped sequences.
+Python and .NET when a field or oneof member maps to Temporal's protobuf
+`Payload` or `Payloads` carrier. When decoding a parameterized Python model,
+concrete type arguments propagate through nested proto-backed records and become
+type hints for single-value `Payload` fields. An unparameterized model decodes
+those fields as `typing.Any`. `Payloads` fields continue to decode as untyped
+sequences.
+
+.NET generic proto-backed records declare an open generic transfer-type
+converter, such as `typeof(Request<,>.TransferTypeConverter)`, which the SDK
+closes with the model's type arguments. Carrier fields decode with
+`ProtoExtensions.FromPayload<T>` (or the first value of
+`ProtoExtensions.FromPayloads<T>` for `Payloads`) from the support file, so
+values decode as the concrete type argument. This requires `Temporalio` 1.19.0
+or newer.
 
 Type parameters are also unsupported in resources, map keys, function-signature
 metadata, or resource-bound generic operations.
-
-.NET also rejects every generic proto-backed record: the current SDK transfer
-type converter registration cannot instantiate an open generic converter. The
-generator reports this explicitly rather than emitting a model that cannot be
-serialized through the SDK.
 
 Python represents generic variants as tagged tuples and protobuf oneof-backed
 generic variants as unions of generic case dataclasses. TypeScript uses tagged

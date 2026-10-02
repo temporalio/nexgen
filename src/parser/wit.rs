@@ -93,6 +93,7 @@ fn api_spec_from_wit(
     }
 
     let mut services = Vec::new();
+    let mut model_scope = None;
     for (key, item) in &world.exports {
         let WorldItem::Interface { id, .. } = item else {
             continue;
@@ -106,6 +107,10 @@ fn api_spec_from_wit(
                     entry.module_export = crate::spec::ModuleExport::Owned;
                 }
             }
+            model_scope.get_or_insert(crate::spec::ModelScopeSpec {
+                name: service.name,
+                namespace: service.namespace,
+            });
             continue;
         }
         services.push(service);
@@ -122,6 +127,7 @@ fn api_spec_from_wit(
             .unwrap_or_else(|| "0.0.0".to_string()),
         support,
         services,
+        model_scope,
         types,
     };
     Ok(spec)
@@ -3739,6 +3745,28 @@ interface types {
         assert_eq!(variant.cases[1].wire_name, "type");
         assert!(spec.types["types.choice"].is_module_export());
         assert!(spec.services.is_empty());
+        let model_scope = spec.model_scope.as_ref().expect("model scope");
+        assert_eq!(model_scope.name, "Types");
+        assert_eq!(model_scope.namespace, LanguageStringSpec::default());
+
+        let namespaced = parse(
+            Language::Dotnet,
+            r#"
+package test:exports@1.0.0;
+world system { export types; }
+/// @nexus.namespace dotnet="Acme.Models"
+interface types {
+  record value { name: string, }
+}
+"#,
+        );
+        assert!(namespaced.services.is_empty());
+        assert_eq!(
+            namespaced
+                .primary_namespace()
+                .and_then(|namespace| namespace.for_language(Language::Dotnet)),
+            Some("Acme.Models")
+        );
 
         let service = parse(
             Language::Python,
@@ -3757,6 +3785,7 @@ interface api {
                 .values()
                 .all(|entry| !entry.is_module_export())
         );
+        assert!(service.model_scope.is_none());
     }
 
     const GENERIC_WIT: &str = r#"

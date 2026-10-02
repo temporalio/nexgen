@@ -1,3 +1,5 @@
+use heck::ToLowerCamelCase;
+
 use crate::error::{Error, Result};
 use crate::generator::dotnet::{
     WireValueConversion, csharp_parameter_name, csharp_type_name, field_property_name,
@@ -6,7 +8,7 @@ use crate::generator::dotnet::{
 use crate::language::Language;
 use crate::planning::{
     PlannedFamily, PlannedProtoMessageType, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec,
-    PlannedType, PlannedWireFieldBinding,
+    PlannedType, PlannedWireFieldBinding, PlannedWireVariantMember,
 };
 use crate::spec::{
     AliasTypeSpec, ExternalTypeSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
@@ -150,9 +152,10 @@ impl ModelBackend {
     pub(in crate::generator) fn model_transfer_converter_attribute(
         &self,
         model: &RecordSpec<PlannedFamily>,
+        api_plan: &PlannedSpec,
     ) -> Option<String> {
         self.model_needs_wire_method(model).then(|| {
-            let type_name = csharp_type_name(&model.name);
+            let type_name = open_model_type_name(model, api_plan);
             format!(
                 "[Temporalio.Converters.TemporalTransferTypeConverter(typeof({type_name}.TransferTypeConverter))]"
             )
@@ -333,57 +336,198 @@ fn validate_record_conversion(
     let Some(proto) = &record.data.proto else {
         return Ok(());
     };
-    if dotnet_proto_type_name_for_info(proto) != csharp_type_name(&record.name)
-        && !api_plan
-            .record_type_parameters(&record.full_name, Language::Dotnet)
-            .is_empty()
-    {
-        return Err(Error::UnsupportedProtoGenericModelTransferConversion {
-            language: Language::Dotnet,
-            message: proto.full_name.clone(),
-        });
-    }
-    for (field_name, field) in record
+    for (_, field) in record
         .fields
         .iter()
         .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
     {
-        match &field.data.wire_binding {
-            Some(PlannedWireFieldBinding::VariantMembers { wire_name, .. }) => {
-                return Err(Error::UnsupportedProtoOneofConversion {
-                    language: Language::Dotnet,
-                    message: proto.full_name.clone(),
-                    oneof: wire_name.clone(),
-                });
-            }
-            Some(PlannedWireFieldBinding::Value { wire_type, .. })
-                if matches!(
-                    field.field_type.validation_type(),
-                    PlannedType::TypeParameter(_)
-                ) && is_proto_generic_carrier(wire_type) =>
-            {
-                return Err(Error::UnsupportedProtoGenericCarrierConversion {
-                    language: Language::Dotnet,
-                    message: proto.full_name.clone(),
-                    field: field_name.clone(),
-                });
-            }
-            _ => {}
+        if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
+            &field.data.wire_binding
+        {
+            oneof_cases(api_plan, &proto.full_name, field, wire_name, members)?;
         }
     }
     Ok(())
 }
 
-fn is_proto_generic_carrier(kind: &PlannedType) -> bool {
-    let PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message))) =
-        kind.validation_type()
-    else {
-        return false;
+/// Protobuf messages that carry a type parameter's value through the payload converter.
+#[derive(Debug, Clone, Copy)]
+enum ProtoGenericCarrier {
+    Payload,
+    Payloads,
+}
+
+/// A WIT variant case bound to one member of a protobuf oneof.
+struct OneofCase<'a> {
+    case_name: String,
+    member: &'a PlannedWireVariantMember,
+    payload: &'a PlannedType,
+}
+
+fn oneof_cases<'a>(
+    api_plan: &'a PlannedSpec,
+    message_name: &str,
+    field: &RecordFieldSpec<PlannedFamily>,
+    wire_name: &str,
+    members: &'a [PlannedWireVariantMember],
+) -> Result<Vec<OneofCase<'a>>> {
+    let invalid = |reason: String| Error::InvalidTypeOverrideField {
+        message: message_name.to_string(),
+        field: wire_name.to_string(),
+        property: "type",
+        reason,
     };
-    matches!(
-        message.proto.full_name.as_str(),
-        "temporal.api.common.v1.Payload" | "temporal.api.common.v1.Payloads"
-    )
+    let PlannedType::Variant(variant_type) = field.field_type.validation_type() else {
+        return Err(invalid(
+            "wire variant members do not resolve to a planned variant".to_string(),
+        ));
+    };
+    let variant = api_plan.variant(&variant_type.full_name).ok_or_else(|| {
+        invalid(format!(
+            "planned variant `{}` is unavailable",
+            variant_type.full_name
+        ))
+    })?;
+    members
+        .iter()
+        .map(|member| {
+            let case = variant
+                .cases
+                .iter()
+                .find(|case| case.wire_name == member.wire_name)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "planned variant `{}` is missing wire case `{}`",
+                        variant.name, member.wire_name
+                    ))
+                })?;
+            let payload = case.payload.as_ref().ok_or_else(|| {
+                invalid(format!(
+                    "planned variant case `{}` has no payload",
+                    case.name
+                ))
+            })?;
+            Ok(OneofCase {
+                case_name: csharp_type_name(&case.name),
+                member,
+                payload,
+            })
+        })
+        .collect()
+}
+
+fn proto_generic_carrier(wire_type: &PlannedType) -> Option<ProtoGenericCarrier> {
+    let PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message))) =
+        wire_type.validation_type()
+    else {
+        return None;
+    };
+    match message.proto.full_name.as_str() {
+        "temporal.api.common.v1.Payload" => Some(ProtoGenericCarrier::Payload),
+        "temporal.api.common.v1.Payloads" => Some(ProtoGenericCarrier::Payloads),
+        _ => None,
+    }
+}
+
+/// Returns the type parameter and carrier when a type-parameter value is stored in a
+/// Payload-shaped protobuf message.
+fn generic_carrier<'a>(
+    value: &'a PlannedType,
+    wire_type: &PlannedType,
+) -> Option<(&'a str, ProtoGenericCarrier)> {
+    let PlannedType::TypeParameter(parameter) = value.validation_type() else {
+        return None;
+    };
+    proto_generic_carrier(wire_type).map(|carrier| (parameter.name.as_str(), carrier))
+}
+
+fn generic_carrier_from_wire_expr(
+    carrier: ProtoGenericCarrier,
+    wire_type: &PlannedType,
+    type_parameter: &str,
+    source_expr: &str,
+    support_namespace: Option<&str>,
+) -> String {
+    let (default_converter, suffix) = match carrier {
+        ProtoGenericCarrier::Payload => ("ProtoExtensions.FromPayload", ""),
+        ProtoGenericCarrier::Payloads => ("ProtoExtensions.FromPayloads", "[0]"),
+    };
+    let converter = qualify_dotnet_support_reference(
+        dotnet_from_proto_converter(wire_type.validation_type()).unwrap_or(default_converter),
+        support_namespace,
+    );
+    format!("{converter}<{type_parameter}>({source_expr}){suffix}")
+}
+
+fn generic_carrier_to_wire_expr(
+    carrier: ProtoGenericCarrier,
+    wire_type: &PlannedType,
+    source_expr: &str,
+    support_namespace: Option<&str>,
+) -> String {
+    let (default_converter, argument) = match carrier {
+        ProtoGenericCarrier::Payload => ("ProtoExtensions.ToPayload", source_expr.to_string()),
+        ProtoGenericCarrier::Payloads => (
+            "ProtoExtensions.ToPayloads",
+            format!("new object?[] {{ {source_expr} }}"),
+        ),
+    };
+    let converter = qualify_dotnet_support_reference(
+        dotnet_to_proto_converter(wire_type.validation_type()).unwrap_or(default_converter),
+        support_namespace,
+    );
+    format!("{converter}({argument})")
+}
+
+/// Returns the closed generic C# name for a generated model, such as `Model<T1, T2>`.
+fn model_type_name(model: &RecordSpec<PlannedFamily>, api_plan: &PlannedSpec) -> String {
+    let base = csharp_type_name(&model.name);
+    let parameters = api_plan.record_type_parameters(&model.full_name, Language::Dotnet);
+    if parameters.is_empty() {
+        base
+    } else {
+        format!(
+            "{base}<{}>",
+            parameters
+                .iter()
+                .map(|usage| usage.parameter.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+/// Returns the open generic C# name for a generated model, such as `Model<,>`.
+fn open_model_type_name(model: &RecordSpec<PlannedFamily>, api_plan: &PlannedSpec) -> String {
+    let base = csharp_type_name(&model.name);
+    let parameter_count = api_plan
+        .record_type_parameters(&model.full_name, Language::Dotnet)
+        .len();
+    if parameter_count == 0 {
+        base
+    } else {
+        format!("{base}<{}>", ",".repeat(parameter_count - 1))
+    }
+}
+
+fn variant_type_name(variant_type: &PlannedType, api_plan: &PlannedSpec) -> String {
+    let PlannedType::Variant(variant) = variant_type.validation_type() else {
+        panic!("oneof field should resolve to a variant");
+    };
+    let base = csharp_type_name(&variant.name);
+    let parameters = api_plan.variant_type_parameters(&variant.full_name, Language::Dotnet);
+    if parameters.is_empty() {
+        base
+    } else {
+        format!(
+            "{base}<{}>",
+            parameters
+                .iter()
+                .map(|usage| usage.parameter.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
 }
 
 pub(crate) fn dotnet_message_type(model_type: &PlannedType) -> String {
@@ -520,7 +664,7 @@ fn render_model_transfer_converter(
     }
     output.push_str("        return proto;\n");
     output.push_str("    }\n\n");
-    let type_name = csharp_type_name(&model.name);
+    let type_name = model_type_name(model, api_plan);
     output.push_str("    /// <summary>\n");
     output.push_str("    /// Converts this model to and from its generated transfer type.\n");
     output.push_str("    /// </summary>\n");
@@ -556,7 +700,7 @@ fn render_model_from_wire_method(
     support_namespace: Option<&str>,
     raw_type: &str,
 ) {
-    let type_name = csharp_type_name(&model.name);
+    let type_name = model_type_name(model, api_plan);
     output.push_str("    internal static ");
     output.push_str(&type_name);
     output.push_str(" FromTransferType(");
@@ -578,6 +722,7 @@ fn render_model_from_wire_method(
             field_name,
             field,
             &format!("wire.{}", csharp_type_name(field_name)),
+            raw_type,
             api_plan,
             support_namespace,
         ));
@@ -593,6 +738,7 @@ fn render_model_from_wire_method(
             field_name,
             field,
             &format!("wire.{}", csharp_type_name(field_name)),
+            raw_type,
             api_plan,
             support_namespace,
         ));
@@ -624,6 +770,7 @@ fn render_model_from_wire_method(
                 field_name,
                 field,
                 &format!("wire.{}", csharp_type_name(field_name)),
+                raw_type,
                 api_plan,
                 support_namespace,
             ));
@@ -639,6 +786,7 @@ fn field_from_wire_expr(
     field_name: &str,
     field: &RecordFieldSpec<PlannedFamily>,
     source_expr: &str,
+    raw_type: &str,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
 ) -> String {
@@ -658,6 +806,48 @@ fn field_from_wire_expr(
             optional,
         );
     }
+    match &field.data.wire_binding {
+        Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) => {
+            return oneof_from_wire_expr(
+                model,
+                field_name,
+                field,
+                wire_name,
+                members,
+                raw_type,
+                api_plan,
+                support_namespace,
+            );
+        }
+        Some(PlannedWireFieldBinding::Value { wire_type, .. }) => {
+            if let Some((type_parameter, carrier)) = generic_carrier(&field.field_type, wire_type) {
+                return if optional {
+                    format!(
+                        "{source_expr} == null ? default : {}",
+                        generic_carrier_from_wire_expr(
+                            carrier,
+                            wire_type,
+                            type_parameter,
+                            source_expr,
+                            support_namespace,
+                        )
+                    )
+                } else {
+                    generic_carrier_from_wire_expr(
+                        carrier,
+                        wire_type,
+                        type_parameter,
+                        &format!(
+                            "{source_expr} ?? throw new System.InvalidOperationException({})",
+                            missing_required_field_message(model, field_name)
+                        ),
+                        support_namespace,
+                    )
+                };
+            }
+        }
+        None => {}
+    }
     value_from_wire_expr(
         &field.field_type,
         source_expr,
@@ -665,6 +855,77 @@ fn field_from_wire_expr(
         field.data.has_presence,
         api_plan,
         support_namespace,
+    )
+}
+
+fn missing_required_field_message(model: &RecordSpec<PlannedFamily>, field_name: &str) -> String {
+    format!(
+        "\"missing required field {}.{}\"",
+        csharp_type_name(&model.name),
+        csharp_type_name(field_name)
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn oneof_from_wire_expr(
+    model: &RecordSpec<PlannedFamily>,
+    field_name: &str,
+    field: &RecordFieldSpec<PlannedFamily>,
+    wire_name: &str,
+    members: &[PlannedWireVariantMember],
+    raw_type: &str,
+    api_plan: &PlannedSpec,
+    support_namespace: Option<&str>,
+) -> String {
+    let proto = model
+        .data
+        .proto
+        .as_ref()
+        .expect("oneof field requires proto backing");
+    let cases = oneof_cases(api_plan, &proto.full_name, field, wire_name, members)
+        .expect("oneof cases are validated during prepare");
+    let variant_type = variant_type_name(&field.field_type, api_plan);
+    let oneof_case_type = format!("{raw_type}.{}OneofCase", csharp_type_name(wire_name));
+    let mut arms = cases
+        .iter()
+        .map(|case| {
+            let member_expr = format!("wire.{}", csharp_type_name(&case.member.wire_name));
+            let value_expr = match generic_carrier(case.payload, &case.member.wire_type) {
+                Some((type_parameter, carrier)) => generic_carrier_from_wire_expr(
+                    carrier,
+                    &case.member.wire_type,
+                    type_parameter,
+                    &member_expr,
+                    support_namespace,
+                ),
+                None => value_from_wire_expr(
+                    case.payload,
+                    &member_expr,
+                    false,
+                    None,
+                    api_plan,
+                    support_namespace,
+                ),
+            };
+            format!(
+                "{oneof_case_type}.{} => ({variant_type})new {variant_type}.{}({value_expr})",
+                csharp_type_name(&case.member.wire_name),
+                case.case_name,
+            )
+        })
+        .collect::<Vec<_>>();
+    arms.push(if field.required {
+        format!(
+            "_ => throw new System.InvalidOperationException({})",
+            missing_required_field_message(model, field_name)
+        )
+    } else {
+        "_ => null".to_string()
+    });
+    format!(
+        "wire.{}Case switch {{ {} }}",
+        csharp_type_name(wire_name),
+        arms.join(", ")
     )
 }
 
@@ -720,7 +981,7 @@ fn value_from_wire_expr(
         PlannedType::Record(record) => {
             let model_name = api_plan
                 .record(&record.full_name)
-                .map(|record| csharp_type_name(&record.name))
+                .map(|record| model_type_name(record, api_plan))
                 .unwrap_or_else(|| csharp_type_name(&record.model_name));
             optional_message_from_wire_expr(
                 source_expr,
@@ -809,6 +1070,22 @@ fn render_field_to_proto_assignment(
 ) {
     let property_name = field_property_name(field);
     let source_expr = property_name.to_string();
+    if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
+        &field.data.wire_binding
+    {
+        render_oneof_to_proto_assignment(
+            backend,
+            output,
+            model,
+            field,
+            wire_name,
+            members,
+            &source_expr,
+            api_plan,
+            support_namespace,
+        );
+        return;
+    }
     let target = format!("proto.{}", csharp_type_name(field_name));
     if field.required {
         output.push_str("        ");
@@ -847,6 +1124,60 @@ fn render_field_to_proto_assignment(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn render_oneof_to_proto_assignment(
+    backend: &ModelBackend,
+    output: &mut String,
+    model: &RecordSpec<PlannedFamily>,
+    field: &RecordFieldSpec<PlannedFamily>,
+    wire_name: &str,
+    members: &[PlannedWireVariantMember],
+    source_expr: &str,
+    api_plan: &PlannedSpec,
+    support_namespace: Option<&str>,
+) {
+    let proto = model
+        .data
+        .proto
+        .as_ref()
+        .expect("oneof field requires proto backing");
+    let cases = oneof_cases(api_plan, &proto.full_name, field, wire_name, members)
+        .expect("oneof cases are validated during prepare");
+    let variant_type = variant_type_name(&field.field_type, api_plan);
+    output.push_str("        switch (");
+    output.push_str(source_expr);
+    output.push_str(")\n        {\n");
+    for case in &cases {
+        let case_variable = format!("{}Case", case.case_name.to_lower_camel_case());
+        let value_expr = format!("{case_variable}.Value");
+        let converted = match generic_carrier(case.payload, &case.member.wire_type) {
+            Some((_, carrier)) => generic_carrier_to_wire_expr(
+                carrier,
+                &case.member.wire_type,
+                &value_expr,
+                support_namespace,
+            ),
+            None => backend.field_kind_to_wire_expr(
+                case.payload,
+                &value_expr,
+                false,
+                api_plan,
+                support_namespace,
+            ),
+        };
+        output.push_str(&format!(
+            "            case {variant_type}.{} {case_variable}:\n",
+            case.case_name
+        ));
+        output.push_str(&format!(
+            "                proto.{} = {converted};\n",
+            csharp_type_name(&case.member.wire_name)
+        ));
+        output.push_str("                break;\n");
+    }
+    output.push_str("        }\n");
+}
+
 fn field_to_proto_expr(
     backend: &ModelBackend,
     model: &RecordSpec<PlannedFamily>,
@@ -866,6 +1197,11 @@ fn field_to_proto_expr(
                 )
             });
         return format!("{converter}({source_expr})");
+    }
+    if let Some(PlannedWireFieldBinding::Value { wire_type, .. }) = &field.data.wire_binding
+        && let Some((_, carrier)) = generic_carrier(&field.field_type, wire_type)
+    {
+        return generic_carrier_to_wire_expr(carrier, wire_type, source_expr, support_namespace);
     }
     backend.field_kind_to_wire_expr(
         &field.field_type,

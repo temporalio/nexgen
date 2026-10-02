@@ -118,6 +118,9 @@ namespace Nexgen.Support
         internal static object? FromPayload(ApiCommon.Payload payload) =>
             SystemNexusConverterContext.PayloadConverter.ToValue<object?>(payload);
 
+        internal static T FromPayload<T>(ApiCommon.Payload payload) =>
+            SystemNexusConverterContext.PayloadConverter.ToValue<T>(payload);
+
         internal static ApiCommon.Payloads ToPayloads(IEnumerable<object?> values)
         {
             var payloads = new ApiCommon.Payloads();
@@ -126,7 +129,10 @@ namespace Nexgen.Support
         }
 
         internal static IReadOnlyCollection<object?> FromPayloads(ApiCommon.Payloads payloads) =>
-            payloads.Payloads_.Select(FromPayload).ToArray();
+            payloads.Payloads_.Select(payload => FromPayload(payload)).ToArray();
+
+        internal static IReadOnlyList<T> FromPayloads<T>(ApiCommon.Payloads payloads) =>
+            payloads.Payloads_.Select(payload => FromPayload<T>(payload)).ToArray();
 
         internal static ApiFailure.Failure ToFailureProto(this Exception value) =>
             SystemNexusConverterContext.FailureConverter.ToFailure(
