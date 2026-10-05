@@ -310,7 +310,8 @@ tags continue to raise `ValueError`.
 .NET native-API generation converts both shapes as well: the containing model
 switches over the protobuf oneof case to construct the variant's nested case
 record, an unset `option<variant>` decodes to `null`, and an unset required
-oneof throws `InvalidOperationException`. Go and TypeScript report an explicit
+oneof throws `InvalidOperationException`. Encoding a `null` required variant
+also throws `InvalidOperationException`. Go and TypeScript report an explicit
 unsupported-conversion error when a reachable oneof model requires protobuf
 conversion.
 

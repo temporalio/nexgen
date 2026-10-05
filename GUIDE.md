@@ -1305,8 +1305,10 @@ classes.
 .NET uses the variant's nested case records, such as `Outcome.Success(Value)`.
 The containing record's transfer-type conversion switches over the protobuf
 `<Oneof>Case` property when decoding and pattern-matches the case records when
-encoding. An unset required oneof throws `InvalidOperationException`; an unset
-`option<variant>` decodes to `null`.
+encoding. Decoding an unset required oneof throws `InvalidOperationException`.
+Encoding a required variant property that holds `null` (for example after
+`null!`) also throws `InvalidOperationException`. An unset `option<variant>`
+decodes to `null`, and encoding `null` leaves the oneof unset.
 
 Other targets reject a reachable model containing a oneof they cannot convert.
 Unreachable declarations and omitted oneofs remain valid.

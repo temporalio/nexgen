@@ -82,6 +82,8 @@ namespace Nexgen.ProtoOneof
                 case OutcomeValue<TOutput>.Failure failureCase:
                     proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);
                     break;
+                default:
+                    throw new System.InvalidOperationException("missing required field Outcome.Value");
             }
             return proto;
         }

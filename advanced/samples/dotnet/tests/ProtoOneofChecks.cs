@@ -85,6 +85,20 @@ namespace Nexgen.DotNetExamples.Tests
         }
 
         [Fact]
+        public void RequiredProtoOneofRejectsNullWhenEncoding()
+        {
+            var model = new Outcome<SuccessfulOutput>(
+                new OutcomeValue<SuccessfulOutput>.Success(new SuccessfulOutput("hello")))
+            {
+                Value = null!,
+            };
+
+            var error = Assert.Throws<InvalidOperationException>(
+                () => CreateSdkConverter(typeof(Outcome<SuccessfulOutput>)).ToTransferType(model));
+            Assert.Equal("missing required field Outcome.Value", error.Message);
+        }
+
+        [Fact]
         public void OptionalProtoOneofRoundTripsUnsetAsNull()
         {
             var converter = CreateSdkConverter(typeof(PauseActivityRequest));

@@ -1176,6 +1176,7 @@ fn render_field_to_proto_assignment(
             backend,
             output,
             model,
+            field_name,
             field,
             wire_name,
             members,
@@ -1228,6 +1229,7 @@ fn render_oneof_to_proto_assignment(
     backend: &ModelBackend,
     output: &mut String,
     model: &RecordSpec<PlannedFamily>,
+    field_name: &str,
     field: &RecordFieldSpec<PlannedFamily>,
     wire_name: &str,
     members: &[PlannedWireVariantMember],
@@ -1273,6 +1275,15 @@ fn render_oneof_to_proto_assignment(
             csharp_type_name(&case.member.wire_name)
         ));
         output.push_str("                break;\n");
+    }
+    // A required oneof has no null value. A forced null (for example `null!`) must not
+    // encode as an unset oneof.
+    if field.required {
+        output.push_str("            default:\n");
+        output.push_str(&format!(
+            "                throw new System.InvalidOperationException({});\n",
+            missing_required_field_message(model, field_name)
+        ));
     }
     output.push_str("        }\n");
 }

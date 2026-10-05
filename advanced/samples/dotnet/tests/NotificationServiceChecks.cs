@@ -84,6 +84,20 @@ namespace Nexgen.DotNetExamples.Tests
         }
 
         [Fact]
+        public void OnCompleteRequestRejectsNullRequiredOneofWhenEncoding()
+        {
+            using var converterContext = PushConverterContext();
+            var model = new OnCompleteRequest<Completion, SourceContext>(
+                null!,
+                new SourceContext("workflow-id"));
+            var converter = CreateSdkConverter(typeof(OnCompleteRequest<Completion, SourceContext>));
+
+            var error = Assert.Throws<InvalidOperationException>(
+                () => converter.ToTransferType(model));
+            Assert.Equal("missing required field OnCompleteRequest.Result", error.Message);
+        }
+
+        [Fact]
         public void OnCompleteResponseRoundTrips()
         {
             var converter = CreateSdkConverter(typeof(OnCompleteResponse));

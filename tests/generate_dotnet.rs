@@ -819,6 +819,9 @@ fn dotnet_notification_models_convert_generic_oneofs_without_service() {
     assert!(!models.contains(" switch {"));
     assert!(models.contains("case OnCompleteRequestResult<TOutput>.Failure failureCase:"));
     assert!(models.contains(
+        "                    break;\n                default:\n                    throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.Result\");\n            }\n            proto.SourceContext ="
+    ));
+    assert!(models.contains(
         "proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);"
     ));
     assert!(models.contains(
@@ -856,7 +859,9 @@ fn dotnet_proto_oneofs_convert_payloads_and_optional_groups() {
     assert!(models.contains("activityOneof = null;"));
     assert!(models.contains("Activity = activityOneof,"));
     assert!(models.contains("case ActivitySelection.Type typeCase:"));
-    assert!(models.contains("proto.Type = typeCase.Value;"));
+    assert!(models.contains(
+        "proto.Type = typeCase.Value;\n                    break;\n            }\n            proto.Reason = Reason;"
+    ));
 }
 
 #[test]

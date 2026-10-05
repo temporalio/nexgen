@@ -72,6 +72,8 @@ namespace Nexgen.NotificationService
                 case OnCompleteRequestResult<TOutput>.Failure failureCase:
                     proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);
                     break;
+                default:
+                    throw new System.InvalidOperationException("missing required field OnCompleteRequest.Result");
             }
             proto.SourceContext = Nexgen.Support.ProtoExtensions.ToPayload(SourceContext);
             return proto;
