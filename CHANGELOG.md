@@ -11,9 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Go proto-backed operation models now use SDK transfer-type converters instead
+  of eager conversion at the operation call site. Conversion errors surface on
+  the returned future. The Go samples require the experimental SDK API from
+  temporalio/sdk-go#2703.
+
 ### Deprecated
 
 ### Breaking Changes
+
+- Go models with generated transfer-type converters require workflow context and
+  cannot be used as top-level workflow return values or activity arguments.
+- Go generation rejects `@nexus.omit` fields used as resource constructor
+  arguments.
 
 ### Fixed
 

@@ -1698,7 +1698,7 @@ fn render_model_transfer_type_converter(
 
     let workflow_context = package.workflow_context_type();
     let context_context = package.context_context_type();
-    let new_converter = package.new_context_aware_transfer_type_converter();
+    let new_converter = package.new_transfer_type_converter();
     let converter_type = package.transfer_type_converter_type();
     let errors_new = package.errors_new();
 
@@ -1709,13 +1709,7 @@ fn render_model_transfer_type_converter(
 
     output.push('\n');
     output.push_str(&format!(
-        "var {converter_var} = {new_converter}[{model_ident}, {proto_value_type}](\n"
-    ));
-    output.push_str(&format!(
-        "\tfunc(*{model_ident}) ({proto_ptr_type}, error) {{\n\t\treturn nil, {error_var}\n\t}},\n"
-    ));
-    output.push_str(&format!(
-        "\tfunc({proto_ptr_type}, *{model_ident}) error {{\n\t\treturn {error_var}\n\t}},\n"
+        "var {converter_var}, {converter_var}Err = {new_converter}[{model_ident}, {proto_value_type}](\n"
     ));
     output.push_str(&format!(
         "\tfunc({context_context}, *{model_ident}) ({proto_ptr_type}, error) {{\n\t\treturn nil, {error_var}\n\t}},\n"
@@ -1740,7 +1734,7 @@ fn render_model_transfer_type_converter(
     // interface on the value when encoding and on the pointer when decoding.
     output.push('\n');
     output.push_str(&format!(
-        "func ({model_ident}) TransferTypeConverter() {converter_type} {{\n\treturn {converter_var}\n}}\n"
+        "func ({model_ident}) TransferTypeConverter() ({converter_type}, error) {{\n\treturn {converter_var}, {converter_var}Err\n}}\n"
     ));
 }
 

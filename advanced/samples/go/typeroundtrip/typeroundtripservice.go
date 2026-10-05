@@ -128,13 +128,7 @@ func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOpti
 
 var errActivityOptionsNeedsWorkflowContext = errors.New("nexgen: ActivityOptions can only be converted inside a workflow")
 
-var activityOptionsTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[ActivityOptions, activity.ActivityOptions](
-	func(*ActivityOptions) (*activity.ActivityOptions, error) {
-		return nil, errActivityOptionsNeedsWorkflowContext
-	},
-	func(*activity.ActivityOptions, *ActivityOptions) error {
-		return errActivityOptionsNeedsWorkflowContext
-	},
+var activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr = workflow.NewTransferTypeConverter[ActivityOptions, activity.ActivityOptions](
 	func(context.Context, *ActivityOptions) (*activity.ActivityOptions, error) {
 		return nil, errActivityOptionsNeedsWorkflowContext
 	},
@@ -154,8 +148,8 @@ var activityOptionsTransferTypeConverter = workflow.NewContextAwareTransferTypeC
 	},
 )
 
-func (ActivityOptions) TransferTypeConverter() workflow.TransferTypeConverter {
-	return activityOptionsTransferTypeConverter
+func (ActivityOptions) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+	return activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr
 }
 
 type FailureContainer struct {
@@ -189,13 +183,7 @@ func failureContainerFromProto(ctx workflow.Context, proto *command.FailWorkflow
 
 var errFailureContainerNeedsWorkflowContext = errors.New("nexgen: FailureContainer can only be converted inside a workflow")
 
-var failureContainerTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[FailureContainer, command.FailWorkflowExecutionCommandAttributes](
-	func(*FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
-		return nil, errFailureContainerNeedsWorkflowContext
-	},
-	func(*command.FailWorkflowExecutionCommandAttributes, *FailureContainer) error {
-		return errFailureContainerNeedsWorkflowContext
-	},
+var failureContainerTransferTypeConverter, failureContainerTransferTypeConverterErr = workflow.NewTransferTypeConverter[FailureContainer, command.FailWorkflowExecutionCommandAttributes](
 	func(context.Context, *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
 		return nil, errFailureContainerNeedsWorkflowContext
 	},
@@ -215,8 +203,8 @@ var failureContainerTransferTypeConverter = workflow.NewContextAwareTransferType
 	},
 )
 
-func (FailureContainer) TransferTypeConverter() workflow.TransferTypeConverter {
-	return failureContainerTransferTypeConverter
+func (FailureContainer) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+	return failureContainerTransferTypeConverter, failureContainerTransferTypeConverterErr
 }
 
 type ActivityOptionsOperationOptions struct {

@@ -303,13 +303,7 @@ func signalWithStartWorkflowRequestFromProto(ctx workflow.Context, proto *workfl
 
 var errSignalWithStartWorkflowRequestNeedsWorkflowContext = errors.New("nexgen: signalWithStartWorkflowRequest can only be converted inside a workflow")
 
-var signalWithStartWorkflowRequestTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[signalWithStartWorkflowRequest, workflowservice.SignalWithStartWorkflowExecutionRequest](
-	func(*signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
-		return nil, errSignalWithStartWorkflowRequestNeedsWorkflowContext
-	},
-	func(*workflowservice.SignalWithStartWorkflowExecutionRequest, *signalWithStartWorkflowRequest) error {
-		return errSignalWithStartWorkflowRequestNeedsWorkflowContext
-	},
+var signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr = workflow.NewTransferTypeConverter[signalWithStartWorkflowRequest, workflowservice.SignalWithStartWorkflowExecutionRequest](
 	func(context.Context, *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
 		return nil, errSignalWithStartWorkflowRequestNeedsWorkflowContext
 	},
@@ -329,8 +323,8 @@ var signalWithStartWorkflowRequestTransferTypeConverter = workflow.NewContextAwa
 	},
 )
 
-func (signalWithStartWorkflowRequest) TransferTypeConverter() workflow.TransferTypeConverter {
-	return signalWithStartWorkflowRequestTransferTypeConverter
+func (signalWithStartWorkflowRequest) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+	return signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr
 }
 
 // --- Operations (internal) ---
@@ -450,13 +444,7 @@ func signalWithStartWorkflowResponseFromProto(ctx workflow.Context, proto *workf
 
 var errSignalWithStartWorkflowResponseNeedsWorkflowContext = errors.New("nexgen: SignalWithStartWorkflowResponse can only be converted inside a workflow")
 
-var signalWithStartWorkflowResponseTransferTypeConverter = workflow.NewContextAwareTransferTypeConverter[SignalWithStartWorkflowResponse, workflowservice.SignalWithStartWorkflowExecutionResponse](
-	func(*SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
-		return nil, errSignalWithStartWorkflowResponseNeedsWorkflowContext
-	},
-	func(*workflowservice.SignalWithStartWorkflowExecutionResponse, *SignalWithStartWorkflowResponse) error {
-		return errSignalWithStartWorkflowResponseNeedsWorkflowContext
-	},
+var signalWithStartWorkflowResponseTransferTypeConverter, signalWithStartWorkflowResponseTransferTypeConverterErr = workflow.NewTransferTypeConverter[SignalWithStartWorkflowResponse, workflowservice.SignalWithStartWorkflowExecutionResponse](
 	func(context.Context, *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
 		return nil, errSignalWithStartWorkflowResponseNeedsWorkflowContext
 	},
@@ -476,8 +464,8 @@ var signalWithStartWorkflowResponseTransferTypeConverter = workflow.NewContextAw
 	},
 )
 
-func (SignalWithStartWorkflowResponse) TransferTypeConverter() workflow.TransferTypeConverter {
-	return signalWithStartWorkflowResponseTransferTypeConverter
+func (SignalWithStartWorkflowResponse) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+	return signalWithStartWorkflowResponseTransferTypeConverter, signalWithStartWorkflowResponseTransferTypeConverterErr
 }
 
 type SignalWithStartWorkflowOptions struct {

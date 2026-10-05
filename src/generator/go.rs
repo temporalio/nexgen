@@ -610,10 +610,10 @@ impl GoPackageContext {
         )
     }
 
-    pub(in crate::generator) fn new_context_aware_transfer_type_converter(&self) -> String {
+    pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
         self.qualified_expr(
             "go.temporal.io/sdk/workflow",
-            "workflow.NewContextAwareTransferTypeConverter",
+            "workflow.NewTransferTypeConverter",
         )
     }
 
