@@ -16,7 +16,7 @@ namespace Nexgen.ProtoGeneric
     public record PayloadBackedContext<TContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="PayloadBackedContext"/> class.
+        /// Initializes a new instance of the <see cref="PayloadBackedContext{TContext}"/> class.
         /// </summary>
         public PayloadBackedContext(TContext details)
         {
@@ -64,7 +64,7 @@ namespace Nexgen.ProtoGeneric
     public record PayloadBackedEnvelope<TOutput, TContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="PayloadBackedEnvelope"/> class.
+        /// Initializes a new instance of the <see cref="PayloadBackedEnvelope{TOutput, TContext}"/> class.
         /// </summary>
         public PayloadBackedEnvelope(PayloadBackedOutput<TOutput> provider, PayloadBackedContext<TContext> scaler)
         {
@@ -110,7 +110,7 @@ namespace Nexgen.ProtoGeneric
     public record PayloadBackedOutput<TOutput>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="PayloadBackedOutput"/> class.
+        /// Initializes a new instance of the <see cref="PayloadBackedOutput{TOutput}"/> class.
         /// </summary>
         public PayloadBackedOutput(TOutput details)
         {

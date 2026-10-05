@@ -941,9 +941,15 @@ impl<'a> ApiPlanner<'a> {
         if required_fields.is_empty() && sourced_fields.is_empty() {
             return;
         }
+        let type_parameters = self
+            .api_plan
+            .record_type_parameters(&model.full_name, Language::Dotnet)
+            .into_iter()
+            .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
+            .collect::<Vec<_>>();
         output.push_str("    /// <summary>\n");
         output.push_str("    /// Initializes a new instance of the <see cref=\"");
-        output.push_str(type_name);
+        output.push_str(&xml_doc_type_reference(type_name, &type_parameters));
         output.push_str("\"/> class.\n");
         output.push_str("    /// </summary>\n");
         output.push_str("    ");
@@ -1725,7 +1731,17 @@ impl<'a> ApiPlanner<'a> {
             );
             option_fields.push((field, field_type, field.required));
         }
-        render_operation_options_constructor(output, &options_type_name, &option_fields);
+        let options_type_parameters = self
+            .operation_model_parameters(operation)
+            .into_iter()
+            .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
+            .collect::<Vec<_>>();
+        render_operation_options_constructor(
+            output,
+            &options_type_name,
+            &options_type_parameters,
+            &option_fields,
+        );
         for (field, field_type, _) in option_fields {
             render_field_xml_doc(output, "    ", field);
             output.push_str("    public ");
@@ -3181,6 +3197,7 @@ fn flattened_nested_model<'a>(
 fn render_operation_options_constructor(
     output: &mut String,
     type_name: &str,
+    type_parameters: &[String],
     option_fields: &[(&RecordFieldSpec<PlannedFamily>, String, bool)],
 ) {
     let required_fields = option_fields
@@ -3192,7 +3209,7 @@ fn render_operation_options_constructor(
     }
     output.push_str("    /// <summary>\n");
     output.push_str("    /// Initializes a new instance of the <see cref=\"");
-    output.push_str(type_name);
+    output.push_str(&xml_doc_type_reference(type_name, type_parameters));
     output.push_str("\"/> class.\n");
     output.push_str("    /// </summary>\n");
     output.push_str("    public ");
@@ -3999,6 +4016,17 @@ fn enum_value_name(name: &str) -> String {
         .trim_start_matches("UNSPECIFIED")
         .trim_start_matches('_')
         .to_string()
+}
+
+/// Returns the XML documentation `cref` for a type. A generic type lists its type
+/// parameters in braces, such as `Request{TContext}`, because XML does not permit `<>`
+/// in an attribute value.
+fn xml_doc_type_reference(type_name: &str, type_parameters: &[String]) -> String {
+    if type_parameters.is_empty() {
+        type_name.to_string()
+    } else {
+        format!("{type_name}{{{}}}", type_parameters.join(", "))
+    }
 }
 
 /// Type parameters that flattened workflow-function overloads add to a model's own.

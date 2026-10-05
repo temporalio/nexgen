@@ -18,7 +18,7 @@ namespace Nexgen.GenericModelService
     public class CompleteOptions<TContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="CompleteOptions"/> class.
+        /// Initializes a new instance of the <see cref="CompleteOptions{TContext}"/> class.
         /// </summary>
         public CompleteOptions(TContext context, IReadOnlyList<TContext> contexts, IReadOnlyDictionary<string, TContext> byName, Inner<TContext> nested)
         {

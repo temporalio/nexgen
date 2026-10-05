@@ -40,7 +40,7 @@ namespace Nexgen.ProtoOneof
     public record Outcome<TOutput>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="Outcome"/> class.
+        /// Initializes a new instance of the <see cref="Outcome{TOutput}"/> class.
         /// </summary>
         public Outcome(OutcomeValue<TOutput> value)
         {

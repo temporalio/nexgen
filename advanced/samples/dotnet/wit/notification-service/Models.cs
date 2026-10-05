@@ -27,7 +27,7 @@ namespace Nexgen.NotificationService
     public record OnCompleteRequest<TOutput, TSourceContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="OnCompleteRequest"/> class.
+        /// Initializes a new instance of the <see cref="OnCompleteRequest{TOutput, TSourceContext}"/> class.
         /// </summary>
         public OnCompleteRequest(OnCompleteRequestResult<TOutput> result, TSourceContext sourceContext)
         {

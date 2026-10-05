@@ -25,7 +25,7 @@ namespace Nexgen.GenericModelService
     public record GenericRequest<TContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="GenericRequest"/> class.
+        /// Initializes a new instance of the <see cref="GenericRequest{TContext}"/> class.
         /// </summary>
         public GenericRequest(TContext context, IReadOnlyList<TContext> contexts, IReadOnlyDictionary<string, TContext> byName, Inner<TContext> nested)
         {
@@ -45,7 +45,7 @@ namespace Nexgen.GenericModelService
     public record GenericResponse<TContext, TOutput, TMetadata>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="GenericResponse"/> class.
+        /// Initializes a new instance of the <see cref="GenericResponse{TContext, TOutput, TMetadata}"/> class.
         /// </summary>
         public GenericResponse(TContext context, OperationCompletionResult<TOutput> completion)
         {
@@ -62,7 +62,7 @@ namespace Nexgen.GenericModelService
     public record Inner<TContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="Inner"/> class.
+        /// Initializes a new instance of the <see cref="Inner{TContext}"/> class.
         /// </summary>
         public Inner(TContext value)
         {
@@ -90,7 +90,7 @@ namespace Nexgen.GenericModelService
     public record OperationCompletionSuccess<TOutput>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="OperationCompletionSuccess"/> class.
+        /// Initializes a new instance of the <see cref="OperationCompletionSuccess{TOutput}"/> class.
         /// </summary>
         public OperationCompletionSuccess(TOutput output)
         {
