@@ -2,8 +2,8 @@ use heck::ToLowerCamelCase;
 
 use crate::error::{Error, Result};
 use crate::generator::dotnet::{
-    WireValueConversion, csharp_parameter_name, csharp_type_name, field_property_name,
-    function_args_parameter_type, qualify_dotnet_support_reference,
+    WireValueConversion, csharp_parameter_name, csharp_type_name, csharp_type_parameter_name,
+    field_property_name, function_args_parameter_type, qualify_dotnet_support_reference,
 };
 use crate::language::Language;
 use crate::planning::{
@@ -431,14 +431,15 @@ fn proto_generic_carrier(wire_type: &PlannedType) -> Option<ProtoGenericCarrier>
 
 /// Returns the type parameter and carrier when a type-parameter value is stored in a
 /// Payload-shaped protobuf message.
-fn generic_carrier<'a>(
-    value: &'a PlannedType,
+fn generic_carrier(
+    value: &PlannedType,
     wire_type: &PlannedType,
-) -> Option<(&'a str, ProtoGenericCarrier)> {
+) -> Option<(String, ProtoGenericCarrier)> {
     let PlannedType::TypeParameter(parameter) = value.validation_type() else {
         return None;
     };
-    proto_generic_carrier(wire_type).map(|carrier| (parameter.name.as_str(), carrier))
+    proto_generic_carrier(wire_type)
+        .map(|carrier| (csharp_type_parameter_name(&parameter.name), carrier))
 }
 
 fn generic_carrier_from_wire_expr(
@@ -490,7 +491,7 @@ fn model_type_name(model: &RecordSpec<PlannedFamily>, api_plan: &PlannedSpec) ->
             "{base}<{}>",
             parameters
                 .iter()
-                .map(|usage| usage.parameter.name.as_str())
+                .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
                 .collect::<Vec<_>>()
                 .join(", ")
         )
@@ -523,7 +524,7 @@ fn variant_type_name(variant_type: &PlannedType, api_plan: &PlannedSpec) -> Stri
             "{base}<{}>",
             parameters
                 .iter()
-                .map(|usage| usage.parameter.name.as_str())
+                .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
                 .collect::<Vec<_>>()
                 .join(", ")
         )
@@ -827,7 +828,7 @@ fn field_from_wire_expr(
                 let converted = generic_carrier_from_wire_expr(
                     carrier,
                     wire_type,
-                    type_parameter,
+                    &type_parameter,
                     source_expr,
                     support_namespace,
                 );
@@ -938,7 +939,7 @@ fn render_oneof_from_wire_setup(
             Some((type_parameter, carrier)) => generic_carrier_from_wire_expr(
                 carrier,
                 &case.member.wire_type,
-                type_parameter,
+                &type_parameter,
                 &member_expr,
                 support_namespace,
             ),

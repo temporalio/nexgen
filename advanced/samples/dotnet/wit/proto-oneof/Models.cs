@@ -24,47 +24,47 @@ namespace Nexgen.ProtoOneof
     }
 
     [GeneratedCode("nexgen", null)]
-    public abstract record OutcomeValue<OutputT>
+    public abstract record OutcomeValue<TOutput>
     {
         private OutcomeValue() { }
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Success(OutputT Value) : OutcomeValue<OutputT>;
+        public sealed record Success(TOutput Value) : OutcomeValue<TOutput>;
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Failure(System.Exception Value) : OutcomeValue<OutputT>;
+        public sealed record Failure(System.Exception Value) : OutcomeValue<TOutput>;
     }
 
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(Outcome<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record Outcome<OutputT>
+    public record Outcome<TOutput>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="Outcome"/> class.
         /// </summary>
-        public Outcome(OutcomeValue<OutputT> value)
+        public Outcome(OutcomeValue<TOutput> value)
         {
             Value = value;
         }
 
-        public OutcomeValue<OutputT> Value { get; init; }
+        public OutcomeValue<TOutput> Value { get; init; }
 
-        internal static Outcome<OutputT> FromTransferType(Temporalio.Api.Update.V1.Outcome wire)
+        internal static Outcome<TOutput> FromTransferType(Temporalio.Api.Update.V1.Outcome wire)
         {
-            OutcomeValue<OutputT> valueOneof;
+            OutcomeValue<TOutput> valueOneof;
             switch (wire.ValueCase)
             {
                 case Temporalio.Api.Update.V1.Outcome.ValueOneofCase.Success:
-                    valueOneof = new OutcomeValue<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<OutputT>(wire.Success)[0]);
+                    valueOneof = new OutcomeValue<TOutput>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<TOutput>(wire.Success)[0]);
                     break;
                 case Temporalio.Api.Update.V1.Outcome.ValueOneofCase.Failure:
-                    valueOneof = new OutcomeValue<OutputT>.Failure(Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure));
+                    valueOneof = new OutcomeValue<TOutput>.Failure(Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure));
                     break;
                 default:
                     throw new System.InvalidOperationException("missing required field Outcome.Value");
             }
 
-            return new Outcome<OutputT>(valueOneof);
+            return new Outcome<TOutput>(valueOneof);
         }
 
         internal Temporalio.Api.Update.V1.Outcome ToTransferType()
@@ -72,10 +72,10 @@ namespace Nexgen.ProtoOneof
             var proto = new Temporalio.Api.Update.V1.Outcome();
             switch (Value)
             {
-                case OutcomeValue<OutputT>.Success successCase:
+                case OutcomeValue<TOutput>.Success successCase:
                     proto.Success = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { successCase.Value });
                     break;
-                case OutcomeValue<OutputT>.Failure failureCase:
+                case OutcomeValue<TOutput>.Failure failureCase:
                     proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);
                     break;
             }
@@ -91,10 +91,10 @@ namespace Nexgen.ProtoOneof
             public System.Type TransferType => typeof(Temporalio.Api.Update.V1.Outcome);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((Outcome<OutputT>)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((Outcome<TOutput>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : Outcome<OutputT>.FromTransferType((Temporalio.Api.Update.V1.Outcome)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : Outcome<TOutput>.FromTransferType((Temporalio.Api.Update.V1.Outcome)transferType);
         }
 
     }

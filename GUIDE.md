@@ -1334,8 +1334,13 @@ record request {
 }
 ```
 
-This generates `Request[ContextT]`-style models in Python, TypeScript, Go, and
-.NET. A language-specific field-level `@nexus.type` override replaces that
+This generates `Request[ContextT]`-style models in Python, TypeScript, and Go.
+.NET follows the C# convention and puts the `T` first, so it generates
+`Request<TContext>`. A trailing `T` in the alias name moves to the front, and
+.NET adds a `T` prefix to an alias name with no trailing `T`. .NET rejects two
+parameters of one declaration that map to the same C# name. In a model with
+workflow-function fields, the names `TWorkflow` and `TResult` are also
+reserved. A language-specific field-level `@nexus.type` override replaces that
 field occurrence and therefore removes it from generic inference for that
 target.
 

@@ -161,7 +161,7 @@ fn dotnet_converts_generic_proto_carriers() {
     let output = generate(Language::Dotnet, &path).unwrap();
     assert!(output.contains("typeof(GenericRequest<>.TransferTypeConverter)"));
     assert!(output.contains(
-        "Details = wire.Details == null ? default : ProtoExtensions.FromPayloads<InputT>(wire.Details)[0],"
+        "Details = wire.Details == null ? default : ProtoExtensions.FromPayloads<TInput>(wire.Details)[0],"
     ));
     assert!(
         output.contains("proto.Details = ProtoExtensions.ToPayloads(new object?[] { details });")

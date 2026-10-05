@@ -13,26 +13,26 @@ namespace Nexgen.ProtoGeneric
 
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(PayloadBackedContext<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record PayloadBackedContext<ContextT>
+    public record PayloadBackedContext<TContext>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="PayloadBackedContext"/> class.
         /// </summary>
-        public PayloadBackedContext(ContextT details)
+        public PayloadBackedContext(TContext details)
         {
             Details = details;
         }
 
-        public ContextT Details { get; init; }
+        public TContext Details { get; init; }
 
-        internal static PayloadBackedContext<ContextT> FromTransferType(Temporalio.Api.Compute.V1.ComputeScaler wire)
+        internal static PayloadBackedContext<TContext> FromTransferType(Temporalio.Api.Compute.V1.ComputeScaler wire)
         {
             if (wire.Details == null)
             {
                 throw new System.InvalidOperationException("missing required field PayloadBackedContext.Details");
             }
 
-            return new PayloadBackedContext<ContextT>(Nexgen.Support.ProtoExtensions.FromPayload<ContextT>(wire.Details));
+            return new PayloadBackedContext<TContext>(Nexgen.Support.ProtoExtensions.FromPayload<TContext>(wire.Details));
         }
 
         internal Temporalio.Api.Compute.V1.ComputeScaler ToTransferType()
@@ -51,33 +51,33 @@ namespace Nexgen.ProtoGeneric
             public System.Type TransferType => typeof(Temporalio.Api.Compute.V1.ComputeScaler);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((PayloadBackedContext<ContextT>)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((PayloadBackedContext<TContext>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : PayloadBackedContext<ContextT>.FromTransferType((Temporalio.Api.Compute.V1.ComputeScaler)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : PayloadBackedContext<TContext>.FromTransferType((Temporalio.Api.Compute.V1.ComputeScaler)transferType);
         }
 
     }
 
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(PayloadBackedEnvelope<,>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record PayloadBackedEnvelope<OutputT, ContextT>
+    public record PayloadBackedEnvelope<TOutput, TContext>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="PayloadBackedEnvelope"/> class.
         /// </summary>
-        public PayloadBackedEnvelope(PayloadBackedOutput<OutputT> provider, PayloadBackedContext<ContextT> scaler)
+        public PayloadBackedEnvelope(PayloadBackedOutput<TOutput> provider, PayloadBackedContext<TContext> scaler)
         {
             Provider = provider;
             Scaler = scaler;
         }
 
-        public PayloadBackedOutput<OutputT> Provider { get; init; }
-        public PayloadBackedContext<ContextT> Scaler { get; init; }
+        public PayloadBackedOutput<TOutput> Provider { get; init; }
+        public PayloadBackedContext<TContext> Scaler { get; init; }
 
-        internal static PayloadBackedEnvelope<OutputT, ContextT> FromTransferType(Temporalio.Api.Compute.V1.ComputeConfigScalingGroup wire)
+        internal static PayloadBackedEnvelope<TOutput, TContext> FromTransferType(Temporalio.Api.Compute.V1.ComputeConfigScalingGroup wire)
         {
-            return new PayloadBackedEnvelope<OutputT, ContextT>(PayloadBackedOutput<OutputT>.FromTransferType(wire.Provider), PayloadBackedContext<ContextT>.FromTransferType(wire.Scaler));
+            return new PayloadBackedEnvelope<TOutput, TContext>(PayloadBackedOutput<TOutput>.FromTransferType(wire.Provider), PayloadBackedContext<TContext>.FromTransferType(wire.Scaler));
         }
 
         internal Temporalio.Api.Compute.V1.ComputeConfigScalingGroup ToTransferType()
@@ -97,36 +97,36 @@ namespace Nexgen.ProtoGeneric
             public System.Type TransferType => typeof(Temporalio.Api.Compute.V1.ComputeConfigScalingGroup);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((PayloadBackedEnvelope<OutputT, ContextT>)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((PayloadBackedEnvelope<TOutput, TContext>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : PayloadBackedEnvelope<OutputT, ContextT>.FromTransferType((Temporalio.Api.Compute.V1.ComputeConfigScalingGroup)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : PayloadBackedEnvelope<TOutput, TContext>.FromTransferType((Temporalio.Api.Compute.V1.ComputeConfigScalingGroup)transferType);
         }
 
     }
 
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(PayloadBackedOutput<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record PayloadBackedOutput<OutputT>
+    public record PayloadBackedOutput<TOutput>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="PayloadBackedOutput"/> class.
         /// </summary>
-        public PayloadBackedOutput(OutputT details)
+        public PayloadBackedOutput(TOutput details)
         {
             Details = details;
         }
 
-        public OutputT Details { get; init; }
+        public TOutput Details { get; init; }
 
-        internal static PayloadBackedOutput<OutputT> FromTransferType(Temporalio.Api.Compute.V1.ComputeProvider wire)
+        internal static PayloadBackedOutput<TOutput> FromTransferType(Temporalio.Api.Compute.V1.ComputeProvider wire)
         {
             if (wire.Details == null)
             {
                 throw new System.InvalidOperationException("missing required field PayloadBackedOutput.Details");
             }
 
-            return new PayloadBackedOutput<OutputT>(Nexgen.Support.ProtoExtensions.FromPayload<OutputT>(wire.Details));
+            return new PayloadBackedOutput<TOutput>(Nexgen.Support.ProtoExtensions.FromPayload<TOutput>(wire.Details));
         }
 
         internal Temporalio.Api.Compute.V1.ComputeProvider ToTransferType()
@@ -145,10 +145,10 @@ namespace Nexgen.ProtoGeneric
             public System.Type TransferType => typeof(Temporalio.Api.Compute.V1.ComputeProvider);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((PayloadBackedOutput<OutputT>)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((PayloadBackedOutput<TOutput>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : PayloadBackedOutput<OutputT>.FromTransferType((Temporalio.Api.Compute.V1.ComputeProvider)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : PayloadBackedOutput<TOutput>.FromTransferType((Temporalio.Api.Compute.V1.ComputeProvider)transferType);
         }
 
     }

@@ -11,43 +11,43 @@ namespace Nexgen.NotificationService
 {
 
     [GeneratedCode("nexgen", null)]
-    public abstract record OnCompleteRequestResult<OutputT>
+    public abstract record OnCompleteRequestResult<TOutput>
     {
         private OnCompleteRequestResult() { }
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Success(OutputT Value) : OnCompleteRequestResult<OutputT>;
+        public sealed record Success(TOutput Value) : OnCompleteRequestResult<TOutput>;
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Failure(System.Exception Value) : OnCompleteRequestResult<OutputT>;
+        public sealed record Failure(System.Exception Value) : OnCompleteRequestResult<TOutput>;
     }
 
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteRequest<,>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record OnCompleteRequest<OutputT, SourceContextT>
+    public record OnCompleteRequest<TOutput, TSourceContext>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="OnCompleteRequest"/> class.
         /// </summary>
-        public OnCompleteRequest(OnCompleteRequestResult<OutputT> result, SourceContextT sourceContext)
+        public OnCompleteRequest(OnCompleteRequestResult<TOutput> result, TSourceContext sourceContext)
         {
             Result = result;
             SourceContext = sourceContext;
         }
 
-        public OnCompleteRequestResult<OutputT> Result { get; init; }
-        public SourceContextT SourceContext { get; init; }
+        public OnCompleteRequestResult<TOutput> Result { get; init; }
+        public TSourceContext SourceContext { get; init; }
 
-        internal static OnCompleteRequest<OutputT, SourceContextT> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)
+        internal static OnCompleteRequest<TOutput, TSourceContext> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)
         {
-            OnCompleteRequestResult<OutputT> resultOneof;
+            OnCompleteRequestResult<TOutput> resultOneof;
             switch (wire.ResultCase)
             {
                 case Temporalio.Api.NotificationService.V1.OnCompleteRequest.ResultOneofCase.Success:
-                    resultOneof = new OnCompleteRequestResult<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayload<OutputT>(wire.Success));
+                    resultOneof = new OnCompleteRequestResult<TOutput>.Success(Nexgen.Support.ProtoExtensions.FromPayload<TOutput>(wire.Success));
                     break;
                 case Temporalio.Api.NotificationService.V1.OnCompleteRequest.ResultOneofCase.Failure:
-                    resultOneof = new OnCompleteRequestResult<OutputT>.Failure(Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure));
+                    resultOneof = new OnCompleteRequestResult<TOutput>.Failure(Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure));
                     break;
                 default:
                     throw new System.InvalidOperationException("missing required field OnCompleteRequest.Result");
@@ -58,7 +58,7 @@ namespace Nexgen.NotificationService
                 throw new System.InvalidOperationException("missing required field OnCompleteRequest.SourceContext");
             }
 
-            return new OnCompleteRequest<OutputT, SourceContextT>(resultOneof, Nexgen.Support.ProtoExtensions.FromPayload<SourceContextT>(wire.SourceContext));
+            return new OnCompleteRequest<TOutput, TSourceContext>(resultOneof, Nexgen.Support.ProtoExtensions.FromPayload<TSourceContext>(wire.SourceContext));
         }
 
         internal Temporalio.Api.NotificationService.V1.OnCompleteRequest ToTransferType()
@@ -66,10 +66,10 @@ namespace Nexgen.NotificationService
             var proto = new Temporalio.Api.NotificationService.V1.OnCompleteRequest();
             switch (Result)
             {
-                case OnCompleteRequestResult<OutputT>.Success successCase:
+                case OnCompleteRequestResult<TOutput>.Success successCase:
                     proto.Success = Nexgen.Support.ProtoExtensions.ToPayload(successCase.Value);
                     break;
-                case OnCompleteRequestResult<OutputT>.Failure failureCase:
+                case OnCompleteRequestResult<TOutput>.Failure failureCase:
                     proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);
                     break;
             }
@@ -86,10 +86,10 @@ namespace Nexgen.NotificationService
             public System.Type TransferType => typeof(Temporalio.Api.NotificationService.V1.OnCompleteRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((OnCompleteRequest<OutputT, SourceContextT>)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((OnCompleteRequest<TOutput, TSourceContext>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : OnCompleteRequest<OutputT, SourceContextT>.FromTransferType((Temporalio.Api.NotificationService.V1.OnCompleteRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : OnCompleteRequest<TOutput, TSourceContext>.FromTransferType((Temporalio.Api.NotificationService.V1.OnCompleteRequest)transferType);
         }
 
     }

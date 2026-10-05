@@ -794,17 +794,17 @@ fn dotnet_notification_models_convert_generic_oneofs_without_service() {
     assert!(models.contains(
         "[Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteRequest<,>.TransferTypeConverter))]"
     ));
-    assert!(models.contains("public record OnCompleteRequest<OutputT, SourceContextT>"));
+    assert!(models.contains("public record OnCompleteRequest<TOutput, TSourceContext>"));
     assert!(models.contains(
-        "internal static OnCompleteRequest<OutputT, SourceContextT> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)"
+        "internal static OnCompleteRequest<TOutput, TSourceContext> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)"
     ));
-    assert!(models.contains("OnCompleteRequestResult<OutputT> resultOneof;"));
+    assert!(models.contains("OnCompleteRequestResult<TOutput> resultOneof;"));
     assert!(models.contains("switch (wire.ResultCase)"));
     assert!(models.contains(
         "case Temporalio.Api.NotificationService.V1.OnCompleteRequest.ResultOneofCase.Success:"
     ));
     assert!(models.contains(
-        "resultOneof = new OnCompleteRequestResult<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayload<OutputT>(wire.Success));"
+        "resultOneof = new OnCompleteRequestResult<TOutput>.Success(Nexgen.Support.ProtoExtensions.FromPayload<TOutput>(wire.Success));"
     ));
     assert!(models.contains(
         "throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.Result\");"
@@ -814,10 +814,10 @@ fn dotnet_notification_models_convert_generic_oneofs_without_service() {
         "throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.SourceContext\");"
     ));
     assert!(models.contains(
-        "return new OnCompleteRequest<OutputT, SourceContextT>(resultOneof, Nexgen.Support.ProtoExtensions.FromPayload<SourceContextT>(wire.SourceContext));"
+        "return new OnCompleteRequest<TOutput, TSourceContext>(resultOneof, Nexgen.Support.ProtoExtensions.FromPayload<TSourceContext>(wire.SourceContext));"
     ));
     assert!(!models.contains(" switch {"));
-    assert!(models.contains("case OnCompleteRequestResult<OutputT>.Failure failureCase:"));
+    assert!(models.contains("case OnCompleteRequestResult<TOutput>.Failure failureCase:"));
     assert!(models.contains(
         "proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);"
     ));
@@ -825,7 +825,7 @@ fn dotnet_notification_models_convert_generic_oneofs_without_service() {
         "proto.SourceContext = Nexgen.Support.ProtoExtensions.ToPayload(SourceContext);"
     ));
     assert!(models.contains(
-        "public object? ToTransferType(object? value) => value is null ? null : ((OnCompleteRequest<OutputT, SourceContextT>)value).ToTransferType();"
+        "public object? ToTransferType(object? value) => value is null ? null : ((OnCompleteRequest<TOutput, TSourceContext>)value).ToTransferType();"
     ));
 }
 
@@ -842,7 +842,7 @@ fn dotnet_proto_oneofs_convert_payloads_and_optional_groups() {
 
     assert!(models.contains("typeof(Outcome<>.TransferTypeConverter)"));
     assert!(models.contains(
-        "new OutcomeValue<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<OutputT>(wire.Success)[0])"
+        "new OutcomeValue<TOutput>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<TOutput>(wire.Success)[0])"
     ));
     assert!(models.contains(
         "proto.Success = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { successCase.Value });"
@@ -868,7 +868,7 @@ fn dotnet_generic_proto_models_reference_nested_generic_converters() {
 
     assert!(models.contains("typeof(PayloadBackedEnvelope<,>.TransferTypeConverter)"));
     assert!(models.contains(
-        "return new PayloadBackedEnvelope<OutputT, ContextT>(PayloadBackedOutput<OutputT>.FromTransferType(wire.Provider), PayloadBackedContext<ContextT>.FromTransferType(wire.Scaler));"
+        "return new PayloadBackedEnvelope<TOutput, TContext>(PayloadBackedOutput<TOutput>.FromTransferType(wire.Provider), PayloadBackedContext<TContext>.FromTransferType(wire.Scaler));"
     ));
     assert!(models.contains(
         "proto.Provider = (Temporalio.Api.Compute.V1.ComputeProvider)Provider.ToTransferType();"
@@ -906,4 +906,59 @@ interface notification-models {
 
     assert!(models.contains("namespace Acme.Notifications\n{"));
     assert!(models.contains("public record Notification"));
+}
+
+#[test]
+fn dotnet_rejects_type_parameters_with_the_same_csharp_name() {
+    let temp_dir = unique_output_path("dotnet-type-parameter-conflict");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("conflict.wit");
+    fs::write(
+        &input_path,
+        r#"package test:conflict@1.0.0;
+
+world system {
+  export conflict-models;
+}
+
+interface conflict-models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.type-parameter
+  type output = placeholder;
+
+  record pair {
+    first: output-t,
+    second: output,
+  }
+}
+"#,
+    )
+    .unwrap();
+
+    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
+        nexgen::language::Language::Dotnet,
+        &[input_path],
+    )
+    .unwrap();
+    let descriptors =
+        nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&project_root())).unwrap();
+    let error = generate_source(
+        nexgen::language::Language::Dotnet,
+        spec,
+        &descriptors,
+        &SupportFiles::default(),
+    )
+    .unwrap_err();
+    fs::remove_dir_all(temp_dir).unwrap();
+
+    assert!(
+        error.to_string().contains(
+            ".NET type parameter `Output` in `conflict-models.pair` maps to `TOutput`, which conflicts with type parameter `OutputT`"
+        ),
+        "{error}"
+    );
 }

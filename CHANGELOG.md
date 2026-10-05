@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+- .NET generic type parameters now use the C# `T` prefix. For example, the
+  authored `output-t` alias generates `TOutput` instead of `OutputT`.
+
 ### Fixed
 
 - Operation-free WIT interfaces now honor `@nexus.namespace`, and .NET names

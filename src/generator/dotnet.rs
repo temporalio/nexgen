@@ -57,6 +57,7 @@ struct ApiPlanner<'a> {
 
 impl<'a> ApiPlanner<'a> {
     fn new(api_plan: &'a PlannedSpec, support_namespace: Option<&'a str>) -> Result<Self> {
+        validate_type_parameter_names(api_plan)?;
         let external_models = DotNetExternalModels::new(api_plan)?;
         let external_model_fragments = external_models.render_models()?;
         Ok(Self {
@@ -565,7 +566,7 @@ impl<'a> ApiPlanner<'a> {
             .variant_type_parameters(&variant.full_name, Language::Dotnet);
         let type_arguments = type_parameters
             .iter()
-            .map(|usage| usage.parameter.name.as_str())
+            .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
             .collect::<Vec<_>>()
             .join(", ");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
@@ -633,7 +634,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(
                 &type_parameters
                     .iter()
-                    .map(|usage| usage.parameter.name.as_str())
+                    .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
                     .collect::<Vec<_>>()
                     .join(", "),
             );
@@ -1269,7 +1270,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(
                 &parameters
                     .iter()
-                    .map(|usage| usage.parameter.name.as_str())
+                    .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
                     .collect::<Vec<_>>()
                     .join(", "),
             );
@@ -1354,7 +1355,10 @@ impl<'a> ApiPlanner<'a> {
                 let input_parameters = self
                     .operation_model_parameters(operation)
                     .into_iter()
-                    .map(|usage| (usage.parameter.full_name, usage.parameter.name))
+                    .map(|usage| {
+                        let name = csharp_type_parameter_name(&usage.parameter.name);
+                        (usage.parameter.full_name, name)
+                    })
                     .collect::<std::collections::BTreeMap<_, _>>();
                 let arguments = parameters
                     .iter()
@@ -1513,7 +1517,7 @@ impl<'a> ApiPlanner<'a> {
             PlannedType::Bool => "bool".to_string(),
             PlannedType::String => "string".to_string(),
             PlannedType::Bytes => "byte[]".to_string(),
-            PlannedType::TypeParameter(parameter) => parameter.name.clone(),
+            PlannedType::TypeParameter(parameter) => csharp_type_parameter_name(&parameter.name),
             PlannedType::Enum(enumeration) => csharp_type_name(&enumeration.name),
             proto_type @ PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(
                 _,
@@ -1535,7 +1539,7 @@ impl<'a> ApiPlanner<'a> {
                         base,
                         parameters
                             .iter()
-                            .map(|usage| usage.parameter.name.as_str())
+                            .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
                             .collect::<Vec<_>>()
                             .join(", ")
                     )
@@ -1568,7 +1572,7 @@ impl<'a> ApiPlanner<'a> {
                                 base,
                                 parameters
                                     .iter()
-                                    .map(|usage| usage.parameter.name.as_str())
+                                    .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
                                     .collect::<Vec<_>>()
                                     .join(", ")
                             )
@@ -2011,7 +2015,7 @@ impl DotNetExternalModels {
                     base,
                     parameters
                         .iter()
-                        .map(|usage| usage.parameter.name.as_str())
+                        .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -2958,7 +2962,7 @@ fn render_flattened_generic_parameters(
     let mut generics = api_plan
         .record_type_parameters(&model.full_name, Language::Dotnet)
         .into_iter()
-        .map(|usage| usage.parameter.name)
+        .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
         .collect::<Vec<_>>();
     if !overload.has_expression_functions() && generics.is_empty() {
         return;
@@ -3027,7 +3031,7 @@ fn render_flattened_method_body(
         output.push_str(
             &model_parameters
                 .iter()
-                .map(|usage| usage.parameter.name.as_str())
+                .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
                 .collect::<Vec<_>>()
                 .join(", "),
         );
@@ -3822,7 +3826,7 @@ fn dotnet_authored_type(wit_type: &PlannedType) -> String {
         TypeSpec::Float => "double".to_string(),
         TypeSpec::String => "string".to_string(),
         TypeSpec::Bytes => "byte[]".to_string(),
-        TypeSpec::TypeParameter(parameter) => parameter.name.clone(),
+        TypeSpec::TypeParameter(parameter) => csharp_type_parameter_name(&parameter.name),
         TypeSpec::Option(inner) => nullable_type(&dotnet_authored_type(inner)),
         TypeSpec::List(inner) => {
             format!("IReadOnlyList<{}>", dotnet_authored_type(inner))
@@ -3997,6 +4001,73 @@ fn enum_value_name(name: &str) -> String {
         .to_string()
 }
 
+/// Type parameters that flattened workflow-function overloads add to a model's own.
+const FLATTENED_FUNCTION_TYPE_PARAMETERS: [&str; 2] = ["TWorkflow", "TResult"];
+
+/// Rejects authored type parameters whose C# names collide within one declaration.
+fn validate_type_parameter_names(api_plan: &PlannedSpec) -> Result<()> {
+    let records = api_plan.records().map(|(full_name, record)| {
+        let reserved: &[&str] = if record.fields.values().any(|field| field.function.is_some()) {
+            &FLATTENED_FUNCTION_TYPE_PARAMETERS
+        } else {
+            &[]
+        };
+        (
+            full_name,
+            api_plan.record_type_parameters(full_name, Language::Dotnet),
+            reserved,
+        )
+    });
+    let variants = api_plan.variants().map(|(full_name, _)| {
+        (
+            full_name,
+            api_plan.variant_type_parameters(full_name, Language::Dotnet),
+            &[][..],
+        )
+    });
+    for (declaration, parameters, reserved) in records.chain(variants) {
+        let mut names = std::collections::BTreeMap::new();
+        for usage in parameters {
+            let name = csharp_type_parameter_name(&usage.parameter.name);
+            let conflicting = if reserved.contains(&name.as_str()) {
+                Some("a type parameter of the generated workflow-function overloads".to_string())
+            } else {
+                names
+                    .get(&name)
+                    .map(|other: &String| format!("type parameter `{other}`"))
+            };
+            if let Some(conflicting) = conflicting {
+                return Err(Error::DotnetTypeParameterNameConflict {
+                    declaration: declaration.to_string(),
+                    parameter: usage.parameter.name,
+                    name,
+                    conflicting,
+                });
+            }
+            names.insert(name, usage.parameter.name);
+        }
+    }
+    Ok(())
+}
+
+/// Returns the C# name of a type parameter. C# puts the `T` before the name, so the
+/// authored `OutputT` becomes `TOutput` and `Context` becomes `TContext`.
+pub(in crate::generator) fn csharp_type_parameter_name(name: &str) -> String {
+    if name == "T" {
+        return name.to_string();
+    }
+    let stem = name
+        .strip_suffix('T')
+        .filter(|stem| !stem.is_empty())
+        .unwrap_or(name);
+    let mut characters = stem.chars();
+    if characters.next() == Some('T') && characters.next().is_some_and(char::is_uppercase) {
+        stem.to_string()
+    } else {
+        format!("T{stem}")
+    }
+}
+
 pub(in crate::generator) fn csharp_type_name(name: &str) -> String {
     csharp_ident(&name.to_upper_camel_case())
 }
@@ -4114,3 +4185,22 @@ const CSHARP_KEYWORDS: &[&str] = &[
     "volatile",
     "while",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::csharp_type_parameter_name;
+
+    #[test]
+    fn type_parameter_names_put_the_t_first() {
+        assert_eq!(csharp_type_parameter_name("OutputT"), "TOutput");
+        assert_eq!(
+            csharp_type_parameter_name("SourceContextT"),
+            "TSourceContext"
+        );
+        assert_eq!(csharp_type_parameter_name("Context"), "TContext");
+        assert_eq!(csharp_type_parameter_name("TenantT"), "TTenant");
+        assert_eq!(csharp_type_parameter_name("Tenant"), "TTenant");
+        assert_eq!(csharp_type_parameter_name("TKey"), "TKey");
+        assert_eq!(csharp_type_parameter_name("T"), "T");
+    }
+}
