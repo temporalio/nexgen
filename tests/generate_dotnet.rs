@@ -798,15 +798,25 @@ fn dotnet_notification_models_convert_generic_oneofs_without_service() {
     assert!(models.contains(
         "internal static OnCompleteRequest<OutputT, SourceContextT> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)"
     ));
+    assert!(models.contains("OnCompleteRequestResult<OutputT> resultOneof;"));
+    assert!(models.contains("switch (wire.ResultCase)"));
     assert!(models.contains(
-        "wire.ResultCase switch { Temporalio.Api.NotificationService.V1.OnCompleteRequest.ResultOneofCase.Success => (OnCompleteRequestResult<OutputT>)new OnCompleteRequestResult<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayload<OutputT>(wire.Success))"
+        "case Temporalio.Api.NotificationService.V1.OnCompleteRequest.ResultOneofCase.Success:"
     ));
     assert!(models.contains(
-        "_ => throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.Result\") }"
+        "resultOneof = new OnCompleteRequestResult<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayload<OutputT>(wire.Success));"
     ));
     assert!(models.contains(
-        "Nexgen.Support.ProtoExtensions.FromPayload<SourceContextT>(wire.SourceContext ?? throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.SourceContext\"))"
+        "throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.Result\");"
     ));
+    assert!(models.contains("if (wire.SourceContext == null)"));
+    assert!(models.contains(
+        "throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.SourceContext\");"
+    ));
+    assert!(models.contains(
+        "return new OnCompleteRequest<OutputT, SourceContextT>(resultOneof, Nexgen.Support.ProtoExtensions.FromPayload<SourceContextT>(wire.SourceContext));"
+    ));
+    assert!(!models.contains(" switch {"));
     assert!(models.contains("case OnCompleteRequestResult<OutputT>.Failure failureCase:"));
     assert!(models.contains(
         "proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);"
@@ -837,9 +847,10 @@ fn dotnet_proto_oneofs_convert_payloads_and_optional_groups() {
     assert!(models.contains(
         "proto.Success = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { successCase.Value });"
     ));
-    assert!(models.contains(
-        "Activity = wire.ActivityCase switch { Temporalio.Api.WorkflowService.V1.PauseActivityRequest.ActivityOneofCase.Id => (ActivitySelection)new ActivitySelection.Id(wire.Id), Temporalio.Api.WorkflowService.V1.PauseActivityRequest.ActivityOneofCase.Type => (ActivitySelection)new ActivitySelection.Type(wire.Type), _ => null },"
-    ));
+    assert!(models.contains("ActivitySelection? activityOneof;"));
+    assert!(models.contains("activityOneof = new ActivitySelection.Type(wire.Type);"));
+    assert!(models.contains("activityOneof = null;"));
+    assert!(models.contains("Activity = activityOneof,"));
     assert!(models.contains("case ActivitySelection.Type typeCase:"));
     assert!(models.contains("proto.Type = typeCase.Value;"));
 }

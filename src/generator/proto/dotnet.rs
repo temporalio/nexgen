@@ -706,6 +706,21 @@ fn render_model_from_wire_method(
     output.push_str(" FromTransferType(");
     output.push_str(raw_type);
     output.push_str(" wire)\n    {\n");
+    for (field_name, field) in model
+        .fields
+        .iter()
+        .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+    {
+        render_field_from_wire_setup(
+            output,
+            model,
+            field_name,
+            field,
+            raw_type,
+            api_plan,
+            support_namespace,
+        );
+    }
     let required_fields = model
         .model_fields()
         .filter(|(_, field)| field.required)
@@ -722,7 +737,6 @@ fn render_model_from_wire_method(
             field_name,
             field,
             &format!("wire.{}", csharp_type_name(field_name)),
-            raw_type,
             api_plan,
             support_namespace,
         ));
@@ -738,7 +752,6 @@ fn render_model_from_wire_method(
             field_name,
             field,
             &format!("wire.{}", csharp_type_name(field_name)),
-            raw_type,
             api_plan,
             support_namespace,
         ));
@@ -770,7 +783,6 @@ fn render_model_from_wire_method(
                 field_name,
                 field,
                 &format!("wire.{}", csharp_type_name(field_name)),
-                raw_type,
                 api_plan,
                 support_namespace,
             ));
@@ -786,7 +798,6 @@ fn field_from_wire_expr(
     field_name: &str,
     field: &RecordFieldSpec<PlannedFamily>,
     source_expr: &str,
-    raw_type: &str,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
 ) -> String {
@@ -807,42 +818,24 @@ fn field_from_wire_expr(
         );
     }
     match &field.data.wire_binding {
-        Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) => {
-            return oneof_from_wire_expr(
-                model,
-                field_name,
-                field,
-                wire_name,
-                members,
-                raw_type,
-                api_plan,
-                support_namespace,
-            );
+        Some(PlannedWireFieldBinding::VariantMembers { .. }) => {
+            // The setup statements decode the oneof into this local.
+            return oneof_local_name(field_name);
         }
         Some(PlannedWireFieldBinding::Value { wire_type, .. }) => {
             if let Some((type_parameter, carrier)) = generic_carrier(&field.field_type, wire_type) {
+                let converted = generic_carrier_from_wire_expr(
+                    carrier,
+                    wire_type,
+                    type_parameter,
+                    source_expr,
+                    support_namespace,
+                );
+                // A required carrier is checked for presence by the setup statements.
                 return if optional {
-                    format!(
-                        "{source_expr} == null ? default : {}",
-                        generic_carrier_from_wire_expr(
-                            carrier,
-                            wire_type,
-                            type_parameter,
-                            source_expr,
-                            support_namespace,
-                        )
-                    )
+                    format!("{source_expr} == null ? default : {converted}")
                 } else {
-                    generic_carrier_from_wire_expr(
-                        carrier,
-                        wire_type,
-                        type_parameter,
-                        &format!(
-                            "{source_expr} ?? throw new System.InvalidOperationException({})",
-                            missing_required_field_message(model, field_name)
-                        ),
-                        support_namespace,
-                    )
+                    converted
                 };
             }
         }
@@ -866,8 +859,52 @@ fn missing_required_field_message(model: &RecordSpec<PlannedFamily>, field_name:
     )
 }
 
+fn oneof_local_name(field_name: &str) -> String {
+    format!("{}Oneof", field_name.to_lower_camel_case())
+}
+
+/// Renders the statements that `FromTransferType` runs before it constructs the model: a
+/// presence check for each required Payload carrier, and a switch that decodes each oneof
+/// into a local.
+fn render_field_from_wire_setup(
+    output: &mut String,
+    model: &RecordSpec<PlannedFamily>,
+    field_name: &str,
+    field: &RecordFieldSpec<PlannedFamily>,
+    raw_type: &str,
+    api_plan: &PlannedSpec,
+    support_namespace: Option<&str>,
+) {
+    match &field.data.wire_binding {
+        Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) => {
+            render_oneof_from_wire_setup(
+                output,
+                model,
+                field_name,
+                field,
+                wire_name,
+                members,
+                raw_type,
+                api_plan,
+                support_namespace,
+            );
+        }
+        Some(PlannedWireFieldBinding::Value { wire_type, .. })
+            if field.required && generic_carrier(&field.field_type, wire_type).is_some() =>
+        {
+            output.push_str(&format!(
+                "        if (wire.{} == null)\n        {{\n            throw new System.InvalidOperationException({});\n        }}\n\n",
+                csharp_type_name(field_name),
+                missing_required_field_message(model, field_name)
+            ));
+        }
+        _ => {}
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
-fn oneof_from_wire_expr(
+fn render_oneof_from_wire_setup(
+    output: &mut String,
     model: &RecordSpec<PlannedFamily>,
     field_name: &str,
     field: &RecordFieldSpec<PlannedFamily>,
@@ -876,7 +913,7 @@ fn oneof_from_wire_expr(
     raw_type: &str,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
-) -> String {
+) {
     let proto = model
         .data
         .proto
@@ -885,48 +922,56 @@ fn oneof_from_wire_expr(
     let cases = oneof_cases(api_plan, &proto.full_name, field, wire_name, members)
         .expect("oneof cases are validated during prepare");
     let variant_type = variant_type_name(&field.field_type, api_plan);
+    let local_name = oneof_local_name(field_name);
     let oneof_case_type = format!("{raw_type}.{}OneofCase", csharp_type_name(wire_name));
-    let mut arms = cases
-        .iter()
-        .map(|case| {
-            let member_expr = format!("wire.{}", csharp_type_name(&case.member.wire_name));
-            let value_expr = match generic_carrier(case.payload, &case.member.wire_type) {
-                Some((type_parameter, carrier)) => generic_carrier_from_wire_expr(
-                    carrier,
-                    &case.member.wire_type,
-                    type_parameter,
-                    &member_expr,
-                    support_namespace,
-                ),
-                None => value_from_wire_expr(
-                    case.payload,
-                    &member_expr,
-                    false,
-                    None,
-                    api_plan,
-                    support_namespace,
-                ),
-            };
-            format!(
-                "{oneof_case_type}.{} => ({variant_type})new {variant_type}.{}({value_expr})",
-                csharp_type_name(&case.member.wire_name),
-                case.case_name,
-            )
-        })
-        .collect::<Vec<_>>();
-    arms.push(if field.required {
-        format!(
-            "_ => throw new System.InvalidOperationException({})",
+    output.push_str(&format!(
+        "        {variant_type}{} {local_name};\n",
+        if field.required { "" } else { "?" }
+    ));
+    output.push_str(&format!(
+        "        switch (wire.{}Case)\n        {{\n",
+        csharp_type_name(wire_name)
+    ));
+    for case in &cases {
+        let member_expr = format!("wire.{}", csharp_type_name(&case.member.wire_name));
+        let value_expr = match generic_carrier(case.payload, &case.member.wire_type) {
+            Some((type_parameter, carrier)) => generic_carrier_from_wire_expr(
+                carrier,
+                &case.member.wire_type,
+                type_parameter,
+                &member_expr,
+                support_namespace,
+            ),
+            None => value_from_wire_expr(
+                case.payload,
+                &member_expr,
+                false,
+                None,
+                api_plan,
+                support_namespace,
+            ),
+        };
+        output.push_str(&format!(
+            "            case {oneof_case_type}.{}:\n",
+            csharp_type_name(&case.member.wire_name)
+        ));
+        output.push_str(&format!(
+            "                {local_name} = new {variant_type}.{}({value_expr});\n",
+            case.case_name
+        ));
+        output.push_str("                break;\n");
+    }
+    output.push_str("            default:\n");
+    if field.required {
+        output.push_str(&format!(
+            "                throw new System.InvalidOperationException({});\n",
             missing_required_field_message(model, field_name)
-        )
+        ));
     } else {
-        "_ => null".to_string()
-    });
-    format!(
-        "wire.{}Case switch {{ {} }}",
-        csharp_type_name(wire_name),
-        arms.join(", ")
-    )
+        output.push_str(&format!("                {local_name} = null;\n"));
+        output.push_str("                break;\n");
+    }
+    output.push_str("        }\n\n");
 }
 
 fn value_from_wire_expr(

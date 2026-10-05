@@ -51,7 +51,20 @@ namespace Nexgen.ProtoOneof
 
         internal static Outcome<OutputT> FromTransferType(Temporalio.Api.Update.V1.Outcome wire)
         {
-            return new Outcome<OutputT>(wire.ValueCase switch { Temporalio.Api.Update.V1.Outcome.ValueOneofCase.Success => (OutcomeValue<OutputT>)new OutcomeValue<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<OutputT>(wire.Success)[0]), Temporalio.Api.Update.V1.Outcome.ValueOneofCase.Failure => (OutcomeValue<OutputT>)new OutcomeValue<OutputT>.Failure(Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure)), _ => throw new System.InvalidOperationException("missing required field Outcome.Value") });
+            OutcomeValue<OutputT> valueOneof;
+            switch (wire.ValueCase)
+            {
+                case Temporalio.Api.Update.V1.Outcome.ValueOneofCase.Success:
+                    valueOneof = new OutcomeValue<OutputT>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<OutputT>(wire.Success)[0]);
+                    break;
+                case Temporalio.Api.Update.V1.Outcome.ValueOneofCase.Failure:
+                    valueOneof = new OutcomeValue<OutputT>.Failure(Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure));
+                    break;
+                default:
+                    throw new System.InvalidOperationException("missing required field Outcome.Value");
+            }
+
+            return new Outcome<OutputT>(valueOneof);
         }
 
         internal Temporalio.Api.Update.V1.Outcome ToTransferType()
@@ -110,10 +123,24 @@ namespace Nexgen.ProtoOneof
 
         internal static PauseActivityRequest FromTransferType(Temporalio.Api.WorkflowService.V1.PauseActivityRequest wire)
         {
+            ActivitySelection? activityOneof;
+            switch (wire.ActivityCase)
+            {
+                case Temporalio.Api.WorkflowService.V1.PauseActivityRequest.ActivityOneofCase.Id:
+                    activityOneof = new ActivitySelection.Id(wire.Id);
+                    break;
+                case Temporalio.Api.WorkflowService.V1.PauseActivityRequest.ActivityOneofCase.Type:
+                    activityOneof = new ActivitySelection.Type(wire.Type);
+                    break;
+                default:
+                    activityOneof = null;
+                    break;
+            }
+
             return new PauseActivityRequest(wire.Namespace, wire.Identity, wire.Reason, wire.RequestId)
             {
                 Execution = wire.Execution == null ? null : WorkflowExecution.FromTransferType(wire.Execution),
-                Activity = wire.ActivityCase switch { Temporalio.Api.WorkflowService.V1.PauseActivityRequest.ActivityOneofCase.Id => (ActivitySelection)new ActivitySelection.Id(wire.Id), Temporalio.Api.WorkflowService.V1.PauseActivityRequest.ActivityOneofCase.Type => (ActivitySelection)new ActivitySelection.Type(wire.Type), _ => null },
+                Activity = activityOneof,
             };
         }
 

@@ -27,7 +27,12 @@ namespace Nexgen.ProtoGeneric
 
         internal static PayloadBackedContext<ContextT> FromTransferType(Temporalio.Api.Compute.V1.ComputeScaler wire)
         {
-            return new PayloadBackedContext<ContextT>(Nexgen.Support.ProtoExtensions.FromPayload<ContextT>(wire.Details ?? throw new System.InvalidOperationException("missing required field PayloadBackedContext.Details")));
+            if (wire.Details == null)
+            {
+                throw new System.InvalidOperationException("missing required field PayloadBackedContext.Details");
+            }
+
+            return new PayloadBackedContext<ContextT>(Nexgen.Support.ProtoExtensions.FromPayload<ContextT>(wire.Details));
         }
 
         internal Temporalio.Api.Compute.V1.ComputeScaler ToTransferType()
@@ -116,7 +121,12 @@ namespace Nexgen.ProtoGeneric
 
         internal static PayloadBackedOutput<OutputT> FromTransferType(Temporalio.Api.Compute.V1.ComputeProvider wire)
         {
-            return new PayloadBackedOutput<OutputT>(Nexgen.Support.ProtoExtensions.FromPayload<OutputT>(wire.Details ?? throw new System.InvalidOperationException("missing required field PayloadBackedOutput.Details")));
+            if (wire.Details == null)
+            {
+                throw new System.InvalidOperationException("missing required field PayloadBackedOutput.Details");
+            }
+
+            return new PayloadBackedOutput<OutputT>(Nexgen.Support.ProtoExtensions.FromPayload<OutputT>(wire.Details));
         }
 
         internal Temporalio.Api.Compute.V1.ComputeProvider ToTransferType()
