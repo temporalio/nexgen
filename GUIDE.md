@@ -1357,7 +1357,9 @@ converter, such as `typeof(Request<,>.TransferTypeConverter)`, which the SDK
 closes with the model's type arguments. Carrier fields decode with
 `ProtoExtensions.FromPayload<T>` (or the first value of
 `ProtoExtensions.FromPayloads<T>` for `Payloads`) from the support file, so
-values decode as the concrete type argument. This requires `Temporalio` 1.19.0
+values decode as the concrete type argument. A `Payloads` carrier must hold
+exactly one payload. If it does not, decoding throws `InvalidOperationException`
+with the field name and the payload count. This requires `Temporalio` 1.19.0
 or newer.
 
 Type parameters are also unsupported in resources, map keys, function-signature

@@ -160,6 +160,13 @@ fn dotnet_converts_generic_proto_carriers() {
     let path = write_generic_carrier_fixture(temp.path());
     let output = generate(Language::Dotnet, &path).unwrap();
     assert!(output.contains("typeof(GenericRequest<>.TransferTypeConverter)"));
+    assert!(
+        output.contains("if (wire.Details != null && wire.Details.Payloads_.Count != 1)"),
+        "{output}"
+    );
+    assert!(output.contains(
+        "throw new System.InvalidOperationException($\"expected exactly one payload in GenericRequest.Details, found {wire.Details.Payloads_.Count}\");"
+    ));
     assert!(output.contains(
         "Details = wire.Details == null ? default : ProtoExtensions.FromPayloads<TInput>(wire.Details)[0],"
     ));

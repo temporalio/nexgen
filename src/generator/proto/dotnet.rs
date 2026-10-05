@@ -865,8 +865,8 @@ fn oneof_local_name(field_name: &str) -> String {
 }
 
 /// Renders the statements that `FromTransferType` runs before it constructs the model: a
-/// presence check for each required Payload carrier, and a switch that decodes each oneof
-/// into a local.
+/// presence check for each required Payload carrier, a count check for each Payloads
+/// carrier, and a switch that decodes each oneof into a local.
 fn render_field_from_wire_setup(
     output: &mut String,
     model: &RecordSpec<PlannedFamily>,
@@ -890,16 +890,33 @@ fn render_field_from_wire_setup(
                 support_namespace,
             );
         }
-        Some(PlannedWireFieldBinding::Value { wire_type, .. })
-            if field.required && generic_carrier(&field.field_type, wire_type).is_some() =>
-        {
-            output.push_str(&format!(
-                "        if (wire.{} == null)\n        {{\n            throw new System.InvalidOperationException({});\n        }}\n\n",
-                csharp_type_name(field_name),
-                missing_required_field_message(model, field_name)
-            ));
+        Some(PlannedWireFieldBinding::Value { wire_type, .. }) => {
+            let Some((_, carrier)) = generic_carrier(&field.field_type, wire_type) else {
+                return;
+            };
+            let source_expr = format!("wire.{}", csharp_type_name(field_name));
+            if field.required {
+                output.push_str(&format!(
+                    "        if ({source_expr} == null)\n        {{\n            throw new System.InvalidOperationException({});\n        }}\n\n",
+                    missing_required_field_message(model, field_name)
+                ));
+            }
+            if matches!(carrier, ProtoGenericCarrier::Payloads) {
+                render_single_payload_check(
+                    output,
+                    "        ",
+                    &source_expr,
+                    !field.required,
+                    &format!(
+                        "{}.{}",
+                        csharp_type_name(&model.name),
+                        csharp_type_name(field_name)
+                    ),
+                );
+                output.push('\n');
+            }
         }
-        _ => {}
+        None => {}
     }
 }
 
@@ -956,6 +973,21 @@ fn render_oneof_from_wire_setup(
             "            case {oneof_case_type}.{}:\n",
             csharp_type_name(&case.member.wire_name)
         ));
+        if let Some((_, ProtoGenericCarrier::Payloads)) =
+            generic_carrier(case.payload, &case.member.wire_type)
+        {
+            render_single_payload_check(
+                output,
+                "                ",
+                &member_expr,
+                false,
+                &format!(
+                    "{}.{}",
+                    csharp_type_name(&model.name),
+                    csharp_type_name(&case.member.wire_name)
+                ),
+            );
+        }
         output.push_str(&format!(
             "                {local_name} = new {variant_type}.{}({value_expr});\n",
             case.case_name
@@ -973,6 +1005,27 @@ fn render_oneof_from_wire_setup(
         output.push_str("                break;\n");
     }
     output.push_str("        }\n\n");
+}
+
+/// Renders a check that a Payloads carrier holds exactly one payload. The decode takes the
+/// first payload, so this check replaces an unclear index error with a message that names
+/// the field.
+fn render_single_payload_check(
+    output: &mut String,
+    indent: &str,
+    source_expr: &str,
+    optional: bool,
+    field_description: &str,
+) {
+    let count_expr = format!("{source_expr}.Payloads_.Count");
+    let condition = if optional {
+        format!("{source_expr} != null && {count_expr} != 1")
+    } else {
+        format!("{count_expr} != 1")
+    };
+    output.push_str(&format!(
+        "{indent}if ({condition})\n{indent}{{\n{indent}    throw new System.InvalidOperationException($\"expected exactly one payload in {field_description}, found {{{count_expr}}}\");\n{indent}}}\n"
+    ));
 }
 
 fn value_from_wire_expr(

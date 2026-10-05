@@ -62,6 +62,28 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Contains("missing required field Outcome.Value", error.Message);
         }
 
+        [Theory]
+        [InlineData(0)]
+        [InlineData(2)]
+        public void ProtoOneofPayloadsCarrierRejectsWrongPayloadCount(int payloadCount)
+        {
+            using var converterContext = PushConverterContext();
+            var success = new Temporalio.Api.Common.V1.Payloads();
+            for (var index = 0; index < payloadCount; index++)
+            {
+                success.Payloads_.Add(
+                    Temporalio.Converters.DataConverter.Default.PayloadConverter.ToPayload(
+                        new SuccessfulOutput("hello")));
+            }
+
+            var error = Assert.Throws<InvalidOperationException>(
+                () => CreateSdkConverter(typeof(Outcome<SuccessfulOutput>)).FromTransferType(
+                    new WireOutcome { Success = success }));
+            Assert.Equal(
+                $"expected exactly one payload in Outcome.Success, found {payloadCount}",
+                error.Message);
+        }
+
         [Fact]
         public void OptionalProtoOneofRoundTripsUnsetAsNull()
         {
