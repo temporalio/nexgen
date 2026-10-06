@@ -449,15 +449,21 @@ fn generic_carrier_from_wire_expr(
     source_expr: &str,
     support_namespace: Option<&str>,
 ) -> String {
-    let (default_converter, suffix) = match carrier {
-        ProtoGenericCarrier::Payload => ("ProtoExtensions.FromPayload", ""),
-        ProtoGenericCarrier::Payloads => ("ProtoExtensions.FromPayloads", "[0]"),
+    let default_converter = match carrier {
+        ProtoGenericCarrier::Payload => "ProtoExtensions.FromPayload",
+        ProtoGenericCarrier::Payloads => "ProtoExtensions.FromPayloads",
     };
     let converter = qualify_dotnet_support_reference(
         dotnet_from_proto_converter(wire_type.validation_type()).unwrap_or(default_converter),
         support_namespace,
     );
-    format!("{converter}<{type_parameter}>({source_expr}){suffix}")
+    match carrier {
+        ProtoGenericCarrier::Payload => format!("{converter}<{type_parameter}>({source_expr})"),
+        // Like the SDK, decode Payloads with no payload as the default value.
+        ProtoGenericCarrier::Payloads => format!(
+            "{source_expr}.Payloads_.Count == 0 ? default! : {converter}<{type_parameter}>({source_expr})[0]"
+        ),
+    }
 }
 
 fn generic_carrier_to_wire_expr(
@@ -834,7 +840,7 @@ fn field_from_wire_expr(
                 );
                 // A required carrier is checked for presence by the setup statements.
                 return if optional {
-                    format!("{source_expr} == null ? default : {converted}")
+                    format!("{source_expr} == null ? default : ({converted})")
                 } else {
                     converted
                 };
@@ -902,7 +908,7 @@ fn render_field_from_wire_setup(
                 ));
             }
             if matches!(carrier, ProtoGenericCarrier::Payloads) {
-                render_single_payload_check(
+                render_payload_count_check(
                     output,
                     "        ",
                     &source_expr,
@@ -976,7 +982,7 @@ fn render_oneof_from_wire_setup(
         if let Some((_, ProtoGenericCarrier::Payloads)) =
             generic_carrier(case.payload, &case.member.wire_type)
         {
-            render_single_payload_check(
+            render_payload_count_check(
                 output,
                 "                ",
                 &member_expr,
@@ -1007,10 +1013,10 @@ fn render_oneof_from_wire_setup(
     output.push_str("        }\n\n");
 }
 
-/// Renders a check that a Payloads carrier holds exactly one payload. The decode takes the
-/// first payload, so this check replaces an unclear index error with a message that names
-/// the field.
-fn render_single_payload_check(
+/// Renders a check that a Payloads carrier holds at most one payload. Like the SDK, the decode
+/// accepts zero payloads as the default value and rejects more than one, with a message that
+/// names the field.
+fn render_payload_count_check(
     output: &mut String,
     indent: &str,
     source_expr: &str,
@@ -1019,12 +1025,12 @@ fn render_single_payload_check(
 ) {
     let count_expr = format!("{source_expr}.Payloads_.Count");
     let condition = if optional {
-        format!("{source_expr} != null && {count_expr} != 1")
+        format!("{source_expr} != null && {count_expr} > 1")
     } else {
-        format!("{count_expr} != 1")
+        format!("{count_expr} > 1")
     };
     output.push_str(&format!(
-        "{indent}if ({condition})\n{indent}{{\n{indent}    throw new System.InvalidOperationException($\"expected exactly one payload in {field_description}, found {{{count_expr}}}\");\n{indent}}}\n"
+        "{indent}if ({condition})\n{indent}{{\n{indent}    throw new System.InvalidOperationException($\"expected at most one payload in {field_description}, found {{{count_expr}}}\");\n{indent}}}\n"
     ));
 }
 

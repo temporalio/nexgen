@@ -1,5 +1,6 @@
 using System;
 using Nexgen.ProtoOneof;
+using NexusRpc.Handlers;
 using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;
 using WireOutcome = Temporalio.Api.Update.V1.Outcome;
@@ -62,26 +63,41 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Contains("missing required field Outcome.Value", error.Message);
         }
 
-        [Theory]
-        [InlineData(0)]
-        [InlineData(2)]
-        public void ProtoOneofPayloadsCarrierRejectsWrongPayloadCount(int payloadCount)
+        [Fact]
+        public void ProtoOneofPayloadsCarrierRejectsMoreThanOnePayload()
         {
             using var converterContext = PushConverterContext();
+            var payload = Temporalio.Converters.DataConverter.Default.PayloadConverter.ToPayload(
+                new SuccessfulOutput("hello"));
             var success = new Temporalio.Api.Common.V1.Payloads();
-            for (var index = 0; index < payloadCount; index++)
-            {
-                success.Payloads_.Add(
-                    Temporalio.Converters.DataConverter.Default.PayloadConverter.ToPayload(
-                        new SuccessfulOutput("hello")));
-            }
+            success.Payloads_.Add(payload);
+            success.Payloads_.Add(payload);
 
             var error = Assert.Throws<InvalidOperationException>(
                 () => CreateSdkConverter(typeof(Outcome<SuccessfulOutput>)).FromTransferType(
                     new WireOutcome { Success = success }));
-            Assert.Equal(
-                $"expected exactly one payload in Outcome.Success, found {payloadCount}",
-                error.Message);
+            Assert.Equal("expected at most one payload in Outcome.Success, found 2", error.Message);
+        }
+
+        [Fact]
+        public void ProtoOneofPayloadsCarrierDecodesNoPayloadAsDefault()
+        {
+            var wire = new WireOutcome { Success = new Temporalio.Api.Common.V1.Payloads() };
+
+            var decoded = Assert.IsType<Outcome<SuccessfulOutput>>(
+                CreateSdkConverter(typeof(Outcome<SuccessfulOutput>)).FromTransferType(wire));
+            var success = Assert.IsType<OutcomeValue<SuccessfulOutput>.Success>(decoded.Value);
+            Assert.Null(success.Value);
+        }
+
+        [Fact]
+        public void ProtoOneofPayloadsCarrierDecodesNoPayloadAsNoValue()
+        {
+            var wire = new WireOutcome { Success = new Temporalio.Api.Common.V1.Payloads() };
+
+            var decoded = Assert.IsType<Outcome<NoValue>>(
+                CreateSdkConverter(typeof(Outcome<NoValue>)).FromTransferType(wire));
+            Assert.IsType<OutcomeValue<NoValue>.Success>(decoded.Value);
         }
 
         [Fact]

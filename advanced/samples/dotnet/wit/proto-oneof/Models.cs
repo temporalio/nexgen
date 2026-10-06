@@ -55,11 +55,11 @@ namespace Nexgen.ProtoOneof
             switch (wire.ValueCase)
             {
                 case Temporalio.Api.Update.V1.Outcome.ValueOneofCase.Success:
-                    if (wire.Success.Payloads_.Count != 1)
+                    if (wire.Success.Payloads_.Count > 1)
                     {
-                        throw new System.InvalidOperationException($"expected exactly one payload in Outcome.Success, found {wire.Success.Payloads_.Count}");
+                        throw new System.InvalidOperationException($"expected at most one payload in Outcome.Success, found {wire.Success.Payloads_.Count}");
                     }
-                    valueOneof = new OutcomeValue<TOutput>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<TOutput>(wire.Success)[0]);
+                    valueOneof = new OutcomeValue<TOutput>.Success(wire.Success.Payloads_.Count == 0 ? default! : Nexgen.Support.ProtoExtensions.FromPayloads<TOutput>(wire.Success)[0]);
                     break;
                 case Temporalio.Api.Update.V1.Outcome.ValueOneofCase.Failure:
                     valueOneof = new OutcomeValue<TOutput>.Failure(Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure));

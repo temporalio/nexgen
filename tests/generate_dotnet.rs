@@ -845,11 +845,11 @@ fn dotnet_proto_oneofs_convert_payloads_and_optional_groups() {
 
     assert!(models.contains("typeof(Outcome<>.TransferTypeConverter)"));
     assert!(models.contains(
-        "new OutcomeValue<TOutput>.Success(Nexgen.Support.ProtoExtensions.FromPayloads<TOutput>(wire.Success)[0])"
+        "new OutcomeValue<TOutput>.Success(wire.Success.Payloads_.Count == 0 ? default! : Nexgen.Support.ProtoExtensions.FromPayloads<TOutput>(wire.Success)[0])"
     ));
-    assert!(models.contains("if (wire.Success.Payloads_.Count != 1)"));
+    assert!(models.contains("if (wire.Success.Payloads_.Count > 1)"));
     assert!(models.contains(
-        "throw new System.InvalidOperationException($\"expected exactly one payload in Outcome.Success, found {wire.Success.Payloads_.Count}\");"
+        "throw new System.InvalidOperationException($\"expected at most one payload in Outcome.Success, found {wire.Success.Payloads_.Count}\");"
     ));
     assert!(models.contains(
         "proto.Success = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { successCase.Value });"
