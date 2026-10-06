@@ -459,21 +459,21 @@ fn needs_unique_key(ty: &CsType) -> bool {
 /// canonical wire string (the operand the parse side compares), a `number`
 /// folds `-0.0` onto `0.0`.
 pub(super) fn unique_key(ty: &CsType, element: &str, depth: usize) -> String {
+    let bound = format!("keyed{depth}");
     match ty {
         CsType::Double => format!("SpecJson.NumberKey({element})"),
         CsType::Temporal(kind) => format!(
-            "({element} is null ? null : (object)TemporalSupport.{}(({}){element}))",
-            temporal_format_fn(*kind),
-            super::types::temporal_type(*kind)
+            "({element} is {{ }} {bound} ? (object)TemporalSupport.{}({bound}) : null)",
+            temporal_format_fn(*kind)
         ),
         CsType::Bytes(encoding) => format!(
-            "({element} is null ? null : (object)Base64Support.{}((byte[]){element}))",
+            "({element} is {{ }} {bound} ? (object)Base64Support.{}({bound}) : null)",
             content_encoding_format_fn(*encoding)
         ),
         CsType::List(inner) if needs_unique_key(inner) => {
             let parameter = format!("uniqueKeyElement{depth}");
             format!(
-                "({element} is null ? null : (object)global::System.Linq.Enumerable.ToList(global::System.Linq.Enumerable.Select({element}, {parameter} => {})))",
+                "({element} is {{ }} {bound} ? (object)global::System.Linq.Enumerable.ToList(global::System.Linq.Enumerable.Select({bound}, {parameter} => {})) : null)",
                 unique_key(inner, &parameter, depth + 1)
             )
         }
@@ -622,7 +622,7 @@ pub(super) fn array_checks(
             "{indent}for (var {index} = 0; {index} < {list}.Count; {index}++)\n{indent}{{\n"
         ));
         out.push_str(&format!(
-            "{indent}    var key = {} ?? ValueEquality.NullKey;\n",
+            "{indent}    var key = (object?){} ?? ValueEquality.NullKey;\n",
             unique_key(element, &format!("{list}[{index}]"), 0)
         ));
         out.push_str(&format!(
@@ -633,7 +633,7 @@ pub(super) fn array_checks(
         let (element_expr, matcher_ty) =
             if matches!(element, CsType::Temporal(_) | CsType::Bytes(_)) {
                 (
-                    format!("((string){})", unique_key(element, "candidate", 0)),
+                    format!("((string){}!)", unique_key(element, "candidate", 0)),
                     CsType::String,
                 )
             } else {
