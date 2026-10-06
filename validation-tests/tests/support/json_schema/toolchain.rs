@@ -170,6 +170,7 @@ impl Workspace {
             format: false,
             java_package_name: (target == Target::Java).then(|| format!("conformance.{dir}")),
             ts_date_time_types,
+            dotnet_namespace: None,
         })
         .map_err(|error| error.to_string())?;
         Ok(output_path)

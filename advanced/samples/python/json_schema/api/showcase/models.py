@@ -865,8 +865,8 @@ class ContactPy:
     members (minProperties/maxProperties on a declared-property object). Also exercises
     the type-level `x-<lang>-name` override (the Stage 4 escape hatch): the emitted type
     is renamed to the derived name plus a per-language suffix (Go `ContactGo`, TS
-    `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its declaration and at every
-    `$ref`, while the wire `$ref` name stays `Contact`.
+    `ContactTs`, Python `ContactPy`, Java `ContactJava`, C# `ContactCs`) at its
+    declaration and at every `$ref`, while the wire `$ref` name stays `Contact`.
     """
 
     email: str | None = None
@@ -5313,10 +5313,11 @@ class Showcase:
 
     revision: typing.Literal[1] = 1
     """Integer const; always 1. Also exercises the single-`const` value override:
-    `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived
-    name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the
-    wire value stays `1`. TS/Python are inert here (no const override keyword — the
-    value is emitted as a plain literal type).
+    `x-go-const-name`/`x-java-const-name`/`x-cs-const-name` rename the emitted constant
+    to the derived name plus a per-language suffix (Go `RevisionGo`, Java
+    `REVISION_JAVA`, C# `RevisionCs`) while the wire value stays `1`. TS/Python are
+    inert here (no const override keyword — the value is emitted as a plain literal
+    type).
     """
 
     enabled: typing.Literal[True] = True
@@ -5324,10 +5325,10 @@ class Showcase:
 
     status: typing.Literal["active", "inactive", "pending"]
     """Closed string value set. Also exercises the enum value-constant override:
-    `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant
-    to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`)
-    while the wire value stays `active`. TS/Python are inert here (no enum override
-    keyword).
+    `x-go-enum-names`/`x-java-enum-names`/`x-cs-enum-names` rename the `active` value's
+    emitted constant to the value name plus a per-language suffix (Go `ActiveGo`, Java
+    `ACTIVE_JAVA`, C# `ActiveCs`) while the wire value stays `active`. TS/Python are
+    inert here (no enum override keyword).
     """
 
     tier: typing.Literal[1, 2, 3]
@@ -5436,11 +5437,11 @@ class Showcase:
     ) = None
     """Deprecated legacy identifier; prefer `requestId`. Exercises the native deprecation
     marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702
-    @deprecated). Also exercises the property-level `x-<lang>-name` override (the Stage
-    4 escape hatch): the emitted member identifier is renamed to the derived name plus a
-    per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`, Java
-    `legacyIdJava`) while the wire name stays `legacyId` (json tag / alias /
-    @JsonProperty).
+    @deprecated, C# [Obsolete]). Also exercises the property-level `x-<lang>-name`
+    override (the Stage 4 escape hatch): the emitted member identifier is renamed to the
+    derived name plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python
+    `legacy_id_py`, Java `legacyIdJava`, C# `LegacyIdCs`) while the wire name stays
+    `legacyId` (json tag / alias / @JsonProperty).
     """
 
     middle_name: str | None = None
@@ -6189,8 +6190,8 @@ class ShowcaseLedger:
     and its inline member shape `ShowcaseLedgerValue`, so both the map and its members
     are ordinary named models. Also exercises the member-name override on a hoisted
     property — `x-<lang>-name` keeps naming the *member* (Go `LedgerGo`, TS `ledgerTs`,
-    Python `ledger_py`, Java `ledgerJava`) while the type keeps its position-derived
-    name.
+    Python `ledger_py`, Java `ledgerJava`, C# `LedgerCs`) while the type keeps its
+    position-derived name.
     """
 
     additional_properties: dict[str, ShowcaseLedgerValue] = dataclasses.field(

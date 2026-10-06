@@ -12,18 +12,18 @@ import type { GetShowcaseInput, Showcase } from "./models";
  * Fetch the showcase payload. Also exercises the service-level `x-<lang>-name`
  * override: the emitted service code identifier is renamed to the derived name plus a
  * per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python
- * class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`) while the wire
- * service name / `@Service` / `ServiceName` string stays
- * `example.showcase.v1.ShowcaseService`.
+ * class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`, C# interface
+ * `IShowcaseServiceCs`) while the wire service name / `@Service` / `ServiceName` string
+ * stays `example.showcase.v1.ShowcaseService`.
  */
 export const showcaseServiceTs = nexus.service("example.showcase.v1.ShowcaseService", {
   /**
    * Fetch a showcase by id. Also exercises the operation-level `x-<lang>-name`
    * override: the emitted operation code identifier is renamed to the derived name plus
    * a per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python
-   * `get_showcase_py`, Java `getShowcaseJava`) while the wire operation name stays
-   * `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from
-   * the operation key, not the override).
+   * `get_showcase_py`, Java `getShowcaseJava`, C# `GetShowcaseCs`) while the wire
+   * operation name stays `GetShowcase` and the synthesized I/O type stays
+   * `GetShowcaseInput` (derived from the operation key, not the override).
    */
   getShowcaseTs: nexus.operation<GetShowcaseInput, Showcase>({
     name: "GetShowcase",
@@ -36,9 +36,9 @@ export const showcaseServiceTs = nexus.service("example.showcase.v1.ShowcaseServ
  * Fetch the showcase payload. Also exercises the service-level `x-<lang>-name`
  * override: the emitted service code identifier is renamed to the derived name plus a
  * per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python
- * class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`) while the wire
- * service name / `@Service` / `ServiceName` string stays
- * `example.showcase.v1.ShowcaseService`.
+ * class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`, C# interface
+ * `IShowcaseServiceCs`) while the wire service name / `@Service` / `ServiceName` string
+ * stays `example.showcase.v1.ShowcaseService`.
  */
 export class ShowcaseServiceClient {
   private readonly client: workflow.NexusServiceClient<typeof showcaseServiceTs>;
@@ -54,9 +54,9 @@ export class ShowcaseServiceClient {
    * Fetch a showcase by id. Also exercises the operation-level `x-<lang>-name`
    * override: the emitted operation code identifier is renamed to the derived name plus
    * a per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python
-   * `get_showcase_py`, Java `getShowcaseJava`) while the wire operation name stays
-   * `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from
-   * the operation key, not the override).
+   * `get_showcase_py`, Java `getShowcaseJava`, C# `GetShowcaseCs`) while the wire
+   * operation name stays `GetShowcase` and the synthesized I/O type stays
+   * `GetShowcaseInput` (derived from the operation key, not the override).
    *
    * @param request - Request for the operation.
    */

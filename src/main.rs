@@ -25,7 +25,7 @@ struct Cli {
 enum Commands {
     #[cfg(feature = "advanced")]
     #[command(about = "Generate C# / .NET bindings")]
-    Dotnet(SupportPackageGenerateArgs),
+    Dotnet(DotnetGenerateArgs),
     #[command(about = "Generate Go bindings")]
     Go(SupportPackageGenerateArgs),
     #[command(about = "Generate Java bindings")]
@@ -77,6 +77,18 @@ struct SupportPackageGenerateArgs {
     /// Import path or namespace of the user-owned support package (required for WIT).
     #[arg(long = "support-package")]
     support_package: Option<String>,
+}
+
+#[cfg(feature = "advanced")]
+#[derive(Args)]
+struct DotnetGenerateArgs {
+    #[command(flatten)]
+    common: SupportPackageGenerateArgs,
+    /// The root namespace for generated JSON Schema types. Each input module's
+    /// types live in a namespace below it. Defaults to `Nexgen.Generated`, or to
+    /// a namespace derived from the service for a single input file.
+    #[arg(long = "namespace")]
+    namespace: Option<String>,
 }
 
 #[derive(Args)]
@@ -163,13 +175,17 @@ fn main() -> ExitCode {
 
     let result = match cli.command {
         #[cfg(feature = "advanced")]
-        Commands::Dotnet(args) => generate_to_file(&generate_request(
-            Language::Dotnet,
-            args.common,
-            Default::default(),
-            None,
-            args.support_package,
-        )),
+        Commands::Dotnet(args) => {
+            let mut request = generate_request(
+                Language::Dotnet,
+                args.common.common,
+                Default::default(),
+                None,
+                args.common.support_package,
+            );
+            request.dotnet_namespace = args.namespace;
+            generate_to_file(&request)
+        }
         Commands::Go(args) => generate_to_file(&generate_request(
             Language::Go,
             args.common,
@@ -311,6 +327,7 @@ fn generate_request(
         format: false,
         java_package_name,
         ts_date_time_types,
+        dotnet_namespace: None,
     }
 }
 

@@ -658,90 +658,127 @@ encoding cannot introduce a new name collision.
 **Status:** C# support is in progress and not yet complete.
 
 The C# backend follows the Java backend's structure (collecting per-model
-serializer, deserializer, spec-strict primitive parse, validate-then-write) in
-C# idiom.
+deserializer, spec-strict primitive parse, validate-then-write) in C# idiom.
 
-The generated runtime type name `Violation` is reserved in every C# module
-scope, and the nested `Converter` name is reserved in every model's scope.
+The generated runtime type names `Violation`, `SpecJson`, `ValueEquality`,
+`TemporalSupport`, and `Base64Support` are reserved in every C# module scope and
+in every model's member scope (a member of one of those names would shadow the
+type the model body names). `TemporalSupport` and `Base64Support` stay reserved
+even when a run does not emit them, so adding a temporal `format` or a
+`contentEncoding` cannot introduce a collision.
 
 1. **Targets `net10.0` and C# 14.** `net10.0` is the oldest .NET release in
    support. Generated code may use any API and language feature it provides.
-2. **Models emit `record`s with `required` `init` members (P2).** Every object
-   model is a `public sealed record` carrying `[GeneratedCode("nexgen", …)]`. A
+2. **Models emit `sealed record`s with `required` `init` members (P2).** Every
+   object model is a `public sealed record` carrying `[GeneratedCode]`. A
    required member is `public required T Name { get; init; }`, so a missing
    required member is a compile error at the construction site; an optional
    member is `{ get; init; }` without `required`. Optional value types are
    `Nullable<T>` (`long?`, `double?`, `bool?`), so absence is never aliased to a
    zero value (P9); optional reference types are `T?` nullable reference
    annotations, and the optional+nullable in-memory collapse follows
-   [[nullability]] as for Java. Lists and typed maps are `IReadOnlyList<T>` /
-   `IReadOnlyDictionary<string, V>`. Generated files enable nullable reference
-   types; the annotations are compile-time only, so a required reference member
-   carries a serialize-side non-null check (Java §6). Record equality is
-   structural over collection members as well as scalars — the generated
-   `Equals`/`GetHashCode` compare sequences and maps by content, so a value
-   equals its own round trip. Unions are an `abstract record` with a private
-   constructor and one nested `sealed record` per branch. Construction is
-   unchecked (P12). (The `union` keyword is not used to avoid depending on a
-   newer .NET release.)
-3. **One class-level collecting converter per model (P11/P12; the analog of Java
-   §5).** Each model carries `[JsonConverter(typeof(<Model>.Converter))]` and a
-   nested `public sealed class Converter : JsonConverter<<Model>>`. `Read` is a
-   two-stage lenient-then-validate bind: it reads the whole value with
-   `JsonDocument.ParseValue`, then walks every declared member through the
-   shared spec-strict and constraint helpers, collecting violations instead of
-   stopping at the first. `System.Text.Json` honors a type-level converter on
-   the stock `DataConverter.Default` with no user wiring (P3), and because the
-   generated converter writes every JSON member name itself, a user's
-   `JsonSerializerOptions` naming policy cannot rename wire keys. Per-member
-   attribute binding (`[JsonPropertyName]`, `[JsonRequired]`) is not used: it is
-   fail-fast on the first bad member, which defeats aggregation.
-4. **Aggregate via one Temporal `ApplicationFailureException` (P11).** Collect
-   every `Violation` — a generated
-   `public sealed record Violation(string Path, string Reason)` — and throw the
-   exception returned by `PayloadValidationError.CreateException(violations)`: a
-   non-retryable application failure with message `Payload validation failed`,
-   type `PayloadValidationError`, and the `IReadOnlyList<Violation>` as its
-   first detail. Generated C# requires Temporal SDK 1.19.0 or newer for this
-   factory. Nested aggregation catches the child's failure and re-paths its
-   locally-retained list through the shared P11.2 segment encoder. Through
-   `DataConverter.Default` the failure reaches the caller unwrapped, as type
-   `PayloadValidationError` and non-retryable, for top-level and nested models
-   alike (measured with Temporalio 1.19.0 on a direct converter round trip; the
-   Nexus boundary is not yet measured, so P11.3 is open for C#).
-5. **Spec-strict primitive parse over the raw number token (P1; Java §4).**
+   [[nullability]] as for Java. Lists and maps are `IReadOnlyList<T>` /
+   `IReadOnlyDictionary<string, V>`; an open model keeps unknown members
+   verbatim in `AdditionalProperties` as `JsonElement`s (P13). Nullable
+   annotations are compile-time only, so a required reference member carries a
+   serialize-side non-null check (Java §6). Record equality is structural: the
+   generated `Equals`/`GetHashCode` compare collections, byte arrays and
+   `JsonElement`s by content (through the runtime `ValueEquality`), so a value
+   equals its own round trip. A model synthesizes, in its own member scope, a
+   nested closed-value class `<Member>Value` per `const`/`enum` member, a nested
+   interface `<Member>Union` per inline `oneOf` member, and a computed
+   `<Member>OrDefault` per optional member with a scalar `default`. Value
+   constants are PascalCase tokens of the value (`Active`, `V1_5`, `VNeg3`,
+   `True`), renamed by `x-cs-const-name` / `x-cs-enum-names`. Construction is
+   unchecked (P12).
+3. **Unions are interfaces.** A `oneOf` model is a `public interface` whose
+   object branches are the member models (which implement it) and whose scalar
+   and array branches are nested wrapper classes `<Union>String`,
+   `<Union>Integer`, `<Union>Number`, `<Union>Boolean`, `<Union>Array` holding a
+   `Value` (`<Union>Object` holds a free-form object's members). A model may be
+   a member of several unions, which is why an interface is used rather than a
+   base record. The union's converter selects the branch by JSON value kind and,
+   for object branches, by the discriminator (see [[oneOf]]).
+4. **One class-level converter per model (P11/P12; the analog of Java §5).**
+   Each model carries `[JsonConverter(typeof(<Model>.Converter))]` and a nested
+   `public sealed class Converter : JsonConverter<<Model>>`, which
+   `System.Text.Json` honors on the stock `DataConverter.Default` with no user
+   wiring (P3). Because the converter writes every member name itself, a user's
+   `JsonSerializerOptions` naming policy cannot rename wire keys. The converter
+   carries three static methods that take the violation path of the value they
+   handle: `Parse` (wire → model, the parse adapter), `Validate` (every shared
+   predicate over the in-memory model), and `WriteValue` (model → wire, the
+   encode adapter). A parent calls a child's methods with the child's path, so a
+   nested model's violations land in the parent's list directly — no exception
+   is thrown and caught between levels — and only the outermost `Read`/`Write`
+   throws. `Read` binds the whole value with `JsonElement.ParseValue` before
+   checking any member, so every violation is collected. Per-member attribute
+   binding (`[JsonPropertyName]`, `[JsonRequired]`) is not used: it is fail-fast
+   on the first bad member, which defeats aggregation.
+5. **Aggregate via one Temporal `ApplicationFailureException` (P11).** The
+   generated `public sealed record Violation(string Path, string Reason)`
+   carries the P11.2 path grammar (`Violation.Member`, `Join`, `Index`), and
+   `Violation.Failure` returns
+   `PayloadValidationError.CreateException(violations)`: a non-retryable
+   application failure with message `Payload validation failed`, type
+   `PayloadValidationError`, and the `IReadOnlyList<Violation>` as its first
+   detail. Generated C# requires Temporal SDK 1.19.0 or newer for this factory.
+   Through `DataConverter.Default` the failure reaches the caller unwrapped, as
+   type `PayloadValidationError` and non-retryable (measured with Temporalio
+   1.19.0 on a direct converter round trip; the Nexus boundary is not yet
+   measured, so P11.3 is open for C#).
+6. **Spec-strict primitive parse over the raw number token (P1; Java §4).**
    `JsonElement.GetRawText()` is the exact wire spelling (`1.0e2`,
-   `12345678901234567890.5`, and `-0` survive verbatim). Integers are classified
-   from that token — integral spellings such as `1.0`/`1e2` are accepted, `1.5`
-   is rejected — and the ±(2^53−1) cap is enforced before narrowing to `long`;
-   `number` is a finite `double` (see [[type]]). A bad value pushes a
-   `Violation` and parsing continues.
-6. **Code points, not UTF-16 units.** `minLength` / `maxLength` count `Rune`s
-   (`string.EnumerateRunes()`), never `string.Length`.
-7. **Patterns compile to static `Regex` fields.** Each normalized [[pattern]]
-   compiles once into a `static readonly Regex` with
-   `RegexOptions.CultureInvariant`, end anchors rewritten to `\z` by the shared
-   `rewrite_end_anchor`. Whether `RegexOptions.ECMAScript` is also required to
-   hold the normalized dialect's character-class semantics is decided by the
-   pattern corpus, not by assertion; if neither mode can hold a construct
-   identically, the strict subset narrows for every target (P6) rather than C#
-   approximating it.
-8. **Duplicate object keys behave as in the other targets.** Despite
-   `JsonDocument` keeping every occurrence of a repeated key , the
-   implementation matches other language targets and only honoring the first key
-   written.
-9. **Serialize: validate-then-write (P11.1/P12; Java §6).** `Write` validates
-   the complete value tree, aggregating nested children's violations with their
-   siblings', before writing the first token, then emits members per the
-   [[nullability]] serialize table. No bytes are written for an invalid value.
-10. **Name overrides are `x-cs-name`, `x-cs-const-name`, and
-    `x-cs-enum-names`.** Types, members, and enum members are PascalCase. The
-    scope is the module's namespace (P15). A case-mapped name that is a C#
-    keyword is emitted as a verbatim identifier (`@event`), which is the
-    keyword's own spelling rather than a mangled name; a name that cannot be a
-    C# identifier at all (empty, or starting with a digit) is a P15 load reject
-    with the override as its fix-it.
-11. **One namespace per module (P14).** Each input file's module is one
-    namespace; the file layout within it is pinned in [[generated-file-layout]]
-    when the backend lands. The generator emits formatted C# directly; no
-    external formatter runs.
+   `12345678901234567890.5`, and `-0` survive verbatim). `SpecJson.SpecLong`
+   classifies integers from that token's significant digits and exponent —
+   integral spellings such as `1.0`/`1e2` are accepted, `1.5` is rejected — and
+   enforces the ±(2^53−1) cap before narrowing to `long`; `number` is a finite
+   `double` (see [[type]]). A bad value records a `Violation` and parsing
+   continues.
+7. **Code points, not UTF-16 units.** `minLength` / `maxLength` count code
+   points (`SpecJson.CodePoints`), never `string.Length`.
+8. **Patterns compile to static `Regex` fields — provisional.** Each normalized
+   [[pattern]] compiles once into a `static readonly Regex` with
+   `RegexOptions.CultureInvariant`. The portability gate already spells `\d`,
+   `\w`, `\s` and `.` as explicit ASCII classes, so .NET's Unicode-aware
+   shorthand never runs. Two .NET-specific rewrites apply at emit: end anchors
+   become `\z` (`rewrite_end_anchor`; .NET's `$` also matches before a final
+   newline), and `rewrite_for_utf16_code_units` makes negated classes, astral
+   class members and quantified astral literals consume a whole surrogate pair,
+   because .NET matches UTF-16 code units where the portable contract matches
+   code points. The pattern corpus confirms or refutes this; if .NET cannot hold
+   a construct identically, the strict subset narrows for every target (P6)
+   rather than C# approximating it.
+9. **Duplicate object keys: the last occurrence wins — provisional.**
+   `SpecJson.Members` reads an object's members into a dictionary where a
+   repeated key keeps its last value, the rule the other targets' stock decoders
+   apply. A conformance case pins it.
+10. **Serialize: validate-then-write (P11.1/P12; Java §6).** `Write` runs
+    `Validate` over the complete value tree, aggregating nested children's
+    violations with their siblings', before writing the first token, then emits
+    members per the [[nullability]] serialize table. No bytes are written for an
+    invalid value.
+11. **Materialized formats.** `date-time` is `DateTimeOffset`, `date` is
+    `DateOnly`, `duration` is `TimeSpan`, and `time` stays a validated,
+    canonicalized `string` (no BCL type holds both offset-bearing and
+    offset-less times of day); `contentEncoding` is `byte[]`. `DateTimeOffset`
+    resolves 100 ns, so a longer fraction is truncated to seven digits (P1
+    exception (b)). It holds UTC offsets only within ±14:00, which is exactly
+    the shared [[format]] domain.
+12. **Name overrides are `x-cs-name`, `x-cs-const-name`, and
+    `x-cs-enum-names`.** Types, members, and constants are PascalCase, so a
+    derived name is never a C# keyword; an override must itself be a legal,
+    non-reserved identifier. A name that cannot be a C# identifier at all
+    (empty, or starting with a digit) is a P15 load reject with the override as
+    its fix-it, as is a member that shares its enclosing type's name (CS0542).
+13. **One namespace per module (P14).** Each input file's module is one
+    namespace: the root module's is `--namespace` (or, for a single input, one
+    derived from its service, else `Nexgen.Generated`) and every other module's
+    is that root plus the module path in PascalCase. Each module emits
+    `Models.cs` (and `Services.cs` when it declares services); the runtime types
+    are emitted once, in the root namespace, as `Violation.cs`, `SpecJson.cs`,
+    `ValueEquality.cs`, and — when used — `TemporalSupport.cs` and
+    `Base64Support.cs`, and a module outside the root namespace binds them by
+    `using` alias. Generated code spells framework types `global::`-qualified so
+    no schema type name can shadow them. The generator emits formatted C#
+    directly; no external formatter runs.

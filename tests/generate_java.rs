@@ -321,6 +321,7 @@ fn assert_showcase_features(mode: &str, generation_mode: nexgen::generator::Gene
         format: false,
         java_package_name: Some(format!("json_schema.{mode}.{example_id}")),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -395,6 +396,7 @@ fn java_json_names_inline_object_union_branch() {
         format: false,
         java_package_name: Some("detail".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -447,6 +449,7 @@ fn java_json_validates_non_object_union_branch_constraints() {
         format: false,
         java_package_name: Some("bc".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = read_java_files(&output_path);
@@ -508,6 +511,7 @@ properties:
         config: Default::default(),
         java_package_name: Some("renamed".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -543,6 +547,7 @@ fn java_json_rejects_non_finite_numbers_in_every_serialize_position() {
         format: false,
         java_package_name: Some("finite".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -608,6 +613,7 @@ fn java_json_emits_runtime_support_for_nested_materialized_values() {
         format: false,
         java_package_name: Some("nested".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -688,6 +694,7 @@ properties:
         config: Default::default(),
         java_package_name: Some("example.prose".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -731,6 +738,7 @@ $defs:
         format: false,
         java_package_name: Some("example.collision".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap_err()
     .to_string();
@@ -767,6 +775,7 @@ $defs:
         format: false,
         java_package_name: Some("example.plain".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .expect("a non-temporal OffsetDateTime model emits no conflicting import");
     let plain_model = fs::read_to_string(output_path.join("OffsetDateTime.java")).unwrap();
@@ -794,6 +803,7 @@ fn java_json_emits_wave2_object_and_matcher_contracts() {
         format: false,
         java_package_name: Some("java_conformance".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -888,6 +898,7 @@ fn java_json_emits_deprecated_services_and_operations() {
         format: false,
         java_package_name: Some("legacy".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -930,6 +941,7 @@ fn java_json_rejects_empty_service_descriptions() {
         format: false,
         java_package_name: Some("empty".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap_err();
     assert!(
@@ -964,6 +976,7 @@ fn java_json_decodes_element_position_unions() {
         format: false,
         java_package_name: Some("bag".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1073,6 +1086,7 @@ fn java_json_cross_module_java_name_override_moves_every_reference() {
         format: false,
         java_package_name: Some("example.pages".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1152,6 +1166,7 @@ services:
         format: false,
         java_package_name: Some("com.example.pkg".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1220,6 +1235,7 @@ fn java_json_nullable_property_keeps_the_branch_constraints() {
         format: false,
         java_package_name: Some("nullable_shape".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1296,6 +1312,7 @@ fn java_json_serialize_side_guards_match_the_parse_side() {
         format: false,
         java_package_name: Some("guards".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1380,6 +1397,7 @@ fn java_json_dispatches_a_non_string_discriminant_by_value() {
         format: false,
         java_package_name: Some("tagged".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1440,6 +1458,7 @@ fn java_json_repaths_nested_violations_on_serialize() {
         format: false,
         java_package_name: Some("nested_path".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1505,6 +1524,7 @@ fn java_json_compiles_contains_matcher_regexes_once() {
         format: false,
         java_package_name: Some("contains_regex".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1568,6 +1588,7 @@ fn java_json_member_javadoc_lands_on_the_getter() {
         format: false,
         java_package_name: Some("member_doc".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1630,6 +1651,7 @@ fn java_json_typed_map_union_branch_implements_the_interface() {
         format: false,
         java_package_name: Some("union_map".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1706,6 +1728,7 @@ fn java_json_nullable_element_keeps_the_branch_constraints() {
         format: false,
         java_package_name: Some("nullable_element".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1785,6 +1808,7 @@ fn java_json_writes_materialized_collection_elements_itself() {
         format: false,
         java_package_name: Some("materialized".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1866,6 +1890,7 @@ fn java_json_enum_name_override_reaches_non_string_members() {
         format: false,
         java_package_name: Some("enum_names".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1946,6 +1971,7 @@ properties:
         format: false,
         java_package_name: Some("naming".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -2015,6 +2041,7 @@ properties:
             format: false,
             java_package_name: Some("spelling".to_string()),
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         })
         .unwrap();
         let model = read_java_files(&output_path)[&PathBuf::from("Spelling.java")].clone();
@@ -2062,6 +2089,7 @@ properties:
         format: false,
         java_package_name: Some("collide".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap_err()
     .to_string();
@@ -2108,6 +2136,7 @@ properties:
         config: Default::default(),
         java_package_name: Some("counts".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
