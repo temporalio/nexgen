@@ -9,7 +9,8 @@ namespace Nexgen.DotNetExamples.Tests
 {
     internal static class TransferTypeTestSupport
     {
-        // TODO: Remove once the SDK scopes this context around System Nexus transfer conversion.
+        // The samples compile the generated code outside the SDK. Thus the SDK's System Nexus
+        // payload converter does not push this context. The test pushes the context here.
         internal static IDisposable PushConverterContext() =>
             SystemNexusConverterContext.Push(
                 DataConverter.Default.PayloadConverter,
