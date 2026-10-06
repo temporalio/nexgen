@@ -652,16 +652,16 @@ enum RowStatus {
 static OPEN_FORMAT_ROWS: &[OpenRow] = &[
     OpenRow {
         matches: "format_materialize_clock/dt-frac-9 (",
-        targets: &[Target::Python],
+        targets: &[Target::CSharp, Target::Python],
         finding: "09#8",
         status: RowStatus::Open,
-        note: "Python truncates nanoseconds to microseconds, so it re-emits a different wire \
-               than the other three. P1 exception (b) conditions this on a recoverable \
-               opt-out that does not exist yet.",
+        note: "Python truncates nanoseconds to microseconds and C# (DateTimeOffset) to \
+               100 ns, so each re-emits a different wire than the other three. P1 exception \
+               (b) conditions this on a recoverable opt-out that does not exist yet.",
     },
     OpenRow {
         matches: "format_materialize_clock/dt-frac-9-offset (",
-        targets: &[Target::Python],
+        targets: &[Target::CSharp, Target::Python],
         finding: "09#8",
         status: RowStatus::Open,
         note: "As above, with an offset.",

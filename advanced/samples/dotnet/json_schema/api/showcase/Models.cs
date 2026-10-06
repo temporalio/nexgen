@@ -1959,7 +1959,7 @@ namespace Nexgen.JsonSchema.Showcase
                         var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(ValueEquality.Comparer);
                         for (var uniqueIndex0 = 0; uniqueIndex0 < member.Count; uniqueIndex0++)
                         {
-                            var key = member[uniqueIndex0] ?? ValueEquality.NullKey;
+                            var key = (object?)member[uniqueIndex0] ?? ValueEquality.NullKey;
                             if (seen0.TryGetValue(key, out var priorIndex))
                             {
                                 violations.Add(new Violation(Violation.Join(path, "values"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
@@ -4299,7 +4299,7 @@ namespace Nexgen.JsonSchema.Showcase
                     var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(ValueEquality.Comparer);
                     for (var uniqueIndex0 = 0; uniqueIndex0 < Value.Count; uniqueIndex0++)
                     {
-                        var key = SpecJson.NumberKey(Value[uniqueIndex0]) ?? ValueEquality.NullKey;
+                        var key = (object?)SpecJson.NumberKey(Value[uniqueIndex0]) ?? ValueEquality.NullKey;
                         if (seen0.TryGetValue(key, out var priorIndex))
                         {
                             violations.Add(new Violation(path, "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
@@ -7938,7 +7938,7 @@ namespace Nexgen.JsonSchema.Showcase
                         var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(ValueEquality.Comparer);
                         for (var uniqueIndex0 = 0; uniqueIndex0 < member.Count; uniqueIndex0++)
                         {
-                            var key = member[uniqueIndex0] ?? ValueEquality.NullKey;
+                            var key = (object?)member[uniqueIndex0] ?? ValueEquality.NullKey;
                             if (seen0.TryGetValue(key, out var priorIndex))
                             {
                                 violations.Add(new Violation(Violation.Join(path, "aliases"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
@@ -8369,7 +8369,7 @@ namespace Nexgen.JsonSchema.Showcase
                         var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(ValueEquality.Comparer);
                         for (var uniqueIndex0 = 0; uniqueIndex0 < member.Count; uniqueIndex0++)
                         {
-                            var key = member[uniqueIndex0] ?? ValueEquality.NullKey;
+                            var key = (object?)member[uniqueIndex0] ?? ValueEquality.NullKey;
                             if (seen0.TryGetValue(key, out var priorIndex))
                             {
                                 violations.Add(new Violation(Violation.Join(path, "nullableTags"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
