@@ -737,8 +737,8 @@ even when a run does not emit them, so adding a temporal `format` or a
    continues.
 7. **Code points, not UTF-16 units.** `minLength` / `maxLength` count code
    points (`SpecJson.CodePoints`), never `string.Length`.
-8. **Patterns compile to static `Regex` fields — provisional.** Each normalized
-   [[pattern]] compiles once into a `static readonly Regex` with
+8. **Patterns compile to static `Regex` fields.** Each normalized [[pattern]]
+   compiles once into a `static readonly Regex` with
    `RegexOptions.CultureInvariant`. The portability gate already spells `\d`,
    `\w`, `\s` and `.` as explicit ASCII classes, so .NET's Unicode-aware
    shorthand never runs. Two .NET-specific rewrites apply at emit: end anchors
@@ -746,9 +746,9 @@ even when a run does not emit them, so adding a temporal `format` or a
    newline), and `rewrite_for_utf16_code_units` makes negated classes, astral
    class members and quantified astral literals consume a whole surrogate pair,
    because .NET matches UTF-16 code units where the portable contract matches
-   code points. The pattern corpus confirms or refutes this; if .NET cannot hold
-   a construct identically, the strict subset narrows for every target (P6)
-   rather than C# approximating it.
+   code points. Every row of the pattern corpus holds in C#; a construct .NET
+   could not hold identically would narrow the strict subset for every target
+   (P6) rather than C# approximating it.
 9. **Duplicate object keys: the last occurrence wins — provisional.**
    `SpecJson.Members` reads an object's members into a dictionary where a
    repeated key keeps its last value, the rule the other targets' stock decoders

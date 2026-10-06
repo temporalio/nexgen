@@ -57,6 +57,10 @@
         "java": {
           "source": "samples/java/src/test/java/jsonschema/JsonSchemaShowcaseRoundTripTest.java",
           "anchor": "recursiveCollectionsRoundTripAndRejectNonFiniteValues"
+        },
+        "csharp": {
+          "source": "samples/dotnet/tests/JsonSchemaConsumerChecks.cs",
+          "anchor": "RecursiveCollectionsRoundTripAndRejectNonFiniteValues"
         }
       },
       "schemas": ["samples/schemas/showcase.nexusrpc.yaml"]
@@ -101,12 +105,16 @@
         "java": {
           "source": "samples/java/src/test/java/jsonschema/JsonSchemaShowcaseRoundTripTest.java",
           "anchor": "numberSpellingsRoundTripByMathematicalValue"
+        },
+        "csharp": {
+          "source": "samples/dotnet/tests/JsonSchemaConsumerChecks.cs",
+          "anchor": "NumberSpellingsRoundTripByMathematicalValue"
         }
       },
       "expected_divergence": {
         "findings": ["new:ts-negative-zero"],
         "status": "structural",
-        "note": "JSON.stringify(-0) is \"0\" and the generated converter is handed an already-parsed value, so TypeScript cannot emit negative zero at all. The other three preserve it. Decision D8's class: the boundary is not the generator's to own, so this is documented rather than fixed.",
+        "note": "JSON.stringify(-0) is \"0\" and the generated converter is handed an already-parsed value, so TypeScript cannot emit negative zero at all. The other four preserve it. Decision D8's class: the boundary is not the generator's to own, so this is documented rather than fixed.",
         "matches": ["typescript did not round-trip numberGrid[0][0]"]
       },
       "schemas": ["samples/schemas/showcase.nexusrpc.yaml"]
@@ -156,6 +164,10 @@
         "java": {
           "source": "samples/java/src/test/java/jsonschema/JsonSchemaTemporalRoundTripTest.java",
           "anchor": "materializedNarrowingRejects"
+        },
+        "csharp": {
+          "source": "samples/dotnet/tests/JsonSchemaConsumerChecks.cs",
+          "anchor": "MaterializedNarrowingRejects"
         }
       },
       "schemas": ["samples/schemas/temporal.yaml"]
@@ -180,7 +192,7 @@
       "permitted_presence_nullability_collapse": [
         {
           "path": "middleName",
-          "targets": ["go", "python", "java"],
+          "targets": ["go", "python", "java", "csharp"],
           "wire_presence": "explicit_null",
           "serialized_presence": "absent"
         }
@@ -201,6 +213,10 @@
         "java": {
           "source": "samples/java/src/test/java/jsonschema/JsonSchemaShowcaseRoundTripTest.java",
           "anchor": "showcaseFixturesRoundTrip"
+        },
+        "csharp": {
+          "source": "samples/dotnet/tests/JsonSchemaRuntimeChecks.cs",
+          "anchor": "EveryWireFixtureRoundTripsByJsonValue"
         }
       },
       "schemas": ["samples/schemas/showcase.nexusrpc.yaml"]
@@ -271,31 +287,31 @@
       "permitted_presence_nullability_collapse": [
         {
           "path": "optionalNullable",
-          "targets": ["go", "python", "java"],
+          "targets": ["go", "python", "java", "csharp"],
           "wire_presence": "explicit_null",
           "serialized_presence": "absent"
         },
         {
           "path": "nullableNumber",
-          "targets": ["go", "python", "java"],
+          "targets": ["go", "python", "java", "csharp"],
           "wire_presence": "explicit_null",
           "serialized_presence": "absent"
         },
         {
           "path": "nullableFlag",
-          "targets": ["go", "python", "java"],
+          "targets": ["go", "python", "java", "csharp"],
           "wire_presence": "explicit_null",
           "serialized_presence": "absent"
         },
         {
           "path": "nullableList",
-          "targets": ["go", "python", "java"],
+          "targets": ["go", "python", "java", "csharp"],
           "wire_presence": "explicit_null",
           "serialized_presence": "absent"
         },
         {
           "path": "nullableChoice",
-          "targets": ["go", "python", "java"],
+          "targets": ["go", "python", "java", "csharp"],
           "wire_presence": "explicit_null",
           "serialized_presence": "absent"
         }
@@ -595,7 +611,7 @@
       "expected_divergence": {
         "findings": ["13#4"],
         "status": "structural",
-        "note": "4503599627370496.5 is rejected by Go and Java, which see the decimal text, and accepted by Python and TypeScript, which see the already-rounded double. The same structural divergence applies to any non-integral decimal token that rounds to an integral binary64 value within the safe-integer cap; [2^52, 2^53) merely makes the effect systematic. TypeScript cannot recover the literal (D8), and narrowing Python alone would move the divergence rather than remove it.",
+        "note": "4503599627370496.5 is rejected by C#, Go and Java, which see the decimal text, and accepted by Python and TypeScript, which see the already-rounded double. The same structural divergence applies to any non-integral decimal token that rounds to an integral binary64 value within the safe-integer cap; [2^52, 2^53) merely makes the effect systematic. TypeScript cannot recover the literal (D8), and narrowing Python alone would move the divergence rather than remove it.",
         "matches": ["parse_failures[5]"]
       },
       "schemas": ["samples/conformance/schemas/integer-semantics.yaml"]
@@ -715,13 +731,13 @@
       "permitted_presence_nullability_collapse": [
         {
           "path": "nullableStatus",
-          "targets": ["go", "python", "java"],
+          "targets": ["go", "python", "java", "csharp"],
           "wire_presence": "explicit_null",
           "serialized_presence": "absent"
         },
         {
           "path": "nullableTier",
-          "targets": ["go", "python", "java"],
+          "targets": ["go", "python", "java", "csharp"],
           "wire_presence": "explicit_null",
           "serialized_presence": "absent"
         }
