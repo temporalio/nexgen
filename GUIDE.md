@@ -81,7 +81,11 @@ const user = await getUser({ userId: "abc" });
 
 An exported interface with no operations or resources acts as a model-only
 module. Its declared types remain public, but the generator does not emit an
-empty service definition or client.
+empty service definition or client. The interface still names the generated
+output where a target would otherwise use the service: its
+`@nexus.namespace` directive selects the .NET namespace or Go import path, and
+.NET otherwise uses `Nexgen.<InterfaceName>`, such as
+`Nexgen.NotificationService` for `interface notification-service`.
 
 ---
 
@@ -726,7 +730,8 @@ export const ActivityOptions = {
 
 Required fields are validated in `from_proto` -- missing required proto fields
 raise a `ValueError` (Python) or throw an `Error` (TypeScript). .NET output
-requires `Temporalio` 1.18.0 or newer.
+requires `Temporalio` 1.18.0 or newer, or 1.19.0 or newer for generic
+proto-backed models.
 
 ### Sourced Fields
 
@@ -1297,6 +1302,14 @@ variant above generates `OutcomeSuccess(value)` and `OutcomeFailure(value)`.
 The containing record's protobuf conversion constructs and matches those case
 classes.
 
+.NET uses the variant's nested case records, such as `Outcome.Success(Value)`.
+The containing record's transfer-type conversion switches over the protobuf
+`<Oneof>Case` property when decoding and pattern-matches the case records when
+encoding. Decoding an unset required oneof throws `InvalidOperationException`.
+Encoding a required variant property that holds `null` (for example after
+`null!`) also throws `InvalidOperationException`. An unset `option<variant>`
+decodes to `null`, and encoding `null` leaves the oneof unset.
+
 Other targets reject a reachable model containing a oneof they cannot convert.
 Unreachable declarations and omitted oneofs remain valid.
 
@@ -1323,25 +1336,37 @@ record request {
 }
 ```
 
-This generates `Request[ContextT]`-style models in Python, TypeScript, Go, and
-.NET. A language-specific field-level `@nexus.type` override replaces that
+This generates `Request[ContextT]`-style models in Python, TypeScript, and Go.
+.NET follows the C# convention and puts the `T` first, so it generates
+`Request<TContext>`. A trailing `T` in the alias name moves to the front, and
+.NET adds a `T` prefix to an alias name with no trailing `T`. .NET rejects two
+parameters of one declaration that map to the same C# name. In a model with
+workflow-function fields, the names `TWorkflow` and `TResult` are also
+reserved. A language-specific field-level `@nexus.type` override replaces that
 field occurrence and therefore removes it from generic inference for that
 target.
 
 Type parameters are not currently supported in proto-backed records except in
-Python when a field or oneof member maps to Temporal's protobuf `Payload` or
-`Payloads` carrier. When decoding a parameterized Python model, concrete type
-arguments propagate through nested proto-backed records and become type hints
-for single-value `Payload` fields. An unparameterized model decodes those fields
-as `typing.Any`. `Payloads` fields continue to decode as untyped sequences.
+Python and .NET when a field or oneof member maps to Temporal's protobuf
+`Payload` or `Payloads` carrier. When decoding a parameterized Python model,
+concrete type arguments propagate through nested proto-backed records and become
+type hints for single-value `Payload` fields. An unparameterized model decodes
+those fields as `typing.Any`. `Payloads` fields continue to decode as untyped
+sequences.
+
+.NET generic proto-backed records declare an open generic transfer-type
+converter, such as `typeof(Request<,>.TransferTypeConverter)`, which the SDK
+closes with the model's type arguments. Carrier fields decode with
+`ProtoExtensions.FromPayload<T>` (or the first value of
+`ProtoExtensions.FromPayloads<T>` for `Payloads`) from the support file, so
+values decode as the concrete type argument. Like the SDK, a `Payloads` carrier
+with no payload decodes as the default value of the type argument, for example
+for a `NoValue` result. If a `Payloads` carrier holds more than one payload,
+decoding throws `InvalidOperationException` with the field name and the payload
+count. This requires `Temporalio` 1.19.0 or newer.
 
 Type parameters are also unsupported in resources, map keys, function-signature
 metadata, or resource-bound generic operations.
-
-.NET also rejects every generic proto-backed record: the current SDK transfer
-type converter registration cannot instantiate an open generic converter. The
-generator reports this explicitly rather than emitting a model that cannot be
-serialized through the SDK.
 
 Python represents generic variants as tagged tuples and protobuf oneof-backed
 generic variants as unions of generic case dataclasses. TypeScript uses tagged

@@ -10,24 +10,24 @@ namespace Nexgen.GenericModelService
 {
 
     [GeneratedCode("nexgen", null)]
-    public abstract record OperationCompletionResult<OutputT>
+    public abstract record OperationCompletionResult<TOutput>
     {
         private OperationCompletionResult() { }
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Success(OperationCompletionSuccess<OutputT> Value) : OperationCompletionResult<OutputT>;
+        public sealed record Success(OperationCompletionSuccess<TOutput> Value) : OperationCompletionResult<TOutput>;
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Failure(OperationCompletionFailure Value) : OperationCompletionResult<OutputT>;
+        public sealed record Failure(OperationCompletionFailure Value) : OperationCompletionResult<TOutput>;
     }
 
     [GeneratedCode("nexgen", null)]
-    public record GenericRequest<ContextT>
+    public record GenericRequest<TContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="GenericRequest"/> class.
+        /// Initializes a new instance of the <see cref="GenericRequest{TContext}"/> class.
         /// </summary>
-        public GenericRequest(ContextT context, IReadOnlyList<ContextT> contexts, IReadOnlyDictionary<string, ContextT> byName, Inner<ContextT> nested)
+        public GenericRequest(TContext context, IReadOnlyList<TContext> contexts, IReadOnlyDictionary<string, TContext> byName, Inner<TContext> nested)
         {
             Context = context;
             Contexts = contexts;
@@ -35,41 +35,41 @@ namespace Nexgen.GenericModelService
             Nested = nested;
         }
 
-        public ContextT Context { get; init; }
-        public IReadOnlyList<ContextT> Contexts { get; init; }
-        public IReadOnlyDictionary<string, ContextT> ByName { get; init; }
-        public Inner<ContextT> Nested { get; init; }
+        public TContext Context { get; init; }
+        public IReadOnlyList<TContext> Contexts { get; init; }
+        public IReadOnlyDictionary<string, TContext> ByName { get; init; }
+        public Inner<TContext> Nested { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]
-    public record GenericResponse<ContextT, OutputT, MetadataT>
+    public record GenericResponse<TContext, TOutput, TMetadata>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="GenericResponse"/> class.
+        /// Initializes a new instance of the <see cref="GenericResponse{TContext, TOutput, TMetadata}"/> class.
         /// </summary>
-        public GenericResponse(ContextT context, OperationCompletionResult<OutputT> completion)
+        public GenericResponse(TContext context, OperationCompletionResult<TOutput> completion)
         {
             Context = context;
             Completion = completion;
         }
 
-        public ContextT Context { get; init; }
-        public OperationCompletionResult<OutputT> Completion { get; init; }
-        public MetadataT? Metadata { get; init; }
+        public TContext Context { get; init; }
+        public OperationCompletionResult<TOutput> Completion { get; init; }
+        public TMetadata? Metadata { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]
-    public record Inner<ContextT>
+    public record Inner<TContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="Inner"/> class.
+        /// Initializes a new instance of the <see cref="Inner{TContext}"/> class.
         /// </summary>
-        public Inner(ContextT value)
+        public Inner(TContext value)
         {
             Value = value;
         }
 
-        public ContextT Value { get; init; }
+        public TContext Value { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -87,17 +87,17 @@ namespace Nexgen.GenericModelService
     }
 
     [GeneratedCode("nexgen", null)]
-    public record OperationCompletionSuccess<OutputT>
+    public record OperationCompletionSuccess<TOutput>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="OperationCompletionSuccess"/> class.
+        /// Initializes a new instance of the <see cref="OperationCompletionSuccess{TOutput}"/> class.
         /// </summary>
-        public OperationCompletionSuccess(OutputT output)
+        public OperationCompletionSuccess(TOutput output)
         {
             Output = output;
         }
 
-        public OutputT Output { get; init; }
+        public TOutput Output { get; init; }
     }
 
 }

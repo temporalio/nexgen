@@ -155,15 +155,23 @@ fn unsupported_backend_rejects_reachable_generic_proto_carrier() {
 }
 
 #[test]
-fn dotnet_rejects_generic_proto_models_until_sdk_supports_generic_converters() {
+fn dotnet_converts_generic_proto_carriers() {
     let temp = tempfile::tempdir().unwrap();
     let path = write_generic_carrier_fixture(temp.path());
-    let error = generate(Language::Dotnet, &path).unwrap_err();
+    let output = generate(Language::Dotnet, &path).unwrap();
+    assert!(output.contains("typeof(GenericRequest<>.TransferTypeConverter)"));
     assert!(
-        error.to_string().contains(
-            "dotnet protobuf transfer-type conversion does not yet support generic model"
-        ),
-        "{error}"
+        output.contains("if (wire.Details != null && wire.Details.Payloads_.Count > 1)"),
+        "{output}"
+    );
+    assert!(output.contains(
+        "throw new System.InvalidOperationException($\"expected at most one payload in GenericRequest.Details, found {wire.Details.Payloads_.Count}\");"
+    ));
+    assert!(output.contains(
+        "Details = wire.Details == null ? default : (wire.Details.Payloads_.Count == 0 ? default! : ProtoExtensions.FromPayloads<TInput>(wire.Details)[0]),"
+    ));
+    assert!(
+        output.contains("proto.Details = ProtoExtensions.ToPayloads(new object?[] { details });")
     );
 }
 

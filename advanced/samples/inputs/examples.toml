@@ -4,11 +4,11 @@ system_nexus = true
 [multi-operation-service]
 system_nexus = true
 
-[proto-generic-python]
-languages = ["python"]
+[proto-generic]
+languages = ["python", "dotnet"]
 
 [proto-oneof]
-languages = ["python"]
+languages = ["python", "dotnet"]
 
 [notification-service]
-languages = ["python"]
+languages = ["python", "dotnet"]

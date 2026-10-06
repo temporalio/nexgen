@@ -4,6 +4,12 @@
     <LangVersion>9.0</LangVersion>
     <Nullable>enable</Nullable>
     <AssemblyName>Nexgen.DotNetExamples</AssemblyName>
+    <!-- Build the XML documentation so that the compiler checks every generated cref. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Generated code does not document every public member. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- A cref that does not resolve gives a broken link in the generated documentation. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS1574;CS1580;CS1584;CS1658</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +22,6 @@
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="3.26.1" />
     <PackageReference Include="NexusRpc" Version="0.4.0" />
-    <PackageReference Include="Temporalio" Version="1.18.0" />
+    <PackageReference Include="Temporalio" Version="1.20.0" />
   </ItemGroup>
 </Project>
