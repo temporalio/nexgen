@@ -181,6 +181,18 @@ cargo run --features advanced -- dotnet \
   --output /tmp/user-service-dotnet
 ```
 
+The `dotnet` target also accepts JSON Schema inputs (work in progress). The
+output targets `net10.0` and `Temporalio` 1.19.0; `--namespace` sets the root
+namespace, and `x-cs-name`, `x-cs-const-name`, and `x-cs-enum-names` override
+emitted identifiers. JSON Schema inputs need no `--support-package`:
+
+```bash
+cargo run --features advanced -- dotnet \
+  samples/schemas/showcase.nexusrpc.yaml \
+  --namespace Example.Showcase \
+  --output /tmp/showcase-dotnet
+```
+
 Inputs are positional; pass more than one path (a file or a directory) to link
 additional WIT into the parser workspace. Generation produces definitions by
 default. Add `--native-api` to also generate native API bindings. Add `--format`

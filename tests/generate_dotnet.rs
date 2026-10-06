@@ -96,6 +96,7 @@ fn generate_dotnet_files(
         java_package_name: None,
         support_package: Some("Nexgen.Support".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let files = if output_path.is_file() {

@@ -424,6 +424,7 @@ fn generate_typescript_files(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let files = read_typescript_output_files(&output_path);
@@ -538,6 +539,7 @@ fn typescript_json_names_inline_object_union_branch() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -583,6 +585,7 @@ fn typescript_json_validates_non_object_union_branch_constraints() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -630,6 +633,7 @@ fn typescript_json_recursively_converts_union_array_branches() {
         format: false,
         java_package_name: None,
         ts_date_time_types: nexgen::generator::TsDateTimeTypes::Date,
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -689,6 +693,7 @@ fn typescript_json_does_not_emit_union_serializer_for_assertion_only_format() {
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -722,6 +727,7 @@ fn typescript_json_rejects_non_finite_numbers_at_every_position() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -757,6 +763,7 @@ fn typescript_json_detects_nested_runtime_support() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let definitions = fs::read_to_string(output_path.join("definitions.ts")).unwrap();
@@ -812,6 +819,7 @@ fn typescript_json_validates_native_temporals_before_serializing() {
             format: false,
             java_package_name: None,
             ts_date_time_types: repr,
+            dotnet_namespace: None,
         })
         .unwrap();
         let models = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -872,6 +880,7 @@ fn typescript_json_guards_nullable_array_elements_during_serialize_validation() 
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -915,6 +924,7 @@ fn typescript_json_maps_element_position_unions() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -955,6 +965,7 @@ fn typescript_json_native_barrel_exports_violation_type_only() {
         },
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let index = fs::read_to_string(output_path.join("index.ts")).unwrap();
@@ -999,6 +1010,7 @@ fn typescript_json_one_sided_operation_type_info() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("services.ts")).unwrap();
@@ -1036,6 +1048,7 @@ fn typescript_json_operation_type_info_follows_ts_name_override() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let models = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1075,6 +1088,7 @@ fn typescript_json_cross_module_ts_name_override_moves_every_reference() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1135,6 +1149,7 @@ $defs:
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .expect_err("alias cycle must reject");
     let message = error.to_string();
@@ -1169,6 +1184,7 @@ fn typescript_json_override_moves_member_derived_names_only() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1211,6 +1227,7 @@ fn typescript_json_rejects_same_type_name_in_two_modules() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     };
 
     let error = generate_to_file(&request("out"))
@@ -1296,6 +1313,7 @@ fn typescript_json_service_module_without_own_types_imports_instead_of_reemittin
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1354,6 +1372,7 @@ fn typescript_json_emits_complete_property_name_matcher() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1386,6 +1405,7 @@ fn typescript_json_materializes_closed_values_and_nullable_defaults() {
         format: false,
         java_package_name: None,
         ts_date_time_types: nexgen::generator::TsDateTimeTypes::Temporal,
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1422,6 +1442,7 @@ fn typescript_json_deprecates_types_fields_services_and_operations() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let models = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1461,6 +1482,7 @@ additionalProperties: true
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1505,6 +1527,7 @@ properties:
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 

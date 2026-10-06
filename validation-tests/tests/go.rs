@@ -207,6 +207,7 @@ fn generate_to_string_with_inputs(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })?;
     let rendered = if output_path.is_file() {
         fs::read_to_string(&output_path)?
@@ -360,6 +361,7 @@ interface namespace-service {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let build = Command::new("go")
@@ -882,6 +884,7 @@ fn go_json_decodes_element_position_unions() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("bag.go")).unwrap();
@@ -981,6 +984,7 @@ fn go_json_recursively_converts_and_validates_element_positions() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1127,6 +1131,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("output.go")).unwrap();
@@ -1203,6 +1208,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("mixed.go")).unwrap();
@@ -1307,6 +1313,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -1410,6 +1417,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -1503,6 +1511,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -1569,6 +1578,7 @@ fn go_json_wave3_pairwise_runtime_matrix() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -1787,6 +1797,7 @@ fn go_json_bare_ref_root_is_a_runtime_alias_for_operation_io() {
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1869,6 +1880,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("fmod.go")).unwrap();
@@ -1981,6 +1993,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("nullable.go")).unwrap();
@@ -2107,6 +2120,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("mat.go")).unwrap();
@@ -2291,6 +2305,7 @@ properties:
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -2353,6 +2368,7 @@ properties:
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -2432,6 +2448,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -2522,6 +2539,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("shapes.go")).unwrap();
@@ -2648,6 +2666,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("shapes.go")).unwrap();
@@ -2707,6 +2726,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -2799,6 +2819,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -2919,6 +2940,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("names.go")).unwrap();

@@ -153,6 +153,7 @@ fn generate_python_package_files(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let files = read_python_package_files(&output_path);
@@ -371,6 +372,7 @@ fn python_json_names_inline_object_union_branch() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -408,6 +410,7 @@ fn python_json_validates_non_object_union_branch_constraints() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -463,6 +466,7 @@ fn python_json_annotates_element_position_unions() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -554,6 +558,7 @@ fn generate_python_schema_tree(name: &str, files: &[(&str, &str)]) -> (PathBuf, 
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     (temp_dir, output_path)
@@ -674,6 +679,7 @@ fn python_json_cross_module_py_name_override_moves_every_reference() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -736,6 +742,7 @@ fn python_json_rejects_same_type_name_in_two_modules() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     };
 
     let error = generate_to_file(&request("out"))
@@ -809,6 +816,7 @@ services:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -856,6 +864,7 @@ fn generate_unformatted_python_package(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     output_path
@@ -929,6 +938,7 @@ $defs:
             format: false,
             java_package_name: None,
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         })
         .unwrap_err()
         .to_string();
@@ -979,6 +989,7 @@ interface api {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let ping = fs::read_to_string(output_path.join("operations/ping.py")).unwrap();

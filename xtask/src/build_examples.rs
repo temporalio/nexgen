@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 
-use heck::ToSnakeCase;
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use nexgen::error::Error as NexgenError;
 use nexgen::generator::{GenerationMode, TsDateTimeTypes};
 use nexgen::language::Language;
@@ -83,7 +83,11 @@ pub fn build_examples(request: &BuildExamplesRequest) -> Result<()> {
             let json_request = request_for_languages(request, |language| {
                 matches!(
                     language,
-                    Language::Python | Language::TypeScript | Language::Go | Language::Java
+                    Language::Dotnet
+                        | Language::Python
+                        | Language::TypeScript
+                        | Language::Go
+                        | Language::Java
                 )
             });
             build_selected_examples(&repo_root, wit_request, json_request)?;
@@ -227,6 +231,7 @@ pub fn build_json_examples(request: &BuildExamplesRequest) -> Result<()> {
     let repo_root = repo_root();
     let languages = if request.languages.is_empty() {
         vec![
+            Language::Dotnet,
             Language::Python,
             Language::TypeScript,
             Language::Go,
@@ -238,7 +243,11 @@ pub fn build_json_examples(request: &BuildExamplesRequest) -> Result<()> {
     for language in languages {
         if !matches!(
             language,
-            Language::Python | Language::TypeScript | Language::Go | Language::Java
+            Language::Dotnet
+                | Language::Python
+                | Language::TypeScript
+                | Language::Go
+                | Language::Java
         ) {
             return Err(NexgenError::UnsupportedLanguage { language }.into());
         }
@@ -510,6 +519,7 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
         java_package_name: (language == Language::Java)
             .then(|| example_directory_name(language, example_id)),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     };
     generate_to_file(&generate_request)?;
     format_example_output(&language_root, language, &output_path)?;
@@ -574,6 +584,8 @@ fn build_json_example_variant(
             java_package_name: (language == Language::Java)
                 .then(|| json_example_java_package(&dir_name, mode)),
             ts_date_time_types,
+            dotnet_namespace: (language == Language::Dotnet)
+                .then(|| json_example_csharp_namespace(output_id)),
         })?;
         format_example_output(&root, language, &output_path)?;
         normalize_example_headers(&output_path)?;
@@ -700,6 +712,11 @@ fn json_example_java_package(name: &str, mode: GenerationMode) -> String {
             GenerationMode::NativeApi => "api",
         }
     )
+}
+/// The root namespace of a C# JSON Schema example. Every example compiles into
+/// one sample project, so each needs its own namespace for the shared runtime.
+fn json_example_csharp_namespace(id: &str) -> String {
+    format!("Nexgen.JsonSchema.{}", id.to_upper_camel_case())
 }
 fn example_directory_name(language: Language, id: &str) -> String {
     match language {

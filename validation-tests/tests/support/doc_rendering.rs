@@ -90,6 +90,7 @@ fn generate(language: nexgen::language::Language, java_package_name: Option<&str
         format: false,
         java_package_name: java_package_name.map(str::to_string),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     output_path

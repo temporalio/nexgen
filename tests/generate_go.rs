@@ -75,6 +75,7 @@ fn generate_to_string_with_system_nexus(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })?;
     let rendered = if output_path.is_file() {
         fs::read_to_string(&output_path)?
@@ -536,6 +537,7 @@ fn go_json_package_name_derives_from_output_directory_name() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -990,6 +992,7 @@ interface sample-service {{
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     });
     let files = result.map(|_| read_go_output_files(&output_path));
     fs::remove_dir_all(temp_dir).unwrap();
@@ -1676,6 +1679,7 @@ fn go_rejects_inputs_flattening_to_the_same_module_file() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     });
 
     let error =
@@ -1729,6 +1733,7 @@ fn go_rejects_reserved_generated_name_collision() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     });
 
     let error = result
@@ -1760,6 +1765,7 @@ fn go_rejects_single_input_output_named_definitions_with_a_remedy() {
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     };
 
     for output_name in ["definitions", "Definitions", "definitions-"] {
@@ -1809,6 +1815,7 @@ fn go_multi_input_module_named_support_has_no_support_file_collision() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .expect("support.json may now generate support.go without a copied support file");
     assert!(temp_dir.join("output/support.go").is_file());
@@ -1836,6 +1843,7 @@ fn go_json_output_named_support_has_no_support_file_collision() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .expect("support output name is no longer reserved for copied fragments");
     assert!(temp_dir.join("support/support.go").is_file());
@@ -1875,6 +1883,7 @@ interface support {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .expect("the service may now own support.go");
     assert!(temp_dir.join("output/support.go").is_file());
@@ -1904,6 +1913,7 @@ fn go_json_names_inline_object_union_branch() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("detail.go")).unwrap();
@@ -1943,6 +1953,7 @@ fn go_json_validates_non_object_union_branch_constraints() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("bc.go")).unwrap();
@@ -2002,6 +2013,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("note.go")).unwrap();
@@ -2052,6 +2064,7 @@ services:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("service.go")).unwrap();
@@ -2140,6 +2153,7 @@ fn go_json_cross_module_go_name_override_moves_every_reference() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -2205,6 +2219,7 @@ fn go_json_override_moves_member_derived_names_only() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = read_go_output_files(&output_path)
@@ -2270,6 +2285,7 @@ services:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .expect_err("two modules declaring `Page` collide in Go's flat package")
     .to_string();
@@ -2292,6 +2308,7 @@ services:
         format: false,
         java_package_name: Some("com.example.pkg".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .expect("separate Java packages keep `Page` apart");
     let service = fs::read_to_string(temp_dir.join("pkg/root/Svc.java")).unwrap();
@@ -2355,6 +2372,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .expect_err("a service and a model in one module both map to `Thing`")
     .to_string();
@@ -2406,6 +2424,7 @@ services:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -2500,6 +2519,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = read_go_output_files(&output_path)
@@ -2568,6 +2588,7 @@ fn go_json_semantic_helper_names_participate_in_p15() {
             config: Default::default(),
             java_package_name: None,
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         })
         .expect_err("the authored type collides with a package semantic helper")
         .to_string();

@@ -1,0 +1,2 @@
+Work-in-progress C# generation for JSON Schema input behind the `advanced` feature: `nexgen dotnet` emits `sealed record` models with validating `System.Text.Json` converters that aggregate violations into one Temporal `PayloadValidationError`, plus Nexus service interfaces, targeting `net10.0` and `Temporalio` 1.19.0.
+`nexgen dotnet` gains `--namespace` to set the root namespace for JSON Schema output, and `x-cs-name`, `x-cs-const-name`, and `x-cs-enum-names` override emitted C# identifiers.

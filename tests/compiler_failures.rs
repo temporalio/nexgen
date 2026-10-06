@@ -170,6 +170,7 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
             format: false,
             java_package_name: (language == Language::Java).then(|| "generated".into()),
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         });
         if let Err(error) = check_result(&expected.error, result) {
             failures.push(format!("{} [{}]: {error}", directory.display(), language));
