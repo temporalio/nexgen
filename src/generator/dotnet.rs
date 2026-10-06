@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 
@@ -52,18 +53,25 @@ struct ApiPlanner<'a> {
     external_models: DotNetExternalModels,
     external_model_fragments: DotNetExternalModelFragments,
     support_namespace: Option<&'a str>,
+    namespaces: &'a Namespaces,
 }
 
 impl<'a> ApiPlanner<'a> {
-    fn new(api_plan: &'a PlannedSpec, support_namespace: Option<&'a str>) -> Result<Self> {
+    fn new(
+        api_plan: &'a PlannedSpec,
+        support_namespace: Option<&'a str>,
+        namespaces: &'a Namespaces,
+        json: dotnet_json::ModelBackend,
+    ) -> Result<Self> {
         validate_type_parameter_names(api_plan)?;
-        let external_models = DotNetExternalModels::new(api_plan)?;
+        let external_models = DotNetExternalModels::new(api_plan, json)?;
         let external_model_fragments = external_models.render_models()?;
         Ok(Self {
             api_plan,
             external_models,
             external_model_fragments,
             support_namespace,
+            namespaces,
         })
     }
 
@@ -102,8 +110,14 @@ impl<'a> ApiPlanner<'a> {
         {
             imports.push(support_namespace);
         }
-        let module_imports = dotnet_module_imports(self.api_plan);
+        let module_imports = self.namespaces.module_imports(self.api_plan);
         imports.extend(module_imports.iter().map(String::as_str));
+        imports.extend(
+            self.external_model_fragments
+                .aliases
+                .iter()
+                .map(String::as_str),
+        );
         let mut output = generated_file_prelude(namespace, &imports);
         if needs_result {
             render_result_helper(&mut output);
@@ -126,7 +140,7 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn render_service_file(&self, namespace: &str, include_native_api: bool) -> String {
-        let module_imports = dotnet_module_imports(self.api_plan);
+        let module_imports = self.namespaces.module_imports(self.api_plan);
         let has_endpoint_operations = self
             .api_plan
             .services
@@ -164,7 +178,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&csharp_string_literal(&service.wire_name));
             output.push_str(")]\n");
             output.push_str("internal interface I");
-            output.push_str(&csharp_type_name(&service.name));
+            output.push_str(&csharp_service_ident(service));
             output.push_str("\n{\n");
             for operation in &service.operations {
                 self.render_service_operation(&mut output, operation);
@@ -174,7 +188,7 @@ impl<'a> ApiPlanner<'a> {
                 for operation in &service.operations {
                     self.render_operation_options_type(&mut output, operation);
                 }
-                let service_type = format!("I{}", csharp_type_name(&service.name));
+                let service_type = format!("I{}", csharp_service_ident(service));
                 self.render_endpoint_service_class(&mut output, service, &service_type);
             }
         }
@@ -197,7 +211,7 @@ impl<'a> ApiPlanner<'a> {
         if let Some(support_namespace) = self.support_namespace {
             imports.push(support_namespace);
         }
-        let module_imports = dotnet_module_imports(self.api_plan);
+        let module_imports = self.namespaces.module_imports(self.api_plan);
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
         for service in &self.api_plan.services {
@@ -218,7 +232,7 @@ impl<'a> ApiPlanner<'a> {
         if let Some(support_namespace) = self.support_namespace {
             imports.push(support_namespace);
         }
-        let module_imports = dotnet_module_imports(self.api_plan);
+        let module_imports = self.namespaces.module_imports(self.api_plan);
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
         for service in &self.api_plan.services {
@@ -247,7 +261,7 @@ impl<'a> ApiPlanner<'a> {
         };
         output.push_str(&service_return_type);
         output.push(' ');
-        output.push_str(&csharp_type_name(&operation.name));
+        output.push_str(&csharp_operation_ident(operation));
         output.push('(');
         if self.operation_has_input(operation) {
             output.push_str(&self.dotnet_erased_model_type(operation.input_model()));
@@ -309,7 +323,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("    private static readonly ServiceDefinition ");
             output.push_str(&service_definition_field_name(service));
             output.push_str(" = ServiceDefinition.FromType<I");
-            output.push_str(&csharp_type_name(&service.name));
+            output.push_str(&csharp_service_ident(service));
             output.push_str(">();\n");
         }
         output.push('\n');
@@ -346,7 +360,7 @@ impl<'a> ApiPlanner<'a> {
         if service.endpoint.is_none() {
             return;
         }
-        let service_type = format!("I{}", csharp_type_name(&service.name));
+        let service_type = format!("I{}", csharp_service_ident(service));
         for operation in &service.operations {
             self.render_operation_options_type(output, operation);
         }
@@ -397,6 +411,9 @@ impl<'a> ApiPlanner<'a> {
         service_type: &str,
     ) {
         let service_class_name = dotnet_endpoint_service_class_name(service);
+        output.push_str("/// <summary>\n/// Calls the <c>");
+        output.push_str(&xml_doc_escape(&service.wire_name));
+        output.push_str("</c> service's operations from a workflow.\n/// </summary>\n");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
         output.push_str("public class ");
@@ -405,6 +422,9 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    private readonly NexusWorkflowClient<");
         output.push_str(service_type);
         output.push_str("> _client;\n\n");
+        output.push_str(
+            "    /// <summary>\n    /// Creates a client for the given Nexus endpoint.\n    /// </summary>\n    /// <param name=\"endpoint\">The Nexus endpoint name.</param>\n",
+        );
         output.push_str("    public ");
         output.push_str(&service_class_name);
         output.push_str("(string endpoint)\n    {\n");
@@ -459,20 +479,20 @@ impl<'a> ApiPlanner<'a> {
         }
         if service.endpoint.is_none() {
             output.push_str("\n    internal NexusWorkflowClient<I");
-            output.push_str(&csharp_type_name(&service.name));
+            output.push_str(&csharp_service_ident(service));
             output.push_str(">? NexgenClient { get; set; }\n");
             output.push_str("\n    internal static ");
             output.push_str(&type_name);
             output.push_str(" BindClient(");
             output.push_str(&type_name);
             output.push_str(" resource, NexusWorkflowClient<I");
-            output.push_str(&csharp_type_name(&service.name));
+            output.push_str(&csharp_service_ident(service));
             output.push_str("> client)\n    {\n");
             output.push_str("        resource.NexgenClient = client;\n");
             output.push_str("        return resource;\n");
             output.push_str("    }\n");
             output.push_str("\n    private NexusWorkflowClient<I");
-            output.push_str(&csharp_type_name(&service.name));
+            output.push_str(&csharp_service_ident(service));
             output.push_str("> RequireNexgenClient()\n    {\n");
             output
                 .push_str("        return NexgenClient ?? throw new InvalidOperationException(\"");
@@ -682,7 +702,7 @@ impl<'a> ApiPlanner<'a> {
         endpoint_constant_name: &str,
         endpoint_parameter: bool,
     ) {
-        let method_name = format!("{}Async", csharp_type_name(&operation.name));
+        let method_name = format!("{}Async", csharp_operation_ident(operation));
         let raw_return = self.operation_raw_return_type(operation);
         let high_level_return = self.operation_return_type(operation);
         let has_input = self.operation_has_input(operation);
@@ -751,7 +771,7 @@ impl<'a> ApiPlanner<'a> {
         operation: &PlannedOperation,
         service_type: &str,
     ) {
-        let method_name = format!("{}Async", csharp_type_name(&operation.name));
+        let method_name = format!("{}Async", csharp_operation_ident(operation));
         let raw_return = self.operation_raw_return_type(operation);
         let high_level_return = self.operation_return_type(operation);
         let has_input = self.operation_has_input(operation);
@@ -893,7 +913,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(raw_return);
             output.push_str(">(svc => svc.");
         }
-        output.push_str(&csharp_type_name(&operation.name));
+        output.push_str(&csharp_operation_ident(operation));
         output.push('(');
         if has_input {
             output.push_str("request");
@@ -1096,7 +1116,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(raw_return);
             output.push_str(">(svc => svc.");
         }
-        output.push_str(&csharp_type_name(&operation.name));
+        output.push_str(&csharp_operation_ident(operation));
         output.push('(');
         if has_input {
             output.push_str("request");
@@ -1185,7 +1205,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&raw_return);
             output.push_str(">(svc => svc.");
         }
-        output.push_str(&csharp_type_name(&operation.name));
+        output.push_str(&csharp_operation_ident(operation));
         output.push('(');
         if has_input {
             output.push_str("request");
@@ -1957,8 +1977,11 @@ struct DotNetExternalModels {
 type DotNetExternalModelFragments = dotnet_json::RenderedModelFragments;
 
 impl DotNetExternalModels {
-    fn new(api_plan: &PlannedSpec) -> Result<Self> {
-        let mut this = Self::default();
+    fn new(api_plan: &PlannedSpec, json: dotnet_json::ModelBackend) -> Result<Self> {
+        let mut this = Self {
+            proto: Default::default(),
+            json,
+        };
         this.prepare(api_plan)?;
         Ok(this)
     }
@@ -2158,15 +2181,46 @@ impl ExternalModelBackend for DotNetExternalModels {
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
     support_package: Option<&str>,
+    namespace: Option<&str>,
 ) -> Result<GeneratedFiles> {
-    let generated = match &tree.root {
+    let module_base = namespace.unwrap_or(DEFAULT_NAMESPACE).to_string();
+    let root_namespace = match (&tree.root, namespace) {
+        (_, Some(namespace)) => namespace.to_string(),
+        (ApiSpecNode::Leaf(leaf), None) => Namespaces::default_leaf_namespace(&leaf.spec),
+        (ApiSpecNode::Branch(_), None) => DEFAULT_NAMESPACE.to_string(),
+    };
+    let mut json_models = BTreeMap::new();
+    collect_json_models(&tree.root, &mut json_models);
+    let namespaces = Namespaces {
+        root: root_namespace.clone(),
+        module_base,
+    };
+    let json_tree = Rc::new(dotnet_json::JsonModelTree::new(
+        json_models,
+        root_namespace,
+        &|module| namespaces.module_namespace(module),
+    )?);
+    let mut generated = match &tree.root {
         ApiSpecNode::Leaf(leaf) => generate_leaf(
             &leaf.spec,
             support_package,
             GeneratedFileOrigin::fixed("generated .NET package module"),
+            &namespaces,
+            &json_tree,
         ),
-        ApiSpecNode::Branch(branch) => generate_tree(branch, support_package),
+        ApiSpecNode::Branch(branch) => {
+            generate_tree(branch, support_package, &namespaces, &json_tree)
+        }
     }?;
+    for (path, contents) in json_tree.runtime_files() {
+        let origin = GeneratedFileOrigin::fixed(format!(
+            "generated C# runtime type `{}`",
+            path.file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or_default()
+        ));
+        generated.files.insert(path, contents, origin)?;
+    }
     Ok(GeneratedFiles {
         layout: crate::generator::GeneratedOutputLayout::Directory,
         files: generated.files.into_files(),
@@ -2183,6 +2237,8 @@ fn generate_leaf(
     api_plan: &PlannedSpec,
     support_package: Option<&str>,
     module_origin: GeneratedFileOrigin,
+    namespaces: &Namespaces,
+    json_tree: &Rc<dotnet_json::JsonModelTree>,
 ) -> Result<DotnetGenerationResult> {
     let mode = crate::nexgen_config::current().mode;
     if let Some(support_package) = support_package {
@@ -2194,9 +2250,14 @@ fn generate_leaf(
             }
         })?;
     }
-    let generator = ApiPlanner::new(api_plan, support_package)?;
+    let namespace = namespaces.namespace(api_plan);
+    let generator = ApiPlanner::new(
+        api_plan,
+        support_package,
+        namespaces,
+        dotnet_json::ModelBackend::new(json_tree.clone(), namespace.clone()),
+    )?;
     validate_dotnet_support_references(api_plan, &generator.external_models, support_package)?;
-    let namespace = dotnet_namespace(api_plan);
     let mut files = GeneratedFileMap::default();
     files.insert(
         "Models.cs",
@@ -2277,11 +2338,11 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str("        public virtual Task<NexusWorkflowOperationHandle<");
                 output.push_str(&response_type);
                 output.push_str(">> ");
-                output.push_str(&csharp_type_name(&operation.name));
+                output.push_str(&csharp_operation_ident(operation));
                 output.push_str("Async(");
                 output.push_str(&request_type);
                 output.push_str(" request) => Next.");
-                output.push_str(&csharp_type_name(&operation.name));
+                output.push_str(&csharp_operation_ident(operation));
                 output.push_str("Async(request);\n\n");
             }
         }
@@ -2315,7 +2376,7 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str(
                     " result.\");\n                }\n                var handle = outbound.Value.",
                 );
-                output.push_str(&csharp_type_name(&operation.name));
+                output.push_str(&csharp_operation_ident(operation));
                 output.push_str("Async(request);\n                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;\n            }\n");
             }
         }
@@ -2336,7 +2397,7 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str("            public override Task<NexusWorkflowOperationHandle<");
                 output.push_str(&response_type);
                 output.push_str(">> ");
-                output.push_str(&csharp_type_name(&operation.name));
+                output.push_str(&csharp_operation_ident(operation));
                 output.push_str("Async(");
                 output.push_str(&request_type);
                 output.push_str(
@@ -2364,13 +2425,42 @@ impl<'a> ApiPlanner<'a> {
 fn generate_tree(
     branch: &ApiSpecBranch<PlannedFamily>,
     support_package: Option<&str>,
+    namespaces: &Namespaces,
+    json_tree: &Rc<dotnet_json::JsonModelTree>,
 ) -> Result<DotnetGenerationResult> {
     let mut files = GeneratedFileMap::default();
     let mut warnings = Vec::new();
     for node in branch.children.values() {
-        generate_tree_node(node, support_package, &mut files, &mut warnings)?;
+        generate_tree_node(
+            node,
+            support_package,
+            &mut files,
+            &mut warnings,
+            namespaces,
+            json_tree,
+        )?;
     }
     Ok(DotnetGenerationResult { files, warnings })
+}
+
+fn collect_json_models(
+    node: &ApiSpecNode<PlannedFamily>,
+    models: &mut BTreeMap<String, crate::planning::PlannedJsonType>,
+) {
+    match node {
+        ApiSpecNode::Leaf(leaf) => {
+            for (_, binding) in leaf.spec.external_types() {
+                if let Some(model) = binding.json_model() {
+                    models.insert(model.full_name.clone(), model.clone());
+                }
+            }
+        }
+        ApiSpecNode::Branch(branch) => {
+            for child in branch.children.values() {
+                collect_json_models(child, models);
+            }
+        }
+    }
 }
 
 fn generate_tree_node(
@@ -2378,6 +2468,8 @@ fn generate_tree_node(
     support_package: Option<&str>,
     files: &mut GeneratedFileMap,
     warnings: &mut Vec<String>,
+    namespaces: &Namespaces,
+    json_tree: &Rc<dotnet_json::JsonModelTree>,
 ) -> Result<()> {
     match node {
         ApiSpecNode::Leaf(leaf) => {
@@ -2385,6 +2477,8 @@ fn generate_tree_node(
                 &leaf.spec,
                 support_package,
                 GeneratedFileOrigin::input_module(Language::Dotnet, &leaf.source_path),
+                namespaces,
+                json_tree,
             )?;
             warnings.extend(generated.warnings);
             let prefix = leaf.module_path.to_path_buf();
@@ -2393,7 +2487,14 @@ fn generate_tree_node(
         }
         ApiSpecNode::Branch(branch) => {
             for node in branch.children.values() {
-                generate_tree_node(node, support_package, files, warnings)?;
+                generate_tree_node(
+                    node,
+                    support_package,
+                    files,
+                    warnings,
+                    namespaces,
+                    json_tree,
+                )?;
             }
             Ok(())
         }
@@ -3033,7 +3134,7 @@ fn render_flattened_method_body(
         output.push_str(operation_call_target);
         output.push('.');
     }
-    output.push_str(&csharp_type_name(&operation.name));
+    output.push_str(&csharp_operation_ident(operation));
     output.push_str("Async(");
     if let Some(endpoint_expr) = endpoint_expr {
         output.push_str(endpoint_expr);
@@ -3165,7 +3266,7 @@ fn operation_options_type_name(operation: &PlannedOperation) -> String {
 }
 
 fn service_definition_field_name(service: &PlannedService) -> String {
-    format!("{}ServiceDefinition", csharp_type_name(&service.name))
+    format!("{}ServiceDefinition", csharp_service_ident(service))
 }
 
 fn model_has_options_fields(model: &PlannedModel, api_plan: &PlannedSpec) -> bool {
@@ -3354,7 +3455,7 @@ fn render_resource_method_operation_body(
     support_namespace: Option<&str>,
     endpoint_expr: Option<&str>,
 ) {
-    let operation_method_name = format!("{}Async", csharp_type_name(&operation.name));
+    let operation_method_name = format!("{}Async", csharp_operation_ident(operation));
     let operation_class_name = dotnet_operations_class_name(service);
     let args =
         resource_method_operation_call_args(operation, request_plan, api_plan, support_namespace)
@@ -3852,54 +3953,93 @@ fn value_uses_result(value: &PlannedType) -> bool {
     }
 }
 
-fn dotnet_namespace(api_plan: &PlannedSpec) -> String {
-    if crate::nexgen_config::current().system_nexus {
-        return "Temporalio.Workflows".to_string();
-    }
-    if !api_plan.module_path.is_root() {
-        return dotnet_module_namespace(&api_plan.module_path);
-    }
-    api_plan
-        .primary_namespace()
-        .and_then(|namespace| namespace.value())
-        .map(ToOwned::to_owned)
-        .or_else(|| {
-            api_plan
-                .services
-                .first()
-                .map(|service| service.name.as_str())
-                .or_else(|| {
-                    api_plan
-                        .model_scope
-                        .as_ref()
-                        .map(|scope| scope.name.as_str())
-                })
-                .map(|name| format!("Nexgen.{}", csharp_type_name(name)))
-        })
-        .unwrap_or_else(|| "Nexgen.Generated".to_string())
+/// The namespace a run's models live under when no `--namespace` is given.
+const DEFAULT_NAMESPACE: &str = "Nexgen.Generated";
+
+#[derive(Debug)]
+/// How a run's modules map to C# namespaces: the root module (and the shared
+/// JSON Schema runtime) in `root`, every other module under `module_base`.
+struct Namespaces {
+    root: String,
+    module_base: String,
 }
 
-fn dotnet_module_imports(api_plan: &PlannedSpec) -> Vec<String> {
-    api_plan
-        .data
-        .module_imports
-        .keys()
-        .map(dotnet_module_namespace)
-        .collect()
+impl Namespaces {
+    /// The root namespace of a single-input run with no `--namespace`: the
+    /// authored namespace, or one derived from the first service (or the
+    /// operation-free interface) name.
+    fn default_leaf_namespace(api_plan: &PlannedSpec) -> String {
+        if crate::nexgen_config::current().system_nexus {
+            return "Temporalio.Workflows".to_string();
+        }
+        api_plan
+            .primary_namespace()
+            .and_then(|namespace| namespace.value())
+            .map(ToOwned::to_owned)
+            .or_else(|| {
+                api_plan
+                    .services
+                    .first()
+                    .map(|service| service.name.as_str())
+                    .or_else(|| {
+                        api_plan
+                            .model_scope
+                            .as_ref()
+                            .map(|scope| scope.name.as_str())
+                    })
+                    .map(|name| format!("Nexgen.{}", csharp_type_name(name)))
+            })
+            .unwrap_or_else(|| DEFAULT_NAMESPACE.to_string())
+    }
+
+    fn namespace(&self, api_plan: &PlannedSpec) -> String {
+        if crate::nexgen_config::current().system_nexus {
+            return "Temporalio.Workflows".to_string();
+        }
+        self.module_namespace(&api_plan.module_path)
+    }
+
+    fn module_namespace(&self, module_path: &crate::spec::ModulePath) -> String {
+        if module_path.is_root() {
+            return self.root.clone();
+        }
+        let suffix = module_path
+            .0
+            .iter()
+            .map(|segment| csharp_type_name(&segment.to_upper_camel_case()))
+            .collect::<Vec<_>>()
+            .join(".");
+        format!("{}.{suffix}", self.module_base)
+    }
+
+    fn module_imports(&self, api_plan: &PlannedSpec) -> Vec<String> {
+        api_plan
+            .data
+            .module_imports
+            .keys()
+            .map(|module| self.module_namespace(module))
+            .collect()
+    }
 }
 
-fn dotnet_module_namespace(module_path: &crate::spec::ModulePath) -> String {
-    let suffix = module_path
-        .0
-        .iter()
-        .map(|segment| csharp_type_name(&segment.to_upper_camel_case()))
-        .collect::<Vec<_>>()
-        .join(".");
-    if suffix.is_empty() {
-        "Nexgen.Generated".to_string()
-    } else {
-        format!("Nexgen.Generated.{suffix}")
-    }
+/// The C# identifier a service's bindings derive from: its `x-cs-name`
+/// override, or its name.
+fn csharp_service_ident(service: &PlannedService) -> String {
+    service
+        .code_name
+        .value()
+        .map(str::to_string)
+        .unwrap_or_else(|| csharp_type_name(&service.name))
+}
+
+/// The C# method identifier for an operation: its `x-cs-name` override, or its
+/// name.
+fn csharp_operation_ident(operation: &PlannedOperation) -> String {
+    operation
+        .code_name
+        .value()
+        .map(str::to_string)
+        .unwrap_or_else(|| csharp_type_name(&operation.name))
 }
 
 fn dotnet_operations_class_name(service: &PlannedService) -> String {
@@ -3911,7 +4051,7 @@ fn dotnet_operations_class_name(service: &PlannedService) -> String {
 }
 
 fn dotnet_endpoint_service_class_name(service: &PlannedService) -> String {
-    format!("{}Client", csharp_type_name(&service.name))
+    format!("{}Client", csharp_service_ident(service))
 }
 
 fn service_endpoint_constant_name(service: &PlannedService) -> String {

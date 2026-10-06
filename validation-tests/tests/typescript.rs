@@ -620,6 +620,7 @@ fn typescript_json_bare_ref_root_alias_typechecks_and_uses_target_converter() {
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -707,6 +708,7 @@ $defs:
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -774,6 +776,7 @@ fn typescript_json_emits_complete_matchers_and_typed_mixed_extras() {
         format: false,
         java_package_name: None,
         ts_date_time_types: nexgen::generator::TsDateTimeTypes::Temporal,
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -929,6 +932,7 @@ fn typescript_json_wave3_pairwise_runtime_matrix() {
         format: false,
         java_package_name: None,
         ts_date_time_types: nexgen::generator::TsDateTimeTypes::Temporal,
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1208,6 +1212,7 @@ fn typescript_json_wave7_discrete_defects_typecheck_and_run() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1368,6 +1373,7 @@ fn typescript_json_dispatches_cross_module_ref_union_branches() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("main/models.ts")).unwrap();
@@ -1423,6 +1429,7 @@ fn typescript_json_guards_nullable_elements_in_array_keywords() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1530,6 +1537,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1610,6 +1618,7 @@ fn typescript_json_truncates_over_capacity_fractional_seconds() {
             format: false,
             java_package_name: None,
             ts_date_time_types: *repr,
+            dotnet_namespace: None,
         })
         .unwrap();
         let runtime = fs::read_to_string(output_path.join("definitions.ts")).unwrap();
@@ -1688,6 +1697,7 @@ fn renders_sample_with_versioned_header() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     assert!(temp_dir.is_dir());

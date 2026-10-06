@@ -715,6 +715,236 @@ fn inline_flag_error(pattern: &str) -> PatternError {
     ))
 }
 
+/// The UTF-16 spelling of "one astral code point": a high surrogate followed
+/// by a low surrogate.
+const SURROGATE_PAIR: &str = r"[\uD800-\uDBFF][\uDC00-\uDFFF]";
+const HIGH_SURROGATE: &str = r"[\uD800-\uDBFF]";
+
+/// Rewrite an end-anchored, normalized pattern for an engine that matches
+/// **UTF-16 code units** rather than code points (.NET `Regex`).
+///
+/// The portable contract matches code points: `^.$` accepts one astral
+/// character (`😀`), and `[^a]` consumes it whole. A code-unit engine reads the
+/// same character as two units, so a negated class, `.`, or a quantified astral
+/// literal would match half of it. The rewrite keeps every BMP construct as
+/// authored and only adds the surrogate-pair reading where a code point can be
+/// astral:
+/// - a negated class (or a negated Perl class) also matches one whole
+///   surrogate pair, unless the pair is one of its excluded members;
+/// - a class with astral members matches them as surrogate-pair sequences;
+/// - a quantified astral literal is grouped so the quantifier applies to the
+///   whole pair.
+///
+/// The output uses `\uXXXX` escapes and lookahead, which every UTF-16 engine
+/// this targets accepts; it is not re-validated by the portability gate.
+pub fn rewrite_for_utf16_code_units(pattern: &str) -> String {
+    let Ok(ast) = ast::parse::Parser::new().parse(pattern) else {
+        return pattern.to_string();
+    };
+    let mut edits = Vec::new();
+    collect_utf16_edits(&ast, pattern, &mut edits);
+    apply_edits(pattern, edits)
+}
+
+fn collect_utf16_edits(ast: &Ast, pattern: &str, edits: &mut Vec<Edit>) {
+    match ast {
+        Ast::Dot(span) => edits.push(Edit {
+            start: span.start.offset,
+            end: span.end.offset,
+            replacement: code_point_alternative(None, "."),
+        }),
+        Ast::ClassPerl(perl) if perl.negated => edits.push(Edit {
+            start: perl.span.start.offset,
+            end: perl.span.end.offset,
+            replacement: code_point_alternative(
+                None,
+                &pattern[perl.span.start.offset..perl.span.end.offset],
+            ),
+        }),
+        Ast::ClassBracketed(class) => {
+            if let Some(replacement) = utf16_class(class, pattern) {
+                edits.push(Edit {
+                    start: class.span.start.offset,
+                    end: class.span.end.offset,
+                    replacement,
+                });
+            }
+        }
+        Ast::Repetition(repetition) => match repetition.ast.as_ref() {
+            Ast::Literal(literal) if u32::from(literal.c) > 0xFFFF => edits.push(Edit {
+                start: literal.span.start.offset,
+                end: literal.span.end.offset,
+                replacement: format!(
+                    "(?:{})",
+                    &pattern[literal.span.start.offset..literal.span.end.offset]
+                ),
+            }),
+            other => collect_utf16_edits(other, pattern, edits),
+        },
+        Ast::Concat(concat) => {
+            for child in &concat.asts {
+                collect_utf16_edits(child, pattern, edits);
+            }
+        }
+        Ast::Alternation(alternation) => {
+            for child in &alternation.asts {
+                collect_utf16_edits(child, pattern, edits);
+            }
+        }
+        Ast::Group(group) => collect_utf16_edits(&group.ast, pattern, edits),
+        _ => {}
+    }
+}
+
+/// A single-code-point matcher over UTF-16: one whole surrogate pair (unless
+/// it is `excluded`), or one BMP unit matched by `single` that is neither the
+/// start nor the end of a surrogate pair. The guards stop a backtracking engine
+/// from splitting one astral code point into two matches of `single`.
+fn code_point_alternative(excluded: Option<&str>, single: &str) -> String {
+    let exclusion = excluded
+        .map(|excluded| format!("(?!{excluded})"))
+        .unwrap_or_default();
+    format!("(?:{exclusion}{SURROGATE_PAIR}|(?!{SURROGATE_PAIR})(?<!{HIGH_SURROGATE}){single})")
+}
+
+/// The code-unit spelling of one bracketed class, or `None` when the authored
+/// class already means the same thing over UTF-16 (a positive, BMP-only set).
+fn utf16_class(class: &ast::ClassBracketed, pattern: &str) -> Option<String> {
+    let mut bmp = Vec::new();
+    let mut astral = Vec::new();
+    if !split_class_members(&class.kind, pattern, &mut bmp, &mut astral) {
+        return None;
+    }
+    let spelling = &pattern[class.span.start.offset..class.span.end.offset];
+    match (class.negated, astral.is_empty()) {
+        (false, true) => None,
+        (true, true) => Some(code_point_alternative(None, spelling)),
+        (false, false) => {
+            let mut alternatives = Vec::new();
+            if !bmp.is_empty() {
+                alternatives.push(format!("[{}]", bmp.concat()));
+            }
+            alternatives.extend(astral_sequences(&astral));
+            Some(format!("(?:{})", alternatives.join("|")))
+        }
+        (true, false) => {
+            let excluded = astral_sequences(&astral).join("|");
+            let bmp_complement = if bmp.is_empty() {
+                r"[\u0000-\uFFFF]".to_string()
+            } else {
+                format!("[^{}]", bmp.concat())
+            };
+            Some(code_point_alternative(Some(&excluded), &bmp_complement))
+        }
+    }
+}
+
+/// Splits a class into BMP member spellings and astral code-point ranges.
+/// Returns false for a construct the gate already rejects (nested classes,
+/// set operations), which is left untouched.
+fn split_class_members(
+    set: &ast::ClassSet,
+    pattern: &str,
+    bmp: &mut Vec<String>,
+    astral: &mut Vec<(u32, u32)>,
+) -> bool {
+    let ast::ClassSet::Item(item) = set else {
+        return false;
+    };
+    split_class_item(item, pattern, bmp, astral)
+}
+
+fn split_class_item(
+    item: &ast::ClassSetItem,
+    pattern: &str,
+    bmp: &mut Vec<String>,
+    astral: &mut Vec<(u32, u32)>,
+) -> bool {
+    match item {
+        ast::ClassSetItem::Empty(_) => true,
+        ast::ClassSetItem::Literal(literal) => {
+            let code = u32::from(literal.c);
+            if code > 0xFFFF {
+                astral.push((code, code));
+            } else {
+                bmp.push(pattern[literal.span.start.offset..literal.span.end.offset].to_string());
+            }
+            true
+        }
+        ast::ClassSetItem::Range(range) => {
+            let (start, end) = (u32::from(range.start.c), u32::from(range.end.c));
+            if end <= 0xFFFF {
+                bmp.push(pattern[range.span.start.offset..range.span.end.offset].to_string());
+            } else if start > 0xFFFF {
+                astral.push((start, end));
+            } else {
+                bmp.push(format!(r"{}-\uFFFF", utf16_unit_escape(start)));
+                astral.push((0x10000, end));
+            }
+            true
+        }
+        ast::ClassSetItem::Perl(perl) => {
+            bmp.push(pattern[perl.span.start.offset..perl.span.end.offset].to_string());
+            true
+        }
+        ast::ClassSetItem::Union(union) => union
+            .items
+            .iter()
+            .all(|item| split_class_item(item, pattern, bmp, astral)),
+        _ => false,
+    }
+}
+
+fn utf16_unit_escape(unit: u32) -> String {
+    format!(r"\u{unit:04X}")
+}
+
+/// The surrogate-pair sequences matching every code point in `ranges`.
+fn astral_sequences(ranges: &[(u32, u32)]) -> Vec<String> {
+    let split = |code: u32| {
+        let offset = code - 0x10000;
+        (0xD800 + (offset >> 10), 0xDC00 + (offset & 0x3FF))
+    };
+    let mut sequences = Vec::new();
+    for &(start, end) in ranges {
+        let (start_high, start_low) = split(start);
+        let (end_high, end_low) = split(end);
+        let low_range = |low: u32, high: u32| {
+            if low == high {
+                utf16_unit_escape(low)
+            } else {
+                format!("[{}-{}]", utf16_unit_escape(low), utf16_unit_escape(high))
+            }
+        };
+        if start_high == end_high {
+            sequences.push(format!(
+                "{}{}",
+                utf16_unit_escape(start_high),
+                low_range(start_low, end_low)
+            ));
+            continue;
+        }
+        sequences.push(format!(
+            "{}{}",
+            utf16_unit_escape(start_high),
+            low_range(start_low, 0xDFFF)
+        ));
+        if end_high - start_high > 1 {
+            sequences.push(format!(
+                "{}{}",
+                low_range(start_high + 1, end_high - 1),
+                low_range(0xDC00, 0xDFFF)
+            ));
+        }
+        sequences.push(format!(
+            "{}{}",
+            utf16_unit_escape(end_high),
+            low_range(0xDC00, end_low)
+        ));
+    }
+    sequences
+}
+
 /// Apply non-overlapping `edits` to `src` (left to right by start offset).
 fn apply_edits(src: &str, mut edits: Vec<Edit>) -> String {
     if edits.is_empty() {
@@ -738,6 +968,22 @@ mod tests {
 
     fn norm(pattern: &str) -> String {
         gate_and_normalize(pattern).expect("should accept")
+    }
+
+    #[test]
+    fn utf16_rewrite_groups_astral_code_points() {
+        let utf16 = rewrite_for_utf16_code_units;
+        let guard = r"(?![\uD800-\uDBFF][\uDC00-\uDFFF])(?<![\uD800-\uDBFF])";
+        let pair = r"[\uD800-\uDBFF][\uDC00-\uDFFF]";
+        assert_eq!(utf16("^[A-Z]{2,4}$"), "^[A-Z]{2,4}$");
+        assert_eq!(utf16(r"a[^\n]b"), format!(r"a(?:{pair}|{guard}[^\n])b"));
+        assert_eq!(utf16("^\u{1F600}+$"), "^(?:\u{1F600})+$");
+        assert_eq!(utf16("[a\u{1F600}]"), r"(?:[a]|\uD83D\uDE00)");
+        assert_eq!(
+            utf16("[^\u{1F600}]"),
+            format!(r"(?:(?!\uD83D\uDE00){pair}|{guard}[\u0000-\uFFFF])")
+        );
+        assert_eq!(utf16("[\u{1F600}-\u{1F602}]"), r"(?:\uD83D[\uDE00-\uDE02])");
     }
 
     #[test]

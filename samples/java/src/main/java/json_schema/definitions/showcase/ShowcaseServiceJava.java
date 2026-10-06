@@ -8,17 +8,17 @@ import io.nexusrpc.Service;
  * Fetch the showcase payload. Also exercises the service-level `x-&lt;lang&gt;-name` override: the
  * emitted service code identifier is renamed to the derived name plus a per-language suffix (Go var
  * `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python class `ShowcaseServicePy`, Java
- * interface `ShowcaseServiceJava`) while the wire service name / `@Service` / `ServiceName` string
- * stays `example.showcase.v1.ShowcaseService`.
+ * interface `ShowcaseServiceJava`, C# interface `IShowcaseServiceCs`) while the wire service name /
+ * `@Service` / `ServiceName` string stays `example.showcase.v1.ShowcaseService`.
  */
 @Service(name = "example.showcase.v1.ShowcaseService")
 public interface ShowcaseServiceJava {
   /**
    * Fetch a showcase by id. Also exercises the operation-level `x-&lt;lang&gt;-name` override: the
    * emitted operation code identifier is renamed to the derived name plus a per-language suffix (Go
-   * `GetShowcaseGo`, TS `getShowcaseTs`, Python `get_showcase_py`, Java `getShowcaseJava`) while
-   * the wire operation name stays `GetShowcase` and the synthesized I/O type stays
-   * `GetShowcaseInput` (derived from the operation key, not the override).
+   * `GetShowcaseGo`, TS `getShowcaseTs`, Python `get_showcase_py`, Java `getShowcaseJava`, C#
+   * `GetShowcaseCs`) while the wire operation name stays `GetShowcase` and the synthesized I/O type
+   * stays `GetShowcaseInput` (derived from the operation key, not the override).
    */
   @Operation(name = "GetShowcase")
   Showcase getShowcaseJava(GetShowcaseInput input);

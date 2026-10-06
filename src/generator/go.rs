@@ -5626,6 +5626,7 @@ mod tests {
             format: false,
             java_package_name: None,
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         })?;
         Ok(std::fs::read_dir(output)
             .unwrap()
@@ -5847,6 +5848,7 @@ mod tests {
             format: false,
             java_package_name: None,
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         })?;
         Ok(std::fs::read_dir(output)
             .unwrap()
