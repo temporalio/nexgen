@@ -990,9 +990,9 @@ impl GoExternalModels {
         }
     }
 
-    fn render_model_wire_methods(&self, output: &mut String, key: &str, model: &RenderedModel) {
+    fn render_model_converters(&self, output: &mut String, key: &str, model: &RenderedModel) {
         if let Self::Proto(backend) = self {
-            backend.render_model_wire_methods(output, key, model);
+            backend.render_model_converters(output, key, model);
         }
     }
 
@@ -1170,18 +1170,16 @@ impl<'a> ApiPlanner<'a> {
             self.imports.insert("runtime".to_string());
             self.imports.insert("strings".to_string());
         }
-        // Transfer-type converters declare `context.Context`-flavoured stubs
-        // and a sentinel `errors.New` value.
+        // Transfer-type converters reject non-workflow conversion inline.
         if self.external_models.renders_transfer_type_converters() {
             if !self.package.is_self_import("go.temporal.io/sdk/converter") {
                 self.imports
                     .insert("go.temporal.io/sdk/converter".to_string());
             }
-            if !self.package.is_self_import("context") {
-                self.imports.insert("context".to_string());
-            }
-            if !self.package.is_self_import("errors") {
-                self.imports.insert("errors".to_string());
+            for import in ["context", "errors"] {
+                if !self.package.is_self_import(import) {
+                    self.imports.insert(import.to_string());
+                }
             }
         }
         let model_fragments = self.external_models.render_models()?;
@@ -2177,11 +2175,10 @@ impl GoVisibility {
     }
 
     fn rewrite_go_expr(&self, expr: &str) -> String {
-        if self.type_name_replacements.is_empty() && !expr.contains(".ToProto()") {
+        if self.type_name_replacements.is_empty() {
             return expr.to_string();
         }
 
-        let expr = expr.replace(".ToProto()", ".toProto()");
         let bytes = expr.as_bytes();
         let mut output = String::with_capacity(expr.len());
         let mut index = 0;
@@ -3758,7 +3755,7 @@ fn render_model(
         output.push_str("}\n");
     }
 
-    external_models.render_model_wire_methods(output, key, model);
+    external_models.render_model_converters(output, key, model);
 }
 
 /// Renders a WIT resource as a Go struct with its constructor fields.

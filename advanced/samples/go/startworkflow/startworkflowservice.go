@@ -23,7 +23,7 @@ type startWorkflowRequest struct {
 	namespace          string
 }
 
-func (m startWorkflowRequest) toProto(ctx workflow.Context) (*workflowservice.StartWorkflowExecutionRequest, error) {
+func startWorkflowRequestToProto(ctx workflow.Context, m *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
 	message := &workflowservice.StartWorkflowExecutionRequest{}
 	{
 		converted, err := workflowTypeToProto(ctx, &m.Workflow)
@@ -51,62 +51,49 @@ func (m startWorkflowRequest) toProto(ctx workflow.Context) (*workflowservice.St
 	return message, nil
 }
 
-func startWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice.StartWorkflowExecutionRequest) (startWorkflowRequest, error) {
-	value := startWorkflowRequest{}
+func startWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice.StartWorkflowExecutionRequest, out *startWorkflowRequest) error {
+	*out = startWorkflowRequest{}
 	{
 		converted, err := workflowTypeFromProto(ctx, proto.GetWorkflowType())
 		if err != nil {
-			return value, err
+			return err
 		}
 		if converted != nil {
-			value.Workflow = *converted
+			out.Workflow = *converted
 		}
 	}
-	value.WorkflowID = proto.GetWorkflowId()
+	out.WorkflowID = proto.GetWorkflowId()
 	{
 		converted, err := taskQueueFromProto(ctx, proto.GetTaskQueue())
 		if err != nil {
-			return value, err
+			return err
 		}
 		if converted != nil {
-			value.TaskQueue = *converted
+			out.TaskQueue = *converted
 		}
 	}
 	{
 		converted, err := durationFromProto(ctx, proto.GetWorkflowStartDelay())
 		if err != nil {
-			return value, err
-		}
-		value.WorkflowStartDelay = converted
-	}
-	value.namespace = proto.GetNamespace()
-	return value, nil
-}
-
-var errStartWorkflowRequestNeedsWorkflowContext = errors.New("nexgen: startWorkflowRequest can only be converted inside a workflow")
-
-var startWorkflowRequestTransferTypeConverter, startWorkflowRequestTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[startWorkflowRequest, workflowservice.StartWorkflowExecutionRequest](
-	func(context.Context, *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
-		return nil, errStartWorkflowRequestNeedsWorkflowContext
-	},
-	func(context.Context, *workflowservice.StartWorkflowExecutionRequest, *startWorkflowRequest) error {
-		return errStartWorkflowRequestNeedsWorkflowContext
-	},
-	func(ctx workflow.Context, m *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
-		return m.toProto(ctx)
-	},
-	func(ctx workflow.Context, message *workflowservice.StartWorkflowExecutionRequest, out *startWorkflowRequest) error {
-		value, err := startWorkflowRequestFromProto(ctx, message)
-		if err != nil {
 			return err
 		}
-		*out = value
-		return nil
-	},
-)
+		out.WorkflowStartDelay = converted
+	}
+	out.namespace = proto.GetNamespace()
+	return nil
+}
 
 func (startWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return startWorkflowRequestTransferTypeConverter, startWorkflowRequestTransferTypeConverterErr
+	return converter.NewContextualTransferTypeConverter(
+		func(context.Context, *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
+			return nil, errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		func(context.Context, *workflowservice.StartWorkflowExecutionRequest, *startWorkflowRequest) error {
+			return errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		startWorkflowRequestToProto,
+		startWorkflowRequestFromProto,
+	)
 }
 
 type cancelWorkflowRequest struct {
@@ -115,10 +102,10 @@ type cancelWorkflowRequest struct {
 	namespace         string
 }
 
-func (m cancelWorkflowRequest) toProto(ctx workflow.Context) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
+func cancelWorkflowRequestToProto(ctx workflow.Context, m *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
 	message := &workflowservice.RequestCancelWorkflowExecutionRequest{}
 	{
-		converted, err := m.WorkflowExecution.toProto(ctx)
+		converted, err := workflowExecutionToProto(ctx, &m.WorkflowExecution)
 		if err != nil {
 			return nil, err
 		}
@@ -131,54 +118,37 @@ func (m cancelWorkflowRequest) toProto(ctx workflow.Context) (*workflowservice.R
 	return message, nil
 }
 
-func cancelWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice.RequestCancelWorkflowExecutionRequest) (cancelWorkflowRequest, error) {
-	value := cancelWorkflowRequest{}
-	{
-		converted, err := workflowExecutionFromProto(ctx, proto.GetWorkflowExecution())
-		if err != nil {
-			return value, err
-		}
-		value.WorkflowExecution = converted
+func cancelWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice.RequestCancelWorkflowExecutionRequest, out *cancelWorkflowRequest) error {
+	*out = cancelWorkflowRequest{}
+	if err := workflowExecutionFromProto(ctx, proto.GetWorkflowExecution(), &out.WorkflowExecution); err != nil {
+		return err
 	}
 	{
 		converted := proto.GetReason()
-		value.Reason = &converted
+		out.Reason = &converted
 	}
-	value.namespace = proto.GetNamespace()
-	return value, nil
+	out.namespace = proto.GetNamespace()
+	return nil
 }
 
-var errCancelWorkflowRequestNeedsWorkflowContext = errors.New("nexgen: cancelWorkflowRequest can only be converted inside a workflow")
-
-var cancelWorkflowRequestTransferTypeConverter, cancelWorkflowRequestTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[cancelWorkflowRequest, workflowservice.RequestCancelWorkflowExecutionRequest](
-	func(context.Context, *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
-		return nil, errCancelWorkflowRequestNeedsWorkflowContext
-	},
-	func(context.Context, *workflowservice.RequestCancelWorkflowExecutionRequest, *cancelWorkflowRequest) error {
-		return errCancelWorkflowRequestNeedsWorkflowContext
-	},
-	func(ctx workflow.Context, m *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
-		return m.toProto(ctx)
-	},
-	func(ctx workflow.Context, message *workflowservice.RequestCancelWorkflowExecutionRequest, out *cancelWorkflowRequest) error {
-		value, err := cancelWorkflowRequestFromProto(ctx, message)
-		if err != nil {
-			return err
-		}
-		*out = value
-		return nil
-	},
-)
-
 func (cancelWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return cancelWorkflowRequestTransferTypeConverter, cancelWorkflowRequestTransferTypeConverterErr
+	return converter.NewContextualTransferTypeConverter(
+		func(context.Context, *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
+			return nil, errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		func(context.Context, *workflowservice.RequestCancelWorkflowExecutionRequest, *cancelWorkflowRequest) error {
+			return errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		cancelWorkflowRequestToProto,
+		cancelWorkflowRequestFromProto,
+	)
 }
 
 type startWorkflowResult struct {
 	RunID *string
 }
 
-func (m startWorkflowResult) toProto(ctx workflow.Context) (*workflowservice.StartWorkflowExecutionResponse, error) {
+func startWorkflowResultToProto(ctx workflow.Context, m *startWorkflowResult) (*workflowservice.StartWorkflowExecutionResponse, error) {
 	message := &workflowservice.StartWorkflowExecutionResponse{}
 	if m.RunID != nil {
 		message.RunId = (*m.RunID)
@@ -186,13 +156,13 @@ func (m startWorkflowResult) toProto(ctx workflow.Context) (*workflowservice.Sta
 	return message, nil
 }
 
-func startWorkflowResultFromProto(ctx workflow.Context, proto *workflowservice.StartWorkflowExecutionResponse) (startWorkflowResult, error) {
-	value := startWorkflowResult{}
+func startWorkflowResultFromProto(ctx workflow.Context, proto *workflowservice.StartWorkflowExecutionResponse, out *startWorkflowResult) error {
+	*out = startWorkflowResult{}
 	{
 		converted := proto.GetRunId()
-		value.RunID = &converted
+		out.RunID = &converted
 	}
-	return value, nil
+	return nil
 }
 
 // --- Resources ---
@@ -295,7 +265,7 @@ type WorkflowExecution struct {
 	RunID *string
 }
 
-func (m WorkflowExecution) toProto(ctx workflow.Context) (*common.WorkflowExecution, error) {
+func workflowExecutionToProto(ctx workflow.Context, m *WorkflowExecution) (*common.WorkflowExecution, error) {
 	message := &common.WorkflowExecution{}
 	message.WorkflowId = m.WorkflowID
 	if m.RunID != nil {
@@ -304,53 +274,40 @@ func (m WorkflowExecution) toProto(ctx workflow.Context) (*common.WorkflowExecut
 	return message, nil
 }
 
-func workflowExecutionFromProto(ctx workflow.Context, proto *common.WorkflowExecution) (WorkflowExecution, error) {
-	value := WorkflowExecution{}
-	value.WorkflowID = proto.GetWorkflowId()
+func workflowExecutionFromProto(ctx workflow.Context, proto *common.WorkflowExecution, out *WorkflowExecution) error {
+	*out = WorkflowExecution{}
+	out.WorkflowID = proto.GetWorkflowId()
 	{
 		converted := proto.GetRunId()
-		value.RunID = &converted
+		out.RunID = &converted
 	}
-	return value, nil
+	return nil
 }
 
 type CancelWorkflowResponse struct {
 }
 
-func (m CancelWorkflowResponse) toProto(ctx workflow.Context) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
+func cancelWorkflowResponseToProto(ctx workflow.Context, m *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
 	message := &workflowservice.RequestCancelWorkflowExecutionResponse{}
 	return message, nil
 }
 
-func cancelWorkflowResponseFromProto(ctx workflow.Context, proto *workflowservice.RequestCancelWorkflowExecutionResponse) (CancelWorkflowResponse, error) {
-	value := CancelWorkflowResponse{}
-	return value, nil
+func cancelWorkflowResponseFromProto(ctx workflow.Context, proto *workflowservice.RequestCancelWorkflowExecutionResponse, out *CancelWorkflowResponse) error {
+	*out = CancelWorkflowResponse{}
+	return nil
 }
 
-var errCancelWorkflowResponseNeedsWorkflowContext = errors.New("nexgen: CancelWorkflowResponse can only be converted inside a workflow")
-
-var cancelWorkflowResponseTransferTypeConverter, cancelWorkflowResponseTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[CancelWorkflowResponse, workflowservice.RequestCancelWorkflowExecutionResponse](
-	func(context.Context, *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
-		return nil, errCancelWorkflowResponseNeedsWorkflowContext
-	},
-	func(context.Context, *workflowservice.RequestCancelWorkflowExecutionResponse, *CancelWorkflowResponse) error {
-		return errCancelWorkflowResponseNeedsWorkflowContext
-	},
-	func(ctx workflow.Context, m *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
-		return m.toProto(ctx)
-	},
-	func(ctx workflow.Context, message *workflowservice.RequestCancelWorkflowExecutionResponse, out *CancelWorkflowResponse) error {
-		value, err := cancelWorkflowResponseFromProto(ctx, message)
-		if err != nil {
-			return err
-		}
-		*out = value
-		return nil
-	},
-)
-
 func (CancelWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return cancelWorkflowResponseTransferTypeConverter, cancelWorkflowResponseTransferTypeConverterErr
+	return converter.NewContextualTransferTypeConverter(
+		func(context.Context, *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
+			return nil, errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		func(context.Context, *workflowservice.RequestCancelWorkflowExecutionResponse, *CancelWorkflowResponse) error {
+			return errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		cancelWorkflowResponseToProto,
+		cancelWorkflowResponseFromProto,
+	)
 }
 
 type StartWorkflowOptions struct {

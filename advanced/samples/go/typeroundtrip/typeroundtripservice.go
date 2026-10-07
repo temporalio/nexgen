@@ -59,7 +59,7 @@ type ActivityOptions struct {
 	Priority *temporal.Priority
 }
 
-func (m ActivityOptions) toProto(ctx workflow.Context) (*activity.ActivityOptions, error) {
+func activityOptionsToProto(ctx workflow.Context, m *ActivityOptions) (*activity.ActivityOptions, error) {
 	message := &activity.ActivityOptions{}
 	{
 		converted, err := taskQueueToProto(ctx, m.TaskQueue)
@@ -92,65 +92,52 @@ func (m ActivityOptions) toProto(ctx workflow.Context) (*activity.ActivityOption
 	return message, nil
 }
 
-func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOptions) (ActivityOptions, error) {
-	value := ActivityOptions{}
+func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOptions, out *ActivityOptions) error {
+	*out = ActivityOptions{}
 	{
 		converted, err := taskQueueFromProto(ctx, proto.GetTaskQueue())
 		if err != nil {
-			return value, err
+			return err
 		}
-		value.TaskQueue = converted
+		out.TaskQueue = converted
 	}
 	{
 		converted, err := retryPolicyFromProto(ctx, proto.GetRetryPolicy())
 		if err != nil {
-			return value, err
+			return err
 		}
 		if converted != nil {
-			value.RetryPolicy = *converted
+			out.RetryPolicy = *converted
 		}
 	}
 	{
 		converted, err := durationFromProto(ctx, proto.GetScheduleToCloseTimeout())
 		if err != nil {
-			return value, err
+			return err
 		}
-		value.ScheduleToCloseTimeout = converted
+		out.ScheduleToCloseTimeout = converted
 	}
 	{
 		converted, err := priorityFromProto(ctx, proto.GetPriority())
 		if err != nil {
-			return value, err
-		}
-		value.Priority = converted
-	}
-	return value, nil
-}
-
-var errActivityOptionsNeedsWorkflowContext = errors.New("nexgen: ActivityOptions can only be converted inside a workflow")
-
-var activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[ActivityOptions, activity.ActivityOptions](
-	func(context.Context, *ActivityOptions) (*activity.ActivityOptions, error) {
-		return nil, errActivityOptionsNeedsWorkflowContext
-	},
-	func(context.Context, *activity.ActivityOptions, *ActivityOptions) error {
-		return errActivityOptionsNeedsWorkflowContext
-	},
-	func(ctx workflow.Context, m *ActivityOptions) (*activity.ActivityOptions, error) {
-		return m.toProto(ctx)
-	},
-	func(ctx workflow.Context, message *activity.ActivityOptions, out *ActivityOptions) error {
-		value, err := activityOptionsFromProto(ctx, message)
-		if err != nil {
 			return err
 		}
-		*out = value
-		return nil
-	},
-)
+		out.Priority = converted
+	}
+	return nil
+}
 
 func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr
+	return converter.NewContextualTransferTypeConverter(
+		func(context.Context, *ActivityOptions) (*activity.ActivityOptions, error) {
+			return nil, errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		func(context.Context, *activity.ActivityOptions, *ActivityOptions) error {
+			return errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		activityOptionsToProto,
+		activityOptionsFromProto,
+	)
 }
 
 type FailureContainer struct {
@@ -158,7 +145,7 @@ type FailureContainer struct {
 	Failure error
 }
 
-func (m FailureContainer) toProto(ctx workflow.Context) (*command.FailWorkflowExecutionCommandAttributes, error) {
+func failureContainerToProto(ctx workflow.Context, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
 	message := &command.FailWorkflowExecutionCommandAttributes{}
 	{
 		converted, err := failureToProto(ctx, m.Failure)
@@ -170,42 +157,29 @@ func (m FailureContainer) toProto(ctx workflow.Context) (*command.FailWorkflowEx
 	return message, nil
 }
 
-func failureContainerFromProto(ctx workflow.Context, proto *command.FailWorkflowExecutionCommandAttributes) (FailureContainer, error) {
-	value := FailureContainer{}
+func failureContainerFromProto(ctx workflow.Context, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
+	*out = FailureContainer{}
 	{
 		converted, err := failureFromProto(ctx, proto.GetFailure())
 		if err != nil {
-			return value, err
-		}
-		value.Failure = converted
-	}
-	return value, nil
-}
-
-var errFailureContainerNeedsWorkflowContext = errors.New("nexgen: FailureContainer can only be converted inside a workflow")
-
-var failureContainerTransferTypeConverter, failureContainerTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[FailureContainer, command.FailWorkflowExecutionCommandAttributes](
-	func(context.Context, *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
-		return nil, errFailureContainerNeedsWorkflowContext
-	},
-	func(context.Context, *command.FailWorkflowExecutionCommandAttributes, *FailureContainer) error {
-		return errFailureContainerNeedsWorkflowContext
-	},
-	func(ctx workflow.Context, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
-		return m.toProto(ctx)
-	},
-	func(ctx workflow.Context, message *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
-		value, err := failureContainerFromProto(ctx, message)
-		if err != nil {
 			return err
 		}
-		*out = value
-		return nil
-	},
-)
+		out.Failure = converted
+	}
+	return nil
+}
 
 func (FailureContainer) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return failureContainerTransferTypeConverter, failureContainerTransferTypeConverterErr
+	return converter.NewContextualTransferTypeConverter(
+		func(context.Context, *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
+			return nil, errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		func(context.Context, *command.FailWorkflowExecutionCommandAttributes, *FailureContainer) error {
+			return errors.New("nexgen: transfer type converter outside a workflow")
+		},
+		failureContainerToProto,
+		failureContainerFromProto,
+	)
 }
 
 type ActivityOptionsOperationOptions struct {
