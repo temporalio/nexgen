@@ -30,8 +30,7 @@ use nexgen::generator::TsDateTimeTypes;
 use serde_json::{Value, json};
 
 use toolchain::{
-    PlanCase, Probe, ProbeKind, TARGETS, Target, TargetVerdicts, Verdict, Workspace,
-    repository_root,
+    PlanCase, Probe, ProbeKind, Target, TargetVerdicts, Verdict, Workspace, repository_root,
 };
 
 fn corpus(name: &str) -> Value {
@@ -127,7 +126,7 @@ fn generate_corpus(
     loop {
         let schema = write_schema(workspace, model, &members);
         let mut failure = None;
-        for target in TARGETS {
+        for target in toolchain::active_targets() {
             if let Err(error) = workspace.generate(target, &schema, dir) {
                 failure = Some(error);
                 break;
@@ -195,7 +194,7 @@ fn run_corpus(
         .into_iter()
         .map(|note| format!("member dropped at load — {note}"))
         .collect();
-    for target in TARGETS {
+    for target in toolchain::active_targets() {
         match toolchain::run_target(workspace, target, &plan) {
             Ok(result) => {
                 verdicts.insert(target, result);
@@ -580,22 +579,33 @@ fn format_corpora_hold_in_every_runtime() {
         });
     }
 
-    let date_findings = run_typescript_profile(
-        "typescript-date",
-        TsDateTimeTypes::Date,
-        "FormatCorpus",
-        "format_corpus",
-        &members,
-        &corpus_rows,
-    );
-    let temporal_findings = run_typescript_profile(
-        "typescript-temporal",
-        TsDateTimeTypes::Temporal,
-        "FormatCorpus",
-        "format_corpus",
-        &members,
-        &corpus_rows,
-    );
+    // The alternate TypeScript temporal profiles belong to the TypeScript
+    // target, so a run that skips TypeScript skips them too.
+    let typescript = toolchain::active_targets().contains(&Target::TypeScript);
+    let date_findings = if typescript {
+        run_typescript_profile(
+            "typescript-date",
+            TsDateTimeTypes::Date,
+            "FormatCorpus",
+            "format_corpus",
+            &members,
+            &corpus_rows,
+        )
+    } else {
+        Vec::new()
+    };
+    let temporal_findings = if typescript {
+        run_typescript_profile(
+            "typescript-temporal",
+            TsDateTimeTypes::Temporal,
+            "FormatCorpus",
+            "format_corpus",
+            &members,
+            &corpus_rows,
+        )
+    } else {
+        Vec::new()
+    };
     let workspace = Workspace::new("format-corpus");
     let mut findings = run_corpus(
         &workspace,
@@ -675,7 +685,10 @@ fn triage(findings: Vec<String>, open_rows: &[OpenRow]) -> (Vec<String>, Vec<Str
             None => unexpected.push(finding),
         }
     }
-    for row in open_rows {
+    // A narrowed run (`NEXGEN_CONFORMANCE_TARGETS`) cannot observe a row
+    // pinned for a target it skipped, so staleness is only judged over a full run.
+    let full_run = toolchain::active_targets().len() == toolchain::TARGETS.len();
+    for row in open_rows.iter().filter(|_| full_run) {
         let seen = open
             .iter()
             .chain(structural.iter())

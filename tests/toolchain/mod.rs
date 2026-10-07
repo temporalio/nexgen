@@ -47,6 +47,30 @@ pub enum Target {
     TypeScript,
 }
 
+/// The targets the runtime tests drive. Every target by default;
+/// `NEXGEN_CONFORMANCE_TARGETS=go,python` narrows a local run to the
+/// toolchains installed on the machine. Structural checks (which consumers a
+/// case declares, which targets a collapse names) always use [`TARGETS`].
+pub fn active_targets() -> Vec<Target> {
+    match std::env::var("NEXGEN_CONFORMANCE_TARGETS") {
+        Ok(list) if !list.trim().is_empty() => {
+            let selected: Vec<Target> = list
+                .split(',')
+                .map(|name| {
+                    Target::from_name(name.trim()).unwrap_or_else(|| {
+                        panic!("NEXGEN_CONFORMANCE_TARGETS names an unknown target {name:?}")
+                    })
+                })
+                .collect();
+            TARGETS
+                .into_iter()
+                .filter(|target| selected.contains(target))
+                .collect()
+        }
+        _ => TARGETS.to_vec(),
+    }
+}
+
 impl Target {
     pub fn name(self) -> &'static str {
         match self {

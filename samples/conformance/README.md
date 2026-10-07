@@ -144,4 +144,7 @@ corpora.
 .NET is not part of this P1 runtime matrix; its validation contract remains a
 separate generator project.
 
+`NEXGEN_CONFORMANCE_TARGETS=go,python` narrows a local run of the
+runtime tests to the toolchains installed; CI runs every target.
+
 Adding a case needs no runner change. Adding a *mutation kind* needs all four.

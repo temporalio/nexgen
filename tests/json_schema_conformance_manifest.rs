@@ -1226,7 +1226,7 @@ fn json_schema_conformance_cases_agree_across_targets() {
                 .diagnostic
                 .clone()
                 .expect("structural test requires a diagnostic");
-            for target in TARGETS {
+            for target in toolchain::active_targets() {
                 let outcome = workspace.generate_schemas(target, &schemas, &case_dir(&case.id));
                 match outcome {
                     Ok(_) => hard_failures.push(format!(
@@ -1249,7 +1249,7 @@ fn json_schema_conformance_cases_agree_across_targets() {
     // them: one build per target amortizes Gradle, `go build` and vitest across
     // the whole manifest.
     let mut generation_failures: BTreeMap<Target, BTreeMap<String, String>> = BTreeMap::new();
-    for target in TARGETS {
+    for target in toolchain::active_targets() {
         for (case, item) in &prepared {
             let schemas = case
                 .schemas
@@ -1277,7 +1277,7 @@ fn json_schema_conformance_cases_agree_across_targets() {
 
     let mut verdicts: BTreeMap<Target, TargetVerdicts> = BTreeMap::new();
     let mut target_failures: BTreeMap<Target, String> = BTreeMap::new();
-    for target in TARGETS {
+    for target in toolchain::active_targets() {
         match toolchain::run_target(&workspace, target, &plans) {
             Ok(result) => {
                 verdicts.insert(target, result);
@@ -1297,7 +1297,7 @@ fn json_schema_conformance_cases_agree_across_targets() {
         }
 
         let mut per_target: BTreeMap<Target, BTreeMap<String, Verdict>> = BTreeMap::new();
-        for target in TARGETS {
+        for target in toolchain::active_targets() {
             let entry = match (verdicts.get(&target), target_failures.get(&target)) {
                 (Some(result), _) => result.get(&case.id).cloned().unwrap_or_else(|| {
                     error_verdicts(&item.plan, "the runner reported no verdict for this case")
@@ -1334,7 +1334,14 @@ fn json_schema_conformance_cases_agree_across_targets() {
         }
         check_collapse_declarations(case, item, &per_target, &mut findings);
 
+        // A narrowed run (`NEXGEN_CONFORMANCE_TARGETS`) cannot observe a
+        // divergence pinned for a target it skipped, so staleness is only judged
+        // over a full run.
+        let full_run = toolchain::active_targets().len() == TARGETS.len();
         if findings.is_empty() {
+            if !full_run {
+                continue;
+            }
             if let Some(divergence) = &case.expected_divergence {
                 hard_failures.push(format!(
                     "{}: every target now agrees, so its expected_divergence ({}) is stale — \
@@ -1377,7 +1384,7 @@ fn json_schema_conformance_cases_agree_across_targets() {
             .iter()
             .filter(|pattern| !findings.iter().any(|finding| finding.contains(*pattern)))
             .collect();
-        if !stale.is_empty() {
+        if !stale.is_empty() && full_run {
             hard_failures.push(format!(
                 "{}: expected_divergence matches nothing any more: {stale:?} — \
                  narrow or delete it",
@@ -1554,6 +1561,9 @@ fn check_collapse_declarations(
             let Some(target) = Target::from_name(name) else {
                 continue;
             };
+            if !toolchain::active_targets().contains(&target) {
+                continue;
+            }
             let mut seen = false;
             for expectation in &item.expectations {
                 let (Some(input), Some(verdict)) = (

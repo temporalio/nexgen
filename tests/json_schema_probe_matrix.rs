@@ -34,7 +34,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use toolchain::{TARGETS, Target, Workspace, brief, command, repository_root, run};
+use toolchain::{Target, Workspace, brief, command, repository_root, run};
 
 /// A target that legitimately refuses to *load* a schema the others accept.
 ///
@@ -577,12 +577,18 @@ fn generated_output_compiles_for_every_probe_schema() {
     for probe in PROBES {
         let schema = write_schema(&workspace, probe);
         let mut load_errors: BTreeMap<Target, String> = BTreeMap::new();
-        for target in TARGETS {
+        for target in toolchain::active_targets() {
             if let Err(error) = workspace.generate(target, &schema, probe.id) {
                 load_errors.insert(target, error);
             }
         }
-        if load_errors.len() == TARGETS.len() {
+        let all_scoped = load_errors.keys().all(|target| {
+            probe
+                .scoped_load
+                .iter()
+                .any(|scoped| scoped.target == *target)
+        });
+        if load_errors.len() == toolchain::active_targets().len() && !all_scoped {
             let expected = probe.load_rejected.unwrap_or_else(|| {
                 panic!(
                     "{}: the loader rejected a shape the matrix expects it to accept:\n{}",
@@ -634,6 +640,9 @@ fn generated_output_compiles_for_every_probe_schema() {
         // A declared scoped load that no longer happens is stale: the target
         // started accepting the schema, and the declaration has to go.
         for scoped in probe.scoped_load {
+            if !toolchain::active_targets().contains(&scoped.target) {
+                continue;
+            }
             assert!(
                 load_errors.contains_key(&scoped.target),
                 "{} / {}: now loads, so its scoped_load declaration is stale — delete it",
@@ -642,7 +651,7 @@ fn generated_output_compiles_for_every_probe_schema() {
             );
         }
         generated.push(probe);
-        for target in TARGETS {
+        for target in toolchain::active_targets() {
             if !load_errors.contains_key(&target) {
                 per_target.entry(target).or_default().push(probe);
             }
@@ -652,36 +661,45 @@ fn generated_output_compiles_for_every_probe_schema() {
     let for_target = |target: Target| per_target.get(&target).unwrap_or(&empty).clone();
     let ids: Vec<&str> = generated.iter().map(|probe| probe.id).collect();
 
-    check_go(
-        &workspace,
-        &for_target(Target::Go),
-        &mut failures,
-        &mut compiled,
-    );
-    check_java(
-        &workspace,
-        &for_target(Target::Java),
-        &mut failures,
-        &mut compiled,
-    );
-    check_python(
-        &workspace,
-        &for_target(Target::Python),
-        &mut failures,
-        &mut compiled,
-    );
-    check_typescript(
-        &workspace,
-        &for_target(Target::TypeScript),
-        &ids,
-        &mut failures,
-        &mut compiled,
-    );
+    let active = toolchain::active_targets();
+    if active.contains(&Target::Go) {
+        check_go(
+            &workspace,
+            &for_target(Target::Go),
+            &mut failures,
+            &mut compiled,
+        );
+    }
+    if active.contains(&Target::Java) {
+        check_java(
+            &workspace,
+            &for_target(Target::Java),
+            &mut failures,
+            &mut compiled,
+        );
+    }
+    if active.contains(&Target::Python) {
+        check_python(
+            &workspace,
+            &for_target(Target::Python),
+            &mut failures,
+            &mut compiled,
+        );
+    }
+    if active.contains(&Target::TypeScript) {
+        check_typescript(
+            &workspace,
+            &for_target(Target::TypeScript),
+            &ids,
+            &mut failures,
+            &mut compiled,
+        );
+    }
 
     let mut report = Vec::new();
     let mut open = Vec::new();
     for probe in &generated {
-        for target in TARGETS {
+        for target in toolchain::active_targets() {
             let key = (probe.id.to_string(), target);
             let observed = failures.0.get(&key);
             let expected = probe.broken.iter().find(|entry| entry.target == target);
