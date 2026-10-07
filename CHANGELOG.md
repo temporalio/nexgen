@@ -15,40 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transfer-type converters and require `Temporalio` 1.19.0 or newer. The
   `notification-service`, `proto-oneof`, and `proto-generic` (previously
   `proto-generic-python`) examples are now generated for .NET.
-- The `@nexus.serialization-context` directive now supports Go.
-- The `@nexus.serialization-context` directive now supports Go proto-backed
-  operations through a generated operation registry, including externally owned
-  request types. If a system-endpoint operation selects a Go helper, a `Registry`
-  section at the end of the generated API file
-  includes rendered system-endpoint operations under their wire service and
-  operation names; duplicate keys are rejected. Ordinary-only annotations do not
-  register global policies, and ordinary wrappers retain eager external-input
-  conversion. Shared request models can use independent policies. An explicit
-  system endpoint does not require `--system-nexus`.
-- Generated Go package initialization registers operation metadata with the SDK.
-  Registry keys and values use `internal.NexusOperationKey` and
-  `internal.NexusOperationRegistryEntry` directly. The SDK retains the map.
-  After workflow interceptors run, the SDK selects the policy once for
-  `__temporal_system` and legacy `temporal-system` endpoints. Direct
-  `ExecuteOperation` calls are covered when the generated package is imported
-  and the call supplies the registered wire key and expected native model.
-  Generated entries set optional `InputType` metadata with `reflect.TypeFor[RequestType]()`;
-    the SDK skips policy selection and external conversion for nonmatching wire
-    types, preserving raw protobuf compatibility. External inputs can use the
-    registry's `InputToTransfer` callback, including in caller scope when selection
-    is nil. The SDK
-  retains inner scope for results and failures; eager result adapters use
-  `internal.NexusOperationPayloadContext`. Interceptor future wrappers must
-    explicitly forward the optional `NexusOperationPayloadContext() workflow.Context`
-    carrier method; the public future interface is unchanged, and arbitrary
-    wrappers do not forward scope automatically. No generated context key or model
-  policy methods are needed. This requires compatible SDK internal APIs and
-  SDK-hosted packages.
-- Go's outer envelope remains Nexus-scoped, without a special envelope bypass.
-  Python system-envelope marking and codec-visitor parity are not implemented.
-  The SDK selects the target failure converter, but authored nested-failure
-  helpers still construct a default failure converter with the scoped data
-  converter; full failure-conversion parity is not included.
 
 ### Changed
 

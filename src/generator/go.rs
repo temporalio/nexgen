@@ -653,13 +653,6 @@ impl GoPackageContext {
         self.qualified_expr("errors", "errors.New")
     }
 
-    pub(in crate::generator) fn nexus_operation_payload_context(&self) -> String {
-        self.qualified_expr(
-            "go.temporal.io/sdk/internal",
-            "internal.NexusOperationPayloadContext",
-        )
-    }
-
     pub(in crate::generator) fn serialization_context_type(&self) -> String {
         self.qualified_expr(
             "go.temporal.io/sdk/converter",

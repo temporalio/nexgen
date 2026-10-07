@@ -147,21 +147,7 @@ type replaceNexusInputOutbound struct {
 
 func (i *replaceNexusInputOutbound) ExecuteNexusOperation(ctx workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
 	input.Input = i.replace(input.Input)
-	return payloadContextForwardingFuture{i.Next.ExecuteNexusOperation(ctx, input)}
-}
-
-// Embedding the public future alone does not forward this optional SDK method.
-type payloadContextForwardingFuture struct {
-	workflow.NexusOperationFuture
-}
-
-func (f payloadContextForwardingFuture) NexusOperationPayloadContext() workflow.Context {
-	if carrier, ok := f.NexusOperationFuture.(interface {
-		NexusOperationPayloadContext() workflow.Context
-	}); ok {
-		return carrier.NexusOperationPayloadContext()
-	}
-	return nil
+	return i.Next.ExecuteNexusOperation(ctx, input)
 }
 
 type WorkflowServiceIntegrationSuite struct {
@@ -340,8 +326,6 @@ func (s *WorkflowServiceIntegrationSuite) TestOneShotConverterIsRescopedFromRoot
 	s.checkSerializationContexts(true)
 }
 
-// The SDK retains the generated registry map. Tests that replace entries must
-// restore them and remain sequential, with no concurrent lookup or execution.
 func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryUsesWireKeyAndNativeRequest() {
 	key := internal.NexusOperationKey{
 		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
@@ -349,25 +333,21 @@ func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryUsesWireKeyAndNat
 	original, ok := ws.NexusOperationRegistry[key]
 	s.Require().True(ok, "registry must use the wire service and operation names")
 	s.Require().NotNil(original.SerializationContext)
-	s.T().Cleanup(func() { ws.NexusOperationRegistry[key] = original })
 
 	var requests []any
-	var contexts []converter.SerializationContext
-	wrapped := original
-	wrapped.SerializationContext = func(request any) converter.SerializationContext {
-		requests = append(requests, request)
-		selected := original.SerializationContext(request)
-		contexts = append(contexts, selected)
-		return selected
-	}
-	ws.NexusOperationRegistry[key] = wrapped
+	s.env.SetWorkerOptions(worker.Options{Interceptors: []interceptor.WorkerInterceptor{
+		&replaceNexusInputInterceptor{replace: func(input any) any {
+			requests = append(requests, input)
+			return input
+		}},
+	}})
 
 	s.checkSerializationContexts(true)
 
-	s.Require().Len(requests, 1, "SDK must invoke the registry callback exactly once")
-	s.Equal([]converter.SerializationContext{converter.WorkflowSerializationContext{
+	s.Require().Len(requests, 1)
+	s.Equal(converter.WorkflowSerializationContext{
 		Namespace: "default-test-namespace", WorkflowID: "target-workflow-id",
-	}}, contexts)
+	}, original.SerializationContext(requests[0]))
 	// The native request type is intentionally unexported. Inspect its fields
 	// without converting it to a proto or adding a public model API for tests.
 	request := reflect.ValueOf(requests[0])
@@ -396,22 +376,10 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 	key := internal.NexusOperationKey{
 		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
 	}
-	original, ok := ws.NexusOperationRegistry[key]
-	s.Require().True(ok)
-	s.Require().NotNil(original.SerializationContext)
-	s.T().Cleanup(func() { ws.NexusOperationRegistry[key] = original })
 
 	// Capture the unexported native model without inventing a public constructor
 	// or substituting a protobuf that would bypass the native policy.
 	var nativeRequest any
-	selections := 0
-	entry := original
-	entry.SerializationContext = func(request any) converter.SerializationContext {
-		nativeRequest = request
-		selections++
-		return original.SerializationContext(request)
-	}
-	ws.NexusOperationRegistry[key] = entry
 	recorder := newRecordingDataConverter()
 	s.env.SetDataConverter(oneShotRecordingDataConverter{recorder})
 	endpoints := []string{"__temporal_system", "temporal-system", "ordinary-endpoint"}
@@ -422,7 +390,8 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 			replacement := reflect.New(value.Type()).Elem()
 			replacement.Set(value)
 			replacement.FieldByName("ID").SetString("intercepted-target")
-			return replacement.Interface()
+			nativeRequest = replacement.Interface()
+			return nativeRequest
 		}},
 	}})
 
@@ -434,7 +403,7 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 			return err
 		}
 		if nativeRequest == nil {
-			return errors.New("SDK registry callback did not capture the native request")
+			return errors.New("workflow interceptor did not capture the native request")
 		}
 		for _, endpoint := range endpoints {
 			// The public constructor rejects the reserved canonical endpoint.
@@ -449,15 +418,6 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 			if err := future.Get(ctx, &response); err != nil {
 				return err
 			}
-			// An opaque wrapper must not be mistaken for an explicit carrier.
-			opaque := struct{ workflow.NexusOperationFuture }{future}
-			if internal.NexusOperationPayloadContext(ctx, opaque) != ctx {
-				return errors.New("opaque future wrapper unexpectedly forwarded inner context")
-			}
-			inner := internal.NexusOperationPayloadContext(ctx, future)
-			if _, err := internal.GetDataConverterFromWorkflowContext(inner).ToPayload("scope-" + endpoint); err != nil {
-				return err
-			}
 		}
 		return nil
 	})
@@ -468,26 +428,16 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 		s.Equal("intercepted-target", call.GetWorkflowId())
 		s.Equal("default-test-namespace", call.GetNamespace())
 	}
-	s.Equal(3, selections, "SDK selects once for the wrapper and each raw system call, never for an ordinary endpoint")
 	target := converter.WorkflowSerializationContext{
 		Namespace: "default-test-namespace", WorkflowID: "intercepted-target",
 	}
-	caller := converter.WorkflowSerializationContext{
-		Namespace: "default-test-namespace", WorkflowID: "default-test-workflow-id",
-	}
 	innerEncodes := map[converter.SerializationContext]int{}
-	scopes := map[string]converter.SerializationContext{}
 	envelopes := map[string]int{}
 	for _, encoded := range recorder.snapshot() {
 		switch value := encoded.Value.(type) {
 		case string:
 			if value == "raw-input" {
 				innerEncodes[encoded.Context]++
-			}
-			for _, endpoint := range endpoints {
-				if value == "scope-"+endpoint {
-					scopes[endpoint] = encoded.Context
-				}
 			}
 		case *workflowservicepb.SignalWithStartWorkflowExecutionRequest:
 			if sc, ok := encoded.Context.(converter.NexusSerializationContext); ok {
@@ -497,10 +447,7 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 			}
 		}
 	}
-	s.Equal(map[converter.SerializationContext]int{target: 3, caller: 1}, innerEncodes)
-	s.Equal(map[string]converter.SerializationContext{
-		"__temporal_system": target, "temporal-system": target, "ordinary-endpoint": caller,
-	}, scopes, "SDK future must retain inner scope; non-system calls keep caller scope")
+	s.Equal(map[converter.SerializationContext]int{target: 4}, innerEncodes)
 	s.Equal(map[string]int{
 		"__temporal_system": 2, "temporal-system": 1, "ordinary-endpoint": 1,
 	}, envelopes, "outer envelopes remain Nexus-scoped on every endpoint")
@@ -514,21 +461,7 @@ func (s *WorkflowServiceIntegrationSuite) TestRawProtobufSkipsNativeRegistryCall
 	s.Require().True(ok)
 	s.Require().NotNil(original.InputType, "generated registry must guard the native callbacks")
 	s.Require().NotEqual(reflect.TypeFor[*workflowservicepb.SignalWithStartWorkflowExecutionRequest](), original.InputType)
-	s.T().Cleanup(func() { ws.NexusOperationRegistry[key] = original })
 
-	selections, conversions := 0, 0
-	entry := original
-	entry.SerializationContext = func(any) converter.SerializationContext {
-		selections++
-		return converter.WorkflowSerializationContext{Namespace: "unexpected", WorkflowID: "unexpected"}
-	}
-	// Keep the generated InputType while installing a callback that would reject
-	// wire inputs. The SDK must skip both callbacks, not just policy selection.
-	entry.InputToTransfer = func(workflow.Context, any) (any, error) {
-		conversions++
-		return nil, errors.New("raw protobuf reached native input conversion")
-	}
-	ws.NexusOperationRegistry[key] = entry
 	payloads, err := converter.GetDefaultDataConverter().ToPayloads("already-encoded-input")
 	s.Require().NoError(err)
 	request := &workflowservicepb.SignalWithStartWorkflowExecutionRequest{
@@ -541,6 +474,7 @@ func (s *WorkflowServiceIntegrationSuite) TestRawProtobufSkipsNativeRegistryCall
 		clients := []workflow.NexusClient{
 			internal.NewSystemNexusClient(workflowServiceName),
 			workflow.NewNexusClient("temporal-system", workflowServiceName),
+			workflow.NewNexusClient("ordinary-endpoint", workflowServiceName),
 		}
 		for _, client := range clients {
 			future := client.ExecuteOperation(ctx, key.Operation, request, workflow.NexusOperationOptions{})
@@ -548,17 +482,12 @@ func (s *WorkflowServiceIntegrationSuite) TestRawProtobufSkipsNativeRegistryCall
 			if err := future.Get(ctx, &response); err != nil {
 				return err
 			}
-			if internal.NexusOperationPayloadContext(ctx, future) != ctx {
-				return errors.New("raw protobuf unexpectedly selected an inner context")
-			}
 		}
 		return nil
 	})
 
 	s.Require().NoError(s.env.GetWorkflowError())
-	s.Zero(selections, "nonmatching wire input must skip the native policy")
-	s.Zero(conversions, "nonmatching wire input must skip external conversion")
-	s.Require().Len(s.calls, 2)
+	s.Require().Len(s.calls, 3)
 	for _, call := range s.calls {
 		s.Equal(request.Namespace, call.Namespace)
 		s.Equal(request.WorkflowId, call.WorkflowId)
@@ -576,18 +505,10 @@ func (s *WorkflowServiceIntegrationSuite) TestRawProtobufSkipsNativeRegistryCall
 			}
 		}
 	}
-	s.Equal(map[string]int{"__temporal_system": 1, "temporal-system": 1}, envelopes)
+	s.Equal(map[string]int{"__temporal_system": 1, "temporal-system": 1, "ordinary-endpoint": 1}, envelopes)
 }
 
-func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryNilCallbackPreservesCallerContext() {
-	s.checkRegistryWithoutOverride(false)
-}
-
-func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryNilResultPreservesCallerContext() {
-	s.checkRegistryWithoutOverride(true)
-}
-
-func (s *WorkflowServiceIntegrationSuite) checkRegistryWithoutOverride(returnNil bool) {
+func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryCopiesEntries() {
 	key := internal.NexusOperationKey{
 		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
 	}
@@ -595,24 +516,15 @@ func (s *WorkflowServiceIntegrationSuite) checkRegistryWithoutOverride(returnNil
 	s.Require().True(ok)
 	s.T().Cleanup(func() { ws.NexusOperationRegistry[key] = original })
 	entry := original
-	entry.SerializationContext = nil
 	calls := 0
-	if returnNil {
-		entry.SerializationContext = func(any) converter.SerializationContext {
-			calls++
-			return nil
-		}
+	entry.SerializationContext = func(any) converter.SerializationContext {
+		calls++
+		return nil
 	}
 	ws.NexusOperationRegistry[key] = entry
 
-	s.checkSerializationContextsWithTarget(true, converter.WorkflowSerializationContext{
-		Namespace: "default-test-namespace", WorkflowID: "default-test-workflow-id",
-	})
-	if returnNil {
-		s.Equal(1, calls, "nil-returning callback must be invoked exactly once")
-	} else {
-		s.Zero(calls)
-	}
+	s.checkSerializationContexts(true)
+	s.Zero(calls, "changing the generated map must not replace an SDK-owned entry")
 }
 
 func (s *WorkflowServiceIntegrationSuite) checkSerializationContexts(oneShot bool) {
