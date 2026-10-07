@@ -1660,10 +1660,9 @@ Go package, so it can access that field. Helpers return a
 If a rendered system-endpoint operation in a Go package selects a helper, the
 generator emits `registry.go`. No generated serialization-context runtime file is
 needed. The registry includes rendered system-endpoint operations in that package,
-not ordinary-endpoint operations, keyed by exported
-`NexusOperationKey{Service, Operation}` using wire names. `NexusOperationKey`
-aliases `internal.NexusOperationKey`; the generated `NexusOperationInfo` name
-aliases `internal.NexusOperationRegistryEntry`. Values have a
+not ordinary-endpoint operations, keyed by
+`internal.NexusOperationKey{Service, Operation}` using wire names. Values use
+`internal.NexusOperationRegistryEntry` directly and have a
 `SerializationContext func(any) converter.SerializationContext` field. An operation
 without a selected helper has a nil field. Package `init` calls
 `internal.RegisterNexusOperationRegistry`; import the generated package so that
@@ -1671,14 +1670,14 @@ registration runs before workflows start. Duplicate wire keys are rejected,
 including collisions with other registered packages. The SDK retains the map;
 treat entries and callbacks as immutable once registered.
 
-Annotated entries use `nexgenOperationInfo(helper)`. This generic adapter accepts
-`helper func(I) C`, where `C` implements `converter.SerializationContext`, and
-sets the optional `InputType reflect.Type` field to `reflect.TypeFor[I]()` before
-calling `helper(request.(I))`. Helpers can therefore return the interface or a
+Annotated entries inline the optional `InputType reflect.Type` field as
+`reflect.TypeFor[RequestType]()` and a serialization-context callback that calls
+`helper(request.(RequestType))`. Helpers can return the interface or a
 concrete implementation without adding methods to the request type. The SDK uses
 `InputType` to skip both policy selection and `InputToTransfer` for nonmatching
 inputs, preserving raw protobuf calls. A nil `InputType` opts out of this guard;
-directly invoking the typed callback still requires an input compatible with `I`.
+directly invoking the typed callback still requires an input compatible with
+the operation's native request type.
 
 The SDK looks up the wire key only for endpoint `__temporal_system` or its legacy
 name, `temporal-system`. Emitting a registry without `--system-nexus` does not

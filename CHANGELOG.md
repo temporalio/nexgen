@@ -25,13 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conversion. Shared request models can use independent policies. An explicit
   system endpoint does not require `--system-nexus`.
 - Generated Go package initialization registers operation metadata with the SDK.
-  Registry keys alias `internal.NexusOperationKey`; generated `NexusOperationInfo`
-    aliases `internal.NexusOperationRegistryEntry`. The SDK retains the map.
+  Registry keys and values use `internal.NexusOperationKey` and
+  `internal.NexusOperationRegistryEntry` directly. The SDK retains the map.
   After workflow interceptors run, the SDK selects the policy once for
   `__temporal_system` and legacy `temporal-system` endpoints. Direct
   `ExecuteOperation` calls are covered when the generated package is imported
   and the call supplies the registered wire key and expected native model.
-  Generated adapters set optional `InputType` metadata with `reflect.TypeFor[I]()`;
+  Generated entries set optional `InputType` metadata with `reflect.TypeFor[RequestType]()`;
     the SDK skips policy selection and external conversion for nonmatching wire
     types, preserving raw protobuf compatibility. External inputs can use the
     registry's `InputToTransfer` callback, including in caller scope when selection
