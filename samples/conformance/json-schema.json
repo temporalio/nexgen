@@ -1494,6 +1494,38 @@
       "serialize_failures": [],
       "permitted_presence_nullability_collapse": [],
       "schemas": ["samples/conformance/schemas/reject-undecidable-union.yaml"]
+    },
+    {
+      "id": "duplicate-member-keys",
+      "intent": "A repeated object key resolves to its last occurrence in every target, for a declared member and for a preserved extra; an invalid last occurrence rejects even after a valid first one.",
+      "model": "DuplicateMemberKeys",
+      "expected_load": {
+        "result": "accepted",
+        "covers": []
+      },
+      "accepted_wire_values": [
+        {
+          "wire_json": "{\"value\":1,\"value\":2}",
+          "expected_wire": "{\"value\":2}",
+          "mutations": [],
+          "covers": []
+        },
+        {
+          "wire_json": "{\"value\":1,\"extra\":\"a\",\"extra\":\"b\"}",
+          "expected_wire": "{\"value\":1,\"extra\":\"b\"}",
+          "mutations": [],
+          "covers": []
+        }
+      ],
+      "parse_failures": [
+        {
+          "wire_json": "{\"value\":1,\"value\":\"x\"}",
+          "expected_paths": ["value"],
+          "covers": []
+        }
+      ],
+      "serialize_failures": [],
+      "schemas": ["samples/conformance/schemas/duplicate-member-keys.yaml"]
     }
   ]
 }
