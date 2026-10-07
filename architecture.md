@@ -120,7 +120,8 @@ proto-backed request types. Selected helpers for non-proto or JSON requests
 remain unsupported.
 
 If a rendered system-endpoint operation selects a Go helper, the backend emits
-`registry.go` for its package. An explicit system endpoint does not require the
+the registry at the end of the generated API file under a `Registry` header.
+An explicit system endpoint does not require the
 `system_nexus` flag. Ordinary-only annotations do not create global policy entries.
 SDK-owned scope removes the need for a generated `serialization_context.go`
 runtime file. The registry includes rendered system-endpoint operations in that
@@ -134,9 +135,8 @@ for external native inputs without a transfer converter. Package `init` calls
 `internal.RegisterNexusOperationRegistry`. The SDK retains the map and rejects
 keys already registered by another package; entries must remain immutable once
 registered, except in sequential tests with no concurrent lookup or execution.
-Qualified helper imports are resolved from
-support imports or known model imports and emitted in the registry file, not
-added to model or runtime files solely for helper references.
+Qualified helper imports are resolved from support imports or known model
+imports and merged into the generated API file's imports.
 
 Annotated entries inline `InputType: reflect.TypeFor[RequestType]()` and
 a serialization-context callback that calls `helper(request.(RequestType))`.
