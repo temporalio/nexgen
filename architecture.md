@@ -124,10 +124,10 @@ If a rendered system-endpoint operation selects a Go helper, the backend emits
 `system_nexus` flag. Ordinary-only annotations do not create global policy entries.
 SDK-owned scope removes the need for a generated `serialization_context.go`
 runtime file. The registry includes rendered system-endpoint operations in that
-package, not just annotated operations, and excludes ordinary-endpoint operations. Its exported
-`NexusOperationKey{Service, Operation}` uses wire names, and duplicate keys are
-rejected. The exported key aliases `internal.NexusOperationKey`, and
-`NexusOperationInfo` aliases `internal.NexusOperationRegistryEntry`. Each entry stores
+package, not just annotated operations, and excludes ordinary-endpoint operations.
+The map uses `internal.NexusOperationKey{Service, Operation}` wire names and
+`internal.NexusOperationRegistryEntry` values directly; duplicate keys are
+rejected. Each entry stores
 `SerializationContext func(any) converter.SerializationContext`, with nil for
 operations without a selected helper, and an optional `InputToTransfer` callback
 for external native inputs without a transfer converter. Package `init` calls
@@ -138,10 +138,9 @@ Qualified helper imports are resolved from
 support imports or known model imports and emitted in the registry file, not
 added to model or runtime files solely for helper references.
 
-Entries use `nexgenOperationInfo(helper)`. The adapter has type parameters
-`I any, C converter.SerializationContext` and accepts `helper func(I) C`. It
-sets the optional `InputType reflect.Type` to `reflect.TypeFor[I]()` and erases
-the request type through `request.(I)`. Before invoking either callback, the SDK
+Annotated entries inline `InputType: reflect.TypeFor[RequestType]()` and
+a serialization-context callback that calls `helper(request.(RequestType))`.
+Before invoking either callback, the SDK
 checks input compatibility when `InputType` is non-nil. Nonmatching wire inputs
 skip policy selection and external conversion; a nil `InputType` disables that
 guard. The helper receives the native request value. This supports concrete

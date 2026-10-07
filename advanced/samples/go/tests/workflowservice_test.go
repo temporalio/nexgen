@@ -343,7 +343,7 @@ func (s *WorkflowServiceIntegrationSuite) TestOneShotConverterIsRescopedFromRoot
 // The SDK retains the generated registry map. Tests that replace entries must
 // restore them and remain sequential, with no concurrent lookup or execution.
 func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryUsesWireKeyAndNativeRequest() {
-	key := ws.NexusOperationKey{
+	key := internal.NexusOperationKey{
 		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
 	}
 	original, ok := ws.NexusOperationRegistry[key]
@@ -393,7 +393,7 @@ func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryUsesWireKeyAndNat
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredNativeRequest() {
-	key := ws.NexusOperationKey{
+	key := internal.NexusOperationKey{
 		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
 	}
 	original, ok := ws.NexusOperationRegistry[key]
@@ -507,7 +507,7 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestRawProtobufSkipsNativeRegistryCallbacks() {
-	key := ws.NexusOperationKey{
+	key := internal.NexusOperationKey{
 		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
 	}
 	original, ok := ws.NexusOperationRegistry[key]
@@ -588,7 +588,7 @@ func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryNilResultPreserve
 }
 
 func (s *WorkflowServiceIntegrationSuite) checkRegistryWithoutOverride(returnNil bool) {
-	key := ws.NexusOperationKey{
+	key := internal.NexusOperationKey{
 		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
 	}
 	original, ok := ws.NexusOperationRegistry[key]

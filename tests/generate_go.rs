@@ -1851,8 +1851,8 @@ fn go_serialization_context_prefers_go_helper_over_default() {
         ),
     ] {
         let rendered = render_go_serialization_context(directive, true).unwrap();
-        assert!(rendered.contains(&format!("nexgenOperationInfo({helper})")));
-        assert!(!rendered.contains("nexgenOperationInfo(defaultContext)"));
+        assert!(rendered.contains(&format!("return {helper}(request.(")));
+        assert!(!rendered.contains("return defaultContext("));
         assert!(!rendered.contains("python_context(request)"));
     }
 }
@@ -1869,7 +1869,7 @@ fn go_serialization_context_accepts_only_go_helper_references() {
         let rendered = render_go_serialization_context(&directive, true).unwrap();
         assert!(!rendered.contains("### serialization_context.go"));
         assert!(rendered.contains("### registry.go"));
-        assert!(rendered.contains(&format!("nexgenOperationInfo({helper})")));
+        assert!(rendered.contains(&format!("return {helper}(request.(")));
     }
     for helper in [
         "_",
@@ -2082,18 +2082,34 @@ fn assert_registry_entry(registry: &str, service: &str, operation: &str, helper:
     let compact: String = registry.chars().filter(|c| !c.is_whitespace()).collect();
     let key = format!("Service:\"{service}\",Operation:\"{operation}\"");
     assert_eq!(compact.matches(&key).count(), 1, "{registry}");
+    let lines = registry
+        .lines()
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        lines.contains(&format!(
+            "Service: \"{service}\",\nOperation: \"{operation}\",\n"
+        )),
+        "{registry}"
+    );
     let entry = compact.split(&key).nth(1).unwrap();
     let value = entry.trim_start_matches(',').strip_prefix("}:").unwrap();
     if let Some(helper) = helper {
+        let input_type = value
+            .strip_prefix("{InputType:reflect.TypeFor[")
+            .unwrap()
+            .split("]()")
+            .next()
+            .unwrap();
         assert!(
-            value.starts_with(&format!("nexgenOperationInfo({helper})")),
+            value.starts_with(&format!(
+                "{{InputType:reflect.TypeFor[{input_type}](),SerializationContext:func(requestany)converter.SerializationContext{{return{helper}(request.({input_type}))}},"
+            )),
             "{registry}"
         );
     } else {
-        assert!(
-            value.starts_with("{}") || value.starts_with("{SerializationContext:nil}"),
-            "{registry}"
-        );
+        assert!(value.starts_with("{}"), "{registry}");
     }
 }
 
@@ -2122,16 +2138,18 @@ fn go_serialization_context_registry_uses_wire_names_and_typed_adapter() {
     assert_registry_entry(registry, "SampleService", "Third", None);
     assert!(!registry.contains("Operation: \"First\""));
     let compact = registry.split_whitespace().collect::<Vec<_>>().join(" ");
-    assert!(compact.contains("type NexusOperationKey = internal.NexusOperationKey"));
-    assert!(compact.contains("type NexusOperationInfo = internal.NexusOperationRegistryEntry"));
+    assert!(!registry.contains("type NexusOperationKey"));
+    assert!(!registry.contains("NexusOperationInfo"));
+    assert!(!registry.contains("nexgenOperationInfo"));
+    assert!(!registry.contains("// NexusOperationRegistry"));
     assert!(compact.contains(
         "func init() { internal.RegisterNexusOperationRegistry(NexusOperationRegistry) }"
     ));
-    assert!(compact.contains("map[NexusOperationKey]NexusOperationInfo"));
-    assert!(compact.contains("func nexgenOperationInfo[I any, C converter.SerializationContext](helper func(I) C) NexusOperationInfo"), "{registry}");
-    assert!(compact.contains("return helper(request.(I))"), "{registry}");
+    assert!(compact.contains(
+        "var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry"
+    ));
     assert!(
-        compact.contains("InputType: reflect.TypeFor[I]()"),
+        compact.contains("InputType: reflect.TypeFor[contextRequest]()"),
         "{registry}"
     );
     assert_eq!(registry.matches("\"reflect\"").count(), 1);
@@ -2281,7 +2299,7 @@ fn go_serialization_context_accepts_eager_external_request() {
         let operation = &files[Path::new("sampleservice.go")];
         let registry = &files[Path::new("registry.go")];
         let compact = registry.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(compact.contains("info.InputToTransfer = func(ctx internal.Context, input any) (any, error) { request := input.(temporal.RetryPolicy) return retryPolicyToProto(ctx, &request) }"), "{registry}");
+        assert!(compact.contains("InputToTransfer: func(ctx internal.Context, input any) (any, error) { request := input.(temporal.RetryPolicy) return retryPolicyToProto(ctx, &request) }"), "{registry}");
         assert!(registry.contains("\"go.temporal.io/sdk/temporal\""));
         assert!(!registry.contains("go.temporal.io/sdk/workflow"));
         assert!(!registry.contains("go.temporal.io/api/common/v1"));
@@ -2293,14 +2311,17 @@ fn go_serialization_context_accepts_eager_external_request() {
         assert!(!operation.contains("SerializationContext()"));
         // A nil policy result must not suppress conversion: the callbacks are independent.
         assert!(!registry.contains("if "));
-        assert!(compact.contains("InputType: reflect.TypeFor[I]()"));
-        assert!(
-            compact.contains("info := nexgenOperationInfo(requestContext) info.InputToTransfer =")
+        assert!(compact.contains("InputType: reflect.TypeFor[temporal.RetryPolicy]()"));
+        assert_registry_entry(
+            registry,
+            "SampleService",
+            "Roundtrip",
+            Some("requestContext"),
         );
-        assert!(compact.contains("return info }()"));
+        assert!(!registry.contains("nexgenOperationInfo"));
         assert_eq!(
             registry
-                .matches("nexgenOperationInfo(requestContext)")
+                .matches("return requestContext(request.(temporal.RetryPolicy))")
                 .count(),
             1
         );
@@ -2321,8 +2342,7 @@ fn go_serialization_context_external_input_only_keeps_imports_file_scoped() {
     let operation = &files[Path::new("sampleservice.go")];
     let registry = &files[Path::new("registry.go")];
     assert!(
-        registry
-            .contains("info.InputToTransfer = func(ctx internal.Context, input any) (any, error)")
+        registry.contains("InputToTransfer: func(ctx internal.Context, input any) (any, error)")
     );
     assert!(registry.contains("\"go.temporal.io/sdk/internal\""));
     assert!(registry.contains("\"go.temporal.io/sdk/temporal\""));
@@ -2365,7 +2385,7 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     assert!(!registry.contains("\"go.temporal.io/sdk/temporal\""));
     let compact = registry.split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(
-        compact.contains("var NexusOperationRegistry = map[NexusOperationKey]NexusOperationInfo{}")
+        compact.contains("var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry{}")
     );
     assert!(!registry.contains("func init()"));
     assert!(!registry.contains("RegisterNexusOperationRegistry"));
@@ -2460,7 +2480,7 @@ fn go_serialization_context_shared_model_has_one_registry_entry_per_operation() 
     let registry = &files[Path::new("registry.go")];
     assert_eq!(
         registry
-            .matches("nexgenOperationInfo(requestContext)")
+            .matches("return requestContext(request.(contextRequest))")
             .count(),
         2
     );
@@ -2691,7 +2711,12 @@ fn go_serialization_context_registry_can_resolve_known_model_imports() {
     );
     let registry = &files[Path::new("registry.go")];
     assert!(registry.contains("\"go.temporal.io/sdk/temporal\""));
-    assert!(registry.contains("nexgenOperationInfo(temporal.Context)"));
+    assert_registry_entry(
+        registry,
+        "SampleService",
+        "Roundtrip",
+        Some("temporal.Context"),
+    );
 }
 
 #[test]
@@ -2739,7 +2764,12 @@ fn go_serialization_context_imports_qualified_helper_alias_in_registry_only() {
         registry.matches("\"example.com/contexthelpers\"").count(),
         1
     );
-    assert!(registry.contains("nexgenOperationInfo(helpers.Context)"));
+    assert_registry_entry(
+        registry,
+        "SampleService",
+        "Roundtrip",
+        Some("helpers.Context"),
+    );
     assert!(!files[Path::new("sampleservice.go")].contains("example.com/contexthelpers"));
     assert!(files[Path::new("support.go")].contains("helpers \"example.com/contexthelpers\""));
 }

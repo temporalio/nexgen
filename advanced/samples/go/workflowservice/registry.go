@@ -8,25 +8,16 @@ import (
 	reflect "reflect"
 )
 
-// NexusOperationKey identifies an operation by its service and operation wire names.
-type NexusOperationKey = internal.NexusOperationKey
-
-// NexusOperationInfo describes the serialization policy for an operation's nested payloads.
-type NexusOperationInfo = internal.NexusOperationRegistryEntry
-
-func nexgenOperationInfo[I any, C converter.SerializationContext](helper func(I) C) NexusOperationInfo {
-	return NexusOperationInfo{
-		InputType: reflect.TypeFor[I](),
+var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry{
+	{
+		Service:   "temporal.api.workflowservice.v1.WorkflowService",
+		Operation: "SignalWithStartWorkflowExecution",
+	}: {
+		InputType: reflect.TypeFor[signalWithStartWorkflowRequest](),
 		SerializationContext: func(request any) converter.SerializationContext {
-			return helper(request.(I))
+			return signalWithStartWorkflowSerializationContext(request.(signalWithStartWorkflowRequest))
 		},
-	}
-}
-
-// NexusOperationRegistry contains system operation metadata for this generated package.
-// Treat it as read-only once workflows are running.
-var NexusOperationRegistry = map[NexusOperationKey]NexusOperationInfo{
-	{Service: "temporal.api.workflowservice.v1.WorkflowService", Operation: "SignalWithStartWorkflowExecution"}: nexgenOperationInfo(signalWithStartWorkflowSerializationContext),
+	},
 }
 
 func init() {

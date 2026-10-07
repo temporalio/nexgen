@@ -1995,7 +1995,15 @@ fn render_operation_registry(
         let used_by_input = input_converters
             .values()
             .any(|callback| callback.contains(&format!("{alias}.")));
-        if (!helper_packages.contains(alias.as_str()) && !used_by_input)
+        let used_by_input_type =
+            services
+                .iter()
+                .flat_map(|service| &service.operations)
+                .any(|operation| {
+                    operation.serialization_context_expr.is_some()
+                        && operation.input_type.contains(&format!("{alias}."))
+                });
+        if (!helper_packages.contains(alias.as_str()) && !used_by_input && !used_by_input_type)
             || package.is_self_import(&path)
         {
             continue;
@@ -2027,31 +2035,10 @@ fn render_operation_registry(
         "go.temporal.io/sdk/internal",
         "internal.NexusOperationRegistryEntry",
     );
+    let type_for = package.qualified_expr("reflect", "reflect.TypeFor");
     output.push_str(&format!(
-        r#"
-// NexusOperationKey identifies an operation by its service and operation wire names.
-type NexusOperationKey = {key}
-
-// NexusOperationInfo describes the serialization policy for an operation's nested payloads.
-type NexusOperationInfo = {info}
-"#
+        "\nvar NexusOperationRegistry = map[{key}]{info}{{\n"
     ));
-    if has_helpers {
-        let type_for = package.qualified_expr("reflect", "reflect.TypeFor");
-        output.push_str(&format!(
-            r#"
-func nexgenOperationInfo[I any, C {sc}](helper func(I) C) NexusOperationInfo {{
-    return NexusOperationInfo{{
-        InputType: {type_for}[I](),
-        SerializationContext: func(request any) {sc} {{
-            return helper(request.(I))
-        }},
-    }}
-}}
-"#
-        ));
-    }
-    output.push_str("\n// NexusOperationRegistry contains system operation metadata for this generated package.\n// Treat it as read-only once workflows are running.\nvar NexusOperationRegistry = map[NexusOperationKey]NexusOperationInfo{\n");
     let mut keys = BTreeSet::new();
     for service in services {
         for operation in &service.operations {
@@ -2068,19 +2055,21 @@ func nexgenOperationInfo[I any, C {sc}](helper func(I) C) NexusOperationInfo {{
             }
             let service_name = go_string_literal(service.wire_name);
             let operation_name = go_string_literal(operation.wire_name);
-            let info = operation
-                .serialization_context_expr
-                .map(|helper| {
-                    if let Some(callback) = input_converters.get(&(service.wire_name, operation.wire_name)) {
-                        format!("func() NexusOperationInfo {{\n\t\tinfo := nexgenOperationInfo({helper})\n\t\tinfo.InputToTransfer = {callback}\n\t\treturn info\n\t}}()")
-                    } else {
-                        format!("nexgenOperationInfo({helper})")
-                    }
-                })
-                .unwrap_or_else(|| "{}".to_string());
             output.push_str(&format!(
-                "\t{{Service: {service_name}, Operation: {operation_name}}}: {info},\n"
+                "\t{{\n\t\tService: {service_name},\n\t\tOperation: {operation_name},\n\t}}: {{\n"
             ));
+            if let Some(helper) = operation.serialization_context_expr {
+                let input_type = &operation.input_type;
+                output.push_str(&format!(
+                    "\t\tInputType: {type_for}[{input_type}](),\n\t\tSerializationContext: func(request any) {sc} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
+                ));
+                if let Some(callback) =
+                    input_converters.get(&(service.wire_name, operation.wire_name))
+                {
+                    output.push_str(&format!("\t\tInputToTransfer: {callback},\n"));
+                }
+            }
+            output.push_str("\t},\n");
         }
     }
     output.push_str("}\n");
