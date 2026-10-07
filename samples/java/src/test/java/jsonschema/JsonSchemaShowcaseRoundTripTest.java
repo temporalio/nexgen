@@ -354,6 +354,11 @@ final class JsonSchemaShowcaseRoundTripTest {
                         Showcase.class,
                         Showcase.class));
         assertTrue(messageChain(badSkuCase).contains("must match pattern"), messageChain(badSkuCase));
+        // The reason quotes the authored pattern (`$`), not the `\z` rewrite
+        // compiled for matching — the same text Go/TS/Python print.
+        assertTrue(
+                messageChain(badSkuCase).contains("must match pattern ^[A-Z]{2,4}$, got ab"),
+                messageChain(badSkuCase));
 
         RuntimeException longSku = assertThrows(RuntimeException.class, () ->
                 CONVERTER.fromPayload(

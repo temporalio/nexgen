@@ -287,9 +287,9 @@ with them.
 | Language | Strategy |
 |---|---|
 | Go | Package-level `var patRe = regexp.MustCompile(<pattern>)` (compiled once at init; the load-time gate already proved it compiles). The shared `Validate` checks `if !patRe.MatchString(v) { push(Violation{Path, Reason: fmt.Sprintf("must match pattern %q, got %q", <pattern>, v)}) }` — `MatchString` is unanchored; RE2 is ASCII-class + rune-`.`. Collected into one `PayloadValidationError` application failure. |
-| TypeScript | Module-level ``const PAT_RE = /<pattern>/u;`` (or `new RegExp(<pattern>, "u")` when the literal can't be spelled). **The `u` flag is mandatory** (code-point `.`; verified). ``if (!PAT_RE.test(v)) push(Violation{path, reason: `must match pattern ${PAT_RE}, got ${JSON.stringify(v)}`})``. `test` is unanchored and — with no `g` flag — stateless. Throw one `PayloadValidationError` application failure. |
-| Python | A module-level `_PATTERN_<HEX> = re.compile(<pattern>, re.ASCII)` (with the `$`→`\Z` normalization applied), keyed by the pattern text so identical patterns share one compiled instance per module. Both directions of the model's `_<Model>TransferTypeConverter` inline the check — `if _PATTERN_<HEX>.search(value) is None: violations.append(Violation(path=…, reason=f"must match pattern <pattern>, got {_quote(value)}"))` — collected into the single `PayloadValidationError` application failure (**PRINCIPLES Python §2/§3**). The comparison is emitted inline rather than behind a runtime helper, the same way TypeScript emits it. **`re.search` (unanchored — never `re.match`, which anchors the start, or `fullmatch`), `re.ASCII` (ASCII `\d\w\s`).** |
-| Java | Static `private static final Pattern PAT_RE = Pattern.compile(<pattern>);` (**default flags** — ASCII `\d\w\s`, code-point `.`; with the `$`→`\z` normalization applied). The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the `String` and checks `if (!PAT_RE.matcher(v).find())`, pushing a `Violation{path, "must match pattern " + <pattern> + ", got " + v}` into the single `PayloadValidationError` application failure. **`Matcher.find` (unanchored), never `matches()`** (which anchors the whole input — verified footgun). Not bean-validation `@Pattern`. |
+| TypeScript | Module-level ``const PAT_RE = /<pattern>/u;`` (or `new RegExp(<pattern>, "u")` when the literal can't be spelled). **The `u` flag is mandatory** (code-point `.`; verified). ``if (!PAT_RE.test(v)) push(Violation{path, reason: `must match pattern <pattern>, got ${JSON.stringify(v)}`})``. `test` is unanchored and — with no `g` flag — stateless. Throw one `PayloadValidationError` application failure. |
+| Python | A module-level `_PATTERN_<HEX> = re.compile(<pattern>, re.ASCII)` (with the `$`→`\Z` normalization applied), keyed by the pattern text so identical patterns share one compiled instance per module. Both directions of the model's `_<Model>TransferTypeConverter` inline the check — `if _PATTERN_<HEX>.search(value) is None: violations.append(Violation(path=…, reason="must match pattern <pattern>, got " + _quote(value)))` (the authored pattern in a plain string literal, never the `\Z`-rewritten `_PATTERN_<HEX>.pattern`) — collected into the single `PayloadValidationError` application failure (**PRINCIPLES Python §2/§3**). The comparison is emitted inline rather than behind a runtime helper, the same way TypeScript emits it. **`re.search` (unanchored — never `re.match`, which anchors the start, or `fullmatch`), `re.ASCII` (ASCII `\d\w\s`).** |
+| Java | Static `private static final Pattern PAT_RE = Pattern.compile(<pattern>);` (**default flags** — ASCII `\d\w\s`, code-point `.`; with the `$`→`\z` normalization applied). The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the `String` and checks `if (!PAT_RE.matcher(v).find())`, pushing a `Violation{path, "must match pattern " + <pattern> + ", got " + v}` (the authored pattern, never the `\z`-rewritten one) into the single `PayloadValidationError` application failure. **`Matcher.find` (unanchored), never `matches()`** (which anchors the whole input — verified footgun). Not bean-validation `@Pattern`. |
 
 The compiled identifiers are also part of **P15**. Go derives
 `<model><position>Pattern` (and the parallel `Format` / `ContentEncoding`
@@ -303,7 +303,11 @@ than producing a duplicate package variable or class field.
 **Informative `reason` strings.** The `Violation` `reason` names the
 **pattern and the offending value** (`must match pattern "^[a-z]+$", got
 "AB1"`), per the [[maximum]] convention. The pattern is an emitted
-compile-time constant; the value is interpolated at runtime.
+compile-time constant; the value is interpolated at runtime. The quoted
+pattern is the **authored (loader-normalized) text** in every target — the
+per-target `$`→`\z`/`\Z` rewrite (and any other host-engine respelling) is
+used only for matching, never shown in the reason, so all targets print the
+same pattern for the same schema.
 
 **The emitted pattern is a string literal in the target's own escape
 grammar.** The pattern text can contain any code point the schema author wrote,

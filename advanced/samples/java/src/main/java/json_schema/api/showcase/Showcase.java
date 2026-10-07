@@ -638,7 +638,7 @@ public final class Showcase {
 
         void validate(String path, List<Violation> violations) {
             if (!VALUE_PATTERN.matcher(value).find()) {
-                violations.add(new Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + value));
+                violations.add(new Violation(path, "must match pattern " + "^[a-z]+$" + ", got " + value));
             }
         }
 
@@ -2303,12 +2303,12 @@ public final class Showcase {
             }
             if (value.sku != null) {
                 if (!SKU_PATTERN.matcher(value.sku).find()) {
-                    violations.add(new Violation("sku", "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + value.sku));
+                    violations.add(new Violation("sku", "must match pattern " + "^[A-Z]{2,4}$" + ", got " + value.sku));
                 }
             }
             if (value.phrase != null) {
                 if (!PHRASE_PATTERN.matcher(value.phrase).find()) {
-                    violations.add(new Violation("phrase", "must match pattern " + "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\\z" + ", got " + value.phrase));
+                    violations.add(new Violation("phrase", "must match pattern " + "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+$" + ", got " + value.phrase));
                 }
             }
             if (value.requestId != null) {
@@ -3878,7 +3878,7 @@ public final class Showcase {
                     } else {
                         sku = field.textValue();
                         if (!SKU_PATTERN.matcher(sku).find()) {
-                            violations.add(new Violation("sku", "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + sku));
+                            violations.add(new Violation("sku", "must match pattern " + "^[A-Z]{2,4}$" + ", got " + sku));
                         }
                     }
                 }
@@ -3895,7 +3895,7 @@ public final class Showcase {
                     } else {
                         phrase = field.textValue();
                         if (!PHRASE_PATTERN.matcher(phrase).find()) {
-                            violations.add(new Violation("phrase", "must match pattern " + "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\\z" + ", got " + phrase));
+                            violations.add(new Violation("phrase", "must match pattern " + "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+$" + ", got " + phrase));
                         }
                     }
                 }

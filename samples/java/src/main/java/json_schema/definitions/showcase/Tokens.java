@@ -83,7 +83,7 @@ public final class Tokens {
                         violations.add(new Violation(Violation.memberPath(entry.getKey()), "must have length <= 8, got " + length));
                     }
                     if (!VALUE_PATTERN.matcher(entry.getValue()).find()) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must match pattern " + "^[a-z]+\\z" + ", got " + entry.getValue()));
+                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must match pattern " + "^[a-z]+$" + ", got " + entry.getValue()));
                     }
                 }
             }
@@ -132,7 +132,7 @@ public final class Tokens {
                         violations.add(new Violation(path, "must have length <= 8, got " + length));
                     }
                     if (!VALUE_PATTERN.matcher(value).find()) {
-                        violations.add(new Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + value));
+                        violations.add(new Violation(path, "must match pattern " + "^[a-z]+$" + ", got " + value));
                     }
                     additionalProperties.put(key, value);
                 }
