@@ -2390,15 +2390,15 @@ properties:
   wideDefault:
     type: string
     format: date-time
-    default: "2021-06-15t12:30:45.123456789012+18:00"
+    default: "2021-06-15t12:30:45.123456789012+14:00"
   plusBoundary:
     type: string
     format: date-time
-    default: "2021-06-15T12:30:45+18:00"
+    default: "2021-06-15T12:30:45+14:00"
   minusBoundary:
     type: string
     format: date-time
-    default: "2021-06-15T12:30:45-18:00"
+    default: "2021-06-15T12:30:45-14:00"
 "##,
     )
     .unwrap();
@@ -2443,7 +2443,7 @@ properties:
     let model = &rendered[&PathBuf::from("Fracsec.java")];
     assert!(
         model.contains(
-            "TemporalSupport.parseDateTimeLiteral(\"2021-06-15T12:30:45.123456789012+18:00\")"
+            "TemporalSupport.parseDateTimeLiteral(\"2021-06-15T12:30:45.123456789012+14:00\")"
         ),
         "{model}"
     );
@@ -2465,10 +2465,10 @@ final class FractionalDefaultsTest {
     void dateTimeDefaultsUseTheMaterializedParser() {
         Fracsec value = new Fracsec(null, null, null, null, null, Collections.emptyMap());
         assertEquals(
-            OffsetDateTime.parse("2021-06-15T12:30:45.123456789+18:00"),
+            OffsetDateTime.parse("2021-06-15T12:30:45.123456789+14:00"),
             value.getWideDefaultOrDefault());
-        assertEquals(ZoneOffset.ofHours(18), value.getPlusBoundaryOrDefault().getOffset());
-        assertEquals(ZoneOffset.ofHours(-18), value.getMinusBoundaryOrDefault().getOffset());
+        assertEquals(ZoneOffset.ofHours(14), value.getPlusBoundaryOrDefault().getOffset());
+        assertEquals(ZoneOffset.ofHours(-14), value.getMinusBoundaryOrDefault().getOffset());
     }
 }
 "#,
@@ -2495,7 +2495,7 @@ properties:
   invalid:
     type: string
     format: date-time
-    default: "2021-06-15T12:30:45+18:01"
+    default: "2021-06-15T12:30:45+14:01"
 "#,
     )
     .unwrap();
@@ -2513,7 +2513,7 @@ properties:
     .unwrap_err()
     .to_string();
     assert!(
-        error.contains("is not a valid date-time") && error.contains("+18:01"),
+        error.contains("is not a valid date-time") && error.contains("+14:01"),
         "{error}"
     );
     fs::remove_dir_all(temp_dir).unwrap();

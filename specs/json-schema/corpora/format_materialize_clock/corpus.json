@@ -1,5 +1,5 @@
 {
-  "note": "Wire strings for the pinned materialized-temporal format check (the :60-rejecting, -18:00..+18:00 offset grammar; see format_conformance). Every row is VALID and must round-trip unless it carries `expect_valid: false`, which declares a wire the materialized grammar REJECTS in every target (absent field = valid). Each runner parses into the language's native temporal type and RE-SERIALIZES via the generator-owned serializer (materialized RFC 3339 subset, ORIGINAL OFFSET PRESERVED with +00:00/-00:00 normalized to Z, T/Z uppercased on the parse path, fractional seconds at the value's own precision with trailing zeros trimmed, no fractional part when zero) -- NO TRUNCATION beyond each native type's genuine capacity limit. The compare harness checks the equally-capable materializing set (go, java, py, js-string, js-temporal) emits byte-identical output for each id. Documented divergences: Python truncates sub-microsecond date-time (native us resolution); legacy TS 'Date' (js-date) folds date-time to a UTC instant at millisecond. The leap-second ':60' rows (dt-leap/t-leap) are no longer a prose SKIP: they carry `expect_valid: false`, because the materialized grammar rejects them in all four targets (measured). They flip back to valid only if the `string` opt-out, which would keep the wider :60-accepting grammar, is implemented.",
+  "note": "Wire strings for the pinned materialized-temporal format check (the :60-rejecting, -14:00..+14:00 offset grammar; see format_conformance). Every row is VALID and must round-trip unless it carries `expect_valid: false`, which declares a wire the materialized grammar REJECTS in every target (absent field = valid). Each runner parses into the language's native temporal type and RE-SERIALIZES via the generator-owned serializer (materialized RFC 3339 subset, ORIGINAL OFFSET PRESERVED with +00:00/-00:00 normalized to Z, T/Z uppercased on the parse path, fractional seconds at the value's own precision with trailing zeros trimmed, no fractional part when zero) -- NO TRUNCATION beyond each native type's genuine capacity limit. The compare harness checks the equally-capable materializing set (go, java, py, js-string, js-temporal) emits byte-identical output for each id. Documented divergences: Python truncates sub-microsecond date-time (native us resolution); legacy TS 'Date' (js-date) folds date-time to a UTC instant at millisecond. The leap-second ':60' rows (dt-leap/t-leap) are no longer a prose SKIP: they carry `expect_valid: false`, because the materialized grammar rejects them in all four targets (measured). They flip back to valid only if the `string` opt-out, which would keep the wider :60-accepting grammar, is implemented.",
   "date-time": [
     {
       "id": "dt-z-nofrac",
@@ -20,19 +20,21 @@
       "typescript_date_wire": "2021-06-15T17:30:45.000Z"
     },
     {
-      "id": "dt-offset-plus-18",
-      "wire": "2021-06-15T12:30:45+18:00",
-      "expected_wire": "2021-06-15T12:30:45+18:00",
-      "typescript_date_wire": "2021-06-14T18:30:45.000Z"
+      "id": "dt-offset-plus-14",
+      "wire": "2021-06-15T12:30:45+14:00",
+      "expected_wire": "2021-06-15T12:30:45+14:00",
+      "typescript_date_wire": "2021-06-14T22:30:45.000Z"
     },
     {
-      "id": "dt-offset-minus-18",
-      "wire": "2021-06-15T12:30:45-18:00",
-      "expected_wire": "2021-06-15T12:30:45-18:00",
-      "typescript_date_wire": "2021-06-16T06:30:45.000Z"
+      "id": "dt-offset-minus-14",
+      "wire": "2021-06-15T12:30:45-14:00",
+      "expected_wire": "2021-06-15T12:30:45-14:00",
+      "typescript_date_wire": "2021-06-16T02:30:45.000Z"
     },
-    {"id": "dt-offset-plus-1801", "wire": "2021-06-15T12:30:45+18:01", "expect_valid": false},
-    {"id": "dt-offset-minus-1801", "wire": "2021-06-15T12:30:45-18:01", "expect_valid": false},
+    {"id": "dt-offset-plus-1401", "wire": "2021-06-15T12:30:45+14:01", "expect_valid": false},
+    {"id": "dt-offset-minus-1401", "wire": "2021-06-15T12:30:45-14:01", "expect_valid": false},
+    {"id": "dt-offset-plus-18", "wire": "2021-06-15T12:30:45+18:00", "expect_valid": false},
+    {"id": "dt-offset-minus-18", "wire": "2021-06-15T12:30:45-18:00", "expect_valid": false},
     {"id": "dt-offset-plus-2359", "wire": "2021-06-15T12:30:45+23:59", "expect_valid": false},
     {"id": "dt-offset-minus-2359", "wire": "2021-06-15T12:30:45-23:59", "expect_valid": false},
     {
@@ -163,17 +165,19 @@
       "expected_wire": "12:30:45-05:00"
     },
     {
-      "id": "t-offset-plus-18",
-      "wire": "12:30:45+18:00",
-      "expected_wire": "12:30:45+18:00"
+      "id": "t-offset-plus-14",
+      "wire": "12:30:45+14:00",
+      "expected_wire": "12:30:45+14:00"
     },
     {
-      "id": "t-offset-minus-18",
-      "wire": "12:30:45-18:00",
-      "expected_wire": "12:30:45-18:00"
+      "id": "t-offset-minus-14",
+      "wire": "12:30:45-14:00",
+      "expected_wire": "12:30:45-14:00"
     },
-    {"id": "t-offset-plus-1801", "wire": "12:30:45+18:01", "expect_valid": false},
-    {"id": "t-offset-minus-1801", "wire": "12:30:45-18:01", "expect_valid": false},
+    {"id": "t-offset-plus-1401", "wire": "12:30:45+14:01", "expect_valid": false},
+    {"id": "t-offset-minus-1401", "wire": "12:30:45-14:01", "expect_valid": false},
+    {"id": "t-offset-plus-18", "wire": "12:30:45+18:00", "expect_valid": false},
+    {"id": "t-offset-minus-18", "wire": "12:30:45-18:00", "expect_valid": false},
     {"id": "t-offset-plus-2359", "wire": "12:30:45+23:59", "expect_valid": false},
     {"id": "t-offset-minus-2359", "wire": "12:30:45-23:59", "expect_valid": false},
     {

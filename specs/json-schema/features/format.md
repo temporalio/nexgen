@@ -165,11 +165,16 @@ node (below):
   fixed-duration type (`time.Duration`, `timedelta`, `java.time.Duration`,
   `TimeSpan`) can represent calendar-variable years/months without a
   reference date. A **string-opt-out** node keeps the full duration grammar.
-- **`date-time` / `time` offsets are narrowed to `-18:00..+18:00` inclusive**
-  — at hour 18, only minute 00 is admitted. This is the single materialized
-  offset domain in every target and lets Java use its idiomatic
-  `OffsetDateTime`. A future string opt-out
-  keeps RFC 3339's wider numeric offset grammar.
+- **`date-time` / `time` offsets are narrowed to `-14:00..+14:00` inclusive**
+  — at hour 14, only minute 00 is admitted. This is the single materialized
+  offset domain in every target. Real-world UTC offsets span
+  `-12:00..+14:00`, and `±14:00` is the narrowest range that every target's
+  idiomatic native carrier can hold (.NET `DateTimeOffset` caps at `±14:00`,
+  Java `ZoneOffset` at `±18:00`, while Go `time.Location`, Python `tzinfo`,
+  and `Temporal.ZonedDateTime` are wider). A wider offset cannot be silently
+  renormalized into range, because readers must round-trip the authored
+  offset. A future string opt-out keeps RFC 3339's wider numeric offset
+  grammar.
 
 All three narrowings are strictly *more* restrictive (no previously-rejected value
 becomes accepted) and are the price of the idiomatic typed field.
@@ -180,8 +185,8 @@ these because we own the check:
   `date-time` is invalid. `-00:00` is accepted. **`time` offset is optional**
   (RFC 3339 `partial-time`); an offset, when present, is range-checked.
 - **Offset range** is enforced by the pinned pattern's own alternation:
-  `00:00–17:59` plus `18:00`, with either sign. Thus `±18:00` is accepted,
-  while `±18:01`, `±23:59`, and malformed minutes such as `+01:60` are
+  `00:00–13:59` plus `14:00`, with either sign. Thus `±14:00` is accepted,
+  while `±14:01`, `±15:00`, `±18:00`, and malformed minutes such as `+01:60` are
   rejected. (The serialize-side range check over a native offset is separate
   — below.)
 - **Case** — `T` / `Z` separators are accepted in either case (RFC 3339
@@ -415,8 +420,8 @@ materialized, `:60`-rejecting grammar):
 | Format | Pinned pattern (materialized node) |
 |---|---|
 | `date` | `^[0-9]{4}-(0[1-9]\|1[0-2])-(0[1-9]\|[12][0-9]\|3[01])$` + calendar predicate (year `0001–9999`) |
-| `time` | `^([01][0-9]\|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?([Zz]\|[+-]((0[0-9]\|1[0-7]):[0-5][0-9]\|18:00))?$` (offset optional; no `\|60`) |
-| `date-time` | full-date `[Tt]` full-time, **offset required**, no `\|60`, offset `00:00–17:59` or `18:00` + calendar + range |
+| `time` | `^([01][0-9]\|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?([Zz]\|[+-]((0[0-9]\|1[0-3]):[0-5][0-9]\|14:00))?$` (offset optional; no `\|60`) |
+| `date-time` | full-date `[Tt]` full-time, **offset required**, no `\|60`, offset `00:00–13:59` or `14:00` + calendar + range |
 | `duration` | `^PT(?:[0-9]+H(?:[0-9]+M(?:[0-9]+S)?)?\|[0-9]+M(?:[0-9]+S)?\|[0-9]+S)$` (time-only) |
 
 *(A string-opt-out temporal node keeps the wider grammar: `time` / `date-time`
@@ -479,9 +484,11 @@ compiled constant; the load gate proves it compiles, so the emitted
     `ZoneOffset.ofTotalSeconds(30)` carry seconds — a sub-minute offset is a
     violation, not something to round or drop.
   - **Offset magnitude** (`date-time` / `time`): the materialized grammar is
-    limited to `-18:00..+18:00`; a constructible Go/Python value outside that
-    domain is a violation. Java `OffsetDateTime` enforces the same bound in its
-    type, while Java/TypeScript string-carried `time` re-runs the pinned regex.
+    limited to `-14:00..+14:00`; a constructible Go/Python/Java value outside
+    that domain is a violation (Java `OffsetDateTime` itself admits up to
+    `±18:00`, so it is checked explicitly), while TypeScript re-runs the pinned
+    regex over the serialized `date-time` and Java/TypeScript string-carried
+    `time` re-runs the pinned regex.
   - **Duration sign** (`duration`): the pinned grammar has no sign, but
     `time.Duration`, `java.time.Duration`, `timedelta` and
     `Temporal.Duration` are all signed. A negative duration is a violation —
@@ -649,8 +656,8 @@ Representative cases:
 - **`date`**: `2020-02-29` OK; `2021-02-29` / `2021-13-01` → fail.
 - **`time`**: `12:30:45+02:00` → `12:30:45+02:00` (**offset preserved** in every
   language and mode, trailing-zero fractional trimmed; a `string` in TS
-  including `--date-time-types=temporal`); `±18:00` is accepted, while
-  `±18:01` and `±23:59` are rejected, as for `date-time`.
+  including `--date-time-types=temporal`); `±14:00` is accepted, while
+  `±14:01`, `±18:00`, and `±23:59` are rejected, as for `date-time`.
 - **`duration`**: `PT90M` → `PT1H30M`; `PT0S` OK; `P1Y` / `P4W` / `P1D` →
   **runtime parse reject** (materialized time-only); overflow `PT<huge>H` →
   `Violation`.

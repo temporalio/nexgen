@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+- Materialized JSON Schema `time` and `date-time` offsets are now limited to
+  `-14:00` through `+14:00` (previously `-18:00` through `+18:00`); at hour 14,
+  only minute 00 is valid. Real-world offsets span `-12:00` through `+14:00`,
+  and `±14:00` is the narrowest range every target's native carrier accepts
+  (.NET `DateTimeOffset` caps there), so the authored offset always round-trips.
+  Deserialization and serialization reject wider offsets in every target.
 - .NET generic type parameters now use the C# `T` prefix. For example, the
   authored `output-t` alias generates `TOutput` instead of `OutputT`.
 
