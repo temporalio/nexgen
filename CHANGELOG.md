@@ -27,10 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- JSON Schema `pattern` violations in generated Java and Python now quote the
-  authored pattern (for example `must match pattern ^[a-z]+$`), matching Go and
-  TypeScript, instead of the `$`→`\z` / `\Z` end-anchor rewrite compiled for
-  the host regex engine. This includes `propertyNames` pattern violations.
+- JSON Schema `pattern` violation reasons are now identical in every target:
+  `must match pattern "^[a-z]+$", got "AB1"`, with the authored pattern (not
+  Java's and Python's `$`→`\z` / `\Z` end-anchor rewrite) and the offending
+  value each quoted as a JSON string. Java previously printed both bare and Go
+  quoted with `%q`. A `propertyNames` pattern failure reads
+  `invalid property name "Bad": must match pattern "^[a-z]+$"` everywhere
+  (Java dropped the prefix and TypeScript appended `, got …`), and every
+  `invalid property name` prefix now JSON-quotes the key. Generated Java
+  `Violation` gains a public `quote(String)` helper.
 - Operation-free WIT interfaces now honor `@nexus.namespace`, and .NET names
   their namespace after the interface (`Nexgen.<InterfaceName>`) instead of
   falling back to `Nexgen.Generated`.

@@ -219,6 +219,9 @@ func TestJSONSchemaShowcasePattern(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, validationText(err), "must match pattern")
 	require.Contains(t, validationText(err), `got "ab"`)
+	// The spec's reason form, byte-identical in every target: the authored
+	// pattern and the offending value, each quoted as a JSON string.
+	require.Contains(t, validationText(err), `must match pattern "^[A-Z]{2,4}$", got "ab"`)
 
 	// Too-long sku (5 letters, above {2,4}).
 	err = decodeValidation(jsonPayload([]byte(base+`,"sku":"ABCDE"}`)), &out)

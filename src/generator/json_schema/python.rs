@@ -1876,7 +1876,10 @@ fn render_py_pattern_check(
         path_expr,
         &format!(
             "{} + _quote({value_expr})",
-            python_string_literal(&format!("must match pattern {pattern}, got "))
+            python_string_literal(&format!(
+                "{}, got ",
+                crate::json_schema::pattern::violation_reason(pattern)
+            ))
         ),
     );
 }
@@ -2076,7 +2079,7 @@ fn render_py_property_name_checks(
             "_member_path(key)",
             &format!(
                 "f'invalid property name {{_quote(key)}}: ' + {}",
-                python_string_literal(&format!("must match pattern {pattern}"))
+                python_string_literal(&crate::json_schema::pattern::violation_reason(pattern))
             ),
         );
     }
