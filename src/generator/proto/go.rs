@@ -679,10 +679,6 @@ struct RenderedResourceFieldInitializer {
 }
 
 impl OperationBinding {
-    pub(in crate::generator) fn has_eager_output(&self) -> bool {
-        self.output_from_proto.is_some() || self.resource_return.is_some()
-    }
-
     pub(in crate::generator) fn registry_input_converter(
         &self,
         input_type: &str,
@@ -1057,7 +1053,7 @@ pub(in crate::generator) fn render_operation_function_proto(
             output.push_str("\t\t\treturn\n");
             output.push_str("\t\t}\n");
             output.push_str("\t\tvalue, err := ");
-            render_conversion_expr(output, transform_expr, transform_type, package);
+            output.push_str(transform_expr);
             output.push('\n');
             output.push_str("\t\tif err != nil {\n");
             output.push_str("\t\t\tresultSettable.SetError(err)\n");
@@ -1099,12 +1095,7 @@ pub(in crate::generator) fn render_operation_function_proto(
                 output.push_str("\t\t\treturn\n");
                 output.push_str("\t\t}\n");
                 output.push_str("\t\tvalue, err := ");
-                let result_type = if binding.output_returns_pointer {
-                    format!("*{output_type}")
-                } else {
-                    output_type.clone()
-                };
-                render_conversion_expr(output, from_proto, &result_type, package);
+                output.push_str(from_proto);
                 output.push('\n');
                 output.push_str("\t\tif err != nil {\n");
                 output.push_str("\t\t\tresultSettable.SetError(err)\n");
@@ -1132,10 +1123,6 @@ pub(in crate::generator) fn render_operation_function_proto(
                 output.push_str("\t\t\tresultSettable.SetError(err)\n");
                 output.push_str("\t\t\treturn\n");
                 output.push_str("\t\t}\n");
-                output.push_str(&format!(
-                    "\t\tctx = {}(ctx, fut)\n",
-                    package.nexus_operation_payload_context()
-                ));
                 for line in &resource_return.local_lines {
                     output.push_str("\t\t");
                     output.push_str(line);
@@ -1157,21 +1144,6 @@ pub(in crate::generator) fn render_operation_function_proto(
         output.push_str("\treturn fut\n");
     }
     output.push_str("}\n");
-}
-
-// Override converters and output transforms take `ctx` in their authored
-// expressions. Scope that parameter to conversion without changing the context
-// retained by the Nexus future.
-fn render_conversion_expr(
-    output: &mut String,
-    expression: &str,
-    result_type: &str,
-
-    package: &GoPackageContext,
-) {
-    let context = package.workflow_context_type();
-    let payload_context = package.nexus_operation_payload_context();
-    output.push_str(&format!("func(ctx {context}) ({result_type}, error) {{\n\t\treturn {expression}\n\t}}({payload_context}(ctx, fut))"));
 }
 
 /// Computes the backend binding for an operation message: the wire type

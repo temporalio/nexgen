@@ -2343,7 +2343,7 @@ fn go_serialization_context_accepts_eager_external_request() {
         assert!(operation.contains("c.ExecuteOperation(ctx, \"Roundtrip\", request,"));
         assert!(!operation.contains("requestProto"));
         assert!(!wrapper.contains("retryPolicyToProto("));
-        assert!(operation.contains("internal.NexusOperationPayloadContext(ctx, fut)"));
+        assert!(operation.contains("value, err := retryPolicyFromProto(ctx, &result)"));
         assert_no_generated_context_plumbing(&files);
         assert!(!operation.contains("SerializationContext()"));
         // A nil policy result must not suppress conversion: the callbacks are independent.
@@ -2426,7 +2426,7 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     assert!(conversion < error && error < execute, "{operation}");
     assert!(operation.contains("workflow.NewNexusClient(\"sample-service\", \"SampleService\")"));
     assert_eq!(operation.matches("retryPolicyToProto(").count(), 1);
-    assert!(operation.contains("internal.NexusOperationPayloadContext(ctx, fut)"));
+    assert!(operation.contains("value, err := retryPolicyFromProto(ctx, &result)"));
     assert!(!operation.contains("requestContext("));
     assert!(!registry.contains("InputToTransfer"));
     assert_eq!(main.matches("\"go.temporal.io/sdk/temporal\"").count(), 1);
@@ -2444,7 +2444,7 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
 }
 
 #[test]
-fn go_serialization_context_preserves_owned_input_and_scopes_eager_output() {
+fn go_serialization_context_preserves_owned_input_and_uses_ctx_for_eager_output() {
     let files = render_go_serialization_context_fixture(
         &format!("{GO_CONTEXT_OWNED_REQUEST}\n{GO_CONTEXT_OVERRIDE_TYPES}"),
         r#"/// @nexus.serialization-context go="requestContext"
@@ -2456,9 +2456,10 @@ fn go_serialization_context_preserves_owned_input_and_scopes_eager_output() {
     let compact = operation.split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(!operation.contains("requestProto"));
 
-    assert!(compact.contains(
-        "value, err := func(ctx workflow.Context) (*temporal.RetryPolicy, error) { return retryPolicyFromProto(ctx, &result) }(internal.NexusOperationPayloadContext(ctx, fut))"
-    ), "{operation}");
+    assert!(
+        compact.contains("value, err := retryPolicyFromProto(ctx, &result)"),
+        "{operation}"
+    );
     assert!(operation.contains("return m.toProto(ctx)"));
     let execute = operation
         .find("c.ExecuteOperation(ctx, \"Roundtrip\", request,")
@@ -2474,7 +2475,7 @@ fn go_serialization_context_preserves_owned_input_and_scopes_eager_output() {
     );
     assert_eq!(
         operation
-            .matches("}(internal.NexusOperationPayloadContext(ctx, fut))")
+            .matches("value, err := retryPolicyFromProto(ctx, &result)")
             .count(),
         1
     );
@@ -2485,7 +2486,7 @@ fn go_serialization_context_preserves_owned_input_and_scopes_eager_output() {
 }
 
 #[test]
-fn go_serialization_context_scopes_output_transform_expression() {
+fn go_serialization_context_uses_ctx_for_output_transform_expression() {
     let files = render_go_serialization_context_fixture(
         &format!("{GO_CONTEXT_OWNED_REQUEST}\n{GO_CONTEXT_OVERRIDE_TYPES}"),
         r#"/// @nexus.serialization-context go="requestContext"
@@ -2496,13 +2497,14 @@ fn go_serialization_context_scopes_output_transform_expression() {
     );
     let operation = &files[Path::new("sampleservice.go")];
     let compact = operation.split_whitespace().collect::<Vec<_>>().join(" ");
-    assert!(compact.contains(
-        "value, err := func(ctx workflow.Context) (string, error) { return transformPolicy(ctx, &result) }(internal.NexusOperationPayloadContext(ctx, fut))"
-    ), "{operation}");
+    assert!(
+        compact.contains("value, err := transformPolicy(ctx, &result)"),
+        "{operation}"
+    );
     assert!(operation.contains("var result common.RetryPolicy"));
     let decode = operation.find("fut.Get(ctx, &result)").unwrap();
     let transform = operation
-        .find("return transformPolicy(ctx, &result)")
+        .find("value, err := transformPolicy(ctx, &result)")
         .unwrap();
     assert!(decode < transform);
     let execute = operation
@@ -2511,7 +2513,7 @@ fn go_serialization_context_scopes_output_transform_expression() {
     assert!(execute < decode);
     assert!(operation.contains("resultSettable.Set(value, nil)"));
     assert!(!operation.contains("retryPolicyFromProto("));
-    assert!(!operation.contains("ctx = internal.NexusOperationPayloadContext(ctx, fut)"));
+    assert!(!operation.contains("ctx = "));
 }
 
 #[test]
@@ -2706,7 +2708,7 @@ fn go_serialization_context_allows_model_field_named_serialization_context() {
 }
 
 #[test]
-fn go_serialization_context_scopes_resource_return_callback_after_decode() {
+fn go_serialization_context_constructs_resource_return_after_decode() {
     let files = render_go_serialization_context_fixture(
         r#"/// @nexus.proto "temporal.api.common.v1.WorkflowType"
         record start-request { name: string }
@@ -2732,19 +2734,11 @@ func requestContext(request startRequest) converter.SerializationContext { retur
         .unwrap()
         + execute;
     let decode = operation[callback..].find("fut.Get(ctx, &result)").unwrap() + callback;
-    let scoped = operation
-        .find("ctx = internal.NexusOperationPayloadContext(ctx, fut)")
-        .unwrap();
     let construct = operation
         .find("value := NewStartedWorkflow(request.Name, result.GetRunId())")
         .unwrap();
-    assert!(execute < callback && callback < decode && decode < scoped && scoped < construct);
-    assert_eq!(
-        operation
-            .matches("ctx = internal.NexusOperationPayloadContext(ctx, fut)")
-            .count(),
-        1
-    );
+    assert!(execute < callback && callback < decode && decode < construct);
+    assert!(!operation.contains("ctx = "));
     assert!(operation.contains("var result common.WorkflowExecution"));
     assert!(operation.contains("resultSettable.Set(value, nil)"));
 }

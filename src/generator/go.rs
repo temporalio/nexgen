@@ -635,13 +635,6 @@ impl GoPackageContext {
         self.qualified_expr("errors", "errors.New")
     }
 
-    pub(in crate::generator) fn nexus_operation_payload_context(&self) -> String {
-        self.qualified_expr(
-            "go.temporal.io/sdk/internal",
-            "internal.NexusOperationPayloadContext",
-        )
-    }
-
     pub(in crate::generator) fn serialization_context_type(&self) -> String {
         self.qualified_expr(
             "go.temporal.io/sdk/converter",
@@ -1187,18 +1180,7 @@ impl<'a> ApiPlanner<'a> {
             service.endpoint.as_deref() == Some("__temporal_system")
                 && !service.operations.is_empty()
         });
-        let has_eager_outputs =
-            services
-                .iter()
-                .flat_map(|service| &service.operations)
-                .any(|operation| {
-                    operation.wire_binding.as_ref().is_some_and(|binding| {
-                        operation.output_transform_expr.is_some() || binding.has_eager_output()
-                    })
-                });
-        if (has_system_operations || has_eager_outputs)
-            && !self.package.is_self_import("go.temporal.io/sdk/internal")
-        {
+        if has_system_operations && !self.package.is_self_import("go.temporal.io/sdk/internal") {
             self.imports
                 .insert("go.temporal.io/sdk/internal".to_string());
         }
