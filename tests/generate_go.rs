@@ -601,13 +601,20 @@ interface namespace-service {
     )
     .unwrap();
 
-    // The sourced map is bound to a field-unique local, evaluated once, and
-    // copied into a properly typed proto map.
-    assert!(rendered.contains("sourcedData := NamespaceData()"));
-    assert!(rendered.contains("if len(sourcedData) > 0 {"));
-    assert!(rendered.contains("message.Data = make(map[string]string, len(sourcedData))"));
-    assert!(rendered.contains("for k, v := range sourcedData {"));
+    // Sourced fields live on the model as unexported fields, populated by the
+    // operation function where `workflow.Context` is in scope.
+    assert!(
+        rendered
+            .contains("type namespaceInfo struct {\n\tName *string\n\tdata map[string]string\n}")
+    );
+    assert!(rendered.contains("\trequest.data = NamespaceData()\n"));
+    // The sourced map is then converted like any other model field, and it now
+    // round-trips back out of the proto as well.
+    assert!(rendered.contains("if len(m.data) > 0 {"));
+    assert!(rendered.contains("message.Data = make(map[string]string, len(m.data))"));
+    assert!(rendered.contains("for k, v := range m.data {"));
     assert!(rendered.contains("message.Data[k] = v"));
+    assert!(rendered.contains("out.data = make(map[string]string, len(proto.GetData()))"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -1369,10 +1376,10 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("ScheduleToCloseTimeout *time.Duration"));
     assert!(rendered.contains("Priority *temporal.Priority"));
 
-    // Generated model gets a context-aware ToProto method targeting the proto
-    // message type and returning conversion errors.
+    // Generated model gets a context-aware encoding function that accepts a
+    // pointer and returns the proto message and conversion errors.
     assert!(rendered
-        .contains("func (m ActivityOptions) toProto(ctx workflow.Context) (*activity.ActivityOptions, error) {"));
+        .contains("func activityOptionsToProto(ctx workflow.Context, m *ActivityOptions) (*activity.ActivityOptions, error) {"));
     assert!(rendered.contains("message := &activity.ActivityOptions{}"));
     assert!(rendered.contains(
         "type ActivityOptions struct {\n\t// TaskQueue - Optional.\n\tTaskQueue *string"
@@ -1389,25 +1396,37 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("converted, err := durationToProto(ctx, m.ScheduleToCloseTimeout)"));
     assert!(rendered.contains("return message, nil"));
 
-    // Generated model gets a context-aware FromProto constructor. Optional
+    // Generated model gets a context-aware FromProto output callback. Optional
     // override fields assign the converter's pointer result directly; the
     // required field is dereferenced with a nil guard.
     assert!(rendered.contains(
-        "func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOptions) (ActivityOptions, error) {"
+        "func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOptions, out *ActivityOptions) error {"
     ));
     assert!(rendered.contains("converted, err := taskQueueFromProto(ctx, proto.GetTaskQueue())"));
     assert!(
         rendered.contains("converted, err := retryPolicyFromProto(ctx, proto.GetRetryPolicy())")
     );
-    assert!(rendered.contains("value.RetryPolicy = *converted"));
-    // Operation functions convert the request to proto before the SDK call and
-    // decode the proto response afterwards.
-    assert!(rendered.contains("requestProto, err := request.toProto(ctx)"));
+    assert!(rendered.contains("out.RetryPolicy = *converted"));
+    // The model constructs a transfer-type converter, so the SDK
+    // runs model<->proto conversion inside the payload converter.
     assert!(rendered.contains(
-        "fut := c.ExecuteOperation(ctx, \"ActivityOptionsOperation\", requestProto, workflow.NexusOperationOptions{})"
+        "return converter.NewContextualTransferTypeConverter("
     ));
-    assert!(rendered.contains("var result activity.ActivityOptions"));
-    assert!(rendered.contains("value, err := activityOptionsFromProto(ctx, &result)"));
+    assert!(rendered.contains(
+        "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn converter.NewContextualTransferTypeConverter"
+    ));
+    assert!(rendered.contains("\t\tactivityOptionsToProto,\n\t\tactivityOptionsFromProto,\n"));
+    assert!(rendered.contains("\t*out = ActivityOptions{}\n"));
+    assert!(!rendered.contains("\tvalue := ActivityOptions{}"));
+    // Operation functions therefore hand the model straight to the SDK and
+    // decode the response back into a model.
+    assert!(!rendered.contains(".toProto(ctx)"));
+    assert!(rendered.contains(
+        "fut := c.ExecuteOperation(ctx, \"ActivityOptionsOperation\", request, workflow.NexusOperationOptions{})"
+    ));
+    assert!(rendered.contains(
+        "\t\tvar value ActivityOptions\n\t\tif err := fut.Get(ctx, &value); err != nil {"
+    ));
 
     // The hand-written support fragment is emitted alongside the generated
     // service file with the pointer-in/pointer-out converter contract.
@@ -1422,6 +1441,327 @@ fn go_type_roundtrip_generates_proto_conversions() {
 }
 
 #[test]
+fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
+    let root = project_root();
+    let rendered = generate_to_string_with_inputs(
+        nexgen::language::Language::Go,
+        &example_input_paths(&root, "workflow-service"),
+        &[descriptor_path(&root)],
+    )
+    .unwrap();
+
+    // Sourced fields become unexported model fields so they survive payload
+    // conversion without widening the public API.
+    assert!(rendered.contains("\tnamespace string\n"));
+    assert!(rendered.contains("\tmessage.Namespace = m.namespace\n"));
+    assert!(rendered.contains("\tout.namespace = proto.GetNamespace()\n"));
+    assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
+
+    // Construction happens in the method; the SDK owns caching by model type.
+    assert!(rendered.contains(
+        "return converter.NewContextualTransferTypeConverter("
+    ));
+    // Value receiver, so both the model and a pointer to it opt in.
+    assert!(rendered.contains(
+        "func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn converter.NewContextualTransferTypeConverter"
+    ));
+
+    // Conversion needs a workflow.Context, so the context-free and
+    // context.Context variants fail loudly instead of silently misconverting.
+    assert!(rendered.contains(
+        "\t\tfunc(context.Context, *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {\n\t\t\treturn nil, errors.New(\"nexgen: transfer type converter outside a workflow\")\n\t\t},\n"
+    ));
+    assert!(rendered.contains(
+        "\t\tfunc(context.Context, *workflowservice.SignalWithStartWorkflowExecutionRequest, *signalWithStartWorkflowRequest) error {\n\t\t\treturn errors.New(\"nexgen: transfer type converter outside a workflow\")\n\t\t},\n"
+    ));
+    assert!(rendered.contains(
+        "\t\tsignalWithStartWorkflowRequestToProto,\n\t\tsignalWithStartWorkflowRequestFromProto,\n"
+    ));
+
+    // Operation responses decode into the model, not the proto.
+    assert!(rendered.contains(
+        "func (SignalWithStartWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {"
+    ));
+    assert!(rendered.contains("\t\tvar value SignalWithStartWorkflowResponse\n"));
+    assert!(!rendered.contains("requestProto"));
+
+    // Inline non-workflow callbacks need `context` and `errors`.
+    assert!(rendered.contains("\t\"context\"\n\t\"errors\"\n"));
+    assert!(!rendered.contains("transferTypeConverterOutsideWorkflow"));
+    assert!(!rendered.contains("NeedsWorkflowContext"));
+    assert!(!rendered.contains("TransferTypeConverterErr"));
+    assert!(!rendered.contains("var signalWithStartWorkflowRequestTransferTypeConverter"));
+}
+
+#[test]
+fn go_nested_model_encoding_bridges_pointer_arguments() {
+    use prost::Message;
+    use prost_types::field_descriptor_proto::{Label, Type};
+    use prost_types::{
+        DescriptorProto, FieldDescriptorProto, FileDescriptorProto, FileDescriptorSet, FileOptions,
+        MessageOptions,
+    };
+
+    let temp_dir = unique_output_path("go-nested-models");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let field = |name: &str, number, label: Label, kind: Type, type_name: Option<&str>| {
+        FieldDescriptorProto {
+            name: Some(name.into()),
+            number: Some(number),
+            label: Some(label as i32),
+            r#type: Some(kind as i32),
+            type_name: type_name.map(str::to_string),
+            ..Default::default()
+        }
+    };
+    let descriptors = FileDescriptorSet {
+        file: vec![FileDescriptorProto {
+            name: Some("nested.proto".into()),
+            package: Some("test".into()),
+            syntax: Some("proto3".into()),
+            options: Some(FileOptions {
+                go_package: Some("example.com/test/wire;wire".into()),
+                ..Default::default()
+            }),
+            message_type: vec![
+                DescriptorProto {
+                    name: Some("Child".into()),
+                    field: vec![field("name", 1, Label::Optional, Type::String, None)],
+                    ..Default::default()
+                },
+                DescriptorProto {
+                    name: Some("Parent".into()),
+                    field: vec![
+                        field(
+                            "required",
+                            1,
+                            Label::Optional,
+                            Type::Message,
+                            Some(".test.Child"),
+                        ),
+                        field(
+                            "optional",
+                            2,
+                            Label::Optional,
+                            Type::Message,
+                            Some(".test.Child"),
+                        ),
+                        field(
+                            "children",
+                            3,
+                            Label::Repeated,
+                            Type::Message,
+                            Some(".test.Child"),
+                        ),
+                        field(
+                            "entries",
+                            4,
+                            Label::Repeated,
+                            Type::Message,
+                            Some(".test.Parent.EntriesEntry"),
+                        ),
+                    ],
+                    nested_type: vec![DescriptorProto {
+                        name: Some("EntriesEntry".into()),
+                        field: vec![
+                            field("key", 1, Label::Optional, Type::String, None),
+                            field(
+                                "value",
+                                2,
+                                Label::Optional,
+                                Type::Message,
+                                Some(".test.Child"),
+                            ),
+                        ],
+                        options: Some(MessageOptions {
+                            map_entry: Some(true),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        }],
+    };
+    let descriptor_path = temp_dir.join("nested.bin");
+    fs::write(&descriptor_path, descriptors.encode_to_vec()).unwrap();
+    let input_path = temp_dir.join("nested.wit");
+    fs::write(
+        &input_path,
+        r#"package test:nested;
+
+interface models {
+    /// @nexus.proto "test.Child"
+    record child {
+        name: string,
+    }
+    /// @nexus.proto "test.Parent"
+    record parent {
+        required: child,
+        optional: option<child>,
+        children: option<list<child>>,
+        entries: option<map<string, child>>,
+    }
+    echo: func(request: parent) -> parent;
+}
+
+world api {
+    export models;
+}
+"#,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("output");
+    generate_to_file(&GenerateRequest {
+        config: nexgen::nexgen_config::NexgenConfig {
+            mode: nexgen::generator::GenerationMode::NativeApi,
+            ..Default::default()
+        },
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path],
+        support_paths: Vec::new(),
+        descriptor_paths: vec![descriptor_path],
+        output_path: output_path.clone(),
+        format: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let files = read_go_output_files(&output_path);
+    let rendered = files.values().cloned().collect::<Vec<_>>().join("\n");
+    assert!(!files.contains_key(&PathBuf::from("support.go")));
+    let root = project_root();
+    let module = fs::read_to_string(root.join("advanced/samples/go/go.mod")).unwrap();
+    fs::write(
+        temp_dir.join("go.mod"),
+        module.replace("go.temporal.io/sdk/advanced/samples/go", "example.com/test"),
+    )
+    .unwrap();
+    fs::copy(
+        root.join("advanced/samples/go/go.sum"),
+        temp_dir.join("go.sum"),
+    )
+    .unwrap();
+    fs::create_dir(temp_dir.join("wire")).unwrap();
+    fs::write(
+        temp_dir.join("wire/wire.go"),
+        include_str!("fixtures/go_nested_wire.go"),
+    )
+    .unwrap();
+    fs::write(
+        output_path.join("conversion_test.go"),
+        include_str!("fixtures/go_nested_conversion_test.go"),
+    )
+    .unwrap();
+    let status = Command::new("go")
+        .args(["test", "./output"])
+        .current_dir(&temp_dir)
+        .status()
+        .unwrap();
+    fs::remove_dir_all(temp_dir).unwrap();
+    assert!(status.success(), "standalone nested Go model tests failed");
+
+    assert!(
+        rendered
+            .contains("func childToProto(ctx workflow.Context, m *Child) (*wire.Child, error) {"),
+        "{rendered}"
+    );
+    assert!(rendered.contains(
+        "func childFromProto(ctx workflow.Context, proto *wire.Child, out *Child) error {"
+    ));
+    assert!(rendered.contains("converted, err := childToProto(ctx, &m.Required)"));
+    assert!(
+        rendered.contains(
+            "if m.Optional != nil {\n\t\tconverted, err := childToProto(ctx, m.Optional)"
+        )
+    );
+    assert!(rendered.contains(
+        "for _, item := range m.Children {\n\t\tconverted, err := childToProto(ctx, &item)"
+    ));
+    assert!(
+        rendered.contains(
+            "for k, v := range m.Entries {\n\t\t\tconverted, err := childToProto(ctx, &v)"
+        )
+    );
+    assert!(rendered.contains(
+        "if proto.GetOptional() != nil {\n\t\tout.Optional = new(Child)\n\t\tif err := childFromProto(ctx, proto.GetOptional(), out.Optional); err != nil {"
+    ));
+    assert!(rendered.contains("out.Optional = new(Child)"));
+    assert!(rendered.contains(
+        "if err := childFromProto(ctx, proto.GetRequired(), &out.Required); err != nil {"
+    ));
+    assert!(rendered.contains(
+        "for _, item := range proto.GetChildren() {\n\t\tvar converted Child\n\t\tif err := childFromProto(ctx, item, &converted); err != nil {"
+    ));
+    assert!(rendered.contains(
+        "for k, v := range proto.GetEntries() {\n\t\t\tvar converted Child\n\t\t\tif err := childFromProto(ctx, v, &converted); err != nil {"
+    ));
+    assert!(rendered.contains("\t*out = Parent{}\n"));
+    assert!(rendered.contains("out.Children = append(out.Children, converted)"));
+    assert!(rendered.contains("out.Entries[k] = converted"));
+    assert!(!rendered.contains("return value, err"));
+    assert!(!rendered.contains(".toProto("));
+}
+
+#[test]
+fn go_model_decode_uses_direct_output_and_shared_support_callbacks() {
+    let root = project_root();
+    let temp_dir = unique_output_path("go-model-decode");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("api.wit");
+    fs::write(
+        &input_path,
+        r#"package test:decode;
+interface service {
+    use nexus:temporal-types/model@1.0.0.{user-metadata};
+    echo: func(request: user-metadata) -> user-metadata;
+}
+world api {
+    export service;
+}
+"#,
+    )
+    .unwrap();
+    let output_path = temp_dir.join("output");
+    generate_to_file(&GenerateRequest {
+        config: nexgen::nexgen_config::NexgenConfig {
+            mode: nexgen::generator::GenerationMode::NativeApi,
+            ..Default::default()
+        },
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input_path, linked_inputs_path(&root)],
+        support_paths: Vec::new(),
+        descriptor_paths: vec![descriptor_path(&root)],
+        output_path: output_path.clone(),
+        format: true,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    for name in ["go.mod", "go.sum"] {
+        fs::copy(
+            root.join("advanced/samples/go").join(name),
+            temp_dir.join(name),
+        )
+        .unwrap();
+    }
+    fs::write(
+        output_path.join("conversion_test.go"),
+        include_str!("fixtures/go_model_conversion_test.go"),
+    )
+    .unwrap();
+    let status = Command::new("go")
+        .args(["test", "./output"])
+        .current_dir(&temp_dir)
+        .status()
+        .unwrap();
+    fs::remove_dir_all(temp_dir).unwrap();
+    assert!(status.success(), "generated Go model runtime tests failed");
+}
+
+#[test]
 fn go_proto_resource_return_converts_request_and_constructs_resource() {
     let root = project_root();
     let rendered = generate_to_string_with_inputs(
@@ -1431,16 +1771,16 @@ fn go_proto_resource_return_converts_request_and_constructs_resource() {
     )
     .unwrap();
 
-    assert!(rendered.contains("\trequestProto, err := request.toProto(ctx)\n"));
+    assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
     assert!(rendered.contains(
-        "\tif err != nil {\n\t\tresult, resultSettable := workflow.NewFuture(ctx)\n\t\tresultSettable.SetError(err)\n\t\treturn result\n\t}\n"
+        "fut := c.ExecuteOperation(ctx, \"StartWorkflow\", request, workflow.NexusOperationOptions{})"
     ));
-    assert!(rendered.contains(
-        "fut := c.ExecuteOperation(ctx, \"StartWorkflow\", requestProto, workflow.NexusOperationOptions{})"
-    ));
+    // Resource returns keep decoding the raw proto response: the planner emits
+    // no model for the resource type, so there is nothing to decode into.
     assert!(rendered.contains("\tvar result workflowservice.StartWorkflowExecutionResponse\n"));
+    // Sourced constructor arguments are read off the model instead of the proto.
     assert!(rendered.contains(
-        "value := NewStartedWorkflow(requestProto.GetNamespace(), request.WorkflowID, result.GetRunId())"
+        "value := NewStartedWorkflow(request.namespace, request.WorkflowID, result.GetRunId())"
     ));
     assert!(rendered.contains(
         "type StartedWorkflow struct {\n\t// Namespace - Required.\n\tNamespace string\n\t// WorkflowID - Required.\n\tWorkflowID string\n\t// RunID - Optional.\n\tRunID *string\n}"
@@ -1449,7 +1789,7 @@ fn go_proto_resource_return_converts_request_and_constructs_resource() {
         "func NewStartedWorkflow(namespace string, workflowID string, runID string) StartedWorkflow"
     ));
     assert!(rendered.contains(
-        "fut := c.ExecuteOperation(ctx, \"RestartWorkflow\", requestProto, workflow.NexusOperationOptions{})"
+        "fut := c.ExecuteOperation(ctx, \"RestartWorkflow\", request, workflow.NexusOperationOptions{})"
     ));
     assert!(rendered.contains("func StartWorkflow("));
     assert!(rendered.contains(
@@ -1528,10 +1868,7 @@ interface workflow-service {
     )
     .unwrap();
 
-    assert!(
-        rendered
-            .contains("value := NewSignalResult(requestProto.GetNamespace(), result.GetStarted())")
-    );
+    assert!(rendered.contains("value := NewSignalResult(request.namespace, result.GetStarted())"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 

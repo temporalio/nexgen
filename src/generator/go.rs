@@ -316,7 +316,7 @@ fn record_message_key(record: &RecordSpec<PlannedFamily>) -> &str {
         .unwrap_or(record.full_name.as_str())
 }
 
-fn record_for_message<'a>(
+pub(in crate::generator) fn record_for_message<'a>(
     api_plan: &'a PlannedSpec,
     message: &PlannedMessageType,
 ) -> Option<&'a RecordSpec<PlannedFamily>> {
@@ -600,6 +600,28 @@ impl GoPackageContext {
             "go.temporal.io/sdk/workflow",
             "workflow.NexusOperationOptions{}",
         )
+    }
+
+    pub(in crate::generator) fn transfer_type_converter_type(&self) -> String {
+        self.qualified_expr(
+            "go.temporal.io/sdk/converter",
+            "converter.TransferTypeConverter",
+        )
+    }
+
+    pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
+        self.qualified_expr(
+            "go.temporal.io/sdk/converter",
+            "converter.NewContextualTransferTypeConverter",
+        )
+    }
+
+    pub(in crate::generator) fn context_context_type(&self) -> String {
+        self.qualified_expr("context", "context.Context")
+    }
+
+    pub(in crate::generator) fn errors_new(&self) -> String {
+        self.qualified_expr("errors", "errors.New")
     }
 
     fn qualified_expr(&self, import_path: &str, code_expr: &str) -> String {
@@ -968,9 +990,18 @@ impl GoExternalModels {
         }
     }
 
-    fn render_model_wire_methods(&self, output: &mut String, key: &str, model: &RenderedModel) {
+    fn render_model_converters(&self, output: &mut String, key: &str, model: &RenderedModel) {
         if let Self::Proto(backend) = self {
-            backend.render_model_wire_methods(output, key, model);
+            backend.render_model_converters(output, key, model);
+        }
+    }
+
+    /// Whether any model emits a `converter.TransferTypeConverter`, which pulls
+    /// in the `context` and `errors` standard-library imports.
+    fn renders_transfer_type_converters(&self) -> bool {
+        match self {
+            Self::Proto(backend) => backend.renders_transfer_type_converters(),
+            Self::Json(_) => false,
         }
     }
 
@@ -1138,6 +1169,18 @@ impl<'a> ApiPlanner<'a> {
             self.imports.insert("reflect".to_string());
             self.imports.insert("runtime".to_string());
             self.imports.insert("strings".to_string());
+        }
+        // Transfer-type converters reject non-workflow conversion inline.
+        if self.external_models.renders_transfer_type_converters() {
+            if !self.package.is_self_import("go.temporal.io/sdk/converter") {
+                self.imports
+                    .insert("go.temporal.io/sdk/converter".to_string());
+            }
+            for import in ["context", "errors"] {
+                if !self.package.is_self_import(import) {
+                    self.imports.insert(import.to_string());
+                }
+            }
         }
         let model_fragments = self.external_models.render_models()?;
         self.imports.extend(model_fragments.imports);
@@ -1616,8 +1659,19 @@ impl<'a> ApiPlanner<'a> {
                 let planned_fields = planned_model
                     .model_fields()
                     .map(|(field_name, field)| {
-                        planned_field(planned_model, field_name, field, self.api_plan)
+                        (
+                            planned_field(planned_model, field_name, field, self.api_plan),
+                            false,
+                        )
                     })
+                    .chain(planned_model.sourced_fields().map(
+                        |(field_name, field, _source_expr)| {
+                            (
+                                planned_field(planned_model, field_name, field, self.api_plan),
+                                true,
+                            )
+                        },
+                    ))
                     .collect::<Vec<_>>();
                 (planned_model.name.clone(), parameters, planned_fields)
             })
@@ -1655,7 +1709,7 @@ impl<'a> ApiPlanner<'a> {
 
         let fields = planned_fields
             .iter()
-            .map(|planned_field| self.build_field(planned_field))
+            .map(|(planned_field, sourced)| self.build_field(planned_field, *sourced))
             .collect::<Result<Vec<_>>>()?;
 
         self.models
@@ -1665,8 +1719,12 @@ impl<'a> ApiPlanner<'a> {
         Ok(())
     }
 
-    fn build_field(&mut self, field: &PlannedField) -> Result<RenderedField> {
-        let field_name = go_field_name(&field.authored_name);
+    fn build_field(&mut self, field: &PlannedField, sourced: bool) -> Result<RenderedField> {
+        let field_name = if sourced {
+            go_unexported_name(&go_field_name(&field.authored_name))
+        } else {
+            go_field_name(&field.authored_name)
+        };
 
         let annotated_go_type = field
             .flattened_annotation_override
@@ -1710,6 +1768,7 @@ impl<'a> ApiPlanner<'a> {
                 .map(str::to_string),
             go_type,
             required: field.required,
+            sourced,
         })
     }
 
@@ -2077,6 +2136,10 @@ pub(in crate::generator) struct RenderedField {
     /// Whether the field is required in the WIT definition. Rendered as a
     /// leading `// Required.` godoc comment on the generated Go struct field.
     pub(in crate::generator) required: bool,
+    /// Whether this field carries a `@nexus.source` value. Sourced fields are
+    /// rendered as unexported struct fields, populated by generated code at
+    /// the operation call site, and never documented.
+    pub(in crate::generator) sourced: bool,
 }
 
 /// The result of resolving a [`PlannedValueType`] to a Go type expression.
@@ -2112,11 +2175,10 @@ impl GoVisibility {
     }
 
     fn rewrite_go_expr(&self, expr: &str) -> String {
-        if self.type_name_replacements.is_empty() && !expr.contains(".ToProto()") {
+        if self.type_name_replacements.is_empty() {
             return expr.to_string();
         }
 
-        let expr = expr.replace(".ToProto()", ".toProto()");
         let bytes = expr.as_bytes();
         let mut output = String::with_capacity(expr.len());
         let mut index = 0;
@@ -2742,6 +2804,7 @@ fn ensure_generic_tuple(
                 doc: None,
                 go_type: format!("T{}", index + 1),
                 required: true,
+                sourced: false,
             })
             .collect();
         models.insert(
@@ -2770,12 +2833,14 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
                         doc: None,
                         go_type: "T".to_string(),
                         required: false,
+                        sourced: false,
                     },
                     RenderedField {
                         name: "Error".to_string(),
                         doc: None,
                         go_type: "E".to_string(),
                         required: false,
+                        sourced: false,
                     },
                 ],
             },
@@ -3672,7 +3737,7 @@ fn render_model(
         output.push_str("}\n");
     } else {
         for field in &model.fields {
-            if public {
+            if public && !field.sourced {
                 render_field_doc_comment(
                     output,
                     "\t",
@@ -3690,7 +3755,7 @@ fn render_model(
         output.push_str("}\n");
     }
 
-    external_models.render_model_wire_methods(output, key, model);
+    external_models.render_model_converters(output, key, model);
 }
 
 /// Renders a WIT resource as a Go struct with its constructor fields.

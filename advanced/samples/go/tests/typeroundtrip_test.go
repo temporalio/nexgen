@@ -186,15 +186,19 @@ func (s *TypeRoundtripIntegrationSuite) TestFailureOperationPreservesAbsence() {
 func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly() {
 	policy := temporal.RetryPolicy{MaximumAttempts: 5}
 
-	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*tr.ActivityOptions, error) {
-		var result tr.ActivityOptions
-		return &result, tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{RetryPolicy: policy}).Get(ctx, &result)
+	// The model is returned inside a wrapper: a proto-backed model carries a
+	// transfer-type converter that only runs inside a workflow, so it cannot be
+	// a workflow's top-level return value.
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*typeRoundtripResults, error) {
+		var results typeRoundtripResults
+		return &results, tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{RetryPolicy: policy}).Get(ctx, &results.ActivityOption)
 	})
 
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
-	var result tr.ActivityOptions
-	s.NoError(s.env.GetWorkflowResult(&result))
+	var results typeRoundtripResults
+	s.NoError(s.env.GetWorkflowResult(&results))
+	result := results.ActivityOption
 	s.Equal(int32(5), result.RetryPolicy.MaximumAttempts)
 	// Optional fields that were never supplied remain absent after the round
 	// trip, which is distinct from present fields containing their zero value.

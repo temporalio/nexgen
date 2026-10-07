@@ -619,6 +619,20 @@ code that converts between the public model and its protobuf transfer type.
 Generated callers continue to accept and return the public model; conversion is
 performed by the target SDK or generated operation helpers.
 
+For Go, generated proto-backed operation inputs and outputs implement
+`converter.ValueWithTransferTypeConverter`. The SDK converts these models during
+payload conversion using `converter.NewContextualTransferTypeConverter`; the generated
+method returns both the converter and its construction error. Models and transfer
+types use non-pointer type arguments, with a value receiver on the model.
+
+Go conversion requires a `workflow.Context` to access the workflow's data
+converter. Using these models outside a workflow, including as a workflow's
+top-level return value or an activity argument, fails with `can only be converted
+inside a workflow`. Override-converter types and resource-return or
+output-transform results continue to use generated operation helpers instead of
+model transfer-type converters. Nexus conversion errors surface on the returned
+future. An `@nexus.omit` field cannot supply a Go resource constructor argument.
+
 ### Transfer-Type Conversion
 
 ```wit

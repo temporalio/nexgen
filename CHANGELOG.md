@@ -18,10 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Go proto-backed operation models now use SDK transfer-type converters instead
+  of eager conversion at the operation call site. Conversion errors surface on
+  the returned future. Generated converters use
+  `converter.NewContextualTransferTypeConverter`. The Go samples pin the
+  squash-merged experimental SDK API from temporalio/sdk-go#2703.
+
 ### Deprecated
 
 ### Breaking Changes
 
+- Go models with generated transfer-type converters require workflow context and
+  cannot be used as top-level workflow return values or activity arguments.
+- Go generation rejects `@nexus.omit` fields used as resource constructor
+  arguments.
 - .NET generic type parameters now use the C# `T` prefix. For example, the
   authored `output-t` alias generates `TOutput` instead of `OutputT`.
 
