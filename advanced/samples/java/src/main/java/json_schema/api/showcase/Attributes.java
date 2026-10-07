@@ -78,7 +78,7 @@ public final class Attributes {
                 for (String pnKey : value.additionalProperties.keySet()) {
                     int pnLength = pnKey.codePointCount(0, pnKey.length());
                     if (pnLength > 8) {
-                        violations.add(new Violation(Violation.memberPath(pnKey), "invalid property name \"" + pnKey + "\": must have length <= 8, got " + pnLength));
+                        violations.add(new Violation(Violation.memberPath(pnKey), "invalid property name " + Violation.quote(pnKey) + ": must have length <= 8, got " + pnLength));
                     }
                 }
                 for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
@@ -138,7 +138,7 @@ public final class Attributes {
                 String pnKey = propertyNameKeys.next();
                 int pnLength = pnKey.codePointCount(0, pnKey.length());
                 if (pnLength > 8) {
-                    violations.add(new Violation(Violation.memberPath(pnKey), "invalid property name \"" + pnKey + "\": must have length <= 8, got " + pnLength));
+                    violations.add(new Violation(Violation.memberPath(pnKey), "invalid property name " + Violation.quote(pnKey) + ": must have length <= 8, got " + pnLength));
                 }
             }
             if (!violations.isEmpty()) {

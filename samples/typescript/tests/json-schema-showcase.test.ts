@@ -479,6 +479,11 @@ describe("json-schema showcase generated definitions", () => {
     expect(() =>
       showcaseTransferTypeConverter.fromTransferType({ ...base, sku: "ab" }),
     ).toThrow(/must match pattern/);
+    // The spec's reason form, byte-identical in every target: the authored
+    // pattern and the offending value, each quoted as a JSON string.
+    expect(() =>
+      showcaseTransferTypeConverter.fromTransferType({ ...base, sku: "ab" }),
+    ).toThrow('must match pattern "^[A-Z]{2,4}$", got "ab"');
     expect(() =>
       showcaseTransferTypeConverter.fromTransferType({ ...base, sku: "ABCDE" }),
     ).toThrow(/must match pattern/);

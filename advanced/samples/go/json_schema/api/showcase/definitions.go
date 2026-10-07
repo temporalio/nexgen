@@ -49,6 +49,40 @@ func memberPath(key string) string {
 	return `["` + escaped + `"]`
 }
 
+func quoteValue(s string) string {
+	const hex = "0123456789abcdef"
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range s {
+		switch r {
+		case '"':
+			b.WriteString(`\"`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '\b':
+			b.WriteString(`\b`)
+		case '\f':
+			b.WriteString(`\f`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			if r < 0x20 {
+				b.WriteString(`\u00`)
+				b.WriteByte(hex[r>>4])
+				b.WriteByte(hex[r&0xf])
+			} else {
+				b.WriteRune(r)
+			}
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+
 func newPayloadValidationError(violations []Violation) error {
 	// TODO: Use temporal.NewPayloadValidationError once it is available in an SDK release.
 	return temporal.NewNonRetryableApplicationError("Payload validation failed", "PayloadValidationError", nil, violations)

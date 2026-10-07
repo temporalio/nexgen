@@ -497,7 +497,7 @@ def test_pattern_constraints_roundtrip_and_reject() -> None:
     # The reason quotes the authored pattern (`$`), not the `\Z` rewrite
     # compiled for matching — the same text Go/TS/Java print.
     assert parse_violations({**BASE, "sku": "ab"}) == [
-        ("sku", 'must match pattern ^[A-Z]{2,4}$, got "ab"')
+        ("sku", 'must match pattern "^[A-Z]{2,4}$", got "ab"')
     ]
 
     ok = parse({**BASE, "sku": "XY", "phrase": "hello world"})

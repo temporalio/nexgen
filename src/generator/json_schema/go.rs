@@ -538,11 +538,12 @@ fn render_go_pattern_check_to(
     output.push_str(errs_value);
     output.push_str(", Violation{");
     output.push_str(path);
-    output.push_str(", fmt.Sprintf(");
-    output.push_str(&go_string_literal("must match pattern %q, got %q"));
     output.push_str(", ");
-    output.push_str(&go_string_literal(pattern));
-    output.push_str(", ");
+    output.push_str(&go_string_literal(&format!(
+        "{}, got ",
+        crate::json_schema::pattern::violation_reason(pattern)
+    )));
+    output.push_str(" + quoteValue(");
     output.push_str(value_expr);
     output.push_str(")})\n");
     output.push_str(indent);
@@ -1038,8 +1039,8 @@ fn render_go_property_name_checks(
         ));
         output.push_str(&inner);
         output.push_str(&format!(
-            "\terrs = append(errs, Violation{{memberPath(k), fmt.Sprintf({}, k, n)}})\n",
-            go_string_literal(&format!("invalid property name %q: {reason}"))
+            "\terrs = append(errs, Violation{{memberPath(k), fmt.Sprintf({}, quoteValue(k), n)}})\n",
+            go_string_literal(&format!("invalid property name %s: {reason}"))
         ));
         output.push_str(&inner);
         output.push_str("}\n");
@@ -1064,9 +1065,10 @@ fn render_go_property_name_checks(
         ));
         output.push_str(&inner);
         output.push_str(&format!(
-            "\terrs = append(errs, Violation{{memberPath(k), fmt.Sprintf({}, k)}})\n",
+            "\terrs = append(errs, Violation{{memberPath(k), \"invalid property name \" + quoteValue(k) + {}}})\n",
             go_string_literal(&format!(
-                "invalid property name %q: must match pattern {pattern}"
+                ": {}",
+                crate::json_schema::pattern::violation_reason(pattern)
             ))
         ));
         output.push_str(&inner);
@@ -1084,8 +1086,8 @@ fn render_go_property_name_checks(
             output.push_str(&format!("if !({alternatives}) {{\n"));
             output.push_str(&inner);
             output.push_str(&format!(
-                "\terrs = append(errs, Violation{{memberPath(k), fmt.Sprintf({}, k)}})\n",
-                go_string_literal("invalid property name %q: must equal an allowed value")
+                "\terrs = append(errs, Violation{{memberPath(k), fmt.Sprintf({}, quoteValue(k))}})\n",
+                go_string_literal("invalid property name %s: must equal an allowed value")
             ));
             output.push_str(&inner);
             output.push_str("}\n");
@@ -1104,9 +1106,9 @@ fn render_go_property_name_checks(
         output.push_str(&format!("if {condition} {{\n"));
         output.push_str(&inner);
         output.push_str(&format!(
-            "\terrs = append(errs, Violation{{memberPath(k), fmt.Sprintf({}, k)}})\n",
+            "\terrs = append(errs, Violation{{memberPath(k), fmt.Sprintf({}, quoteValue(k))}})\n",
             go_string_literal(&format!(
-                "invalid property name %q: must be a valid {}",
+                "invalid property name %s: must be a valid {}",
                 check.name
             ))
         ));
@@ -1736,6 +1738,23 @@ fn render_validator_core(output: &mut String) {
         "\tescaped := strings.ReplaceAll(strings.ReplaceAll(key, `\\`, `\\\\`), `\"`, `\\\"`)\n",
     );
     output.push_str("\treturn `[\"` + escaped + `\"]`\n}\n\n");
+    // quoteValue renders a string the way every target quotes an offending
+    // value or key in a violation reason: a JSON string literal (Python
+    // `json.dumps(ensure_ascii=False)`, TypeScript `JSON.stringify`, Java
+    // `Violation.quote`), not Go's `%q`, whose escapes differ.
+    output.push_str("func quoteValue(s string) string {\n");
+    output.push_str("\tconst hex = \"0123456789abcdef\"\n");
+    output.push_str("\tvar b strings.Builder\n\tb.WriteByte('\"')\n");
+    output.push_str("\tfor _, r := range s {\n\t\tswitch r {\n");
+    output.push_str("\t\tcase '\"':\n\t\t\tb.WriteString(`\\\"`)\n");
+    output.push_str("\t\tcase '\\\\':\n\t\t\tb.WriteString(`\\\\`)\n");
+    output.push_str("\t\tcase '\\b':\n\t\t\tb.WriteString(`\\b`)\n");
+    output.push_str("\t\tcase '\\f':\n\t\t\tb.WriteString(`\\f`)\n");
+    output.push_str("\t\tcase '\\n':\n\t\t\tb.WriteString(`\\n`)\n");
+    output.push_str("\t\tcase '\\r':\n\t\t\tb.WriteString(`\\r`)\n");
+    output.push_str("\t\tcase '\\t':\n\t\t\tb.WriteString(`\\t`)\n");
+    output.push_str("\t\tdefault:\n\t\t\tif r < 0x20 {\n\t\t\t\tb.WriteString(`\\u00`)\n\t\t\t\tb.WriteByte(hex[r>>4])\n\t\t\t\tb.WriteByte(hex[r&0xf])\n\t\t\t} else {\n\t\t\t\tb.WriteRune(r)\n\t\t\t}\n\t\t}\n\t}\n");
+    output.push_str("\tb.WriteByte('\"')\n\treturn b.String()\n}\n\n");
     output.push_str("func newPayloadValidationError(violations []Violation) error {\n");
     output.push_str("\t// TODO: Use temporal.NewPayloadValidationError once it is available in an SDK release.\n");
     output.push_str("\treturn temporal.NewNonRetryableApplicationError(\"Payload validation failed\", \"PayloadValidationError\", nil, violations)\n");

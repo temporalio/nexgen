@@ -28,6 +28,34 @@ public final class Violation {
         return "[\"" + key.replace("\\", "\\\\").replace("\"", "\\\"") + "\"]";
     }
 
+    /** Quotes {@code value} as a JSON string literal for a violation reason. */
+    public static String quote(String value) {
+        StringBuilder out = new StringBuilder(value.length() + 2).append('"');
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '"') {
+                out.append("\\\"");
+            } else if (c == '\\') {
+                out.append("\\\\");
+            } else if (c == '\b') {
+                out.append("\\b");
+            } else if (c == '\f') {
+                out.append("\\f");
+            } else if (c == '\n') {
+                out.append("\\n");
+            } else if (c == '\r') {
+                out.append("\\r");
+            } else if (c == '\t') {
+                out.append("\\t");
+            } else if (c < 0x20) {
+                out.append(String.format("\\u%04x", (int) c));
+            } else {
+                out.append(c);
+            }
+        }
+        return out.append('"').toString();
+    }
+
     public Violation withPathPrefix(String prefix) {
         if (path == null || path.isEmpty()) {
             return new Violation(prefix, reason);

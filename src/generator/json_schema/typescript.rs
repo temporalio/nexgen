@@ -678,12 +678,12 @@ fn render_ts_pattern_check(
     indent: &str,
 ) {
     let const_name = ts_pattern_const_name(pattern);
-    let escaped = ts_template_escape(pattern);
+    let escaped = ts_template_escape(&crate::json_schema::pattern::violation_reason(pattern));
     output.push_str(indent);
     output.push_str(&format!("if (!{const_name}.test({value_expr})) {{\n"));
     output.push_str(indent);
     output.push_str(&format!(
-        "  violations.push({{ path: {path_expr}, reason: `must match pattern {escaped}, got ${{JSON.stringify({value_expr})}}` }});\n"
+        "  violations.push({{ path: {path_expr}, reason: `{escaped}, got ${{JSON.stringify({value_expr})}}` }});\n"
     ));
     output.push_str(indent);
     output.push_str("}\n");
@@ -854,7 +854,7 @@ fn render_ts_property_name_checks(
         output.push_str(&format!("if ({condition}) {{\n"));
         output.push_str(&inner);
         output.push_str(&format!(
-            "  violations.push({{ path: {DEFINITIONS_NAMESPACE}.memberPath(key), reason: `invalid property name \"${{key}}\": {reason}` }});\n"
+            "  violations.push({{ path: {DEFINITIONS_NAMESPACE}.memberPath(key), reason: `invalid property name ${{JSON.stringify(key)}}: {reason}` }});\n"
         ));
         output.push_str(&inner);
         output.push_str("}\n");
@@ -896,12 +896,12 @@ fn render_ts_property_name_checks(
     drop(emit);
     if let Some(pattern) = &matcher.pattern {
         let const_name = ts_pattern_const_name(pattern);
-        let escaped = ts_template_escape(pattern);
+        let escaped = ts_template_escape(&crate::json_schema::pattern::violation_reason(pattern));
         output.push_str(&inner);
         output.push_str(&format!("if (!{const_name}.test(key)) {{\n"));
         output.push_str(&inner);
         output.push_str(&format!(
-            "  violations.push({{ path: {DEFINITIONS_NAMESPACE}.memberPath(key), reason: `invalid property name \"${{key}}\": must match pattern {escaped}, got ${{JSON.stringify(key)}}` }});\n"
+            "  violations.push({{ path: {DEFINITIONS_NAMESPACE}.memberPath(key), reason: `invalid property name ${{JSON.stringify(key)}}: {escaped}` }});\n"
         ));
         output.push_str(&inner);
         output.push_str("}\n");
@@ -921,7 +921,7 @@ fn render_ts_property_name_checks(
         output.push_str(&format!("!{const_name}.test(key)) {{\n"));
         output.push_str(&inner);
         output.push_str(&format!(
-            "  violations.push({{ path: {DEFINITIONS_NAMESPACE}.memberPath(key), reason: `invalid property name \"${{key}}\": must be a valid {}, got ${{JSON.stringify(key)}}` }});\n",
+            "  violations.push({{ path: {DEFINITIONS_NAMESPACE}.memberPath(key), reason: `invalid property name ${{JSON.stringify(key)}}: must be a valid {}, got ${{JSON.stringify(key)}}` }});\n",
             check.name
         ));
         output.push_str(&inner);

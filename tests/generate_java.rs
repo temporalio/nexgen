@@ -463,8 +463,8 @@ fn java_json_validates_non_object_union_branch_constraints() {
     assert!(declaring.contains("if (!VALUE_PATTERN.matcher(value).find()) {"));
     // The reason quotes the authored pattern, not the `\z`-rewritten one the
     // static compiles — the same text every other target prints.
-    assert!(declaring.contains("\"must match pattern \" + \"^[a-z]+$\" + \", got \""));
-    assert!(!declaring.contains("\"must match pattern \" + \"^[a-z]+\\\\z\""));
+    assert!(declaring.contains("\"must match pattern \\\"^[a-z]+$\\\", got \" + Violation.quote("));
+    assert!(!declaring.contains("must match pattern \\\"^[a-z]+\\\\z"));
     assert!(declaring.contains("must be >= 1, got "));
     assert!(declaring.contains("must have at least 1 items, got "));
     assert!(declaring.contains("duplicate items: element at index "));

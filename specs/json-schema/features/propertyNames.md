@@ -80,15 +80,19 @@ restated here.
 
 | Language | Strategy |
 |---|---|
-| Go | Iterate the wire keys and run the key predicate (compiled `regexp` for [[pattern]], length checks); a failure → a `Violation` at the key's path with `Reason: fmt.Sprintf("invalid property name %q: %s", key, why)` (`why` is the underlying assertion's reason, e.g. `must match ^[a-z]+$`), collected into one `PayloadValidationError` application failure. |
-| TypeScript | the same predicate over the wire object's own keys; a failure → push a `Violation` at the key's path with ``reason: `invalid property name "${k}": ${why}` ``, throw one `PayloadValidationError` application failure. |
-| Python | both directions of the `_<Model>TransferTypeConverter` (**PRINCIPLES Python §3**) loop the map's keys and apply the same key check; a failure appends a `Violation` at the key's path with ``reason=f'invalid property name "{key}": {why}'`` per bad key into the single `PayloadValidationError` application failure. |
-| Java | in the per-POJO collecting deserializer (PRINCIPLES Java §5), iterate the parsed tree's keys, apply the same key check, and push a `Violation` at the key's path with `"invalid property name \"" + key + "\": " + why` per bad key into the single `PayloadValidationError` application failure. |
+| Go | Iterate the wire keys and run the key predicate (compiled `regexp` for [[pattern]], length checks); a failure → a `Violation` at the key's path with `Reason: "invalid property name " + quoteValue(key) + ": " + why` (`why` is the underlying assertion's reason, e.g. `must match pattern "^[a-z]+$"`), collected into one `PayloadValidationError` application failure. |
+| TypeScript | the same predicate over the wire object's own keys; a failure → push a `Violation` at the key's path with ``reason: `invalid property name ${JSON.stringify(k)}: ${why}` ``, throw one `PayloadValidationError` application failure. |
+| Python | both directions of the `_<Model>TransferTypeConverter` (**PRINCIPLES Python §3**) loop the map's keys and apply the same key check; a failure appends a `Violation` at the key's path with ``reason=f'invalid property name {_quote(key)}: {why}'`` per bad key into the single `PayloadValidationError` application failure. |
+| Java | in the per-POJO collecting deserializer (PRINCIPLES Java §5), iterate the parsed tree's keys, apply the same key check, and push a `Violation` at the key's path with `"invalid property name " + Violation.quote(key) + ": " + why` per bad key into the single `PayloadValidationError` application failure. |
 
-Every row states the same predicate and the same `invalid property name "<key>": `
-prefix on both paths; per **P12.2** that identity is the requirement, and whether
-a target reaches it through one exported validator or an inlined check is an
-emission choice.
+Every row states the same predicate and the same `invalid property name <key>: `
+prefix on both paths, with `<key>` quoted as a JSON string literal (the
+[[pattern]] quoting rule, so a key containing `"` or `\` reads identically in
+every target). A [[pattern]] key failure's `why` is `must match pattern
+<quoted pattern>` with no `, got` suffix, since the prefix already names the
+key — `invalid property name "Bad": must match pattern "^[a-z]+$"`. Per
+**P12.2** that identity is the requirement, and whether a target reaches it
+through one exported validator or an inlined check is an emission choice.
 
 Reuses whatever the string-assertion specs ([[pattern]], [[minLength]],
 [[maxLength]], [[enum]], [[format]]) emit — `propertyNames` is just those

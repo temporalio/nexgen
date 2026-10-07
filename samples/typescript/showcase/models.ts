@@ -967,7 +967,7 @@ export const attributesTransferTypeConverter =
         if (__nexgenDefinitions.codePointLength(key, 8) > 8) {
           violations.push({
             path: __nexgenDefinitions.memberPath(key),
-            reason: `invalid property name "${key}": must have length <= 8, got ${__nexgenDefinitions.codePointLength(key)}`,
+            reason: `invalid property name ${JSON.stringify(key)}: must have length <= 8, got ${__nexgenDefinitions.codePointLength(key)}`,
           });
         }
       }
@@ -1029,7 +1029,7 @@ export const attributesTransferTypeConverter =
         if (__nexgenDefinitions.codePointLength(key, 8) > 8) {
           violations.push({
             path: __nexgenDefinitions.memberPath(key),
-            reason: `invalid property name "${key}": must have length <= 8, got ${__nexgenDefinitions.codePointLength(key)}`,
+            reason: `invalid property name ${JSON.stringify(key)}: must have length <= 8, got ${__nexgenDefinitions.codePointLength(key)}`,
           });
         }
       }
@@ -2618,7 +2618,7 @@ export const showcaseTransferTypeConverter =
           if (!PATTERN_821EF753B4B37A85.test(raw["sku"])) {
             violations.push({
               path: "sku",
-              reason: `must match pattern ^[A-Z]{2,4}\$, got ${JSON.stringify(raw["sku"])}`,
+              reason: `must match pattern "^[A-Z]{2,4}\$", got ${JSON.stringify(raw["sku"])}`,
             });
           }
         }
@@ -2638,7 +2638,7 @@ export const showcaseTransferTypeConverter =
           if (!PATTERN_AF8AB992526D6283.test(raw["phrase"])) {
             violations.push({
               path: "phrase",
-              reason: `must match pattern ^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\$, got ${JSON.stringify(raw["phrase"])}`,
+              reason: `must match pattern "^[^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+[\\\\t\\\\n\\\\x0B\\\\f\\\\r ][^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+\$", got ${JSON.stringify(raw["phrase"])}`,
             });
           }
         }
@@ -3403,7 +3403,7 @@ export const showcaseTransferTypeConverter =
             if (!PATTERN_C182F89FDB221836.test(measurements as string)) {
               violations.push({
                 path: "measurements",
-                reason: `must match pattern ^[a-z]+\$, got ${JSON.stringify(measurements as string)}`,
+                reason: `must match pattern "^[a-z]+\$", got ${JSON.stringify(measurements as string)}`,
               });
             }
           }
@@ -4395,7 +4395,7 @@ export const showcaseTransferTypeConverter =
           if (!PATTERN_F7DE686CF7F23810.test(raw["wildcard"])) {
             violations.push({
               path: "wildcard",
-              reason: `must match pattern a[^\\n]b, got ${JSON.stringify(raw["wildcard"])}`,
+              reason: `must match pattern "a[^\\\\n]b", got ${JSON.stringify(raw["wildcard"])}`,
             });
           }
         }
@@ -4933,7 +4933,7 @@ export const showcaseTransferTypeConverter =
             if (!PATTERN_821EF753B4B37A85.test(value.sku)) {
               violations.push({
                 path: "sku",
-                reason: `must match pattern ^[A-Z]{2,4}\$, got ${JSON.stringify(value.sku)}`,
+                reason: `must match pattern "^[A-Z]{2,4}\$", got ${JSON.stringify(value.sku)}`,
               });
             }
           }
@@ -4950,7 +4950,7 @@ export const showcaseTransferTypeConverter =
             if (!PATTERN_AF8AB992526D6283.test(value.phrase)) {
               violations.push({
                 path: "phrase",
-                reason: `must match pattern ^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\$, got ${JSON.stringify(value.phrase)}`,
+                reason: `must match pattern "^[^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+[\\\\t\\\\n\\\\x0B\\\\f\\\\r ][^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+\$", got ${JSON.stringify(value.phrase)}`,
               });
             }
           }
@@ -5586,7 +5586,7 @@ export const showcaseTransferTypeConverter =
               if (!PATTERN_C182F89FDB221836.test(value.measurements as string)) {
                 violations.push({
                   path: "measurements",
-                  reason: `must match pattern ^[a-z]+\$, got ${JSON.stringify(value.measurements as string)}`,
+                  reason: `must match pattern "^[a-z]+\$", got ${JSON.stringify(value.measurements as string)}`,
                 });
               }
             }
@@ -6488,7 +6488,7 @@ export const showcaseTransferTypeConverter =
             if (!PATTERN_F7DE686CF7F23810.test(value.wildcard)) {
               violations.push({
                 path: "wildcard",
-                reason: `must match pattern a[^\\n]b, got ${JSON.stringify(value.wildcard)}`,
+                reason: `must match pattern "a[^\\\\n]b", got ${JSON.stringify(value.wildcard)}`,
               });
             }
           }
@@ -7704,7 +7704,7 @@ export const tokensTransferTypeConverter =
           if (!PATTERN_C182F89FDB221836.test(raw[key])) {
             violations.push({
               path: path,
-              reason: `must match pattern ^[a-z]+\$, got ${JSON.stringify(raw[key])}`,
+              reason: `must match pattern "^[a-z]+\$", got ${JSON.stringify(raw[key])}`,
             });
           }
         }
@@ -7754,7 +7754,7 @@ export const tokensTransferTypeConverter =
           if (!PATTERN_C182F89FDB221836.test(entry)) {
             violations.push({
               path: path,
-              reason: `must match pattern ^[a-z]+\$, got ${JSON.stringify(entry)}`,
+              reason: `must match pattern "^[a-z]+\$", got ${JSON.stringify(entry)}`,
             });
           }
         }
