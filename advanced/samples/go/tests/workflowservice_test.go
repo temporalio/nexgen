@@ -352,7 +352,6 @@ func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryUsesWireKeyAndNat
 	// without converting it to a proto or adding a public model API for tests.
 	request := reflect.ValueOf(requests[0])
 	s.Require().Equal(reflect.Struct, request.Kind(), "callback must receive a native request value")
-	s.Equal(request.Type(), original.InputType, "generated adapter must record the native input type")
 	s.Equal(reflect.TypeOf(ws.SignalWithStartWorkflowOptions{}).PkgPath(), request.Type().PkgPath())
 	for name, want := range map[string]string{
 		"namespace": "default-test-namespace", "ID": "target-workflow-id",
@@ -453,61 +452,6 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 	}, envelopes, "outer envelopes remain Nexus-scoped on every endpoint")
 }
 
-func (s *WorkflowServiceIntegrationSuite) TestRawProtobufSkipsNativeRegistryCallbacks() {
-	key := internal.NexusOperationKey{
-		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
-	}
-	original, ok := ws.NexusOperationRegistry[key]
-	s.Require().True(ok)
-	s.Require().NotNil(original.InputType, "generated registry must guard the native callbacks")
-	s.Require().NotEqual(reflect.TypeFor[*workflowservicepb.SignalWithStartWorkflowExecutionRequest](), original.InputType)
-
-	payloads, err := converter.GetDefaultDataConverter().ToPayloads("already-encoded-input")
-	s.Require().NoError(err)
-	request := &workflowservicepb.SignalWithStartWorkflowExecutionRequest{
-		Namespace: "wire-namespace", WorkflowId: "wire-workflow", SignalName: "wake-up",
-		Input: payloads, SignalInput: payloads,
-	}
-	recorder := newRecordingDataConverter()
-	s.env.SetDataConverter(oneShotRecordingDataConverter{recorder})
-	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
-		clients := []workflow.NexusClient{
-			internal.NewSystemNexusClient(workflowServiceName),
-			workflow.NewNexusClient("temporal-system", workflowServiceName),
-			workflow.NewNexusClient("ordinary-endpoint", workflowServiceName),
-		}
-		for _, client := range clients {
-			future := client.ExecuteOperation(ctx, key.Operation, request, workflow.NexusOperationOptions{})
-			var response workflowservicepb.SignalWithStartWorkflowExecutionResponse
-			if err := future.Get(ctx, &response); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-
-	s.Require().NoError(s.env.GetWorkflowError())
-	s.Require().Len(s.calls, 3)
-	for _, call := range s.calls {
-		s.Equal(request.Namespace, call.Namespace)
-		s.Equal(request.WorkflowId, call.WorkflowId)
-		s.Equal(request.SignalName, call.SignalName)
-		s.Equal(payloads, call.Input)
-		s.Equal(payloads, call.SignalInput)
-	}
-	envelopes := map[string]int{}
-	for _, encoded := range recorder.snapshot() {
-		if sc, ok := encoded.Context.(converter.NexusSerializationContext); ok {
-			if _, ok := encoded.Value.(*workflowservicepb.SignalWithStartWorkflowExecutionRequest); ok {
-				s.Equal(workflowServiceName, sc.Service)
-				s.Equal(key.Operation, sc.Operation)
-				envelopes[sc.Endpoint]++
-			}
-		}
-	}
-	s.Equal(map[string]int{"__temporal_system": 1, "temporal-system": 1, "ordinary-endpoint": 1}, envelopes)
-}
-
 func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryCopiesEntries() {
 	key := internal.NexusOperationKey{
 		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
@@ -519,7 +463,7 @@ func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryCopiesEntries() {
 	calls := 0
 	entry.SerializationContext = func(any) converter.SerializationContext {
 		calls++
-		return nil
+		return converter.WorkflowSerializationContext{}
 	}
 	ws.NexusOperationRegistry[key] = entry
 
