@@ -679,16 +679,6 @@ struct RenderedResourceFieldInitializer {
 }
 
 impl OperationBinding {
-    pub(in crate::generator) fn registry_input_converter(
-        &self,
-        input_type: &str,
-        context_type: &str,
-    ) -> Option<String> {
-        self.input_to_proto.as_ref().map(|expression| {
-            format!("func(ctx {context_type}, input any) (any, error) {{\n\t\trequest := input.({input_type})\n\t\treturn {expression}\n\t}}")
-        })
-    }
-
     pub(in crate::generator) fn requires_fmt(&self) -> bool {
         self.output_returns_pointer
     }
@@ -763,6 +753,7 @@ impl ModelBackend {
         services: &mut [RenderedService<'_>],
     ) -> Result<()> {
         for (service, planned_service) in services.iter_mut().zip(api_plan.services.iter()) {
+            let is_system_endpoint = service.is_system_endpoint();
             for (rendered_op, planned_op) in service
                 .operations
                 .iter_mut()
@@ -785,12 +776,21 @@ impl ModelBackend {
                 // Generated models carry a transfer-type converter, so the SDK
                 // converts them to proto inside the payload converter. Anything
                 // else (hand-written override converters over types nexgen does
-                // not own) uses an eager converter, either here or in the SDK's
-                // registry callback when the operation selects a policy.
+                // not own) uses an eager converter unless policy selection needs
+                // the native request in the SDK.
                 let input_to_proto = if input_conv.kind == GoConversionKind::ModelConverter {
                     self.mark_transfer_model_checked(api_plan, &input, &planned_op.name, "input")?;
                     None
                 } else {
+                    if is_system_endpoint && rendered_op.serialization_context_expr.is_some() {
+                        return Err(Error::UnsupportedGoProtoConversion {
+                            context: format!(
+                                "operation `{}` input `{}`",
+                                planned_op.name, rendered_op.input_type
+                            ),
+                            reason: "cannot attach a TransferTypeConverter to an external input type for a system operation with @nexus.serialization-context; use a generated, locally owned request model instead".to_string(),
+                        });
+                    }
                     let input_arg = match input_conv.kind {
                         GoConversionKind::OverrideConverter => "&request".to_string(),
                         _ => "request".to_string(),
@@ -995,7 +995,7 @@ pub(in crate::generator) fn render_operation_function_proto(
     }
 
     let input_arg = match binding.input_to_proto.as_deref() {
-        Some(input_to_proto) if !service.defers_input_to_registry(operation) => {
+        Some(input_to_proto) => {
             output.push_str("\trequestProto, err := ");
             output.push_str(input_to_proto);
             output.push('\n');
@@ -1008,9 +1008,7 @@ pub(in crate::generator) fn render_operation_function_proto(
             output.push_str("\t}\n");
             "requestProto"
         }
-        // The SDK converts native requests through their transfer converter or
-        // the registered system operation's InputToTransfer callback.
-        _ => "request",
+        None => "request",
     };
     let endpoint = service
         .endpoint

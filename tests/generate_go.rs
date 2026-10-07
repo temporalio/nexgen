@@ -2095,6 +2095,11 @@ fn go_registry_section(source: &str) -> &str {
 fn assert_registry_entry(registry: &str, service: &str, operation: &str, helper: Option<&str>) {
     let compact: String = registry.chars().filter(|c| !c.is_whitespace()).collect();
     let key = format!("Service:\"{service}\",Operation:\"{operation}\"");
+    assert!(!compact.contains("InputType:"), "{registry}");
+    let Some(helper) = helper else {
+        assert!(!compact.contains(&key), "{registry}");
+        return;
+    };
     assert_eq!(compact.matches(&key).count(), 1, "{registry}");
     let lines = registry
         .lines()
@@ -2109,22 +2114,19 @@ fn assert_registry_entry(registry: &str, service: &str, operation: &str, helper:
     );
     let entry = compact.split(&key).nth(1).unwrap();
     let value = entry.trim_start_matches(',').strip_prefix("}:").unwrap();
-    if let Some(helper) = helper {
-        let input_type = value
-            .strip_prefix("{InputType:reflect.TypeFor[")
-            .unwrap()
-            .split("]()")
-            .next()
-            .unwrap();
-        assert!(
-            value.starts_with(&format!(
-                "{{InputType:reflect.TypeFor[{input_type}](),SerializationContext:func(requestany)converter.SerializationContext{{return{helper}(request.({input_type}))}},"
-            )),
-            "{registry}"
-        );
-    } else {
-        assert!(value.starts_with("{}"), "{registry}");
-    }
+    let input_type = value
+        .split("request.(")
+        .nth(1)
+        .unwrap()
+        .split(')')
+        .next()
+        .unwrap();
+    assert!(
+        value.starts_with(&format!(
+            "{{SerializationContext:func(requestany)converter.SerializationContext{{return{helper}(request.({input_type}))}},"
+        )),
+        "{registry}"
+    );
 }
 
 #[test]
@@ -2167,10 +2169,7 @@ fn go_serialization_context_registry_uses_wire_names_and_typed_adapter() {
     assert!(compact.contains(
         "var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry"
     ));
-    assert!(
-        compact.contains("InputType: reflect.TypeFor[contextRequest]()"),
-        "{registry}"
-    );
+    assert!(compact.contains("return requestContext(request.(contextRequest))"));
     assert_eq!(registry.matches("\"reflect\"").count(), 1);
     assert_eq!(
         registry.matches("\"go.temporal.io/sdk/converter\"").count(),
@@ -2299,7 +2298,9 @@ import (
     "go.temporal.io/sdk/workflow"
 )
 
-func requestContext(request temporal.RetryPolicy) converter.SerializationContext { return nil }
+func requestContext(request temporal.RetryPolicy) converter.SerializationContext {
+    return converter.WorkflowSerializationContext{Namespace: "target-namespace", WorkflowID: "target-workflow"}
+}
 func retryPolicyToProto(ctx workflow.Context, value *temporal.RetryPolicy) (*common.RetryPolicy, error) {
     return &common.RetryPolicy{}, nil
 }
@@ -2312,92 +2313,37 @@ func transformPolicy(ctx workflow.Context, value *common.RetryPolicy) (string, e
 "#;
 
 #[test]
-fn go_serialization_context_accepts_eager_external_request() {
+fn go_serialization_context_rejects_external_request() {
     for endpoint in ["__temporal_system", "temporal-system"] {
-        let files = try_render_go_serialization_context_fixture_at_endpoint(
-            GO_CONTEXT_OVERRIDE_TYPES,
-            r#"/// @nexus.serialization-context go="requestContext"
-        roundtrip: func(request: retry-policy) -> retry-policy;"#,
-            GO_CONTEXT_OVERRIDE_SUPPORT,
-            endpoint,
-        )
-        .unwrap();
-        let operation = &files[Path::new("sampleservice.go")];
-        let registry = go_registry_main(&files);
-        let wrapper = operation.split("// --- Registry ---").next().unwrap();
-        let section = go_registry_section(registry);
-        let compact = registry.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(compact.contains("InputToTransfer: func(ctx internal.Context, input any) (any, error) { request := input.(temporal.RetryPolicy) return retryPolicyToProto(ctx, &request) }"), "{registry}");
-        assert_eq!(
-            registry.matches("\"go.temporal.io/sdk/temporal\"").count(),
-            1
-        );
-        assert_eq!(
-            registry.matches("\"go.temporal.io/sdk/workflow\"").count(),
-            1
-        );
-        assert_eq!(
-            registry.matches("\"go.temporal.io/api/common/v1\"").count(),
-            1
-        );
-        assert!(operation.contains("c.ExecuteOperation(ctx, \"Roundtrip\", request,"));
-        assert!(!operation.contains("requestProto"));
-        assert!(!wrapper.contains("retryPolicyToProto("));
-        assert!(operation.contains("value, err := retryPolicyFromProto(ctx, &result)"));
-        assert_no_generated_context_plumbing(&files);
-        assert!(!operation.contains("SerializationContext()"));
-        // A nil policy result must not suppress conversion: the callbacks are independent.
-        assert!(!section.contains("if "));
-        assert!(compact.contains("InputType: reflect.TypeFor[temporal.RetryPolicy]()"));
-        assert_registry_entry(
-            registry,
-            "SampleService",
-            "Roundtrip",
-            Some("requestContext"),
-        );
-        assert!(!registry.contains("nexgenOperationInfo"));
-        assert_eq!(
-            registry
-                .matches("return requestContext(request.(temporal.RetryPolicy))")
-                .count(),
-            1
-        );
-        assert!(files[Path::new("support.go")].contains("return nil"));
+        for native_type in ["temporal.RetryPolicy", "*temporal.RetryPolicy"] {
+            for operation in [
+                "roundtrip: func(request: retry-policy) -> retry-policy;",
+                "send: func(request: retry-policy);",
+            ] {
+                let error = try_render_go_serialization_context_fixture_at_endpoint(
+                    &GO_CONTEXT_OVERRIDE_TYPES.replace("temporal.RetryPolicy", native_type),
+                    &format!("/// @nexus.serialization-context go=\"requestContext\"\n{operation}"),
+                    &GO_CONTEXT_OVERRIDE_SUPPORT.replace(
+                        "request temporal.RetryPolicy",
+                        &format!("request {native_type}"),
+                    ),
+                    endpoint,
+                )
+                .unwrap_err()
+                .to_string();
+                let operation_name = if operation.starts_with("roundtrip") {
+                    "Roundtrip"
+                } else {
+                    "Send"
+                };
+                assert!(error.contains(operation_name), "{error}");
+                assert!(error.contains(native_type), "{error}");
+                assert!(error.contains("TransferTypeConverter"), "{error}");
+                assert!(error.contains("@nexus.serialization-context"), "{error}");
+                assert!(error.contains("locally owned request model"), "{error}");
+            }
+        }
     }
-}
-
-#[test]
-fn go_serialization_context_external_input_only_merges_registry_imports() {
-    let files = try_render_go_serialization_context_fixture_at_endpoint(
-        GO_CONTEXT_OVERRIDE_TYPES,
-        r#"/// @nexus.serialization-context go="requestContext"
-        send: func(request: retry-policy);"#,
-        GO_CONTEXT_OVERRIDE_SUPPORT,
-        "temporal-system",
-    )
-    .unwrap();
-    let operation = &files[Path::new("sampleservice.go")];
-    let registry = go_registry_main(&files);
-    let wrapper = operation.split("// --- Registry ---").next().unwrap();
-    assert!(
-        registry.contains("InputToTransfer: func(ctx internal.Context, input any) (any, error)")
-    );
-    assert_eq!(
-        registry.matches("\"go.temporal.io/sdk/internal\"").count(),
-        1
-    );
-    assert_eq!(
-        registry.matches("\"go.temporal.io/sdk/temporal\"").count(),
-        1
-    );
-    assert_eq!(
-        registry.matches("\"go.temporal.io/sdk/workflow\"").count(),
-        1
-    );
-    assert!(!operation.contains("\"go.temporal.io/api/common/v1\""));
-    assert!(!wrapper.contains("retryPolicyToProto("));
-    assert!(operation.contains("c.ExecuteOperation(ctx, \"Send\", request,"));
-    assert_no_generated_context_plumbing(&files);
 }
 
 #[test]
@@ -2428,7 +2374,6 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     assert_eq!(operation.matches("retryPolicyToProto(").count(), 1);
     assert!(operation.contains("value, err := retryPolicyFromProto(ctx, &result)"));
     assert!(!operation.contains("requestContext("));
-    assert!(!registry.contains("InputToTransfer"));
     assert_eq!(main.matches("\"go.temporal.io/sdk/temporal\"").count(), 1);
     let compact = registry.split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(
@@ -2481,7 +2426,6 @@ fn go_serialization_context_preserves_owned_input_and_uses_ctx_for_eager_output(
     );
     assert!(!operation.contains("ctx = nexgenPayloadContext(ctx"));
     assert_no_generated_context_plumbing(&files);
-    assert!(!go_registry_section(go_registry_main(&files)).contains("InputToTransfer"));
     assert!(operation.contains("\"go.temporal.io/sdk/internal\""));
 }
 

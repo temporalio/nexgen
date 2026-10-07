@@ -675,7 +675,6 @@ var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperat
 		Service:   "temporal.api.workflowservice.v1.WorkflowService",
 		Operation: "SignalWithStartWorkflowExecution",
 	}: {
-		InputType: reflect.TypeFor[signalWithStartWorkflowRequest](),
 		SerializationContext: func(request any) converter.SerializationContext {
 			return signalWithStartWorkflowSerializationContext(request.(signalWithStartWorkflowRequest))
 		},

@@ -1948,22 +1948,6 @@ fn render_operation_registry(
                 .map(|(name, _)| name)
         })
         .collect();
-    let input_context = package.qualified_expr("go.temporal.io/sdk/internal", "internal.Context");
-    let input_converters: BTreeMap<_, _> = services
-        .iter()
-        .flat_map(|service| {
-            service.operations.iter().filter_map(|operation| {
-                if !service.defers_input_to_registry(operation) {
-                    return None;
-                }
-                let callback = operation
-                    .wire_binding
-                    .as_ref()?
-                    .registry_input_converter(&operation.input_type, &input_context)?;
-                Some(((service.wire_name, operation.wire_name), callback))
-            })
-        })
-        .collect();
     let mut candidates = external_imports.to_vec();
     candidates.extend(model_imports.iter().map(|path| {
         (
@@ -1984,9 +1968,6 @@ fn render_operation_registry(
         }
     }
     let mut imports = BTreeMap::new();
-    if has_helpers && !package.is_self_import("reflect") {
-        imports.insert("reflect".to_string(), "reflect".to_string());
-    }
     if has_helpers && !package.is_self_import("go.temporal.io/sdk/converter") {
         imports.insert(
             "converter".to_string(),
@@ -2000,9 +1981,6 @@ fn render_operation_registry(
         );
     }
     for (path, alias) in candidates {
-        let used_by_input = input_converters
-            .values()
-            .any(|callback| callback.contains(&format!("{alias}.")));
         let used_by_input_type =
             services
                 .iter()
@@ -2011,7 +1989,7 @@ fn render_operation_registry(
                     operation.serialization_context_expr.is_some()
                         && operation.input_type.contains(&format!("{alias}."))
                 });
-        if (!helper_packages.contains(alias.as_str()) && !used_by_input && !used_by_input_type)
+        if (!helper_packages.contains(alias.as_str()) && !used_by_input_type)
             || package.is_self_import(&path)
         {
             continue;
@@ -2036,13 +2014,15 @@ fn render_operation_registry(
         "go.temporal.io/sdk/internal",
         "internal.NexusOperationRegistryEntry",
     );
-    let type_for = package.qualified_expr("reflect", "reflect.TypeFor");
     output.push_str(&format!(
         "\nvar NexusOperationRegistry = map[{key}]{info}{{\n"
     ));
     let mut keys = BTreeSet::new();
     for service in services {
         for operation in &service.operations {
+            let Some(helper) = operation.serialization_context_expr else {
+                continue;
+            };
             if !keys.insert((service.wire_name, operation.wire_name)) {
                 return Err(Error::InvalidWitDirective {
                     path: PathBuf::from("<go-plan>"),
@@ -2059,17 +2039,10 @@ fn render_operation_registry(
             output.push_str(&format!(
                 "\t{{\n\t\tService: {service_name},\n\t\tOperation: {operation_name},\n\t}}: {{\n"
             ));
-            if let Some(helper) = operation.serialization_context_expr {
-                let input_type = &operation.input_type;
-                output.push_str(&format!(
-                    "\t\tInputType: {type_for}[{input_type}](),\n\t\tSerializationContext: func(request any) {sc} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
-                ));
-                if let Some(callback) =
-                    input_converters.get(&(service.wire_name, operation.wire_name))
-                {
-                    output.push_str(&format!("\t\tInputToTransfer: {callback},\n"));
-                }
-            }
+            let input_type = &operation.input_type;
+            output.push_str(&format!(
+                "\t\tSerializationContext: func(request any) {sc} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
+            ));
             output.push_str("\t},\n");
         }
     }
@@ -2245,18 +2218,11 @@ pub(in crate::generator) struct RenderedService<'a> {
 }
 
 impl RenderedService<'_> {
-    fn is_system_endpoint(&self) -> bool {
+    pub(in crate::generator) fn is_system_endpoint(&self) -> bool {
         matches!(
             self.endpoint.as_deref(),
             Some("__temporal_system" | "temporal-system")
         )
-    }
-
-    pub(in crate::generator) fn defers_input_to_registry(
-        &self,
-        operation: &RenderedOperation<'_>,
-    ) -> bool {
-        operation.serialization_context_expr.is_some() && self.is_system_endpoint()
     }
 }
 
@@ -5457,6 +5423,178 @@ fn render_forwarding_wrapper(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    use prost::Message;
+    use prost_types::{
+        DescriptorProto, FieldDescriptorProto, FileDescriptorProto, FileDescriptorSet, FileOptions,
+        field_descriptor_proto::{Label, Type},
+    };
+
+    use crate::error::{Error, Result};
+    use crate::{GenerateRequest, generate_to_file};
+
+    fn generate_context_operation(
+        endpoint: &str,
+        native_type: &str,
+        annotated: bool,
+        owned_request: bool,
+    ) -> Result<BTreeMap<PathBuf, String>> {
+        let temp = tempfile::tempdir().unwrap();
+        let input = temp.path().join("context.wit");
+        let annotation = if annotated {
+            "/// @nexus.serialization-context go=\"requestContext\""
+        } else {
+            ""
+        };
+        let declaration = if owned_request {
+            r#"/// @nexus.proto "test.Request"
+            record request { retry-policy: option<retry-policy> }"#
+        } else {
+            "type request = retry-policy;"
+        };
+        std::fs::write(
+            &input,
+            format!(
+                r#"package test:context@1.0.0;
+                world system {{ export sample-service; }}
+                /// @nexus.endpoint "{endpoint}"
+                interface sample-service {{
+                    type placeholder = string;
+                    /// @nexus.proto "test.RetryPolicy"
+                    /// @nexus.type go="go.temporal.io/sdk/{native_type}"
+                    type retry-policy = placeholder;
+                    {declaration}
+                    {annotation}
+                    send: func(request: request) -> retry-policy;
+                }}"#
+            ),
+        )
+        .unwrap();
+        let descriptor = temp.path().join("wire.bin");
+        let descriptors = FileDescriptorSet {
+            file: vec![FileDescriptorProto {
+                name: Some("wire.proto".to_string()),
+                package: Some("test".to_string()),
+                syntax: Some("proto3".to_string()),
+                options: Some(FileOptions {
+                    go_package: Some("example.com/wire;wire".to_string()),
+                    ..Default::default()
+                }),
+                message_type: vec![
+                    DescriptorProto {
+                        name: Some("RetryPolicy".to_string()),
+                        ..Default::default()
+                    },
+                    DescriptorProto {
+                        name: Some("Request".to_string()),
+                        field: vec![FieldDescriptorProto {
+                            name: Some("retry_policy".to_string()),
+                            number: Some(1),
+                            label: Some(Label::Optional as i32),
+                            r#type: Some(Type::Message as i32),
+                            type_name: Some(".test.RetryPolicy".to_string()),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            }],
+        };
+        std::fs::write(&descriptor, descriptors.encode_to_vec()).unwrap();
+        let output = temp.path().join("generated");
+        generate_to_file(&GenerateRequest {
+            config: crate::nexgen_config::NexgenConfig {
+                mode: crate::generator::GenerationMode::NativeApi,
+                ..Default::default()
+            },
+            language: crate::language::Language::Go,
+            input_paths: vec![input],
+            support_paths: Vec::new(),
+            descriptor_paths: vec![descriptor],
+            output_path: output.clone(),
+            format: false,
+            java_package_name: None,
+            ts_date_time_types: Default::default(),
+        })?;
+        Ok(std::fs::read_dir(output)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                (
+                    PathBuf::from(entry.file_name()),
+                    std::fs::read_to_string(entry.path()).unwrap(),
+                )
+            })
+            .collect())
+    }
+
+    #[test]
+    fn serialization_context_rejects_external_operation_inputs() {
+        for endpoint in ["__temporal_system", "temporal-system"] {
+            for native_type in ["temporal.RetryPolicy", "*temporal.RetryPolicy"] {
+                let error =
+                    generate_context_operation(endpoint, native_type, true, false).unwrap_err();
+                let Error::UnsupportedGoProtoConversion { context, reason } = error else {
+                    panic!("unexpected error: {error}");
+                };
+                assert!(context.contains("Send"), "{context}");
+                assert!(context.contains(native_type), "{context}");
+                assert!(reason.contains("TransferTypeConverter"), "{reason}");
+                assert!(reason.contains("locally owned request model"), "{reason}");
+            }
+        }
+    }
+
+    #[test]
+    fn external_inputs_keep_eager_conversion_without_system_policy() {
+        for (endpoint, annotated) in [
+            ("sample-service", true),
+            ("temporal-system", false),
+            ("__temporal_system", false),
+        ] {
+            let files =
+                generate_context_operation(endpoint, "temporal.RetryPolicy", annotated, false)
+                    .unwrap();
+            let source = &files[&PathBuf::from("sampleservice.go")];
+            assert!(
+                source.contains("requestProto, err := retryPolicyToProto(ctx, &request)"),
+                "{source}"
+            );
+            assert!(
+                source.contains("c.ExecuteOperation(ctx, \"Send\", requestProto,"),
+                "{source}"
+            );
+            assert!(
+                source.contains("retryPolicyFromProto(ctx, &result)"),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn system_policy_supports_generated_request_with_nested_external_type() {
+        let files =
+            generate_context_operation("temporal-system", "temporal.RetryPolicy", true, true)
+                .unwrap();
+        let source = &files[&PathBuf::from("sampleservice.go")];
+        assert!(
+            source.contains("c.ExecuteOperation(ctx, \"Send\", request,"),
+            "{source}"
+        );
+        assert!(source.contains("TransferTypeConverter()"), "{source}");
+        assert!(
+            source.contains("retryPolicyToProto(ctx, m.RetryPolicy)"),
+            "{source}"
+        );
+        assert!(
+            source.contains("retryPolicyFromProto(ctx, &result)"),
+            "{source}"
+        );
+    }
+
     #[test]
     fn recognizes_builtin_nilable_types() {
         for type_expr in ["any", "error", "[]byte", "map[string]any"] {
