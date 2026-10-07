@@ -15,12 +15,12 @@ namespace Nexgen.GenericModelService
 {
 
     [GeneratedCode("nexgen", null)]
-    public class CompleteOptions<ContextT>
+    public class CompleteOptions<TContext>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="CompleteOptions"/> class.
+        /// Initializes a new instance of the <see cref="CompleteOptions{TContext}"/> class.
         /// </summary>
-        public CompleteOptions(ContextT context, IReadOnlyList<ContextT> contexts, IReadOnlyDictionary<string, ContextT> byName, Inner<ContextT> nested)
+        public CompleteOptions(TContext context, IReadOnlyList<TContext> contexts, IReadOnlyDictionary<string, TContext> byName, Inner<TContext> nested)
         {
             Context = context;
             Contexts = contexts;
@@ -28,10 +28,10 @@ namespace Nexgen.GenericModelService
             Nested = nested;
         }
 
-        public ContextT Context { get; set; }
-        public IReadOnlyList<ContextT> Contexts { get; set; }
-        public IReadOnlyDictionary<string, ContextT> ByName { get; set; }
-        public Inner<ContextT> Nested { get; set; }
+        public TContext Context { get; set; }
+        public IReadOnlyList<TContext> Contexts { get; set; }
+        public IReadOnlyDictionary<string, TContext> ByName { get; set; }
+        public Inner<TContext> Nested { get; set; }
     }
 
     /// <summary>
@@ -44,18 +44,18 @@ namespace Nexgen.GenericModelService
         private const string GenericModelServiceEndpoint = "generic-models";
 
         [GeneratedCode("nexgen", null)]
-        private static async Task<GenericResponse<ContextT, object, object>> CompleteAsync<ContextT>(GenericRequest<ContextT> request)
+        private static async Task<GenericResponse<TContext, object, object>> CompleteAsync<TContext>(GenericRequest<TContext> request)
         {
             var client = Workflow.CreateNexusWorkflowClient("GenericModelService", GenericModelServiceEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<GenericResponse<ContextT, object, object>>("Complete", request).ConfigureAwait(true);
+            var result = await client.ExecuteNexusOperationAsync<GenericResponse<TContext, object, object>>("Complete", request).ConfigureAwait(true);
             return result;
         }
 
         /// <param name="options">Options for the operation.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<GenericResponse<ContextT, object, object>> CompleteAsync<ContextT>(CompleteOptions<ContextT> options)
+        public static Task<GenericResponse<TContext, object, object>> CompleteAsync<TContext>(CompleteOptions<TContext> options)
         {
-            var request = new GenericRequest<ContextT>(options.Context, options.Contexts, options.ByName, options.Nested);
+            var request = new GenericRequest<TContext>(options.Context, options.Contexts, options.ByName, options.Nested);
             return CompleteAsync(request);
         }
 

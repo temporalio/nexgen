@@ -51,6 +51,9 @@ generated code, and tests.
 - [`start-workflow`](samples/inputs/start-workflow.wit): a proto-backed Temporal workflow-start API that returns a generated resource handle with follow-up operations such as cancel, restart, and get-result.
 - [`workflow-service`](samples/inputs/workflow-service.wit): a proto-backed `SignalWithStartWorkflowExecution` example showing flattened APIs, function arguments, sourced fields, support converters, and output transforms.
 - [`type-roundtrip`](samples/inputs/type-roundtrip.wit): a proto-backed type roundtrip example for focused native/proto conversion coverage, including retry policies, activity options, durations, task queues, and priority.
+- [`notification-service`](samples/inputs/notification-service.wit): a proto-backed notification completion payload with generic source-context and output values, generated for Python and .NET.
+- [`proto-oneof`](samples/inputs/proto-oneof.wit): proto-backed models with required and optional protobuf oneofs, including a generic `Payloads`-carried case, generated for Python and .NET.
+- [`proto-generic`](samples/inputs/proto-generic.wit): generic proto-backed models whose type parameters are carried by `Payload` fields through nested records, generated for Python and .NET.
 
 Rebuild the checked-in example outputs:
 
@@ -304,15 +307,22 @@ raises `ValueError("missing required field Model.field")`. Each selected case
 uses the normal WIT variant tuple form `(tag, payload)`, and unknown authored
 tags continue to raise `ValueError`.
 
-Other language backends report an explicit unsupported-conversion error when a
-reachable oneof model requires protobuf conversion.
+.NET native-API generation converts both shapes as well: the containing model
+switches over the protobuf oneof case to construct the variant's nested case
+record, an unset `option<variant>` decodes to `null`, and an unset required
+oneof throws `InvalidOperationException`. Encoding a `null` required variant
+also throws `InvalidOperationException`. Go and TypeScript report an explicit
+unsupported-conversion error when a reachable oneof model requires protobuf
+conversion.
 
 Python also preserves concrete runtime type arguments while decoding nested
 proto-backed generic records. A type parameter represented by Temporal's
 single-value `Payload` carrier is passed to the payload converter as its type
-hint; `Payloads` continues to decode as a sequence. The
-`proto-generic-python` sample exercises this Python-only exception without
-making the cross-language `generic-models` sample depend on protobuf support.
+hint; `Payloads` continues to decode as a sequence. .NET generic proto-backed
+models use open generic transfer-type converters and decode carrier fields as
+the model's concrete type arguments. The `proto-oneof` and `proto-generic`
+samples exercise this Python and .NET support without making the cross-language
+`generic-models` sample depend on protobuf support.
 
 Generate WIT for a proto RPC from a descriptor set:
 

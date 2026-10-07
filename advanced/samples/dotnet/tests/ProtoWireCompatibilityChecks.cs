@@ -44,7 +44,8 @@ namespace Nexgen.DotNetExamples.Tests
         public void FailureIntermediateUsesSdkFailureConverter()
         {
             var payloadConverter = new Temporalio.Converters.DefaultPayloadConverter();
-            // TODO: Remove once the SDK scopes this context around System Nexus transfer conversion.
+            // The samples compile the generated code outside the SDK. Thus the SDK's System Nexus
+            // payload converter does not push this context. The test pushes the context here.
             using var converterContext = SystemNexusConverterContext.Push(
                 payloadConverter,
                 Temporalio.Converters.DataConverter.Default.FailureConverter);

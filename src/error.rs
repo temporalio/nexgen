@@ -55,6 +55,16 @@ pub enum Error {
         conflicting_declaration: String,
     },
 
+    #[error(
+        ".NET type parameter `{parameter}` in `{declaration}` maps to `{name}`, which conflicts with {conflicting}"
+    )]
+    DotnetTypeParameterNameConflict {
+        declaration: String,
+        parameter: String,
+        name: String,
+        conflicting: String,
+    },
+
     #[error("refusing to overwrite existing path `{path}`")]
     OutputPathExists { path: PathBuf },
 
@@ -139,11 +149,6 @@ pub enum Error {
         message: String,
         field: String,
     },
-
-    #[error(
-        "{language} protobuf transfer-type conversion does not yet support generic model `{message}`"
-    )]
-    UnsupportedProtoGenericModelTransferConversion { language: Language, message: String },
 
     #[error("Java code generation does not support protobuf-backed model `{message}`")]
     UnsupportedJavaProtoModel { message: String },

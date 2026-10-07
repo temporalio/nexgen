@@ -776,3 +776,198 @@ interface workflow-service {
     assert!(!rendered.contains("WorkflowServiceOperations"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
+
+#[test]
+fn dotnet_notification_models_convert_generic_oneofs_without_service() {
+    let root = project_root();
+    let files = generate_dotnet_files(
+        &example_input_paths(&root, "notification-service"),
+        &[descriptor_path(&root)],
+    );
+    let models = files
+        .get(&PathBuf::from("Models.cs"))
+        .expect("notification output should include Models.cs");
+
+    assert!(!files.contains_key(&PathBuf::from("Services.cs")));
+    assert!(!files.contains_key(&PathBuf::from("Operations.cs")));
+    assert!(models.contains("namespace Nexgen.NotificationService\n{"));
+    assert!(models.contains(
+        "[Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteRequest<,>.TransferTypeConverter))]"
+    ));
+    assert!(models.contains("public record OnCompleteRequest<TOutput, TSourceContext>"));
+    assert!(models.contains(
+        "internal static OnCompleteRequest<TOutput, TSourceContext> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)"
+    ));
+    assert!(models.contains("OnCompleteRequestResult<TOutput> resultOneof;"));
+    assert!(models.contains("switch (wire.ResultCase)"));
+    assert!(models.contains(
+        "case Temporalio.Api.NotificationService.V1.OnCompleteRequest.ResultOneofCase.Success:"
+    ));
+    assert!(models.contains(
+        "resultOneof = new OnCompleteRequestResult<TOutput>.Success(Nexgen.Support.ProtoExtensions.FromPayload<TOutput>(wire.Success));"
+    ));
+    assert!(models.contains(
+        "throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.Result\");"
+    ));
+    assert!(models.contains("if (wire.SourceContext == null)"));
+    assert!(models.contains(
+        "throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.SourceContext\");"
+    ));
+    assert!(models.contains(
+        "return new OnCompleteRequest<TOutput, TSourceContext>(resultOneof, Nexgen.Support.ProtoExtensions.FromPayload<TSourceContext>(wire.SourceContext));"
+    ));
+    assert!(!models.contains(" switch {"));
+    assert!(models.contains("case OnCompleteRequestResult<TOutput>.Failure failureCase:"));
+    assert!(models.contains(
+        "                    break;\n                default:\n                    throw new System.InvalidOperationException(\"missing required field OnCompleteRequest.Result\");\n            }\n            proto.SourceContext ="
+    ));
+    assert!(models.contains(
+        "proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failureCase.Value);"
+    ));
+    assert!(models.contains(
+        "proto.SourceContext = Nexgen.Support.ProtoExtensions.ToPayload(SourceContext);"
+    ));
+    assert!(models.contains(
+        "public object? ToTransferType(object? value) => value is null ? null : ((OnCompleteRequest<TOutput, TSourceContext>)value).ToTransferType();"
+    ));
+}
+
+#[test]
+fn dotnet_proto_oneofs_convert_payloads_and_optional_groups() {
+    let root = project_root();
+    let files = generate_dotnet_files(
+        &example_input_paths(&root, "proto-oneof"),
+        &[descriptor_path(&root)],
+    );
+    let models = files
+        .get(&PathBuf::from("Models.cs"))
+        .expect("proto oneof output should include Models.cs");
+
+    assert!(models.contains("typeof(Outcome<>.TransferTypeConverter)"));
+    assert!(models.contains(
+        "new OutcomeValue<TOutput>.Success(wire.Success.Payloads_.Count == 0 ? default! : Nexgen.Support.ProtoExtensions.FromPayloads<TOutput>(wire.Success)[0])"
+    ));
+    assert!(models.contains("if (wire.Success.Payloads_.Count > 1)"));
+    assert!(models.contains(
+        "throw new System.InvalidOperationException($\"expected at most one payload in Outcome.Success, found {wire.Success.Payloads_.Count}\");"
+    ));
+    assert!(models.contains(
+        "proto.Success = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { successCase.Value });"
+    ));
+    assert!(models.contains("ActivitySelection? activityOneof;"));
+    assert!(models.contains("activityOneof = new ActivitySelection.Type(wire.Type);"));
+    assert!(models.contains("activityOneof = null;"));
+    assert!(models.contains("Activity = activityOneof,"));
+    assert!(models.contains("case ActivitySelection.Type typeCase:"));
+    assert!(models.contains(
+        "proto.Type = typeCase.Value;\n                    break;\n            }\n            proto.Reason = Reason;"
+    ));
+}
+
+#[test]
+fn dotnet_generic_proto_models_reference_nested_generic_converters() {
+    let root = project_root();
+    let files = generate_dotnet_files(
+        &example_input_paths(&root, "proto-generic"),
+        &[descriptor_path(&root)],
+    );
+    let models = files
+        .get(&PathBuf::from("Models.cs"))
+        .expect("proto generic output should include Models.cs");
+
+    assert!(models.contains("typeof(PayloadBackedEnvelope<,>.TransferTypeConverter)"));
+    assert!(models.contains(
+        "return new PayloadBackedEnvelope<TOutput, TContext>(PayloadBackedOutput<TOutput>.FromTransferType(wire.Provider), PayloadBackedContext<TContext>.FromTransferType(wire.Scaler));"
+    ));
+    assert!(models.contains(
+        "proto.Provider = (Temporalio.Api.Compute.V1.ComputeProvider)Provider.ToTransferType();"
+    ));
+}
+
+#[test]
+fn dotnet_model_only_interfaces_use_their_namespace_directive() {
+    let temp_dir = unique_output_path("dotnet-model-only-namespace");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("models.wit");
+    fs::write(
+        &input_path,
+        r#"package test:models@1.0.0;
+
+world system {
+  export notification-models;
+}
+
+/// @nexus.namespace dotnet="Acme.Notifications"
+interface notification-models {
+  record notification {
+    message: string,
+  }
+}
+"#,
+    )
+    .unwrap();
+
+    let files = generate_dotnet_files(&[input_path], &[]);
+    fs::remove_dir_all(temp_dir).unwrap();
+    let models = files
+        .get(&PathBuf::from("Models.cs"))
+        .expect("model-only output should include Models.cs");
+
+    assert!(models.contains("namespace Acme.Notifications\n{"));
+    assert!(models.contains("public record Notification"));
+}
+
+#[test]
+fn dotnet_rejects_type_parameters_with_the_same_csharp_name() {
+    let temp_dir = unique_output_path("dotnet-type-parameter-conflict");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("conflict.wit");
+    fs::write(
+        &input_path,
+        r#"package test:conflict@1.0.0;
+
+world system {
+  export conflict-models;
+}
+
+interface conflict-models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.type-parameter
+  type output = placeholder;
+
+  record pair {
+    first: output-t,
+    second: output,
+  }
+}
+"#,
+    )
+    .unwrap();
+
+    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
+        nexgen::language::Language::Dotnet,
+        &[input_path],
+    )
+    .unwrap();
+    let descriptors =
+        nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&project_root())).unwrap();
+    let error = generate_source(
+        nexgen::language::Language::Dotnet,
+        spec,
+        &descriptors,
+        &SupportFiles::default(),
+    )
+    .unwrap_err();
+    fs::remove_dir_all(temp_dir).unwrap();
+
+    assert!(
+        error.to_string().contains(
+            ".NET type parameter `Output` in `conflict-models.pair` maps to `TOutput`, which conflicts with type parameter `OutputT`"
+        ),
+        "{error}"
+    );
+}

@@ -1355,7 +1355,8 @@ fn python_request_models_are_bidirectional_wire_models() {
     assert!(rendered.contains("return await _signal_with_start_workflow(request)"));
     assert!(models.contains("payloads_to_proto(value.args)"));
     assert!(models.contains("def from_transfer_type("));
-    assert!(models.contains("_ = temporalio.converter.transfer_type_convertible("));
+    assert!(models.contains("  # pyright: ignore[reportUnusedCallResult]\n"));
+    assert!(!models.contains("_ = temporalio.converter.transfer_type_convertible("));
     assert!(!models.contains("@temporalio.converter.transfer_type_convertible("));
     assert!(!models.contains("def from_proto("));
     assert!(models.contains("from ._support import ("));
@@ -1402,6 +1403,8 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
     let package_init = package
         .get(&PathBuf::from("__init__.py"))
         .expect("standalone Python package should include __init__.py");
+    assert!(!package.contains_key(&PathBuf::from("services.py")));
+    assert!(!package_init.contains("OutcomeClient"));
 
     let outcome_model = models
         .find("class Outcome(typing.Generic[OutputT]):")
@@ -1411,7 +1414,7 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
         .expect("generic converter should be emitted");
     let outcome_registration = models
         .find(
-            "_ = temporalio.converter.transfer_type_convertible(_OutcomeTransferTypeConverter[typing.Any])(Outcome)",
+            "temporalio.converter.transfer_type_convertible(_OutcomeTransferTypeConverter[typing.Any])(Outcome)",
         )
         .expect("generic converter should be registered");
     assert!(outcome_model < outcome_converter);
@@ -1433,10 +1436,13 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
     assert!(!models.contains("value: OutcomeValue[OutputT] | None"));
     assert!(!models.contains("class Failure:"));
     assert!(!models.contains("class Payloads:"));
-    assert!(models.contains("_oneof_value_case = value.WhichOneof(\"value\")"));
     assert!(models.contains(
-        "if _oneof_value_case is None:\n            raise ValueError(\"missing required field Outcome.value\")"
+        "        _oneof_value: OutcomeValueSuccess[OutputT] | OutcomeValueFailure\n        match value.WhichOneof(\"value\"):\n            case \"success\":\n"
     ));
+    assert!(models.contains(
+        "            case None:\n                raise ValueError(\"missing required field Outcome.value\")\n"
+    ));
+    assert!(!models.contains("unknown protobuf oneof case"));
     assert!(
         models
             .contains("typing.cast(OutputT, payloads_from_proto(value.success, [output_type])[0])")
@@ -1444,21 +1450,17 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
     assert!(
         models.contains("_oneof_value = OutcomeValueFailure(failure_from_proto(value.failure))")
     );
-    assert!(models.contains("if isinstance(_oneof_value_value, OutcomeValueSuccess):"));
     assert!(models.contains(
-        "if runtime_value.value is None:\n            raise ValueError(\"missing required field Outcome.value\")"
+        "        match value.value:\n            case OutcomeValueSuccess():\n                message.success.CopyFrom(payloads_to_proto([value.value.value]))\n            case OutcomeValueFailure():\n                message.failure.CopyFrom(failure_to_proto(value.value.value))\n"
     ));
-    assert!(
-        models.contains("message.success.CopyFrom(payloads_to_proto([_oneof_value_value.value]))")
-    );
-    assert!(models.contains("elif isinstance(_oneof_value_value, OutcomeValueFailure):"));
-    assert!(
-        models.contains("message.failure.CopyFrom(failure_to_proto(_oneof_value_value.value))")
-    );
-    assert!(models.contains("unsupported variant case Outcome.value:"));
+    assert!(models.contains(
+        "        if value.activity is not None:\n            match value.activity:\n                case ActivitySelectionId():\n"
+    ));
+    assert!(!models.contains("runtime_value"));
+    assert!(!models.contains("unsupported variant case"));
     assert!(models.contains("class PauseActivityRequest:"));
     assert!(models.contains(
-        "_ = temporalio.converter.transfer_type_convertible(_PauseActivityRequestTransferTypeConverter)(PauseActivityRequest)"
+        "temporalio.converter.transfer_type_convertible(_PauseActivityRequestTransferTypeConverter)(PauseActivityRequest)"
     ));
     assert!(models.contains("namespace: str"));
     assert!(models.contains("execution: WorkflowExecution | None = None"));
@@ -1467,10 +1469,10 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
     assert!(models.contains("reason: str"));
     assert!(models.contains("request_id: str"));
     assert!(models.contains("class WorkflowExecution:"));
-    assert!(models.contains("_oneof_activity_case = value.WhichOneof(\"activity\")"));
-    assert!(
-        models.contains("if _oneof_activity_case is None:\n            _oneof_activity = None")
-    );
+    assert!(models.contains(
+        "        _oneof_activity: ActivitySelectionId | ActivitySelectionType | None\n        match value.WhichOneof(\"activity\"):\n"
+    ));
+    assert!(models.contains("            case None:\n                _oneof_activity = None\n"));
     assert!(package_init.contains("ActivitySelection,"));
     assert!(package_init.contains("ActivitySelectionId,"));
     assert!(package_init.contains("ActivitySelectionType,"));
@@ -1478,6 +1480,24 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
     assert!(package_init.contains("OutcomeValueSuccess,"));
     assert!(package_init.contains("OutcomeValueFailure,"));
     assert!(package_init.contains("PauseActivityRequest,"));
+}
+
+#[test]
+fn python_notification_models_do_not_emit_an_empty_service() {
+    let root = project_root();
+    let package = generate_python_package_files(
+        &example_input_paths(&root, "notification-service"),
+        &[descriptor_path(&root)],
+    );
+    let package_init = package
+        .get(&PathBuf::from("__init__.py"))
+        .expect("notification package should include __init__.py");
+
+    assert!(package.contains_key(&PathBuf::from("models.py")));
+    assert!(!package.contains_key(&PathBuf::from("services.py")));
+    assert!(package_init.contains("OnCompleteRequest,"));
+    assert!(package_init.contains("OnCompleteResponse,"));
+    assert!(!package_init.contains("NotificationServiceClient"));
 }
 
 #[test]
@@ -1542,7 +1562,7 @@ fn python_rejects_proto_variant_case_class_name_collisions() {
 fn python_proto_generics_propagate_payload_type_hints() {
     let root = project_root();
     let package = generate_python_package_files(
-        &example_input_paths(&root, "proto-generic-python"),
+        &example_input_paths(&root, "proto-generic"),
         &[descriptor_path(&root)],
     );
     let models = package
@@ -1558,7 +1578,7 @@ fn python_proto_generics_propagate_payload_type_hints() {
     assert!(models.contains("PayloadBackedContext[ContextT]"));
     assert!(!models.contains("@typing.cast("));
     assert!(models.contains(
-        "_ = temporalio.converter.transfer_type_convertible(_PayloadBackedEnvelopeTransferTypeConverter[typing.Any, typing.Any])(PayloadBackedEnvelope)"
+        "temporalio.converter.transfer_type_convertible(_PayloadBackedEnvelopeTransferTypeConverter[typing.Any, typing.Any])(PayloadBackedEnvelope)"
     ));
     assert!(models.contains(
         "output_type, context_type = typing.get_args(type_hint) or (typing.Any, typing.Any)"

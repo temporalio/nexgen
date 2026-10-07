@@ -43,6 +43,7 @@ enum ProtoGenericCarrier {
 #[derive(Debug, Clone)]
 struct ProtoOneofCase {
     class_name: String,
+    annotation: String,
     proto_name: String,
     payload_type: ResolvedFieldType,
     generic_carrier: Option<ProtoGenericCarrier>,
@@ -125,6 +126,14 @@ fn variant_case_class_name(variant_name: &str, case_name: &str) -> String {
     format!("{variant_name}{}", case_name.to_upper_camel_case())
 }
 
+fn variant_case_annotation(class_name: &str, type_parameters: &[String]) -> String {
+    if type_parameters.is_empty() {
+        class_name.to_string()
+    } else {
+        format!("{class_name}[{}]", type_parameters.join(", "))
+    }
+}
+
 fn render_oneof_variant_body(variant: &RenderedVariant) -> String {
     let mut body = String::new();
     for case in &variant.cases {
@@ -162,12 +171,7 @@ fn render_oneof_variant_body(variant: &RenderedVariant) -> String {
         if index > 0 {
             body.push_str("\n    | ");
         }
-        body.push_str(&class_name);
-        if !case.type_parameters.is_empty() {
-            body.push('[');
-            body.push_str(&case.type_parameters.join(", "));
-            body.push(']');
-        }
+        body.push_str(&variant_case_annotation(&class_name, &case.type_parameters));
     }
     if variant.cases.len() > 1 {
         body.push_str("\n)");
@@ -228,7 +232,13 @@ fn build_oneof(
                 reason: format!("planned variant case `{}` has no payload", case.name),
             })?;
         let class_name = variant_case_class_name(&variant.name, &case.name);
+        let type_parameters = api_plan
+            .type_parameters(&payload, Language::Python)
+            .into_iter()
+            .map(|usage| usage.parameter.name)
+            .collect::<Vec<_>>();
         cases.push(ProtoOneofCase {
+            annotation: variant_case_annotation(&class_name, &type_parameters),
             class_name,
             proto_name: member.wire_name.clone(),
             payload_type: resolve_type(&payload)?,
@@ -1231,8 +1241,6 @@ fn render_record_wire_block(
     }
     let wrote_method = true;
     {
-        let generic_oneof = !model.type_parameters.is_empty()
-            && proto_fields.iter().any(|field| field.oneof.is_some());
         if model.fields.is_empty() {
             if wrote_method {
                 output.push('\n');
@@ -1252,9 +1260,6 @@ fn render_record_wire_block(
         output.push_str("    ) -> ");
         output.push_str(&proto_ref.type_ref);
         output.push_str(":\n");
-        if generic_oneof {
-            output.push_str("        runtime_value: typing.Any = value\n");
-        }
         output.push_str("        message = ");
         output.push_str(&proto_ref.type_ref);
         output.push_str("()\n");
@@ -1266,23 +1271,13 @@ fn render_record_wire_block(
             .zip(model.fields.iter())
             .zip(proto_fields.iter())
         {
-            let value_expr = format!(
-                "{}.{}",
-                if generic_oneof {
-                    "runtime_value"
-                } else {
-                    "value"
-                },
-                rendered_field.attr_name
-            );
+            let value_expr = format!("value.{}", rendered_field.attr_name);
             let write = field_write_for_rendered_field(
-                &model.name,
                 field_name,
                 planned_field,
                 rendered_field,
                 proto_field,
                 &value_expr,
-                generic_oneof,
             );
             for line in &write.lines {
                 output.push_str("        ");
@@ -1322,7 +1317,7 @@ fn render_record_wire_block(
     post_class_lines.extend([
         String::new(),
         format!(
-            "_ = temporalio.converter.transfer_type_convertible({converter_registration_type})({})",
+            "temporalio.converter.transfer_type_convertible({converter_registration_type})({})  # pyright: ignore[reportUnusedCallResult]",
             model.name
         ),
     ]);
@@ -1356,25 +1351,20 @@ fn field_read_policy(model_name: &str, rendered_field: &RenderedField) -> WireRe
 }
 
 fn field_write_for_rendered_field(
-    model_name: &str,
     field_name: &str,
     planned_field: &RecordFieldSpec<PlannedFamily>,
     rendered_field: &RenderedField,
     proto_field: &ProtoField,
     value_expr: &str,
-    value_is_any: bool,
 ) -> RenderedWireWrite {
     if let Some(oneof) = &proto_field.oneof {
         return oneof_field_write(
-            model_name,
-            &rendered_field.attr_name,
             oneof,
             value_expr,
             matches!(
                 rendered_field.default_kind,
                 PythonFieldDefaultKind::Required
             ),
-            value_is_any,
         );
     }
     let optional_guard = matches!(
@@ -1421,29 +1411,29 @@ fn oneof_field_read(
     required: bool,
 ) -> RenderedWireRead {
     let local_var = format!("_oneof_{attr_name}");
-    let case_var = format!("{local_var}_case");
+    let mut annotation = oneof
+        .cases
+        .iter()
+        .map(|case| case.annotation.as_str())
+        .collect::<Vec<_>>()
+        .join(" | ");
+    if !required {
+        annotation.push_str(" | None");
+    }
     let mut setup_lines = vec![
+        format!("{local_var}: {annotation}"),
         format!(
-            "{case_var} = value.WhichOneof({})",
+            "match value.WhichOneof({}):",
             python_string_literal(&oneof.name)
         ),
-        format!("if {case_var} is None:"),
     ];
-    if required {
-        setup_lines.push(format!(
-            "    raise ValueError({})",
-            python_string_literal(&format!("missing required field {model_name}.{attr_name}"))
-        ));
-    } else {
-        setup_lines.push(format!("    {local_var} = None"));
-    }
     for case in &oneof.cases {
         setup_lines.push(format!(
-            "elif {case_var} == {}:",
+            "    case {}:",
             python_string_literal(&case.proto_name)
         ));
         setup_lines.push(format!(
-            "    {local_var} = {}({})",
+            "        {local_var} = {}({})",
             case.class_name,
             match case.generic_carrier {
                 Some(carrier) => generic_carrier_from_proto_expr(
@@ -1460,50 +1450,33 @@ fn oneof_field_read(
             }
         ));
     }
-    setup_lines.push("else:".to_string());
-    setup_lines.push(format!(
-        "    raise ValueError(f\"unknown protobuf oneof case {model_name}.{}: {{{case_var}}}\")",
-        oneof.name
-    ));
+    setup_lines.push("    case None:".to_string());
+    if required {
+        setup_lines.push(format!(
+            "        raise ValueError({})",
+            python_string_literal(&format!("missing required field {model_name}.{attr_name}"))
+        ));
+    } else {
+        setup_lines.push(format!("        {local_var} = None"));
+    }
     RenderedWireRead {
         setup_lines,
         expr: local_var,
     }
 }
 
-fn oneof_field_write(
-    model_name: &str,
-    attr_name: &str,
-    oneof: &ProtoOneof,
-    value_expr: &str,
-    required: bool,
-    value_is_any: bool,
-) -> RenderedWireWrite {
+fn oneof_field_write(oneof: &ProtoOneof, value_expr: &str, required: bool) -> RenderedWireWrite {
     let mut lines = Vec::new();
     let case_indent = if required {
-        lines.push(format!("if {value_expr} is None:"));
-        lines.push(format!(
-            "    raise ValueError({})",
-            python_string_literal(&format!("missing required field {model_name}.{attr_name}"))
-        ));
         ""
     } else {
         lines.push(format!("if {value_expr} is not None:"));
         "    "
     };
-    let public_value_expr = format!("_oneof_{}_value", attr_name.to_snake_case());
-    lines.push(if value_is_any {
-        format!("{case_indent}{public_value_expr} = {value_expr}")
-    } else {
-        format!("{case_indent}{public_value_expr} = typing.cast(typing.Any, {value_expr})")
-    });
-    for (index, case) in oneof.cases.iter().enumerate() {
-        let keyword = if index == 0 { "if" } else { "elif" };
-        lines.push(format!(
-            "{case_indent}{keyword} isinstance({public_value_expr}, {}):",
-            case.class_name
-        ));
-        let case_value_expr = format!("{public_value_expr}.value");
+    lines.push(format!("{case_indent}match {value_expr}:"));
+    for case in &oneof.cases {
+        lines.push(format!("{case_indent}    case {}():", case.class_name));
+        let case_value_expr = format!("{value_expr}.value");
         let case_lines = match case.generic_carrier {
             Some(carrier) => {
                 generic_carrier_to_proto_lines(carrier, &case_value_expr, &case.proto_name, false)
@@ -1516,14 +1489,9 @@ fn oneof_field_write(
             ),
         };
         for line in case_lines {
-            lines.push(format!("{case_indent}    {line}"));
+            lines.push(format!("{case_indent}        {line}"));
         }
     }
-    lines.push(format!("{case_indent}else:"));
-    lines.push(format!(
-        "{case_indent}    raise TypeError(f\"unsupported variant case {model_name}.{}: {{{public_value_expr}!r}}\")",
-        oneof.name,
-    ));
     RenderedWireWrite { lines }
 }
 

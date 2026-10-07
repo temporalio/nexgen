@@ -83,9 +83,9 @@ class _ActivityOptionsTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
-    _ActivityOptionsTransferTypeConverter
-)(ActivityOptions)
+temporalio.converter.transfer_type_convertible(_ActivityOptionsTransferTypeConverter)(
+    ActivityOptions
+)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -129,6 +129,6 @@ class _FailureContainerTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
-    _FailureContainerTransferTypeConverter
-)(FailureContainer)
+temporalio.converter.transfer_type_convertible(_FailureContainerTransferTypeConverter)(
+    FailureContainer
+)  # pyright: ignore[reportUnusedCallResult]

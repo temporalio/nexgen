@@ -59,9 +59,9 @@ class _PayloadBackedContextTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _PayloadBackedContextTransferTypeConverter[typing.Any]
-)(PayloadBackedContext)
+)(PayloadBackedContext)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -126,9 +126,9 @@ class _PayloadBackedEnvelopeTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _PayloadBackedEnvelopeTransferTypeConverter[typing.Any, typing.Any]
-)(PayloadBackedEnvelope)
+)(PayloadBackedEnvelope)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -170,6 +170,6 @@ class _PayloadBackedOutputTransferTypeConverter(
         return message
 
 
-_ = temporalio.converter.transfer_type_convertible(
+temporalio.converter.transfer_type_convertible(
     _PayloadBackedOutputTransferTypeConverter[typing.Any]
-)(PayloadBackedOutput)
+)(PayloadBackedOutput)  # pyright: ignore[reportUnusedCallResult]

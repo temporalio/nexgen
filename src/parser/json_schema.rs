@@ -1348,6 +1348,7 @@ fn api_spec_from_parsed_json_documents(
         version: "0.0.0".to_string(),
         support: SupportSpec::default(),
         services,
+        model_scope: None,
         types,
     };
     validate_identifier_namespace(language, &spec)?;

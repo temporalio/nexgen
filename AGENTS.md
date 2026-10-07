@@ -12,6 +12,10 @@
   full command passing. It covers Rust formatting and tests plus the checked-in
   Python, TypeScript, Go, Java, and .NET sample projects.
 
+  ```sh
+  cargo validate python
+  ```
+
 - When running Rust tests directly, pass the feature flag to test the "advanced" features:
 
   ```sh
@@ -25,9 +29,9 @@ When asked to create a stack of pull requests, use the
 than creating and linking the PRs manually.
 
 - If `gh stack` is unavailable, install it with `gh extension install
-  github/gh-stack`.
+github/gh-stack`.
 - Initialize the stack from its trunk branch, normally with `gh stack init
-  --base main <bottom-branch>`, then add each successive layer from the current
+--base main <bottom-branch>`, then add each successive layer from the current
   top branch with `gh stack add <branch>`.
 - Commit each layer independently. Use `gh stack push` to publish every branch
   and `gh stack submit` to create the PRs with the correct parent branches.

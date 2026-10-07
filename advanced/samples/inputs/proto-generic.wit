@@ -1,11 +1,12 @@
-/// Python-only fixture for concrete type hints in Payload-backed proto models.
+/// Payload-backed generic proto models, including concrete type arguments that
+/// propagate through nested proto-backed records.
 package temporal:nexus@1.0.0;
 
 world system {
-  export proto-generic-python;
+  export proto-generic;
 }
 
-interface proto-generic-python {
+interface proto-generic {
   use nexus:temporal-types/model@1.0.0.{placeholder};
 
   /// @nexus.type-parameter
