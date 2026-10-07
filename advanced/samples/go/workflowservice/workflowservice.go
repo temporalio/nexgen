@@ -667,3 +667,20 @@ func SignalWithStartWorkflowTyped[WorkflowArg any, WorkflowResult any](
 		UserMetadata:             &opts.UserMetadata,
 	})
 }
+
+// --- Registry ---
+
+var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry{
+	{
+		Service:   "temporal.api.workflowservice.v1.WorkflowService",
+		Operation: "SignalWithStartWorkflowExecution",
+	}: {
+		SerializationContext: func(request any) converter.SerializationContext {
+			return signalWithStartWorkflowSerializationContext(request.(signalWithStartWorkflowRequest))
+		},
+	},
+}
+
+func init() {
+	internal.RegisterNexusOperationRegistry(NexusOperationRegistry)
+}

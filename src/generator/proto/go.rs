@@ -642,6 +642,7 @@ pub(in crate::generator) struct OperationBinding {
     /// converter -- the SDK then performs the conversion inside the payload
     /// converter, and the model is passed to `ExecuteOperation` as-is.
     input_to_proto: Option<String>,
+
     /// Assignments that populate the request model's `@nexus.source` fields
     /// from their source expressions, emitted at the top of the operation
     /// function where `ctx` is in scope.
@@ -752,6 +753,7 @@ impl ModelBackend {
         services: &mut [RenderedService<'_>],
     ) -> Result<()> {
         for (service, planned_service) in services.iter_mut().zip(api_plan.services.iter()) {
+            let is_system_endpoint = service.is_system_endpoint();
             for (rendered_op, planned_op) in service
                 .operations
                 .iter_mut()
@@ -765,19 +767,30 @@ impl ModelBackend {
                     continue;
                 };
                 let output = operation_output(planned_op, api_plan);
-                let Some((_input_wire_type, input_conv)) =
+                let Some((_, input_conv)) =
                     operation_message_binding(&input, &planned_op.name, "input", self)?
                 else {
                     continue;
                 };
+
                 // Generated models carry a transfer-type converter, so the SDK
                 // converts them to proto inside the payload converter. Anything
                 // else (hand-written override converters over types nexgen does
-                // not own) still converts eagerly here.
+                // not own) uses an eager converter unless policy selection needs
+                // the native request in the SDK.
                 let input_to_proto = if input_conv.kind == GoConversionKind::ModelConverter {
                     self.mark_transfer_model_checked(api_plan, &input, &planned_op.name, "input")?;
                     None
                 } else {
+                    if is_system_endpoint && rendered_op.serialization_context_expr.is_some() {
+                        return Err(Error::UnsupportedGoProtoConversion {
+                            context: format!(
+                                "operation `{}` input `{}`",
+                                planned_op.name, rendered_op.input_type
+                            ),
+                            reason: "cannot attach a TransferTypeConverter to an external input type for a system operation with @nexus.serialization-context; use a generated, locally owned request model instead".to_string(),
+                        });
+                    }
                     let input_arg = match input_conv.kind {
                         GoConversionKind::OverrideConverter => "&request".to_string(),
                         _ => "request".to_string(),
@@ -893,6 +906,7 @@ impl ModelBackend {
 
                 rendered_op.wire_binding = Some(OperationBinding {
                     input_to_proto,
+
                     input_sourced_assignments,
                     output_proto_type,
                     output_model_type,
@@ -953,8 +967,8 @@ fn is_proto_generic_carrier(kind: &PlannedType) -> bool {
     )
 }
 
-/// Renders an operation function that serializes its request to proto before
-/// the SDK call and deserializes the proto response afterwards.
+/// Renders an operation function using transfer converters where available,
+/// with eager conversion for externally owned models and transformed results.
 pub(in crate::generator) fn render_operation_function_proto(
     output: &mut String,
     service: &crate::generator::go::RenderedService<'_>,
@@ -979,6 +993,7 @@ pub(in crate::generator) fn render_operation_function_proto(
         output.push_str(assignment);
         output.push('\n');
     }
+
     let input_arg = match binding.input_to_proto.as_deref() {
         Some(input_to_proto) => {
             output.push_str("\trequestProto, err := ");
@@ -993,8 +1008,6 @@ pub(in crate::generator) fn render_operation_function_proto(
             output.push_str("\t}\n");
             "requestProto"
         }
-        // The request model implements `workflow.ValueWithTransferTypeConverter`,
-        // so the SDK converts it to proto while encoding the payload.
         None => "request",
     };
     let endpoint = service
@@ -1736,9 +1749,7 @@ fn render_model_transfer_type_converter(
     output.push_str(&format!(
         "func ({model_ident}) TransferTypeConverter() ({converter_type}, error) {{\n"
     ));
-    output.push_str(&format!(
-        "\treturn {new_converter}(\n"
-    ));
+    output.push_str(&format!("\treturn {new_converter}(\n"));
     output.push_str(&format!(
         "\t\tfunc({context_context}, *{model_ident}) (*{proto_value_type}, error) {{\n\t\t\treturn nil, {errors_new}(\"nexgen: transfer type converter outside a workflow\")\n\t\t}},\n"
     ));
