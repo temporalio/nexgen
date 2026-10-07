@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- JSON Schema `pattern` violations in generated Java and Python now quote the
+  authored pattern (for example `must match pattern ^[a-z]+$`), matching Go and
+  TypeScript, instead of the `$`→`\z` / `\Z` end-anchor rewrite compiled for
+  the host regex engine. This includes `propertyNames` pattern violations.
 - Operation-free WIT interfaces now honor `@nexus.namespace`, and .NET names
   their namespace after the interface (`Nexgen.<InterfaceName>`) instead of
   falling back to `Nexgen.Generated`.

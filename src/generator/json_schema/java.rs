@@ -132,8 +132,12 @@ struct StringLengthConstraints {
     max_length: Option<u64>,
     /// The loader-normalized `pattern` with the per-target `$`→`\z` rewrite
     /// already applied (Java's strict end-of-input anchor). See
-    /// `specs/json-schema/features/pattern.md`.
+    /// `specs/json-schema/features/pattern.md`. Compiled for matching only.
     pattern: Option<String>,
+    /// The loader-normalized `pattern` *before* the per-target rewrite — the
+    /// text the violation reason quotes, so Java prints the same pattern as
+    /// every other target rather than its host-regex rewrite.
+    authored_pattern: Option<String>,
     /// A pinned `format` check (regex + optional length guard) on the same node.
     format: Option<JavaFormat>,
 }
@@ -147,6 +151,7 @@ impl StringLengthConstraints {
                 .pattern
                 .as_deref()
                 .map(|pattern| crate::json_schema::pattern::rewrite_end_anchor(pattern, r"\z")),
+            authored_pattern: schema.pattern.clone(),
             format: schema
                 .format
                 .as_deref()
@@ -603,11 +608,12 @@ fn render_java_string_checks(
     // `pattern`: unanchored `Matcher.find()` (never `matches()`, which anchors
     // the whole input), default flags (ASCII `\d\w\s`, code-point `.`). The
     // compiled `Pattern` is a static field on the class (compiled once).
-    if let Some(pattern) = &constraints.pattern {
+    // The reason quotes the authored pattern, not the `\z`-rewritten one.
+    if let Some(authored) = &constraints.authored_pattern {
         output.push_str(&format!(
             "{indent}if (!{field_pattern}.matcher({value_expr}).find()) {{\n{indent}    violations.add(new Violation({json}, \"must match pattern \" + {pattern_literal} + \", got \" + {value_expr}));\n{indent}}}\n",
             field_pattern = java_pattern_field_name(field_java_name),
-            pattern_literal = java_string_literal(pattern),
+            pattern_literal = java_string_literal(authored),
         ));
     }
     // `format`: the length guard (if any) short-circuits **before** the pinned
@@ -658,11 +664,11 @@ fn render_java_inline_string_checks(
             ));
         }
     }
-    if let Some(pattern) = constraints.pattern {
+    if let (Some(pattern), Some(authored)) = (&constraints.pattern, &constraints.authored_pattern) {
         output.push_str(&format!(
             "{indent}if (!java.util.regex.Pattern.compile({}).matcher({value_expr}).find()) {{\n{indent}    violations.add(new Violation({path_expr}, \"must match pattern \" + {} + \", got \" + {value_expr}));\n{indent}}}\n",
-            java_string_literal(&pattern),
-            java_string_literal(&pattern),
+            java_string_literal(pattern),
+            java_string_literal(authored),
         ));
     }
     if let Some(format) = constraints.format {
