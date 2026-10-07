@@ -1409,9 +1409,7 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("out.RetryPolicy = *converted"));
     // The model constructs a transfer-type converter, so the SDK
     // runs model<->proto conversion inside the payload converter.
-    assert!(rendered.contains(
-        "return converter.NewContextualTransferTypeConverter("
-    ));
+    assert!(rendered.contains("return converter.NewContextualTransferTypeConverter("));
     assert!(rendered.contains(
         "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn converter.NewContextualTransferTypeConverter"
     ));
@@ -1458,9 +1456,7 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
 
     // Construction happens in the method; the SDK owns caching by model type.
-    assert!(rendered.contains(
-        "return converter.NewContextualTransferTypeConverter("
-    ));
+    assert!(rendered.contains("return converter.NewContextualTransferTypeConverter("));
     // Value receiver, so both the model and a pointer to it opt in.
     assert!(rendered.contains(
         "func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn converter.NewContextualTransferTypeConverter"

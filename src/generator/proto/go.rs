@@ -1779,9 +1779,7 @@ fn render_model_transfer_type_converter(
     output.push_str(&format!(
         "func ({model_ident}) TransferTypeConverter() ({converter_type}, error) {{\n"
     ));
-    output.push_str(&format!(
-        "\treturn {new_converter}(\n"
-    ));
+    output.push_str(&format!("\treturn {new_converter}(\n"));
     output.push_str(&format!(
         "\t\tfunc({context_context}, *{model_ident}) (*{proto_value_type}, error) {{\n\t\t\treturn nil, {errors_new}(\"nexgen: transfer type converter outside a workflow\")\n\t\t}},\n"
     ));
