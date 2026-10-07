@@ -620,8 +620,8 @@ Generated callers continue to accept and return the public model; conversion is
 performed by the target SDK or generated operation helpers.
 
 For Go, generated proto-backed operation inputs and outputs implement
-`workflow.ValueWithTransferTypeConverter`. The SDK converts these models during
-payload conversion using `workflow.NewTransferTypeConverter`; the generated
+`converter.ValueWithTransferTypeConverter`. The SDK converts these models during
+payload conversion using `converter.NewContextualTransferTypeConverter`; the generated
 method returns both the converter and its construction error. Models and transfer
 types use non-pointer type arguments, with a value receiver on the model.
 

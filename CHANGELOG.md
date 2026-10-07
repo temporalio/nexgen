@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Go proto-backed operation models now use SDK transfer-type converters instead
   of eager conversion at the operation call site. Conversion errors surface on
-  the returned future. The Go samples require the experimental SDK API from
-  temporalio/sdk-go#2703.
+  the returned future. Generated converters use
+  `converter.NewContextualTransferTypeConverter`. The Go samples pin the
+  squash-merged experimental SDK API from temporalio/sdk-go#2703.
 
 ### Deprecated
 

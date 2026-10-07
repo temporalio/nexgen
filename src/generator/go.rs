@@ -604,15 +604,15 @@ impl GoPackageContext {
 
     pub(in crate::generator) fn transfer_type_converter_type(&self) -> String {
         self.qualified_expr(
-            "go.temporal.io/sdk/workflow",
-            "workflow.TransferTypeConverter",
+            "go.temporal.io/sdk/converter",
+            "converter.TransferTypeConverter",
         )
     }
 
     pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
         self.qualified_expr(
-            "go.temporal.io/sdk/workflow",
-            "workflow.NewTransferTypeConverter",
+            "go.temporal.io/sdk/converter",
+            "converter.NewContextualTransferTypeConverter",
         )
     }
 
@@ -996,7 +996,7 @@ impl GoExternalModels {
         }
     }
 
-    /// Whether any model emits a `workflow.TransferTypeConverter`, which pulls
+    /// Whether any model emits a `converter.TransferTypeConverter`, which pulls
     /// in the `context` and `errors` standard-library imports.
     fn renders_transfer_type_converters(&self) -> bool {
         match self {
@@ -1173,6 +1173,10 @@ impl<'a> ApiPlanner<'a> {
         // Transfer-type converters declare `context.Context`-flavoured stubs
         // and a sentinel `errors.New` value.
         if self.external_models.renders_transfer_type_converters() {
+            if !self.package.is_self_import("go.temporal.io/sdk/converter") {
+                self.imports
+                    .insert("go.temporal.io/sdk/converter".to_string());
+            }
             if !self.package.is_self_import("context") {
                 self.imports.insert("context".to_string());
             }

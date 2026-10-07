@@ -15,6 +15,7 @@ import (
 	sdk "go.temporal.io/api/sdk/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -303,7 +304,7 @@ func signalWithStartWorkflowRequestFromProto(ctx workflow.Context, proto *workfl
 
 var errSignalWithStartWorkflowRequestNeedsWorkflowContext = errors.New("nexgen: signalWithStartWorkflowRequest can only be converted inside a workflow")
 
-var signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr = workflow.NewTransferTypeConverter[signalWithStartWorkflowRequest, workflowservice.SignalWithStartWorkflowExecutionRequest](
+var signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[signalWithStartWorkflowRequest, workflowservice.SignalWithStartWorkflowExecutionRequest](
 	func(context.Context, *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
 		return nil, errSignalWithStartWorkflowRequestNeedsWorkflowContext
 	},
@@ -323,7 +324,7 @@ var signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflow
 	},
 )
 
-func (signalWithStartWorkflowRequest) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr
 }
 
@@ -444,7 +445,7 @@ func signalWithStartWorkflowResponseFromProto(ctx workflow.Context, proto *workf
 
 var errSignalWithStartWorkflowResponseNeedsWorkflowContext = errors.New("nexgen: SignalWithStartWorkflowResponse can only be converted inside a workflow")
 
-var signalWithStartWorkflowResponseTransferTypeConverter, signalWithStartWorkflowResponseTransferTypeConverterErr = workflow.NewTransferTypeConverter[SignalWithStartWorkflowResponse, workflowservice.SignalWithStartWorkflowExecutionResponse](
+var signalWithStartWorkflowResponseTransferTypeConverter, signalWithStartWorkflowResponseTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[SignalWithStartWorkflowResponse, workflowservice.SignalWithStartWorkflowExecutionResponse](
 	func(context.Context, *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
 		return nil, errSignalWithStartWorkflowResponseNeedsWorkflowContext
 	},
@@ -464,7 +465,7 @@ var signalWithStartWorkflowResponseTransferTypeConverter, signalWithStartWorkflo
 	},
 )
 
-func (SignalWithStartWorkflowResponse) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+func (SignalWithStartWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return signalWithStartWorkflowResponseTransferTypeConverter, signalWithStartWorkflowResponseTransferTypeConverterErr
 }
 

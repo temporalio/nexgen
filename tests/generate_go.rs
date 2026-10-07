@@ -1410,10 +1410,10 @@ fn go_type_roundtrip_generates_proto_conversions() {
     // The model advertises a package-level transfer-type converter, so the SDK
     // runs model<->proto conversion inside the payload converter.
     assert!(rendered.contains(
-        "var activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr = workflow.NewTransferTypeConverter[ActivityOptions, activity.ActivityOptions]("
+        "var activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[ActivityOptions, activity.ActivityOptions]("
     ));
     assert!(rendered.contains(
-        "func (ActivityOptions) TransferTypeConverter() (workflow.TransferTypeConverter, error) {\n\treturn activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr\n}"
+        "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr\n}"
     ));
     assert!(rendered.contains("\t\treturn m.toProto(ctx)\n"));
     assert!(rendered.contains("\t\tvalue, err := activityOptionsFromProto(ctx, message)\n"));
@@ -1459,11 +1459,11 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     // The converter is a package-level singleton: the SDK caches it by
     // reflect.Type, so a fresh value per call would defeat the cache.
     assert!(rendered.contains(
-        "var signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr = workflow.NewTransferTypeConverter[signalWithStartWorkflowRequest, workflowservice.SignalWithStartWorkflowExecutionRequest]("
+        "var signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[signalWithStartWorkflowRequest, workflowservice.SignalWithStartWorkflowExecutionRequest]("
     ));
     // Value receiver, so both the model and a pointer to it opt in.
     assert!(rendered.contains(
-        "func (signalWithStartWorkflowRequest) TransferTypeConverter() (workflow.TransferTypeConverter, error) {\n\treturn signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr\n}"
+        "func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn signalWithStartWorkflowRequestTransferTypeConverter, signalWithStartWorkflowRequestTransferTypeConverterErr\n}"
     ));
 
     // Conversion needs a workflow.Context, so the context-free and
@@ -1480,7 +1480,7 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
 
     // Operation responses decode into the model, not the proto.
     assert!(rendered.contains(
-        "func (SignalWithStartWorkflowResponse) TransferTypeConverter() (workflow.TransferTypeConverter, error) {"
+        "func (SignalWithStartWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {"
     ));
     assert!(rendered.contains("\t\tvar value SignalWithStartWorkflowResponse\n"));
     assert!(!rendered.contains("requestProto"));

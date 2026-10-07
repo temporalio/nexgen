@@ -85,7 +85,7 @@ pub(in crate::generator) struct ModelBackend {
     proto_models: BTreeMap<String, PlannedTypeInfo>,
     wire_models: RefCell<BTreeMap<String, RenderedModelWire>>,
     /// Models that appear as a top-level Nexus operation input or output, and
-    /// therefore need a [`workflow.TransferTypeConverter`] so the SDK performs
+    /// therefore need a [`converter.TransferTypeConverter`] so the SDK performs
     /// model<->proto conversion inside the payload converter.
     transfer_models: RefCell<BTreeSet<String>>,
 }

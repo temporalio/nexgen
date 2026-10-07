@@ -9,6 +9,7 @@ import (
 
 	activity "go.temporal.io/api/activity/v1"
 	command "go.temporal.io/api/command/v1"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -128,7 +129,7 @@ func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOpti
 
 var errActivityOptionsNeedsWorkflowContext = errors.New("nexgen: ActivityOptions can only be converted inside a workflow")
 
-var activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr = workflow.NewTransferTypeConverter[ActivityOptions, activity.ActivityOptions](
+var activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[ActivityOptions, activity.ActivityOptions](
 	func(context.Context, *ActivityOptions) (*activity.ActivityOptions, error) {
 		return nil, errActivityOptionsNeedsWorkflowContext
 	},
@@ -148,7 +149,7 @@ var activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterEr
 	},
 )
 
-func (ActivityOptions) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return activityOptionsTransferTypeConverter, activityOptionsTransferTypeConverterErr
 }
 
@@ -183,7 +184,7 @@ func failureContainerFromProto(ctx workflow.Context, proto *command.FailWorkflow
 
 var errFailureContainerNeedsWorkflowContext = errors.New("nexgen: FailureContainer can only be converted inside a workflow")
 
-var failureContainerTransferTypeConverter, failureContainerTransferTypeConverterErr = workflow.NewTransferTypeConverter[FailureContainer, command.FailWorkflowExecutionCommandAttributes](
+var failureContainerTransferTypeConverter, failureContainerTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[FailureContainer, command.FailWorkflowExecutionCommandAttributes](
 	func(context.Context, *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
 		return nil, errFailureContainerNeedsWorkflowContext
 	},
@@ -203,7 +204,7 @@ var failureContainerTransferTypeConverter, failureContainerTransferTypeConverter
 	},
 )
 
-func (FailureContainer) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+func (FailureContainer) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return failureContainerTransferTypeConverter, failureContainerTransferTypeConverterErr
 }
 

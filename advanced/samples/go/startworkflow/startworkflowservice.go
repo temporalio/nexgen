@@ -9,6 +9,7 @@ import (
 
 	common "go.temporal.io/api/common/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -84,7 +85,7 @@ func startWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice.
 
 var errStartWorkflowRequestNeedsWorkflowContext = errors.New("nexgen: startWorkflowRequest can only be converted inside a workflow")
 
-var startWorkflowRequestTransferTypeConverter, startWorkflowRequestTransferTypeConverterErr = workflow.NewTransferTypeConverter[startWorkflowRequest, workflowservice.StartWorkflowExecutionRequest](
+var startWorkflowRequestTransferTypeConverter, startWorkflowRequestTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[startWorkflowRequest, workflowservice.StartWorkflowExecutionRequest](
 	func(context.Context, *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
 		return nil, errStartWorkflowRequestNeedsWorkflowContext
 	},
@@ -104,7 +105,7 @@ var startWorkflowRequestTransferTypeConverter, startWorkflowRequestTransferTypeC
 	},
 )
 
-func (startWorkflowRequest) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+func (startWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return startWorkflowRequestTransferTypeConverter, startWorkflowRequestTransferTypeConverterErr
 }
 
@@ -149,7 +150,7 @@ func cancelWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice
 
 var errCancelWorkflowRequestNeedsWorkflowContext = errors.New("nexgen: cancelWorkflowRequest can only be converted inside a workflow")
 
-var cancelWorkflowRequestTransferTypeConverter, cancelWorkflowRequestTransferTypeConverterErr = workflow.NewTransferTypeConverter[cancelWorkflowRequest, workflowservice.RequestCancelWorkflowExecutionRequest](
+var cancelWorkflowRequestTransferTypeConverter, cancelWorkflowRequestTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[cancelWorkflowRequest, workflowservice.RequestCancelWorkflowExecutionRequest](
 	func(context.Context, *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
 		return nil, errCancelWorkflowRequestNeedsWorkflowContext
 	},
@@ -169,7 +170,7 @@ var cancelWorkflowRequestTransferTypeConverter, cancelWorkflowRequestTransferTyp
 	},
 )
 
-func (cancelWorkflowRequest) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+func (cancelWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return cancelWorkflowRequestTransferTypeConverter, cancelWorkflowRequestTransferTypeConverterErr
 }
 
@@ -328,7 +329,7 @@ func cancelWorkflowResponseFromProto(ctx workflow.Context, proto *workflowservic
 
 var errCancelWorkflowResponseNeedsWorkflowContext = errors.New("nexgen: CancelWorkflowResponse can only be converted inside a workflow")
 
-var cancelWorkflowResponseTransferTypeConverter, cancelWorkflowResponseTransferTypeConverterErr = workflow.NewTransferTypeConverter[CancelWorkflowResponse, workflowservice.RequestCancelWorkflowExecutionResponse](
+var cancelWorkflowResponseTransferTypeConverter, cancelWorkflowResponseTransferTypeConverterErr = converter.NewContextualTransferTypeConverter[CancelWorkflowResponse, workflowservice.RequestCancelWorkflowExecutionResponse](
 	func(context.Context, *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
 		return nil, errCancelWorkflowResponseNeedsWorkflowContext
 	},
@@ -348,7 +349,7 @@ var cancelWorkflowResponseTransferTypeConverter, cancelWorkflowResponseTransferT
 	},
 )
 
-func (CancelWorkflowResponse) TransferTypeConverter() (workflow.TransferTypeConverter, error) {
+func (CancelWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return cancelWorkflowResponseTransferTypeConverter, cancelWorkflowResponseTransferTypeConverterErr
 }
 
