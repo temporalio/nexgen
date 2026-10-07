@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `@nexus.serialization-context` directive now supports Go.
 - The `@nexus.serialization-context` directive now supports Go proto-backed
   operations through a generated operation registry, including externally owned
-  request types. If a system-endpoint operation selects a Go helper, `registry.go`
+  request types. If a system-endpoint operation selects a Go helper, a `Registry`
+  section at the end of the generated API file
   includes rendered system-endpoint operations under their wire service and
   operation names; duplicate keys are rejected. Ordinary-only annotations do not
   register global policies, and ordinary wrappers retain eager external-input

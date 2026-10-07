@@ -1619,8 +1619,8 @@ such as `helpers.Context`. Each component must be a valid Go identifier, not a
 keyword or the blank identifier `_`. Calls, deeper selector chains, and arbitrary
 expressions are not accepted. For a qualified helper, supply the package import
 in a Go support fragment unless the generated model already imports that package.
-The generator copies the matching import into `registry.go`, not the model or
-runtime helper file, and preserves an explicit alias. For example, `helpers.Context` can use
+The generator copies the matching import into the generated API file and
+preserves an explicit alias. For example, `helpers.Context` can use
 `import helpers "example.com/helpers"` from a support fragment.
 
 For example, add the Go helper to the operation directive:
@@ -1658,8 +1658,9 @@ Go package, so it can access that field. Helpers return a
 `nil` leaves the converter unchanged.
 
 If a rendered system-endpoint operation in a Go package selects a helper, the
-generator emits `registry.go`. No generated serialization-context runtime file is
-needed. The registry includes rendered system-endpoint operations in that package,
+generator appends a `Registry` section to the generated API file. No separate
+registry or serialization-context runtime file is needed. The registry includes
+rendered system-endpoint operations in that package,
 not ordinary-endpoint operations, keyed by
 `internal.NexusOperationKey{Service, Operation}` using wire names. Values use
 `internal.NexusOperationRegistryEntry` directly and have a

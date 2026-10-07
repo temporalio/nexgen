@@ -878,6 +878,12 @@ struct GoModelFragments {
     body: String,
 }
 
+#[derive(Debug, Default)]
+struct GoOperationRegistry {
+    imports: Vec<(String, String)>,
+    body: String,
+}
+
 enum GoExternalModels {
     Json(json::ModelBackend),
     Proto(proto::ModelBackend),
@@ -1256,7 +1262,39 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
-        let external_imports = self.external_models.imports();
+        let mut external_imports = self.external_models.imports();
+        let registry = if self.package.has_serialization_context {
+            render_operation_registry(
+                &self.package,
+                &services,
+                &self.imports,
+                &external_imports,
+                support_fragments,
+            )?
+        } else {
+            GoOperationRegistry::default()
+        };
+        for (path, alias) in &registry.imports {
+            if let Some((_, previous_alias)) = external_imports
+                .iter()
+                .find(|(existing, _)| existing == path)
+            {
+                if previous_alias != alias {
+                    return Err(Error::InvalidWitDirective {
+                        path: PathBuf::from("<go-plan>"),
+                        context: "Go operation registry".to_string(),
+                        directive: "@nexus.serialization-context".to_string(),
+                        reason: format!(
+                            "import `{path}` uses both `{previous_alias}` and `{alias}` in the generated API file"
+                        ),
+                    });
+                }
+            } else if alias == path.rsplit('/').next().unwrap_or(path) {
+                self.imports.insert(path.clone());
+            } else {
+                external_imports.push((path.clone(), alias.clone()));
+            }
+        }
         let output = render_file(
             &self.package,
             &self.imports,
@@ -1273,6 +1311,7 @@ impl<'a> ApiPlanner<'a> {
             &self.external_models,
             self.api_plan,
             &visibility,
+            &registry.body,
         );
 
         let mut files = GeneratedFileMap::default();
@@ -1282,19 +1321,6 @@ impl<'a> ApiPlanner<'a> {
             go_api_file_name(self.api_plan)
         };
         files.insert(file_name, output, primary_origin)?;
-        if self.package.has_serialization_context {
-            files.insert(
-                PathBuf::from("registry.go"),
-                render_operation_registry(
-                    &self.package,
-                    &services,
-                    &self.imports,
-                    &external_imports,
-                    support_fragments,
-                )?,
-                GeneratedFileOrigin::fixed("generated Go Nexus operation registry"),
-            )?;
-        }
 
         // Emit hand-written support fragments (e.g. proto converter functions)
         // in one support file. Like the TypeScript backend, all fragments are
@@ -1921,7 +1947,7 @@ fn render_operation_registry(
     model_imports: &BTreeSet<String>,
     external_imports: &[(String, String)],
     support_fragments: &[SupportFragmentSpec],
-) -> Result<String> {
+) -> Result<GoOperationRegistry> {
     let services: Vec<_> = services
         .iter()
         .filter(|service| service.is_system_endpoint())
@@ -2021,14 +2047,7 @@ fn render_operation_registry(
             }
         }
     }
-    let mut output = format!("{GENERATED_HEADER}\n\npackage {}\n", package.package_name);
-    if !imports.is_empty() {
-        output.push_str("\nimport (\n");
-        for (alias, path) in imports {
-            output.push_str(&format!("\t{alias} \"{path}\"\n"));
-        }
-        output.push_str(")\n");
-    }
+    let mut output = String::from("\n// --- Registry ---\n");
     let sc = package.serialization_context_type();
     let key = package.qualified_expr("go.temporal.io/sdk/internal", "internal.NexusOperationKey");
     let info = package.qualified_expr(
@@ -2082,7 +2101,13 @@ fn render_operation_registry(
             "\nfunc init() {{\n\t{register}(NexusOperationRegistry)\n}}\n"
         ));
     }
-    Ok(output)
+    Ok(GoOperationRegistry {
+        imports: imports
+            .into_iter()
+            .map(|(alias, path)| (path, alias))
+            .collect(),
+        body: output,
+    })
 }
 
 fn render_support_file(fragments: &[SupportFragmentSpec], package_name: &str) -> String {
@@ -3470,6 +3495,7 @@ fn render_file(
     external_models: &GoExternalModels,
     api_plan: &PlannedSpec,
     visibility: &GoVisibility,
+    registry: &str,
 ) -> String {
     let mut output = String::new();
     output.push_str(GENERATED_HEADER);
@@ -3535,6 +3561,7 @@ fn render_file(
         if !external_model_body.is_empty() {
             output.push_str(external_model_body);
         }
+        output.push_str(registry);
         return output;
     }
     if !external_model_body.is_empty()
@@ -3546,6 +3573,7 @@ fn render_file(
     {
         output.push('\n');
         output.push_str(external_model_body);
+        output.push_str(registry);
         return output;
     }
 
@@ -3729,8 +3757,10 @@ fn render_file(
         }
     }
 
-    // An external input converter can move entirely into registry.go. Its proto
-    // package is then unused here unless another model or output references it.
+    output.push_str(registry);
+
+    // Imports collected while planning can become unused when the SDK owns
+    // input conversion instead of the generated wrapper.
     let unused_external_imports: Vec<_> = external_imports
         .iter()
         .filter(|(_, alias)| !output[body_start..].contains(&format!("{alias}.")))
