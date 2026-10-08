@@ -6,7 +6,10 @@ import * as nexus from "nexus-rpc";
 
 import type { ActivityOptions, FailureContainer } from "../wit/type-roundtrip/index.ts";
 import { typeRoundtripService } from "../wit/type-roundtrip/services.ts";
-import { failureFromProto, failureToProto } from "../wit/type-roundtrip/support.ts";
+import {
+  failureFromProto,
+  failureToProto,
+} from "../support/temporal_model_converters.ts";
 import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts";
 
 const workflowsPath = fileURLToPath(
@@ -16,9 +19,9 @@ const workflowsPath = fileURLToPath(
 // The handler is only a test transport. Give its copy of the generated
 // converters a fixed converter; the Workflow bundle imports the real module
 // and continues to obtain its converter from the activation context.
-vi.mock("../wit/type-roundtrip/support.ts", async (importOriginal) => {
+vi.mock("../support/temporal_model_converters.ts", async (importOriginal) => {
   const support =
-    await importOriginal<typeof import("../wit/type-roundtrip/support.ts")>();
+    await importOriginal<typeof import("../support/temporal_model_converters.ts")>();
   const common = await import("@temporalio/common");
   return {
     ...support,

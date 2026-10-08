@@ -3,10 +3,11 @@
 Generated C# for the WIT inputs in [`../inputs/`](../inputs/), plus the
 snapshot-only native-api form of the JSON-Schema inputs.
 
+- `TemporalSupport/` — authored converters and workflow-service helpers shared
+  by the generated projects.
 - `wit/` — generated output per WIT example (`workflow-service`,
   `user-service`, `type-showcase`, `type-roundtrip`, `start-workflow`,
-  `function-execution`): models, operations, Nexus service interfaces, and
-  Temporal support.
+  `function-execution`): models, operations, and Nexus service interfaces.
 - `json_schema/api/` — native-api (service + client) output for the
   JSON-Schema inputs. Snapshot-only: regenerated and diffed by the Rust tests,
   not exercised by runtime tests here.

@@ -35,7 +35,7 @@ interface start-workflow-service {
     workflow-id: string,
     task-queue: task-queue,
     workflow-start-delay: option<duration>,
-    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="workflow.GetInfo(ctx).Namespace" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
+    /// @nexus.source python="_support.workflow_namespace()" typescript="support.workflowNamespace()" go="workflow.GetInfo(ctx).Namespace" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
     namespace: string,
     /// @nexus.omit
     workflow-execution-timeout: placeholder,
@@ -90,7 +90,7 @@ interface start-workflow-service {
 
   /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest" typescript-import="@temporalio/proto"
   record cancel-workflow-request {
-    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="workflow.GetInfo(ctx).Namespace" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
+    /// @nexus.source python="_support.workflow_namespace()" typescript="support.workflowNamespace()" go="workflow.GetInfo(ctx).Namespace" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
     namespace: string,
     workflow-execution: workflow-execution,
     reason: option<string>,

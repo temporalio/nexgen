@@ -7,8 +7,8 @@ JSON-Schema samples.
 - Authored WIT inputs live in [`advanced/samples/inputs/*.wit`](../inputs)
 - Checked-in generated WIT outputs live in
   `advanced/samples/typescript/wit/<example>/`
-- Generated support fragments are emitted as `support.ts` next to the generated
-  `index.ts`
+- Authored Temporal converters live in the shared `support/` directory;
+  generated modules import them rather than copying them into each output
 - Snapshot-only JSON-Schema native-api output lives in
   `advanced/samples/typescript/json_schema/api/<example>/`
 - Vitest files live in `advanced/samples/typescript/tests/` (WIT round-trip and

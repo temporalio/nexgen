@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 
@@ -18,8 +17,8 @@ use crate::planning::{
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec,
-    FunctionFieldSpec, IntSpec, OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec,
-    SupportFragmentSpec, TypeSpec, VariantSpec,
+    FunctionFieldSpec, IntSpec, OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
+    VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -98,6 +97,7 @@ impl<'a> ApiPlanner<'a> {
         if models.iter().any(|model| {
             self.external_models
                 .model_uses_support_extensions(model, self.api_plan)
+                || model.sourced_fields().next().is_some()
         }) && let Some(support_namespace) = self.support_namespace
         {
             imports.push(support_namespace);
@@ -151,6 +151,9 @@ impl<'a> ApiPlanner<'a> {
         {
             imports.push("Temporalio.Workflows");
         }
+        if let Some(support_namespace) = self.support_namespace {
+            imports.push(support_namespace);
+        }
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
         for service in &self.api_plan.services {
@@ -191,6 +194,9 @@ impl<'a> ApiPlanner<'a> {
             "Google.Protobuf.WellKnownTypes",
             "Temporalio.Workflows",
         ];
+        if let Some(support_namespace) = self.support_namespace {
+            imports.push(support_namespace);
+        }
         let module_imports = dotnet_module_imports(self.api_plan);
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
@@ -209,6 +215,9 @@ impl<'a> ApiPlanner<'a> {
             "System.Threading.Tasks",
             "Temporalio.Workflows",
         ];
+        if let Some(support_namespace) = self.support_namespace {
+            imports.push(support_namespace);
+        }
         let module_imports = dotnet_module_imports(self.api_plan);
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
@@ -2164,18 +2173,15 @@ impl ExternalModelBackend for DotNetExternalModels {
 
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: Option<&str>,
 ) -> Result<GeneratedFiles> {
     let generated = match &tree.root {
-        ApiSpecNode::Leaf(leaf) => {
-            let support_fragments = support_fragments_for_plan(&leaf.spec, support);
-            generate_leaf(
-                &leaf.spec,
-                &support_fragments,
-                GeneratedFileOrigin::fixed("generated .NET package module"),
-            )
-        }
-        ApiSpecNode::Branch(branch) => generate_tree(branch, support),
+        ApiSpecNode::Leaf(leaf) => generate_leaf(
+            &leaf.spec,
+            support_package,
+            GeneratedFileOrigin::fixed("generated .NET package module"),
+        ),
+        ApiSpecNode::Branch(branch) => generate_tree(branch, support_package),
     }?;
     Ok(GeneratedFiles {
         layout: crate::generator::GeneratedOutputLayout::Directory,
@@ -2191,17 +2197,21 @@ struct DotnetGenerationResult {
 
 fn generate_leaf(
     api_plan: &PlannedSpec,
-    support_fragments: &[SupportFragmentSpec],
+    support_package: Option<&str>,
     module_origin: GeneratedFileOrigin,
 ) -> Result<DotnetGenerationResult> {
     let mode = crate::nexgen_config::current().mode;
-    let support_namespace = dotnet_support_namespace(support_fragments)?;
-    let generator = ApiPlanner::new(api_plan, support_namespace.as_deref())?;
-    validate_dotnet_support_references(
-        api_plan,
-        &generator.external_models,
-        support_namespace.as_deref(),
-    )?;
+    if let Some(support_package) = support_package {
+        validate_dotnet_support_name(support_package).map_err(|reason| {
+            Error::InvalidSupportNamespace {
+                language: Language::Dotnet,
+                namespace: support_package.to_string(),
+                reason,
+            }
+        })?;
+    }
+    let generator = ApiPlanner::new(api_plan, support_package)?;
+    validate_dotnet_support_references(api_plan, &generator.external_models, support_package)?;
     let namespace = dotnet_namespace(api_plan);
     let mut files = GeneratedFileMap::default();
     files.insert(
@@ -2244,13 +2254,6 @@ fn generate_leaf(
             "Resources.cs",
             generator.render_resources_file(&namespace),
             module_origin,
-        )?;
-    }
-    for fragment in support_fragments {
-        files.insert(
-            support_fragment_path(fragment)?,
-            render_support_file(&fragment.contents),
-            GeneratedFileOrigin::support_fragment(Language::Dotnet, &fragment.path),
         )?;
     }
     Ok(DotnetGenerationResult {
@@ -2374,28 +2377,27 @@ impl<'a> ApiPlanner<'a> {
 
 fn generate_tree(
     branch: &ApiSpecBranch<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: Option<&str>,
 ) -> Result<DotnetGenerationResult> {
     let mut files = GeneratedFileMap::default();
     let mut warnings = Vec::new();
     for node in branch.children.values() {
-        generate_tree_node(node, support, &mut files, &mut warnings)?;
+        generate_tree_node(node, support_package, &mut files, &mut warnings)?;
     }
     Ok(DotnetGenerationResult { files, warnings })
 }
 
 fn generate_tree_node(
     node: &ApiSpecNode<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: Option<&str>,
     files: &mut GeneratedFileMap,
     warnings: &mut Vec<String>,
 ) -> Result<()> {
     match node {
         ApiSpecNode::Leaf(leaf) => {
-            let support_fragments = support_fragments_for_plan(&leaf.spec, support);
             let generated = generate_leaf(
                 &leaf.spec,
-                &support_fragments,
+                support_package,
                 GeneratedFileOrigin::input_module(Language::Dotnet, &leaf.source_path),
             )?;
             warnings.extend(generated.warnings);
@@ -2405,52 +2407,11 @@ fn generate_tree_node(
         }
         ApiSpecNode::Branch(branch) => {
             for node in branch.children.values() {
-                generate_tree_node(node, support, files, warnings)?;
+                generate_tree_node(node, support_package, files, warnings)?;
             }
             Ok(())
         }
     }
-}
-
-fn support_fragments_for_plan(
-    plan: &PlannedSpec,
-    support: &crate::SupportFiles,
-) -> Vec<SupportFragmentSpec> {
-    if support.fragments.is_empty() {
-        plan.support
-            .fragments_for_language(Language::Dotnet)
-            .to_vec()
-    } else {
-        support.fragments.clone()
-    }
-}
-
-fn dotnet_support_namespace(support_fragments: &[SupportFragmentSpec]) -> Result<Option<String>> {
-    let mut namespace = None::<String>;
-    for fragment in support_fragments {
-        let Some(fragment_namespace) = fragment.namespace.as_deref() else {
-            continue;
-        };
-        validate_dotnet_support_name(fragment_namespace).map_err(|reason| {
-            Error::InvalidSupportNamespace {
-                language: Language::Dotnet,
-                namespace: fragment_namespace.to_string(),
-                reason,
-            }
-        })?;
-        if let Some(existing) = &namespace {
-            if existing != fragment_namespace {
-                return Err(Error::InvalidSupportNamespace {
-                    language: Language::Dotnet,
-                    namespace: fragment_namespace.to_string(),
-                    reason: format!("conflicts with support namespace `{existing}`"),
-                });
-            }
-        } else {
-            namespace = Some(fragment_namespace.to_string());
-        }
-    }
-    Ok(namespace)
 }
 
 fn validate_dotnet_support_references(
@@ -2469,10 +2430,7 @@ fn validate_dotnet_support_references(
         }
     }
     for model in api_plan.records().map(|(_, record)| record) {
-        for (_, sourced_field, source_expr) in model.sourced_fields() {
-            if let Some(reference) = source_expr.strip_suffix("()") {
-                validate_dotnet_support_reference(reference, support_namespace)?;
-            }
+        for (_, sourced_field, _) in model.sourced_fields() {
             validate_dotnet_field_kind_support_references(
                 &sourced_field.field_type,
                 external_models,
@@ -2563,20 +2521,6 @@ fn is_valid_csharp_identifier(name: &str) -> bool {
         && chars.all(|character| character == '_' || character.is_ascii_alphanumeric())
 }
 
-pub(in crate::generator) fn qualify_dotnet_support_call(
-    source_expr: &str,
-    support_namespace: Option<&str>,
-) -> String {
-    if let Some(reference) = source_expr.strip_suffix("()") {
-        format!(
-            "{}()",
-            qualify_dotnet_support_reference(reference, support_namespace)
-        )
-    } else {
-        source_expr.to_string()
-    }
-}
-
 pub(in crate::generator) fn qualify_dotnet_support_reference(
     reference: &str,
     support_namespace: Option<&str>,
@@ -2607,19 +2551,6 @@ fn generated_file_prelude(namespace: &str, imports: &[&str]) -> String {
     output.push_str("namespace ");
     output.push_str(namespace);
     output.push_str("\n{\n\n");
-    output
-}
-
-fn render_support_file(contents: &str) -> String {
-    let mut output = String::new();
-    if !contents.trim_start().starts_with("// <auto-generated") {
-        output.push_str(GENERATED_HEADER);
-        output.push('\n');
-    }
-    if !contents.contains("#nullable") {
-        output.push_str("#nullable enable\n");
-    }
-    output.push_str(contents);
     output
 }
 
@@ -3079,7 +3010,7 @@ fn render_flattened_method_body(
     constructor_args.extend(
         model
             .sourced_fields()
-            .map(|(_, _, source_expr)| qualify_dotnet_support_call(source_expr, support_namespace)),
+            .map(|(_, _, source_expr)| source_expr.to_string()),
     );
     output.push('(');
     output.push_str(&constructor_args.join(", "));
@@ -3565,7 +3496,7 @@ enum ResourceMethodRequestInitKind {
 fn resource_method_request_model_init_expr(
     request_plan: &RequestPlan,
     api_plan: &PlannedSpec,
-    support_namespace: Option<&str>,
+    _support_namespace: Option<&str>,
     type_name_override: Option<&str>,
     init_kind: ResourceMethodRequestInitKind,
 ) -> Option<String> {
@@ -3596,7 +3527,7 @@ fn resource_method_request_model_init_expr(
     let sourced_field_exprs = type_name_override.is_none().then(|| {
         model
             .sourced_fields()
-            .map(|(_, _, source_expr)| qualify_dotnet_support_call(source_expr, support_namespace))
+            .map(|(_, _, source_expr)| source_expr.to_string())
             .collect()
     });
     Some(model_init_expr(
@@ -3921,24 +3852,6 @@ fn value_uses_result(value: &PlannedType) -> bool {
         })) => value_uses_result(fallback),
         _ => false,
     }
-}
-
-fn support_fragment_path(fragment: &SupportFragmentSpec) -> Result<PathBuf> {
-    let path = PathBuf::from(&fragment.path);
-    if path.extension().and_then(|extension| extension.to_str()) != Some("cs") {
-        return Err(Error::InvalidGeneratedPath {
-            path,
-            reason: ".NET support files must end with `.cs`".to_string(),
-        });
-    }
-    let file_name = path
-        .file_name()
-        .ok_or_else(|| Error::InvalidGeneratedPath {
-            path: path.clone(),
-            reason: "support path must have a file name".to_string(),
-        })?
-        .to_os_string();
-    Ok(PathBuf::from("Support").join(file_name))
 }
 
 fn dotnet_namespace(api_plan: &PlannedSpec) -> String {

@@ -10,7 +10,6 @@ pub(crate) mod python;
 mod resource_plan;
 pub(crate) mod typescript;
 
-use crate::SupportFiles;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::language::Language;
@@ -75,10 +74,6 @@ pub(crate) enum GeneratedFileOrigin {
         language: Language,
         output_dir_name: String,
     },
-    SupportFragment {
-        language: Language,
-        source: PathBuf,
-    },
     Operation {
         language: Language,
         service: String,
@@ -119,13 +114,6 @@ impl GeneratedFileOrigin {
         Self::OutputDirectoryNamedModule {
             language,
             output_dir_name: output_dir_name.into(),
-        }
-    }
-
-    pub(crate) fn support_fragment(language: Language, source: impl Into<PathBuf>) -> Self {
-        Self::SupportFragment {
-            language,
-            source: source.into(),
         }
     }
 
@@ -197,11 +185,6 @@ impl GeneratedFileOrigin {
                 "{} module derived from output directory `{output_dir_name}`",
                 language_display_name(*language)
             ),
-            Self::SupportFragment { language, source } => format!(
-                "{} support file `{}`",
-                language_display_name(*language),
-                source.display()
-            ),
             Self::Operation {
                 language,
                 service,
@@ -249,11 +232,6 @@ impl GeneratedFileOrigin {
             )),
             Self::OutputDirectoryNamedModule { language, .. } => Some(format!(
                 "point `--output` at a directory whose name generates a different {} file path",
-                language_display_name(*language)
-            )),
-            Self::SupportFragment { language, source } => Some(format!(
-                "rename support file `{}` so it generates a different {} path",
-                source.display(),
                 language_display_name(*language)
             )),
             Self::Operation {
@@ -464,6 +442,7 @@ pub enum TsDateTimeTypes {
 pub(crate) struct GenerateFilesOptions {
     pub(crate) go_output_dir_name: String,
     pub(crate) java_package_root: Option<String>,
+    pub(crate) support_package: Option<String>,
     /// The TypeScript temporal representation (`--date-time-types`); ignored by
     /// the non-TypeScript backends.
     pub(crate) ts_date_time_types: TsDateTimeTypes,
@@ -473,7 +452,6 @@ pub(crate) fn generate_files_for_tree_with_mode_and_options(
     language: Language,
     tree: ApiSpecTree,
     descriptors: &DescriptorIndex,
-    support: &SupportFiles,
     mode: GenerationMode,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
@@ -482,22 +460,27 @@ pub(crate) fn generate_files_for_tree_with_mode_and_options(
         ..crate::nexgen_config::current()
     };
     let _scope = crate::nexgen_config::scope(config);
-    crate::compile_tree_to_files(language, tree, descriptors, support, options)
+    crate::compile_tree_to_files(language, tree, descriptors, options)
 }
 
 pub(crate) fn generate_files_from_planned_tree(
     language: Language,
     tree: &ApiSpecTree<PlannedFamily>,
-    support: &SupportFiles,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     let mode = crate::nexgen_config::current().mode;
     let mut generated = match language {
-        Language::Dotnet => dotnet::generate(tree, support),
-        Language::Go => generate_go_tree(tree, support, options),
-        Language::Java => java::generate(tree, support, options.java_package_root.as_deref()),
-        Language::Python => python::generate(tree, support),
-        Language::TypeScript => typescript::generate(tree, support, options.ts_date_time_types),
+        Language::Dotnet => dotnet::generate(tree, options.support_package.as_deref()),
+        Language::Go => generate_go_tree(tree, options),
+        Language::Java => java::generate(tree, options.java_package_root.as_deref()),
+        Language::Python => {
+            python::generate(tree, options.support_package.as_deref().unwrap_or(""))
+        }
+        Language::TypeScript => typescript::generate(
+            tree,
+            options.support_package.as_deref().unwrap_or(""),
+            options.ts_date_time_types,
+        ),
         language => Err(Error::UnsupportedLanguage { language }),
     }?;
     generated.warnings = if mode == GenerationMode::NativeApi {
@@ -510,14 +493,13 @@ pub(crate) fn generate_files_from_planned_tree(
 
 fn generate_go_tree(
     tree: &ApiSpecTree<PlannedFamily>,
-    support: &SupportFiles,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     go::generate_tree(
         tree,
-        support,
         &go::GoOptions {
             output_dir_name: options.go_output_dir_name,
+            support_package: options.support_package,
             ..go::GoOptions::default()
         },
     )
@@ -527,13 +509,13 @@ pub fn generate_source(
     language: Language,
     spec: ApiSpec,
     descriptors: &DescriptorIndex,
-    support: &SupportFiles,
+    support_package: &str,
 ) -> Result<String> {
     generate_source_with_mode(
         language,
         spec,
         descriptors,
-        support,
+        support_package,
         GenerationMode::NativeApi,
     )
 }
@@ -542,16 +524,18 @@ pub fn generate_source_with_mode(
     language: Language,
     spec: ApiSpec,
     descriptors: &DescriptorIndex,
-    support: &SupportFiles,
+    support_package: &str,
     mode: GenerationMode,
 ) -> Result<String> {
     let generated = generate_files_for_tree_with_mode_and_options(
         language,
         ApiSpecTree::single(spec),
         descriptors,
-        support,
         mode,
-        GenerateFilesOptions::default(),
+        GenerateFilesOptions {
+            support_package: Some(support_package.to_string()),
+            ..GenerateFilesOptions::default()
+        },
     )?;
     Ok(match generated.layout {
         GeneratedOutputLayout::SingleFile => generated
@@ -613,7 +597,6 @@ mod tests {
 
     use prost_types::FileDescriptorSet;
 
-    use crate::SupportFiles;
     use crate::descriptors::DescriptorIndex;
     use crate::language::Language;
 
@@ -731,28 +714,28 @@ mod tests {
 
     #[test]
     fn generated_file_insert_reports_only_mutable_action_against_fixed_artifact() {
-        let mutable = GeneratedFileOrigin::input_module(Language::Go, "support.json");
-        let fixed = GeneratedFileOrigin::fixed("generated Go support file");
+        let mutable = GeneratedFileOrigin::input_module(Language::Go, "definitions.json");
+        let fixed = GeneratedFileOrigin::fixed("generated Go definitions file");
         for (first, second, expected_first, expected_second) in [
             (
                 mutable.clone(),
                 fixed.clone(),
-                "Go input module `support.json`",
-                "generated Go support file",
+                "Go input module `definitions.json`",
+                "generated Go definitions file",
             ),
             (
                 fixed.clone(),
                 mutable.clone(),
-                "generated Go support file",
-                "Go input module `support.json`",
+                "generated Go definitions file",
+                "Go input module `definitions.json`",
             ),
         ] {
             let mut files = GeneratedFileMap::default();
             files
-                .insert("support.go", "first".to_string(), first)
+                .insert("definitions.go", "first".to_string(), first)
                 .unwrap();
             let error = files
-                .insert("support.go", "second".to_string(), second)
+                .insert("definitions.go", "second".to_string(), second)
                 .unwrap_err();
             let crate::error::Error::GeneratedFileSourceConflict {
                 path,
@@ -763,12 +746,12 @@ mod tests {
             else {
                 panic!("expected generated-file source conflict, got {error}");
             };
-            assert_eq!(path, PathBuf::from("support.go"));
+            assert_eq!(path, PathBuf::from("definitions.go"));
             assert_eq!(first_source, expected_first);
             assert_eq!(second_source, expected_second);
             assert_eq!(
                 remedy,
-                "rename input file or directory `support.json` so it generates a different Go path"
+                "rename input file or directory `definitions.json` so it generates a different Go path"
             );
         }
     }
@@ -923,9 +906,11 @@ interface user-service {
             Language::Python,
             ApiSpecTree::single(spec),
             &descriptors,
-            &SupportFiles::default(),
             GenerationMode::NativeApi,
-            GenerateFilesOptions::default(),
+            GenerateFilesOptions {
+                support_package: Some("support".to_string()),
+                ..GenerateFilesOptions::default()
+            },
         )
         .unwrap();
 
@@ -972,9 +957,11 @@ interface example-service {
             Language::Python,
             ApiSpecTree::single(spec),
             &descriptors,
-            &SupportFiles::default(),
             GenerationMode::DefinitionsOnly,
-            GenerateFilesOptions::default(),
+            GenerateFilesOptions {
+                support_package: Some("support".to_string()),
+                ..GenerateFilesOptions::default()
+            },
         )
         .unwrap();
 

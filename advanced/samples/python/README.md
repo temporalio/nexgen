@@ -6,8 +6,9 @@ snapshot-only JSON-Schema **native-api** outputs.
 - Authored WIT inputs live in `advanced/samples/inputs/*.wit`
 - Checked-in generated packages live in `advanced/samples/python/wit/<name>/`,
   where `<name>` is the snake_case WIT input name
-- Generated support fragments live under each package's private `_support/`
-  package, and generated models are exposed as the public `models` module
+- Authored Temporal converters live in the shared `temporal_support/` package;
+  generated helpers remain under each package's private `_support/`, and
+  generated models are exposed as the public `models` module
 - JSON-Schema native-api outputs (services + clients) live under
   `advanced/samples/python/json_schema/api/` and are snapshot-tested only
 - Proto wire-compatibility fixtures live in `advanced/samples/wire/proto/`

@@ -9,10 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="bin/**/*.cs;obj/**/*.cs;tests/**/*.cs;*.cs;wit/**/*.cs" />
+    <Compile Remove="bin/**/*.cs;obj/**/*.cs;tests/**/*.cs;*.cs;wit/**/*.cs;TemporalSupport/**/*.cs" />
     <!-- The generated interceptor partials require matching SDK changes. -->
     <Compile Include="wit/workflow-service/**/*.cs"
-             Exclude="wit/workflow-service/SystemNexusWorkflowOutboundInterceptor.cs" />
+             Exclude="wit/workflow-service/SystemNexusWorkflowOutboundInterceptor.cs;wit/workflow-service/Support/*.cs" />
+    <Compile Include="TemporalSupport/*.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -12,7 +12,7 @@ use crate::spec::{
     ApiSpec, ApiSpecTransform, AuthoredFamily, AuthoredResourceType, ExternalTypeSpec,
     JsonModelSpec, OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
     ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec, ResourceSpec, SelectedFamily,
-    SelectedSupportSpec, SelectedTextSpec, ServiceSpec, Symbol, TypeFamily, TypeSpec,
+    SelectedTextSpec, ServiceSpec, Symbol, TypeFamily, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 /// Selected IR after resource-method and resource-return bindings are resolved.
@@ -40,7 +40,6 @@ impl TypeFamily for ResourceBoundFamily {
     type OperationData = ();
     type FieldData = ();
     type Text = SelectedTextSpec;
-    type Support = SelectedSupportSpec;
 }
 
 struct ResourceBindingMapper {
@@ -81,9 +80,6 @@ impl ApiSpecTransform<SelectedFamily, ResourceBoundFamily> for ResourceBindingMa
     fn map_operation_data(&mut self, _: &str, _: ()) {}
     fn map_field_data(&mut self, _: &str, _: &str, _: ()) {}
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
-        value
-    }
-    fn map_support(&mut self, value: SelectedSupportSpec) -> SelectedSupportSpec {
         value
     }
 }

@@ -82,7 +82,7 @@ fn api_spec_from_wit(
     let package = &resolve.packages[package_id];
     let world_id = select_world(resolve, package_id, &path)?;
     let world = &resolve.worlds[world_id];
-    let support = collect_support_spec(resolve, package_id, package_origins)?;
+    reject_obsolete_support_directives(resolve, package_origins)?;
 
     let mut types = BTreeMap::new();
     for (_, dependency_package) in resolve.packages.iter() {
@@ -125,7 +125,6 @@ fn api_spec_from_wit(
             .as_ref()
             .map(ToString::to_string)
             .unwrap_or_else(|| "0.0.0".to_string()),
-        support,
         services,
         model_scope,
         types,
@@ -184,143 +183,28 @@ fn format_error_chain(error: &impl std::fmt::Display) -> String {
     format!("{error:#}")
 }
 
-fn collect_support_spec(
+fn reject_obsolete_support_directives(
     resolve: &Resolve,
-    current_package_id: PackageId,
     package_origins: &PackageOrigins,
-) -> Result<SupportSpec> {
-    let mut fragments = BTreeMap::new();
-
-    for language in all_languages() {
-        let mut language_fragments = Vec::new();
-        let mut seen_paths = BTreeSet::new();
-
-        for (package_id, origin_path) in package_origins {
-            if *package_id == current_package_id {
-                continue;
-            }
-            collect_package_support_fragments(
-                language,
-                resolve,
-                *package_id,
-                origin_path,
-                &mut seen_paths,
-                &mut language_fragments,
-            )?;
-        }
-
-        if let Some(origin_path) = package_origins.get(&current_package_id) {
-            collect_package_support_fragments(
-                language,
-                resolve,
-                current_package_id,
-                origin_path,
-                &mut seen_paths,
-                &mut language_fragments,
-            )?;
-        }
-
-        if !language_fragments.is_empty() {
-            fragments.insert(language, language_fragments);
-        }
-    }
-
-    Ok(SupportSpec { fragments })
-}
-
-fn collect_package_support_fragments(
-    language: Language,
-    resolve: &Resolve,
-    package_id: PackageId,
-    origin_path: &Path,
-    seen_paths: &mut BTreeSet<String>,
-    fragments: &mut Vec<SupportFragmentSpec>,
 ) -> Result<()> {
-    let package = &resolve.packages[package_id];
-    let package_name = if let Some(version) = &package.name.version {
-        format!(
-            "{}:{}@{}",
-            package.name.namespace, package.name.name, version
-        )
-    } else {
-        format!("{}:{}", package.name.namespace, package.name.name)
-    };
-
-    collect_support_fragment_from_docs(
-        language,
-        package.docs.contents.as_deref(),
-        origin_path,
-        &format!("package `{package_name}`"),
-        seen_paths,
-        fragments,
-    )?;
-
-    for (world_name, world_id) in &package.worlds {
-        let world = &resolve.worlds[*world_id];
-        collect_support_fragment_from_docs(
-            language,
-            world.docs.contents.as_deref(),
-            origin_path,
-            &format!("package `{package_name}` world `{world_name}`"),
-            seen_paths,
-            fragments,
-        )?;
+    for (package_id, origin_path) in package_origins {
+        let package = &resolve.packages[*package_id];
+        let package_name = format!("package `{}:{}`", package.name.namespace, package.name.name);
+        reject_obsolete_support_docs(package.docs.contents.as_deref(), origin_path, &package_name)?;
+        for (world_name, world_id) in &package.worlds {
+            reject_obsolete_support_docs(
+                resolve.worlds[*world_id].docs.contents.as_deref(),
+                origin_path,
+                &format!("{package_name} world `{world_name}`"),
+            )?;
+        }
     }
-
     Ok(())
 }
 
-fn collect_support_fragment_from_docs(
-    language: Language,
-    docs: Option<&str>,
-    origin_path: &Path,
-    context: &str,
-    seen_paths: &mut BTreeSet<String>,
-    fragments: &mut Vec<SupportFragmentSpec>,
-) -> Result<()> {
-    let directives = parse_directives(docs, origin_path, context)?;
-    let Some(relative_path) =
-        directive_value_for_language(&directives, "support", origin_path, context, language)?
-    else {
-        return Ok(());
-    };
-    let namespace = directive_value_for_language(
-        &directives,
-        "support-namespace",
-        origin_path,
-        context,
-        language,
-    )?;
-
-    let resolved_path = resolve_support_path(origin_path, &relative_path);
-    let normalized_path = resolved_path.to_string_lossy().replace('\\', "/");
-    if !seen_paths.insert(normalized_path.clone()) {
-        return Ok(());
-    }
-
-    let contents = load_support_fragment_contents(&resolved_path)?;
-    fragments.push(SupportFragmentSpec {
-        path: normalized_path,
-        contents,
-        namespace,
-    });
+fn reject_obsolete_support_docs(docs: Option<&str>, path: &Path, context: &str) -> Result<()> {
+    parse_directives(docs, path, context)?;
     Ok(())
-}
-
-fn load_support_fragment_contents(path: &Path) -> Result<String> {
-    fs::read_to_string(path).map_err(|source| Error::ReadFile {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-fn resolve_support_path(base_dir: &Path, support_path: &str) -> PathBuf {
-    let support_path = PathBuf::from(support_path);
-    if support_path.is_absolute() {
-        support_path
-    } else {
-        base_dir.join(support_path)
-    }
 }
 
 struct PreparedWitWorkspace {
@@ -345,8 +229,6 @@ fn prepare_wit_workspace(
 
     if let Some(source_dir) = input_package_source_dir(path) {
         copy_package_source_dir(&source_dir, &package_root, path)?;
-    } else if let Some(source_dir) = input_support_source_dir(path) {
-        copy_standalone_input_support_dir(&source_dir, &package_root, path)?;
     }
 
     let target_name = input_target_name(path);
@@ -376,18 +258,6 @@ fn input_package_source_dir(path: &Path) -> Option<PathBuf> {
     }
 
     if path.file_name()? != "main.wit" {
-        return None;
-    }
-
-    let parent = path.parent()?;
-    if parent.as_os_str().is_empty() || !parent.exists() {
-        return None;
-    }
-    Some(parent.to_path_buf())
-}
-
-fn input_support_source_dir(path: &Path) -> Option<PathBuf> {
-    if path.is_dir() {
         return None;
     }
 
@@ -430,60 +300,6 @@ fn copy_package_source_dir(
         })?;
         if file_type.is_dir() {
             copy_package_source_dir(&source_path, &destination_path, input_path)?;
-            continue;
-        }
-
-        if let Some(parent) = destination_path.parent() {
-            fs::create_dir_all(parent).map_err(|source| Error::WriteFile {
-                path: parent.to_path_buf(),
-                source,
-            })?;
-        }
-        fs::copy(&source_path, &destination_path).map_err(|source| Error::WriteFile {
-            path: destination_path,
-            source,
-        })?;
-    }
-
-    Ok(())
-}
-
-fn copy_standalone_input_support_dir(
-    source_dir: &Path,
-    destination_dir: &Path,
-    input_path: &Path,
-) -> Result<()> {
-    for entry in fs::read_dir(source_dir).map_err(|source| Error::ReadFile {
-        path: source_dir.to_path_buf(),
-        source,
-    })? {
-        let entry = entry.map_err(|source| Error::ReadFile {
-            path: source_dir.to_path_buf(),
-            source,
-        })?;
-        let source_path = entry.path();
-        let destination_path = destination_dir.join(entry.file_name());
-
-        if source_path == input_path {
-            continue;
-        }
-
-        let file_type = entry.file_type().map_err(|source| Error::ReadFile {
-            path: source_path.clone(),
-            source,
-        })?;
-        if file_type.is_dir() {
-            if entry.file_name() == "deps" {
-                continue;
-            }
-            copy_standalone_input_support_dir(&source_path, &destination_path, input_path)?;
-            continue;
-        }
-
-        if source_path
-            .extension()
-            .is_some_and(|extension| extension == "wit")
-        {
             continue;
         }
 
@@ -1457,7 +1273,12 @@ fn build_fields_from_record(
                 default_value: field_default,
                 required,
                 visibility: source
-                    .map(|source_expr| RecordFieldVisibility::Sourced { source_expr })
+                    .map(
+                        |(source_expr, support_import)| RecordFieldVisibility::Sourced {
+                            source_expr,
+                            support_import,
+                        },
+                    )
                     .unwrap_or_else(|| {
                         if api_omit_directive.is_some() {
                             RecordFieldVisibility::ApiOmitted
@@ -1974,18 +1795,59 @@ fn build_source_call(
     path: &Path,
     context: &str,
     language: Language,
-) -> Result<Option<String>> {
+) -> Result<Option<(String, bool)>> {
     let Some(directive) = directive(directives, "source", path, context)? else {
         return Ok(None);
     };
 
-    let Some(helper_name) =
+    // Validate every authored marker, including those for non-selected languages.
+    // A language-specific expression takes precedence over a generic expression.
+    let mut selected_support_import = None;
+    for (key, marker_language) in [
+        ("go-support-import", Language::Go),
+        ("python-support-import", Language::Python),
+        ("typescript-support-import", Language::TypeScript),
+        ("dotnet-support-import", Language::Dotnet),
+    ] {
+        let Some(value) = directive.value(key) else {
+            continue;
+        };
+        let support_import = parse_bool(value).map_err(|reason| Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.source".to_string(),
+            reason: format!("`{key}` {reason}"),
+        })?;
+        if directive_language_value(directive, marker_language)
+            .or_else(|| directive.value("value"))
+            .is_none()
+        {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: context.to_string(),
+                directive: "@nexus.source".to_string(),
+                reason: format!(
+                    "`{key}` requires a `{}` or default source expression",
+                    language_key(marker_language)
+                ),
+            });
+        }
+        if language == marker_language {
+            selected_support_import = Some(support_import);
+        }
+    }
+
+    let Some(source_expr) =
         directive_language_value(directive, language).or_else(|| directive.value("value"))
     else {
         return Ok(None);
     };
 
-    Ok(Some(helper_name.to_string()))
+    let support_import = selected_support_import.unwrap_or(matches!(
+        language,
+        Language::Python | Language::TypeScript | Language::Dotnet
+    ));
+    Ok(Some((source_expr.to_string(), support_import)))
 }
 
 fn is_valid_support_helper_name(name: &str) -> bool {
@@ -3579,6 +3441,14 @@ fn parse_directive_line(line: &str, path: &Path, context: &str) -> Result<Direct
 
     let name_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
     let name = &rest[..name_end];
+    if matches!(name, "support" | "support-namespace") {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: format!("@nexus.{name}"),
+            reason: "this directive is obsolete; use `--support-package` instead".to_string(),
+        });
+    }
     let mut tail = rest[name_end..].trim_start();
     let mut args = BTreeMap::new();
 
@@ -4083,7 +3953,8 @@ interface workflow-service {
             .1;
         assert!(matches!(
             go_record.fields["workflow_id_reuse_policy"].visibility,
-            crate::spec::RecordFieldVisibility::Sourced { ref source_expr } if source_expr == "workflowIDReusePolicy(ctx)"
+            crate::spec::RecordFieldVisibility::Sourced { ref source_expr, support_import: false }
+                if source_expr == "workflowIDReusePolicy(ctx)"
         ));
 
         let python = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
@@ -4106,6 +3977,154 @@ interface workflow-service {
         assert_eq!(
             field.default_value.as_ref().unwrap().enum_case,
             "allow-duplicate"
+        );
+    }
+
+    #[test]
+    fn selects_sourced_field_support_import_defaults_and_overrides() {
+        use crate::spec::RecordFieldVisibility;
+
+        let wit = r#"
+package temporal:nexus@1.0.0;
+
+world system {
+  export workflow-service;
+}
+
+interface workflow-service {
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record request {
+    /// @nexus.source go="  goExpr(ctx)  " python="_support.expr()" typescript="support.expr()" dotnet="Support.Expr()" java="expr()"
+    defaults: option<string>,
+    /// @nexus.source go="goExpr()" go-support-import=true python="plain_expr()" python-support-import=false typescript="plainExpr()" typescript-support-import=false dotnet="Plain.Expr()" dotnet-support-import=false
+    overrides: option<string>,
+    /// @nexus.source "genericExpr()" python-support-import=false
+    generic: option<string>,
+  }
+}
+"#;
+
+        for (language, default_expr, default_import, override_expr, override_import) in [
+            (Language::Go, "  goExpr(ctx)  ", false, "goExpr()", true),
+            (
+                Language::Python,
+                "_support.expr()",
+                true,
+                "plain_expr()",
+                false,
+            ),
+            (
+                Language::TypeScript,
+                "support.expr()",
+                true,
+                "plainExpr()",
+                false,
+            ),
+            (
+                Language::Dotnet,
+                "Support.Expr()",
+                true,
+                "Plain.Expr()",
+                false,
+            ),
+        ] {
+            let spec = parse(language, wit);
+            let record = spec
+                .records()
+                .find(|(_, record)| record.name == "Request")
+                .unwrap()
+                .1;
+            for (field_name, expected_expr, expected_import) in [
+                ("defaults", default_expr, default_import),
+                ("overrides", override_expr, override_import),
+            ] {
+                assert!(
+                    matches!(
+                        &record.fields[field_name].visibility,
+                        RecordFieldVisibility::Sourced { source_expr, support_import }
+                            if source_expr == expected_expr && *support_import == expected_import
+                    ),
+                    "{language:?}: {field_name}"
+                );
+                assert_eq!(record.field_source(field_name), Some(expected_expr));
+            }
+            assert!(matches!(
+                &record.fields["generic"].visibility,
+                RecordFieldVisibility::Sourced { source_expr, support_import }
+                    if source_expr == "genericExpr()"
+                        && *support_import == matches!(language, Language::TypeScript | Language::Dotnet)
+            ));
+            assert_eq!(record.sourced_fields().count(), 3);
+        }
+
+        let java = parse(Language::Java, wit);
+        let record = java
+            .records()
+            .find(|(_, record)| record.name == "Request")
+            .unwrap()
+            .1;
+        assert!(matches!(
+            &record.fields["defaults"].visibility,
+            RecordFieldVisibility::Sourced { source_expr, support_import: false }
+                if source_expr == "expr()"
+        ));
+        assert_eq!(record.field_source("overrides"), None);
+        assert!(matches!(
+            &record.fields["generic"].visibility,
+            RecordFieldVisibility::Sourced { source_expr, support_import: false }
+                if source_expr == "genericExpr()"
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_source_support_import_even_for_unselected_language() {
+        let wit = r#"
+package temporal:nexus@1.0.0;
+world system { export workflow-service; }
+interface workflow-service {
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record request {
+    /// @nexus.source python="expr()" python-support-import=yes
+    namespace: option<string>,
+  }
+}
+"#;
+        let error = crate::parser::parse_api_spec_from_wit_for_language(
+            Language::Go,
+            wit,
+            PathBuf::from("inline.wit"),
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("`python-support-import` expected `true` or `false`")
+        );
+    }
+
+    #[test]
+    fn rejects_source_support_import_without_matching_expression() {
+        let wit = r#"
+package temporal:nexus@1.0.0;
+world system { export workflow-service; }
+interface workflow-service {
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record request {
+    /// @nexus.source go="expr()" python-support-import=false
+    namespace: option<string>,
+  }
+}
+"#;
+        let error = crate::parser::parse_api_spec_from_wit_for_language(
+            Language::Go,
+            wit,
+            PathBuf::from("inline.wit"),
+        )
+        .unwrap_err();
+        assert!(
+            error.to_string().contains(
+                "`python-support-import` requires a `python` or default source expression"
+            )
         );
     }
 
@@ -4173,38 +4192,6 @@ interface workflow-service {
         assert_eq!(
             typescript.services[0].wire_name,
             "temporal.api.workflowservice.v1.WorkflowService"
-        );
-        let python_support = python.support.fragments_for_language(Language::Python);
-        let typescript_support = typescript
-            .support
-            .fragments_for_language(Language::TypeScript);
-        let dotnet_support = dotnet.support.fragments_for_language(Language::Dotnet);
-        assert_eq!(python_support.len(), 1);
-        assert_eq!(typescript_support.len(), 1);
-        assert_eq!(dotnet_support.len(), 1);
-        assert!(
-            python_support[0]
-                .path
-                .ends_with("deps/nexus-temporal-types/python/temporal_model_converters.py")
-        );
-        assert!(
-            typescript_support[0]
-                .path
-                .ends_with("deps/nexus-temporal-types/typescript/temporal_model_converters.ts")
-        );
-        assert!(
-            python_support[0]
-                .contents
-                .contains("def retry_policy_from_proto(")
-        );
-        assert!(
-            typescript_support[0]
-                .contents
-                .contains("export function retryPolicyFromProto(")
-        );
-        assert_eq!(
-            dotnet_support[0].namespace.as_deref(),
-            Some("Nexgen.Support")
         );
         assert!(
             python
@@ -5053,59 +5040,29 @@ interface workflow-service {
     }
 
     #[test]
-    fn accumulates_linked_and_root_input_support_fragments() {
-        let temp_dir = unique_temp_dir("support-fragments");
-        fs::create_dir_all(&temp_dir).unwrap();
-        let input_path = temp_dir.join("input.wit");
-        let extra_support_path = temp_dir.join("extra_support.py");
-        fs::write(
-            &extra_support_path,
-            "def extra_support_hook() -> str:\n    return 'extra'\n",
-        )
-        .unwrap();
-
-        let wit = r#"
-/// @nexus.support python="extra_support.py"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-interface workflow-service {
-  use nexus:temporal-types/model@1.0.0.{retry-policy};
-
-  retry-policy-operation: func(request: retry-policy) -> retry-policy;
-}
-"#;
-
-        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
-            Language::Python,
-            wit,
-            input_path,
-            &[linked_inputs_path()],
-        )
-        .unwrap();
-        let python_support = spec.support.fragments_for_language(Language::Python);
-        assert_eq!(python_support.len(), 2);
-        assert!(
-            python_support[0]
-                .path
-                .ends_with("deps/nexus-temporal-types/python/temporal_model_converters.py")
-        );
-        assert!(python_support[1].path.ends_with("extra_support.py"));
-        assert!(
-            python_support[0]
-                .contents
-                .contains("def retry_policy_from_proto(")
-        );
-        assert!(
-            python_support[1]
-                .contents
-                .contains("def extra_support_hook() -> str:")
-        );
-
-        fs::remove_dir_all(temp_dir).unwrap();
+    fn obsolete_support_directives_point_to_support_package() {
+        for directive in [
+            r#"@nexus.support python="extra_support.py""#,
+            r#"@nexus.support-namespace dotnet="Nexgen.Support""#,
+        ] {
+            for wit in [
+                format!("/// {directive}\npackage temporal:nexus@1.0.0;\nworld system {{}}\n"),
+                format!("package temporal:nexus@1.0.0;\n/// {directive}\nworld system {{}}\n"),
+            ] {
+                let error = crate::parser::parse_api_spec_from_wit_for_language(
+                    Language::Python,
+                    &wit,
+                    PathBuf::from("inline.wit"),
+                )
+                .unwrap_err();
+                assert!(
+                    error
+                        .to_string()
+                        .contains(directive.split_whitespace().next().unwrap())
+                );
+                assert!(error.to_string().contains("--support-package"));
+            }
+        }
     }
 
     #[test]

@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use heck::{ToKebabCase, ToSnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
 
-use crate::SupportFiles;
 use crate::error::{Error, Result};
 use crate::generator::render_request_plan;
 use crate::generator::{
@@ -20,8 +19,7 @@ use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec,
     FunctionArgsSpec as GenericFunctionArgsSpec, FunctionFieldSpec as GenericFunctionFieldSpec,
     FunctionResultSpec as GenericFunctionResultSpec, IntSpec, LanguageStringSpec, ModulePath,
-    OperationSpec, RecordFieldSpec, RecordSpec, SupportFragmentSpec, TypeReplacementSpec, TypeSpec,
-    VariantSpec,
+    OperationSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecLeaf, ApiSpecNode, ApiSpecTree};
 
@@ -58,6 +56,7 @@ pub struct GoOptions {
     /// non-root name -- `generate_to_file` resolves and validates it before
     /// generation runs.
     pub(crate) output_dir_name: String,
+    pub(crate) support_package: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -634,12 +633,11 @@ struct GoGenerationResult {
 /// by the file that declares it.
 fn generate_in_tree(
     api_plan: &PlannedSpec,
-    support_fragments: &[SupportFragmentSpec],
     options: &GoOptions,
     tree_models: &[PlannedJsonType],
     primary_origin: GeneratedFileOrigin,
 ) -> Result<GoGenerationResult> {
-    ApiPlanner::new(api_plan, options, tree_models)?.generate(support_fragments, primary_origin)
+    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin)
 }
 
 /// Every JSON model declared anywhere in the generate closure.
@@ -653,12 +651,11 @@ fn collect_tree_json_models(leaves: &[&ApiSpecLeaf<PlannedFamily>]) -> Vec<Plann
 
 pub(crate) fn generate_tree(
     tree: &ApiSpecTree<PlannedFamily>,
-    support: &SupportFiles,
     options: &GoOptions,
 ) -> Result<GeneratedFiles> {
     match &tree.root {
-        ApiSpecNode::Leaf(leaf) => generate_single_leaf(leaf, support, options),
-        ApiSpecNode::Branch(branch) => generate_branch_tree(branch, support, options),
+        ApiSpecNode::Leaf(leaf) => generate_single_leaf(leaf, options),
+        ApiSpecNode::Branch(branch) => generate_branch_tree(branch, options),
     }
 }
 
@@ -668,7 +665,6 @@ pub(crate) fn generate_tree(
 /// `definitions.go` alongside the one model file, rather than inlined into it.
 fn generate_single_leaf(
     leaf: &ApiSpecLeaf<PlannedFamily>,
-    support: &SupportFiles,
     options: &GoOptions,
 ) -> Result<GeneratedFiles> {
     let primary_origin = if go_tree_has_json_models(&[leaf]) {
@@ -678,8 +674,7 @@ fn generate_single_leaf(
     } else {
         GeneratedFileOrigin::fixed("generated Go API module")
     };
-    let mut generated =
-        generate_in_tree(&leaf.spec, &support.fragments, options, &[], primary_origin)?;
+    let mut generated = generate_in_tree(&leaf.spec, options, &[], primary_origin)?;
     if go_tree_has_json_models(&[leaf]) {
         let package_name = GoPackageContext::new(&leaf.spec, options)?.package_name;
         let definitions_path = PathBuf::from("definitions.go");
@@ -699,7 +694,6 @@ fn generate_single_leaf(
 
 fn generate_branch_tree(
     branch: &ApiSpecBranch<PlannedFamily>,
-    support: &SupportFiles,
     options: &GoOptions,
 ) -> Result<GeneratedFiles> {
     let mut leaves = Vec::new();
@@ -735,7 +729,6 @@ fn generate_branch_tree(
         leaf_spec.module_path = root.clone();
         let generated = generate_in_tree(
             &leaf_spec,
-            &[],
             options,
             &tree_models,
             GeneratedFileOrigin::input_module(Language::Go, &leaf.source_path),
@@ -756,16 +749,6 @@ fn generate_branch_tree(
             PathBuf::from("definitions.go"),
             json::render_definitions_file(&package_name, &tree_models)?,
             GeneratedFileOrigin::fixed("generated Go validation runtime"),
-        )?;
-    }
-
-    // Hand-written support fragments (rare for JSON inputs) are emitted once.
-    let support_fragments = support_fragments_for_plans(&leaves, support);
-    if !support_fragments.is_empty() {
-        files.insert(
-            PathBuf::from("support.go"),
-            render_support_file(&support_fragments, &package_name),
-            GeneratedFileOrigin::fixed("generated Go support file"),
         )?;
     }
 
@@ -797,20 +780,6 @@ fn go_tree_has_json_models(leaves: &[&ApiSpecLeaf<PlannedFamily>]) -> bool {
             .map(|(_, binding)| binding)
             .any(|binding| binding.json_model().is_some())
     })
-}
-
-fn support_fragments_for_plans(
-    plans: &[&ApiSpecLeaf<PlannedFamily>],
-    support: &SupportFiles,
-) -> Vec<SupportFragmentSpec> {
-    if !support.fragments.is_empty() {
-        return support.fragments.clone();
-    }
-    plans
-        .iter()
-        .flat_map(|leaf| leaf.spec.support.fragments_for_language(Language::Go))
-        .cloned()
-        .collect()
 }
 
 fn collect_leaf_specs<'a>(
@@ -871,13 +840,20 @@ fn plan_uses_json_models(api_plan: &PlannedSpec) -> bool {
 }
 
 impl GoExternalModels {
-    fn new(api_plan: &PlannedSpec, package: GoPackageContext) -> Self {
+    fn new(
+        api_plan: &PlannedSpec,
+        package: GoPackageContext,
+        support_package: Option<&str>,
+    ) -> Self {
         if plan_uses_json_models(api_plan) {
             Self::Json(json::ModelBackend::new(
                 crate::nexgen_config::current().mode == GenerationMode::NativeApi,
             ))
         } else {
-            Self::Proto(proto::ModelBackend::new(package))
+            Self::Proto(proto::ModelBackend::new(
+                package,
+                support_package.map(str::to_string),
+            ))
         }
     }
 
@@ -1020,7 +996,11 @@ impl<'a> ApiPlanner<'a> {
         collect_imports_from_plan(api_plan, &mut imports);
         imports.retain(|import_path| !package.is_self_import(import_path));
 
-        let mut external_models = GoExternalModels::new(api_plan, package.clone());
+        let mut external_models = GoExternalModels::new(
+            api_plan,
+            package.clone(),
+            options.support_package.as_deref(),
+        );
         external_models.adopt_tree_models(tree_models);
         external_models.prepare(api_plan)?;
 
@@ -1036,11 +1016,7 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    fn generate(
-        mut self,
-        support_fragments: &[SupportFragmentSpec],
-        primary_origin: GeneratedFileOrigin,
-    ) -> Result<GoGenerationResult> {
+    fn generate(mut self, primary_origin: GeneratedFileOrigin) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
         if !self.external_models.renders_operation_references() {
             for service in &self.api_plan.services {
@@ -1187,18 +1163,6 @@ impl<'a> ApiPlanner<'a> {
             go_api_file_name(self.api_plan)
         };
         files.insert(file_name, output, primary_origin)?;
-
-        // Emit hand-written support fragments (e.g. proto converter functions)
-        // in one support file. Like the TypeScript backend, all fragments are
-        // emitted unconditionally, even when nothing in the generated code
-        // references them.
-        if !support_fragments.is_empty() {
-            files.insert(
-                PathBuf::from("support.go"),
-                render_support_file(support_fragments, &self.package.package_name),
-                GeneratedFileOrigin::fixed("generated Go support file"),
-            )?;
-        }
 
         Ok(GoGenerationResult {
             files,
@@ -1760,127 +1724,6 @@ fn go_api_file_name(api_plan: &PlannedSpec) -> PathBuf {
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| "api".to_string());
     PathBuf::from(format!("{stem}.go"))
-}
-
-fn render_support_file(fragments: &[SupportFragmentSpec], package_name: &str) -> String {
-    if let [fragment] = fragments {
-        return rewrite_support_package(&fragment.contents, package_name);
-    }
-
-    let mut prelude = String::new();
-    let mut imports = BTreeSet::new();
-    let mut bodies = Vec::new();
-    for fragment in fragments {
-        let parsed = parse_support_fragment(&fragment.contents);
-        if prelude.is_empty() {
-            prelude = parsed.prelude;
-        } else if !parsed.prelude.trim().is_empty() {
-            bodies.push(parsed.prelude.trim().to_string());
-        }
-        imports.extend(parsed.imports);
-        if !parsed.body.trim().is_empty() {
-            bodies.push(parsed.body.trim().to_string());
-        }
-    }
-
-    let mut output = String::new();
-    if !prelude.trim().is_empty() {
-        output.push_str(prelude.trim_end());
-        output.push('\n');
-    }
-    output.push_str("package ");
-    output.push_str(package_name);
-    output.push_str("\n\n");
-    if !imports.is_empty() {
-        output.push_str("import (\n");
-        for import in imports {
-            output.push('\t');
-            output.push_str(&import);
-            output.push('\n');
-        }
-        output.push_str(")\n\n");
-    }
-    output.push_str(&bodies.join("\n\n"));
-    output.push('\n');
-    output
-}
-
-/// Replaces the `package <name>` declaration in a Go support fragment with the
-/// generated package name, preserving the rest of the file. If no package
-/// declaration is found, the original contents are returned unchanged.
-fn rewrite_support_package(contents: &str, package_name: &str) -> String {
-    let mut result = String::with_capacity(contents.len());
-    let mut replaced = false;
-    for line in contents.lines() {
-        if !replaced && line.trim_start().starts_with("package ") {
-            result.push_str("package ");
-            result.push_str(package_name);
-            replaced = true;
-        } else {
-            result.push_str(line);
-        }
-        result.push('\n');
-    }
-    result
-}
-
-#[derive(Default)]
-struct ParsedSupportFragment {
-    prelude: String,
-    imports: BTreeSet<String>,
-    body: String,
-}
-
-fn parse_support_fragment(contents: &str) -> ParsedSupportFragment {
-    let lines = contents.lines().collect::<Vec<_>>();
-    let Some(package_index) = lines
-        .iter()
-        .position(|line| line.trim_start().starts_with("package "))
-    else {
-        return ParsedSupportFragment {
-            body: contents.to_string(),
-            ..Default::default()
-        };
-    };
-
-    let mut parsed = ParsedSupportFragment {
-        prelude: lines[..package_index].join("\n"),
-        ..Default::default()
-    };
-    let mut index = package_index + 1;
-    skip_blank_lines(&lines, &mut index);
-
-    while index < lines.len() {
-        let line = lines[index].trim_start();
-        if line == "import (" {
-            index += 1;
-            while index < lines.len() && lines[index].trim() != ")" {
-                let import = lines[index].trim();
-                if !import.is_empty() {
-                    parsed.imports.insert(import.to_string());
-                }
-                index += 1;
-            }
-            if index < lines.len() {
-                index += 1;
-            }
-        } else if let Some(import) = line.strip_prefix("import ") {
-            parsed.imports.insert(import.trim().to_string());
-            index += 1;
-        } else {
-            break;
-        }
-        skip_blank_lines(&lines, &mut index);
-    }
-
-    parsed.body = lines[index..].join("\n");
-    parsed
-}
-
-fn skip_blank_lines(lines: &[&str], index: &mut usize) {
-    while *index < lines.len() && lines[*index].trim().is_empty() {
-        *index += 1;
-    }
 }
 
 /// Derives a valid Go package name from a Nexus endpoint string by stripping
@@ -3167,7 +3010,7 @@ fn render_file(
         for (path, alias) in external_imports {
             output.push('\t');
             let default_alias = path.rsplit('/').next().unwrap_or(path);
-            if alias != default_alias {
+            if alias != default_alias || alias == "support" {
                 output.push_str(alias);
                 output.push(' ');
             }

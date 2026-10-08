@@ -18,8 +18,8 @@ The generator picks its input format from the file extension, so the same
 (`.json`/`.yaml`/`.yml`) inputs.
 
 > [!IMPORTANT]
-> Everything on this page — the `dotnet` target, the `--support-file`,
-> `--descriptors`, `--format`, and `--native-api` flags, and the `add-rpc` and
+> The `dotnet` target, the `--descriptors`, `--format`, and `--native-api`
+> flags, and the `add-rpc` and
 > `debug-wit-dir` subcommands — is
 > gated behind the `advanced` Cargo feature, which is off by default. Build or
 > run with `--features advanced` (as every command below does), or produce a
@@ -45,6 +45,13 @@ and `advanced/samples/typescript/wit/<example-name>/`; Go output lives under
 each language's `tests/` directory where present. See
 [`samples/README.md`](samples/README.md) for links to each example's WIT,
 generated code, and tests.
+
+The linked `nexus:temporal-types` WIT package describes semantic types, while
+authored language-specific Temporal converters live in each sample project:
+`go/support/`, `python/temporal_support/`, `typescript/support/`, and
+`dotnet/TemporalSupport/`. `cargo build-examples` passes the appropriate
+`support_package` for each output; generated example directories may be safely
+replaced without deleting these authored helpers.
 
 - [`user-service`](samples/inputs/user-service.wit): a small WIT-direct API showing the basic shape of an operation returning a resource and a resource method that calls another operation.
 - [`type-showcase`](samples/inputs/type-showcase.wit): a WIT-direct API focused on type coverage, including records, enums, flags, variants, results, maps, tuples, resources, resource methods, and no-result operations.
@@ -124,6 +131,7 @@ Generate Python:
 ```bash
 cargo run --features advanced -- python \
   advanced/samples/inputs/user-service.wit \
+  --support-package temporal_support \
   --output /tmp/user_service
 ```
 
@@ -134,6 +142,7 @@ Generate TypeScript:
 ```bash
 cargo run --features advanced -- typescript \
   advanced/samples/inputs/user-service.wit \
+  --support-package ./support \
   --output /tmp/user-service
 ```
 
@@ -142,6 +151,7 @@ Generate Go:
 ```bash
 cargo run --features advanced -- go \
   advanced/samples/inputs/user-service.wit \
+  --support-package go.temporal.io/sdk/advanced/samples/go/support \
   --output /tmp/userservice
 ```
 
@@ -150,6 +160,7 @@ Generate .NET:
 ```bash
 cargo run --features advanced -- dotnet \
   advanced/samples/inputs/user-service.wit \
+  --support-package Nexgen.Support \
   --output /tmp/user-service-dotnet
 ```
 
@@ -171,7 +182,6 @@ The WIT file defines the public surface. `@nexus` directives carry the parts WIT
 
 - service endpoint names
 - service wire names
-- support file paths
 - language-native service namespaces/packages
 - language-native override types
 - flattened API-only field types
@@ -190,20 +200,24 @@ Input WIT files can set generated service namespaces/packages with
 `go="go.temporal.io/sdk/workflow"`. For Go, the import path's final segment is
 used as the package name and the full path is used to remove self-imports.
 
-Input WIT files can add support code with `@nexus.support`. Python support fragments are copied into the generated private `_support` package, TypeScript support fragments are emitted as `support.ts` next to the generated `index.ts`, and .NET support fragments are copied under `Support/`.
-
-Support code can also be supplied outside WIT with repeatable `--support-file`
-arguments on the language subcommand. Explicit support files apply to the
-selected language, are appended after WIT-declared support, and use the same generated
-layout as `@nexus.support` fragments. .NET support files infer their support
-namespace from the C# `namespace` declaration in the file:
+Go, Python, TypeScript and .NET WIT generation require one `--support-package`
+import path or namespace per invocation; JSON Schema generation does not.
+The package is hand-written and
+stays in the user's project; nexgen imports its helpers instead of reading,
+copying, or generating that code. Java does not use this option. For example:
 
 ```bash
 cargo run --features advanced -- python \
   advanced/samples/inputs/user-service.wit \
-  --support-file /path/to/custom_support.py \
+  --support-package temporal_support \
   --output /tmp/user_service
 ```
+
+`@nexus.source` and `@nexus.output-transform` remain authored expressions,
+not helper names: include calls and qualify support helpers explicitly (for
+example `python="_support.workflow_namespace()"`). Go source expressions such
+as `workflow.GetInfo(ctx).Namespace` do not need to reference the support
+package.
 
 ## Proto Backing
 
@@ -265,6 +279,7 @@ cargo run --features advanced -- python \
   advanced/samples/inputs/workflow-service.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package temporal_support \
   --native-api \
   --output /tmp/workflow_service
 ```

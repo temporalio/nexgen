@@ -7,6 +7,7 @@ import (
 
 	common "go.temporal.io/api/common/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
+	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -22,7 +23,7 @@ type startWorkflowRequest struct {
 func (m startWorkflowRequest) toProto(ctx workflow.Context) (*workflowservice.StartWorkflowExecutionRequest, error) {
 	message := &workflowservice.StartWorkflowExecutionRequest{}
 	{
-		converted, err := workflowTypeToProto(ctx, &m.Workflow)
+		converted, err := support.WorkflowTypeToProto(ctx, &m.Workflow)
 		if err != nil {
 			return nil, err
 		}
@@ -30,14 +31,14 @@ func (m startWorkflowRequest) toProto(ctx workflow.Context) (*workflowservice.St
 	}
 	message.WorkflowId = m.WorkflowID
 	{
-		converted, err := taskQueueToProto(ctx, &m.TaskQueue)
+		converted, err := support.TaskQueueToProto(ctx, &m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
 		message.TaskQueue = converted
 	}
 	{
-		converted, err := durationToProto(ctx, m.WorkflowStartDelay)
+		converted, err := support.DurationToProto(ctx, m.WorkflowStartDelay)
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +51,7 @@ func (m startWorkflowRequest) toProto(ctx workflow.Context) (*workflowservice.St
 func startWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice.StartWorkflowExecutionRequest) (startWorkflowRequest, error) {
 	value := startWorkflowRequest{}
 	{
-		converted, err := workflowTypeFromProto(ctx, proto.GetWorkflowType())
+		converted, err := support.WorkflowTypeFromProto(ctx, proto.GetWorkflowType())
 		if err != nil {
 			return value, err
 		}
@@ -60,7 +61,7 @@ func startWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice.
 	}
 	value.WorkflowID = proto.GetWorkflowId()
 	{
-		converted, err := taskQueueFromProto(ctx, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(ctx, proto.GetTaskQueue())
 		if err != nil {
 			return value, err
 		}
@@ -69,7 +70,7 @@ func startWorkflowRequestFromProto(ctx workflow.Context, proto *workflowservice.
 		}
 	}
 	{
-		converted, err := durationFromProto(ctx, proto.GetWorkflowStartDelay())
+		converted, err := support.DurationFromProto(ctx, proto.GetWorkflowStartDelay())
 		if err != nil {
 			return value, err
 		}

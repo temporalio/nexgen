@@ -67,6 +67,15 @@ interface user-service {
 This produces a data model for the request and response, a service definition,
 and a convenience wrapper function that lets callers write:
 
+For Go, Python, TypeScript, and .NET, pass `--support-package` to
+`nexgen generate` with the import path or namespace of support code maintained by your
+project. For example, `--support-package my_app.nexgen_support` for Python,
+`--support-package @my-org/nexgen-support` for TypeScript,
+`--support-package example.com/myapp/nexgensupport` for Go, or
+`--support-package MyApp.NexgenSupport` for .NET. Java does not require a
+support package. The generator references this package; it does not copy
+support files into the generated output.
+
 **Python:**
 
 ```python
@@ -736,12 +745,14 @@ proto-backed models.
 ### Sourced Fields
 
 Fields annotated with `@nexus.source` are not exposed in the user-facing API.
-Instead, transfer-type conversion calls a support function to obtain the value.
+Instead, transfer-type conversion evaluates the language-specific expression
+verbatim to obtain the value. Expressions can refer to helpers from the
+project's support package supplied with `--support-package`.
 
 ```wit
 record start-workflow-request {
   workflow-id: string,
-  /// @nexus.source python="workflow_namespace" typescript="workflowNamespace"
+  /// @nexus.source python="_support.workflow_namespace()" typescript="support.workflowNamespace()"
   namespace: string,
 }
 ```
@@ -750,11 +761,20 @@ The `namespace` field does not appear as a constructor parameter. During
 transfer-type conversion:
 
 ```python
-message.namespace = workflow_namespace()   # auto-injected
+message.namespace = _support.workflow_namespace()   # auto-injected
 ```
 
-The support function must be defined in the support file referenced by
-`@nexus.support`.
+The expression is authored code, not a function name that the generator calls
+automatically. Include the call (and any arguments) in the expression itself.
+If it refers to a support helper, qualify it with the generated import alias
+(`_support` in Python, `support` in TypeScript or Go); the generator does not
+rewrite sourced expressions. The import is a separate choice: Python,
+TypeScript, and .NET sourced expressions request the configured support package
+by default, while Go sourced expressions do not. Use
+`go-support-import=true` when a Go expression refers to `support`; use
+`python-support-import=false` or `typescript-support-import=false` when an
+expression only refers to other modules. These markers control imports, never
+the expression text.
 
 ### Omitted Fields
 
@@ -823,7 +843,9 @@ is never nil.
 ### Output Transforms
 
 An operation annotated with `@nexus.output-transform` transforms the raw
-operation result into a different type before returning it.
+operation result into a different type before returning it. Its language
+expressions are emitted verbatim, not interpreted as names of support
+functions to call.
 
 ```wit
 /// @nexus.output-transform
@@ -1133,11 +1155,11 @@ is just `signal_name`.
 type signal-function = placeholder;
 ```
 
-Generated Python imports and calls the converter during transfer-type
-conversion:
+Generated Python imports the user-owned support module and calls the converter
+during transfer-type conversion:
 
 ```python
-from ._support import signal_function_to_proto
+import temporal_support as _support
 
 @dataclasses.dataclass(slots=True, kw_only=True)
 class SignalWithStartWorkflowRequest:
@@ -1145,9 +1167,9 @@ class SignalWithStartWorkflowRequest:
     signal_args: list[typing.Any] | None = None
 
     def to_transfer_type(self, value: "SignalWithStartWorkflowRequest"):
-        message.signal_name = signal_function_to_proto(value.signal)
+        message.signal_name = _support.signal_function_to_proto(value.signal)
         if value.signal_args is not None:
-            message.signal_input.CopyFrom(payloads_to_proto(value.signal_args))
+            message.signal_input.CopyFrom(_support.payloads_to_proto(value.signal_args))
         return message
 ```
 
@@ -1232,25 +1254,6 @@ interface user-service { ... }
 
 The service name (used in generated code) is derived from the interface name
 converted to PascalCase: `user-service` becomes `UserService`.
-
----
-
-### @nexus.support
-
-**Placement:** Package doc comment
-**Syntax:** `@nexus.support python="<path>" typescript="<path>"`
-
-Includes external support code in the generated output. Paths are resolved
-relative to the WIT file. Python support files are copied into a private
-`_support/` package; TypeScript support files become `support.ts` next to the
-generated `index.ts`.
-
-```wit
-/// @nexus.support
-///   python="python/model_overrides.py"
-///   typescript="typescript/model_overrides.ts"
-package nexus:temporal-types@1.0.0;
-```
 
 ---
 
@@ -1455,18 +1458,27 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 ### @nexus.source
 
 **Placement:** Record field (within a `@nexus.proto` record)
-**Syntax:** `@nexus.source python="<func>" typescript="<func>" go="<Func>"`
+**Syntax:** `@nexus.source python="<expr>" typescript="<expr>" go="<expr>"`
+Optional: `<lang>-support-import=true|false`
 
-Populates a field by calling a support function instead of exposing it as an API
-parameter. The function must be defined in the support file.
+Populates a field by evaluating the supplied language expression instead of
+exposing it as an API parameter. The expression is emitted as written; if it
+calls a helper, that helper must be available from the package specified by
+`--support-package`. For each authored language expression, the optional
+`<lang>-support-import` marker determines whether the generated module imports
+that package. It defaults to `true` for Python, TypeScript and .NET, and
+`false` for Go. For example, `go-support-import=true` accompanies
+`go="support.Namespace(ctx)"`; `python-support-import=false` avoids an unused
+import when a Python expression uses only other modules. The expression itself
+is never prefixed or rewritten.
 
 ```wit
-/// @nexus.source python="workflow_namespace" typescript="workflowNamespace"
+/// @nexus.source python="_support.workflow_namespace()" typescript="support.workflowNamespace()"
 namespace: string,
 ```
 
 During transfer-type conversion, this becomes
-`message.namespace = workflow_namespace()`.
+`message.namespace = _support.workflow_namespace()`.
 
 Cannot be combined with `@nexus.default`.
 
@@ -1581,7 +1593,8 @@ def signal_with_start_workflow_serialization_context(
     )
 ```
 
-The referenced helper must be provided through `@nexus.support`.
+The referenced helper must be available from the package specified by
+`--support-package`.
 
 ---
 
@@ -1599,8 +1612,9 @@ The referenced helper must be provided through `@nexus.support`.
 ```
 
 Transforms the raw operation result to a different return type. The expression
-has access to `request` and `result` variables. Go expressions must return
-`(T, error)`.
+is emitted as written and has access to `request` and `result` variables.
+Helpers used by the expression must be available to the generated code. Go
+expressions must return `(T, error)`.
 
 ```wit
 /// @nexus.output-transform

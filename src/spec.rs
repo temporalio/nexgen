@@ -10,7 +10,6 @@ pub struct ApiSpec<F: TypeFamily = AuthoredFamily> {
     pub module_path: ModulePath,
     pub data: F::SpecData,
     pub version: String,
-    pub support: F::Support,
     pub services: Vec<ServiceSpec<F>>,
     /// The authored scope that owns this input's models when it defines no
     /// services, such as an operation-free WIT interface. Backends use it to
@@ -179,7 +178,6 @@ pub trait TypeFamily {
     type OperationData: std::fmt::Debug + Clone + PartialEq;
     type FieldData: std::fmt::Debug + Clone + PartialEq;
     type Text: TextSpec;
-    type Support: SupportSpecFamily;
 }
 
 /// Text metadata carried by an API-spec stage. `for_language` remains a small
@@ -189,10 +187,6 @@ pub trait TextSpec: std::fmt::Debug + Clone + PartialEq {
     fn for_language(&self, language: Language) -> Option<&str>;
     fn import_for_language(&self, language: Language) -> Option<&str>;
     fn is_empty(&self) -> bool;
-}
-
-pub trait SupportSpecFamily: std::fmt::Debug + Clone + PartialEq {
-    fn fragments_for_language(&self, language: Language) -> &[SupportFragmentSpec];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,7 +208,6 @@ impl TypeFamily for AuthoredFamily {
     type OperationData = ();
     type FieldData = ();
     type Text = LanguageStringSpec;
-    type Support = SupportSpec;
 }
 
 /// Name family after target-language selection. It preserves the `ApiSpec<F>`
@@ -238,7 +231,6 @@ impl TypeFamily for SelectedFamily {
     type OperationData = ();
     type FieldData = ();
     type Text = SelectedTextSpec;
-    type Support = SelectedSupportSpec;
 }
 
 /// Maps one structural `ApiSpec` family into another.
@@ -266,7 +258,6 @@ pub trait ApiSpecTransform<From: TypeFamily, To: TypeFamily> {
         data: From::FieldData,
     ) -> To::FieldData;
     fn map_text(&mut self, text: From::Text) -> To::Text;
-    fn map_support(&mut self, support: From::Support) -> To::Support;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -411,7 +402,6 @@ impl<F: TypeFamily> ApiSpec<F> {
             module_path: self.module_path,
             data: map.map_spec_data(self.data),
             version: self.version,
-            support: map.map_support(self.support),
             services: self
                 .services
                 .into_iter()
@@ -622,44 +612,6 @@ impl<F: TypeFamily> ServiceSpec<F> {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SupportSpec {
-    pub fragments: BTreeMap<Language, Vec<SupportFragmentSpec>>,
-}
-
-impl SupportSpec {
-    pub fn fragments_for_language(&self, language: Language) -> &[SupportFragmentSpec] {
-        self.fragments
-            .get(&language)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
-    }
-}
-
-impl SupportSpecFamily for SupportSpec {
-    fn fragments_for_language(&self, language: Language) -> &[SupportFragmentSpec] {
-        self.fragments_for_language(language)
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct SelectedSupportSpec {
-    pub(crate) fragments: Vec<SupportFragmentSpec>,
-}
-
-impl SupportSpecFamily for SelectedSupportSpec {
-    fn fragments_for_language(&self, _language: Language) -> &[SupportFragmentSpec] {
-        &self.fragments
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SupportFragmentSpec {
-    pub path: String,
-    pub contents: String,
-    pub namespace: Option<String>,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
@@ -854,6 +806,8 @@ pub enum RecordFieldVisibility {
     Omitted,
     Sourced {
         source_expr: String,
+        /// Whether the selected source expression requires the target's support import.
+        support_import: bool,
     },
 }
 
@@ -955,7 +909,7 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn sourced_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)> {
         self.fields.iter().filter_map(|(name, field)| {
-            let RecordFieldVisibility::Sourced { source_expr } = &field.visibility else {
+            let RecordFieldVisibility::Sourced { source_expr, .. } = &field.visibility else {
                 return None;
             };
             Some((name.as_str(), field, source_expr.as_str()))
@@ -1013,7 +967,7 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn field_source(&self, field_name: &str) -> Option<&str> {
         self.fields.get(field_name).and_then(|field| {
-            let RecordFieldVisibility::Sourced { source_expr } = &field.visibility else {
+            let RecordFieldVisibility::Sourced { source_expr, .. } = &field.visibility else {
                 return None;
             };
             Some(source_expr.as_str())

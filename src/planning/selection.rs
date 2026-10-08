@@ -13,7 +13,7 @@
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, ApiSpecTransform, AuthoredFamily, AuthoredResourceType, JsonModelSpec,
-    LanguageStringSpec, SelectedFamily, SelectedSupportSpec, SelectedTextSpec, SupportSpec, Symbol,
+    LanguageStringSpec, SelectedFamily, SelectedTextSpec, Symbol,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 
@@ -66,16 +66,6 @@ impl ApiSpecTransform<AuthoredFamily, SelectedFamily> for Selector {
                 .map(ToOwned::to_owned),
         }
     }
-
-    fn map_support(&mut self, support: SupportSpec) -> SelectedSupportSpec {
-        SelectedSupportSpec {
-            fragments: support
-                .fragments
-                .get(&self.language)
-                .cloned()
-                .unwrap_or_default(),
-        }
-    }
 }
 
 pub(crate) struct LanguageSelectionPass {
@@ -109,7 +99,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use crate::language::Language;
-    use crate::spec::{ApiSpec, LanguageStringSpec, ServiceSpec, SupportFragmentSpec, SupportSpec};
+    use crate::spec::{ApiSpec, LanguageStringSpec, ServiceSpec};
     use crate::spec::{ApiSpecNode, ApiSpecTree, CompilerPass};
 
     use super::{LanguageSelectionPass, select_spec};
@@ -122,26 +112,6 @@ mod tests {
             module_path: Default::default(),
             data: (),
             version: "1".to_string(),
-            support: SupportSpec {
-                fragments: BTreeMap::from([
-                    (
-                        Language::Python,
-                        vec![SupportFragmentSpec {
-                            path: "python.py".to_string(),
-                            contents: String::new(),
-                            namespace: None,
-                        }],
-                    ),
-                    (
-                        Language::Go,
-                        vec![SupportFragmentSpec {
-                            path: "go.go".to_string(),
-                            contents: String::new(),
-                            namespace: None,
-                        }],
-                    ),
-                ]),
-            },
             services: vec![ServiceSpec {
                 name: "service".to_string(),
                 code_name: LanguageStringSpec {
@@ -174,8 +144,6 @@ mod tests {
             leaf.spec.services[0].code_name.value.as_deref(),
             Some("PythonService")
         );
-        assert_eq!(leaf.spec.support.fragments.len(), 1);
-        assert_eq!(leaf.spec.support.fragments[0].path, "python.py");
     }
 
     #[test]
@@ -185,13 +153,12 @@ mod tests {
                 module_path: Default::default(),
                 data: (),
                 version: "1".to_string(),
-                support: SupportSpec::default(),
                 services: vec![],
                 model_scope: None,
                 types: BTreeMap::new(),
             },
             Language::Go,
         );
-        assert!(selected.support.fragments.is_empty());
+        assert!(selected.services.is_empty());
     }
 }

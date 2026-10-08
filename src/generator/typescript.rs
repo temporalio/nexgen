@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use heck::{ToKebabCase, ToLowerCamelCase, ToShoutySnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::generator::json_schema::typescript as typescript_json;
 use crate::generator::proto::typescript as typescript_proto;
 use crate::generator::proto::typescript::{
@@ -29,7 +29,7 @@ use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec, FunctionFieldSpec,
     FunctionResultSpec, IntSpec, LanguageImportSpec, LanguageImportStyle, LanguageStringSpec,
     ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
-    SupportFragmentSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -41,6 +41,24 @@ pub(in crate::generator) const GENERATED_HEADER: &str = concat!(
 const TYPESCRIPT_FORMAT_LINE_LENGTH: usize = 88;
 const EXPERIMENTAL_WARNING: &str = "This API is experimental and subject to change.";
 const WIRE_VALUE_EXPR: &str = "{wire}";
+
+/// Authored helper names are paths relative to the support package. Source and
+/// output-transform expressions never pass through this function.
+pub(in crate::generator) fn support_reference(name: &str) -> String {
+    let is_identifier = |part: &str| {
+        part.chars()
+            .next()
+            .is_some_and(is_typescript_identifier_start)
+            && part.chars().all(is_typescript_identifier_char)
+    };
+    if name == "support" || name.starts_with("support.") {
+        name.to_string()
+    } else if name.split('.').all(is_identifier) {
+        format!("support.{name}")
+    } else {
+        name.to_string()
+    }
+}
 
 type PlannedOperation = OperationSpec<PlannedFamily>;
 type PlannedFlags = FlagsSpec<PlannedFamily>;
@@ -90,7 +108,7 @@ impl RenderedExternalModelFragments {
 
 fn generate_tree(
     branch: &ApiSpecBranch<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: &str,
     ts_date_time_types: TsDateTimeTypes,
 ) -> Result<TypeScriptGenerationResult> {
     let mut files = GeneratedFileMap::default();
@@ -104,24 +122,29 @@ fn generate_tree(
     }
     insert_branch_index_file(&mut files, branch, &rendered_support.root_exports)?;
     for node in branch.children.values() {
-        generate_tree_node(node, support, ts_date_time_types, &mut files, &mut warnings)?;
+        generate_tree_node(
+            node,
+            support_package,
+            ts_date_time_types,
+            &mut files,
+            &mut warnings,
+        )?;
     }
     Ok(TypeScriptGenerationResult { files, warnings })
 }
 
 fn generate_tree_node(
     node: &ApiSpecNode<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: &str,
     ts_date_time_types: TsDateTimeTypes,
     files: &mut GeneratedFileMap,
     warnings: &mut Vec<String>,
 ) -> Result<()> {
     match node {
         ApiSpecNode::Leaf(leaf) => {
-            let support_fragments = support_fragments_for_plan(&leaf.spec, support);
             let mut generated = generate_leaf(
                 &leaf.spec,
-                &support_fragments,
+                support_package,
                 ts_date_time_types,
                 GeneratedFileOrigin::input_module(Language::TypeScript, &leaf.source_path),
             )?;
@@ -138,7 +161,7 @@ fn generate_tree_node(
         ApiSpecNode::Branch(branch) => {
             insert_branch_index_file(files, branch, &[])?;
             for node in branch.children.values() {
-                generate_tree_node(node, support, ts_date_time_types, files, warnings)?;
+                generate_tree_node(node, support_package, ts_date_time_types, files, warnings)?;
             }
             Ok(())
         }
@@ -178,19 +201,6 @@ fn typescript_module_has_import_or_export(contents: &str) -> bool {
         let line = line.trim_start();
         line.starts_with("import ") || line.starts_with("export ")
     })
-}
-
-fn support_fragments_for_plan(
-    plan: &PlannedSpec,
-    support: &crate::SupportFiles,
-) -> Vec<SupportFragmentSpec> {
-    if support.fragments.is_empty() {
-        plan.support
-            .fragments_for_language(Language::TypeScript)
-            .to_vec()
-    } else {
-        support.fragments.clone()
-    }
 }
 
 #[derive(Debug, Default)]
@@ -549,7 +559,7 @@ impl<'a> ApiPlanner<'a> {
             serialization_context_expr: operation
                 .serialization_context
                 .for_language(Language::TypeScript)
-                .map(str::to_string),
+                .map(support_reference),
         })
     }
 
@@ -687,7 +697,18 @@ impl<'a> ApiPlanner<'a> {
         let sourced_fields = planned_model
             .sourced_fields()
             .map(|(field_name, field, source_expr)| {
-                self.build_sourced_field(field_name, field, source_expr)
+                self.build_sourced_field(
+                    field_name,
+                    field,
+                    source_expr,
+                    matches!(
+                        field.visibility,
+                        RecordFieldVisibility::Sourced {
+                            support_import: true,
+                            ..
+                        }
+                    ),
+                )
             })
             .collect();
 
@@ -1214,9 +1235,11 @@ impl<'a> ApiPlanner<'a> {
         if field.annotation == "common.Payload" && annotation != field.annotation {
             let value_expr = format!("model.{}", field.name);
             if field.optional {
-                return format!("{value_expr} == null ? undefined : valueToPayload({value_expr})");
+                return format!(
+                    "{value_expr} == null ? undefined : support.valueToPayload({value_expr})"
+                );
             }
-            return format!("valueToPayload({value_expr})");
+            return format!("support.valueToPayload({value_expr})");
         }
         field.to_wire_expr.clone()
     }
@@ -1243,6 +1266,7 @@ impl<'a> ApiPlanner<'a> {
         field_name: &str,
         field: &RecordFieldSpec<PlannedFamily>,
         source_expr: &str,
+        support_import: bool,
     ) -> RenderedSourcedField {
         let field_name = typescript_generated_field_name(field_name);
 
@@ -1264,6 +1288,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
+                support_import,
                 visible: true,
                 from_wire_expr: map_value_from_wire_expr(
                     &value_type,
@@ -1288,6 +1313,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
+                support_import,
                 visible: true,
                 from_wire_expr: format!(
                     "{} ?? []",
@@ -1302,6 +1328,7 @@ impl<'a> ApiPlanner<'a> {
             annotation: Self::typescript_field_annotation(field, resolved_type.annotation.clone()),
             doc,
             source_expr: default_source_expr,
+            support_import,
             visible: true,
             from_wire_expr: required_from_wire_expr(
                 &resolved_type,
@@ -1764,7 +1791,7 @@ fn flattened_field_from_wire_expr(
         && flattened_annotation != nested_annotation
     {
         format!(
-            "{nested_field_from_wire_expr} == null ? undefined : payloadToValue<{flattened_annotation}>(({nested_field_from_wire_expr})!)"
+            "{nested_field_from_wire_expr} == null ? undefined : support.payloadToValue<{flattened_annotation}>(({nested_field_from_wire_expr})!)"
         )
     } else {
         nested_field_from_wire_expr.to_string()
@@ -1811,12 +1838,15 @@ fn defaulted_enum_to_wire_expr(
 fn required_function_to_wire_expr(owner_name: &str, field_name: &str, converter: &str) -> String {
     let required_value =
         required_field_expr(&format!("model.{field_name}"), owner_name, field_name);
-    format!("{converter}({required_value})")
+    format!("{}({required_value})", support_reference(converter))
 }
 
 fn optional_function_to_wire_expr(field_name: &str, converter: &str) -> String {
     let value_expr = format!("model.{field_name}");
-    format!("{value_expr} == null ? undefined : {converter}({value_expr})")
+    format!(
+        "{value_expr} == null ? undefined : {}({value_expr})",
+        support_reference(converter)
+    )
 }
 
 fn required_function_name_to_wire_expr(
@@ -1829,7 +1859,7 @@ fn required_function_name_to_wire_expr(
         required_field_expr(&format!("model.{field_name}"), owner_name, field_name);
     function_value_to_wire_expr(
         resolved_type,
-        &format!("{name_extractor}({required_value})"),
+        &format!("{}({required_value})", support_reference(name_extractor)),
     )
 }
 
@@ -1841,7 +1871,10 @@ fn optional_function_name_to_wire_expr(
     let value_expr = format!("model.{field_name}");
     format!(
         "{value_expr} == null ? undefined : {}",
-        function_value_to_wire_expr(resolved_type, &format!("{name_extractor}({value_expr})"),)
+        function_value_to_wire_expr(
+            resolved_type,
+            &format!("{}({value_expr})", support_reference(name_extractor)),
+        )
     )
 }
 
@@ -1913,7 +1946,7 @@ impl PlannedOperationExt for PlannedOperation {
 
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: &str,
     ts_date_time_types: TsDateTimeTypes,
 ) -> Result<GeneratedFiles> {
     // A `$ref` resolves against the whole input closure ([[ref]]
@@ -1922,16 +1955,13 @@ pub(crate) fn generate(
     // `oneOf` branch is populated here, before any leaf renders.
     typescript_json::set_tree_json_models(collect_tree_json_models(&tree.root));
     let generated = match &tree.root {
-        ApiSpecNode::Leaf(leaf) => {
-            let support_fragments = support_fragments_for_plan(&leaf.spec, support);
-            generate_leaf(
-                &leaf.spec,
-                &support_fragments,
-                ts_date_time_types,
-                GeneratedFileOrigin::fixed("generated TypeScript package module"),
-            )
-        }
-        ApiSpecNode::Branch(branch) => generate_tree(branch, support, ts_date_time_types),
+        ApiSpecNode::Leaf(leaf) => generate_leaf(
+            &leaf.spec,
+            support_package,
+            ts_date_time_types,
+            GeneratedFileOrigin::fixed("generated TypeScript package module"),
+        ),
+        ApiSpecNode::Branch(branch) => generate_tree(branch, support_package, ts_date_time_types),
     }?;
     Ok(GeneratedFiles {
         layout: crate::generator::GeneratedOutputLayout::Directory,
@@ -1976,11 +2006,10 @@ fn collect_tree_json_models_into(
 
 fn generate_leaf(
     api_plan: &PlannedSpec,
-    support_fragments: &[SupportFragmentSpec],
+    support_package: &str,
     ts_date_time_types: TsDateTimeTypes,
     module_origin: GeneratedFileOrigin,
 ) -> Result<TypeScriptGenerationResult> {
-    reject_support_namespaces(Language::TypeScript, support_fragments)?;
     let language_imports = collect_typescript_language_imports(api_plan);
     let mut planner = ApiPlanner::new(api_plan, ts_date_time_types)?;
     let services = api_plan
@@ -2031,7 +2060,6 @@ fn generate_leaf(
         planner.resolve_message_value_conversion(&model_type);
     }
 
-    let support_source = support_source(support_fragments);
     let model_fragments = planner.render_external_models()?;
 
     render_module_files(
@@ -2043,7 +2071,7 @@ fn generate_leaf(
         &model_fragments,
         &services,
         &language_imports,
-        support_source.as_deref(),
+        support_package,
         api_plan,
         module_origin,
     )
@@ -2379,22 +2407,6 @@ fn typescript_qualified_namespaces(expression: &str) -> BTreeSet<String> {
         index = end;
     }
     namespaces
-}
-
-fn reject_support_namespaces(
-    language: Language,
-    support_fragments: &[SupportFragmentSpec],
-) -> Result<()> {
-    if let Some(namespace) = support_fragments
-        .iter()
-        .find_map(|fragment| fragment.namespace.as_deref())
-    {
-        return Err(Error::UnsupportedSupportNamespace {
-            language,
-            namespace: namespace.to_string(),
-        });
-    }
-    Ok(())
 }
 
 fn model_type_parameters(
@@ -2991,6 +3003,7 @@ pub(in crate::generator) struct RenderedSourcedField {
     annotation: String,
     doc: Option<String>,
     source_expr: String,
+    support_import: bool,
     visible: bool,
     pub(in crate::generator) from_wire_expr: String,
     pub(in crate::generator) to_wire_expr: String,
@@ -3103,12 +3116,6 @@ impl WireValueConversion {
     }
 }
 
-#[derive(Debug, Default)]
-struct SupportExports {
-    value_names: Vec<String>,
-    type_names: Vec<String>,
-}
-
 fn collect_typescript_model_requirements(
     variants: &[&RenderedVariant],
     models: &[&RenderedModel],
@@ -3173,15 +3180,13 @@ fn render_module_files(
     model_fragments: &RenderedExternalModelFragments,
     services: &[RenderedService<'_>],
     language_imports: &[LanguageImportSpec],
-    support_source: Option<&str>,
+    support_package: &str,
     api_plan: &PlannedSpec,
     module_origin: GeneratedFileOrigin,
 ) -> Result<GeneratedFileMap> {
     let mode = crate::nexgen_config::current().mode;
     let model_requirements = collect_typescript_model_requirements(variants, models);
     let resource_requirements = collect_typescript_resource_requirements(services);
-    let support_source = support_source.filter(|source| !source.trim().is_empty());
-    let support_exports = support_source.map(support_exports);
     let module_model_names = model_fragments
         .type_exported_names
         .iter()
@@ -3198,7 +3203,7 @@ fn render_module_files(
         model_fragments,
         &model_requirements,
         language_imports,
-        support_exports.as_ref(),
+        support_package,
         api_plan,
     );
     // A module whose every operation type is `$ref`d from another file declares
@@ -3237,7 +3242,7 @@ fn render_module_files(
                 &module_model_names,
                 services,
                 language_imports,
-                support_exports.as_ref(),
+                support_package,
                 mode == GenerationMode::NativeApi,
                 api_plan,
             ),
@@ -3254,7 +3259,7 @@ fn render_module_files(
                 models,
                 &module_model_names,
                 services,
-                support_exports.as_ref(),
+                support_package,
                 api_plan,
             ),
             GeneratedFileOrigin::fixed("generated TypeScript System Nexus operation registry"),
@@ -3288,7 +3293,7 @@ fn render_module_files(
                 services,
                 &resource_requirements,
                 language_imports,
-                support_exports.as_ref(),
+                support_package,
                 api_plan,
             ),
             module_origin.clone(),
@@ -3312,7 +3317,7 @@ fn render_module_files(
                         service,
                         operation,
                         language_imports,
-                        support_exports.as_ref(),
+                        support_package,
                         api_plan,
                     ),
                     GeneratedFileOrigin::operation(
@@ -3324,13 +3329,6 @@ fn render_module_files(
             }
         }
     }
-    if let Some(support_source) = support_source {
-        files.insert(
-            "support.ts",
-            render_support_module(support_source),
-            GeneratedFileOrigin::fixed("generated TypeScript support module"),
-        )?;
-    }
     files.insert_multi(
         rendered_support.files,
         GeneratedFileOrigin::fixed("generated TypeScript external-model runtime"),
@@ -3338,50 +3336,8 @@ fn render_module_files(
     Ok(files)
 }
 
-fn support_source(support_fragments: &[SupportFragmentSpec]) -> Option<String> {
-    (!support_fragments.is_empty()).then(|| {
-        support_fragments
-            .iter()
-            .map(|fragment| fragment.contents.as_str())
-            .collect::<Vec<_>>()
-            .join("\n\n")
-    })
-}
-
 fn operation_file_name(operation: &RenderedOperation<'_>) -> String {
     operation.attr_name.to_kebab_case()
-}
-
-fn support_exports(source: &str) -> SupportExports {
-    let mut exports = SupportExports::default();
-    for line in source.lines().map(str::trim_start) {
-        if let Some(name) = export_name(line, "export function ") {
-            exports.value_names.push(name.to_string());
-        } else if let Some(name) = export_name(line, "export const ") {
-            exports.value_names.push(name.to_string());
-        } else if let Some(name) = export_name(line, "export let ") {
-            exports.value_names.push(name.to_string());
-        } else if let Some(name) = export_name(line, "export var ") {
-            exports.value_names.push(name.to_string());
-        } else if let Some(name) = export_name(line, "export class ") {
-            exports.value_names.push(name.to_string());
-        } else if let Some(name) = export_name(line, "export enum ") {
-            exports.value_names.push(name.to_string());
-        } else if let Some(name) = export_name(line, "export type ") {
-            exports.type_names.push(name.to_string());
-        } else if let Some(name) = export_name(line, "export interface ") {
-            exports.type_names.push(name.to_string());
-        }
-    }
-    exports
-}
-
-fn export_name<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
-    let remainder = line.strip_prefix(prefix)?;
-    let end = remainder
-        .find(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_' || ch == '$'))
-        .unwrap_or(remainder.len());
-    (end > 0).then_some(&remainder[..end])
 }
 
 fn render_typescript_namespace_imports(
@@ -3482,7 +3438,14 @@ fn render_typescript_namespace_imports(
 fn typescript_relative_import(source_dir: &Path, package: &str) -> String {
     package
         .starts_with('.')
-        .then(|| relative_module_path(source_dir, Path::new(package)))
+        .then(|| {
+            relative_module_path(
+                source_dir,
+                Path::new(package)
+                    .strip_prefix(".")
+                    .unwrap_or(Path::new(package)),
+            )
+        })
         .unwrap_or_else(|| package.to_string())
 }
 
@@ -3656,10 +3619,6 @@ fn render_definitions_only_index_module(
         output.push('\n');
     }
     output
-}
-
-fn render_support_module(support_source: &str) -> String {
-    render_generated_module(String::new(), support_source.to_string())
 }
 
 fn render_index_module(
@@ -3885,7 +3844,7 @@ fn render_operation_registry_module(
     models: &[&RenderedModel],
     external_model_names: &BTreeSet<String>,
     services: &[RenderedService<'_>],
-    support_exports: Option<&SupportExports>,
+    support_package: &str,
     api_plan: &PlannedSpec,
 ) -> String {
     let mut body = String::new();
@@ -3935,7 +3894,12 @@ fn render_operation_registry_module(
             &["SerializationContext".to_string()],
         );
     }
-    render_support_imports(&mut imports, support_exports, "./support", &body);
+    render_support_import(
+        &mut imports,
+        support_package,
+        &api_plan.module_path.to_path_buf(),
+        &body,
+    );
     render_type_imports(
         &mut imports,
         "./models",
@@ -4081,7 +4045,7 @@ fn render_models_module(
     model_fragments: &RenderedExternalModelFragments,
     requirements: &TypeScriptRequirements,
     language_imports: &[LanguageImportSpec],
-    support_exports: Option<&SupportExports>,
+    support_package: &str,
     api_plan: &PlannedSpec,
 ) -> String {
     let mode = crate::nexgen_config::current().mode;
@@ -4090,8 +4054,7 @@ fn render_models_module(
     if mode == GenerationMode::NativeApi {
         render_required_field(&mut body, true);
     }
-    let uses_function_payload_helpers = support_exports.is_some()
-        && mode == GenerationMode::NativeApi
+    let uses_function_payload_helpers = mode == GenerationMode::NativeApi
         && models.iter().any(|model| {
             model.fields.iter().any(|field| {
                 field.to_wire_expr.contains("requestArgsToPayloads(")
@@ -4190,7 +4153,30 @@ fn render_models_module(
         &generated_value_imports,
     );
     render_typescript_requirement_imports(&mut imports, requirements);
-    render_support_imports(&mut imports, support_exports, "./support", &body);
+    let sourced_fields = models
+        .iter()
+        .filter(|model| model.wire_function_names.is_some())
+        .flat_map(|model| &model.sourced_fields)
+        .collect::<Vec<_>>();
+    render_sourced_support_import(
+        &mut imports,
+        support_package,
+        &api_plan.module_path.to_path_buf(),
+        &body,
+        &sourced_fields,
+        models.iter().any(|model| {
+            model.fields.iter().any(|field| {
+                contains_qualified_identifier(&field.from_wire_expr, "support")
+                    || contains_qualified_identifier(&field.to_wire_expr, "support")
+            }) || model.sourced_fields.iter().any(|field| {
+                contains_qualified_identifier(&field.from_wire_expr, "support")
+                    || contains_qualified_identifier(
+                        &field.to_wire_expr.replace(&field.source_expr, ""),
+                        "support",
+                    )
+            })
+        }),
+    );
     if !model_fragments.imports.is_empty() {
         if !imports.is_empty() && !imports.ends_with('\n') {
             imports.push('\n');
@@ -4290,7 +4276,7 @@ fn render_service_module(
     external_model_names: &BTreeSet<String>,
     services: &[RenderedService<'_>],
     language_imports: &[LanguageImportSpec],
-    support_exports: Option<&SupportExports>,
+    support_package: &str,
     include_native_api: bool,
     api_plan: &PlannedSpec,
 ) -> String {
@@ -4314,7 +4300,12 @@ fn render_service_module(
             ("workflow", typescript_workflow_module(), false),
         ],
     );
-    render_support_imports(&mut imports, support_exports, "./support", &body);
+    render_support_import(
+        &mut imports,
+        support_package,
+        &api_plan.module_path.to_path_buf(),
+        &body,
+    );
     // Operation type info references converter *values*, so they import alongside
     // (and before) the type-only model imports.
     render_value_imports(
@@ -4385,7 +4376,7 @@ fn render_resources_module(
     services: &[RenderedService<'_>],
     requirements: &TypeScriptRequirements,
     language_imports: &[LanguageImportSpec],
-    support_exports: Option<&SupportExports>,
+    support_package: &str,
     api_plan: &PlannedSpec,
 ) -> String {
     let mut body = String::new();
@@ -4418,7 +4409,12 @@ fn render_resources_module(
         api_plan,
         &body,
     );
-    render_support_imports(&mut imports, support_exports, "./support", &body);
+    render_support_import(
+        &mut imports,
+        support_package,
+        &api_plan.module_path.to_path_buf(),
+        &body,
+    );
     for service in services {
         if contains_identifier(&body, &service.attr_name) {
             render_value_imports(
@@ -4454,7 +4450,7 @@ fn render_operation_module(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     language_imports: &[LanguageImportSpec],
-    support_exports: Option<&SupportExports>,
+    support_package: &str,
     api_plan: &PlannedSpec,
 ) -> String {
     let mut body = String::new();
@@ -4498,7 +4494,19 @@ fn render_operation_module(
     if let Some(path) = &operation.output_transform_type_import {
         render_type_imports(&mut imports, path, &[operation.output_annotation.clone()]);
     }
-    render_support_imports(&mut imports, support_exports, "../support", &body);
+    let sourced_fields = operation
+        .input
+        .as_ref()
+        .map(|input| input.sourced_fields.iter().collect::<Vec<_>>())
+        .unwrap_or_default();
+    render_sourced_support_import(
+        &mut imports,
+        support_package,
+        &api_plan.module_path.to_path_buf().join("operations"),
+        &body,
+        &sourced_fields,
+        false,
+    );
     let resources = used_import_names(&body, &resource_type_names(services));
     let value_resources = resources
         .iter()
@@ -4529,23 +4537,55 @@ fn render_operation_module(
     render_generated_module(imports, body)
 }
 
-fn render_support_imports(
+fn render_support_import(
     output: &mut String,
-    support_exports: Option<&SupportExports>,
-    path: &str,
+    support_package: &str,
+    source_dir: &Path,
     source: &str,
 ) {
-    if let Some(support_exports) = support_exports {
-        render_value_imports(
-            output,
-            path,
-            &used_import_names(source, &support_exports.value_names),
-        );
-        render_type_imports(
-            output,
-            path,
-            &used_import_names(source, &support_exports.type_names),
-        );
+    render_support_import_if(
+        output,
+        support_package,
+        source_dir,
+        contains_qualified_identifier(source, "support"),
+    );
+}
+
+fn render_sourced_support_import(
+    output: &mut String,
+    support_package: &str,
+    source_dir: &Path,
+    body: &str,
+    sourced_fields: &[&RenderedSourcedField],
+    converter_uses_support: bool,
+) {
+    // Raw expressions are emitted unchanged, but are not evidence of an import:
+    // the parser supplies that intent explicitly. Remove the raw text before
+    // scanning for generated helper calls; its syntax may be any TS expression.
+    let mut other_code = body.to_string();
+    for field in sourced_fields {
+        other_code = other_code.replace(&field.source_expr, "");
+    }
+    render_support_import_if(
+        output,
+        support_package,
+        source_dir,
+        converter_uses_support
+            || sourced_fields.iter().any(|field| field.support_import)
+            || contains_qualified_identifier(&other_code, "support"),
+    );
+}
+
+fn render_support_import_if(
+    output: &mut String,
+    support_package: &str,
+    source_dir: &Path,
+    needed: bool,
+) {
+    if needed {
+        output.push_str("import * as support from '");
+        output.push_str(&typescript_relative_import(source_dir, support_package));
+        output.push_str("';\n");
     }
 }
 
@@ -4701,7 +4741,7 @@ fn render_function_runtime_helpers(output: &mut String, render_from: bool) {
         output.push_str("  if (payloads == null) {\n");
         output.push_str("    return undefined;\n");
         output.push_str("  }\n");
-        output.push_str("  return payloadsFromProto(payloads);\n");
+        output.push_str("  return support.payloadsFromProto(payloads);\n");
         output.push_str("}\n\n");
     }
     output.push_str("function requestArgsToPayloads(\n");
@@ -4711,7 +4751,9 @@ fn render_function_runtime_helpers(output: &mut String, render_from: bool) {
     output.push_str("  if (args == null) {\n");
     output.push_str("    return undefined;\n");
     output.push_str("  }\n");
-    output.push_str("  return payloadsToProto(args, functionInputTypes(functionValue));\n");
+    output.push_str(
+        "  return support.payloadsToProto(args, support.functionInputTypes(functionValue));\n",
+    );
     output.push_str("}\n");
 }
 
@@ -6573,8 +6615,9 @@ fn is_typescript_keyword(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        TypeScriptRequirements, collect_typescript_value_requirements,
-        render_typescript_requirement_imports,
+        RenderedSourcedField, TypeScriptRequirements, collect_typescript_value_requirements,
+        render_sourced_support_import, render_support_import,
+        render_typescript_requirement_imports, support_reference,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -6583,7 +6626,6 @@ mod tests {
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::SupportFiles;
     use crate::descriptors::DescriptorIndex;
     use crate::generator::{
         GenerateFilesOptions, GeneratedOutputLayout, GenerationMode,
@@ -6594,7 +6636,6 @@ mod tests {
     use crate::planning::PlannedType;
     use crate::spec::ApiSpecTree;
     use crate::spec::IntSpec;
-    use crate::spec::SupportFragmentSpec;
 
     #[test]
     fn requirement_imports_are_structural() {
@@ -6613,6 +6654,111 @@ mod tests {
         assert!(imports.is_empty());
     }
 
+    #[test]
+    fn support_imports_resolve_relative_to_output_root_only_when_referenced() {
+        let mut imports = String::new();
+        render_support_import(
+            &mut imports,
+            "./shared/support",
+            Path::new(""),
+            "support.convert(x)",
+        );
+        assert_eq!(imports, "import * as support from './shared/support';\n");
+
+        imports.clear();
+        render_support_import(
+            &mut imports,
+            "./shared/support",
+            Path::new("api/operations"),
+            "support.convert(x)",
+        );
+        assert_eq!(
+            imports,
+            "import * as support from '../../shared/support';\n"
+        );
+
+        imports.clear();
+        render_support_import(&mut imports, "@org/helpers", Path::new("api"), "x()");
+        assert!(imports.is_empty());
+        render_support_import(
+            &mut imports,
+            "@org/helpers",
+            Path::new("api"),
+            "support.convert(x)",
+        );
+        assert_eq!(imports, "import * as support from '@org/helpers';\n");
+    }
+
+    #[test]
+    fn sourced_support_import_is_intent_not_expression_scanning() {
+        let field = |source_expr: &str, support_import| RenderedSourcedField {
+            name: "namespace".into(),
+            annotation: "string".into(),
+            doc: None,
+            source_expr: source_expr.into(),
+            support_import,
+            visible: true,
+            from_wire_expr: String::new(),
+            to_wire_expr: String::new(),
+        };
+        let expr = "support[`${requestInput.kind}Namespace`]()";
+        let sourced = field(expr, true);
+        let body = format!("    namespace: {expr},");
+        let mut imports = String::new();
+        render_sourced_support_import(
+            &mut imports,
+            "./shared/support",
+            Path::new("api/operations"),
+            &body,
+            &[&sourced],
+            false,
+        );
+        assert_eq!(
+            imports,
+            "import * as support from '../../shared/support';\n"
+        );
+
+        let sourced = field("support.workflowNamespace()", false);
+        let body = format!("    namespace: {},", sourced.source_expr);
+        imports.clear();
+        render_sourced_support_import(
+            &mut imports,
+            "@org/helpers",
+            Path::new("api"),
+            &body,
+            &[&sourced],
+            false,
+        );
+        assert!(imports.is_empty());
+
+        render_sourced_support_import(
+            &mut imports,
+            "@org/helpers",
+            Path::new("api"),
+            &body,
+            &[&sourced],
+            true,
+        );
+        assert_eq!(imports, "import * as support from '@org/helpers';\n");
+    }
+
+    #[test]
+    fn helper_paths_gain_support_namespace_once() {
+        assert_eq!(
+            support_reference("customConverter"),
+            "support.customConverter"
+        );
+        assert_eq!(
+            support_reference("other.converter"),
+            "support.other.converter"
+        );
+        assert_eq!(
+            support_reference("support.customConverter"),
+            "support.customConverter"
+        );
+        assert_eq!(support_reference("(x) => x"), "(x) => x");
+    }
+
     fn sample_input_path(root: &std::path::Path) -> PathBuf {
         root.join("advanced/samples/inputs/workflow-service.wit")
     }
@@ -6627,19 +6773,6 @@ mod tests {
 
     fn example_input_paths(root: &std::path::Path, input_path: PathBuf) -> Vec<PathBuf> {
         vec![input_path, linked_inputs_path(root)]
-    }
-
-    fn sample_support_files(root: &std::path::Path) -> SupportFiles {
-        let path = root.join(
-            "advanced/samples/inputs/deps/nexus-temporal-types/typescript/temporal_model_converters.ts",
-        );
-        SupportFiles {
-            fragments: vec![SupportFragmentSpec {
-                path: path.to_string_lossy().into_owned(),
-                contents: fs::read_to_string(path).unwrap(),
-                namespace: None,
-            }],
-        }
     }
 
     fn ensure_typescript_dependencies(root: &std::path::Path) {
@@ -6691,7 +6824,6 @@ mod tests {
         let descriptors =
             DescriptorIndex::load(&root.join("advanced/samples/descriptors/temporal_api.bin"))
                 .unwrap();
-        let support = sample_support_files(&root);
         let _scope = scope(NexgenConfig {
             system_nexus: true,
             ..current()
@@ -6700,9 +6832,11 @@ mod tests {
             Language::TypeScript,
             ApiSpecTree::single(spec.clone()),
             &descriptors,
-            &support,
             GenerationMode::NativeApi,
-            GenerateFilesOptions::default(),
+            GenerateFilesOptions {
+                support_package: Some("./support".to_string()),
+                ..Default::default()
+            },
         )
         .unwrap();
         assert_eq!(generated.layout, GeneratedOutputLayout::Directory);
@@ -6759,18 +6893,23 @@ mod tests {
         let descriptors =
             DescriptorIndex::load(&root.join("advanced/samples/descriptors/temporal_api.bin"))
                 .unwrap();
-        let support = sample_support_files(&root);
-        let output =
-            generate_source(Language::TypeScript, spec.clone(), &descriptors, &support).unwrap();
+        let output = generate_source(
+            Language::TypeScript,
+            spec.clone(),
+            &descriptors,
+            "./support",
+        )
+        .unwrap();
 
-        assert!(output.contains("### support.ts"));
+        assert!(!output.contains("### support.ts"));
         assert!(output.contains("### index.ts"));
         let index_output = output
             .split("### index.ts")
             .nth(1)
             .expect("rendered output should include index.ts");
         assert!(!index_output.contains("export * from './support.ts';"));
-        assert!(output.contains("export function retryPolicyFromProto("));
+        assert!(!output.contains("export function retryPolicyFromProto("));
+        assert!(output.contains("support.retryPolicyFromProto("));
         assert!(!index_output.contains("export const SignalWithStartWorkflowRequest = {"));
         assert!(!index_output.contains("const UserMetadata = {"));
         assert!(index_output.contains("function userMetadataFromProto("));
@@ -6811,7 +6950,7 @@ mod tests {
         assert!(output.contains("idConflictPolicy?: common.WorkflowIdConflictPolicy;"));
         assert!(output.contains("workflowIdConflictPolicy:"));
         assert!(output.contains("model.idConflictPolicy == null"));
-        assert!(output.contains("workflowIdConflictPolicyToProto(model.idConflictPolicy)"));
+        assert!(output.contains("support.workflowIdConflictPolicyToProto(model.idConflictPolicy)"));
         assert!(!output.contains("identity?: string;"));
         assert!(output.contains("memo?: Record<string, unknown>;"));
         assert!(output.contains("searchAttributes?: common.TypedSearchAttributes;"));
@@ -6823,42 +6962,48 @@ mod tests {
         assert!(output.contains("staticDetails?: string;"));
         assert!(!output.contains("userMetadata?: UserMetadata;"));
         assert!(output.contains("namespace: string;"));
-        assert!(output.contains("namespace: model.namespace ?? (workflowNamespace()),"));
-        assert!(output.contains("workflowType: workflowTypeToProto("));
-        assert!(output.contains("workflowFunctionName("));
+        // Sourced fields and output transforms are authored expressions, not
+        // support-helper references; their text must remain untouched.
+        assert!(output.contains("namespace: model.namespace ?? (support.workflowNamespace()),"));
+        assert!(!output.contains("support.support.workflowNamespace()"));
+        assert!(output.contains("workflowType: support.workflowTypeToProto("));
         assert!(output.contains("input: requestArgsToPayloads(model.args, model.workflow),"));
         assert!(
             output.contains("signalInput: requestArgsToPayloads(model.signalArgs, model.signal),")
         );
         assert!(!output.contains("_RequestArgsToPayloads"));
-        assert!(output.contains("signalName: signalFunctionName("));
+        assert!(output.contains("signalName: support.signalFunctionName("));
         assert!(!output.contains("signalName: ((value) =>"));
-        assert!(output.contains("workflowType: workflowTypeToProto("));
-        assert!(output.contains("taskQueue: taskQueueToProto("));
+        assert!(output.contains("workflowType: support.workflowTypeToProto("));
+        assert!(output.contains("taskQueue: support.taskQueueToProto("));
         assert!(output.contains(
-            "workflowRunTimeout: model.runTimeout == null ? undefined : durationToProto(model.runTimeout),"
+            "workflowRunTimeout: model.runTimeout == null ? undefined : support.durationToProto(model.runTimeout),"
         ));
-        assert!(output.contains("memo: model.memo == null ? undefined : memoToProto(model.memo),"));
+        assert!(
+            output.contains(
+                "memo: model.memo == null ? undefined : support.memoToProto(model.memo),"
+            )
+        );
         assert!(output.contains(
-            "searchAttributes: model.searchAttributes == null ? undefined : searchAttributesToProto(model.searchAttributes),"
+            "searchAttributes: model.searchAttributes == null ? undefined : support.searchAttributesToProto(model.searchAttributes),"
         ));
         assert!(output.contains(
-            "priority: model.priority == null ? undefined : priorityToProto(model.priority),"
+            "priority: model.priority == null ? undefined : support.priorityToProto(model.priority),"
         ));
         assert!(output.contains("model.staticSummary == null && model.staticDetails == null"));
         assert!(output.contains("summary: model.staticSummary == null"));
-        assert!(output.contains("valueToPayload(model.staticSummary)"));
-        assert!(
-            output.contains("return payloadsToProto(args, functionInputTypes(functionValue));")
-        );
+        assert!(output.contains("support.valueToPayload(model.staticSummary)"));
+        assert!(output.contains(
+            "return support.payloadsToProto(args, support.functionInputTypes(functionValue));"
+        ));
         assert!(!output.contains("common.defaultPayloadConverter"));
         assert!(!output.contains("payloadToProto(payload: unknown"));
         assert!(!output.contains("function isPayload("));
         assert!(output.contains(
-            "versioningOverride: model.versioningOverride == null ? undefined : versioningOverrideToProto(model.versioningOverride),"
+            "versioningOverride: model.versioningOverride == null ? undefined : support.versioningOverrideToProto(model.versioningOverride),"
         ));
-        assert!(output.contains("export function taskQueueFromProto("));
-        assert!(output.contains("export function taskQueueToProto("));
+        assert!(output.contains("support.taskQueueFromProto("));
+        assert!(output.contains("support.taskQueueToProto("));
         assert!(output.contains(
             "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest | undefined {"
         ));
@@ -6884,7 +7029,7 @@ mod tests {
         assert!(
             output.contains("requestInput: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,")
         );
-        assert!(output.contains("namespace: workflowNamespace(),"));
+        assert!(output.contains("namespace: support.workflowNamespace(),"));
         assert!(output.contains("const client = workflow.createNexusServiceClient({"));
         assert!(!output.contains("export class WorkflowServiceClient"));
         assert!(!output.contains("from './temporal_model_converters.ts'"));
@@ -6899,7 +7044,7 @@ mod tests {
             Language::TypeScript,
             type_roundtrip_spec,
             &descriptors,
-            &support,
+            "./support",
         )
         .unwrap();
         assert!(type_roundtrip_output.contains("retryPolicy: common.RetryPolicy;"));
@@ -7006,13 +7151,13 @@ interface workflow-service {
             Language::TypeScript,
             spec.clone(),
             &descriptors,
-            &SupportFiles::default(),
+            "./support",
         )
         .unwrap();
 
         assert!(output.contains("workflowIdReusePolicy?: common.WorkflowIdReusePolicy;"));
         assert!(output.contains(
-            "workflowIdReusePolicy: model.workflowIdReusePolicy == null ? undefined : workflowIdReusePolicyToProto(model.workflowIdReusePolicy)"
+            "workflowIdReusePolicy: model.workflowIdReusePolicy == null ? undefined : support.workflowIdReusePolicyToProto(model.workflowIdReusePolicy)"
         ));
         assert!(!output.contains("export enum WorkflowIdReusePolicy"));
     }
@@ -7059,7 +7204,7 @@ interface example-service {
             Language::TypeScript,
             spec.clone(),
             &descriptors,
-            &SupportFiles::default(),
+            "./support",
         )
         .unwrap();
 
@@ -7115,13 +7260,8 @@ interface workflow-service {
             system_nexus: true,
             ..current()
         });
-        let output = generate_source(
-            Language::TypeScript,
-            spec,
-            &descriptors,
-            &SupportFiles::default(),
-        )
-        .unwrap();
+        let output =
+            generate_source(Language::TypeScript, spec, &descriptors, "./support").unwrap();
 
         assert!(output.contains("Promise<nexus.NexusOperationHandle<Response>>"));
         assert!(output.contains("return await client.startOperation("));
@@ -7164,7 +7304,7 @@ interface example-service {
             Language::TypeScript,
             spec.clone(),
             &descriptors,
-            &SupportFiles::default(),
+            "./support",
         )
         .unwrap();
         assert!(output.contains("public constructor(endpoint: string)"));

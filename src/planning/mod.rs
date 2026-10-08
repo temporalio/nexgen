@@ -12,8 +12,7 @@ use crate::spec::{
     ExternalTypeSpec, ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec,
     FunctionFieldSpec, FunctionResultSpec, JsonModelSpec, LanguageStringSpec, ModulePath,
     OperationSpec, RecordFieldVisibility, RecordSpec, ResourceFieldSpec, SelectedFamily,
-    SelectedSupportSpec, SelectedTextSpec, ServiceSpec, SupportSpec, Symbol, TypeDeclSpec,
-    TypeFamily, TypeReplacementSpec, TypeSpec,
+    SelectedTextSpec, ServiceSpec, Symbol, TypeDeclSpec, TypeFamily, TypeReplacementSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, ApiSpecNode, ApiSpecTree, CompilerPass};
 
@@ -68,7 +67,6 @@ impl TypeFamily for PlannedFamily {
     // `TypePlanningMapper` materializes it from already-selected values with no
     // language override maps, so no later stage performs selection.
     type Text = LanguageStringSpec;
-    type Support = SupportSpec;
 }
 
 pub(crate) type PlannedSpec = ApiSpec<PlannedFamily>;

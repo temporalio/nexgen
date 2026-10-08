@@ -17,7 +17,7 @@ use crate::spec::{
 
 use super::{
     OperationBoundFamily, OperationBoundOperation, OperationBoundResource,
-    ResolvedResourceBindingSource, SelectedSupportSpec, SelectedTextSpec,
+    ResolvedResourceBindingSource, SelectedTextSpec,
 };
 
 /// Operation-bound IR after resource-return structures become explicit records.
@@ -40,7 +40,6 @@ impl crate::spec::TypeFamily for OperationLoweredFamily {
     type OperationData = OperationBoundOperation;
     type FieldData = ();
     type Text = SelectedTextSpec;
-    type Support = SelectedSupportSpec;
 }
 
 pub(crate) struct OperationLoweringPass;
@@ -199,9 +198,6 @@ impl ApiSpecTransform<OperationBoundFamily, OperationLoweredFamily> for Operatio
     }
     fn map_field_data(&mut self, _: &str, _: &str, _: ()) {}
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
-        value
-    }
-    fn map_support(&mut self, value: super::SelectedSupportSpec) -> super::SelectedSupportSpec {
         value
     }
 }
