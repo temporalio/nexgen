@@ -204,7 +204,9 @@ Go, Python, TypeScript and .NET WIT generation require one `--support-package`
 import path or namespace per invocation; JSON Schema generation does not.
 The package is hand-written and
 stays in the user's project; nexgen imports its helpers instead of reading,
-copying, or generating that code. Java does not use this option. For example:
+copying, or generating that code. Java does not use this option. Follow the
+[per-language setup and helper contract](../GUIDE.md#integrating-a-support-package)
+before running generation. For example:
 
 ```bash
 cargo run --features advanced -- python \

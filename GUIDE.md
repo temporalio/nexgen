@@ -8,6 +8,7 @@ of `@nexus` directives.
 ## Contents
 
 - [Quick Start](#quick-start)
+- [Integrating a Support Package](#integrating-a-support-package)
 - [Type Mappings](#type-mappings)
   - [Records](#records)
   - [Enums](#enums)
@@ -67,15 +68,6 @@ interface user-service {
 This produces a data model for the request and response, a service definition,
 and a convenience wrapper function that lets callers write:
 
-For Go, Python, TypeScript, and .NET, pass `--support-package` to
-`nexgen generate` with the import path or namespace of support code maintained by your
-project. For example, `--support-package my_app.nexgen_support` for Python,
-`--support-package @my-org/nexgen-support` for TypeScript,
-`--support-package example.com/myapp/nexgensupport` for Go, or
-`--support-package MyApp.NexgenSupport` for .NET. Java does not require a
-support package. The generator references this package; it does not copy
-support files into the generated output.
-
 **Python:**
 
 ```python
@@ -95,6 +87,163 @@ output where a target would otherwise use the service: its
 `@nexus.namespace` directive selects the .NET namespace or Go import path, and
 .NET otherwise uses `Nexgen.<InterfaceName>`, such as
 `Nexgen.NotificationService` for `interface notification-service`.
+
+---
+
+## Integrating a Support Package
+
+For **WIT** generation in Go, Python, TypeScript, and .NET, pass one
+`--support-package` value on the language subcommand, even if that particular
+input does not use support helpers. It identifies code **you maintain in your
+project**; nexgen neither reads it nor copies it into the output. Java does not
+consume user support, and JSON Schema generation does not require this option
+(its generated JSON runtime helpers are unrelated).
+
+The package must be importable when the generated code is compiled or run.
+Nexgen does not verify that it exists or that its exports have the required
+signatures: use the language's compiler or type checker to check the integration.
+The WIT directives name some helpers explicitly (for example `python-from` on
+`@nexus.type` and `typescript-converter` on `@nexus.function`); for other
+protobuf conversions nexgen derives names from the proto message. Check the
+calls in generated code for the exact exports and signatures your support
+package needs. Keep authored support code outside directories that you replace
+when regenerating output.
+
+### Go
+
+Create a **separate Go package in a separate directory** from the generated
+package, in a module that the generated code can import. Pass its full Go
+import path, not the package name or a `.go` file path. For the sample
+[`go.mod`](advanced/samples/go/go.mod) and
+[`support/`](advanced/samples/go/support/), that value is
+`go.temporal.io/sdk/advanced/samples/go/support`; generated code imports it as
+`support`. For example:
+
+```sh
+cargo run --features advanced -- go advanced/samples/inputs/type-roundtrip.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package go.temporal.io/sdk/advanced/samples/go/support \
+  --native-api --output advanced/samples/go/typeroundtrip
+```
+
+Export converter functions from the support package. For
+`google.protobuf.Duration`, nexgen derives `support.DurationToProto(ctx, value)`
+and `support.DurationFromProto(ctx, value)` when WIT does not specify names.
+When WIT sets `go-to` or `go-from` on `@nexus.type`, nexgen uses each given
+name exactly. Each converter must be exported. Its parameters and
+`(value, error)` results must match the generated call. See
+[the sample converters](advanced/samples/go/support/temporal_model_converters.go).
+Do not import the generated package from support. That import creates a cycle.
+The sample converters import `go.temporal.io/sdk/internal`. Only packages
+under the SDK module tree can import it. If your module is elsewhere, use
+dependencies that your module can access. Do not copy the sample file without
+changing that import.
+
+Go `@nexus.source` expressions remain raw. `go="workflow.GetInfo(ctx).Namespace"`
+uses the SDK and needs no support import. If an expression itself calls
+`support.Namespace(ctx)`, write `go-support-import=true` on its
+`@nexus.source` directive; Go defaults that import intent to `false`, and
+unused Go imports are compilation errors. Verify with `go test ./...` from the
+module root.
+
+### Python
+
+Place an importable Python package in your project and pass its module name,
+not a filename. The sample's
+[`temporal_support/`](advanced/samples/python/temporal_support/) is importable
+as `temporal_support` from the sample project root. Its `__init__.py` exposes
+the converter functions needed by generated code; merely putting them in a
+submodule is not enough if they are not re-exported. Generated code imports
+`temporal_support as _support` where needed and calls functions such as
+`_support.retry_policy_to_proto(value)` or `_support.payloads_to_proto(values)`.
+
+```sh
+cargo run --features advanced -- python advanced/samples/inputs/type-roundtrip.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package temporal_support \
+  --native-api --output advanced/samples/python/wit/type_roundtrip
+```
+
+Your runtime must also be able to `import temporal_support` (for example,
+install the package or make its parent directory available on Python's import
+path). The sample tests set `pythonpath = ["."]` in
+[`pyproject.toml`](advanced/samples/python/pyproject.toml); from the sample
+directory, `uv run python -c 'import temporal_support'` checks resolution.
+Default converter names use proto-message snake case, such as
+`duration_from_proto` / `duration_to_proto`; user-authored names in WIT must
+also be exported. Keep support independent of generated models to avoid
+circular imports.
+
+Python `@nexus.source` expressions can explicitly call
+`_support.workflow_namespace()`. They default to requesting the `_support`
+import even when the expression uses computed access rather than `_support.`
+syntax. Use `python-support-import=false` when a raw expression does not need
+that import. Check the generated project with `ruff check` and a Python type
+checker as well as your tests.
+
+### TypeScript
+
+Export helpers from a TypeScript module and pass either an installed package
+specifier (for example `@my-org/nexgen-support`) or a path **relative to the
+output directory**, not the directory in which you run the CLI. For the
+sample output root `advanced/samples/typescript/wit/type-roundtrip`, the sample
+module is `../../support/temporal_model_converters`; generated `models.ts`
+imports it as `support`. Nexgen adjusts that relative specifier for nested
+files such as `operations/<operation>.ts`.
+
+```sh
+cargo run --features advanced -- typescript advanced/samples/inputs/type-roundtrip.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package ../../support/temporal_model_converters \
+  --native-api --output advanced/samples/typescript/wit/type-roundtrip
+```
+
+Export the exact WIT-named or derived converter functions, for example
+`durationFromProto` / `durationToProto`. Generic payload and function
+conversions can also call `valueToPayload`, `payloadToValue`,
+`payloadsFromProto`, `payloadsToProto`, and `functionInputTypes`. See
+[`support/temporal_model_converters.ts`](advanced/samples/typescript/support/temporal_model_converters.ts)
+for their contracts. A TypeScript expression in `@nexus.source` can call
+`support.workflowNamespace()`. Nexgen does not add the prefix or the call.
+By default, `@nexus.source` requests the `support` import for TypeScript. Set
+`typescript-support-import=false` when the expression does not need that
+import. Include both the support module and generated output in your project.
+Run the project's TypeScript type checker (the sample uses `npm run typecheck`).
+
+### .NET
+
+Pass the C# **namespace**, not a source path or assembly name:
+`--support-package Nexgen.Support` for the sample. Put hand-written `.cs`
+files such as [`TemporalSupport.cs`](advanced/samples/dotnet/TemporalSupport/TemporalSupport.cs)
+and [`WorkflowServiceSupport.cs`](advanced/samples/dotnet/TemporalSupport/WorkflowServiceSupport.cs)
+outside regenerated output and compile them into the **same project/assembly**
+as the generated files. This is why the sample's `internal` helpers work;
+simply referencing a separate support DLL would not give the generated code
+access to those members. The support namespace need not equal the generated
+models' namespace. If your `.csproj` disables default compile items or
+excludes directories, explicitly include the authored sources (see
+[`Nexgen.DotNetMultiOperationService.csproj`](advanced/samples/dotnet/Nexgen.DotNetMultiOperationService.csproj)).
+
+```sh
+cargo run --features advanced -- dotnet advanced/samples/inputs/type-roundtrip.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package Nexgen.Support \
+  --native-api --output advanced/samples/dotnet/wit/type-roundtrip
+```
+
+Generated calls qualify helper names with `Nexgen.Support`; where extension
+methods such as `ToProto()` need it, generated modules also use the support
+namespace. Provide `ProtoExtensions.FromPayload`, `FromPayloads`, `ToPayload`,
+and `ToPayloads` for the generic payload carriers, along with any converters
+and serialization-context helpers named in your WIT. A sourced expression
+such as `TemporalWorkflowContext.WorkflowNamespace()` stays authored code; its
+support-namespace import is requested by default, with
+`dotnet-support-import=false` for expressions that do not need it. Verify that
+the project compiles with `dotnet build`.
 
 ---
 
