@@ -2,15 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
-import {
-  workflowTypeFromProto,
-  workflowTypeToProto,
-  taskQueueFromProto,
-  taskQueueToProto,
-  workflowNamespace,
-  durationFromProto,
-  durationToProto,
-} from "./support";
+import * as support from "../../support/temporal_model_converters";
 
 export function requiredField<T>(
   value: T | null | undefined,
@@ -84,7 +76,7 @@ function startWorkflowRequestFromProto(
   }
   return {
     workflow: requiredField(
-      workflowTypeFromProto(
+      support.workflowTypeFromProto(
         requiredField(proto.workflowType, "StartWorkflowRequest", "workflow"),
       ),
       "StartWorkflowRequest",
@@ -96,7 +88,7 @@ function startWorkflowRequestFromProto(
       "workflowId",
     ),
     taskQueue: requiredField(
-      taskQueueFromProto(
+      support.taskQueueFromProto(
         requiredField(proto.taskQueue, "StartWorkflowRequest", "taskQueue"),
       ),
       "StartWorkflowRequest",
@@ -105,7 +97,7 @@ function startWorkflowRequestFromProto(
     workflowStartDelay:
       proto.workflowStartDelay == null
         ? undefined
-        : durationFromProto(proto.workflowStartDelay),
+        : support.durationFromProto(proto.workflowStartDelay),
     namespace: requiredField(
       proto.namespace === "" ? undefined : proto.namespace,
       "sourced field",
@@ -121,18 +113,18 @@ function startWorkflowRequestToProto(
     return undefined;
   }
   return {
-    workflowType: workflowTypeToProto(
+    workflowType: support.workflowTypeToProto(
       requiredField(model.workflow, "StartWorkflowRequest", "workflow"),
     ),
     workflowId: requiredField(model.workflowId, "StartWorkflowRequest", "workflowId"),
-    taskQueue: taskQueueToProto(
+    taskQueue: support.taskQueueToProto(
       requiredField(model.taskQueue, "StartWorkflowRequest", "taskQueue"),
     ),
     workflowStartDelay:
       model.workflowStartDelay == null
         ? undefined
-        : durationToProto(model.workflowStartDelay),
-    namespace: model.namespace ?? workflowNamespace(),
+        : support.durationToProto(model.workflowStartDelay),
+    namespace: model.namespace ?? support.workflowNamespace(),
   };
 }
 
@@ -237,7 +229,7 @@ function cancelWorkflowRequestToProto(
         ),
       ) ?? {},
     reason: model.reason,
-    namespace: model.namespace ?? workflowNamespace(),
+    namespace: model.namespace ?? support.workflowNamespace(),
   };
 }
 

@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using NexusRpc;
 using Temporalio.Workflows;
+using Nexgen.Support;
 
 namespace Nexgen.UserService
 {

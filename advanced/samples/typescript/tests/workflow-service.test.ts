@@ -15,9 +15,9 @@ const workflowsPath = fileURLToPath(
 // The handler is only a test transport. Give its copy of the generated
 // converters a fixed converter; the Workflow bundle imports the real module
 // and continues to obtain its converter from the activation context.
-vi.mock("../wit/workflow-service/support.ts", async (importOriginal) => {
+vi.mock("../support/temporal_model_converters.ts", async (importOriginal) => {
   const support =
-    await importOriginal<typeof import("../wit/workflow-service/support.ts")>();
+    await importOriginal<typeof import("../support/temporal_model_converters.ts")>();
   const common = await import("@temporalio/common");
   return {
     ...support,

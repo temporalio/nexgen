@@ -452,7 +452,7 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
         },
         language,
         input_paths,
-        support_paths: Vec::new(),
+        support_package: sample_support_package(repo_root, language, &output_path),
         descriptor_paths: vec![repo_root.join("advanced/samples/descriptors/temporal_api.bin")],
         output_path: output_path.clone(),
         format: false,
@@ -516,7 +516,7 @@ fn build_json_example_variant(
             },
             language,
             input_paths: vec![input_path.clone()],
-            support_paths: Vec::new(),
+            support_package: None,
             descriptor_paths: Vec::new(),
             output_path: output_path.clone(),
             format: false,
@@ -537,6 +537,40 @@ fn samples_language_root(root: &Path, language: Language) -> PathBuf {
 fn advanced_language_root(root: &Path, language: Language) -> PathBuf {
     root.join("advanced/samples").join(language.as_str())
 }
+
+fn sample_support_package(
+    repo_root: &Path,
+    language: Language,
+    output_path: &Path,
+) -> Option<String> {
+    match language {
+        Language::Go => Some("go.temporal.io/sdk/advanced/samples/go/support".into()),
+        Language::Python => Some("temporal_support".into()),
+        Language::Dotnet => Some("Nexgen.Support".into()),
+        Language::TypeScript => {
+            let support_module =
+                repo_root.join("advanced/samples/typescript/support/temporal_model_converters");
+            let shared = output_path
+                .ancestors()
+                .find(|ancestor| support_module.starts_with(ancestor))
+                .expect("sample paths share the repository root");
+            let levels = output_path
+                .strip_prefix(shared)
+                .expect("shared ancestor is a prefix")
+                .components()
+                .count();
+            let relative = std::iter::repeat_n("..", levels).collect::<PathBuf>().join(
+                support_module
+                    .strip_prefix(shared)
+                    .expect("shared ancestor is a prefix"),
+            );
+            Some(relative.to_string_lossy().replace('\\', "/"))
+        }
+        Language::Java => None,
+        _ => None,
+    }
+}
+
 fn example_input_path(root: &Path, id: &str) -> PathBuf {
     let input_root = root.join("advanced/samples/inputs");
     let mut inputs = Vec::new();
@@ -781,6 +815,30 @@ mod tests {
             discover_json_example_ids(&repo_root()).unwrap(),
             ["chat", "kb", "showcase", "temporal"]
         );
+    }
+
+    #[test]
+    fn typescript_support_import_is_relative_to_each_generated_output() {
+        let root = repo_root();
+        for (output, expected) in [
+            (
+                "advanced/samples/typescript/wit/workflow-service",
+                "../../support/temporal_model_converters",
+            ),
+            (
+                "advanced/samples/typescript/json_schema/api/chat",
+                "../../../support/temporal_model_converters",
+            ),
+            (
+                "samples/typescript/chat",
+                "../../../advanced/samples/typescript/support/temporal_model_converters",
+            ),
+        ] {
+            assert_eq!(
+                sample_support_package(&root, Language::TypeScript, &root.join(output)),
+                Some(expected.to_string()),
+            );
+        }
     }
 
     #[test]

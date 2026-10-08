@@ -4,7 +4,7 @@ import * as workflow from "@temporalio/workflow";
 import { startWorkflowService } from "../services";
 import { requiredField } from "../models";
 import type { StartWorkflowRequest } from "../models";
-import { workflowNamespace } from "../support";
+import * as support from "../../../support/temporal_model_converters";
 import { StartedWorkflow } from "../resources";
 
 type RestartWorkflowInput = StartWorkflowRequest extends infer Input
@@ -21,7 +21,7 @@ export async function restartWorkflow(
 ): Promise<StartedWorkflow> {
   const request = {
     ...requestInput,
-    namespace: workflowNamespace(),
+    namespace: support.workflowNamespace(),
   } as StartWorkflowRequest;
   const client = workflow.createNexusServiceClient({
     service: startWorkflowService,

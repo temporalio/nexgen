@@ -134,6 +134,11 @@ pub enum Error {
     #[error("language `{language}` is not implemented yet")]
     UnsupportedLanguage { language: Language },
 
+    #[error(
+        "generating {language} from WIT requires `--support-package` with a non-empty package reference"
+    )]
+    MissingSupportPackage { language: Language },
+
     #[error("{language} protobuf conversion does not yet support oneof group `{message}.{oneof}`")]
     UnsupportedProtoOneofConversion {
         language: Language,

@@ -8,6 +8,7 @@ of `@nexus` directives.
 ## Contents
 
 - [Quick Start](#quick-start)
+- [Integrating a Support Package](#integrating-a-support-package)
 - [Type Mappings](#type-mappings)
   - [Records](#records)
   - [Enums](#enums)
@@ -86,6 +87,167 @@ output where a target would otherwise use the service: its
 `@nexus.namespace` directive selects the .NET namespace or Go import path, and
 .NET otherwise uses `Nexgen.<InterfaceName>`, such as
 `Nexgen.NotificationService` for `interface notification-service`.
+
+---
+
+## Integrating a Support Package
+
+For **WIT** generation in Go, Python, TypeScript, and .NET, pass one
+`--support-package` value on the language subcommand, even if that particular
+input does not use support helpers. It identifies code **you maintain in your
+project**; nexgen neither reads it nor copies it into the output. Java does not
+consume user support, and JSON Schema generation does not require this option
+(its generated JSON runtime helpers are unrelated).
+
+The package must be importable when the generated code is compiled or run.
+Nexgen does not verify that it exists or that its exports have the required
+signatures: use the language's compiler or type checker to check the integration.
+The WIT directives name some helpers explicitly (for example `python-from` on
+`@nexus.type` and `typescript-converter` on `@nexus.function`); for other
+protobuf conversions nexgen derives names from the proto message. Check the
+calls in generated code for the exact exports and signatures your support
+package needs. Keep authored support code outside directories that you replace
+when regenerating output.
+
+Each `@nexus.source` value is a call to a helper in the support package.
+Write the helper path and its arguments, without the package prefix. Nexgen
+imports support and adds the prefix to the helper call. It does not add or
+change the arguments. For example, write `workflow_namespace()` in Python,
+`workflowNamespace()` in TypeScript, `WorkflowNamespace(ctx)` in Go, or
+`TemporalWorkflowContext.WorkflowNamespace()` in .NET. Generated code calls
+`_support.workflow_namespace()`, `support.workflowNamespace()`,
+`support.WorkflowNamespace(ctx)`, or
+`Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()` for those
+examples. `@nexus.output-transform` remains a separate authored expression.
+
+### Go
+
+Create a **separate Go package in a separate directory** from the generated
+package, in a module that the generated code can import. Pass its full Go
+import path, not the package name or a `.go` file path. For the sample
+[`go.mod`](advanced/samples/go/go.mod) and
+[`support/`](advanced/samples/go/support/), that value is
+`go.temporal.io/sdk/advanced/samples/go/support`; generated code imports it as
+`support`. For example:
+
+```sh
+cargo run --features advanced -- go advanced/samples/inputs/type-roundtrip.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package go.temporal.io/sdk/advanced/samples/go/support \
+  --native-api --output advanced/samples/go/typeroundtrip
+```
+
+Export converter functions from the support package. For
+`google.protobuf.Duration`, nexgen derives `support.DurationToProto(ctx, value)`
+and `support.DurationFromProto(ctx, value)` when WIT does not specify names.
+When WIT sets `go-to` or `go-from` on `@nexus.type`, nexgen uses each given
+name exactly. Each converter must be exported. Its parameters and
+`(value, error)` results must match the generated call. See
+[the sample converters](advanced/samples/go/support/temporal_model_converters.go).
+Do not import the generated package from support. That import creates a cycle.
+The sample converters import `go.temporal.io/sdk/internal`. Only packages
+under the SDK module tree can import it. If your module is elsewhere, use
+dependencies that your module can access. Do not copy the sample file without
+changing that import.
+
+For `@nexus.source`, the sample writes `WorkflowNamespace(ctx)`. Generated
+code calls `support.WorkflowNamespace(ctx)`. The support package implements it with
+`workflow.GetInfo(ctx).Namespace`. The generated Go package imports support
+for the sourced field. Verify with `go test ./...` from the module root.
+
+### Python
+
+Place an importable Python package in your project and pass its module name,
+not a filename. The sample's
+[`temporal_support/`](advanced/samples/python/temporal_support/) is importable
+as `temporal_support` from the sample project root. Its `__init__.py` exposes
+the converter functions needed by generated code; merely putting them in a
+submodule is not enough if they are not re-exported. Generated code imports
+`temporal_support as _support` where needed and calls functions such as
+`_support.retry_policy_to_proto(value)` or `_support.payloads_to_proto(values)`.
+
+```sh
+cargo run --features advanced -- python advanced/samples/inputs/type-roundtrip.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package temporal_support \
+  --native-api --output advanced/samples/python/wit/type_roundtrip
+```
+
+Your runtime must also be able to `import temporal_support` (for example,
+install the package or make its parent directory available on Python's import
+path). The sample tests set `pythonpath = ["."]` in
+[`pyproject.toml`](advanced/samples/python/pyproject.toml); from the sample
+directory, `uv run python -c 'import temporal_support'` checks resolution.
+Default converter names use proto-message snake case, such as
+`duration_from_proto` / `duration_to_proto`; user-authored names in WIT must
+also be exported. Keep support independent of generated models to avoid
+circular imports.
+
+For `@nexus.source`, the sample writes `workflow_namespace()`. Generated
+code calls `_support.workflow_namespace()`.
+Check the generated project with `ruff check`, a Python type checker, and
+your tests.
+
+### TypeScript
+
+Export helpers from a TypeScript module and pass either an installed package
+specifier (for example `@my-org/nexgen-support`) or a path **relative to the
+output directory**, not the directory in which you run the CLI. For the
+sample output root `advanced/samples/typescript/wit/type-roundtrip`, the sample
+module is `../../support/temporal_model_converters`; generated `models.ts`
+imports it as `support`. Nexgen adjusts that relative specifier for nested
+files such as `operations/<operation>.ts`.
+
+```sh
+cargo run --features advanced -- typescript advanced/samples/inputs/type-roundtrip.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package ../../support/temporal_model_converters \
+  --native-api --output advanced/samples/typescript/wit/type-roundtrip
+```
+
+Export the exact WIT-named or derived converter functions, for example
+`durationFromProto` / `durationToProto`. Generic payload and function
+conversions can also call `valueToPayload`, `payloadToValue`,
+`payloadsFromProto`, `payloadsToProto`, and `functionInputTypes`. See
+[`support/temporal_model_converters.ts`](advanced/samples/typescript/support/temporal_model_converters.ts)
+for their contracts. For `@nexus.source`, write `workflowNamespace()`.
+Generated code calls `support.workflowNamespace()`.
+Include both the support module and generated output in your project.
+Run the project's TypeScript type checker (the sample uses `npm run typecheck`).
+
+### .NET
+
+Pass the C# **namespace**, not a source path or assembly name:
+`--support-package Nexgen.Support` for the sample. Put hand-written `.cs`
+files such as [`TemporalSupport.cs`](advanced/samples/dotnet/TemporalSupport/TemporalSupport.cs)
+and [`WorkflowServiceSupport.cs`](advanced/samples/dotnet/TemporalSupport/WorkflowServiceSupport.cs)
+outside regenerated output and compile them into the **same project/assembly**
+as the generated files. This is why the sample's `internal` helpers work;
+simply referencing a separate support DLL would not give the generated code
+access to those members. The support namespace need not equal the generated
+models' namespace. If your `.csproj` disables default compile items or
+excludes directories, explicitly include the authored sources (see
+[`Nexgen.DotNetMultiOperationService.csproj`](advanced/samples/dotnet/Nexgen.DotNetMultiOperationService.csproj)).
+
+```sh
+cargo run --features advanced -- dotnet advanced/samples/inputs/type-roundtrip.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package Nexgen.Support \
+  --native-api --output advanced/samples/dotnet/wit/type-roundtrip
+```
+
+Generated calls qualify helper names with `Nexgen.Support`; where extension
+methods such as `ToProto()` need it, generated modules also use the support
+namespace. Provide `ProtoExtensions.FromPayload`, `FromPayloads`, `ToPayload`,
+and `ToPayloads` for the generic payload carriers, along with any converters
+and serialization-context helpers named in your WIT. For `@nexus.source`,
+write `TemporalWorkflowContext.WorkflowNamespace()`. Generated code adds the
+support namespace to the call. Verify that the project compiles with
+`dotnet build`.
 
 ---
 
@@ -735,26 +897,32 @@ proto-backed models.
 
 ### Sourced Fields
 
-Fields annotated with `@nexus.source` are not exposed in the user-facing API.
-Instead, transfer-type conversion calls a support function to obtain the value.
+Fields annotated with `@nexus.source` are not exposed in operation convenience
+APIs. Each value is a helper call relative to the project's support package,
+supplied with `--support-package`. Include the call and its arguments in WIT.
+Nexgen adds the package prefix and imports support for the generated field.
 
 ```wit
 record start-workflow-request {
   workflow-id: string,
-  /// @nexus.source python="workflow_namespace" typescript="workflowNamespace"
+  /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
   namespace: string,
 }
 ```
 
-The `namespace` field does not appear as a constructor parameter. During
-transfer-type conversion:
+The convenience API does not require a `namespace` argument. For example,
+the generated Python model uses the helper as a default factory. Conversion
+then reads the model field:
 
 ```python
-message.namespace = workflow_namespace()   # auto-injected
+namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
+# In to_transfer_type:
+message.namespace = value.namespace
 ```
 
-The support function must be defined in the support file referenced by
-`@nexus.support`.
+Nexgen prefixes the helper call, but it does not add arguments. The
+configured package supplies the helper. The `@nexus.output-transform`
+directive is different: its value remains a raw expression.
 
 ### Omitted Fields
 
@@ -823,7 +991,12 @@ is never nil.
 ### Output Transforms
 
 An operation annotated with `@nexus.output-transform` transforms the raw
-operation result into a different type before returning it.
+operation result into a different type before returning it. Its language
+expressions are emitted verbatim, not interpreted as names of support
+functions to call. Unlike `@nexus.source`, this directive can call an SDK
+function directly. Moving that call into a Go support package could require
+the support package to import generated request or result types. That import
+would create a package cycle.
 
 ```wit
 /// @nexus.output-transform
@@ -1133,11 +1306,11 @@ is just `signal_name`.
 type signal-function = placeholder;
 ```
 
-Generated Python imports and calls the converter during transfer-type
-conversion:
+Generated Python imports the user-owned support module and calls the converter
+during transfer-type conversion:
 
 ```python
-from ._support import signal_function_to_proto
+import temporal_support as _support
 
 @dataclasses.dataclass(slots=True, kw_only=True)
 class SignalWithStartWorkflowRequest:
@@ -1145,9 +1318,9 @@ class SignalWithStartWorkflowRequest:
     signal_args: list[typing.Any] | None = None
 
     def to_transfer_type(self, value: "SignalWithStartWorkflowRequest"):
-        message.signal_name = signal_function_to_proto(value.signal)
+        message.signal_name = _support.signal_function_to_proto(value.signal)
         if value.signal_args is not None:
-            message.signal_input.CopyFrom(payloads_to_proto(value.signal_args))
+            message.signal_input.CopyFrom(_support.payloads_to_proto(value.signal_args))
         return message
 ```
 
@@ -1232,25 +1405,6 @@ interface user-service { ... }
 
 The service name (used in generated code) is derived from the interface name
 converted to PascalCase: `user-service` becomes `UserService`.
-
----
-
-### @nexus.support
-
-**Placement:** Package doc comment
-**Syntax:** `@nexus.support python="<path>" typescript="<path>"`
-
-Includes external support code in the generated output. Paths are resolved
-relative to the WIT file. Python support files are copied into a private
-`_support/` package; TypeScript support files become `support.ts` next to the
-generated `index.ts`.
-
-```wit
-/// @nexus.support
-///   python="python/model_overrides.py"
-///   typescript="typescript/model_overrides.ts"
-package nexus:temporal-types@1.0.0;
-```
 
 ---
 
@@ -1455,18 +1609,22 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 ### @nexus.source
 
 **Placement:** Record field (within a `@nexus.proto` record)
-**Syntax:** `@nexus.source python="<func>" typescript="<func>" go="<Func>"`
+**Syntax:** `@nexus.source python="<helper-call>" typescript="<helper-call>" go="<helper-call>" dotnet="<helper-call>"`
 
-Populates a field by calling a support function instead of exposing it as an API
-parameter. The function must be defined in the support file.
+Provides a field value through a helper in the package specified by
+`--support-package`. The field is not an argument in operation convenience
+APIs. Write a helper call with its arguments, but without the package prefix.
+Nexgen adds the prefix and imports support when it generates the sourced field.
+Other expressions, including property access after a call, are not valid here.
 
 ```wit
-/// @nexus.source python="workflow_namespace" typescript="workflowNamespace"
+/// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
 namespace: string,
 ```
 
-During transfer-type conversion, this becomes
-`message.namespace = workflow_namespace()`.
+The sample's Python model uses `_support.workflow_namespace` as its default
+factory. Go calls `support.WorkflowNamespace(ctx)`. Both helpers come from the
+configured support package.
 
 Cannot be combined with `@nexus.default`.
 
@@ -1581,7 +1739,8 @@ def signal_with_start_workflow_serialization_context(
     )
 ```
 
-The referenced helper must be provided through `@nexus.support`.
+The referenced helper must be available from the package specified by
+`--support-package`.
 
 ---
 
@@ -1599,8 +1758,9 @@ The referenced helper must be provided through `@nexus.support`.
 ```
 
 Transforms the raw operation result to a different return type. The expression
-has access to `request` and `result` variables. Go expressions must return
-`(T, error)`.
+is emitted as written and has access to `request` and `result` variables.
+Helpers used by the expression must be available to the generated code. Go
+expressions must return `(T, error)`.
 
 ```wit
 /// @nexus.output-transform

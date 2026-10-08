@@ -1,5 +1,5 @@
 // Drives the `nexgen` binary over the WIT/proto CLI surface (`--descriptors`,
-// `--native-api`, `--support-file`), all behind the `advanced` feature.
+// `--native-api`, `--support-package`), all behind the `advanced` feature.
 #![cfg(feature = "advanced")]
 
 use std::collections::BTreeMap;
@@ -10,9 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use heck::ToSnakeCase;
-use nexgen::SupportFiles;
 use nexgen::generator::generate_source;
-use nexgen::spec::SupportFragmentSpec;
 use nexgen::{GenerateRequest, generate_to_file};
 
 mod common;
@@ -753,7 +751,7 @@ fn generate_python_to_string(input_paths: &[PathBuf], descriptor_paths: &[PathBu
         },
         language: nexgen::language::Language::Python,
         input_paths: input_paths.to_vec(),
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: descriptor_paths.to_vec(),
         output_path: output_path.clone(),
         format: false,
@@ -780,7 +778,7 @@ fn generate_python_package_files(
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: input_paths.to_vec(),
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: descriptor_paths.to_vec(),
         output_path: output_path.clone(),
         format: false,
@@ -804,6 +802,8 @@ fn generate_formatted_python_output(root: &Path, example_id: &str, output_path: 
             "--output",
             output_path.to_str().unwrap(),
             "--native-api",
+            "--support-package",
+            "temporal_support",
         ]);
     if example_id == PRIMARY_EXAMPLE_ID {
         command.arg("--system-nexus");
@@ -840,6 +840,8 @@ fn generate_formatted_json_python_output(
         input_path.to_str().unwrap(),
         "--output",
         output_path.to_str().unwrap(),
+        "--support-package",
+        "temporal_support",
     ];
     if generate_native_api {
         args.push("--native-api");
@@ -1080,6 +1082,8 @@ fn cli_generates_wit_direct_example_without_descriptors() {
             wit_input_path(&root, "user-service").to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "temporal_support",
         ])
         .output()
         .unwrap();
@@ -1090,6 +1094,41 @@ fn cli_generates_wit_direct_example_without_descriptors() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(output_path.join("__init__.py").is_file());
+    assert!(output_path.join("models.py").is_file());
+    fs::remove_dir_all(output_path).unwrap();
+}
+
+#[test]
+fn cli_requires_support_package_for_wit_but_not_json_schema() {
+    let root = project_root();
+    let output_path = unique_output_path("python-support-package-requirement");
+    let wit = Command::new(env!("CARGO_BIN_EXE_nexgen"))
+        .args([
+            "python",
+            wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--output",
+            output_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!wit.status.success());
+    assert!(String::from_utf8_lossy(&wit.stderr).contains("--support-package"));
+    assert!(!output_path.exists());
+
+    let json = Command::new(env!("CARGO_BIN_EXE_nexgen"))
+        .args([
+            "python",
+            json_input_path(&root, "chat").to_str().unwrap(),
+            "--output",
+            output_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        json.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&json.stderr)
+    );
     assert!(output_path.join("models.py").is_file());
     fs::remove_dir_all(output_path).unwrap();
 }
@@ -1130,6 +1169,8 @@ interface example-service {
             input_path.to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "temporal_support",
         ])
         .output()
         .unwrap();
@@ -1144,48 +1185,6 @@ interface example-service {
     assert!(output_path.join("services.py").is_file());
     assert!(!output_path.join("operations/example_operation.py").exists());
 
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn cli_generates_python_support_file_from_parameter() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-support-file-input");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let support_path = temp_dir.join("custom_support.py");
-    let output_path = temp_dir.join("output");
-    fs::write(
-        &support_path,
-        "def custom_support_hook() -> str:\n    return 'custom'\n",
-    )
-    .unwrap();
-
-    let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
-        .args([
-            "python",
-            wit_input_path(&root, "user-service").to_str().unwrap(),
-            "--support-file",
-            support_path.to_str().unwrap(),
-            "--output",
-            output_path.to_str().unwrap(),
-        ])
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        fs::read_to_string(output_path.join("_support/custom_support.py")).unwrap(),
-        "def custom_support_hook() -> str:\n    return 'custom'\n"
-    );
-    assert!(
-        fs::read_to_string(output_path.join("_support/__init__.py"))
-            .unwrap()
-            .contains("from .custom_support import *")
-    );
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -1254,7 +1253,7 @@ fn python_request_models_are_bidirectional_wire_models() {
     assert!(!rendered.contains("namespace: str | None = None"));
     assert!(!rendered.contains("namespace: str | None"));
     assert!(rendered.contains("namespace: str = ("));
-    assert!(rendered.contains("dataclasses.field(default_factory=workflow_namespace)"));
+    assert!(rendered.contains("dataclasses.field(default_factory=_support.workflow_namespace)"));
     assert!(rendered.contains("message.namespace = value.namespace"));
     assert!(rendered.contains("result = await handle"));
     assert!(rendered.contains(
@@ -1359,26 +1358,17 @@ fn python_request_models_are_bidirectional_wire_models() {
     assert!(!models.contains("_ = temporalio.converter.transfer_type_convertible("));
     assert!(!models.contains("@temporalio.converter.transfer_type_convertible("));
     assert!(!models.contains("def from_proto("));
-    assert!(models.contains("from ._support import ("));
-    assert!(models.contains("retry_policy_to_proto,"));
-    assert!(
-        rendered.contains("from ._support import signal_with_start_workflow_serialization_context")
-    );
+    assert!(models.contains("import temporal_support as _support"));
+    assert!(models.contains("_support.retry_policy_to_proto("));
+    assert!(rendered.contains("import temporal_support as _support"));
     assert!(rendered.contains(
-        "): _NexusOperationInfo(\n        operation=_services.WorkflowService.signal_with_start_workflow,\n        serialization_context=signal_with_start_workflow_serialization_context,\n    ),"
+        "): _NexusOperationInfo(\n        operation=_services.WorkflowService.signal_with_start_workflow,\n        serialization_context=_support.signal_with_start_workflow_serialization_context,\n    ),"
     ));
     assert!(rendered.contains(
         "handle = await nexus_client.start_operation(\n        operation=\"SignalWithStartWorkflowExecution\",\n        input=request,\n        output_type=SignalWithStartWorkflowResponse,\n    )"
     ));
-    assert!(rendered.contains(
-        "class SignalWithStartWorkflowModelRequest(typing.Protocol):\n    namespace: str\n    id: str"
-    ));
-    assert!(rendered.contains(
-        "def signal_with_start_workflow_serialization_context(\n    request: SignalWithStartWorkflowModelRequest,\n) -> temporalio_converter.WorkflowSerializationContext:"
-    ));
-    assert!(rendered.contains(
-        "return temporalio_converter.WorkflowSerializationContext(\n        namespace=request.namespace,\n        workflow_id=request.id,\n    )"
-    ));
+    assert!(!rendered.contains("class SignalWithStartWorkflowModelRequest(typing.Protocol):"));
+    assert!(!rendered.contains("def signal_with_start_workflow_serialization_context("));
 
     let type_roundtrip_rendered = generate_python_to_string(
         &example_input_paths(&root, TYPE_ROUNDTRIP_EXAMPLE_ID),
@@ -1443,15 +1433,14 @@ fn python_standalone_proto_oneof_models_are_exported_and_converted() {
         "            case None:\n                raise ValueError(\"missing required field Outcome.value\")\n"
     ));
     assert!(!models.contains("unknown protobuf oneof case"));
-    assert!(
-        models
-            .contains("typing.cast(OutputT, payloads_from_proto(value.success, [output_type])[0])")
-    );
-    assert!(
-        models.contains("_oneof_value = OutcomeValueFailure(failure_from_proto(value.failure))")
-    );
     assert!(models.contains(
-        "        match value.value:\n            case OutcomeValueSuccess():\n                message.success.CopyFrom(payloads_to_proto([value.value.value]))\n            case OutcomeValueFailure():\n                message.failure.CopyFrom(failure_to_proto(value.value.value))\n"
+        "typing.cast(OutputT, _support.payloads_from_proto(value.success, [output_type])[0])"
+    ));
+    assert!(models.contains(
+        "_oneof_value = OutcomeValueFailure(_support.failure_from_proto(value.failure))"
+    ));
+    assert!(models.contains(
+        "        match value.value:\n            case OutcomeValueSuccess():\n                message.success.CopyFrom(_support.payloads_to_proto([value.value.value]))\n            case OutcomeValueFailure():\n                message.failure.CopyFrom(_support.failure_to_proto(value.value.value))\n"
     ));
     assert!(models.contains(
         "        if value.activity is not None:\n            match value.activity:\n                case ActivitySelectionId():\n"
@@ -1546,7 +1535,7 @@ fn python_rejects_proto_variant_case_class_name_collisions() {
         nexgen::language::Language::Python,
         spec,
         &descriptors,
-        &SupportFiles::default(),
+        "temporal_support",
     )
     .unwrap_err();
 
@@ -1568,9 +1557,11 @@ fn python_proto_generics_propagate_payload_type_hints() {
     let models = package
         .get(&PathBuf::from("models.py"))
         .expect("proto generic models should include models.py");
-    let support = package
-        .get(&PathBuf::from("_support/temporal_model_converters.py"))
-        .expect("proto generic models should include the Temporal converter support module");
+    assert!(
+        !package.keys().any(|path| path.starts_with("_support")),
+        "user support files must not be copied into generated packages"
+    );
+    assert!(models.contains("import temporal_support as _support"));
 
     assert!(models.contains("class PayloadBackedEnvelope(typing.Generic[OutputT, ContextT]):"));
     assert!(models.contains("PayloadBackedEnvelope[OutputT, ContextT]"));
@@ -1594,19 +1585,62 @@ fn python_proto_generics_propagate_payload_type_hints() {
     assert!(models.contains("context_type, = typing.get_args(type_hint) or (typing.Any,)"));
     assert!(models.contains("payload_from_proto(value.details, context_type)"));
     assert!(
-        models.contains("typing.cast(OutputT, payload_from_proto(value.details, output_type))")
+        models.contains(
+            "typing.cast(OutputT, _support.payload_from_proto(value.details, output_type))"
+        )
     );
-    assert!(
-        models.contains("typing.cast(ContextT, payload_from_proto(value.details, context_type))")
-    );
+    assert!(models.contains(
+        "typing.cast(ContextT, _support.payload_from_proto(value.details, context_type))"
+    ));
     assert!(models.contains("typing.cast(PayloadBackedOutput[OutputT],"));
     assert!(models.contains("typing.cast(PayloadBackedContext[ContextT],"));
-    assert!(support.contains("type_hint: type[typing.Any] | None = None,"));
-    assert!(support.contains("converter.from_payload(_clone_payload(proto), type_hint)"));
+    assert!(models.contains("_support.payload_from_proto(value.details, output_type)"));
+    assert!(models.contains("_support.payload_to_proto("));
 }
 
 #[test]
-fn python_rejects_support_namespace() {
+fn python_sourced_helper_import_is_automatic() {
+    let root = project_root();
+    let temp_dir = unique_output_path("python-sourced-support-only");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let wit_path = temp_dir.join("source-only.wit");
+    let wit = r#"
+package temporal:source-only@1.0.0;
+
+world system { export models; }
+
+interface models {
+  type placeholder = string;
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest"
+  record cancel-request {
+    /// @nexus.source python="workflow_namespace()"
+    namespace: string,
+    /// @nexus.omit
+    workflow-execution: placeholder,
+    /// @nexus.omit
+    reason: placeholder,
+    /// @nexus.omit
+    identity: placeholder,
+    /// @nexus.omit
+    request-id: placeholder,
+    /// @nexus.omit
+    first-execution-run-id: placeholder,
+    /// @nexus.omit
+    links: placeholder,
+  }
+}
+"#;
+    fs::write(&wit_path, wit).unwrap();
+    let files = generate_python_package_files(&[wit_path], &[descriptor_path(&root)]);
+    let models = &files[&PathBuf::from("models.py")];
+    assert!(models.contains("import temporal_support as _support"));
+    assert!(models.contains("default_factory=_support.workflow_namespace"));
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn python_proto_helpers_use_the_supplied_support_module() {
     let root = project_root();
     let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
         nexgen::language::Language::Python,
@@ -1614,116 +1648,18 @@ fn python_rejects_support_namespace() {
     )
     .unwrap();
     let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let err = generate_source(
-        nexgen::language::Language::Python,
-        spec.clone(),
-        &descriptors,
-        &SupportFiles {
-            fragments: vec![SupportFragmentSpec {
-                path: "support.py".to_string(),
-                contents: String::new(),
-                namespace: Some("example.support".to_string()),
-            }],
-        },
-    )
-    .unwrap_err();
-    assert!(err.to_string().contains("support namespace"));
-}
-
-#[test]
-fn python_support_fragments_with_same_module_name_collide() {
-    let root = project_root();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &example_input_paths(&root, PRIMARY_EXAMPLE_ID),
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let error = generate_source(
+    let output = generate_source(
         nexgen::language::Language::Python,
         spec,
         &descriptors,
-        &SupportFiles {
-            fragments: vec![
-                SupportFragmentSpec {
-                    path: "first/helpers.py".to_string(),
-                    contents: String::new(),
-                    namespace: None,
-                },
-                SupportFragmentSpec {
-                    path: "second/helpers.py".to_string(),
-                    contents: String::new(),
-                    namespace: None,
-                },
-            ],
-        },
-    )
-    .unwrap_err();
-
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("_support/helpers.py"));
-    assert_eq!(first_source, "Python support file `first/helpers.py`");
-    assert_eq!(second_source, "Python support file `second/helpers.py`");
-    assert!(
-        remedy.contains("support file `first/helpers.py`"),
-        "{remedy}"
-    );
-    assert!(
-        remedy.contains("support file `second/helpers.py`"),
-        "{remedy}"
-    );
-}
-
-#[test]
-fn python_support_fragment_colliding_with_support_initializer_has_one_remedy() {
-    let root = project_root();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &example_input_paths(&root, PRIMARY_EXAMPLE_ID),
+        "company.shared.temporal_support",
     )
     .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let error = generate_source(
-        nexgen::language::Language::Python,
-        spec,
-        &descriptors,
-        &SupportFiles {
-            fragments: vec![SupportFragmentSpec {
-                path: "custom/__init__.py".to_string(),
-                contents: String::new(),
-                namespace: None,
-            }],
-        },
-    )
-    .unwrap_err();
 
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("_support/__init__.py"));
-    assert_eq!(first_source, "Python support file `custom/__init__.py`");
-    assert_eq!(
-        second_source,
-        "generated Python support package initializer"
-    );
-    assert_eq!(
-        remedy,
-        "rename support file `custom/__init__.py` so it generates a different Python path"
-    );
+    assert!(output.contains("import company.shared.temporal_support as _support"));
+    assert!(output.contains("_support.retry_policy_to_proto("));
+    assert!(output.contains("_support.signal_with_start_workflow_serialization_context"));
+    assert!(!output.contains("### _support/"));
 }
 
 #[test]
@@ -1770,7 +1706,7 @@ interface second-service {
         nexgen::language::Language::Python,
         spec,
         &descriptors,
-        &SupportFiles::default(),
+        "temporal_support",
     )
     .unwrap_err();
 
@@ -1808,7 +1744,7 @@ fn python_json_names_inline_object_union_branch() {
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1845,7 +1781,7 @@ fn python_json_validates_non_object_union_branch_constraints() {
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1895,7 +1831,7 @@ fn python_json_enforces_remaining_scalar_and_typed_extra_contracts() {
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1951,7 +1887,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2004,7 +1940,7 @@ fn python_json_union_serializer_validates_before_dispatching() {
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2074,7 +2010,7 @@ fn python_json_annotates_element_position_unions() {
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2164,7 +2100,7 @@ fn generate_python_schema_tree(name: &str, files: &[(&str, &str)]) -> (PathBuf, 
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::Python,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2342,7 +2278,7 @@ fn python_json_cross_module_py_name_override_moves_every_reference() {
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2385,7 +2321,7 @@ fn python_json_bare_ref_root_alias_is_the_target_class_at_runtime() {
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::Python,
         input_paths: vec![input],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2453,7 +2389,7 @@ fn python_json_rejects_same_type_name_in_two_modules() {
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_dir.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join(output),
         format: false,
@@ -2526,7 +2462,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2578,7 +2514,7 @@ fn python_json_property_names_never_shadow_converter_locals() {
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2661,7 +2597,7 @@ fn python_json_model_properties_use_union_none_and_defaults_preserve_presence() 
         config: Default::default(),
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2716,7 +2652,7 @@ fn generate_unformatted_python_package(
         config,
         language: nexgen::language::Language::Python,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("temporal_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3108,7 +3044,7 @@ $defs:
             config: Default::default(),
             language: nexgen::language::Language::Python,
             input_paths: vec![input_path],
-            support_paths: Vec::new(),
+            support_package: Some("temporal_support".into()),
             descriptor_paths: Vec::new(),
             output_path: temp_dir.join("out"),
             format: false,

@@ -80,16 +80,25 @@ pub(in crate::generator) type GoConversionResult<T> = std::result::Result<T, Str
 #[derive(Debug)]
 pub(in crate::generator) struct ModelBackend {
     package: GoPackageContext,
+    support_package: Option<String>,
     imports: RefCell<GoImportCollector>,
     proto_models: BTreeMap<String, PlannedTypeInfo>,
     wire_models: RefCell<BTreeMap<String, RenderedModelWire>>,
 }
 
 impl ModelBackend {
-    pub(in crate::generator) fn new(package: GoPackageContext) -> Self {
+    pub(in crate::generator) fn new(
+        package: GoPackageContext,
+        support_package: Option<String>,
+    ) -> Self {
+        let mut imports = GoImportCollector::default();
+        if support_package.is_some() {
+            imports.used_aliases.insert("support".to_string());
+        }
         Self {
             package,
-            imports: RefCell::new(GoImportCollector::default()),
+            support_package,
+            imports: RefCell::new(imports),
             proto_models: BTreeMap::new(),
             wire_models: RefCell::new(BTreeMap::new()),
         }
@@ -97,6 +106,24 @@ impl ModelBackend {
 
     pub(in crate::generator) fn imports(&self) -> Ref<'_, GoImportCollector> {
         self.imports.borrow()
+    }
+
+    fn register_support_import(&self) {
+        if let Some(path) = &self.support_package {
+            self.imports
+                .borrow_mut()
+                .by_path
+                .insert(path.clone(), "support".to_string());
+        }
+    }
+
+    fn support_converter(&self, name: String) -> String {
+        if self.support_package.is_some() {
+            self.register_support_import();
+            format!("support.{name}")
+        } else {
+            name
+        }
     }
 
     pub(in crate::generator) fn message_proto_type(
@@ -227,7 +254,7 @@ impl ExternalModelBackend<PlannedValueType> for ModelBackend {
             })),
             PlannedValueType::Enum(enum_type) => Some(go_enum_conversion(enum_type, self)),
             PlannedValueType::Message(message_type) => {
-                Some(go_message_conversion(message_type, &self.package))
+                Some(go_message_conversion(message_type, self))
             }
             _ => None,
         }
@@ -371,12 +398,16 @@ fn go_enum_conversion(
 
 fn go_message_conversion(
     message: &PlannedMessageType,
-    package: &GoPackageContext,
+    backend: &ModelBackend,
 ) -> GoConversionResult<GoValueConversion> {
     if let Some(replacement) = &message.replacement {
-        if let Some(type_name) = go_replacement_type_name(replacement, package) {
-            let from = go_from_proto_converter(&message.info.full_name, replacement);
-            let to = go_to_proto_converter(&message.info.full_name, replacement);
+        if let Some(type_name) = go_replacement_type_name(replacement, &backend.package) {
+            let from = backend.support_converter(go_from_proto_converter(
+                &message.info.full_name,
+                replacement,
+            ));
+            let to = backend
+                .support_converter(go_to_proto_converter(&message.info.full_name, replacement));
             let native_is_nilable_value = crate::generator::go::go_type_is_nilable(&type_name);
             return Ok(GoValueConversion {
                 kind: GoConversionKind::OverrideConverter,
@@ -390,8 +421,8 @@ fn go_message_conversion(
     }
 
     if message.authored_type.is_some() {
-        let from = go_default_from_proto_name(&message.info.full_name);
-        let to = go_default_to_proto_name(&message.info.full_name);
+        let from = backend.support_converter(go_default_from_proto_name(&message.info.full_name));
+        let to = backend.support_converter(go_default_to_proto_name(&message.info.full_name));
         return Ok(GoValueConversion {
             kind: GoConversionKind::OverrideConverter,
             from_proto: Box::new(move |expr| format!("{from}(ctx, {expr})")),
@@ -427,21 +458,21 @@ fn go_message_conversion(
     ))
 }
 
-fn leaf_lower_camel(full_name: &str) -> String {
-    use heck::ToLowerCamelCase;
+fn leaf_upper_camel(full_name: &str) -> String {
+    use heck::ToUpperCamelCase;
     full_name
         .rsplit('.')
         .next()
         .unwrap_or(full_name)
-        .to_lower_camel_case()
+        .to_upper_camel_case()
 }
 
 fn go_default_from_proto_name(full_name: &str) -> String {
-    format!("{}FromProto", leaf_lower_camel(full_name))
+    format!("{}FromProto", leaf_upper_camel(full_name))
 }
 
 fn go_default_to_proto_name(full_name: &str) -> String {
-    format!("{}ToProto", leaf_lower_camel(full_name))
+    format!("{}ToProto", leaf_upper_camel(full_name))
 }
 
 fn go_from_proto_converter(
@@ -464,6 +495,47 @@ fn go_to_proto_converter(
         .for_language(Language::Go)
         .map(str::to_string)
         .unwrap_or_else(|| go_default_to_proto_name(full_name))
+}
+
+#[cfg(test)]
+mod converter_name_tests {
+    use super::{
+        go_default_from_proto_name, go_default_to_proto_name, go_from_proto_converter,
+        go_to_proto_converter,
+    };
+    use crate::language::Language;
+    use crate::spec::{LanguageStringSpec, TypeReplacementSpec};
+
+    #[test]
+    fn exports_derived_names_but_preserves_authored_go_names() {
+        assert_eq!(
+            go_default_from_proto_name("temporal.api.HTTPPayload"),
+            "HttpPayloadFromProto"
+        );
+        assert_eq!(
+            go_default_to_proto_name("temporal.api.HTTPPayload"),
+            "HttpPayloadToProto"
+        );
+        let replacement = TypeReplacementSpec {
+            type_name: LanguageStringSpec::default(),
+            from_proto: LanguageStringSpec {
+                by_language: [(Language::Go, "FromHTTPProto".to_string())].into(),
+                ..Default::default()
+            },
+            to_proto: LanguageStringSpec {
+                by_language: [(Language::Go, "ToHTTPProto".to_string())].into(),
+                ..Default::default()
+            },
+        };
+        assert_eq!(
+            go_from_proto_converter("temporal.api.HTTPPayload", &replacement),
+            "FromHTTPProto"
+        );
+        assert_eq!(
+            go_to_proto_converter("temporal.api.HTTPPayload", &replacement),
+            "ToHTTPProto"
+        );
+    }
 }
 
 /// Builds the [`GoValueConversion`] for a single planned value type,
@@ -1543,7 +1615,10 @@ fn build_sourced_conversions(
     planned_model
         .sourced_fields()
         .map(|(field_name, field, source_expr)| {
-            build_sourced_conversion(field_name, field, source_expr, api_plan, backend).map_err(
+            // The parser validates a helper invocation; Go owns qualification
+            // against the configured support package, not the authored WIT.
+            let source_expr = backend.support_converter(source_expr.to_string());
+            build_sourced_conversion(field_name, field, &source_expr, api_plan, backend).map_err(
                 |reason| Error::UnsupportedGoProtoConversion {
                     context: format!("sourced field `{}.{}`", planned_model.name, field_name),
                     reason,

@@ -10,10 +10,7 @@ import temporalio.api.compute.v1.provider_pb2
 import temporalio.api.compute.v1.scaler_pb2
 import temporalio.converter
 
-from ._support import (
-    payload_from_proto,
-    payload_to_proto,
-)
+import temporal_support as _support
 
 
 ContextT = typing.TypeVar("ContextT")
@@ -44,7 +41,9 @@ class _PayloadBackedContextTransferTypeConverter(
         (context_type,) = typing.get_args(type_hint) or (typing.Any,)
         if not value.HasField("details"):
             raise ValueError("missing required field PayloadBackedContext.details")
-        details = typing.cast(ContextT, payload_from_proto(value.details, context_type))
+        details = typing.cast(
+            ContextT, _support.payload_from_proto(value.details, context_type)
+        )
         return PayloadBackedContext(
             details=details,
         )
@@ -55,7 +54,7 @@ class _PayloadBackedContextTransferTypeConverter(
         value: PayloadBackedContext[ContextT],
     ) -> temporalio.api.compute.v1.scaler_pb2.ComputeScaler:
         message = temporalio.api.compute.v1.scaler_pb2.ComputeScaler()
-        message.details.CopyFrom(payload_to_proto(value.details))
+        message.details.CopyFrom(_support.payload_to_proto(value.details))
         return message
 
 
@@ -155,7 +154,9 @@ class _PayloadBackedOutputTransferTypeConverter(
         (output_type,) = typing.get_args(type_hint) or (typing.Any,)
         if not value.HasField("details"):
             raise ValueError("missing required field PayloadBackedOutput.details")
-        details = typing.cast(OutputT, payload_from_proto(value.details, output_type))
+        details = typing.cast(
+            OutputT, _support.payload_from_proto(value.details, output_type)
+        )
         return PayloadBackedOutput(
             details=details,
         )
@@ -166,7 +167,7 @@ class _PayloadBackedOutputTransferTypeConverter(
         value: PayloadBackedOutput[OutputT],
     ) -> temporalio.api.compute.v1.provider_pb2.ComputeProvider:
         message = temporalio.api.compute.v1.provider_pb2.ComputeProvider()
-        message.details.CopyFrom(payload_to_proto(value.details))
+        message.details.CopyFrom(_support.payload_to_proto(value.details))
         return message
 
 

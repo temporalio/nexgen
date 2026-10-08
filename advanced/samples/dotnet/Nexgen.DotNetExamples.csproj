@@ -15,8 +15,6 @@
   <ItemGroup>
     <!-- The generated interceptor partials require matching SDK changes. -->
     <Compile Remove="bin/**/*.cs;obj/**/*.cs;tests/**/*.cs;**/Support/*.cs;wit/multi-operation-service/**/*.cs;wit/workflow-service/SystemNexusWorkflowOutboundInterceptor.cs" />
-    <Compile Include="wit/workflow-service/Support/TemporalSupport.cs" />
-    <Compile Include="wit/workflow-service/Support/WorkflowServiceSupport.cs" />
   </ItemGroup>
 
   <ItemGroup>

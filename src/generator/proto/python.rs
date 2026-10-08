@@ -474,8 +474,14 @@ fn message_override_conversion(model_type: &PlannedType) -> Option<WireValueConv
         });
     }
     if let Some(authored_type) = &proto.authored_type {
-        let from_proto = python_default_from_proto_name(&proto.proto.full_name);
-        let to_proto = python_default_to_proto_name(&proto.proto.full_name);
+        let from_proto = format!(
+            "_support.{}",
+            python_default_from_proto_name(&proto.proto.full_name)
+        );
+        let to_proto = format!(
+            "_support.{}",
+            python_default_to_proto_name(&proto.proto.full_name)
+        );
         return Some(WireValueConversion {
             annotation: python_authored_type_annotation(authored_type),
             from_wire: format!("{from_proto}({{wire}})"),
@@ -683,11 +689,11 @@ fn generic_carrier_from_proto_expr(
 ) -> String {
     let converted = match carrier {
         ProtoGenericCarrier::Payload => format!(
-            "payload_from_proto({proto_expr}, {})",
+            "_support.payload_from_proto({proto_expr}, {})",
             concrete_type_hint(&resolved_type.annotation, type_arguments)
         ),
         ProtoGenericCarrier::Payloads => format!(
-            "payloads_from_proto({proto_expr}, [{}])[0]",
+            "_support.payloads_from_proto({proto_expr}, [{}])[0]",
             concrete_type_hint(&resolved_type.annotation, type_arguments)
         ),
     };
@@ -759,8 +765,8 @@ fn generic_carrier_to_proto_lines(
     }
     let indent = if optional_guard { "    " } else { "" };
     let converted = match carrier {
-        ProtoGenericCarrier::Payload => format!("payload_to_proto({value_expr})"),
-        ProtoGenericCarrier::Payloads => format!("payloads_to_proto([{value_expr}])"),
+        ProtoGenericCarrier::Payload => format!("_support.payload_to_proto({value_expr})"),
+        ProtoGenericCarrier::Payloads => format!("_support.payloads_to_proto([{value_expr}])"),
     };
     lines.push(format!(
         "{indent}message.{proto_name}.CopyFrom({converted})"
@@ -1050,19 +1056,21 @@ pub(crate) fn python_default_to_proto_name(name: &str) -> String {
 }
 
 pub(crate) fn python_from_proto_converter(name: &str, replacement: &TypeReplacementSpec) -> String {
-    replacement
+    let name = replacement
         .from_proto
         .for_language(Language::Python)
         .map(str::to_string)
-        .unwrap_or_else(|| python_default_from_proto_name(name))
+        .unwrap_or_else(|| python_default_from_proto_name(name));
+    format!("_support.{name}")
 }
 
 pub(crate) fn python_to_proto_converter(name: &str, replacement: &TypeReplacementSpec) -> String {
-    replacement
+    let name = replacement
         .to_proto
         .for_language(Language::Python)
         .map(str::to_string)
-        .unwrap_or_else(|| python_default_to_proto_name(name))
+        .unwrap_or_else(|| python_default_to_proto_name(name));
+    format!("_support.{name}")
 }
 
 pub(crate) fn python_replacement_type_name(replacement: &TypeReplacementSpec) -> Option<String> {
@@ -1388,7 +1396,7 @@ fn field_write_for_rendered_field(
             field_name,
             planned_field,
             value_expr,
-            converter,
+            &format!("_support.{converter}"),
             &rendered_field.wire_value_type,
             optional_guard,
         ),

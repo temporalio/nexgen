@@ -3,7 +3,7 @@
 import * as workflow from "@temporalio/workflow";
 import { startWorkflowService } from "../services";
 import type { CancelWorkflowResponse, CancelWorkflowRequest } from "../models";
-import { workflowNamespace } from "../support";
+import * as support from "../../../support/temporal_model_converters";
 
 type CancelWorkflowInput = CancelWorkflowRequest extends infer Input
   ? Input extends unknown
@@ -19,7 +19,7 @@ export async function cancelWorkflow(
 ): Promise<workflow.NexusOperationHandle<CancelWorkflowResponse>> {
   const request = {
     ...requestInput,
-    namespace: workflowNamespace(),
+    namespace: support.workflowNamespace(),
   } as CancelWorkflowRequest;
   const client = workflow.createNexusServiceClient({
     service: startWorkflowService,
