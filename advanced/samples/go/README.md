@@ -31,10 +31,11 @@ cargo run --features advanced -- go advanced/samples/inputs/type-roundtrip.wit \
 The sample support source imports
 `go.temporal.io/sdk/internal` because it lives under the SDK module tree; a
 project in another module cannot copy that import unchanged. Adapt those
-conversions using APIs available to your module. A sourced Go expression
-using the package must name it explicitly, such as
-`go="support.Namespace(ctx)" go-support-import=true`; expressions using the
-Temporal `workflow` package instead need no support import. From this sample
-module, run `go test ./...` after generation; do the same from your module
-root. See [the WIT guide](../../../GUIDE.md#go) for more detail. JSON Schema
-generation does not need user support.
+conversions using APIs available to your module. For `@nexus.source`, write
+the helper call without the package prefix. The sample uses
+`go="WorkflowNamespace(ctx)"`; generated code calls
+`support.WorkflowNamespace(ctx)`. The support helper calls
+`workflow.GetInfo(ctx).Namespace`. Run `go test ./...` from this sample module
+after generation. Run the same command from your own module root. See
+[the WIT guide](../../../GUIDE.md#go) for more detail. JSON Schema generation
+does not need user support.

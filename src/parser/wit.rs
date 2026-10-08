@@ -1273,12 +1273,7 @@ fn build_fields_from_record(
                 default_value: field_default,
                 required,
                 visibility: source
-                    .map(
-                        |(source_expr, support_import)| RecordFieldVisibility::Sourced {
-                            source_expr,
-                            support_import,
-                        },
-                    )
+                    .map(|source_expr| RecordFieldVisibility::Sourced { source_expr })
                     .unwrap_or_else(|| {
                         if api_omit_directive.is_some() {
                             RecordFieldVisibility::ApiOmitted
@@ -1795,45 +1790,26 @@ fn build_source_call(
     path: &Path,
     context: &str,
     language: Language,
-) -> Result<Option<(String, bool)>> {
+) -> Result<Option<String>> {
     let Some(directive) = directive(directives, "source", path, context)? else {
         return Ok(None);
     };
 
-    // Validate every authored marker, including those for non-selected languages.
-    // A language-specific expression takes precedence over a generic expression.
-    let mut selected_support_import = None;
-    for (key, marker_language) in [
-        ("go-support-import", Language::Go),
-        ("python-support-import", Language::Python),
-        ("typescript-support-import", Language::TypeScript),
-        ("dotnet-support-import", Language::Dotnet),
+    for key in [
+        "go-support-import",
+        "python-support-import",
+        "typescript-support-import",
+        "dotnet-support-import",
     ] {
-        let Some(value) = directive.value(key) else {
-            continue;
-        };
-        let support_import = parse_bool(value).map_err(|reason| Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.to_string(),
-            directive: "@nexus.source".to_string(),
-            reason: format!("`{key}` {reason}"),
-        })?;
-        if directive_language_value(directive, marker_language)
-            .or_else(|| directive.value("value"))
-            .is_none()
-        {
+        if directive.value(key).is_some() {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(),
                 context: context.to_string(),
                 directive: "@nexus.source".to_string(),
                 reason: format!(
-                    "`{key}` requires a `{}` or default source expression",
-                    language_key(marker_language)
+                    "`{key}` is no longer supported; remove it and call a helper from `--support-package` in the source expression"
                 ),
             });
-        }
-        if language == marker_language {
-            selected_support_import = Some(support_import);
         }
     }
 
@@ -1843,11 +1819,78 @@ fn build_source_call(
         return Ok(None);
     };
 
-    let support_import = selected_support_import.unwrap_or(matches!(
-        language,
-        Language::Python | Language::TypeScript | Language::Dotnet
-    ));
-    Ok(Some((source_expr.to_string(), support_import)))
+    let source_expr = source_expr.trim();
+    if !is_support_helper_invocation(source_expr) {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.source".to_string(),
+            reason: format!(
+                "`{source_expr}` must be a helper call relative to `--support-package`, such as `WorkflowNamespace(ctx)`"
+            ),
+        });
+    }
+    let helper = source_expr
+        .split_once('(')
+        .expect("validated helper call")
+        .0
+        .trim();
+    let alias = match language {
+        Language::Python => Some("_support"),
+        Language::Go | Language::TypeScript => Some("support"),
+        _ => None,
+    };
+    if alias.is_some_and(|alias| helper.starts_with(&format!("{alias}."))) {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.source".to_string(),
+            reason: format!(
+                "`{source_expr}` already has the generated support prefix; remove that prefix from the helper call"
+            ),
+        });
+    }
+
+    Ok(Some(source_expr.to_string()))
+}
+
+fn is_support_helper_invocation(source_expr: &str) -> bool {
+    let Some((helper, args)) = source_expr.split_once('(') else {
+        return false;
+    };
+    if !is_valid_support_helper_path(helper.trim()) {
+        return false;
+    }
+
+    // The arguments belong to the target language. Check only the boundary
+    // of the call; leave nested expressions untouched for that language.
+    let mut depth = 1;
+    let mut quote = None;
+    let mut escaped = false;
+    for (index, character) in args.char_indices() {
+        if let Some(delimiter) = quote {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == delimiter {
+                quote = None;
+            }
+            continue;
+        }
+        match character {
+            '\'' | '"' | '`' => quote = Some(character),
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 && index + character.len_utf8() != args.len() {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    depth == 0 && quote.is_none()
 }
 
 fn is_valid_support_helper_name(name: &str) -> bool {
@@ -3933,7 +3976,7 @@ interface workflow-service {
   record request {
     /// @nexus.proto-field "workflow_id_reuse_policy"
     /// @nexus.default "allow-duplicate"
-    /// @nexus.source go="workflowIDReusePolicy(ctx)"
+    /// @nexus.source go="WorkflowIDReusePolicy(ctx)"
     id-reuse-policy: workflow-id-reuse-policy,
   }
 }
@@ -3953,8 +3996,8 @@ interface workflow-service {
             .1;
         assert!(matches!(
             go_record.fields["workflow_id_reuse_policy"].visibility,
-            crate::spec::RecordFieldVisibility::Sourced { ref source_expr, support_import: false }
-                if source_expr == "workflowIDReusePolicy(ctx)"
+            crate::spec::RecordFieldVisibility::Sourced { ref source_expr }
+                if source_expr == "WorkflowIDReusePolicy(ctx)"
         ));
 
         let python = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
@@ -3981,52 +4024,28 @@ interface workflow-service {
     }
 
     #[test]
-    fn selects_sourced_field_support_import_defaults_and_overrides() {
+    fn selects_sourced_field_expression_without_rewriting_it() {
         use crate::spec::RecordFieldVisibility;
 
         let wit = r#"
 package temporal:nexus@1.0.0;
 
-world system {
-  export workflow-service;
-}
-
+world system { export workflow-service; }
 interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
-    /// @nexus.source go="  goExpr(ctx)  " python="_support.expr()" typescript="support.expr()" dotnet="Support.Expr()" java="expr()"
-    defaults: option<string>,
-    /// @nexus.source go="goExpr()" go-support-import=true python="plain_expr()" python-support-import=false typescript="plainExpr()" typescript-support-import=false dotnet="Plain.Expr()" dotnet-support-import=false
-    overrides: option<string>,
-    /// @nexus.source "genericExpr()" python-support-import=false
-    generic: option<string>,
+    /// @nexus.source go="Namespace(ctx)" python="namespace()" typescript="namespace()" dotnet="Support.Namespace()" java="expr()"
+    namespace: option<string>,
   }
 }
 "#;
 
-        for (language, default_expr, default_import, override_expr, override_import) in [
-            (Language::Go, "  goExpr(ctx)  ", false, "goExpr()", true),
-            (
-                Language::Python,
-                "_support.expr()",
-                true,
-                "plain_expr()",
-                false,
-            ),
-            (
-                Language::TypeScript,
-                "support.expr()",
-                true,
-                "plainExpr()",
-                false,
-            ),
-            (
-                Language::Dotnet,
-                "Support.Expr()",
-                true,
-                "Plain.Expr()",
-                false,
-            ),
+        for (language, expression) in [
+            (Language::Go, "Namespace(ctx)"),
+            (Language::Python, "namespace()"),
+            (Language::TypeScript, "namespace()"),
+            (Language::Dotnet, "Support.Namespace()"),
+            (Language::Java, "expr()"),
         ] {
             let spec = parse(language, wit);
             let record = spec
@@ -4034,57 +4053,23 @@ interface workflow-service {
                 .find(|(_, record)| record.name == "Request")
                 .unwrap()
                 .1;
-            for (field_name, expected_expr, expected_import) in [
-                ("defaults", default_expr, default_import),
-                ("overrides", override_expr, override_import),
-            ] {
-                assert!(
-                    matches!(
-                        &record.fields[field_name].visibility,
-                        RecordFieldVisibility::Sourced { source_expr, support_import }
-                            if source_expr == expected_expr && *support_import == expected_import
-                    ),
-                    "{language:?}: {field_name}"
-                );
-                assert_eq!(record.field_source(field_name), Some(expected_expr));
-            }
             assert!(matches!(
-                &record.fields["generic"].visibility,
-                RecordFieldVisibility::Sourced { source_expr, support_import }
-                    if source_expr == "genericExpr()"
-                        && *support_import == matches!(language, Language::TypeScript | Language::Dotnet)
+                &record.fields["namespace"].visibility,
+                RecordFieldVisibility::Sourced { source_expr } if source_expr == expression
             ));
-            assert_eq!(record.sourced_fields().count(), 3);
+            assert_eq!(record.field_source("namespace"), Some(expression));
         }
-
-        let java = parse(Language::Java, wit);
-        let record = java
-            .records()
-            .find(|(_, record)| record.name == "Request")
-            .unwrap()
-            .1;
-        assert!(matches!(
-            &record.fields["defaults"].visibility,
-            RecordFieldVisibility::Sourced { source_expr, support_import: false }
-                if source_expr == "expr()"
-        ));
-        assert_eq!(record.field_source("overrides"), None);
-        assert!(matches!(
-            &record.fields["generic"].visibility,
-            RecordFieldVisibility::Sourced { source_expr, support_import: false }
-                if source_expr == "genericExpr()"
-        ));
     }
 
     #[test]
-    fn rejects_invalid_source_support_import_even_for_unselected_language() {
+    fn rejects_removed_source_support_import_even_for_unselected_language() {
         let wit = r#"
 package temporal:nexus@1.0.0;
 world system { export workflow-service; }
 interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
-    /// @nexus.source python="expr()" python-support-import=yes
+    /// @nexus.source go="Namespace(ctx)" python-support-import=true
     namespace: option<string>,
   }
 }
@@ -4098,19 +4083,39 @@ interface workflow-service {
         assert!(
             error
                 .to_string()
-                .contains("`python-support-import` expected `true` or `false`")
+                .contains("`python-support-import` is no longer supported")
         );
     }
 
     #[test]
-    fn rejects_source_support_import_without_matching_expression() {
+    fn validates_sourced_helper_invocations_without_parsing_their_arguments() {
+        use super::is_support_helper_invocation;
+
+        assert!(is_support_helper_invocation("WorkflowNamespace(ctx)"));
+        assert!(is_support_helper_invocation(
+            "Helpers.Namespace(ctx, getID(request.id, \")\"))"
+        ));
+        for invalid in [
+            "WorkflowNamespace",
+            "workflow.GetInfo(ctx).Namespace",
+            "WorkflowNamespace(ctx) + Other()",
+            "WorkflowNamespace(ctx",
+            "WorkflowNamespace(ctx))",
+            "Namespace .(ctx)",
+        ] {
+            assert!(!is_support_helper_invocation(invalid), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn rejects_non_helper_source_expression_with_a_remedy() {
         let wit = r#"
 package temporal:nexus@1.0.0;
 world system { export workflow-service; }
 interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
-    /// @nexus.source go="expr()" python-support-import=false
+    /// @nexus.source go="workflow.GetInfo(ctx).Namespace"
     namespace: option<string>,
   }
 }
@@ -4122,10 +4127,33 @@ interface workflow-service {
         )
         .unwrap_err();
         assert!(
-            error.to_string().contains(
-                "`python-support-import` requires a `python` or default source expression"
-            )
+            error
+                .to_string()
+                .contains("relative to `--support-package`")
         );
+        assert!(error.to_string().contains("WorkflowNamespace(ctx)"));
+    }
+
+    #[test]
+    fn rejects_authored_support_prefix_on_sourced_helper() {
+        let wit = r#"
+package temporal:nexus@1.0.0;
+world system { export workflow-service; }
+interface workflow-service {
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record request {
+    /// @nexus.source python="_support.workflow_namespace()"
+    namespace: option<string>,
+  }
+}
+"#;
+        let error = crate::parser::parse_api_spec_from_wit_for_language(
+            Language::Python,
+            wit,
+            PathBuf::from("inline.wit"),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("remove that prefix"));
     }
 
     #[test]
@@ -4152,7 +4180,7 @@ interface workflow-service {
     signal: signal-function,
     /// @nexus.name go="WorkflowExecutionTimeout"
     workflow-execution-timeout: placeholder,
-    /// @nexus.source "workflow_namespace"
+    /// @nexus.source "workflow_namespace()"
     namespace: option<string>,
     /// @nexus.omit
     header: placeholder,
@@ -4283,7 +4311,10 @@ interface workflow-service {
                 .to_type_string(),
             "string"
         );
-        assert_eq!(model.field_source("namespace"), Some("workflow_namespace"));
+        assert_eq!(
+            model.field_source("namespace"),
+            Some("workflow_namespace()")
+        );
 
         let dotnet_model = dotnet
             .record_for_proto(
@@ -4368,7 +4399,7 @@ world system {
 interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
-    /// @nexus.source python="workflow_namespace" typescript="workflowNamespace" dotnet="TemporalWorkflowContext.WorkflowNamespace"
+    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
     namespace: option<string>,
   }
 
@@ -4401,7 +4432,7 @@ interface workflow-service {
                 )
                 .unwrap()
                 .field_source("namespace"),
-            Some("workflow_namespace")
+            Some("workflow_namespace()")
         );
         assert_eq!(
             typescript
@@ -4410,7 +4441,7 @@ interface workflow-service {
                 )
                 .unwrap()
                 .field_source("namespace"),
-            Some("workflowNamespace")
+            Some("workflowNamespace()")
         );
         assert_eq!(
             dotnet
@@ -4419,7 +4450,7 @@ interface workflow-service {
                 )
                 .unwrap()
                 .field_source("namespace"),
-            Some("TemporalWorkflowContext.WorkflowNamespace")
+            Some("TemporalWorkflowContext.WorkflowNamespace()")
         );
     }
 
@@ -5188,7 +5219,7 @@ interface workflow-service {
     task-queue: task-queue,
     /// @nexus.proto-field "signal_name"
     signal: signal-function,
-    /// @nexus.source "workflow_namespace"
+    /// @nexus.source "workflow_namespace()"
     namespace: option<string>,
     /// @nexus.omit
     workflow-execution-timeout: placeholder,

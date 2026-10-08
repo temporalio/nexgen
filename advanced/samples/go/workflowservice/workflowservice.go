@@ -162,7 +162,7 @@ func (m signalWithStartWorkflowRequest) toProto(ctx workflow.Context) (*workflow
 		}
 		message.Header = converted
 	}
-	message.Namespace = workflow.GetInfo(ctx).Namespace
+	message.Namespace = support.WorkflowNamespace(ctx)
 	return message, nil
 }
 

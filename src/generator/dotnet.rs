@@ -2535,6 +2535,18 @@ pub(in crate::generator) fn qualify_dotnet_support_reference(
     }
 }
 
+// `@nexus.source` supplies an invocation, not a bare reference. Qualify only
+// its helper path so authored arguments (including nested calls) stay intact.
+fn dotnet_source_expr(source_expr: &str, support_namespace: Option<&str>) -> String {
+    let Some((helper, arguments)) = source_expr.split_once('(') else {
+        return source_expr.to_string();
+    };
+    format!(
+        "{}({arguments}",
+        qualify_dotnet_support_reference(helper, support_namespace)
+    )
+}
+
 fn generated_file_prelude(namespace: &str, imports: &[&str]) -> String {
     let mut output = String::new();
     output.push_str(GENERATED_HEADER);
@@ -3010,7 +3022,7 @@ fn render_flattened_method_body(
     constructor_args.extend(
         model
             .sourced_fields()
-            .map(|(_, _, source_expr)| source_expr.to_string()),
+            .map(|(_, _, source_expr)| dotnet_source_expr(source_expr, support_namespace)),
     );
     output.push('(');
     output.push_str(&constructor_args.join(", "));
@@ -3444,7 +3456,8 @@ fn resource_method_flattened_operation_call_args(
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
 ) -> Option<Vec<String>> {
-    let source_exprs = resource_method_request_field_exprs(request_plan, model, api_plan)?;
+    let source_exprs =
+        resource_method_request_field_exprs(request_plan, model, api_plan, support_namespace)?;
     let overload = flattened_overloads(model)
         .into_iter()
         .find(|overload| !overload.has_expression_functions())?;
@@ -3496,7 +3509,7 @@ enum ResourceMethodRequestInitKind {
 fn resource_method_request_model_init_expr(
     request_plan: &RequestPlan,
     api_plan: &PlannedSpec,
-    _support_namespace: Option<&str>,
+    support_namespace: Option<&str>,
     type_name_override: Option<&str>,
     init_kind: ResourceMethodRequestInitKind,
 ) -> Option<String> {
@@ -3521,13 +3534,13 @@ fn resource_method_request_model_init_expr(
         }
         field_exprs.push((
             model_field,
-            resource_method_request_value_expr(&field.value, api_plan)?,
+            resource_method_request_value_expr(&field.value, api_plan, support_namespace)?,
         ));
     }
     let sourced_field_exprs = type_name_override.is_none().then(|| {
         model
             .sourced_fields()
-            .map(|(_, _, source_expr)| source_expr.to_string())
+            .map(|(_, _, source_expr)| dotnet_source_expr(source_expr, support_namespace))
             .collect()
     });
     Some(model_init_expr(
@@ -3557,6 +3570,7 @@ fn resource_method_request_field_exprs(
     request_plan: &RequestPlan,
     model: &PlannedModel,
     api_plan: &PlannedSpec,
+    support_namespace: Option<&str>,
 ) -> Option<BTreeMap<String, String>> {
     let RequestPlan::Construct { fields, .. } = request_plan else {
         return None;
@@ -3567,7 +3581,7 @@ fn resource_method_request_field_exprs(
             model.public_fields().find(|(field_name, candidate)| {
                 candidate.name == field.field_name || *field_name == field.field_name
             })?;
-        let expr = resource_method_request_value_expr(&field.value, api_plan)?;
+        let expr = resource_method_request_value_expr(&field.value, api_plan, support_namespace)?;
         source_exprs.insert(model_field.name.clone(), expr.clone());
         source_exprs.insert(model_field_name.to_string(), expr);
     }
@@ -3588,6 +3602,7 @@ fn resource_method_request_source_expr(
 fn resource_method_request_value_expr(
     request_plan: &RequestPlan,
     api_plan: &PlannedSpec,
+    support_namespace: Option<&str>,
 ) -> Option<String> {
     match request_plan {
         RequestPlan::Source(RequestPlanSource::ResourceField(name)) => Some(csharp_type_name(name)),
@@ -3597,7 +3612,7 @@ fn resource_method_request_value_expr(
         RequestPlan::Construct { .. } => resource_method_request_model_init_expr(
             request_plan,
             api_plan,
-            None,
+            support_namespace,
             None,
             ResourceMethodRequestInitKind::AllFields,
         ),
@@ -4129,7 +4144,33 @@ const CSHARP_KEYWORDS: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::csharp_type_parameter_name;
+    use super::{csharp_type_parameter_name, dotnet_source_expr};
+
+    #[test]
+    fn sourced_helper_is_qualified_without_changing_its_arguments() {
+        assert_eq!(
+            dotnet_source_expr(
+                "TemporalWorkflowContext.WorkflowNamespace()",
+                Some("Nexgen.Support")
+            ),
+            "Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()"
+        );
+        assert_eq!(
+            dotnet_source_expr(
+                "Helpers.Lookup(\"a,b\", Other.Call(1, 2))",
+                Some("Nexgen.Support")
+            ),
+            "Nexgen.Support.Helpers.Lookup(\"a,b\", Other.Call(1, 2))"
+        );
+        assert_eq!(
+            dotnet_source_expr("Nexgen.Support.Helpers.Lookup(42)", Some("Nexgen.Support")),
+            "Nexgen.Support.Helpers.Lookup(42)"
+        );
+        assert_eq!(
+            dotnet_source_expr("Helpers.Lookup(42)", None),
+            "Helpers.Lookup(42)"
+        );
+    }
 
     #[test]
     fn type_parameter_names_put_the_t_first() {

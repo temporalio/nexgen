@@ -918,7 +918,7 @@ fn cli_uses_typescript_support_package_without_copying_sources() {
 }
 
 #[test]
-fn typescript_sourced_expression_import_intent_handles_template_interpolation() {
+fn typescript_sourced_helper_import_is_automatic() {
     let root = project_root();
     let temp_dir = unique_output_path("typescript-sourced-support-only");
     fs::create_dir_all(&temp_dir).unwrap();
@@ -933,7 +933,7 @@ interface models {
 
   /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest" typescript-import="@temporalio/proto"
   record cancel-request {
-    /// @nexus.source typescript="`${support.workflowNamespace()}`"
+    /// @nexus.source typescript="workflowNamespace()"
     namespace: string,
     /// @nexus.omit
     workflow-execution: placeholder,
@@ -951,17 +951,9 @@ interface models {
 }
 "#;
     fs::write(&wit_path, wit).unwrap();
-    let rendered = generate_typescript_to_string(&[wit_path.clone()], &[descriptor_path(&root)]);
-    assert!(rendered.contains("import * as support from './support';"));
-    assert!(rendered.contains("`${support.workflowNamespace()}`"));
-
-    let without_support = wit.replace(
-        "typescript=\"`${support.workflowNamespace()}`\"",
-        "typescript=\"''\" typescript-support-import=false",
-    );
-    fs::write(&wit_path, without_support).unwrap();
     let rendered = generate_typescript_to_string(&[wit_path], &[descriptor_path(&root)]);
-    assert!(!rendered.contains("import * as support from './support';"));
+    assert!(rendered.contains("import * as support from './support';"));
+    assert!(rendered.contains("support.workflowNamespace()"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 

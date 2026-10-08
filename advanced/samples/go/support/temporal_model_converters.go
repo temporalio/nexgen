@@ -18,6 +18,11 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
+// WorkflowNamespace returns the namespace of the current workflow.
+func WorkflowNamespace(ctx workflow.Context) string {
+	return workflow.GetInfo(ctx).Namespace
+}
+
 // --- Duration (google.protobuf.Duration) ---
 
 func DurationToProto(_ workflow.Context, d *time.Duration) (*durationpb.Duration, error) {

@@ -109,6 +109,17 @@ calls in generated code for the exact exports and signatures your support
 package needs. Keep authored support code outside directories that you replace
 when regenerating output.
 
+Each `@nexus.source` value is a call to a helper in the support package.
+Write the helper path and its arguments, without the package prefix. Nexgen
+imports support and adds the prefix to the helper call. It does not add or
+change the arguments. For example, write `workflow_namespace()` in Python,
+`workflowNamespace()` in TypeScript, `WorkflowNamespace(ctx)` in Go, or
+`TemporalWorkflowContext.WorkflowNamespace()` in .NET. Generated code calls
+`_support.workflow_namespace()`, `support.workflowNamespace()`,
+`support.WorkflowNamespace(ctx)`, or
+`Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()` for those
+examples. `@nexus.output-transform` remains a separate authored expression.
+
 ### Go
 
 Create a **separate Go package in a separate directory** from the generated
@@ -140,12 +151,10 @@ under the SDK module tree can import it. If your module is elsewhere, use
 dependencies that your module can access. Do not copy the sample file without
 changing that import.
 
-Go `@nexus.source` expressions remain raw. `go="workflow.GetInfo(ctx).Namespace"`
-uses the SDK and needs no support import. If an expression itself calls
-`support.Namespace(ctx)`, write `go-support-import=true` on its
-`@nexus.source` directive; Go defaults that import intent to `false`, and
-unused Go imports are compilation errors. Verify with `go test ./...` from the
-module root.
+For `@nexus.source`, the sample writes `WorkflowNamespace(ctx)`. Generated
+code calls `support.WorkflowNamespace(ctx)`. The support package implements it with
+`workflow.GetInfo(ctx).Namespace`. The generated Go package imports support
+for the sourced field. Verify with `go test ./...` from the module root.
 
 ### Python
 
@@ -176,12 +185,10 @@ Default converter names use proto-message snake case, such as
 also be exported. Keep support independent of generated models to avoid
 circular imports.
 
-Python `@nexus.source` expressions can explicitly call
-`_support.workflow_namespace()`. They default to requesting the `_support`
-import even when the expression uses computed access rather than `_support.`
-syntax. Use `python-support-import=false` when a raw expression does not need
-that import. Check the generated project with `ruff check` and a Python type
-checker as well as your tests.
+For `@nexus.source`, the sample writes `workflow_namespace()`. Generated
+code calls `_support.workflow_namespace()`.
+Check the generated project with `ruff check`, a Python type checker, and
+your tests.
 
 ### TypeScript
 
@@ -206,11 +213,9 @@ Export the exact WIT-named or derived converter functions, for example
 conversions can also call `valueToPayload`, `payloadToValue`,
 `payloadsFromProto`, `payloadsToProto`, and `functionInputTypes`. See
 [`support/temporal_model_converters.ts`](advanced/samples/typescript/support/temporal_model_converters.ts)
-for their contracts. A TypeScript expression in `@nexus.source` can call
-`support.workflowNamespace()`. Nexgen does not add the prefix or the call.
-By default, `@nexus.source` requests the `support` import for TypeScript. Set
-`typescript-support-import=false` when the expression does not need that
-import. Include both the support module and generated output in your project.
+for their contracts. For `@nexus.source`, write `workflowNamespace()`.
+Generated code calls `support.workflowNamespace()`.
+Include both the support module and generated output in your project.
 Run the project's TypeScript type checker (the sample uses `npm run typecheck`).
 
 ### .NET
@@ -239,11 +244,10 @@ Generated calls qualify helper names with `Nexgen.Support`; where extension
 methods such as `ToProto()` need it, generated modules also use the support
 namespace. Provide `ProtoExtensions.FromPayload`, `FromPayloads`, `ToPayload`,
 and `ToPayloads` for the generic payload carriers, along with any converters
-and serialization-context helpers named in your WIT. A sourced expression
-such as `TemporalWorkflowContext.WorkflowNamespace()` stays authored code; its
-support-namespace import is requested by default, with
-`dotnet-support-import=false` for expressions that do not need it. Verify that
-the project compiles with `dotnet build`.
+and serialization-context helpers named in your WIT. For `@nexus.source`,
+write `TemporalWorkflowContext.WorkflowNamespace()`. Generated code adds the
+support namespace to the call. Verify that the project compiles with
+`dotnet build`.
 
 ---
 
@@ -893,37 +897,32 @@ proto-backed models.
 
 ### Sourced Fields
 
-Fields annotated with `@nexus.source` are not exposed in the user-facing API.
-Instead, transfer-type conversion evaluates the language-specific expression
-verbatim to obtain the value. Expressions can refer to helpers from the
-project's support package supplied with `--support-package`.
+Fields annotated with `@nexus.source` are not exposed in operation convenience
+APIs. Each value is a helper call relative to the project's support package,
+supplied with `--support-package`. Include the call and its arguments in WIT.
+Nexgen adds the package prefix and imports support for the generated field.
 
 ```wit
 record start-workflow-request {
   workflow-id: string,
-  /// @nexus.source python="_support.workflow_namespace()" typescript="support.workflowNamespace()"
+  /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
   namespace: string,
 }
 ```
 
-The `namespace` field does not appear as a constructor parameter. During
-transfer-type conversion:
+The convenience API does not require a `namespace` argument. For example,
+the generated Python model uses the helper as a default factory. Conversion
+then reads the model field:
 
 ```python
-message.namespace = _support.workflow_namespace()   # auto-injected
+namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
+# In to_transfer_type:
+message.namespace = value.namespace
 ```
 
-The expression is authored code, not a function name that the generator calls
-automatically. Include the call (and any arguments) in the expression itself.
-If it refers to a support helper, qualify it with the generated import alias
-(`_support` in Python, `support` in TypeScript or Go); the generator does not
-rewrite sourced expressions. The import is a separate choice: Python,
-TypeScript, and .NET sourced expressions request the configured support package
-by default, while Go sourced expressions do not. Use
-`go-support-import=true` when a Go expression refers to `support`; use
-`python-support-import=false` or `typescript-support-import=false` when an
-expression only refers to other modules. These markers control imports, never
-the expression text.
+Nexgen prefixes the helper call, but it does not add arguments. The
+configured package supplies the helper. The `@nexus.output-transform`
+directive is different: its value remains a raw expression.
 
 ### Omitted Fields
 
@@ -994,7 +993,10 @@ is never nil.
 An operation annotated with `@nexus.output-transform` transforms the raw
 operation result into a different type before returning it. Its language
 expressions are emitted verbatim, not interpreted as names of support
-functions to call.
+functions to call. Unlike `@nexus.source`, this directive can call an SDK
+function directly. Moving that call into a Go support package could require
+the support package to import generated request or result types. That import
+would create a package cycle.
 
 ```wit
 /// @nexus.output-transform
@@ -1607,27 +1609,22 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 ### @nexus.source
 
 **Placement:** Record field (within a `@nexus.proto` record)
-**Syntax:** `@nexus.source python="<expr>" typescript="<expr>" go="<expr>"`
-Optional: `<lang>-support-import=true|false`
+**Syntax:** `@nexus.source python="<helper-call>" typescript="<helper-call>" go="<helper-call>" dotnet="<helper-call>"`
 
-Populates a field by evaluating the supplied language expression instead of
-exposing it as an API parameter. The expression is emitted as written; if it
-calls a helper, that helper must be available from the package specified by
-`--support-package`. For each authored language expression, the optional
-`<lang>-support-import` marker determines whether the generated module imports
-that package. It defaults to `true` for Python, TypeScript and .NET, and
-`false` for Go. For example, `go-support-import=true` accompanies
-`go="support.Namespace(ctx)"`; `python-support-import=false` avoids an unused
-import when a Python expression uses only other modules. The expression itself
-is never prefixed or rewritten.
+Provides a field value through a helper in the package specified by
+`--support-package`. The field is not an argument in operation convenience
+APIs. Write a helper call with its arguments, but without the package prefix.
+Nexgen adds the prefix and imports support when it generates the sourced field.
+Other expressions, including property access after a call, are not valid here.
 
 ```wit
-/// @nexus.source python="_support.workflow_namespace()" typescript="support.workflowNamespace()"
+/// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
 namespace: string,
 ```
 
-During transfer-type conversion, this becomes
-`message.namespace = _support.workflow_namespace()`.
+The sample's Python model uses `_support.workflow_namespace` as its default
+factory. Go calls `support.WorkflowNamespace(ctx)`. Both helpers come from the
+configured support package.
 
 Cannot be combined with `@nexus.default`.
 

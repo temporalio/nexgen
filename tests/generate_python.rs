@@ -1599,7 +1599,7 @@ fn python_proto_generics_propagate_payload_type_hints() {
 }
 
 #[test]
-fn python_sourced_expression_import_intent_does_not_depend_on_dotted_access() {
+fn python_sourced_helper_import_is_automatic() {
     let root = project_root();
     let temp_dir = unique_output_path("python-sourced-support-only");
     fs::create_dir_all(&temp_dir).unwrap();
@@ -1614,7 +1614,7 @@ interface models {
 
   /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest"
   record cancel-request {
-    /// @nexus.source python="getattr(_support, 'workflow_namespace')()"
+    /// @nexus.source python="workflow_namespace()"
     namespace: string,
     /// @nexus.omit
     workflow-execution: placeholder,
@@ -1632,19 +1632,10 @@ interface models {
 }
 "#;
     fs::write(&wit_path, wit).unwrap();
-    let files = generate_python_package_files(&[wit_path.clone()], &[descriptor_path(&root)]);
-    let models = &files[&PathBuf::from("models.py")];
-    assert!(models.contains("import temporal_support as _support"));
-    assert!(models.contains("namespace: str = getattr(_support, 'workflow_namespace')()"));
-
-    let without_support = wit.replace(
-        "python=\"getattr(_support, 'workflow_namespace')()\"",
-        "python=\"str\" python-support-import=false",
-    );
-    fs::write(&wit_path, without_support).unwrap();
     let files = generate_python_package_files(&[wit_path], &[descriptor_path(&root)]);
     let models = &files[&PathBuf::from("models.py")];
-    assert!(!models.contains("import temporal_support as _support"));
+    assert!(models.contains("import temporal_support as _support"));
+    assert!(models.contains("default_factory=_support.workflow_namespace"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 

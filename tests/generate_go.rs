@@ -573,7 +573,7 @@ interface namespace-service {
   /// @nexus.proto "temporal.api.namespace.v1.NamespaceInfo"
   record namespace-info {
     name: option<string>,
-    /// @nexus.source go="NamespaceData()"
+    /// @nexus.source go="NamespaceData(ctx)"
     data: option<map<string, string>>,
     /// @nexus.omit
     state: placeholder,
@@ -606,20 +606,15 @@ interface namespace-service {
 
     // The sourced map is bound to a field-unique local, evaluated once, and
     // copied into a properly typed proto map.
-    assert!(rendered.contains("sourcedData := NamespaceData()"));
+    assert!(rendered.contains("sourcedData := support.NamespaceData(ctx)"));
     assert!(rendered.contains("if len(sourcedData) > 0 {"));
     assert!(rendered.contains("message.Data = make(map[string]string, len(sourcedData))"));
     assert!(rendered.contains("for k, v := range sourcedData {"));
     assert!(rendered.contains("message.Data[k] = v"));
-    assert!(!rendered.contains("support \"example.com/nexgen/support\""));
+    assert!(rendered.contains("support \"example.com/nexgen/support\""));
 
-    // With no converter to register the package, an explicit sourced import
-    // must still yield buildable Go. The expression itself remains unchanged.
-    let wit = fs::read_to_string(&wit_path).unwrap().replace(
-        "go=\"NamespaceData()\"",
-        "go=\"support.NamespaceData(ctx)\" go-support-import=true",
-    );
-    fs::write(&wit_path, wit).unwrap();
+    // With no other converter to register the package, a sourced field alone
+    // must import the support package and qualify its helper invocation.
     let module_root = temp_dir.join("module");
     fs::create_dir_all(module_root.join("support")).unwrap();
     for file in ["go.mod", "go.sum"] {
@@ -1558,7 +1553,7 @@ interface workflow-service {
 
   /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest"
   record cancel-request {
-    /// @nexus.source go="workflow.GetInfo(ctx).Namespace"
+    /// @nexus.source go="WorkflowNamespace(ctx)"
     namespace: string,
     /// @nexus.omit
     workflow-execution: placeholder,
@@ -1589,8 +1584,9 @@ interface workflow-service {
         &[descriptor_path(&root)],
     )
     .unwrap();
-    assert!(rendered.contains("workflow.GetInfo(ctx).Namespace"));
-    assert!(!rendered.contains("support.GetInfo(ctx).Namespace"));
+    assert!(rendered.contains("support.WorkflowNamespace(ctx)"));
+    assert!(!rendered.contains("support.support.WorkflowNamespace(ctx)"));
+    assert!(!rendered.contains("workflow.GetInfo(ctx).Namespace"));
 
     assert!(
         rendered

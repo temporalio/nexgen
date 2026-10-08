@@ -1615,16 +1615,10 @@ fn build_sourced_conversions(
     planned_model
         .sourced_fields()
         .map(|(field_name, field, source_expr)| {
-            if matches!(
-                field.visibility,
-                RecordFieldVisibility::Sourced {
-                    support_import: true,
-                    ..
-                }
-            ) {
-                backend.register_support_import();
-            }
-            build_sourced_conversion(field_name, field, source_expr, api_plan, backend).map_err(
+            // The parser validates a helper invocation; Go owns qualification
+            // against the configured support package, not the authored WIT.
+            let source_expr = backend.support_converter(source_expr.to_string());
+            build_sourced_conversion(field_name, field, &source_expr, api_plan, backend).map_err(
                 |reason| Error::UnsupportedGoProtoConversion {
                     context: format!("sourced field `{}.{}`", planned_model.name, field_name),
                     reason,

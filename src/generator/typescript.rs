@@ -60,6 +60,12 @@ pub(in crate::generator) fn support_reference(name: &str) -> String {
     }
 }
 
+/// The parser validates this as a call rooted in the support package; keep
+/// its authored arguments verbatim when qualifying the callee.
+fn sourced_support_call(source_expr: &str) -> String {
+    format!("support.{source_expr}")
+}
+
 type PlannedOperation = OperationSpec<PlannedFamily>;
 type PlannedFlags = FlagsSpec<PlannedFamily>;
 type PlannedVariant = VariantSpec<PlannedFamily>;
@@ -697,18 +703,7 @@ impl<'a> ApiPlanner<'a> {
         let sourced_fields = planned_model
             .sourced_fields()
             .map(|(field_name, field, source_expr)| {
-                self.build_sourced_field(
-                    field_name,
-                    field,
-                    source_expr,
-                    matches!(
-                        field.visibility,
-                        RecordFieldVisibility::Sourced {
-                            support_import: true,
-                            ..
-                        }
-                    ),
-                )
+                self.build_sourced_field(field_name, field, source_expr)
             })
             .collect();
 
@@ -1266,12 +1261,11 @@ impl<'a> ApiPlanner<'a> {
         field_name: &str,
         field: &RecordFieldSpec<PlannedFamily>,
         source_expr: &str,
-        support_import: bool,
     ) -> RenderedSourcedField {
         let field_name = typescript_generated_field_name(field_name);
 
-        let default_source_expr = source_expr.to_string();
-        let source_expr = format!("model.{field_name} ?? ({source_expr})");
+        let default_source_expr = sourced_support_call(source_expr);
+        let source_expr = format!("model.{field_name} ?? ({default_source_expr})");
         let doc = field
             .doc
             .as_ref()
@@ -1288,7 +1282,6 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
-                support_import,
                 visible: true,
                 from_wire_expr: map_value_from_wire_expr(
                     &value_type,
@@ -1313,7 +1306,6 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
-                support_import,
                 visible: true,
                 from_wire_expr: format!(
                     "{} ?? []",
@@ -1328,7 +1320,6 @@ impl<'a> ApiPlanner<'a> {
             annotation: Self::typescript_field_annotation(field, resolved_type.annotation.clone()),
             doc,
             source_expr: default_source_expr,
-            support_import,
             visible: true,
             from_wire_expr: required_from_wire_expr(
                 &resolved_type,
@@ -3003,7 +2994,6 @@ pub(in crate::generator) struct RenderedSourcedField {
     annotation: String,
     doc: Option<String>,
     source_expr: String,
-    support_import: bool,
     visible: bool,
     pub(in crate::generator) from_wire_expr: String,
     pub(in crate::generator) to_wire_expr: String,
@@ -4153,29 +4143,14 @@ fn render_models_module(
         &generated_value_imports,
     );
     render_typescript_requirement_imports(&mut imports, requirements);
-    let sourced_fields = models
-        .iter()
-        .filter(|model| model.wire_function_names.is_some())
-        .flat_map(|model| &model.sourced_fields)
-        .collect::<Vec<_>>();
-    render_sourced_support_import(
+    render_support_import_if(
         &mut imports,
         support_package,
         &api_plan.module_path.to_path_buf(),
-        &body,
-        &sourced_fields,
-        models.iter().any(|model| {
-            model.fields.iter().any(|field| {
-                contains_qualified_identifier(&field.from_wire_expr, "support")
-                    || contains_qualified_identifier(&field.to_wire_expr, "support")
-            }) || model.sourced_fields.iter().any(|field| {
-                contains_qualified_identifier(&field.from_wire_expr, "support")
-                    || contains_qualified_identifier(
-                        &field.to_wire_expr.replace(&field.source_expr, ""),
-                        "support",
-                    )
-            })
-        }),
+        contains_qualified_identifier(&body, "support")
+            || models.iter().any(|model| {
+                model.wire_function_names.is_some() && !model.sourced_fields.is_empty()
+            }),
     );
     if !model_fragments.imports.is_empty() {
         if !imports.is_empty() && !imports.ends_with('\n') {
@@ -4494,18 +4469,15 @@ fn render_operation_module(
     if let Some(path) = &operation.output_transform_type_import {
         render_type_imports(&mut imports, path, &[operation.output_annotation.clone()]);
     }
-    let sourced_fields = operation
-        .input
-        .as_ref()
-        .map(|input| input.sourced_fields.iter().collect::<Vec<_>>())
-        .unwrap_or_default();
-    render_sourced_support_import(
+    render_support_import_if(
         &mut imports,
         support_package,
         &api_plan.module_path.to_path_buf().join("operations"),
-        &body,
-        &sourced_fields,
-        false,
+        contains_qualified_identifier(&body, "support")
+            || operation
+                .input
+                .as_ref()
+                .is_some_and(|input| !input.sourced_fields.is_empty()),
     );
     let resources = used_import_names(&body, &resource_type_names(services));
     let value_resources = resources
@@ -4548,31 +4520,6 @@ fn render_support_import(
         support_package,
         source_dir,
         contains_qualified_identifier(source, "support"),
-    );
-}
-
-fn render_sourced_support_import(
-    output: &mut String,
-    support_package: &str,
-    source_dir: &Path,
-    body: &str,
-    sourced_fields: &[&RenderedSourcedField],
-    converter_uses_support: bool,
-) {
-    // Raw expressions are emitted unchanged, but are not evidence of an import:
-    // the parser supplies that intent explicitly. Remove the raw text before
-    // scanning for generated helper calls; its syntax may be any TS expression.
-    let mut other_code = body.to_string();
-    for field in sourced_fields {
-        other_code = other_code.replace(&field.source_expr, "");
-    }
-    render_support_import_if(
-        output,
-        support_package,
-        source_dir,
-        converter_uses_support
-            || sourced_fields.iter().any(|field| field.support_import)
-            || contains_qualified_identifier(&other_code, "support"),
     );
 }
 
@@ -6615,9 +6562,9 @@ fn is_typescript_keyword(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        RenderedSourcedField, TypeScriptRequirements, collect_typescript_value_requirements,
-        render_sourced_support_import, render_support_import,
-        render_typescript_requirement_imports, support_reference,
+        TypeScriptRequirements, collect_typescript_value_requirements, render_support_import,
+        render_support_import_if, render_typescript_requirement_imports, sourced_support_call,
+        support_reference,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -6690,56 +6637,34 @@ mod tests {
     }
 
     #[test]
-    fn sourced_support_import_is_intent_not_expression_scanning() {
-        let field = |source_expr: &str, support_import| RenderedSourcedField {
-            name: "namespace".into(),
-            annotation: "string".into(),
-            doc: None,
-            source_expr: source_expr.into(),
-            support_import,
-            visible: true,
-            from_wire_expr: String::new(),
-            to_wire_expr: String::new(),
-        };
-        let expr = "support[`${requestInput.kind}Namespace`]()";
-        let sourced = field(expr, true);
-        let body = format!("    namespace: {expr},");
+    fn sourced_expressions_import_support_without_inspecting_the_expression() {
         let mut imports = String::new();
-        render_sourced_support_import(
+        render_support_import_if(
             &mut imports,
             "./shared/support",
             Path::new("api/operations"),
-            &body,
-            &[&sourced],
-            false,
+            true,
         );
         assert_eq!(
             imports,
             "import * as support from '../../shared/support';\n"
         );
 
-        let sourced = field("support.workflowNamespace()", false);
-        let body = format!("    namespace: {},", sourced.source_expr);
         imports.clear();
-        render_sourced_support_import(
-            &mut imports,
-            "@org/helpers",
-            Path::new("api"),
-            &body,
-            &[&sourced],
-            false,
-        );
+        render_support_import_if(&mut imports, "@org/helpers", Path::new("api"), false);
         assert!(imports.is_empty());
+    }
 
-        render_sourced_support_import(
-            &mut imports,
-            "@org/helpers",
-            Path::new("api"),
-            &body,
-            &[&sourced],
-            true,
+    #[test]
+    fn sourced_calls_are_qualified_without_changing_authored_arguments() {
+        assert_eq!(
+            sourced_support_call("workflowNamespace()"),
+            "support.workflowNamespace()"
         );
-        assert_eq!(imports, "import * as support from '@org/helpers';\n");
+        assert_eq!(
+            sourced_support_call("Helpers.name(request.id, { fallback: 'local' })"),
+            "support.Helpers.name(request.id, { fallback: 'local' })"
+        );
     }
 
     #[test]

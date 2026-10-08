@@ -215,11 +215,11 @@ cargo run --features advanced -- python \
   --output /tmp/user_service
 ```
 
-`@nexus.source` and `@nexus.output-transform` remain authored expressions,
-not helper names: include calls and qualify support helpers explicitly (for
-example `python="_support.workflow_namespace()"`). Go source expressions such
-as `workflow.GetInfo(ctx).Namespace` do not need to reference the support
-package.
+`@nexus.source` values are calls to helpers in the configured support package.
+Include the call and its arguments, but do not add the package prefix (for
+example `python="workflow_namespace()"` or `go="WorkflowNamespace(ctx)"`).
+Nexgen adds the prefix and imports support. `@nexus.output-transform`
+remains a raw authored expression.
 
 ## Proto Backing
 
@@ -253,7 +253,7 @@ interface workflow-service {
     task-queue: task-queue,
     /// @nexus.proto-field "signal_name"
     signal: signal-function,
-    /// @nexus.source "workflow_namespace()"
+    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
     namespace: option<string>,
   }
 

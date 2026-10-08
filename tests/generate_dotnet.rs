@@ -581,7 +581,7 @@ fn dotnet_renders_proto_backed_temporal_types() {
     assert!(rendered.contains("public string TaskQueue { get; init; }\n"));
     assert!(rendered.contains("public string Signal { get; init; }\n"));
     assert!(rendered.contains(
-        "new SignalWithStartWorkflowRequest(workflow, options.Id, options.TaskQueue, signal, TemporalWorkflowContext.WorkflowNamespace())"
+        "new SignalWithStartWorkflowRequest(workflow, options.Id, options.TaskQueue, signal, Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())"
     ));
     assert!(rendered.contains("wire.SignalName, wire.Namespace)"));
     assert!(!rendered.contains("get => _namespace"));
@@ -610,7 +610,7 @@ fn dotnet_renders_proto_backed_temporal_types() {
         )
     );
     assert!(rendered.contains(
-        "options.TaskQueue, Nexgen.Support.TemporalFunctionNames.SignalName(signalMethod), TemporalWorkflowContext.WorkflowNamespace())"
+        "options.TaskQueue, Nexgen.Support.TemporalFunctionNames.SignalName(signalMethod), Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())"
     ));
     assert!(rendered.contains("Args = workflowArgs"));
     assert!(rendered.contains("Args = args"));
@@ -645,8 +645,7 @@ fn dotnet_renders_proto_backed_temporal_types() {
     assert!(rendered.contains("using Nexgen.Support;"));
     assert!(rendered.contains("Nexgen.Support.ProtoExtensions.ToWorkflowTypeProto(Workflow"));
     assert!(rendered.contains("Nexgen.Support.ProtoExtensions.ToTaskQueueProto(TaskQueue"));
-    assert!(rendered.contains("TemporalWorkflowContext.WorkflowNamespace()"));
-    assert!(!rendered.contains("Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()"));
+    assert!(rendered.contains("Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()"));
     assert!(rendered.contains(
         "Temporalio.Workflows.Workflow.GetExternalWorkflowHandle(request.Id, result.RunId)"
     ));

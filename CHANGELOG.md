@@ -26,10 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (Java and JSON Schema generation are unchanged). Support code is imported
   from that caller-owned package instead of copied from `--support-file` or
   `@nexus.support`; support-namespace directives are removed. `@nexus.source`
-  and `@nexus.output-transform` remain authored expressions.
-- `@nexus.source` supports per-language `<lang>-support-import=true|false`
-  import intent without rewriting the expression. Go defaults to `false`;
-  Python, TypeScript and .NET default to `true`.
+  now names a helper call relative to the configured support package. Nexgen
+  prefixes that call and imports support for every sourced field. The
+  per-language `<lang>-support-import` options are removed.
+  `@nexus.output-transform` remains an authored expression.
 - .NET generic type parameters now use the C# `T` prefix. For example, the
   authored `output-t` alias generates `TOutput` instead of `OutputT`.
 

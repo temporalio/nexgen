@@ -806,8 +806,6 @@ pub enum RecordFieldVisibility {
     Omitted,
     Sourced {
         source_expr: String,
-        /// Whether the selected source expression requires the target's support import.
-        support_import: bool,
     },
 }
 

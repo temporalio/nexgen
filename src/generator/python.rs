@@ -677,9 +677,12 @@ impl<'a> ApiPlanner<'a> {
             self.api_plan,
             self.inline_model_rebuilds,
             self.model_hoists,
-            self.models
-                .values()
-                .any(|model| model.fields.iter().any(|field| field.support_import)),
+            self.models.values().any(|model| {
+                planned_record(self.api_plan, &model.full_name)
+                    .fields
+                    .values()
+                    .any(|field| matches!(field.visibility, RecordFieldVisibility::Sourced { .. }))
+            }),
         )? {
             files.insert("models.py", models_source, module_origin.clone())?;
         }
@@ -881,12 +884,7 @@ impl<'a> ApiPlanner<'a> {
         if !used_resource_names.is_empty() {
             render_named_python_import(&mut output, ".", &used_resource_names);
         }
-        render_support_import(
-            &mut output,
-            &body,
-            support_package,
-            sourced_support_import_in_body(self.api_plan, &body),
-        );
+        render_support_import(&mut output, &body, support_package, false);
         if !body.is_empty() {
             output.push('\n');
             output.push('\n');
@@ -1578,19 +1576,8 @@ impl<'a> ApiPlanner<'a> {
             .iter()
             .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
             .map(|(field_name, field)| {
-                if let RecordFieldVisibility::Sourced {
-                    source_expr,
-                    support_import,
-                } = &field.visibility
-                {
-                    let mut rendered = self.build_public_sourced_field(
-                        planned_model,
-                        field_name,
-                        field,
-                        source_expr,
-                    )?;
-                    rendered.support_import = *support_import;
-                    Ok(rendered)
+                if let RecordFieldVisibility::Sourced { source_expr } = &field.visibility {
+                    self.build_public_sourced_field(planned_model, field_name, field, source_expr)
                 } else {
                     self.build_field(planned_model, field_name, field)
                 }
@@ -1711,7 +1698,6 @@ impl<'a> ApiPlanner<'a> {
                 default_expr: Some("dataclasses.field(default_factory=dict)".to_string()),
                 wire_value_type: value_type,
                 imports,
-                support_import: false,
             });
         }
 
@@ -1735,7 +1721,6 @@ impl<'a> ApiPlanner<'a> {
                 default_expr: Some("dataclasses.field(default_factory=list)".to_string()),
                 wire_value_type: resolved_type.clone(),
                 imports: resolved_type.imports,
-                support_import: false,
             });
         }
 
@@ -1756,7 +1741,6 @@ impl<'a> ApiPlanner<'a> {
                 default_expr: Some(default_expr.clone()),
                 wire_value_type: resolved_type.clone(),
                 imports,
-                support_import: false,
             });
         }
 
@@ -1774,7 +1758,6 @@ impl<'a> ApiPlanner<'a> {
                 default_expr: None,
                 wire_value_type: resolved_type.clone(),
                 imports,
-                support_import: false,
             });
         }
 
@@ -1791,7 +1774,6 @@ impl<'a> ApiPlanner<'a> {
             default_expr: Some("None".to_string()),
             wire_value_type: resolved_type.clone(),
             imports,
-            support_import: false,
         })
     }
 
@@ -1803,8 +1785,9 @@ impl<'a> ApiPlanner<'a> {
         source_expr: &str,
     ) -> Result<RenderedField> {
         let mut rendered = self.build_field(record, field_name, field)?;
-        rendered.default_kind = PythonFieldDefaultKind::Expression(source_expr.to_string());
-        rendered.default_expr = Some(python_dataclass_source_default_expr(source_expr));
+        let source_call = python_source_call(source_expr);
+        rendered.default_kind = PythonFieldDefaultKind::Expression(source_call.clone());
+        rendered.default_expr = Some(python_dataclass_source_default_expr(&source_call));
         Ok(rendered)
     }
 
@@ -2658,7 +2641,6 @@ pub(in crate::generator) struct RenderedField {
     pub(in crate::generator) default_expr: Option<String>,
     pub(in crate::generator) wire_value_type: ResolvedFieldType,
     pub(in crate::generator) imports: PythonImports,
-    pub(in crate::generator) support_import: bool,
 }
 
 #[derive(Debug, Default)]
@@ -3511,25 +3493,6 @@ fn render_support_import(
     }
 }
 
-// A sourced expression normally lives in models.py. Keep operation and resource
-// imports correct if their rendered bodies also contain an authored expression.
-fn sourced_support_import_in_body(api_plan: &PlannedSpec, body: &str) -> bool {
-    api_plan
-        .records()
-        .flat_map(|(_, record)| record.fields.values())
-        .any(|field| match &field.visibility {
-            RecordFieldVisibility::Sourced {
-                source_expr,
-                support_import: true,
-            } => {
-                !source_expr.is_empty()
-                    && (body.contains(source_expr)
-                        || body.contains(&python_dataclass_source_default_expr(source_expr)))
-            }
-            _ => false,
-        })
-}
-
 pub(in crate::generator) fn render_named_python_import(
     output: &mut String,
     module: &str,
@@ -4372,12 +4335,7 @@ fn render_operation_module(
     if !used_resource_names.is_empty() {
         render_named_python_import(&mut output, ".._resources", &used_resource_names);
     }
-    render_support_import(
-        &mut output,
-        &body,
-        support_package,
-        sourced_support_import_in_body(api_plan, &body),
-    );
+    render_support_import(&mut output, &body, support_package, false);
     output.push('\n');
     output.push('\n');
     output.push_str(&body);
@@ -7537,6 +7495,10 @@ fn python_parameter_default_expr(default_kind: &PythonFieldDefaultKind) -> Optio
     }
 }
 
+fn python_source_call(source_expr: &str) -> String {
+    format!("_support.{source_expr}")
+}
+
 fn python_dataclass_source_default_expr(source_expr: &str) -> String {
     let source_provider = source_expr.strip_suffix("()").unwrap_or(source_expr);
     if source_provider
@@ -7751,19 +7713,27 @@ mod tests {
 
     #[test]
     fn renders_source_provider_defaults_as_dataclass_factories() {
+        let no_args = super::python_source_call("workflow_namespace()");
+        assert_eq!(no_args, "_support.workflow_namespace()");
         assert_eq!(
-            super::python_dataclass_source_default_expr("workflow_namespace"),
-            "dataclasses.field(default_factory=workflow_namespace)"
+            super::python_dataclass_source_default_expr(&no_args),
+            "dataclasses.field(default_factory=_support.workflow_namespace)"
+        );
+        let with_args =
+            super::python_source_call("Helpers.namespace(request.id, fallback='default')");
+        assert_eq!(
+            with_args,
+            "_support.Helpers.namespace(request.id, fallback='default')"
         );
         assert_eq!(
-            super::python_dataclass_source_default_expr("workflow_namespace()"),
-            "dataclasses.field(default_factory=workflow_namespace)"
+            super::python_dataclass_source_default_expr(&with_args),
+            "_support.Helpers.namespace(request.id, fallback='default')"
         );
     }
 
     #[test]
-    fn sourced_support_intent_imports_without_literal_helper_reference() {
-        let body = "value = getattr(_support, 'workflow_namespace')()\n";
+    fn sourced_fields_import_support_without_literal_helper_reference() {
+        let body = "value = workflow_namespace()\n";
         let mut output = String::new();
         super::render_support_import(&mut output, body, "temporal_support", true);
         assert_eq!(output, "import temporal_support as _support\n");
@@ -7772,6 +7742,7 @@ mod tests {
         super::render_support_import(&mut output, body, "temporal_support", false);
         assert!(output.is_empty());
 
+        // Converter helpers still request the configured package without sourced fields.
         super::render_support_import(
             &mut output,
             "value = _support.payload_to_proto(value)\n",
