@@ -3909,12 +3909,14 @@ func TestMaterializedSerializeChecks(t *testing.T) {
     }
 
     subMinuteOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 30))
-    justOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 18*60*60+60))
-    negativeJustOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", -(18*60*60+60)))
+    justOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 14*60*60+60))
+    negativeJustOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", -(14*60*60+60)))
+    formerBoundaryOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 18*60*60))
+    negativeFormerBoundaryOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", -18*60*60))
     wideOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 23*60*60+59*60))
     negativeWideOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", -(23*60*60+59*60)))
     overflowYear := time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)
-    for name, value := range map[string]time.Time{"sub-minute offset": subMinuteOffset, "offset +18:01": justOutOfRangeOffset, "offset -18:01": negativeJustOutOfRangeOffset, "offset +23:59": wideOutOfRangeOffset, "offset -23:59": negativeWideOutOfRangeOffset, "year 10000": overflowYear} {
+    for name, value := range map[string]time.Time{"sub-minute offset": subMinuteOffset, "offset +14:01": justOutOfRangeOffset, "offset -14:01": negativeJustOutOfRangeOffset, "offset +18:00": formerBoundaryOffset, "offset -18:00": negativeFormerBoundaryOffset, "offset +23:59": wideOutOfRangeOffset, "offset -23:59": negativeWideOutOfRangeOffset, "year 10000": overflowYear} {
         model := base
         model.When = &value
         if _, err := json.Marshal(model); err == nil {
@@ -3922,7 +3924,7 @@ func TestMaterializedSerializeChecks(t *testing.T) {
         }
     }
 
-    for _, seconds := range []int{18 * 60 * 60, -18 * 60 * 60} {
+    for _, seconds := range []int{14 * 60 * 60, -14 * 60 * 60} {
         boundary := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", seconds))
         boundaryModel := base
         boundaryModel.When = &boundary
@@ -3937,7 +3939,7 @@ func TestMaterializedSerializeChecks(t *testing.T) {
         }
     }
 
-    for name, value := range map[string]time.Time{"offset +18:01": justOutOfRangeOffset, "offset -18:01": negativeJustOutOfRangeOffset, "offset +23:59": wideOutOfRangeOffset, "offset -23:59": negativeWideOutOfRangeOffset} {
+    for name, value := range map[string]time.Time{"offset +14:01": justOutOfRangeOffset, "offset -14:01": negativeJustOutOfRangeOffset, "offset +18:00": formerBoundaryOffset, "offset -18:00": negativeFormerBoundaryOffset, "offset +23:59": wideOutOfRangeOffset, "offset -23:59": negativeWideOutOfRangeOffset} {
         model := base
         model.Clock = &value
         if _, err := json.Marshal(model); err == nil {

@@ -6839,9 +6839,9 @@ const TEMPORAL_SUPPORT_BODY: &str = r####"    private static int daysInMonth(int
         if (offsetSeconds % 60 != 0) {
             violations.add(new Violation(path, "must be a valid " + name + ", got " + value
                     + ": the UTC offset " + offset + " is not a whole number of minutes"));
-        } else if (offsetSeconds < -18 * 60 * 60 || offsetSeconds > 18 * 60 * 60) {
+        } else if (offsetSeconds < -14 * 60 * 60 || offsetSeconds > 14 * 60 * 60) {
             violations.add(new Violation(path, "must be a valid " + name + ", got " + value
-                    + ": the UTC offset is outside -18:00 through +18:00"));
+                    + ": the UTC offset is outside -14:00 through +14:00"));
         }
     }
 

@@ -236,11 +236,11 @@ def _check_contains(
 
 
 _TEMPORAL_DATE_TIME_RE = re.compile(
-    r"^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-7]):[0-5][0-9]|18:00))\Z"
+    r"^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-3]):[0-5][0-9]|14:00))\Z"
 )
 _TEMPORAL_DATE_RE = re.compile(r"^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\Z")
 _TEMPORAL_TIME_RE = re.compile(
-    r"^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-7]):[0-5][0-9]|18:00))?\Z"
+    r"^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-3]):[0-5][0-9]|14:00))?\Z"
 )
 _TEMPORAL_DURATION_RE = re.compile(
     r"^PT(?:[0-9]+H(?:[0-9]+M(?:[0-9]+S)?)?|[0-9]+M(?:[0-9]+S)?|[0-9]+S)\Z"
@@ -392,7 +392,7 @@ def _check_temporal_offset(
     path: str,
     violations: list[Violation],
 ) -> None:
-    """Asserts a UTC offset is a whole number of minutes in -18:00..+18:00.
+    """Asserts a UTC offset is a whole number of minutes in -14:00..+14:00.
 
     `tzinfo` allows seconds and offsets up to almost 24 hours, both wider than
     the materialized wire grammar.
@@ -408,13 +408,13 @@ def _check_temporal_offset(
                 ),
             )
         )
-    elif abs(offset) > datetime.timedelta(hours=18):
+    elif abs(offset) > datetime.timedelta(hours=14):
         violations.append(
             Violation(
                 path=path,
                 reason=(
                     f"must be a valid {name}, got {_quote(str(value))}: "
-                    "the UTC offset is outside -18:00 through +18:00"
+                    "the UTC offset is outside -14:00 through +14:00"
                 ),
             )
         )

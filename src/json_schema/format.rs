@@ -14,7 +14,7 @@
 //! formats — `date-time`, `date`, `time`, `duration` — are *materialized* into
 //! a language-native typed field (Go `time.Time`, Java `OffsetDateTime`, Python
 //! `datetime`, …) and asserted with a **narrowed** grammar (leap second `:60`
-//! rejected; clock offsets limited to `-18:00..+18:00`; `duration` time-only;
+//! rejected; clock offsets limited to `-14:00..+14:00`; `duration` time-only;
 //! calendar year floor 0001); their wire form is
 //! produced by a generator-owned serializer, so a literal is canonicalized
 //! through [`canonicalize`] rather than echoed verbatim. Every other standard
@@ -65,7 +65,7 @@ pub const SUPPORTED_FORMATS: [&str; 11] = [
 /// The RFC-3339 temporal formats. These are **materialized** as idiomatic
 /// native typed model fields (Go `time.Time`, Java `OffsetDateTime`, Python
 /// `datetime`, …) rather than a bare `string`, and asserted with a **narrowed**
-/// grammar (leap second `:60` rejected; clock offsets limited to ±18 hours;
+/// grammar (leap second `:60` rejected; clock offsets limited to ±14 hours;
 /// `duration` is time-only). See
 /// `specs/json-schema/features/format.md` (Materialization) and `TemporalKind`.
 pub const TEMPORAL_FORMATS: [&str; 4] = ["date-time", "date", "time", "duration"];
@@ -132,7 +132,7 @@ impl TemporalKind {
     /// The pinned, anchored (`^…$`) **materialized** regex for this kind — the
     /// narrowed grammar (leap second `:60` excluded by the `[0-5][0-9]` seconds
     /// group; `date-time` offset required; materialized offsets limited to
-    /// `-18:00..+18:00`; `duration` time-only). `T`/`Z`
+    /// `-14:00..+14:00`; `duration` time-only). `T`/`Z`
     /// separators are accepted in either case. Emitted (with the per-target
     /// end-anchor rewrite) into each generator's parse adapter, where the wire
     /// string's `:60` / offset / precision are still observable.
@@ -163,10 +163,10 @@ pub fn materialized_pattern(kind: TemporalKind) -> &'static str {
     match kind {
         TemporalKind::Date => "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
         TemporalKind::Time => {
-            "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-7]):[0-5][0-9]|18:00))?$"
+            "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-3]):[0-5][0-9]|14:00))?$"
         }
         TemporalKind::DateTime => {
-            "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-7]):[0-5][0-9]|18:00))$"
+            "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-3]):[0-5][0-9]|14:00))$"
         }
         TemporalKind::Duration => {
             "^PT(?:[0-9]+H(?:[0-9]+M(?:[0-9]+S)?)?|[0-9]+M(?:[0-9]+S)?|[0-9]+S)$"
@@ -895,19 +895,21 @@ mod tests {
     }
 
     #[test]
-    fn materialized_offsets_are_limited_to_eighteen_hours() {
+    fn materialized_offsets_are_limited_to_fourteen_hours() {
         for kind in [TemporalKind::DateTime, TemporalKind::Time] {
             let render = |offset: &str| match kind {
                 TemporalKind::DateTime => format!("2021-01-15T12:30:45{offset}"),
                 _ => format!("12:30:45{offset}"),
             };
-            for offset in ["+18:00", "-18:00"] {
+            for offset in ["+14:00", "-14:00", "+13:59", "-13:59"] {
                 assert!(
                     is_valid_materialized(kind, &render(offset)),
                     "{kind:?} must accept {offset}"
                 );
             }
-            for offset in ["+18:01", "-18:01", "+23:59", "-23:59"] {
+            for offset in [
+                "+14:01", "-14:01", "+15:00", "-15:00", "+18:00", "-18:00", "+23:59", "-23:59",
+            ] {
                 assert!(
                     !is_valid_materialized(kind, &render(offset)),
                     "{kind:?} must reject {offset}"
