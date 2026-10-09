@@ -31,6 +31,9 @@ subtly wrong in one language.
 
 ## Installation
 
+For contributor validation, changelog fragments, and releases, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 Download the archive for your platform from the
 [latest GitHub release](https://github.com/temporalio/nexgen/releases/latest):
 

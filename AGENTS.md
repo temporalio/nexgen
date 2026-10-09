@@ -85,8 +85,16 @@ justification for why it belongs where it is planned in the architecture.
   rule, or processing flow changes. JSON Schema architecture lives under
   `specs/json-schema/`, especially `pipeline.md` and `PRINCIPLES.md`.
 - Update `GUIDE.md` when WIT authoring or generated WIT-facing behavior changes.
-- Update `CHANGELOG.md` only for public-facing changes, such as CLI flags,
-  generated APIs, or externally visible behavior. Use the `Unreleased` section.
+- For public-facing changes (CLI flags, generated APIs, or externally visible
+  behavior), add a new fragment in `changelog/<category>/` instead of editing
+  `CHANGELOG.md`. Categories are `added`, `stabilized`, `changed`, `deprecated`,
+  `breaking-changes`, `fixed`, and `security`. Use `stabilized` when a feature
+  is no longer experimental.
+- Choose a fun, whimsical lowercase kebab-case filename, such as
+  `moonwalking-marshmallow.md`. Keep entries concise, ideally a sentence or two.
+  Each nonempty line becomes one bullet; omit the leading `-`. Multiple items
+  from one PR can share a fragment, but unrelated PRs should have separate files.
+- `CHANGELOG.md` contains completed releases only. See `changelog/README.md`.
 
 ## Compatibility
 
