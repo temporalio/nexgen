@@ -480,12 +480,6 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
     fn map_text(&mut self, text: SelectedTextSpec) -> LanguageStringSpec {
         materialize_selected_text(&text)
     }
-
-    fn map_support(&mut self, support: SelectedSupportSpec) -> SupportSpec {
-        SupportSpec {
-            fragments: BTreeMap::from([(self.planner.language, support.fragments)]),
-        }
-    }
 }
 
 impl<'a> TypePlanningContext<'a> {
@@ -1354,9 +1348,6 @@ impl ApiSpecTransform<SelectedFamily, OperationLoweredFamily> for SelectedToOper
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
         value
     }
-    fn map_support(&mut self, value: SelectedSupportSpec) -> SelectedSupportSpec {
-        value
-    }
 }
 
 impl TypePlanningContext<'_> {
@@ -1380,8 +1371,7 @@ mod tests {
     use crate::language::Language;
     use crate::spec::{ApiSpecLeaf, ApiSpecNode, ApiSpecTree, CompilerPass};
     use crate::spec::{
-        ExternalTypeSpec, ExternalVariantSourceSpec, LanguageStringSpec, ModulePath,
-        ProtoOneofSpec, SupportSpec,
+        ExternalTypeSpec, ExternalVariantSourceSpec, LanguageStringSpec, ModulePath, ProtoOneofSpec,
     };
 
     #[test]
@@ -1555,7 +1545,6 @@ mod tests {
             module_path: ModulePath::default(),
             data: (),
             version: "1.0.0".to_string(),
-            support: SupportSpec::default(),
             services: vec![ServiceSpec {
                 name: "example-service".to_string(),
                 code_name: LanguageStringSpec::default(),

@@ -18,7 +18,6 @@ const JAVA_FORMAT_LINE_LENGTH: usize = 88;
 
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
-    _support: &crate::SupportFiles,
     base_package: Option<&str>,
 ) -> Result<GeneratedFiles> {
     let base_package = base_package.unwrap_or(DEFAULT_PACKAGE);

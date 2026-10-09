@@ -10,12 +10,7 @@ import temporalio.api.update.v1.message_pb2
 import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.converter
 
-from ._support import (
-    failure_from_proto,
-    failure_to_proto,
-    payloads_from_proto,
-    payloads_to_proto,
-)
+import temporal_support as _support
 
 
 OutputT = typing.TypeVar("OutputT")
@@ -47,11 +42,14 @@ class _OutcomeTransferTypeConverter(
             case "success":
                 _oneof_value = OutcomeValueSuccess(
                     typing.cast(
-                        OutputT, payloads_from_proto(value.success, [output_type])[0]
+                        OutputT,
+                        _support.payloads_from_proto(value.success, [output_type])[0],
                     )
                 )
             case "failure":
-                _oneof_value = OutcomeValueFailure(failure_from_proto(value.failure))
+                _oneof_value = OutcomeValueFailure(
+                    _support.failure_from_proto(value.failure)
+                )
             case None:
                 raise ValueError("missing required field Outcome.value")
         return Outcome(
@@ -66,9 +64,11 @@ class _OutcomeTransferTypeConverter(
         message = temporalio.api.update.v1.message_pb2.Outcome()
         match value.value:
             case OutcomeValueSuccess():
-                message.success.CopyFrom(payloads_to_proto([value.value.value]))
+                message.success.CopyFrom(
+                    _support.payloads_to_proto([value.value.value])
+                )
             case OutcomeValueFailure():
-                message.failure.CopyFrom(failure_to_proto(value.value.value))
+                message.failure.CopyFrom(_support.failure_to_proto(value.value.value))
         return message
 
 

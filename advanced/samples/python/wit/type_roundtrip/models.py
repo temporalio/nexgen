@@ -10,18 +10,7 @@ import temporalio.api.activity.v1.message_pb2
 import temporalio.api.command.v1.message_pb2
 import temporalio.converter
 
-from ._support import (
-    duration_from_proto,
-    duration_to_proto,
-    failure_from_proto,
-    failure_to_proto,
-    priority_from_proto,
-    priority_to_proto,
-    retry_policy_from_proto,
-    retry_policy_to_proto,
-    task_queue_from_proto,
-    task_queue_to_proto,
-)
+import temporal_support as _support
 
 
 @dataclasses.dataclass(slots=True, kw_only=True)
@@ -49,18 +38,18 @@ class _ActivityOptionsTransferTypeConverter(
     ) -> ActivityOptions:
         if not value.HasField("retry_policy"):
             raise ValueError("missing required field ActivityOptions.retry_policy")
-        retry_policy = retry_policy_from_proto(value.retry_policy)
+        retry_policy = _support.retry_policy_from_proto(value.retry_policy)
         return ActivityOptions(
-            task_queue=task_queue_from_proto(value.task_queue)
+            task_queue=_support.task_queue_from_proto(value.task_queue)
             if value.HasField("task_queue")
             else None,
             retry_policy=retry_policy,
-            schedule_to_close_timeout=duration_from_proto(
+            schedule_to_close_timeout=_support.duration_from_proto(
                 value.schedule_to_close_timeout
             )
             if value.HasField("schedule_to_close_timeout")
             else None,
-            priority=priority_from_proto(value.priority)
+            priority=_support.priority_from_proto(value.priority)
             if value.HasField("priority")
             else None,
         )
@@ -72,14 +61,16 @@ class _ActivityOptionsTransferTypeConverter(
     ) -> temporalio.api.activity.v1.message_pb2.ActivityOptions:
         message = temporalio.api.activity.v1.message_pb2.ActivityOptions()
         if value.task_queue is not None:
-            message.task_queue.CopyFrom(task_queue_to_proto(value.task_queue))
-        message.retry_policy.CopyFrom(retry_policy_to_proto(value.retry_policy))
+            message.task_queue.CopyFrom(_support.task_queue_to_proto(value.task_queue))
+        message.retry_policy.CopyFrom(
+            _support.retry_policy_to_proto(value.retry_policy)
+        )
         if value.schedule_to_close_timeout is not None:
             message.schedule_to_close_timeout.CopyFrom(
-                duration_to_proto(value.schedule_to_close_timeout)
+                _support.duration_to_proto(value.schedule_to_close_timeout)
             )
         if value.priority is not None:
-            message.priority.CopyFrom(priority_to_proto(value.priority))
+            message.priority.CopyFrom(_support.priority_to_proto(value.priority))
         return message
 
 
@@ -113,7 +104,7 @@ class _FailureContainerTransferTypeConverter(
         type_hint: type[FailureContainer],
     ) -> FailureContainer:
         return FailureContainer(
-            failure=failure_from_proto(value.failure)
+            failure=_support.failure_from_proto(value.failure)
             if value.HasField("failure")
             else None,
         )
@@ -125,7 +116,7 @@ class _FailureContainerTransferTypeConverter(
     ) -> temporalio.api.command.v1.message_pb2.FailWorkflowExecutionCommandAttributes:
         message = temporalio.api.command.v1.message_pb2.FailWorkflowExecutionCommandAttributes()
         if value.failure is not None:
-            message.failure.CopyFrom(failure_to_proto(value.failure))
+            message.failure.CopyFrom(_support.failure_to_proto(value.failure))
         return message
 
 

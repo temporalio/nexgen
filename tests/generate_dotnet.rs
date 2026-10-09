@@ -10,8 +10,7 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use nexgen::generator::generate_source;
-use nexgen::spec::SupportFragmentSpec;
-use nexgen::{GenerateRequest, SupportFiles, generate_to_file};
+use nexgen::{GenerateRequest, generate_to_file};
 
 mod common;
 use common::wit_input_path;
@@ -108,11 +107,11 @@ fn generate_dotnet_files(
         },
         language: nexgen::language::Language::Dotnet,
         input_paths: input_paths.to_vec(),
-        support_paths: Vec::new(),
         descriptor_paths: descriptor_paths.to_vec(),
         output_path: output_path.clone(),
         format: false,
         java_package_name: None,
+        support_package: Some("Nexgen.Support".to_string()),
         ts_date_time_types: Default::default(),
     })
     .unwrap();
@@ -139,6 +138,8 @@ fn generate_dotnet_output(root: &Path, example_id: &str, output_path: &Path) {
             "--output",
             output_path.to_str().unwrap(),
             "--native-api",
+            "--support-package",
+            "Nexgen.Support",
         ]);
     if example_id == WORKFLOW_SERVICE_EXAMPLE_ID {
         command.arg("--system-nexus");
@@ -306,24 +307,18 @@ namespace Temporalio.Worker
 }
 
 #[test]
-fn cli_generates_dotnet_support_file_from_parameter() {
+fn cli_uses_dotnet_support_package_without_copying_files() {
     let root = project_root();
-    let temp_dir = unique_output_path("dotnet-support-file-input");
+    let temp_dir = unique_output_path("dotnet-support-package");
     fs::create_dir_all(&temp_dir).unwrap();
-    let support_path = temp_dir.join("CustomSupport.cs");
     let output_path = temp_dir.join("output");
-    fs::write(
-        &support_path,
-        "namespace Custom\n{\npublic static class CustomSupport { }\n}\n",
-    )
-    .unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
         .args([
             "dotnet",
             wit_input_path(&root, "user-service").to_str().unwrap(),
-            "--support-file",
-            support_path.to_str().unwrap(),
+            "--support-package",
+            "Custom",
             "--output",
             output_path.to_str().unwrap(),
         ])
@@ -335,57 +330,35 @@ fn cli_generates_dotnet_support_file_from_parameter() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(
-        fs::read_to_string(output_path.join("Support/CustomSupport.cs"))
-            .unwrap()
-            .contains("public static class CustomSupport")
-    );
+    assert!(!output_path.join("Support/CustomSupport.cs").exists());
+    assert!(output_path.join("Models.cs").exists());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
-fn dotnet_support_fragments_with_same_file_name_collide() {
+fn dotnet_qualifies_helpers_from_supplied_support_namespace() {
     let root = project_root();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Dotnet,
-        &example_input_paths(&root, WORKFLOW_SERVICE_EXAMPLE_ID),
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let error = generate_source(
-        nexgen::language::Language::Dotnet,
-        spec,
-        &descriptors,
-        &SupportFiles {
-            fragments: vec![
-                SupportFragmentSpec {
-                    path: "first/Helpers.cs".to_string(),
-                    contents: String::new(),
-                    namespace: None,
-                },
-                SupportFragmentSpec {
-                    path: "second/Helpers.cs".to_string(),
-                    contents: String::new(),
-                    namespace: None,
-                },
-            ],
-        },
-    )
-    .unwrap_err();
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("Support/Helpers.cs"));
-    assert_eq!(first_source, ".NET support file `first/Helpers.cs`");
-    assert_eq!(second_source, ".NET support file `second/Helpers.cs`");
-    assert!(remedy.contains("support file `first/Helpers.cs`"));
-    assert!(remedy.contains("support file `second/Helpers.cs`"));
+    let output = unique_output_path("dotnet-custom-support-namespace");
+    let status = Command::new(env!("CARGO_BIN_EXE_nexgen"))
+        .arg("dotnet")
+        .args(example_input_paths(&root, WORKFLOW_SERVICE_EXAMPLE_ID))
+        .args([
+            "--descriptors",
+            descriptor_path(&root).to_str().unwrap(),
+            "--support-package",
+            "Custom.Support",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let files = read_dotnet_output_files(&output);
+    let models = files.get(&PathBuf::from("Models.cs")).unwrap();
+    assert!(models.contains("using Custom.Support;"));
+    assert!(models.contains("Custom.Support.ProtoExtensions."));
+    assert!(!files.keys().any(|path| path.starts_with("Support")));
+    fs::remove_dir_all(output).unwrap();
 }
 
 #[test]
@@ -503,7 +476,7 @@ fn dotnet_renders_proto_backed_temporal_types() {
 
     assert!(rendered.contains("internal interface IWorkflowService"));
     assert!(rendered.contains("namespace Nexgen.WorkflowService\n{"));
-    assert!(rendered.contains("namespace Nexgen.Support\n{"));
+    assert!(!rendered.contains("namespace Nexgen.Support\n{"));
     assert!(!rendered.contains("namespace Temporalio.Workflows;"));
     assert!(!rendered.contains("namespace Nexgen.Support;"));
     assert!(rendered.contains(
@@ -533,10 +506,7 @@ fn dotnet_renders_proto_backed_temporal_types() {
     ));
     assert!(!services.contains("OperationDefinition.FromMethod"));
     assert!(!operations.contains("NexgenOperationRegistry"));
-    assert!(rendered.contains(
-        "internal static ISerializationContext SignalWithStartWorkflow(SignalWithStartWorkflowRequest request)"
-    ));
-    assert!(rendered.contains("new ISerializationContext.Workflow(request.Namespace, request.Id)"));
+    assert!(!rendered.contains("internal static ISerializationContext SignalWithStartWorkflow("));
     assert!(!operations.contains("ServiceDefinition.FromType"));
     assert!(!rendered.contains("endpoint: \"temporal-system\""));
     assert!(!rendered.contains(
@@ -675,6 +645,10 @@ fn dotnet_renders_proto_backed_temporal_types() {
     assert!(rendered.contains("using Nexgen.Support;"));
     assert!(rendered.contains("Nexgen.Support.ProtoExtensions.ToWorkflowTypeProto(Workflow"));
     assert!(rendered.contains("Nexgen.Support.ProtoExtensions.ToTaskQueueProto(TaskQueue"));
+    assert!(rendered.contains("Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()"));
+    assert!(rendered.contains(
+        "Temporalio.Workflows.Workflow.GetExternalWorkflowHandle(request.Id, result.RunId)"
+    ));
     assert!(rendered.contains(
         "proto.UserMetadata = (Temporalio.Api.Sdk.V1.UserMetadata)userMetadata.ToTransferType();"
     ));
@@ -692,31 +666,10 @@ fn dotnet_renders_proto_backed_temporal_types() {
         rendered
             .contains("proto.Summary = Nexgen.Support.ProtoExtensions.ToPayload(staticSummary);")
     );
-    assert!(rendered.contains("internal static ApiCommon.Payload ToPayload(object? value)"));
-    assert!(
-        rendered
-            .contains("internal static ApiCommon.Payloads ToPayloads(IEnumerable<object?> values)")
-    );
     assert!(!rendered.contains("ToProto(this object? value)"));
     assert!(!rendered.contains("ToProto(this IEnumerable<object?> value)"));
-    assert!(rendered.contains("internal static Duration ToProto(this TimeSpan value)"));
     assert!(!rendered.contains(" FromProto("));
-    assert!(rendered.contains("internal static class TemporalWorkflowContext"));
-    assert!(rendered.contains("internal static class TemporalFunctionNames"));
-    assert!(rendered.contains("internal static class SystemNexusConverterContext"));
-    assert!(rendered.contains("internal static class ProtoExtensions"));
-    assert!(rendered.contains("SystemNexusConverterContext.PayloadConverter.ToPayload(value)"));
-    assert!(rendered.contains("SystemNexusConverterContext.FailureConverter.ToFailure("));
     assert!(!rendered.contains("CurrentUserPayloadConverter"));
-    assert!(
-        rendered.contains(
-            "internal static ApiCommon.WorkflowType ToWorkflowTypeProto(this string value)"
-        )
-    );
-    assert!(
-        rendered
-            .contains("internal static ApiTaskQueue.TaskQueue ToTaskQueueProto(this string value)")
-    );
     assert!(!rendered.contains("ToProto(default("));
     assert!(!rendered.contains("internal static TProto ToProto<TProto>(this string value)"));
     assert!(!rendered.contains("targetType == typeof"));
@@ -959,7 +912,7 @@ interface conflict-models {
         nexgen::language::Language::Dotnet,
         spec,
         &descriptors,
-        &SupportFiles::default(),
+        "Nexgen.Support",
     )
     .unwrap_err();
     fs::remove_dir_all(temp_dir).unwrap();

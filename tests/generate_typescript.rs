@@ -1,5 +1,5 @@
 // Drives the `nexgen` binary over the WIT/proto CLI surface (`--descriptors`,
-// `--native-api`, `--support-file`), all behind the `advanced` feature.
+// `--native-api`, `--support-package`), all behind the `advanced` feature.
 #![cfg(feature = "advanced")]
 
 use std::collections::BTreeMap;
@@ -10,8 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use nexgen::generator::generate_source;
-use nexgen::spec::SupportFragmentSpec;
-use nexgen::{GenerateRequest, SupportFiles, generate_to_file};
+use nexgen::{GenerateRequest, generate_to_file};
 
 mod common;
 use common::{json_input_path, wit_input_path, write_bare_ref_alias_closure};
@@ -618,7 +617,7 @@ fn generate_typescript_to_string(input_paths: &[PathBuf], descriptor_paths: &[Pa
         },
         language: nexgen::language::Language::TypeScript,
         input_paths: input_paths.to_vec(),
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: descriptor_paths.to_vec(),
         output_path: output_path.clone(),
         format: false,
@@ -645,6 +644,8 @@ fn generate_formatted_typescript_output(root: &Path, example_id: &str, output_pa
         .args([
             "--descriptors",
             descriptor_path(root).to_str().unwrap(),
+            "--support-package",
+            "./support",
             "--output",
             output_path.to_str().unwrap(),
             "--native-api",
@@ -702,6 +703,8 @@ fn generate_formatted_json_typescript_output_repr(
     let mut args = vec![
         "typescript",
         input_path.to_str().unwrap(),
+        "--support-package",
+        "./support",
         "--output",
         output_path.to_str().unwrap(),
     ];
@@ -880,26 +883,24 @@ fn typescript_json_api_examples_render_successfully() {
 }
 
 #[test]
-fn cli_generates_typescript_support_file_from_parameter() {
+fn cli_uses_typescript_support_package_without_copying_sources() {
     let root = project_root();
-    let temp_dir = unique_output_path("typescript-support-file-input");
+    let temp_dir = unique_output_path("typescript-support-package");
     fs::create_dir_all(&temp_dir).unwrap();
-    let support_path = temp_dir.join("custom-support.ts");
     let output_path = temp_dir.join("output");
-    fs::write(
-        &support_path,
-        "export function customSupportHook(): string {\n  return \"custom\";\n}\n",
-    )
-    .unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
         .args([
             "typescript",
-            wit_input_path(&root, "user-service").to_str().unwrap(),
-            "--support-file",
-            support_path.to_str().unwrap(),
+            wit_input_path(&root, PRIMARY_EXAMPLE_ID).to_str().unwrap(),
+            linked_inputs_path(&root).to_str().unwrap(),
+            "--descriptors",
+            descriptor_path(&root).to_str().unwrap(),
+            "--support-package",
+            "./shared/helpers",
             "--output",
             output_path.to_str().unwrap(),
+            "--native-api",
         ])
         .output()
         .unwrap();
@@ -909,37 +910,51 @@ fn cli_generates_typescript_support_file_from_parameter() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(
-        fs::read_to_string(output_path.join("support.ts"))
-            .unwrap()
-            .contains("export function customSupportHook()")
-    );
+    assert!(!output_path.join("support.ts").exists());
+    let models = fs::read_to_string(output_path.join("models.ts")).unwrap();
+    assert!(models.contains("import * as support from './shared/helpers';"));
+    assert!(models.contains("support.valueToPayload("));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
-fn typescript_rejects_support_namespace() {
+fn typescript_sourced_helper_import_is_automatic() {
     let root = project_root();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::TypeScript,
-        &example_input_paths(&root, PRIMARY_EXAMPLE_ID),
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let err = generate_source(
-        nexgen::language::Language::TypeScript,
-        spec.clone(),
-        &descriptors,
-        &SupportFiles {
-            fragments: vec![SupportFragmentSpec {
-                path: "support.ts".to_string(),
-                contents: String::new(),
-                namespace: Some("example.support".to_string()),
-            }],
-        },
-    )
-    .unwrap_err();
-    assert!(err.to_string().contains("support namespace"));
+    let temp_dir = unique_output_path("typescript-sourced-support-only");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let wit_path = temp_dir.join("source-only.wit");
+    let wit = r#"
+package temporal:source-only@1.0.0;
+
+world system { export models; }
+
+interface models {
+  type placeholder = string;
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest" typescript-import="@temporalio/proto"
+  record cancel-request {
+    /// @nexus.source typescript="workflowNamespace()"
+    namespace: string,
+    /// @nexus.omit
+    workflow-execution: placeholder,
+    /// @nexus.omit
+    reason: placeholder,
+    /// @nexus.omit
+    identity: placeholder,
+    /// @nexus.omit
+    request-id: placeholder,
+    /// @nexus.omit
+    first-execution-run-id: placeholder,
+    /// @nexus.omit
+    links: placeholder,
+  }
+}
+"#;
+    fs::write(&wit_path, wit).unwrap();
+    let rendered = generate_typescript_to_string(&[wit_path], &[descriptor_path(&root)]);
+    assert!(rendered.contains("import * as support from './support';"));
+    assert!(rendered.contains("support.workflowNamespace()"));
+    fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
@@ -982,7 +997,7 @@ interface second-service {
         nexgen::language::Language::TypeScript,
         spec,
         &descriptors,
-        &SupportFiles::default(),
+        "./support",
     )
     .unwrap_err();
     let nexgen::error::Error::GeneratedFileSourceConflict {
@@ -1058,20 +1073,19 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     assert!(rendered.contains("staticSummary?: string;"));
     assert!(rendered.contains("staticDetails?: string;"));
     assert!(!rendered.contains("userMetadata?: UserMetadata;"));
-    assert!(rendered.contains("### support.ts"));
+    assert!(!rendered.contains("### support.ts"));
     assert!(rendered.contains("### index.ts"));
     let index_rendered = rendered
         .split("### index.ts")
         .nth(1)
         .expect("rendered output should include index.ts");
     assert!(!index_rendered.contains("export * from './support.ts';"));
-    assert!(rendered.contains("export function retryPolicyFromProto("));
+    assert!(rendered.contains("support.retryPolicyFromProto("));
     assert!(!index_rendered.contains("export const SignalWithStartWorkflowRequest = {"));
     assert!(!index_rendered.contains("const UserMetadata = {"));
     assert!(index_rendered.contains("function userMetadataFromProto("));
     assert!(index_rendered.contains("function signalWithStartWorkflowRequestToProto<"));
-    assert!(rendered.contains("workflowType: workflowTypeToProto("));
-    assert!(rendered.contains("workflowFunctionName("));
+    assert!(rendered.contains("workflowType: support.workflowTypeToProto("));
     assert!(rendered.contains("input: requestArgsToPayloads(model.args, model.workflow),"));
     assert!(
         rendered.contains("signalInput: requestArgsToPayloads(model.signalArgs, model.signal),")
@@ -1086,7 +1100,7 @@ fn typescript_renders_required_fields_and_custom_message_types() {
         })
         .expect("signal-with-start request renderer should be present");
     let workflow_type_index = signal_request_to_proto
-        .find("workflowType: workflowTypeToProto(")
+        .find("workflowType: support.workflowTypeToProto(")
         .expect("workflow type should be serialized");
     let input_index = signal_request_to_proto
         .find("input: requestArgsToPayloads(model.args, model.workflow),")
@@ -1095,7 +1109,7 @@ fn typescript_renders_required_fields_and_custom_message_types() {
         .find("workflowId: requiredField(")
         .expect("workflow id should be serialized");
     let task_queue_index = signal_request_to_proto
-        .find("taskQueue: taskQueueToProto(")
+        .find("taskQueue: support.taskQueueToProto(")
         .expect("task queue should be serialized");
     let signal_name_index = signal_request_to_proto
         .find("signalName:")
@@ -1104,39 +1118,42 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     assert!(input_index < workflow_id_index);
     assert!(workflow_id_index < task_queue_index);
     assert!(task_queue_index < signal_name_index);
-    assert!(rendered.contains("signalName: signalFunctionName("));
+    assert!(rendered.contains("signalName: support.signalFunctionName("));
     assert!(!rendered.contains("signalName: ((value) =>"));
-    assert!(rendered.contains("workflowType: workflowTypeToProto("));
-    assert!(rendered.contains("taskQueue: taskQueueToProto("));
+    assert!(rendered.contains("workflowType: support.workflowTypeToProto("));
+    assert!(rendered.contains("taskQueue: support.taskQueueToProto("));
     assert!(rendered.contains(
-        "workflowRunTimeout: model.runTimeout == null ? undefined : durationToProto(model.runTimeout),"
+        "workflowRunTimeout: model.runTimeout == null ? undefined : support.durationToProto(model.runTimeout),"
     ));
     assert!(rendered.contains("common.WorkflowIdReusePolicy.ALLOW_DUPLICATE"));
-    assert!(rendered.contains("workflowIdReusePolicy: workflowIdReusePolicyToProto("));
+    assert!(rendered.contains("workflowIdReusePolicy: support.workflowIdReusePolicyToProto("));
     assert!(!rendered.contains("workflowIdReusePolicyToProto(0"));
     assert!(rendered.contains("workflowIdConflictPolicy:"));
     assert!(!rendered.contains("workflowIdConflictPolicyToProto(0"));
     assert!(rendered.contains("model.idConflictPolicy == null"));
-    assert!(rendered.contains("workflowIdConflictPolicyToProto(model.idConflictPolicy)"));
-    assert!(rendered.contains("memo: model.memo == null ? undefined : memoToProto(model.memo),"));
+    assert!(rendered.contains("support.workflowIdConflictPolicyToProto(model.idConflictPolicy)"));
+    assert!(
+        rendered
+            .contains("memo: model.memo == null ? undefined : support.memoToProto(model.memo),")
+    );
     assert!(rendered.contains(
-        "searchAttributes: model.searchAttributes == null ? undefined : searchAttributesToProto(model.searchAttributes),"
+        "searchAttributes: model.searchAttributes == null ? undefined : support.searchAttributesToProto(model.searchAttributes),"
     ));
     assert!(rendered.contains(
-        "priority: model.priority == null ? undefined : priorityToProto(model.priority),"
+        "priority: model.priority == null ? undefined : support.priorityToProto(model.priority),"
     ));
     assert!(rendered.contains("model.staticSummary == null && model.staticDetails == null"));
     assert!(rendered.contains("summary: model.staticSummary == null"));
-    assert!(rendered.contains("valueToPayload(model.staticSummary)"));
+    assert!(rendered.contains("support.valueToPayload(model.staticSummary)"));
     assert!(rendered.contains("requestArgsToPayloads(model.args, model.workflow)"));
     assert!(!rendered.contains("common.defaultPayloadConverter"));
     assert!(!rendered.contains("payloadToProto(payload: unknown"));
     assert!(!rendered.contains("function isPayload("));
     assert!(rendered.contains(
-        "versioningOverride: model.versioningOverride == null ? undefined : versioningOverrideToProto(model.versioningOverride),"
+        "versioningOverride: model.versioningOverride == null ? undefined : support.versioningOverrideToProto(model.versioningOverride),"
     ));
-    assert!(rendered.contains("export function taskQueueFromProto("));
-    assert!(rendered.contains("export function taskQueueToProto("));
+    assert!(rendered.contains("support.taskQueueFromProto("));
+    assert!(rendered.contains("support.taskQueueToProto("));
     assert!(rendered.contains(
         "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest | undefined {"
     ));
@@ -1208,7 +1225,7 @@ fn typescript_json_names_inline_object_union_branch() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1253,7 +1270,7 @@ fn typescript_json_validates_non_object_union_branch_constraints() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1300,7 +1317,7 @@ fn typescript_json_recursively_converts_union_array_branches() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1358,7 +1375,7 @@ fn typescript_json_does_not_emit_union_serializer_for_assertion_only_format() {
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1392,7 +1409,7 @@ fn typescript_json_rejects_non_finite_numbers_at_every_position() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1427,7 +1444,7 @@ fn typescript_json_detects_nested_runtime_support() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1482,7 +1499,7 @@ fn typescript_json_validates_native_temporals_before_serializing() {
             config: Default::default(),
             language: nexgen::language::Language::TypeScript,
             input_paths: vec![input_path],
-            support_paths: Vec::new(),
+            support_package: Some("./support".to_string()),
             descriptor_paths: Vec::new(),
             output_path: output_path.clone(),
             format: false,
@@ -1542,7 +1559,7 @@ fn typescript_json_guards_nullable_array_elements_during_serialize_validation() 
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1585,7 +1602,7 @@ fn typescript_json_maps_element_position_unions() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1621,7 +1638,7 @@ fn typescript_json_native_barrel_exports_violation_type_only() {
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1669,7 +1686,7 @@ fn typescript_json_one_sided_operation_type_info() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1706,7 +1723,7 @@ fn typescript_json_operation_type_info_follows_ts_name_override() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1745,7 +1762,7 @@ fn typescript_json_cross_module_ts_name_override_moves_every_reference() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1793,7 +1810,7 @@ fn typescript_json_bare_ref_root_alias_typechecks_and_uses_target_converter() {
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1880,7 +1897,7 @@ $defs:
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1956,7 +1973,7 @@ $defs:
     let error = generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("output"),
         format: false,
@@ -1991,7 +2008,7 @@ fn typescript_json_override_moves_member_derived_names_only() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2033,7 +2050,7 @@ fn typescript_json_rejects_same_type_name_in_two_modules() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_dir.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join(output),
         format: false,
@@ -2118,7 +2135,7 @@ fn typescript_json_service_module_without_own_types_imports_instead_of_reemittin
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2176,7 +2193,7 @@ fn typescript_json_emits_complete_matchers_and_typed_mixed_extras() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2332,7 +2349,7 @@ fn typescript_json_emits_complete_property_name_matcher() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2364,7 +2381,7 @@ fn typescript_json_materializes_closed_values_and_nullable_defaults() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2400,7 +2417,7 @@ fn typescript_json_deprecates_types_fields_services_and_operations() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2427,7 +2444,7 @@ fn typescript_json_wave3_pairwise_runtime_matrix() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2746,7 +2763,7 @@ fn typescript_json_wave7_discrete_defects_typecheck_and_run() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2932,7 +2949,7 @@ fn typescript_json_dispatches_cross_module_ref_union_branches() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![main_path, shapes_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3016,7 +3033,7 @@ fn typescript_json_guards_nullable_elements_in_array_keywords() {
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3123,7 +3140,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3210,7 +3227,7 @@ fn typescript_json_truncates_over_capacity_fractional_seconds() {
             config: Default::default(),
             language: nexgen::language::Language::TypeScript,
             input_paths: vec![input_path],
-            support_paths: Vec::new(),
+            support_package: Some("./support".to_string()),
             descriptor_paths: Vec::new(),
             output_path: output_path.clone(),
             format: false,
@@ -3296,7 +3313,7 @@ additionalProperties: true
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3340,7 +3357,7 @@ properties:
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::TypeScript,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("./support".to_string()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,

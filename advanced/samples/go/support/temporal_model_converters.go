@@ -1,4 +1,4 @@
-package workflowservice
+package support
 
 import (
 	"fmt"
@@ -18,16 +18,21 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
+// WorkflowNamespace returns the namespace of the current workflow.
+func WorkflowNamespace(ctx workflow.Context) string {
+	return workflow.GetInfo(ctx).Namespace
+}
+
 // --- Duration (google.protobuf.Duration) ---
 
-func durationToProto(_ workflow.Context, d *time.Duration) (*durationpb.Duration, error) {
+func DurationToProto(_ workflow.Context, d *time.Duration) (*durationpb.Duration, error) {
 	if d == nil {
 		return nil, nil
 	}
 	return durationpb.New(*d), nil
 }
 
-func durationFromProto(_ workflow.Context, d *durationpb.Duration) (*time.Duration, error) {
+func DurationFromProto(_ workflow.Context, d *durationpb.Duration) (*time.Duration, error) {
 	if d == nil {
 		return nil, nil
 	}
@@ -37,14 +42,14 @@ func durationFromProto(_ workflow.Context, d *durationpb.Duration) (*time.Durati
 
 // --- TaskQueue (temporal.api.taskqueue.v1.TaskQueue) ---
 
-func taskQueueToProto(_ workflow.Context, name *string) (*taskqueue.TaskQueue, error) {
+func TaskQueueToProto(_ workflow.Context, name *string) (*taskqueue.TaskQueue, error) {
 	if name == nil {
 		return nil, nil
 	}
 	return &taskqueue.TaskQueue{Name: *name, Kind: enums.TASK_QUEUE_KIND_NORMAL}, nil
 }
 
-func taskQueueFromProto(_ workflow.Context, tq *taskqueue.TaskQueue) (*string, error) {
+func TaskQueueFromProto(_ workflow.Context, tq *taskqueue.TaskQueue) (*string, error) {
 	if tq == nil {
 		return nil, nil
 	}
@@ -54,11 +59,11 @@ func taskQueueFromProto(_ workflow.Context, tq *taskqueue.TaskQueue) (*string, e
 
 // --- RetryPolicy (temporal.api.common.v1.RetryPolicy) ---
 
-func retryPolicyToProto(_ workflow.Context, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {
+func RetryPolicyToProto(_ workflow.Context, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {
 	return internal.ConvertToPBRetryPolicy(p), nil
 }
 
-func retryPolicyFromProto(_ workflow.Context, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {
+func RetryPolicyFromProto(_ workflow.Context, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {
 	if p == nil {
 		return nil, nil
 	}
@@ -78,14 +83,14 @@ func retryPolicyFromProto(_ workflow.Context, p *common.RetryPolicy) (*temporal.
 
 // --- Priority (temporal.api.common.v1.Priority) ---
 
-func priorityToProto(_ workflow.Context, p *temporal.Priority) (*common.Priority, error) {
+func PriorityToProto(_ workflow.Context, p *temporal.Priority) (*common.Priority, error) {
 	if p == nil {
 		return nil, nil
 	}
 	return internal.ConvertToPBPriority(*p), nil
 }
 
-func priorityFromProto(_ workflow.Context, p *common.Priority) (*temporal.Priority, error) {
+func PriorityFromProto(_ workflow.Context, p *common.Priority) (*temporal.Priority, error) {
 	if p == nil {
 		return nil, nil
 	}
@@ -98,14 +103,14 @@ func priorityFromProto(_ workflow.Context, p *common.Priority) (*temporal.Priori
 
 // --- WorkflowType (temporal.api.common.v1.WorkflowType) ---
 
-func workflowTypeToProto(_ workflow.Context, name *string) (*common.WorkflowType, error) {
+func WorkflowTypeToProto(_ workflow.Context, name *string) (*common.WorkflowType, error) {
 	if name == nil {
 		return nil, nil
 	}
 	return &common.WorkflowType{Name: *name}, nil
 }
 
-func workflowTypeFromProto(_ workflow.Context, t *common.WorkflowType) (*string, error) {
+func WorkflowTypeFromProto(_ workflow.Context, t *common.WorkflowType) (*string, error) {
 	if t == nil {
 		return nil, nil
 	}
@@ -114,11 +119,11 @@ func workflowTypeFromProto(_ workflow.Context, t *common.WorkflowType) (*string,
 }
 
 // --- Payload / Payloads (temporal.api.common.v1.Payload[s]) ---
-func payloadToProto(ctx workflow.Context, value any) (*common.Payload, error) {
+func PayloadToProto(ctx workflow.Context, value any) (*common.Payload, error) {
 	return internal.GetDataConverterFromWorkflowContext(ctx).ToPayload(value)
 }
 
-func payloadFromProto(ctx workflow.Context, payload *common.Payload) (any, error) {
+func PayloadFromProto(ctx workflow.Context, payload *common.Payload) (any, error) {
 	if payload == nil {
 		return nil, nil
 	}
@@ -129,17 +134,17 @@ func payloadFromProto(ctx workflow.Context, payload *common.Payload) (any, error
 	return value, nil
 }
 
-func payloadsToProto(ctx workflow.Context, values []any) (*common.Payloads, error) {
+func PayloadsToProto(ctx workflow.Context, values []any) (*common.Payloads, error) {
 	return internal.GetDataConverterFromWorkflowContext(ctx).ToPayloads(values...)
 }
 
-func payloadsFromProto(ctx workflow.Context, payloads *common.Payloads) ([]any, error) {
+func PayloadsFromProto(ctx workflow.Context, payloads *common.Payloads) ([]any, error) {
 	if payloads == nil {
 		return nil, nil
 	}
 	values := make([]any, 0, len(payloads.GetPayloads()))
 	for _, payload := range payloads.GetPayloads() {
-		value, err := payloadFromProto(ctx, payload)
+		value, err := PayloadFromProto(ctx, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -150,14 +155,14 @@ func payloadsFromProto(ctx workflow.Context, payloads *common.Payloads) ([]any, 
 
 // --- Failure (temporal.api.failure.v1.Failure) ---
 
-func failureToProto(ctx workflow.Context, value error) (*failurepb.Failure, error) {
+func FailureToProto(ctx workflow.Context, value error) (*failurepb.Failure, error) {
 	failureConverter := temporal.NewDefaultFailureConverter(temporal.DefaultFailureConverterOptions{
 		DataConverter: internal.GetDataConverterFromWorkflowContext(ctx),
 	})
 	return failureConverter.ErrorToFailure(value), nil
 }
 
-func failureFromProto(ctx workflow.Context, failure *failurepb.Failure) (error, error) {
+func FailureFromProto(ctx workflow.Context, failure *failurepb.Failure) (error, error) {
 	if failure == nil {
 		return nil, nil
 	}
@@ -169,7 +174,7 @@ func failureFromProto(ctx workflow.Context, failure *failurepb.Failure) (error, 
 
 // --- Memo (temporal.api.common.v1.Memo) ---
 
-func memoToProto(ctx workflow.Context, memo map[string]any) (*common.Memo, error) {
+func MemoToProto(ctx workflow.Context, memo map[string]any) (*common.Memo, error) {
 	return internal.GetWorkflowMemo(
 		memo,
 		internal.GetDataConverterFromWorkflowContext(ctx),
@@ -177,13 +182,13 @@ func memoToProto(ctx workflow.Context, memo map[string]any) (*common.Memo, error
 	)
 }
 
-func memoFromProto(ctx workflow.Context, memo *common.Memo) (map[string]any, error) {
+func MemoFromProto(ctx workflow.Context, memo *common.Memo) (map[string]any, error) {
 	if memo == nil {
 		return nil, nil
 	}
 	result := make(map[string]any, len(memo.GetFields()))
 	for key, payload := range memo.GetFields() {
-		value, err := payloadFromProto(ctx, payload)
+		value, err := PayloadFromProto(ctx, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -192,13 +197,13 @@ func memoFromProto(ctx workflow.Context, memo *common.Memo) (map[string]any, err
 	return result, nil
 }
 
-func headerToProto(ctx workflow.Context, header map[string]any) (*common.Header, error) {
+func HeaderToProto(ctx workflow.Context, header map[string]any) (*common.Header, error) {
 	if header == nil {
 		return nil, nil
 	}
 	fields := make(map[string]*common.Payload, len(header))
 	for key, value := range header {
-		payload, err := payloadToProto(ctx, value)
+		payload, err := PayloadToProto(ctx, value)
 		if err != nil {
 			return nil, fmt.Errorf("encode workflow header error: %v", err)
 		}
@@ -207,13 +212,13 @@ func headerToProto(ctx workflow.Context, header map[string]any) (*common.Header,
 	return &common.Header{Fields: fields}, nil
 }
 
-func headerFromProto(ctx workflow.Context, header *common.Header) (map[string]any, error) {
+func HeaderFromProto(ctx workflow.Context, header *common.Header) (map[string]any, error) {
 	if header == nil {
 		return nil, nil
 	}
 	result := make(map[string]any, len(header.GetFields()))
 	for key, payload := range header.GetFields() {
-		value, err := payloadFromProto(ctx, payload)
+		value, err := PayloadFromProto(ctx, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -224,14 +229,14 @@ func headerFromProto(ctx workflow.Context, header *common.Header) (map[string]an
 
 // --- SearchAttributes (temporal.api.common.v1.SearchAttributes) ---
 
-func searchAttributesToProto(_ workflow.Context, searchAttributes *temporal.SearchAttributes) (*common.SearchAttributes, error) {
+func SearchAttributesToProto(_ workflow.Context, searchAttributes *temporal.SearchAttributes) (*common.SearchAttributes, error) {
 	if searchAttributes == nil {
 		return nil, nil
 	}
 	return internal.SerializeSearchAttributes(nil, *searchAttributes)
 }
 
-func searchAttributesFromProto(_ workflow.Context, searchAttributes *common.SearchAttributes) (*temporal.SearchAttributes, error) {
+func SearchAttributesFromProto(_ workflow.Context, searchAttributes *common.SearchAttributes) (*temporal.SearchAttributes, error) {
 	if searchAttributes == nil {
 		return nil, nil
 	}
@@ -284,14 +289,14 @@ func searchAttributesFromProto(_ workflow.Context, searchAttributes *common.Sear
 
 // --- VersioningOverride (temporal.api.workflow.v1.VersioningOverride) ---
 
-func versioningOverrideToProto(_ workflow.Context, versioningOverride *client.VersioningOverride) (*workflowpb.VersioningOverride, error) {
+func VersioningOverrideToProto(_ workflow.Context, versioningOverride *client.VersioningOverride) (*workflowpb.VersioningOverride, error) {
 	if versioningOverride == nil {
 		return nil, nil
 	}
 	return internal.VersioningOverrideToProto(*versioningOverride), nil
 }
 
-func versioningOverrideFromProto(_ workflow.Context, versioningOverride *workflowpb.VersioningOverride) (*client.VersioningOverride, error) {
+func VersioningOverrideFromProto(_ workflow.Context, versioningOverride *workflowpb.VersioningOverride) (*client.VersioningOverride, error) {
 	if versioningOverride == nil {
 		return nil, nil
 	}
