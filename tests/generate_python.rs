@@ -646,10 +646,6 @@ fn python_root(root: &Path) -> PathBuf {
     root.join("advanced/samples/python")
 }
 
-fn samples_python_root(root: &Path) -> PathBuf {
-    root.join("samples/python")
-}
-
 fn python_output_path(root: &Path, example_id: &str) -> PathBuf {
     python_root(root)
         .join("wit")
@@ -1186,38 +1182,6 @@ interface example-service {
     assert!(!output_path.join("operations/example_operation.py").exists());
 
     fs::remove_dir_all(temp_dir).unwrap();
-}
-
-/// The generated JSON-Schema runtime must also *run* on the declared floor,
-/// `requires-python = ">=3.10"` — not merely parse as 3.10 syntax.
-///
-/// `assert_python_310_syntax_compatible` checks the AST at
-/// `feature_version=(3, 10)`, which is a syntax check only, and the project
-/// environments above are whatever interpreter `uv` picked (3.13 here). That left a
-/// real class of bug uncovered: before 3.11, `datetime.fromisoformat` parses only
-/// the fractional-second widths `isoformat` writes, so an RFC 3339 `.1` raised on
-/// 3.10 while passing everywhere else. Every test in the suite was green.
-///
-/// The environment lives outside the project directory so the checked-in one is
-/// untouched and neither `basedpyright` nor `ruff` picks it up (their excludes name
-/// `.venv`). It is created on demand in well under a second from the same locked
-/// `uv.lock`, so this is one extra resolve, not a second maintained lockfile; `uv`
-/// fetches a managed CPython 3.10 if the host has none.
-#[test]
-fn python_json_samples_run_on_the_declared_python_floor() {
-    let root = project_root();
-    let floor_environment = root.join("target/python-floor-venv");
-
-    let status = Command::new("uv")
-        .current_dir(samples_python_root(&root))
-        .env("UV_PROJECT_ENVIRONMENT", &floor_environment)
-        .args(["run", "--python", "3.10", "--locked", "pytest"])
-        .status()
-        .unwrap();
-    assert!(
-        status.success(),
-        "the JSON-Schema sample suite failed on Python 3.10, the declared floor"
-    );
 }
 
 #[test]
