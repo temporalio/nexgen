@@ -585,7 +585,7 @@ func (ShowcaseMeasurementsString) isShowcaseMeasurements() {}
 func (v ShowcaseMeasurementsString) Validate() error {
 	var errs []Violation
 	if !_nexgenJsonSchemaPattern5e5b612d7a5d2b24.MatchString(string(v)) {
-		errs = append(errs, Violation{"", fmt.Sprintf("must match pattern %q, got %q", "^[a-z]+$", string(v))})
+		errs = append(errs, Violation{"", "must match pattern \"^[a-z]+$\", got " + quoteValue(string(v))})
 	}
 	if len(errs) > 0 {
 		return newPayloadValidationError(errs)
@@ -1260,7 +1260,7 @@ func (m Attributes) Validate() error {
 	}
 	for k := range m.AdditionalProperties {
 		if n := utf8.RuneCountInString(k); n > 8 {
-			errs = append(errs, Violation{memberPath(k), fmt.Sprintf("invalid property name %q: must have length <= 8, got %d", k, n)})
+			errs = append(errs, Violation{memberPath(k), fmt.Sprintf("invalid property name %s: must have length <= 8, got %d", quoteValue(k), n)})
 		}
 	}
 	if len(errs) > 0 {
@@ -1292,7 +1292,7 @@ func (m *Attributes) UnmarshalJSON(data []byte) error {
 	}
 	for k := range raw {
 		if n := utf8.RuneCountInString(k); n > 8 {
-			errs = append(errs, Violation{memberPath(k), fmt.Sprintf("invalid property name %q: must have length <= 8, got %d", k, n)})
+			errs = append(errs, Violation{memberPath(k), fmt.Sprintf("invalid property name %s: must have length <= 8, got %d", quoteValue(k), n)})
 		}
 	}
 	if len(errs) > 0 {
@@ -2679,12 +2679,12 @@ func (m Showcase) Validate() error {
 	}
 	if m.Sku != nil {
 		if !_nexgenJsonSchemaPattern5e5b412d5a5d7b322c347d24.MatchString(*m.Sku) {
-			errs = append(errs, Violation{"sku", fmt.Sprintf("must match pattern %q, got %q", "^[A-Z]{2,4}$", *m.Sku)})
+			errs = append(errs, Violation{"sku", "must match pattern \"^[A-Z]{2,4}$\", got " + quoteValue(*m.Sku)})
 		}
 	}
 	if m.Phrase != nil {
 		if !_nexgenJsonSchemaPattern5e5b5e5c745c6e5c7830425c665c72205d2b5b5c745c6e5c7830425c665c72205d5b5e5c745c6e5c7830425c665c72205d2b24.MatchString(*m.Phrase) {
-			errs = append(errs, Violation{"phrase", fmt.Sprintf("must match pattern %q, got %q", "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+$", *m.Phrase)})
+			errs = append(errs, Violation{"phrase", "must match pattern \"^[^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+[\\\\t\\\\n\\\\x0B\\\\f\\\\r ][^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+$\", got " + quoteValue(*m.Phrase)})
 		}
 	}
 	if m.RequestID != nil {
@@ -3023,7 +3023,7 @@ func (m Showcase) Validate() error {
 	}
 	if m.Wildcard != nil {
 		if !_nexgenJsonSchemaPattern615b5e5c6e5d62.MatchString(*m.Wildcard) {
-			errs = append(errs, Violation{"wildcard", fmt.Sprintf("must match pattern %q, got %q", "a[^\\n]b", *m.Wildcard)})
+			errs = append(errs, Violation{"wildcard", "must match pattern \"a[^\\\\n]b\", got " + quoteValue(*m.Wildcard)})
 		}
 	}
 	if len(errs) > 0 {
@@ -3138,13 +3138,13 @@ func (m *Showcase) UnmarshalJSON(data []byte) error {
 	if v, ok := parseStringField(get("sku"), "sku", false, false, &errs); ok {
 		m.Sku = &v
 		if !_nexgenJsonSchemaPattern5e5b412d5a5d7b322c347d24.MatchString(v) {
-			errs = append(errs, Violation{"sku", fmt.Sprintf("must match pattern %q, got %q", "^[A-Z]{2,4}$", v)})
+			errs = append(errs, Violation{"sku", "must match pattern \"^[A-Z]{2,4}$\", got " + quoteValue(v)})
 		}
 	}
 	if v, ok := parseStringField(get("phrase"), "phrase", false, false, &errs); ok {
 		m.Phrase = &v
 		if !_nexgenJsonSchemaPattern5e5b5e5c745c6e5c7830425c665c72205d2b5b5c745c6e5c7830425c665c72205d5b5e5c745c6e5c7830425c665c72205d2b24.MatchString(v) {
-			errs = append(errs, Violation{"phrase", fmt.Sprintf("must match pattern %q, got %q", "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+$", v)})
+			errs = append(errs, Violation{"phrase", "must match pattern \"^[^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+[\\\\t\\\\n\\\\x0B\\\\f\\\\r ][^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+$\", got " + quoteValue(v)})
 		}
 	}
 	if v, ok := parseStringField(get("requestId"), "requestId", false, false, &errs); ok {
@@ -3976,7 +3976,7 @@ func (m *Showcase) UnmarshalJSON(data []byte) error {
 	if v, ok := parseStringField(get("wildcard"), "wildcard", false, false, &errs); ok {
 		m.Wildcard = &v
 		if !_nexgenJsonSchemaPattern615b5e5c6e5d62.MatchString(v) {
-			errs = append(errs, Violation{"wildcard", fmt.Sprintf("must match pattern %q, got %q", "a[^\\n]b", v)})
+			errs = append(errs, Violation{"wildcard", "must match pattern \"a[^\\\\n]b\", got " + quoteValue(v)})
 		}
 	}
 	if v, ok := parseStringField(get("quoted"), "quoted", false, false, &errs); ok {
@@ -5130,7 +5130,7 @@ func (m Tokens) Validate() error {
 			errs = append(errs, Violation{path, fmt.Sprintf("must have length <= 8, got %d", n)})
 		}
 		if !_nexgenJsonSchemaPattern5e5b612d7a5d2b24.MatchString(v) {
-			errs = append(errs, Violation{path, fmt.Sprintf("must match pattern %q, got %q", "^[a-z]+$", v)})
+			errs = append(errs, Violation{path, "must match pattern \"^[a-z]+$\", got " + quoteValue(v)})
 		}
 	}
 	if len(errs) > 0 {
@@ -5158,7 +5158,7 @@ func (m *Tokens) UnmarshalJSON(data []byte) error {
 				errs = append(errs, Violation{path, fmt.Sprintf("must have length <= 8, got %d", n)})
 			}
 			if !_nexgenJsonSchemaPattern5e5b612d7a5d2b24.MatchString(value) {
-				errs = append(errs, Violation{path, fmt.Sprintf("must match pattern %q, got %q", "^[a-z]+$", value)})
+				errs = append(errs, Violation{path, "must match pattern \"^[a-z]+$\", got " + quoteValue(value)})
 			}
 			m.AdditionalProperties[k] = value
 		}

@@ -1951,7 +1951,8 @@ class _ShowcaseTransferTypeConverter(
                         violations.append(
                             Violation(
                                 path="sku",
-                                reason=f"must match pattern {_PATTERN_CD24623C0C29CA35.pattern}, got {_quote(sku_value_raw)}",
+                                reason='must match pattern "^[A-Z]{2,4}$", got '
+                                + _quote(sku_value_raw),
                             )
                         )
 
@@ -1973,7 +1974,8 @@ class _ShowcaseTransferTypeConverter(
                         violations.append(
                             Violation(
                                 path="phrase",
-                                reason=f"must match pattern {_PATTERN_B4BA2CA20EB1B963.pattern}, got {_quote(phrase_value_raw)}",
+                                reason='must match pattern "^[^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+[\\\\t\\\\n\\\\x0B\\\\f\\\\r ][^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+$", got '
+                                + _quote(phrase_value_raw),
                             )
                         )
 
@@ -3636,7 +3638,8 @@ class _ShowcaseTransferTypeConverter(
                         violations.append(
                             Violation(
                                 path="wildcard",
-                                reason=f"must match pattern {_PATTERN_F7DE686CF7F23810.pattern}, got {_quote(wildcard_value_raw)}",
+                                reason='must match pattern "a[^\\\\n]b", got '
+                                + _quote(wildcard_value_raw),
                             )
                         )
 
@@ -4031,7 +4034,8 @@ class _ShowcaseTransferTypeConverter(
                     violations.append(
                         Violation(
                             path="sku",
-                            reason=f"must match pattern {_PATTERN_CD24623C0C29CA35.pattern}, got {_quote(sku_value)}",
+                            reason='must match pattern "^[A-Z]{2,4}$", got '
+                            + _quote(sku_value),
                         )
                     )
             out["sku"] = sku_value
@@ -4044,7 +4048,8 @@ class _ShowcaseTransferTypeConverter(
                     violations.append(
                         Violation(
                             path="phrase",
-                            reason=f"must match pattern {_PATTERN_B4BA2CA20EB1B963.pattern}, got {_quote(phrase_value)}",
+                            reason='must match pattern "^[^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+[\\\\t\\\\n\\\\x0B\\\\f\\\\r ][^\\\\t\\\\n\\\\x0B\\\\f\\\\r ]+$", got '
+                            + _quote(phrase_value),
                         )
                     )
             out["phrase"] = phrase_value
@@ -4526,7 +4531,8 @@ class _ShowcaseTransferTypeConverter(
                     violations.append(
                         Violation(
                             path="measurements",
-                            reason=f"must match pattern {_PATTERN_F242E3A159C2422C.pattern}, got {_quote(measurements_value)}",
+                            reason='must match pattern "^[a-z]+$", got '
+                            + _quote(measurements_value),
                         )
                     )
             if not (
@@ -5283,7 +5289,8 @@ class _ShowcaseTransferTypeConverter(
                     violations.append(
                         Violation(
                             path="wildcard",
-                            reason=f"must match pattern {_PATTERN_F7DE686CF7F23810.pattern}, got {_quote(wildcard_value)}",
+                            reason='must match pattern "a[^\\\\n]b", got '
+                            + _quote(wildcard_value),
                         )
                     )
             out["wildcard"] = wildcard_value
@@ -7148,7 +7155,8 @@ class _TokensTransferTypeConverter(
                     violations.append(
                         Violation(
                             path=path,
-                            reason=f"must match pattern {_PATTERN_F242E3A159C2422C.pattern}, got {_quote(member_raw)}",
+                            reason='must match pattern "^[a-z]+$", got '
+                            + _quote(member_raw),
                         )
                     )
             additional_properties[key] = member
@@ -7194,7 +7202,8 @@ class _TokensTransferTypeConverter(
                     violations.append(
                         Violation(
                             path=path,
-                            reason=f"must match pattern {_PATTERN_F242E3A159C2422C.pattern}, got {_quote(entry)}",
+                            reason='must match pattern "^[a-z]+$", got '
+                            + _quote(entry),
                         )
                     )
             out[key] = entry
@@ -7913,7 +7922,7 @@ def _showcase_measurements_from_transfer_type(
             violations.append(
                 Violation(
                     path=path,
-                    reason=f"must match pattern {_PATTERN_F242E3A159C2422C.pattern}, got {_quote(value)}",
+                    reason='must match pattern "^[a-z]+$", got ' + _quote(value),
                 )
             )
         return value

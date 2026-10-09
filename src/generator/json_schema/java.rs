@@ -132,8 +132,12 @@ struct StringLengthConstraints {
     max_length: Option<u64>,
     /// The loader-normalized `pattern` with the per-target `$`→`\z` rewrite
     /// already applied (Java's strict end-of-input anchor). See
-    /// `specs/json-schema/features/pattern.md`.
+    /// `specs/json-schema/features/pattern.md`. Compiled for matching only.
     pattern: Option<String>,
+    /// The loader-normalized `pattern` *before* the per-target rewrite — the
+    /// text the violation reason quotes, so Java prints the same pattern as
+    /// every other target rather than its host-regex rewrite.
+    authored_pattern: Option<String>,
     /// A pinned `format` check (regex + optional length guard) on the same node.
     format: Option<JavaFormat>,
 }
@@ -147,6 +151,7 @@ impl StringLengthConstraints {
                 .pattern
                 .as_deref()
                 .map(|pattern| crate::json_schema::pattern::rewrite_end_anchor(pattern, r"\z")),
+            authored_pattern: schema.pattern.clone(),
             format: schema
                 .format
                 .as_deref()
@@ -603,11 +608,15 @@ fn render_java_string_checks(
     // `pattern`: unanchored `Matcher.find()` (never `matches()`, which anchors
     // the whole input), default flags (ASCII `\d\w\s`, code-point `.`). The
     // compiled `Pattern` is a static field on the class (compiled once).
-    if let Some(pattern) = &constraints.pattern {
+    // The reason quotes the authored pattern, not the `\z`-rewritten one.
+    if let Some(authored) = &constraints.authored_pattern {
         output.push_str(&format!(
-            "{indent}if (!{field_pattern}.matcher({value_expr}).find()) {{\n{indent}    violations.add(new Violation({json}, \"must match pattern \" + {pattern_literal} + \", got \" + {value_expr}));\n{indent}}}\n",
+            "{indent}if (!{field_pattern}.matcher({value_expr}).find()) {{\n{indent}    violations.add(new Violation({json}, {reason_literal} + Violation.quote({value_expr})));\n{indent}}}\n",
             field_pattern = java_pattern_field_name(field_java_name),
-            pattern_literal = java_string_literal(pattern),
+            reason_literal = java_string_literal(&format!(
+                "{}, got ",
+                crate::json_schema::pattern::violation_reason(authored)
+            )),
         ));
     }
     // `format`: the length guard (if any) short-circuits **before** the pinned
@@ -658,11 +667,14 @@ fn render_java_inline_string_checks(
             ));
         }
     }
-    if let Some(pattern) = constraints.pattern {
+    if let (Some(pattern), Some(authored)) = (&constraints.pattern, &constraints.authored_pattern) {
         output.push_str(&format!(
-            "{indent}if (!java.util.regex.Pattern.compile({}).matcher({value_expr}).find()) {{\n{indent}    violations.add(new Violation({path_expr}, \"must match pattern \" + {} + \", got \" + {value_expr}));\n{indent}}}\n",
-            java_string_literal(&pattern),
-            java_string_literal(&pattern),
+            "{indent}if (!java.util.regex.Pattern.compile({}).matcher({value_expr}).find()) {{\n{indent}    violations.add(new Violation({path_expr}, {} + Violation.quote({value_expr})));\n{indent}}}\n",
+            java_string_literal(pattern),
+            java_string_literal(&format!(
+                "{}, got ",
+                crate::json_schema::pattern::violation_reason(authored)
+            )),
         ));
     }
     if let Some(format) = constraints.format {
@@ -810,19 +822,22 @@ fn render_java_property_name_checks(
         if let Some(min) = constraints.min_length {
             let min_literal = java_count_literal(min);
             output.push_str(&format!(
-                "{indent}    if (pnLength < {min_literal}) {{\n{indent}        violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \\\"\" + pnKey + \"\\\": must have length >= {min}, got \" + pnLength));\n{indent}    }}\n"
+                "{indent}    if (pnLength < {min_literal}) {{\n{indent}        violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \" + Violation.quote(pnKey) + \": must have length >= {min}, got \" + pnLength));\n{indent}    }}\n"
             ));
         }
         if let Some(max) = constraints.max_length {
             let max_literal = java_count_literal(max);
             output.push_str(&format!(
-                "{indent}    if (pnLength > {max_literal}) {{\n{indent}        violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \\\"\" + pnKey + \"\\\": must have length <= {max}, got \" + pnLength));\n{indent}    }}\n"
+                "{indent}    if (pnLength > {max_literal}) {{\n{indent}        violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \" + Violation.quote(pnKey) + \": must have length <= {max}, got \" + pnLength));\n{indent}    }}\n"
             ));
         }
     }
+    render_java_property_name_pattern_check(output, &constraints, &format!("{indent}    "));
     let mut non_length = constraints.clone();
     non_length.min_length = None;
     non_length.max_length = None;
+    non_length.pattern = None;
+    non_length.authored_pattern = None;
     render_java_string_checks(
         output,
         "pnKey",
@@ -3904,19 +3919,22 @@ fn render_java_serialize_property_name_checks(
         if let Some(min) = constraints.min_length {
             let min_literal = java_count_literal(min);
             output.push_str(&format!(
-                "{indent}    if (pnLength < {min_literal}) {{\n{indent}        violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \\\"\" + pnKey + \"\\\": must have length >= {min}, got \" + pnLength));\n{indent}    }}\n"
+                "{indent}    if (pnLength < {min_literal}) {{\n{indent}        violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \" + Violation.quote(pnKey) + \": must have length >= {min}, got \" + pnLength));\n{indent}    }}\n"
             ));
         }
         if let Some(max) = constraints.max_length {
             let max_literal = java_count_literal(max);
             output.push_str(&format!(
-                "{indent}    if (pnLength > {max_literal}) {{\n{indent}        violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \\\"\" + pnKey + \"\\\": must have length <= {max}, got \" + pnLength));\n{indent}    }}\n"
+                "{indent}    if (pnLength > {max_literal}) {{\n{indent}        violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \" + Violation.quote(pnKey) + \": must have length <= {max}, got \" + pnLength));\n{indent}    }}\n"
             ));
         }
     }
+    render_java_property_name_pattern_check(output, &constraints, &format!("{indent}    "));
     let mut non_length = constraints.clone();
     non_length.min_length = None;
     non_length.max_length = None;
+    non_length.pattern = None;
+    non_length.authored_pattern = None;
     render_java_string_checks(
         output,
         "pnKey",
@@ -3933,6 +3951,27 @@ fn render_java_serialize_property_name_checks(
         &format!("{indent}    "),
     );
     output.push_str(&format!("{indent}}}\n"));
+}
+
+/// Emits the `propertyNames` `pattern` check over `pnKey`. Unlike a value
+/// position, the reason leads with the `invalid property name "<key>": `
+/// prefix every `propertyNames` reason carries and has no `, got` suffix (the
+/// prefix already names the key). See `specs/json-schema/features/propertyNames.md`.
+fn render_java_property_name_pattern_check(
+    output: &mut String,
+    constraints: &StringLengthConstraints,
+    indent: &str,
+) {
+    if let Some(authored) = &constraints.authored_pattern {
+        output.push_str(&format!(
+            "{indent}if (!{field_pattern}.matcher(pnKey).find()) {{\n{indent}    violations.add(new Violation(Violation.memberPath(pnKey), \"invalid property name \" + Violation.quote(pnKey) + {reason_literal}));\n{indent}}}\n",
+            field_pattern = java_pattern_field_name(PROPERTY_NAME_POSITION),
+            reason_literal = java_string_literal(&format!(
+                ": {}",
+                crate::json_schema::pattern::violation_reason(authored)
+            )),
+        ));
+    }
 }
 
 fn render_java_closed_string_checks(
@@ -6248,6 +6287,37 @@ pub(in crate::generator) fn render_violation_file(package: &str) -> String {
     output.push_str("    public static String memberPath(String key) {\n");
     output.push_str("        if (key.matches(\"[A-Za-z_][A-Za-z0-9_]*\")) {\n            return key;\n        }\n");
     output.push_str("        return \"[\\\"\" + key.replace(\"\\\\\", \"\\\\\\\\\").replace(\"\\\"\", \"\\\\\\\"\") + \"\\\"]\";\n    }\n\n");
+    // quote renders a string the way every target quotes an offending value or
+    // key in a reason: a JSON string literal (Go `quoteValue`, Python
+    // `json.dumps(ensure_ascii=False)`, TypeScript `JSON.stringify`).
+    output.push_str(
+        "    /** Quotes {@code value} as a JSON string literal for a violation reason. */\n",
+    );
+    output.push_str("    public static String quote(String value) {\n");
+    output.push_str(
+        "        StringBuilder out = new StringBuilder(value.length() + 2).append('\"');\n",
+    );
+    output.push_str("        for (int i = 0; i < value.length(); i++) {\n");
+    output.push_str("            char c = value.charAt(i);\n");
+    output.push_str("            if (c == '\"') {\n                out.append(\"\\\\\\\"\");\n");
+    output.push_str(
+        "            } else if (c == '\\\\') {\n                out.append(\"\\\\\\\\\");\n",
+    );
+    output
+        .push_str("            } else if (c == '\\b') {\n                out.append(\"\\\\b\");\n");
+    output
+        .push_str("            } else if (c == '\\f') {\n                out.append(\"\\\\f\");\n");
+    output
+        .push_str("            } else if (c == '\\n') {\n                out.append(\"\\\\n\");\n");
+    output
+        .push_str("            } else if (c == '\\r') {\n                out.append(\"\\\\r\");\n");
+    output
+        .push_str("            } else if (c == '\\t') {\n                out.append(\"\\\\t\");\n");
+    output.push_str("            } else if (c < 0x20) {\n                out.append(String.format(\"\\\\u%04x\", (int) c));\n");
+    output.push_str("            } else {\n                out.append(c);\n            }\n");
+    output.push_str("        }\n");
+    output.push_str("        return out.append('\"').toString();\n");
+    output.push_str("    }\n\n");
     output.push_str("    public Violation withPathPrefix(String prefix) {\n");
     output.push_str("        if (path == null || path.isEmpty()) {\n            return new Violation(prefix, reason);\n        }\n");
     output.push_str("        return new Violation(path.startsWith(\"[\") ? prefix + path : prefix + \".\" + path, reason);\n    }\n\n");

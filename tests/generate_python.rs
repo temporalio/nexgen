@@ -321,7 +321,7 @@ reported = violations(lambda: converter(PatternNames).from_transfer_type(
 ))
 assert reported == [
     ("A", 'invalid property name "A": must have length >= 2, got 1'),
-    ("A", r'invalid property name "A": must match pattern ^[a-z]+\Z'),
+    ("A", 'invalid property name "A": must match pattern "^[a-z]+$"'),
     ("toolongkey", 'invalid property name "toolongkey": must have length <= 8, got 10'),
 ], reported
 assert violations(lambda: converter(EnumNames).to_transfer_type(
@@ -335,10 +335,10 @@ assert violations(lambda: converter(FormatNames).from_transfer_type(
 # canonical string produced from a native value.
 assert violations(lambda: converter(Contract).from_transfer_type(
     {"known": "ok", "day": "2025-08-21"}, Contract
-)) == [("day", 'must match pattern ^2026-, got "2025-08-21"')]
+)) == [("day", 'must match pattern "^2026-", got "2025-08-21"')]
 changed = Contract(known="ok", day=datetime.date(2025, 8, 21))
 assert violations(lambda: converter(Contract).to_transfer_type(changed)) == [
-    ("day", 'must match pattern ^2026-, got "2025-08-21"')
+    ("day", 'must match pattern "^2026-", got "2025-08-21"')
 ]
 
 wrong_closed = Contract(
@@ -351,7 +351,7 @@ reported = violations(lambda: converter(Contract).to_transfer_type(wrong_closed)
 assert reported == [
     ("fixedDay", 'must equal "2026-08-21"'),
     ("dayChoice", 'must be one of ["2026-08-21", "2026-08-22"], got "2026-08-23"'),
-    ("fixedBlob", r'must match pattern ^YQ==\Z, got "Yg=="'),
+    ("fixedBlob", 'must match pattern "^YQ==$", got "Yg=="'),
     ("fixedBlob", 'must equal "YQ=="'),
 ], reported
 "#;
@@ -521,7 +521,7 @@ assert converter.to_transfer_type(model) == valid, converter.to_transfer_type(mo
 expected = [
     ("violations", "must have length >= 2, got 1"),
     ("math", "must be a finite number, got inf"),
-    ("re", 'must match pattern ^[a-z]+\\Z, got "ABC"'),
+    ("re", 'must match pattern "^[a-z]+$", got "ABC"'),
 ]
 
 # The critical case: a property named `violations` rebound the violation
@@ -1768,6 +1768,12 @@ fn python_json_validates_non_object_union_branch_constraints() {
         rendered.contains("_PATTERN_F242E3A159C2422C = re.compile(\"^[a-z]+\\\\Z\", re.ASCII)")
     );
     assert!(rendered.contains("if _PATTERN_F242E3A159C2422C.search(value) is None:"));
+    // The reason quotes the authored pattern, not the `\Z`-rewritten source the
+    // compiled const carries — the same text every other target prints.
+    assert!(
+        rendered.contains("reason=\"must match pattern \\\"^[a-z]+$\\\", got \" + _quote(value)")
+    );
+    assert!(!rendered.contains("must match pattern {_PATTERN_"));
     assert!(rendered.contains("_check_unique_items("));
     // The array branch's element schema is part of the serialize contract too:
     // its unconstrained `number` still contributes the uniform finiteness guard

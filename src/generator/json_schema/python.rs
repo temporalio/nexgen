@@ -1854,10 +1854,12 @@ fn render_py_string_checks(
     }
 }
 
-/// Emits the `pattern` predicate. The message reads the pattern text back off
-/// the compiled object (`.pattern`) rather than embedding it in the f-string,
-/// which sidesteps escaping a regex inside a Python string literal entirely.
-/// `re.search` is unanchored — never `match` (anchors the start) or `fullmatch`.
+/// Emits the `pattern` predicate. The check runs the compiled (`\Z`-rewritten)
+/// regex, but the message quotes the *authored* pattern — the same text every
+/// other target prints — as a plain string literal concatenated with the
+/// offending value (never interpolated into an f-string, so no brace or quote
+/// in the regex needs f-string escaping). `re.search` is unanchored — never
+/// `match` (anchors the start) or `fullmatch`.
 fn render_py_pattern_check(
     output: &mut String,
     value_expr: &str,
@@ -1872,7 +1874,13 @@ fn render_py_pattern_check(
         indent,
         &format!("{const_name}.search({value_expr}) is None"),
         path_expr,
-        &format!("f\"must match pattern {{{const_name}.pattern}}, got {{_quote({value_expr})}}\""),
+        &format!(
+            "{} + _quote({value_expr})",
+            python_string_literal(&format!(
+                "{}, got ",
+                crate::json_schema::pattern::violation_reason(pattern)
+            ))
+        ),
     );
 }
 
@@ -2070,7 +2078,8 @@ fn render_py_property_name_checks(
             &format!("{const_name}.search(key) is None"),
             "_member_path(key)",
             &format!(
-                "f'invalid property name {{_quote(key)}}: must match pattern {{{const_name}.pattern}}'"
+                "f'invalid property name {{_quote(key)}}: ' + {}",
+                python_string_literal(&crate::json_schema::pattern::violation_reason(pattern))
             ),
         );
     }

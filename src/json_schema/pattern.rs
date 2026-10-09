@@ -132,6 +132,18 @@ pub fn gate_and_normalize(pattern: &str) -> Result<String, PatternError> {
     Ok(apply_edits(pattern, edits))
 }
 
+/// The target-neutral `must match pattern "<pattern>"` lead of a `pattern`
+/// violation reason. `pattern` is the loader-normalized text (never a
+/// per-target `$` rewrite), quoted as a JSON string — the same form every
+/// target quotes the offending value in — so every target prints the same
+/// bytes for the same schema. Backends embed it as a literal in their own
+/// string grammar and append `, got <JSON-quoted value>` for value positions.
+/// See `specs/json-schema/features/pattern.md` ("Informative reason strings").
+pub fn violation_reason(pattern: &str) -> String {
+    let quoted = serde_json::to_string(pattern).expect("a string always serializes");
+    format!("must match pattern {quoted}")
+}
+
 /// Rewrite every unescaped `$` end-anchor assertion to `replacement` (Python
 /// `\Z`, Java `\z`), leaving `^`, escaped `\$`, and literals untouched. Applied
 /// by the Python/Java backends at emit time; Go/JS keep `$` (already
