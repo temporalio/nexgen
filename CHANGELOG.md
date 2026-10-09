@@ -9,16 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Breaking Changes
+
+### Fixed
+
+### Security
+
+## [0.2.8] - 2026-10-09
+
+### Added
+
 - .NET native-API generation now converts protobuf oneof-backed variants and
   generic proto-backed records whose type parameters are carried by Temporal
   `Payload` or `Payloads` fields. Generic models register open generic
   transfer-type converters and require `Temporalio` 1.19.0 or newer. The
   `notification-service`, `proto-oneof`, and `proto-generic` (previously
   `proto-generic-python`) examples are now generated for .NET.
-
-### Changed
-
-### Deprecated
 
 ### Breaking Changes
 
@@ -38,8 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Operation-free WIT interfaces now honor `@nexus.namespace`, and .NET names
   their namespace after the interface (`Nexgen.<InterfaceName>`) instead of
   falling back to `Nexgen.Generated`.
-
-### Security
 
 ## [0.2.7] - 2026-10-01
 
