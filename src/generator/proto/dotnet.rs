@@ -5,7 +5,6 @@ use crate::generator::dotnet::{
     WireValueConversion, csharp_parameter_name, csharp_type_name, csharp_type_parameter_name,
     field_property_name, function_args_parameter_type, qualify_dotnet_support_reference,
 };
-use crate::language::Language;
 use crate::planning::{
     PlannedFamily, PlannedProtoMessageType, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec,
     PlannedType, PlannedWireFieldBinding, PlannedWireVariantMember,
@@ -489,7 +488,7 @@ fn generic_carrier_to_wire_expr(
 /// Returns the closed generic C# name for a generated model, such as `Model<T1, T2>`.
 fn model_type_name(model: &RecordSpec<PlannedFamily>, api_plan: &PlannedSpec) -> String {
     let base = csharp_type_name(&model.name);
-    let parameters = api_plan.record_type_parameters(&model.full_name, Language::Dotnet);
+    let parameters = api_plan.record_type_parameters(&model.full_name);
     if parameters.is_empty() {
         base
     } else {
@@ -507,9 +506,7 @@ fn model_type_name(model: &RecordSpec<PlannedFamily>, api_plan: &PlannedSpec) ->
 /// Returns the open generic C# name for a generated model, such as `Model<,>`.
 fn open_model_type_name(model: &RecordSpec<PlannedFamily>, api_plan: &PlannedSpec) -> String {
     let base = csharp_type_name(&model.name);
-    let parameter_count = api_plan
-        .record_type_parameters(&model.full_name, Language::Dotnet)
-        .len();
+    let parameter_count = api_plan.record_type_parameters(&model.full_name).len();
     if parameter_count == 0 {
         base
     } else {
@@ -522,7 +519,7 @@ fn variant_type_name(variant_type: &PlannedType, api_plan: &PlannedSpec) -> Stri
         panic!("oneof field should resolve to a variant");
     };
     let base = csharp_type_name(&variant.name);
-    let parameters = api_plan.variant_type_parameters(&variant.full_name, Language::Dotnet);
+    let parameters = api_plan.variant_type_parameters(&variant.full_name);
     if parameters.is_empty() {
         base
     } else {
@@ -558,11 +555,10 @@ fn dotnet_message_type_for_proto_message(proto: &PlannedProtoMessageType) -> Str
         .unwrap_or_else(|| dotnet_proto_type_name_for_info(&proto.proto))
 }
 
-pub(crate) fn dotnet_replacement_type_name(replacement: &TypeReplacementSpec) -> Option<String> {
-    replacement
-        .type_name
-        .for_language(Language::Dotnet)
-        .map(str::to_string)
+pub(crate) fn dotnet_replacement_type_name(
+    replacement: &TypeReplacementSpec<PlannedFamily>,
+) -> Option<String> {
+    replacement.type_name.value().map(str::to_string)
 }
 
 pub(crate) fn dotnet_proto_or_local_type(
@@ -591,11 +587,7 @@ pub(crate) fn dotnet_proto_type_name_for_info(info: &PlannedProtoTypeInfo) -> St
         .and_then(|options| options.csharp_namespace.as_deref())
         .filter(|namespace| !namespace.is_empty())
         .map(|namespace| format!("{namespace}.{}", dotnet_proto_relative_type_name(info)))
-        .or_else(|| {
-            info.type_name
-                .for_language(Language::Dotnet)
-                .map(str::to_string)
-        })
+        .or_else(|| info.type_name.value().map(str::to_string))
         .unwrap_or_else(|| dotnet_proto_type_name_fallback(&info.full_name))
 }
 
@@ -608,7 +600,7 @@ pub(crate) fn dotnet_to_proto_converter(model_type: &PlannedType) -> Option<&str
     proto
         .replacement
         .as_ref()
-        .and_then(|replacement| replacement.to_proto.for_language(Language::Dotnet))
+        .and_then(|replacement| replacement.to_proto.value())
 }
 
 pub(crate) fn dotnet_from_proto_converter(model_type: &PlannedType) -> Option<&str> {
@@ -620,7 +612,7 @@ pub(crate) fn dotnet_from_proto_converter(model_type: &PlannedType) -> Option<&s
     proto
         .replacement
         .as_ref()
-        .and_then(|replacement| replacement.from_proto.for_language(Language::Dotnet))
+        .and_then(|replacement| replacement.from_proto.value())
 }
 
 fn render_model_transfer_converter(
@@ -1117,7 +1109,7 @@ fn proto_message_from_wire_expr(
     let conversion = proto
         .replacement
         .as_ref()
-        .and_then(|replacement| replacement.from_proto.for_language(Language::Dotnet))
+        .and_then(|replacement| replacement.from_proto.value())
         .map(|converter| {
             let converter = qualify_dotnet_support_reference(converter, support_namespace);
             format!("{converter}({{value}})")
@@ -1395,14 +1387,11 @@ pub(crate) fn dotnet_proto_type_name_fallback(full_name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use prost_types::FileOptions;
 
     use super::{dotnet_proto_type_name_fallback, dotnet_proto_type_name_for_info};
-    use crate::language::Language;
     use crate::planning::PlannedProtoTypeInfo;
-    use crate::spec::LanguageStringSpec;
+    use crate::spec::SelectedTextSpec;
 
     #[test]
     fn proto_type_name_fallback_pascal_cases_dotted_parts() {
@@ -1426,8 +1415,8 @@ mod tests {
                 csharp_namespace: Some("Temporalio.Api.Workflow.V1".to_string()),
                 ..Default::default()
             }),
-            reference: LanguageStringSpec::default(),
-            type_name: LanguageStringSpec::default(),
+            reference: SelectedTextSpec::default(),
+            type_name: SelectedTextSpec::default(),
         };
 
         assert_eq!(
@@ -1446,15 +1435,10 @@ mod tests {
                 csharp_namespace: Some("Temporalio.Api.Common.V1".to_string()),
                 ..Default::default()
             }),
-            reference: LanguageStringSpec::default(),
-            type_name: LanguageStringSpec {
-                default: None,
-                by_language: BTreeMap::from([(
-                    Language::Dotnet,
-                    "Should.Not.Be.Used.Payload".to_string(),
-                )]),
-                default_import: None,
-                imports: BTreeMap::new(),
+            reference: SelectedTextSpec::default(),
+            type_name: SelectedTextSpec {
+                value: Some("Should.Not.Be.Used.Payload".to_string()),
+                import: None,
             },
         };
 

@@ -119,6 +119,7 @@ pub(crate) fn compile_tree_to_files(
     let selected_tree = planning::LanguageSelectionPass::new(language)
         .apply(authored_tree)
         .expect("language selection is infallible");
+    let selected_tree = planning::SelectedValidationPass.apply(selected_tree)?;
 
     // selected IR -> resource bindings -> operation relationships -> lowered
     // operation results -> planned types -> reachability-pruned planned IR
@@ -133,8 +134,7 @@ pub(crate) fn compile_tree_to_files(
     let operation_bound_tree = planning::OperationBindingPass::new().apply(resource_bound_tree)?;
     let operation_lowered_tree =
         planning::OperationLoweringPass::new().apply(operation_bound_tree)?;
-    let type_planning =
-        planning::TypePlanningPass::new(&operation_lowered_tree, descriptors, language);
+    let type_planning = planning::TypePlanningPass::new(&operation_lowered_tree, descriptors);
     let planned_tree = type_planning.apply(operation_lowered_tree)?;
     let planned_tree = planning::ReachabilityPass::new().apply(planned_tree)?;
 

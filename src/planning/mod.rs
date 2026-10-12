@@ -6,13 +6,12 @@ use prost_types::FileOptions;
 
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
-use crate::language::Language;
 use crate::spec::{
-    AliasTypeSpec, ApiSpec, ApiSpecTransform, AuthoredResourceType, ExternalTypeSourceSpec,
-    ExternalTypeSpec, ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec,
-    FunctionFieldSpec, FunctionResultSpec, JsonModelSpec, LanguageStringSpec, ModulePath,
-    OperationSpec, RecordFieldVisibility, RecordSpec, ResourceFieldSpec, SelectedFamily,
-    SelectedTextSpec, ServiceSpec, Symbol, TypeDeclSpec, TypeFamily, TypeReplacementSpec, TypeSpec,
+    AliasTypeSpec, ApiSpec, ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec,
+    ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec, FunctionFieldSpec,
+    FunctionResultSpec, JsonModelSpec, ModulePath, OperationSpec, RecordFieldVisibility,
+    RecordSpec, ResourceFieldSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec,
+    ServiceSpec, Symbol, TypeDeclSpec, TypeFamily, TypeReplacementSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, ApiSpecNode, ApiSpecTree, CompilerPass};
 
@@ -23,6 +22,7 @@ mod operation_lowering;
 mod proto;
 mod reachability;
 mod resource_resolution;
+mod selected_validation;
 mod selection;
 mod type_planning;
 
@@ -40,6 +40,7 @@ pub(crate) use resource_resolution::{
     ResolvedResourceReturnSpec, ResolvedResourceSpec, ResourceBoundData, ResourceBoundFamily,
     ResourceResolutionPass,
 };
+pub(crate) use selected_validation::SelectedValidationPass;
 pub(crate) use selection::LanguageSelectionPass;
 #[cfg(test)]
 pub(crate) use selection::select_spec;
@@ -63,30 +64,19 @@ impl TypeFamily for PlannedFamily {
     type ResourceData = PlannedResource;
     type OperationData = PlannedOperationData;
     type FieldData = PlannedFieldData;
-    // Planned code still exposes the legacy text container to the generators.
-    // `TypePlanningMapper` materializes it from already-selected values with no
-    // language override maps, so no later stage performs selection.
-    type Text = LanguageStringSpec;
+    type Text = SelectedTextSpec;
 }
 
 pub(crate) type PlannedSpec = ApiSpec<PlannedFamily>;
 pub(crate) type PlannedType = TypeSpec<PlannedFamily>;
 
-pub(super) fn materialize_selected_text(text: &SelectedTextSpec) -> LanguageStringSpec {
-    LanguageStringSpec {
-        default: text.value.clone(),
-        default_import: text.import.clone(),
-        ..Default::default()
-    }
-}
-
 pub(super) fn materialize_selected_replacement(
     replacement: &TypeReplacementSpec<OperationLoweredFamily>,
-) -> TypeReplacementSpec {
+) -> TypeReplacementSpec<PlannedFamily> {
     TypeReplacementSpec {
-        type_name: materialize_selected_text(&replacement.type_name),
-        from_proto: materialize_selected_text(&replacement.from_proto),
-        to_proto: materialize_selected_text(&replacement.to_proto),
+        type_name: replacement.type_name.clone(),
+        from_proto: replacement.from_proto.clone(),
+        to_proto: replacement.to_proto.clone(),
     }
 }
 
@@ -190,8 +180,8 @@ pub(crate) struct PlannedProtoTypeInfo {
     pub(crate) package: String,
     pub(crate) file_name: Option<String>,
     pub(crate) file_options: Option<FileOptions>,
-    pub(crate) reference: LanguageStringSpec,
-    pub(crate) type_name: LanguageStringSpec,
+    pub(crate) reference: SelectedTextSpec,
+    pub(crate) type_name: SelectedTextSpec,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -292,7 +282,7 @@ pub(crate) enum PlannedProtoType {
 pub(crate) struct PlannedProtoMessageType {
     pub(crate) proto: PlannedProtoTypeInfo,
     pub(crate) model_name: String,
-    pub(crate) replacement: Option<TypeReplacementSpec>,
+    pub(crate) replacement: Option<TypeReplacementSpec<PlannedFamily>>,
     pub(crate) authored_type: Option<Box<PlannedType>>,
 }
 
@@ -300,7 +290,7 @@ pub(crate) struct PlannedProtoMessageType {
 pub(crate) struct PlannedProtoEnumType {
     pub(crate) proto: PlannedProtoTypeInfo,
     pub(crate) name: String,
-    pub(crate) replacement: Option<TypeReplacementSpec>,
+    pub(crate) replacement: Option<TypeReplacementSpec<PlannedFamily>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

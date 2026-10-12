@@ -19,7 +19,7 @@ use crate::error::{Error, Result};
 use crate::language::Language;
 use crate::parser::{ManifestModel, ManifestService, NameManifest, build_name_manifest};
 use crate::spec::{ApiSpecLeaf, ApiSpecNode, ApiSpecTransform, ApiSpecTree, CompilerPass};
-use crate::spec::{LanguageStringSpec, ModulePath};
+use crate::spec::{ModulePath, SelectedTextSpec};
 
 use super::{
     PlannedAliasType, PlannedEnumType, PlannedFamily, PlannedFieldData, PlannedFlagsType,
@@ -190,7 +190,7 @@ impl ApiSpecTransform<PlannedFamily, PlannedFamily> for EmittedNameMapper<'_> {
     fn map_field_data(&mut self, _: &str, _: &str, value: PlannedFieldData) -> PlannedFieldData {
         value
     }
-    fn map_text(&mut self, value: LanguageStringSpec) -> LanguageStringSpec {
+    fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
         value
     }
 }
@@ -204,7 +204,7 @@ pub(crate) fn build_json_name_manifest(
     api_plan: &PlannedSpec,
 ) -> Result<NameManifest> {
     let models = manifest_models(api_plan);
-    let services = manifest_services(language, api_plan);
+    let services = manifest_services(api_plan);
     build_name_manifest(language, &models, &services)
 }
 
@@ -217,7 +217,7 @@ fn collect_tree_manifest_inputs(
     match node {
         ApiSpecNode::Leaf(leaf) => {
             models.extend(manifest_models(&leaf.spec));
-            services.extend(manifest_services(language, &leaf.spec));
+            services.extend(manifest_services(&leaf.spec));
         }
         ApiSpecNode::Branch(branch) => {
             for child in branch.children.values() {
@@ -255,13 +255,13 @@ fn manifest_model(json: &PlannedJsonType) -> ManifestModel {
     }
 }
 
-fn manifest_services(language: Language, api_plan: &PlannedSpec) -> Vec<ManifestService> {
+fn manifest_services(api_plan: &PlannedSpec) -> Vec<ManifestService> {
     api_plan
         .services
         .iter()
         .map(|service| ManifestService {
             name: service.name.clone(),
-            code_name: service.code_name.for_language(language).map(str::to_string),
+            code_name: service.code_name.value().map(str::to_string),
             module_key: api_plan.module_path.as_module_key(),
             io_type_refs: service
                 .operations

@@ -10,8 +10,8 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 use crate::spec::{
-    ApiSpecTransform, AuthoredResourceType, ExternalTypeSourceSpec, ExternalTypeSpec,
-    JsonModelSpec, ProtoTypeSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec, Symbol,
+    ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec, JsonModelSpec, ProtoTypeSpec,
+    RecordFieldSpec, RecordFieldVisibility, RecordSpec, SelectedResourceType, Symbol,
     TypeDeclEntry, TypeDeclSpec, TypeSpec,
 };
 
@@ -30,7 +30,7 @@ impl crate::spec::TypeFamily for OperationLoweredFamily {
     type Enum = Symbol;
     type Flags = Symbol;
     type Variant = Symbol;
-    type Resource = AuthoredResourceType;
+    type Resource = SelectedResourceType;
     type Proto = Symbol;
     type Json = JsonModelSpec<Symbol>;
     type Alias = Symbol;
@@ -168,7 +168,7 @@ impl ApiSpecTransform<OperationBoundFamily, OperationLoweredFamily> for Operatio
     fn map_variant(&mut self, value: Symbol) -> Symbol {
         value
     }
-    fn map_resource(&mut self, value: AuthoredResourceType) -> AuthoredResourceType {
+    fn map_resource(&mut self, value: SelectedResourceType) -> SelectedResourceType {
         value
     }
     fn map_proto(&mut self, value: Symbol) -> Symbol {

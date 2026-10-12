@@ -46,9 +46,11 @@ flowchart LR
         authoredForBinding[AuthoredFamily]
         validated[AuthoredFamily<br/>validated]
         selected[SelectedFamily]
+        selectedValidated[SelectedFamily<br/>validated]
 
         authoredForBinding -->|AuthoredValidationPass| validated
         validated -->|LanguageSelectionPass| selected
+        selected -->|SelectedValidationPass| selectedValidated
     end
 
     subgraph bind["Resource & Operation Binding"]
@@ -84,7 +86,7 @@ flowchart LR
     end
 
     authored --> authoredForBinding
-    selected --> selectedForBinding
+    selectedValidated --> selectedForBinding
     operationBound --> operationBoundForPlanning
     reachable --> reachableForEmission
 ```
@@ -95,6 +97,7 @@ flowchart LR
   constraints.
 - `LanguageSelectionPass` selects the target-language values from authored
   language maps.
+- `SelectedValidationPass` validates the selected generic surface after selection.
 - `ResourceResolutionPass` resolves resource-method and resource-return facts
   from the API spec and descriptors.
 - `OperationBindingPass` attaches resolved resource facts to their owning

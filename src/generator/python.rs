@@ -22,9 +22,9 @@ use crate::planning::{
 use crate::planning::{RequestPlan, ResolvedResourceBindingSource};
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec,
-    FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec, LanguageImportStyle,
-    LanguageStringSpec, ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility,
-    RecordSpec, TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec, LanguageImportStyle, ModulePath,
+    OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec, SelectedTextSpec,
+    TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -494,15 +494,9 @@ impl<'a> ApiPlanner<'a> {
                     .collect::<Result<Vec<_>>>()?;
 
                 Ok(RenderedService {
-                    name: service
-                        .code_name
-                        .for_language(Language::Python)
-                        .unwrap_or(&service.name),
+                    name: service.code_name.value().unwrap_or(&service.name),
                     wire_name: &service.wire_name,
-                    doc: service
-                        .doc
-                        .for_language(Language::Python)
-                        .map(str::to_string),
+                    doc: service.doc.value().map(str::to_string),
                     endpoint: service.endpoint.clone(),
                     experimental: service.experimental,
                     deprecated: service.deprecated,
@@ -1096,7 +1090,7 @@ impl<'a> ApiPlanner<'a> {
                 target,
                 ..
             })) => type_name
-                .for_language(Language::Python)
+                .value()
                 .map(str::to_string)
                 .unwrap_or_else(|| self.python_resource_value_annotation(target)),
         }
@@ -1143,9 +1137,7 @@ impl<'a> ApiPlanner<'a> {
                         .service_model_ref(input, "models", self.api_plan);
                 let input_conversion = self.resolve_message_value_conversion(input)?;
                 let annotation = if let PlannedType::Record(record) = input {
-                    let parameters = self
-                        .api_plan
-                        .record_type_parameters(&record.full_name, Language::Python);
+                    let parameters = self.api_plan.record_type_parameters(&record.full_name);
                     python_generic_record_annotation(&input_conversion.annotation, &parameters)
                 } else {
                     input_conversion.annotation.clone()
@@ -1154,9 +1146,7 @@ impl<'a> ApiPlanner<'a> {
                     descriptor_type_ref: if let PlannedType::Record(record) = input {
                         python_erased_generic_record_annotation(
                             &type_ref,
-                            &self
-                                .api_plan
-                                .record_type_parameters(&record.full_name, Language::Python),
+                            &self.api_plan.record_type_parameters(&record.full_name),
                         )
                     } else {
                         type_ref.clone()
@@ -1217,7 +1207,7 @@ impl<'a> ApiPlanner<'a> {
             }
         };
         let model_input_parameters = input
-            .map(|input| self.api_plan.type_parameters(input, Language::Python))
+            .map(|input| self.api_plan.type_parameters(input))
             .unwrap_or_default();
         let model_input_identities = model_input_parameters
             .iter()
@@ -1225,7 +1215,7 @@ impl<'a> ApiPlanner<'a> {
             .collect::<BTreeSet<_>>();
         let model_output_parameters = operation
             .output_type()
-            .map(|output| self.api_plan.type_parameters(output, Language::Python))
+            .map(|output| self.api_plan.type_parameters(output))
             .unwrap_or_default();
         let generic_model_types =
             !model_input_parameters.is_empty() || !model_output_parameters.is_empty();
@@ -1237,12 +1227,7 @@ impl<'a> ApiPlanner<'a> {
         let output_annotation_default =
             erase_python_type_parameters(&output_annotation_default, &model_output_only_parameters);
         let overload_output_annotation = output_transform
-            .and_then(|transform| {
-                transform
-                    .type_name
-                    .for_language(crate::language::Language::Python)
-                    .map(str::to_string)
-            })
+            .and_then(|transform| transform.type_name.value().map(str::to_string))
             .or_else(|| {
                 output_resource_return
                     .as_ref()
@@ -1276,9 +1261,7 @@ impl<'a> ApiPlanner<'a> {
         let descriptor_output_ref = match operation.output_type() {
             Some(PlannedType::Record(record)) => python_erased_generic_record_annotation(
                 &output_ref,
-                &self
-                    .api_plan
-                    .record_type_parameters(&record.full_name, Language::Python),
+                &self.api_plan.record_type_parameters(&record.full_name),
             ),
             _ => output_ref.clone(),
         };
@@ -1287,19 +1270,13 @@ impl<'a> ApiPlanner<'a> {
             wire_name: operation.wire_name.as_str(),
             attr_name: operation
                 .code_name
-                .for_language(Language::Python)
+                .value()
                 .map(str::to_string)
                 .unwrap_or_else(|| python_ident(&operation.name.to_snake_case())),
             experimental: operation.experimental,
             deprecated: operation.deprecated,
-            doc: operation
-                .doc
-                .for_language(Language::Python)
-                .map(str::to_string),
-            return_doc: operation
-                .return_doc
-                .for_language(Language::Python)
-                .map(str::to_string),
+            doc: operation.doc.value().map(str::to_string),
+            return_doc: operation.return_doc.value().map(str::to_string),
             input: rendered_input,
             output_ref,
             descriptor_output_ref,
@@ -1308,15 +1285,11 @@ impl<'a> ApiPlanner<'a> {
             overload_output_annotation,
             output_type_parameters,
             output_type_expr,
-            output_transform_expr: output_transform.and_then(|transform| {
-                transform
-                    .transform
-                    .for_language(crate::language::Language::Python)
-                    .map(str::to_string)
-            }),
+            output_transform_expr: output_transform
+                .and_then(|transform| transform.transform.value().map(str::to_string)),
             serialization_context_expr: operation
                 .serialization_context
-                .for_language(crate::language::Language::Python)
+                .value()
                 .map(|helper| format!("_support.{helper}")),
             output_resource_return,
             output_direct_result,
@@ -1341,9 +1314,7 @@ impl<'a> ApiPlanner<'a> {
                 let conversion = self.resolve_message_value_conversion(model_type)?;
                 Ok(python_generic_record_annotation(
                     &conversion.annotation,
-                    &self
-                        .api_plan
-                        .record_type_parameters(&record.full_name, Language::Python),
+                    &self.api_plan.record_type_parameters(&record.full_name),
                 ))
             }
             _ => panic!("operation output annotation should be model-shaped"),
@@ -1428,7 +1399,7 @@ impl<'a> ApiPlanner<'a> {
                 doc: planned_field
                     .doc
                     .as_ref()
-                    .and_then(|doc| doc.for_language(Language::Python))
+                    .and_then(|doc| doc.value())
                     .map(str::to_string),
             });
             request_fields.push(RenderedUnpackedRequestField {
@@ -1517,7 +1488,7 @@ impl<'a> ApiPlanner<'a> {
                             attr_name: nested_rendered_field.attr_name.clone(),
                             annotation: nested_planned_model
                                 .field_flattened_annotation(nested_field_name)
-                                .and_then(|annotation| annotation.for_language(Language::Python))
+                                .and_then(|annotation| annotation.value())
                                 .map(|annotation| {
                                     if nested_planned_field.required {
                                         annotation.to_string()
@@ -1535,7 +1506,7 @@ impl<'a> ApiPlanner<'a> {
                             doc: nested_planned_field
                                 .doc
                                 .as_ref()
-                                .and_then(|doc| doc.for_language(Language::Python))
+                                .and_then(|doc| doc.value())
                                 .map(str::to_string),
                         }
                     },
@@ -1562,7 +1533,7 @@ impl<'a> ApiPlanner<'a> {
                 full_name: full_name.to_string(),
                 name: planned_model.name.clone(),
                 type_parameters: api_plan
-                    .record_type_parameters(full_name, Language::Python)
+                    .record_type_parameters(full_name)
                     .into_iter()
                     .map(|usage| usage.parameter.name)
                     .collect(),
@@ -1639,7 +1610,7 @@ impl<'a> ApiPlanner<'a> {
                         .as_ref()
                         .map(|payload| {
                             self.api_plan
-                                .type_parameters(payload, Language::Python)
+                                .type_parameters(payload)
                                 .into_iter()
                                 .map(|usage| usage.parameter.name)
                                 .collect()
@@ -1661,7 +1632,7 @@ impl<'a> ApiPlanner<'a> {
             name: variant_spec.name.clone(),
             type_parameters: self
                 .api_plan
-                .variant_type_parameters(&variant_spec.full_name, Language::Python)
+                .variant_type_parameters(&variant_spec.full_name)
                 .into_iter()
                 .map(|usage| usage.parameter.name)
                 .collect(),
@@ -1915,7 +1886,7 @@ fn resolve_python_value_type(
         PlannedType::Variant(variant_type) => ResolvedFieldType {
             annotation: python_generic_record_annotation(
                 &variant_type.name,
-                &api_plan.variant_type_parameters(&variant_type.full_name, Language::Python),
+                &api_plan.variant_type_parameters(&variant_type.full_name),
             ),
             imports: PythonImports::default(),
             kind: ResolvedFieldKind::Scalar,
@@ -1935,7 +1906,7 @@ fn resolve_python_value_type(
             let annotation = if let PlannedType::Record(record) = message_type {
                 python_generic_record_annotation(
                     &conversion.annotation,
-                    &api_plan.record_type_parameters(&record.full_name, Language::Python),
+                    &api_plan.record_type_parameters(&record.full_name),
                 )
             } else {
                 conversion.annotation.clone()
@@ -2022,7 +1993,7 @@ fn resolve_python_value_type(
             type_name, target, ..
         })) => {
             let mut resolved = resolve_python_value_type(api_plan, external_models, target)?;
-            if let Some(annotation) = type_name.for_language(Language::Python) {
+            if let Some(annotation) = type_name.value() {
                 resolved.annotation = annotation.to_string();
             }
             resolved
@@ -2276,7 +2247,7 @@ fn collect_model_type_imports(
 }
 
 fn collect_type_replacement_imports(
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
     imports: &mut BTreeSet<LanguageImportSpec>,
 ) {
     collect_python_import(&replacement.type_name, imports);
@@ -2415,8 +2386,8 @@ fn collect_authored_type_imports(
     }
 }
 
-fn collect_python_import(spec: &LanguageStringSpec, imports: &mut BTreeSet<LanguageImportSpec>) {
-    if let Some(module) = spec.import_for_language(Language::Python) {
+fn collect_python_import(spec: &SelectedTextSpec, imports: &mut BTreeSet<LanguageImportSpec>) {
+    if let Some(module) = spec.import() {
         imports.insert(LanguageImportSpec {
             language: Language::Python,
             reference: module.to_string(),
@@ -2428,7 +2399,7 @@ fn collect_python_import(spec: &LanguageStringSpec, imports: &mut BTreeSet<Langu
         return;
     }
 
-    let Some(expression) = spec.for_language(Language::Python) else {
+    let Some(expression) = spec.value() else {
         return;
     };
     for module_path in python_qualified_module_paths(expression) {
@@ -2973,10 +2944,9 @@ fn source_paths_label(paths: &BTreeSet<PathBuf>) -> String {
 
 fn python_function_result_annotation(result: &FunctionResultSpec<PlannedFamily>) -> String {
     match result {
-        FunctionResultSpec::Annotation(annotation) => annotation
-            .for_language(Language::Python)
-            .unwrap_or("typing.Any")
-            .to_string(),
+        FunctionResultSpec::Annotation(annotation) => {
+            annotation.value().unwrap_or("typing.Any").to_string()
+        }
         FunctionResultSpec::Authored(authored_type) => {
             python_authored_type_annotation(authored_type)
         }
@@ -3022,7 +2992,7 @@ pub(in crate::generator) fn python_authored_type_annotation(authored_type: &Plan
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => type_name
-            .for_language(Language::Python)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| python_authored_type_annotation(target)),
         TypeSpec::External(ExternalTypeSpec::Proto(proto_name)) => proto_name
@@ -3221,7 +3191,7 @@ fn python_field_annotation(
     }
 
     if let Some(annotation) = &field.annotation {
-        if let Some(annotation) = annotation.for_language(Language::Python) {
+        if let Some(annotation) = annotation.value() {
             return annotation.to_string();
         }
     }
@@ -7595,14 +7565,14 @@ fn validate_python_generated_names<'a>(
     }
 
     for (_, record) in api_plan.records() {
-        for usage in api_plan.record_type_parameters(&record.full_name, Language::Python) {
+        for usage in api_plan.record_type_parameters(&record.full_name) {
             declarations
                 .entry(usage.parameter.name.clone())
                 .or_insert_with(|| format!("type parameter `{}`", usage.parameter.full_name));
         }
     }
     for (_, variant) in api_plan.variants() {
-        for usage in api_plan.variant_type_parameters(&variant.full_name, Language::Python) {
+        for usage in api_plan.variant_type_parameters(&variant.full_name) {
             declarations
                 .entry(usage.parameter.name.clone())
                 .or_insert_with(|| format!("type parameter `{}`", usage.parameter.full_name));

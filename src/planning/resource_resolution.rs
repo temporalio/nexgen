@@ -9,10 +9,10 @@ use prost_types::field_descriptor_proto::Type;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::spec::{
-    ApiSpec, ApiSpecTransform, AuthoredFamily, AuthoredResourceType, ExternalTypeSpec,
-    JsonModelSpec, OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
-    ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec, ResourceSpec, SelectedFamily,
-    SelectedTextSpec, ServiceSpec, Symbol, TypeFamily, TypeSpec,
+    ApiSpec, ApiSpecTransform, ExternalTypeSpec, JsonModelSpec, OperationSpec, RecordFieldSpec,
+    RecordFieldVisibility, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
+    ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec, ServiceSpec, Symbol,
+    TypeFamily, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 /// Selected IR after resource-method and resource-return bindings are resolved.
@@ -30,7 +30,7 @@ impl TypeFamily for ResourceBoundFamily {
     type Enum = Symbol;
     type Flags = Symbol;
     type Variant = Symbol;
-    type Resource = crate::spec::AuthoredResourceType;
+    type Resource = SelectedResourceType;
     type Proto = Symbol;
     type Json = crate::spec::JsonModelSpec<Symbol>;
     type Alias = Symbol;
@@ -62,7 +62,7 @@ impl ApiSpecTransform<SelectedFamily, ResourceBoundFamily> for ResourceBindingMa
     fn map_variant(&mut self, value: Symbol) -> Symbol {
         value
     }
-    fn map_resource(&mut self, value: AuthoredResourceType) -> AuthoredResourceType {
+    fn map_resource(&mut self, value: SelectedResourceType) -> SelectedResourceType {
         value
     }
     fn map_proto(&mut self, value: Symbol) -> Symbol {
@@ -766,7 +766,7 @@ fn operation_output_resource_message_name(
 
 fn operation_output_resource_wire_type(
     operation: &OperationSpec<SelectedFamily>,
-) -> Option<&ExternalTypeSpec<AuthoredFamily>> {
+) -> Option<&ExternalTypeSpec<SelectedFamily>> {
     let TypeSpec::Resource(resource_name) = operation.output_type()? else {
         return None;
     };

@@ -14,7 +14,7 @@ use super::type_planning::TypePlanningContext;
 use super::{
     PlannedFieldData, PlannedProtoEnumType, PlannedProtoMessageType, PlannedProtoType,
     PlannedProtoTypeInfo, PlannedType, PlannedWireFieldBinding, PlannedWireVariantMember,
-    materialize_selected_replacement, materialize_selected_text,
+    materialize_selected_replacement,
 };
 
 impl PlannedProtoTypeInfo {
@@ -63,13 +63,12 @@ fn native_source_for_proto<'a>(
 fn proto_reference(
     spec: &ApiSpec<OperationLoweredFamily>,
     proto_name: &str,
-) -> crate::spec::LanguageStringSpec {
+) -> crate::spec::SelectedTextSpec {
     spec.external_type_binding(proto_name)
         .and_then(|binding| binding.reference())
-        .map(materialize_selected_text)
+        .cloned()
         .or_else(|| {
-            native_source_for_proto(spec, proto_name)
-                .map(|source| materialize_selected_text(&source.reference))
+            native_source_for_proto(spec, proto_name).map(|source| source.reference.clone())
         })
         .unwrap_or_default()
 }
@@ -77,12 +76,11 @@ fn proto_reference(
 fn proto_type_name(
     spec: &ApiSpec<OperationLoweredFamily>,
     proto_name: &str,
-) -> crate::spec::LanguageStringSpec {
+) -> crate::spec::SelectedTextSpec {
     spec.external_type_binding(proto_name)
-        .map(|binding| materialize_selected_text(binding.type_name()))
+        .map(|binding| binding.type_name().clone())
         .or_else(|| {
-            native_source_for_proto(spec, proto_name)
-                .map(|source| materialize_selected_text(&source.type_name))
+            native_source_for_proto(spec, proto_name).map(|source| source.type_name.clone())
         })
         .unwrap_or_default()
 }

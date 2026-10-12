@@ -27,8 +27,8 @@ use crate::planning::{
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec, FunctionFieldSpec,
-    FunctionResultSpec, IntSpec, LanguageImportSpec, LanguageImportStyle, LanguageStringSpec,
-    ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
+    FunctionResultSpec, IntSpec, LanguageImportSpec, LanguageImportStyle, ModulePath,
+    OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec, SelectedTextSpec,
     TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
@@ -465,9 +465,7 @@ impl<'a> ApiPlanner<'a> {
         let output_annotation_default = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_operation_output_annotation(
                 &output_annotation_default,
-                &self
-                    .api_plan
-                    .record_type_parameters(&record.full_name, Language::TypeScript),
+                &self.api_plan.record_type_parameters(&record.full_name),
                 input,
                 self.api_plan,
             ),
@@ -476,18 +474,14 @@ impl<'a> ApiPlanner<'a> {
         let service_output_operation_annotation = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_erased_record_annotation(
                 &output_transfer_annotation,
-                &self
-                    .api_plan
-                    .record_type_parameters(&record.full_name, Language::TypeScript),
+                &self.api_plan.record_type_parameters(&record.full_name),
             ),
             _ => output_transfer_annotation.clone(),
         };
         let output_operation_annotation = match operation.output_type() {
             Some(PlannedType::Record(record)) => typescript_operation_output_annotation(
                 &output_transfer_annotation,
-                &self
-                    .api_plan
-                    .record_type_parameters(&record.full_name, Language::TypeScript),
+                &self.api_plan.record_type_parameters(&record.full_name),
                 input,
                 self.api_plan,
             ),
@@ -498,47 +492,28 @@ impl<'a> ApiPlanner<'a> {
             wire_name: operation.wire_name.as_str(),
             attr_name: operation
                 .code_name
-                .for_language(Language::TypeScript)
+                .value()
                 .map(str::to_string)
                 .unwrap_or_else(|| typescript_ident(&operation.name.to_lower_camel_case())),
             experimental: operation.experimental,
             deprecated: operation.deprecated,
-            doc: operation
-                .doc
-                .for_language(Language::TypeScript)
-                .map(str::to_string),
-            return_doc: operation
-                .return_doc
-                .for_language(Language::TypeScript)
-                .map(str::to_string),
+            doc: operation.doc.value().map(str::to_string),
+            return_doc: operation.return_doc.value().map(str::to_string),
             output_operation_annotation,
             service_output_operation_annotation,
             input: rendered_input,
             output_annotation: output_transform
-                .and_then(|transform| {
-                    transform
-                        .type_name
-                        .for_language(Language::TypeScript)
-                        .map(str::to_string)
-                })
+                .and_then(|transform| transform.type_name.value().map(str::to_string))
                 .or_else(|| {
                     output_resource_return
                         .as_ref()
                         .map(|resource| resource.resource_type_name.clone())
                 })
                 .unwrap_or(output_annotation_default),
-            output_transform_type_import: output_transform.and_then(|transform| {
-                transform
-                    .type_import
-                    .for_language(Language::TypeScript)
-                    .map(str::to_string)
-            }),
-            output_transform_expr: output_transform.and_then(|transform| {
-                transform
-                    .transform
-                    .for_language(Language::TypeScript)
-                    .map(str::to_string)
-            }),
+            output_transform_type_import: output_transform
+                .and_then(|transform| transform.type_import.value().map(str::to_string)),
+            output_transform_expr: output_transform
+                .and_then(|transform| transform.transform.value().map(str::to_string)),
             output_resource_return,
             output_direct_result: operation.output_direct_result(),
             output_model_name: operation
@@ -564,7 +539,7 @@ impl<'a> ApiPlanner<'a> {
             ),
             serialization_context_expr: operation
                 .serialization_context
-                .for_language(Language::TypeScript)
+                .value()
                 .map(support_reference),
         })
     }
@@ -849,7 +824,7 @@ impl<'a> ApiPlanner<'a> {
                 name: planned_variant.name.clone(),
                 type_parameters: self
                     .api_plan
-                    .variant_type_parameters(&planned_variant.full_name, Language::TypeScript)
+                    .variant_type_parameters(&planned_variant.full_name)
                     .into_iter()
                     .map(|usage| usage.parameter.name)
                     .collect(),
@@ -889,7 +864,7 @@ impl<'a> ApiPlanner<'a> {
         let doc = field
             .doc
             .as_ref()
-            .and_then(|doc| doc.for_language(Language::TypeScript))
+            .and_then(|doc| doc.value())
             .map(str::to_string);
 
         if let PlannedType::Map(_, value) = &field.field_type {
@@ -1185,7 +1160,7 @@ impl<'a> ApiPlanner<'a> {
             );
             let annotation = nested_planned_model
                 .field_flattened_annotation(nested_field_name)
-                .and_then(|annotation| annotation.for_language(Language::TypeScript))
+                .and_then(|annotation| annotation.value())
                 .map(str::to_string)
                 .unwrap_or_else(|| nested_rendered_field.annotation.clone());
             let to_wire_expr =
@@ -1211,7 +1186,7 @@ impl<'a> ApiPlanner<'a> {
         let doc = field
             .doc
             .as_ref()
-            .and_then(|doc| doc.for_language(Language::TypeScript))
+            .and_then(|doc| doc.value())
             .map(str::to_string);
         Some(RenderedField {
             name: generated_field_name.to_string(),
@@ -1269,7 +1244,7 @@ impl<'a> ApiPlanner<'a> {
         let doc = field
             .doc
             .as_ref()
-            .and_then(|doc| doc.for_language(Language::TypeScript))
+            .and_then(|doc| doc.value())
             .map(str::to_string);
 
         if let PlannedType::Map(_, value) = &field.field_type {
@@ -1339,7 +1314,7 @@ impl<'a> ApiPlanner<'a> {
         let annotation = field
             .annotation
             .as_ref()
-            .and_then(|annotation| annotation.for_language(Language::TypeScript))
+            .and_then(|annotation| annotation.value())
             .map(str::to_string)
             .unwrap_or(default_annotation);
         if !field.required && annotation.ends_with(" | undefined") {
@@ -1444,7 +1419,7 @@ impl<'a> ApiPlanner<'a> {
                         &variant_type.name,
                         &self
                             .api_plan
-                            .variant_type_parameters(&variant_type.full_name, Language::TypeScript)
+                            .variant_type_parameters(&variant_type.full_name)
                             .into_iter()
                             .map(|usage| usage.parameter.name)
                             .collect::<Vec<_>>(),
@@ -1462,7 +1437,7 @@ impl<'a> ApiPlanner<'a> {
                 let annotation = if let PlannedType::Record(record) = message_type {
                     let parameters = self
                         .api_plan
-                        .record_type_parameters(&record.full_name, Language::TypeScript)
+                        .record_type_parameters(&record.full_name)
                         .into_iter()
                         .map(|usage| RenderedTypeParameter {
                             name: usage.parameter.name,
@@ -1574,7 +1549,7 @@ impl<'a> ApiPlanner<'a> {
                 ..
             })) => {
                 let mut resolved = self.resolve_planned_value_type(fallback);
-                if let Some(annotation) = type_name.for_language(Language::TypeScript) {
+                if let Some(annotation) = type_name.value() {
                     resolved.annotation = annotation.to_string();
                     resolved.requirements = TypeScriptRequirements {
                         long: annotation == "Long",
@@ -2017,14 +1992,11 @@ fn generate_leaf(
                 name: service.name.as_str(),
                 attr_name: service
                     .code_name
-                    .for_language(Language::TypeScript)
+                    .value()
                     .map(str::to_string)
                     .unwrap_or_else(|| typescript_ident(&service.name.to_lower_camel_case())),
                 wire_name: service.wire_name.as_str(),
-                doc: service
-                    .doc
-                    .for_language(Language::TypeScript)
-                    .map(str::to_string),
+                doc: service.doc.value().map(str::to_string),
                 endpoint: service.endpoint.clone(),
                 experimental: service.experimental,
                 deprecated: service.deprecated,
@@ -2194,7 +2166,7 @@ fn collect_model_type_imports(
 }
 
 fn collect_type_replacement_imports(
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
     imports: &mut BTreeSet<LanguageImportSpec>,
 ) {
     collect_typescript_import(&replacement.type_name, true, false, imports);
@@ -2336,15 +2308,15 @@ fn collect_authored_type_imports(
 }
 
 fn collect_typescript_import(
-    spec: &LanguageStringSpec,
+    spec: &SelectedTextSpec,
     type_only: bool,
     named_import: bool,
     imports: &mut BTreeSet<LanguageImportSpec>,
 ) {
-    let Some(module) = spec.import_for_language(Language::TypeScript) else {
+    let Some(module) = spec.import() else {
         return;
     };
-    let Some(expression) = spec.for_language(Language::TypeScript) else {
+    let Some(expression) = spec.value() else {
         return;
     };
     for namespace in typescript_qualified_namespaces(expression) {
@@ -2409,7 +2381,7 @@ fn model_type_parameters(
     }
 
     let mut model_parameters = api_plan
-        .record_type_parameters(&model.full_name, Language::TypeScript)
+        .record_type_parameters(&model.full_name)
         .into_iter()
         .map(|usage| RenderedTypeParameter {
             name: usage.parameter.name,
@@ -2487,10 +2459,9 @@ fn model_type_parameters(
 
 fn typescript_function_result_annotation(result: &FunctionResultSpec<PlannedFamily>) -> String {
     match result {
-        FunctionResultSpec::Annotation(annotation) => annotation
-            .for_language(Language::TypeScript)
-            .unwrap_or("unknown")
-            .to_string(),
+        FunctionResultSpec::Annotation(annotation) => {
+            annotation.value().unwrap_or("unknown").to_string()
+        }
         FunctionResultSpec::Authored(authored_type) => {
             typescript_authored_type_annotation(authored_type)
         }
@@ -2566,7 +2537,7 @@ pub(in crate::generator) fn typescript_authored_type_annotation(
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => type_name
-            .for_language(Language::TypeScript)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| typescript_authored_type_annotation(target)),
         TypeSpec::External(ExternalTypeSpec::Proto(wire_name)) => wire_name
@@ -2699,14 +2670,8 @@ fn typescript_function_type_descriptor(
 ) -> Option<RenderedFunctionTypeDescriptor> {
     let descriptor = function.type_descriptor.as_ref()?;
     Some(RenderedFunctionTypeDescriptor {
-        value_type: descriptor
-            .value_type
-            .for_language(Language::TypeScript)?
-            .to_string(),
-        args_type: descriptor
-            .args_type
-            .for_language(Language::TypeScript)?
-            .to_string(),
+        value_type: descriptor.value_type.value()?.to_string(),
+        args_type: descriptor.args_type.value()?.to_string(),
     })
 }
 
@@ -2843,7 +2808,7 @@ fn typescript_operation_output_annotation(
         return model_name.to_string();
     }
     let input_parameters = input
-        .map(|input| api_plan.type_parameters(input, Language::TypeScript))
+        .map(|input| api_plan.type_parameters(input))
         .unwrap_or_default()
         .into_iter()
         .map(|usage| (usage.parameter.full_name, usage.parameter.name))
@@ -5738,7 +5703,7 @@ fn typescript_resource_value_annotation(value: &PlannedType) -> String {
             target: fallback,
             ..
         })) => type_name
-            .for_language(Language::TypeScript)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| typescript_resource_value_annotation(fallback)),
     }
@@ -5789,7 +5754,7 @@ fn collect_typescript_value_requirements(
             target: fallback,
             ..
         })) => {
-            if let Some(annotation) = type_name.for_language(Language::TypeScript) {
+            if let Some(annotation) = type_name.value() {
                 requirements.long |= annotation == "Long";
             } else {
                 collect_typescript_value_requirements(fallback, requirements);

@@ -18,8 +18,8 @@ use crate::planning::{
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec,
     FunctionArgsSpec as GenericFunctionArgsSpec, FunctionFieldSpec as GenericFunctionFieldSpec,
-    FunctionResultSpec as GenericFunctionResultSpec, IntSpec, LanguageStringSpec, ModulePath,
-    OperationSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    FunctionResultSpec as GenericFunctionResultSpec, IntSpec, ModulePath, OperationSpec,
+    RecordFieldSpec, RecordSpec, SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecLeaf, ApiSpecNode, ApiSpecTree};
 
@@ -113,9 +113,9 @@ struct PlannedVariantCase {
 pub(in crate::generator) struct PlannedField {
     pub(in crate::generator) proto_name: String,
     pub(in crate::generator) authored_name: String,
-    pub(in crate::generator) doc: Option<LanguageStringSpec>,
-    annotation_override: Option<LanguageStringSpec>,
-    pub(in crate::generator) flattened_annotation_override: Option<LanguageStringSpec>,
+    pub(in crate::generator) doc: Option<SelectedTextSpec>,
+    annotation_override: Option<SelectedTextSpec>,
+    pub(in crate::generator) flattened_annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) required: bool,
     role: PlannedFieldRole,
     pub(in crate::generator) kind: PlannedFieldKind,
@@ -152,7 +152,7 @@ pub(in crate::generator) enum PlannedValueType {
         err: Option<Box<PlannedValueType>>,
     },
     External {
-        type_name: LanguageStringSpec,
+        type_name: SelectedTextSpec,
         fallback: Box<PlannedValueType>,
     },
     Unknown,
@@ -172,7 +172,7 @@ pub(in crate::generator) enum PlannedScalarType {
 pub(in crate::generator) struct PlannedEnumType {
     pub(in crate::generator) info: Option<PlannedTypeInfo>,
     pub(in crate::generator) name: Option<String>,
-    pub(in crate::generator) replacement: Option<TypeReplacementSpec>,
+    pub(in crate::generator) replacement: Option<TypeReplacementSpec<PlannedFamily>>,
 }
 
 #[derive(Debug, Clone)]
@@ -191,7 +191,7 @@ pub(in crate::generator) struct PlannedVariantType {
 pub(in crate::generator) struct PlannedMessageType {
     pub(in crate::generator) info: PlannedTypeInfo,
     pub(in crate::generator) model_name: String,
-    pub(in crate::generator) replacement: Option<TypeReplacementSpec>,
+    pub(in crate::generator) replacement: Option<TypeReplacementSpec<PlannedFamily>>,
     pub(in crate::generator) authored_type: Option<PlannedType>,
     pub(in crate::generator) source: PlannedMessageSource,
 }
@@ -209,8 +209,8 @@ fn local_type_info(full_name: &str) -> PlannedTypeInfo {
         package: String::new(),
         file_name: None,
         file_options: None,
-        reference: LanguageStringSpec::default(),
-        type_name: LanguageStringSpec::default(),
+        reference: SelectedTextSpec::default(),
+        type_name: SelectedTextSpec::default(),
     }
 }
 
@@ -391,7 +391,7 @@ fn planned_variant(variant: &VariantSpec<PlannedFamily>, spec: &PlannedSpec) -> 
     PlannedVariant {
         info: local_type_info(&variant.full_name),
         name: variant.name.clone(),
-        type_parameters: spec.variant_type_parameters(&variant.full_name, Language::Go),
+        type_parameters: spec.variant_type_parameters(&variant.full_name),
         cases: variant
             .cases
             .iter()
@@ -514,7 +514,7 @@ impl GoPackageContext {
         // unqualified accordingly.
         let import_path = api_plan
             .primary_namespace()
-            .and_then(|namespace| namespace.for_language(Language::Go))
+            .and_then(|namespace| namespace.value())
             .map(str::to_string);
         let package_name = Self::derive_package_name(&options.output_dir_name)?;
 
@@ -1103,7 +1103,7 @@ impl<'a> ApiPlanner<'a> {
                     field
                         .flattened_annotation
                         .as_ref()
-                        .and_then(|annotation| annotation.for_language(Language::Go))
+                        .and_then(|annotation| annotation.value())
                         .is_some()
                 })
             })
@@ -1188,10 +1188,7 @@ impl<'a> ApiPlanner<'a> {
         let output = operation_output(operation, self.api_plan);
         self.resolve_message_types(&input)?;
         let model_type_parameters = record_for_message(self.api_plan, &input)
-            .map(|record| {
-                self.api_plan
-                    .record_type_parameters(&record.full_name, Language::Go)
-            })
+            .map(|record| self.api_plan.record_type_parameters(&record.full_name))
             .unwrap_or_default();
         let input_type = go_generic_reference(
             &resolve_message_go_type(&input, &self.external_models),
@@ -1199,10 +1196,7 @@ impl<'a> ApiPlanner<'a> {
             false,
         );
         let go_output_transform = operation.output_transform.as_ref().and_then(|transform| {
-            Some((
-                transform.type_name.for_language(Language::Go)?,
-                transform.transform.for_language(Language::Go)?,
-            ))
+            Some((transform.type_name.value()?, transform.transform.value()?))
         });
         let raw_output_type = if go_output_transform.is_some() {
             match &output {
@@ -1309,8 +1303,8 @@ impl<'a> ApiPlanner<'a> {
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
-            doc: operation.doc.for_language(Language::Go),
-            return_doc: operation.return_doc.for_language(Language::Go),
+            doc: operation.doc.value(),
+            return_doc: operation.return_doc.value(),
             func_name: go_unexported_name(&operation.name),
             input_type,
             model_type_parameters,
@@ -1426,7 +1420,7 @@ impl<'a> ApiPlanner<'a> {
                         &variant_type.name,
                         &self
                             .api_plan
-                            .variant_type_parameters(&variant_type.info.full_name, Language::Go),
+                            .variant_type_parameters(&variant_type.info.full_name),
                         false,
                     ),
                 })
@@ -1448,9 +1442,7 @@ impl<'a> ApiPlanner<'a> {
                     .map(|record| {
                         go_generic_reference(
                             &base,
-                            &self
-                                .api_plan
-                                .record_type_parameters(&record.full_name, Language::Go),
+                            &self.api_plan.record_type_parameters(&record.full_name),
                             false,
                         )
                     })
@@ -1491,7 +1483,7 @@ impl<'a> ApiPlanner<'a> {
                 type_name,
                 fallback,
             } => {
-                if let Some(annotation) = type_name.for_language(Language::Go) {
+                if let Some(annotation) = type_name.value() {
                     Ok(ResolvedGoType {
                         type_expr: self.package.go_type_expr(annotation),
                     })
@@ -1576,7 +1568,7 @@ impl<'a> ApiPlanner<'a> {
             record_for_message(self.api_plan, message).map(|planned_model| {
                 let parameters = self
                     .api_plan
-                    .record_type_parameters(&planned_model.full_name, Language::Go);
+                    .record_type_parameters(&planned_model.full_name);
                 let planned_fields = planned_model
                     .model_fields()
                     .map(|(field_name, field)| {
@@ -1636,7 +1628,7 @@ impl<'a> ApiPlanner<'a> {
             .flattened_annotation_override
             .as_ref()
             .or(field.annotation_override.as_ref())
-            .and_then(|annotation| annotation.for_language(Language::Go))
+            .and_then(|annotation| annotation.value())
             .map(|annotation| self.package.go_type_expr(annotation));
 
         let go_type = if let Some(annotated) = annotated_go_type {
@@ -1670,7 +1662,7 @@ impl<'a> ApiPlanner<'a> {
             doc: field
                 .doc
                 .as_ref()
-                .and_then(|doc| doc.for_language(Language::Go))
+                .and_then(|doc| doc.value())
                 .map(str::to_string),
             go_type,
             required: field.required,
@@ -2106,8 +2098,7 @@ impl GoVisibilityMarker<'_> {
             .output_transform
             .as_ref()
             .is_some_and(|transform| {
-                transform.type_name.for_language(Language::Go).is_some()
-                    && transform.transform.for_language(Language::Go).is_some()
+                transform.type_name.value().is_some() && transform.transform.value().is_some()
             })
         {
             return;
@@ -2204,7 +2195,7 @@ impl GoVisibilityMarker<'_> {
                 type_name,
                 fallback,
             } => {
-                if type_name.for_language(Language::Go).is_none() {
+                if type_name.value().is_none() {
                     self.mark_value_type(fallback);
                 }
             }
@@ -2412,12 +2403,12 @@ fn resolve_message_go_type(
 /// annotation) is stripped and will be collected separately by
 /// [`collect_imports`].
 pub(in crate::generator) fn go_replacement_type_name(
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
     package: &GoPackageContext,
 ) -> Option<String> {
     replacement
         .type_name
-        .for_language(Language::Go)
+        .value()
         .map(|annotation| package.go_type_expr(annotation))
 }
 
@@ -2445,7 +2436,7 @@ pub(in crate::generator) fn go_authored_type_annotation(wit_type: &PlannedType) 
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => type_name
-            .for_language(Language::Go)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| go_authored_type_annotation(target)),
         TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message))) => {
@@ -2757,10 +2748,9 @@ fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<Stri
                 collect_imports_from_message_type(&output, imports);
             }
             if let Some(transform) = &operation.output_transform {
-                if let (Some(annotation), Some(_expr)) = (
-                    transform.type_name.for_language(Language::Go),
-                    transform.transform.for_language(Language::Go),
-                ) {
+                if let (Some(annotation), Some(_expr)) =
+                    (transform.type_name.value(), transform.transform.value())
+                {
                     let (import_path, _) = parse_go_import(annotation);
                     if let Some(path) = import_path {
                         imports.insert(path);
@@ -2787,7 +2777,7 @@ fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTr
     match &function.result {
         FunctionResultSpec::Authored(result) => collect_imports_from_authored_type(result, imports),
         FunctionResultSpec::Annotation(result) => {
-            if let Some(annotation) = result.for_language(Language::Go) {
+            if let Some(annotation) = result.value() {
                 let (import_path, _) = parse_go_import(annotation);
                 if let Some(path) = import_path {
                     imports.insert(path);
@@ -2822,7 +2812,7 @@ fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTre
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => {
-            if let Some(annotation) = type_name.for_language(Language::Go) {
+            if let Some(annotation) = type_name.value() {
                 let (import_path, _) = parse_go_import(annotation);
                 if let Some(path) = import_path {
                     imports.insert(path);
@@ -2838,7 +2828,7 @@ fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTre
 /// Collects Go imports from a message type's replacement or authored type.
 fn collect_imports_from_message_type(message: &PlannedMessageType, imports: &mut BTreeSet<String>) {
     if let Some(replacement) = &message.replacement {
-        if let Some(annotation) = replacement.type_name.for_language(Language::Go) {
+        if let Some(annotation) = replacement.type_name.value() {
             let (import_path, _) = parse_go_import(annotation);
             if let Some(path) = import_path {
                 imports.insert(path);
@@ -2868,7 +2858,7 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
             type_name,
             fallback,
         } => {
-            if let Some(annotation) = type_name.for_language(Language::Go) {
+            if let Some(annotation) = type_name.value() {
                 let (import_path, _) = parse_go_import(annotation);
                 if let Some(path) = import_path {
                     imports.insert(path);
@@ -2879,7 +2869,7 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
         }
         PlannedValueType::Enum(enum_type) => {
             if let Some(replacement) = &enum_type.replacement {
-                if let Some(annotation) = replacement.type_name.for_language(Language::Go) {
+                if let Some(annotation) = replacement.type_name.value() {
                     let (import_path, _) = parse_go_import(annotation);
                     if let Some(path) = import_path {
                         imports.insert(path);
@@ -2889,7 +2879,7 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
         }
         PlannedValueType::Message(message_type) => {
             if let Some(replacement) = &message_type.replacement {
-                if let Some(annotation) = replacement.type_name.for_language(Language::Go) {
+                if let Some(annotation) = replacement.type_name.value() {
                     let (import_path, _) = parse_go_import(annotation);
                     if let Some(path) = import_path {
                         imports.insert(path);
@@ -3761,7 +3751,7 @@ fn resolve_resource_value_type_with_struct_flag(
             type_name,
             fallback,
         } => {
-            if let Some(annotation) = type_name.for_language(Language::Go) {
+            if let Some(annotation) = type_name.value() {
                 (package.go_type_expr(annotation), false)
             } else {
                 resolve_resource_value_type_with_struct_flag(fallback, package)
@@ -4271,7 +4261,7 @@ fn go_function_constraint(
             go_authored_function_type_expr(result, package, visibility)
         }
         FunctionResultSpec::Annotation(result) => result
-            .for_language(Language::Go)
+            .value()
             .map(|result| package.go_type_expr(result))
             .map(|result| visibility.rewrite_go_expr(&result))
             .unwrap_or_else(|| "any".to_string()),
@@ -4372,7 +4362,7 @@ fn go_authored_function_type_expr(
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => type_name
-            .for_language(Language::Go)
+            .value()
             .map(|annotation| package.go_type_expr(annotation))
             .unwrap_or_else(|| go_authored_function_type_expr(target, package, visibility)),
         _ => go_authored_type_annotation(wit_type),

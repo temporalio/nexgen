@@ -329,10 +329,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(".Operations[");
             output.push_str(&csharp_string_literal(&operation.wire_name));
             output.push_str("]");
-            if let Some(serialization_context) = operation
-                .serialization_context
-                .for_language(Language::Dotnet)
-            {
+            if let Some(serialization_context) = operation.serialization_context.value() {
                 output.push_str(",\n            serializationContext: ");
                 output.push_str(&qualify_dotnet_support_reference(
                     serialization_context,
@@ -353,10 +350,7 @@ impl<'a> ApiPlanner<'a> {
         for operation in &service.operations {
             self.render_operation_options_type(output, operation);
         }
-        let explicit_operations_class = service
-            .operations_class
-            .for_language(Language::Dotnet)
-            .is_some();
+        let explicit_operations_class = service.operations_class.value().is_some();
         render_xml_summary(
             output,
             "",
@@ -570,9 +564,7 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn render_variant(&self, output: &mut String, variant: &PlannedVariant) {
-        let type_parameters = self
-            .api_plan
-            .variant_type_parameters(&variant.full_name, Language::Dotnet);
+        let type_parameters = self.api_plan.variant_type_parameters(&variant.full_name);
         let type_arguments = type_parameters
             .iter()
             .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
@@ -635,9 +627,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str(" record ");
         let type_name = csharp_type_name(&model.name);
         output.push_str(&type_name);
-        let type_parameters = self
-            .api_plan
-            .record_type_parameters(&model.full_name, Language::Dotnet);
+        let type_parameters = self.api_plan.record_type_parameters(&model.full_name);
         if !type_parameters.is_empty() {
             output.push('<');
             output.push_str(
@@ -952,7 +942,7 @@ impl<'a> ApiPlanner<'a> {
         }
         let type_parameters = self
             .api_plan
-            .record_type_parameters(&model.full_name, Language::Dotnet)
+            .record_type_parameters(&model.full_name)
             .into_iter()
             .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
             .collect::<Vec<_>>();
@@ -1270,7 +1260,7 @@ impl<'a> ApiPlanner<'a> {
     ) -> Vec<crate::spec::TypeParameterUsage> {
         operation
             .input_type()
-            .map(|input| self.api_plan.type_parameters(input, Language::Dotnet))
+            .map(|input| self.api_plan.type_parameters(input))
             .unwrap_or_default()
     }
 
@@ -1296,9 +1286,7 @@ impl<'a> ApiPlanner<'a> {
     fn dotnet_erased_model_type(&self, model_type: &PlannedType) -> String {
         if let PlannedType::Record(record) = model_type {
             let base = csharp_type_name(&record.model_name);
-            let parameters = self
-                .api_plan
-                .record_type_parameters(&record.full_name, Language::Dotnet);
+            let parameters = self.api_plan.record_type_parameters(&record.full_name);
             if !parameters.is_empty() {
                 return format!(
                     "{}<{}>",
@@ -1314,7 +1302,7 @@ impl<'a> ApiPlanner<'a> {
 
     fn operation_return_type(&self, operation: &PlannedOperation) -> String {
         if let Some(transform) = &operation.output_transform
-            && let Some(type_name) = transform.type_name.for_language(Language::Dotnet)
+            && let Some(type_name) = transform.type_name.value()
         {
             return type_name.to_string();
         }
@@ -1328,7 +1316,7 @@ impl<'a> ApiPlanner<'a> {
         if let PlannedType::Record(record) = model_type
             && !self
                 .api_plan
-                .record_type_parameters(&record.full_name, Language::Dotnet)
+                .record_type_parameters(&record.full_name)
                 .is_empty()
         {
             return self.operation_input_type(model_type);
@@ -1363,9 +1351,7 @@ impl<'a> ApiPlanner<'a> {
 
     fn operation_output_type(&self, operation: &PlannedOperation) -> String {
         if let Some(PlannedType::Record(record)) = operation.output_type() {
-            let parameters = self
-                .api_plan
-                .record_type_parameters(&record.full_name, Language::Dotnet);
+            let parameters = self.api_plan.record_type_parameters(&record.full_name);
             if !parameters.is_empty() {
                 let input_parameters = self
                     .operation_model_parameters(operation)
@@ -1543,9 +1529,7 @@ impl<'a> ApiPlanner<'a> {
             PlannedType::Flags(flags) => csharp_type_name(&flags.name),
             PlannedType::Variant(variant) => {
                 let base = csharp_type_name(&variant.name);
-                let parameters = self
-                    .api_plan
-                    .variant_type_parameters(&variant.full_name, Language::Dotnet);
+                let parameters = self.api_plan.variant_type_parameters(&variant.full_name);
                 if parameters.is_empty() {
                     base
                 } else {
@@ -1576,9 +1560,7 @@ impl<'a> ApiPlanner<'a> {
                     }
                     PlannedType::Record(record) => {
                         let base = csharp_type_name(&record.model_name);
-                        let parameters = self
-                            .api_plan
-                            .record_type_parameters(&record.full_name, Language::Dotnet);
+                        let parameters = self.api_plan.record_type_parameters(&record.full_name);
                         if parameters.is_empty() {
                             base
                         } else {
@@ -1625,7 +1607,7 @@ impl<'a> ApiPlanner<'a> {
                 target: fallback,
                 ..
             })) => type_name
-                .for_language(Language::Dotnet)
+                .value()
                 .map(str::to_string)
                 .unwrap_or_else(|| self.dotnet_value_type(fallback)),
         }
@@ -1667,7 +1649,7 @@ impl<'a> ApiPlanner<'a> {
     ) -> String {
         if let Some(annotation) = model
             .field_flattened_annotation(field_name)
-            .and_then(|annotation| annotation.for_language(Language::Dotnet))
+            .and_then(|annotation| annotation.value())
         {
             if field.required {
                 annotation.to_string()
@@ -2031,7 +2013,7 @@ impl DotNetExternalModels {
             && api_plan.record(&record.full_name).is_some()
         {
             let base = csharp_type_name(&record.model_name);
-            let parameters = api_plan.record_type_parameters(&record.full_name, Language::Dotnet);
+            let parameters = api_plan.record_type_parameters(&record.full_name);
             return if parameters.is_empty() {
                 base
             } else {
@@ -2421,10 +2403,7 @@ fn validate_dotnet_support_references(
 ) -> Result<()> {
     for service in &api_plan.services {
         for operation in &service.operations {
-            if let Some(reference) = operation
-                .serialization_context
-                .for_language(Language::Dotnet)
-            {
+            if let Some(reference) = operation.serialization_context.value() {
                 validate_dotnet_support_reference(reference, support_namespace)?;
             }
         }
@@ -2587,8 +2566,8 @@ fn indent_namespace_body(output: &mut String) {
     }
 }
 
-fn dotnet_doc(spec: &crate::spec::LanguageStringSpec) -> Option<&str> {
-    spec.for_language(Language::Dotnet)
+fn dotnet_doc(spec: &crate::spec::SelectedTextSpec) -> Option<&str> {
+    spec.value()
 }
 
 fn render_operation_xml_doc(
@@ -2919,7 +2898,7 @@ fn render_flattened_generic_parameters(
     api_plan: &PlannedSpec,
 ) {
     let mut generics = api_plan
-        .record_type_parameters(&model.full_name, Language::Dotnet)
+        .record_type_parameters(&model.full_name)
         .into_iter()
         .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
         .collect::<Vec<_>>();
@@ -2984,7 +2963,7 @@ fn render_flattened_method_body(
     }
     output.push_str("        var request = new ");
     output.push_str(&csharp_type_name(&model.name));
-    let model_parameters = api_plan.record_type_parameters(&model.full_name, Language::Dotnet);
+    let model_parameters = api_plan.record_type_parameters(&model.full_name);
     if !model_parameters.is_empty() {
         output.push('<');
         output.push_str(
@@ -3654,7 +3633,7 @@ fn operation_transform_expression(
     api_plan: &PlannedSpec,
 ) -> String {
     if let Some(transform) = &operation.output_transform
-        && let Some(expression) = transform.transform.for_language(Language::Dotnet)
+        && let Some(expression) = transform.transform.value()
     {
         return expression
             .replace("request", request_expr)
@@ -3830,7 +3809,7 @@ fn dotnet_authored_type(wit_type: &PlannedType) -> String {
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             target, type_name, ..
         })) => type_name
-            .for_language(Language::Dotnet)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| dotnet_authored_type(target)),
     }
@@ -3878,7 +3857,7 @@ fn dotnet_namespace(api_plan: &PlannedSpec) -> String {
     }
     api_plan
         .primary_namespace()
-        .and_then(|namespace| namespace.for_language(Language::Dotnet))
+        .and_then(|namespace| namespace.value())
         .map(ToOwned::to_owned)
         .or_else(|| {
             api_plan
@@ -3922,7 +3901,7 @@ fn dotnet_module_namespace(module_path: &crate::spec::ModulePath) -> String {
 fn dotnet_operations_class_name(service: &PlannedService) -> String {
     service
         .operations_class
-        .for_language(Language::Dotnet)
+        .value()
         .map(csharp_type_name)
         .unwrap_or_else(|| "Operations".to_string())
 }
@@ -3970,14 +3949,14 @@ fn validate_type_parameter_names(api_plan: &PlannedSpec) -> Result<()> {
         };
         (
             full_name,
-            api_plan.record_type_parameters(full_name, Language::Dotnet),
+            api_plan.record_type_parameters(full_name),
             reserved,
         )
     });
     let variants = api_plan.variants().map(|(full_name, _)| {
         (
             full_name,
-            api_plan.variant_type_parameters(full_name, Language::Dotnet),
+            api_plan.variant_type_parameters(full_name),
             &[][..],
         )
     });

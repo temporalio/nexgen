@@ -225,12 +225,12 @@ pub(crate) fn typescript_default_to_proto_name(name: &str) -> String {
 
 pub(crate) fn typescript_from_proto_converter(
     name: &str,
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
 ) -> String {
     support_reference(
         &replacement
             .from_proto
-            .for_language(Language::TypeScript)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| typescript_default_from_proto_name(name)),
     )
@@ -238,24 +238,21 @@ pub(crate) fn typescript_from_proto_converter(
 
 pub(crate) fn typescript_to_proto_converter(
     name: &str,
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
 ) -> String {
     support_reference(
         &replacement
             .to_proto
-            .for_language(Language::TypeScript)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| typescript_default_to_proto_name(name)),
     )
 }
 
 pub(crate) fn typescript_replacement_type_name(
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
 ) -> Option<String> {
-    replacement
-        .type_name
-        .for_language(Language::TypeScript)
-        .map(str::to_string)
+    replacement.type_name.value().map(str::to_string)
 }
 
 pub(in crate::generator) fn message_override_conversion(

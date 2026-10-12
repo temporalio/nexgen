@@ -3733,10 +3733,12 @@ interface generic-service {
 
     #[test]
     fn parses_and_inferrs_generic_record_parameters_by_alias_identity() {
-        let spec = parse(Language::TypeScript, GENERIC_WIT);
+        let spec = crate::planning::select_spec(
+            parse(Language::TypeScript, GENERIC_WIT),
+            Language::TypeScript,
+        );
         let request = spec.record("generic-service.request").unwrap();
-        let request_parameters =
-            spec.record_type_parameters(&request.full_name, Language::TypeScript);
+        let request_parameters = spec.record_type_parameters(&request.full_name);
         assert_eq!(request_parameters.len(), 1);
         assert_eq!(request_parameters[0].parameter.name, "ContextT");
         assert_eq!(
@@ -3745,8 +3747,7 @@ interface generic-service {
         );
 
         let response = spec.record("generic-service.response").unwrap();
-        let response_parameters =
-            spec.record_type_parameters(&response.full_name, Language::TypeScript);
+        let response_parameters = spec.record_type_parameters(&response.full_name);
         assert_eq!(
             response_parameters
                 .iter()
@@ -3796,16 +3797,16 @@ interface generic-service {
     hidden: output-t,
   }"#,
         );
-        let typescript = parse(Language::TypeScript, &wit);
+        let authored = parse(Language::TypeScript, &wit);
+        let typescript = crate::planning::select_spec(authored.clone(), Language::TypeScript);
         assert!(
             typescript
-                .record_type_parameters("generic-service.overridden", Language::TypeScript)
+                .record_type_parameters("generic-service.overridden")
                 .is_empty()
         );
 
-        let python = parse(Language::Python, &wit);
-        let parameters =
-            python.record_type_parameters("generic-service.overridden", Language::Python);
+        let python = crate::planning::select_spec(authored, Language::Python);
+        let parameters = python.record_type_parameters("generic-service.overridden");
         assert_eq!(parameters.len(), 1);
         assert_eq!(parameters[0].parameter.name, "ContextT");
     }
@@ -3825,10 +3826,10 @@ interface generic-service {
                 "context: context-t,\n    output: output-t,",
                 "result-value: outer-result,\n    repeated: context-t,",
             );
-        let spec = parse(Language::Go, &variant);
-        let inner = spec.variant_type_parameters("generic-service.inner-result", Language::Go);
+        let spec = crate::planning::select_spec(parse(Language::Go, &variant), Language::Go);
+        let inner = spec.variant_type_parameters("generic-service.inner-result");
         assert_eq!(inner[0].parameter.name, "ContextT");
-        let outer = spec.variant_type_parameters("generic-service.outer-result", Language::Go);
+        let outer = spec.variant_type_parameters("generic-service.outer-result");
         assert_eq!(
             outer
                 .iter()
@@ -3836,7 +3837,7 @@ interface generic-service {
                 .collect::<Vec<_>>(),
             ["ContextT", "KeyT", "OutputT"]
         );
-        let response = spec.record_type_parameters("generic-service.response", Language::Go);
+        let response = spec.record_type_parameters("generic-service.response");
         assert_eq!(
             response
                 .iter()

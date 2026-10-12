@@ -236,7 +236,7 @@ fn collect_variant_source_module_imports(
 
 fn collect_resource_symbol_module_import(
     source_module: &ModulePath,
-    resource: &AuthoredResourceType,
+    resource: &SelectedResourceType,
     imports: &mut BTreeMap<ModulePath, BTreeMap<ModulePath, BTreeSet<String>>>,
 ) {
     collect_symbol_module_import(source_module, &resource.name, imports);
@@ -247,7 +247,7 @@ fn collect_resource_symbol_module_import(
 
 fn collect_authored_external_type_module_imports(
     source_module: &ModulePath,
-    external: &ExternalTypeSpec,
+    external: &ExternalTypeSpec<SelectedFamily>,
     imports: &mut BTreeMap<ModulePath, BTreeMap<ModulePath, BTreeSet<String>>>,
 ) {
     match external {
@@ -266,7 +266,7 @@ fn collect_authored_external_type_module_imports(
 
 fn collect_authored_type_module_imports(
     source_module: &ModulePath,
-    ty: &TypeSpec,
+    ty: &TypeSpec<SelectedFamily>,
     imports: &mut BTreeMap<ModulePath, BTreeMap<ModulePath, BTreeSet<String>>>,
 ) {
     match ty {
@@ -329,7 +329,6 @@ use crate::spec::{FunctionTypeDescriptorSpec, OperationOutputTransformSpec, Reso
 pub(super) struct TypePlanningContext<'a> {
     pub(super) spec: ApiSpec<OperationLoweredFamily>,
     spec_data: PlannedSpecData,
-    language: Language,
     pub(super) descriptors: &'a DescriptorIndex,
     resource_data: IndexMap<String, PlannedResource>,
     record_plans: IndexMap<String, PlannedRecordData>,
@@ -401,7 +400,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
         }
     }
 
-    fn map_resource(&mut self, resource: AuthoredResourceType) -> PlannedResourceType {
+    fn map_resource(&mut self, resource: SelectedResourceType) -> PlannedResourceType {
         self.planner.planned_resource_type_from_authored(&resource)
     }
 
@@ -477,8 +476,8 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
             .unwrap_or_default()
     }
 
-    fn map_text(&mut self, text: SelectedTextSpec) -> LanguageStringSpec {
-        materialize_selected_text(&text)
+    fn map_text(&mut self, text: SelectedTextSpec) -> SelectedTextSpec {
+        text
     }
 }
 
@@ -487,12 +486,10 @@ impl<'a> TypePlanningContext<'a> {
         spec: ApiSpec<OperationLoweredFamily>,
         spec_data: PlannedSpecData,
         descriptors: &'a DescriptorIndex,
-        language: Language,
     ) -> Result<Self> {
         Ok(Self {
             spec,
             spec_data,
-            language,
             descriptors,
             resource_data: IndexMap::new(),
             record_plans: IndexMap::new(),
@@ -595,22 +592,22 @@ impl<'a> TypePlanningContext<'a> {
 
         Ok(OperationSpec {
             name: operation.name.clone(),
-            code_name: materialize_selected_text(&operation.code_name),
+            code_name: operation.code_name.clone(),
             wire_name: operation.wire_name.clone(),
             experimental: operation.experimental,
             deprecated: operation.deprecated,
-            doc: materialize_selected_text(&operation.doc),
-            return_doc: materialize_selected_text(&operation.return_doc),
+            doc: operation.doc.clone(),
+            return_doc: operation.return_doc.clone(),
             input,
             output,
             output_transform: operation.output_transform.as_ref().map(|transform| {
                 OperationOutputTransformSpec {
-                    type_name: materialize_selected_text(&transform.type_name),
-                    type_import: materialize_selected_text(&transform.type_import),
-                    transform: materialize_selected_text(&transform.transform),
+                    type_name: transform.type_name.clone(),
+                    type_import: transform.type_import.clone(),
+                    transform: transform.transform.clone(),
                 }
             }),
-            serialization_context: materialize_selected_text(&operation.serialization_context),
+            serialization_context: operation.serialization_context.clone(),
             data: PlannedOperationData {
                 output_resource_return: plan_operation_resource_return(
                     operation.data.output_resource_return.as_ref(),
@@ -713,7 +710,7 @@ impl<'a> TypePlanningContext<'a> {
         &mut self,
         service: &ServiceSpec<OperationLoweredFamily>,
         operation: &OperationSpec<OperationLoweredFamily>,
-        resource: &AuthoredResourceType,
+        resource: &SelectedResourceType,
     ) -> Result<PlannedResourceType> {
         let Some(output_type) = resource.wire_type.as_ref() else {
             return Ok(PlannedResourceType {
@@ -876,7 +873,7 @@ impl<'a> TypePlanningContext<'a> {
 
     fn planned_external_type_from_resource(
         &mut self,
-        authored_type: &ExternalTypeSpec,
+        authored_type: &ExternalTypeSpec<SelectedFamily>,
     ) -> ExternalTypeSpec<PlannedFamily> {
         match authored_type {
             ExternalTypeSpec::Proto(proto_name) => {
@@ -904,18 +901,15 @@ impl<'a> TypePlanningContext<'a> {
                     name: name.as_str().to_string(),
                 },
                 target: Box::new(self.planned_type_from_resource(target)),
-                type_name: LanguageStringSpec {
-                    default: type_name.for_language(self.language).map(ToOwned::to_owned),
-                    default_import: type_name
-                        .import_for_language(self.language)
-                        .map(ToOwned::to_owned),
-                    ..Default::default()
-                },
+                type_name: type_name.clone(),
             }),
         }
     }
 
-    fn planned_type_from_resource(&mut self, authored_type: &TypeSpec) -> PlannedType {
+    fn planned_type_from_resource(
+        &mut self,
+        authored_type: &TypeSpec<SelectedFamily>,
+    ) -> PlannedType {
         match authored_type {
             TypeSpec::External(external) => {
                 TypeSpec::External(self.planned_external_type_from_resource(external))
@@ -968,7 +962,7 @@ impl<'a> TypePlanningContext<'a> {
 
     fn planned_resource_type_from_authored(
         &mut self,
-        resource: &AuthoredResourceType,
+        resource: &SelectedResourceType,
     ) -> PlannedResourceType {
         PlannedResourceType {
             type_name: resource.as_str().to_upper_camel_case(),
@@ -1019,7 +1013,7 @@ impl<'a> TypePlanningContext<'a> {
             primary: function.primary,
             result: match &function.result {
                 FunctionResultSpec::Annotation(annotation) => {
-                    FunctionResultSpec::Annotation(materialize_selected_text(annotation))
+                    FunctionResultSpec::Annotation(annotation.clone())
                 }
                 FunctionResultSpec::Authored(authored_type) => FunctionResultSpec::Authored(
                     self.planned_selected_type_from_authored(authored_type),
@@ -1060,8 +1054,8 @@ impl<'a> TypePlanningContext<'a> {
             result_type_parameter: function.result_type_parameter.clone(),
             type_descriptor: function.type_descriptor.as_ref().map(|descriptor| {
                 FunctionTypeDescriptorSpec {
-                    value_type: materialize_selected_text(&descriptor.value_type),
-                    args_type: materialize_selected_text(&descriptor.args_type),
+                    value_type: descriptor.value_type.clone(),
+                    args_type: descriptor.args_type.clone(),
                 }
             }),
         }
@@ -1105,7 +1099,7 @@ impl<'a> TypePlanningContext<'a> {
                     name: name.as_str().to_string(),
                 },
                 target: Box::new(self.planned_authored_type_override_from_authored(target)),
-                type_name: materialize_selected_text(type_name),
+                type_name: type_name.clone(),
             })),
             TypeSpec::External(ExternalTypeSpec::Json(json_type)) => {
                 TypeSpec::External(ExternalTypeSpec::Json(self.map_json_type(json_type)))
@@ -1205,7 +1199,7 @@ impl<'a> TypePlanningContext<'a> {
                         name: name.as_str().to_string(),
                     },
                     target: Box::new(fallback),
-                    type_name: materialize_selected_text(type_name),
+                    type_name: type_name.clone(),
                 }))
             }
             TypeSpec::List(inner) => TypeSpec::List(Box::new(
@@ -1248,19 +1242,16 @@ fn plan_operation_resource_return(
 pub(crate) struct TypePlanningPass<'a> {
     imports: BTreeMap<ModulePath, BTreeMap<ModulePath, BTreeSet<String>>>,
     descriptors: &'a DescriptorIndex,
-    language: Language,
 }
 
 impl<'a> TypePlanningPass<'a> {
     pub(crate) fn new(
         tree: &ApiSpecTree<OperationLoweredFamily>,
         descriptors: &'a DescriptorIndex,
-        language: Language,
     ) -> Self {
         Self {
             imports: module_import_index(tree),
             descriptors,
-            language,
         }
     }
 }
@@ -1282,12 +1273,8 @@ impl CompilerPass<OperationLoweredFamily, PlannedFamily> for TypePlanningPass<'_
             // another module needs the tree-wide name manifest.
             cross_module_model_names: BTreeMap::new(),
         };
-        let mut planner = TypePlanningContext::new(
-            leaf.spec.clone(),
-            spec_data.clone(),
-            self.descriptors,
-            self.language,
-        )?;
+        let mut planner =
+            TypePlanningContext::new(leaf.spec.clone(), spec_data.clone(), self.descriptors)?;
         let lowered = planner.plan_operations()?;
         let source_spec = planner.spec.clone();
         let mut planned = planner.plan_spec(source_spec);
@@ -1321,7 +1308,7 @@ impl ApiSpecTransform<SelectedFamily, OperationLoweredFamily> for SelectedToOper
     fn map_variant(&mut self, value: Symbol) -> Symbol {
         value
     }
-    fn map_resource(&mut self, value: AuthoredResourceType) -> AuthoredResourceType {
+    fn map_resource(&mut self, value: SelectedResourceType) -> SelectedResourceType {
         value
     }
     fn map_proto(&mut self, value: Symbol) -> Symbol {
@@ -1389,6 +1376,119 @@ mod tests {
                 panic!("descriptor-only proto reference should stay external");
             };
             assert_eq!(message.proto.full_name, proto_name);
+        }
+    }
+
+    #[test]
+    fn selected_text_survives_planning_reachability_and_emitted_names() {
+        use crate::spec::{
+            ExternalTypeBindingSpec, ProtoAliasBindingSpec, SelectedTextSpec, TypeReplacementSpec,
+        };
+
+        let proto_name = "temporal.api.common.v1.RetryPolicy";
+        let text = LanguageStringSpec {
+            default: Some("DefaultValue".to_string()),
+            default_import: Some("default.module".to_string()),
+            by_language: BTreeMap::from([
+                (Language::Python, "SelectedValue".to_string()),
+                (Language::Go, "UnselectedValue".to_string()),
+            ]),
+            imports: BTreeMap::from([(Language::Python, "selected.module".to_string())]),
+        };
+        let mut spec = proto_operation_spec(proto_name);
+        let service = &mut spec.services[0];
+        service.code_name = text.clone();
+        service.doc = text.clone();
+        service.namespace = text.clone();
+        service.operations_class = text.clone();
+        let operation = &mut service.operations[0];
+        operation.code_name = text.clone();
+        operation.doc = text.clone();
+        operation.return_doc = text.clone();
+        operation.serialization_context = text.clone();
+        operation.output_transform = Some(OperationOutputTransformSpec {
+            type_name: text.clone(),
+            type_import: text.clone(),
+            transform: text.clone(),
+        });
+        spec.types.insert(
+            proto_name.to_string(),
+            TypeDeclSpec::External(ExternalTypeBindingSpec::ProtoAlias(ProtoAliasBindingSpec {
+                proto: Symbol::new(proto_name),
+                reference: text.clone(),
+                type_name: text.clone(),
+                replacement: Some(TypeReplacementSpec {
+                    type_name: text.clone(),
+                    from_proto: text.clone(),
+                    to_proto: text,
+                }),
+                authored_type: None,
+            }))
+            .into(),
+        );
+
+        let planned = ApiSpecTree {
+            root: ApiSpecNode::Leaf(ApiSpecLeaf {
+                module_path: Default::default(),
+                source_root: Default::default(),
+                source_path: Default::default(),
+                spec: plan_single_leaf(spec),
+            }),
+        };
+        let reachable = super::super::ReachabilityPass::new()
+            .apply(planned)
+            .unwrap();
+        let ready = super::super::EmittedNameResolutionPass::new(Language::Python, &reachable)
+            .unwrap()
+            .apply(reachable)
+            .unwrap();
+        let ApiSpecNode::Leaf(leaf) = ready.root else {
+            panic!("single leaf");
+        };
+        let expected = SelectedTextSpec {
+            value: Some("SelectedValue".to_string()),
+            import: Some("selected.module".to_string()),
+        };
+        let service = &leaf.spec.services[0];
+        for text in [
+            &service.code_name,
+            &service.doc,
+            &service.namespace,
+            &service.operations_class,
+        ] {
+            assert_eq!(text, &expected);
+        }
+        let operation = &service.operations[0];
+        for text in [
+            &operation.code_name,
+            &operation.doc,
+            &operation.return_doc,
+            &operation.serialization_context,
+        ] {
+            assert_eq!(text, &expected);
+        }
+        let transform = operation.output_transform.as_ref().unwrap();
+        for text in [
+            &transform.type_name,
+            &transform.type_import,
+            &transform.transform,
+        ] {
+            assert_eq!(text, &expected);
+        }
+        let Some(TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message)))) =
+            operation.input_type()
+        else {
+            panic!("external protobuf input");
+        };
+        assert_eq!(message.proto.reference, expected);
+        assert_eq!(message.proto.type_name, expected);
+        let replacement = message.replacement.as_ref().unwrap();
+        for text in [
+            &replacement.type_name,
+            &replacement.from_proto,
+            &replacement.to_proto,
+        ] {
+            assert_eq!(text, &expected);
         }
     }
 
@@ -1500,7 +1600,7 @@ mod tests {
                 .data
                 .proto
                 .as_ref()
-                .and_then(|proto| proto.reference.default_import.as_deref()),
+                .and_then(|proto| proto.reference.import()),
             Some("record.module")
         );
     }
@@ -1531,7 +1631,7 @@ mod tests {
         let operation_lowered = super::super::OperationLoweringPass::new()
             .apply(operation_bound)
             .unwrap();
-        let planned = TypePlanningPass::new(&operation_lowered, &descriptors, Language::Python)
+        let planned = TypePlanningPass::new(&operation_lowered, &descriptors)
             .apply(operation_lowered)
             .unwrap();
         let ApiSpecNode::Leaf(leaf) = planned.root else {

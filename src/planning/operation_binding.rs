@@ -27,7 +27,7 @@ impl TypeFamily for OperationBoundFamily {
     type Enum = Symbol;
     type Flags = Symbol;
     type Variant = Symbol;
-    type Resource = AuthoredResourceType;
+    type Resource = SelectedResourceType;
     type Proto = Symbol;
     type Json = JsonModelSpec<Symbol>;
     type Alias = Symbol;
@@ -111,7 +111,7 @@ impl ApiSpecTransform<ResourceBoundFamily, OperationBoundFamily> for OperationBi
     fn map_variant(&mut self, value: Symbol) -> Symbol {
         value
     }
-    fn map_resource(&mut self, value: AuthoredResourceType) -> AuthoredResourceType {
+    fn map_resource(&mut self, value: SelectedResourceType) -> SelectedResourceType {
         value
     }
     fn map_proto(&mut self, value: Symbol) -> Symbol {

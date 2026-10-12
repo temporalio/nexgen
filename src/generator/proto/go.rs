@@ -477,22 +477,22 @@ fn go_default_to_proto_name(full_name: &str) -> String {
 
 fn go_from_proto_converter(
     full_name: &str,
-    replacement: &crate::spec::TypeReplacementSpec,
+    replacement: &crate::spec::TypeReplacementSpec<PlannedFamily>,
 ) -> String {
     replacement
         .from_proto
-        .for_language(Language::Go)
+        .value()
         .map(str::to_string)
         .unwrap_or_else(|| go_default_from_proto_name(full_name))
 }
 
 fn go_to_proto_converter(
     full_name: &str,
-    replacement: &crate::spec::TypeReplacementSpec,
+    replacement: &crate::spec::TypeReplacementSpec<PlannedFamily>,
 ) -> String {
     replacement
         .to_proto
-        .for_language(Language::Go)
+        .value()
         .map(str::to_string)
         .unwrap_or_else(|| go_default_to_proto_name(full_name))
 }
@@ -503,8 +503,7 @@ mod converter_name_tests {
         go_default_from_proto_name, go_default_to_proto_name, go_from_proto_converter,
         go_to_proto_converter,
     };
-    use crate::language::Language;
-    use crate::spec::{LanguageStringSpec, TypeReplacementSpec};
+    use crate::spec::{SelectedTextSpec, TypeReplacementSpec};
 
     #[test]
     fn exports_derived_names_but_preserves_authored_go_names() {
@@ -517,13 +516,13 @@ mod converter_name_tests {
             "HttpPayloadToProto"
         );
         let replacement = TypeReplacementSpec {
-            type_name: LanguageStringSpec::default(),
-            from_proto: LanguageStringSpec {
-                by_language: [(Language::Go, "FromHTTPProto".to_string())].into(),
+            type_name: SelectedTextSpec::default(),
+            from_proto: SelectedTextSpec {
+                value: Some("FromHTTPProto".to_string()),
                 ..Default::default()
             },
-            to_proto: LanguageStringSpec {
-                by_language: [(Language::Go, "ToHTTPProto".to_string())].into(),
+            to_proto: SelectedTextSpec {
+                value: Some("ToHTTPProto".to_string()),
                 ..Default::default()
             },
         };
@@ -774,8 +773,8 @@ impl ModelBackend {
                         .output_transform
                         .as_ref()
                         .is_some_and(|transform| {
-                            transform.type_name.for_language(Language::Go).is_some()
-                                && transform.transform.for_language(Language::Go).is_some()
+                            transform.type_name.value().is_some()
+                                && transform.transform.value().is_some()
                         });
                 let resource_return = if let Some(resource_return) =
                     &planned_op.data.output_resource_return
@@ -1532,7 +1531,7 @@ fn build_field_conversion(
             if field
                 .flattened_annotation_override
                 .as_ref()
-                .and_then(|annotation| annotation.for_language(Language::Go))
+                .and_then(|annotation| annotation.value())
                 .is_some()
                 && !conversion.from_proto_returns_pointer
             {

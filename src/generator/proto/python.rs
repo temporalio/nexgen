@@ -10,7 +10,6 @@ use crate::generator::python::{
     ResolvedFieldType, RootPackageImports, WireValueConversion, python_authored_type_annotation,
     python_string_literal,
 };
-use crate::language::Language;
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding, PlannedWireVariantMember, relative_descriptor_name,
@@ -233,7 +232,7 @@ fn build_oneof(
             })?;
         let class_name = variant_case_class_name(&variant.name, &case.name);
         let type_parameters = api_plan
-            .type_parameters(&payload, Language::Python)
+            .type_parameters(&payload)
             .into_iter()
             .map(|usage| usage.parameter.name)
             .collect::<Vec<_>>();
@@ -1055,29 +1054,34 @@ pub(crate) fn python_default_to_proto_name(name: &str) -> String {
     )
 }
 
-pub(crate) fn python_from_proto_converter(name: &str, replacement: &TypeReplacementSpec) -> String {
+pub(crate) fn python_from_proto_converter(
+    name: &str,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
+) -> String {
     let name = replacement
         .from_proto
-        .for_language(Language::Python)
+        .value()
         .map(str::to_string)
         .unwrap_or_else(|| python_default_from_proto_name(name));
     format!("_support.{name}")
 }
 
-pub(crate) fn python_to_proto_converter(name: &str, replacement: &TypeReplacementSpec) -> String {
+pub(crate) fn python_to_proto_converter(
+    name: &str,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
+) -> String {
     let name = replacement
         .to_proto
-        .for_language(Language::Python)
+        .value()
         .map(str::to_string)
         .unwrap_or_else(|| python_default_to_proto_name(name));
     format!("_support.{name}")
 }
 
-pub(crate) fn python_replacement_type_name(replacement: &TypeReplacementSpec) -> Option<String> {
-    replacement
-        .type_name
-        .for_language(Language::Python)
-        .map(str::to_string)
+pub(crate) fn python_replacement_type_name(
+    replacement: &TypeReplacementSpec<PlannedFamily>,
+) -> Option<String> {
+    replacement.type_name.value().map(str::to_string)
 }
 
 fn render_record_wire_block(
