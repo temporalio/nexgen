@@ -11,7 +11,7 @@ use nexgen::descriptors::DescriptorIndex;
 use nexgen::generator::generate_source;
 use nexgen::language::Language;
 use nexgen::parser::load_api_spec_from_wit_for_language_with_inputs;
-use nexgen::{SupportFiles, add_message_to_string, add_rpc_to_string};
+use nexgen::{add_message_to_string, add_rpc_to_string};
 use prost::Message;
 use prost_types::field_descriptor_proto::{Label, Type};
 use prost_types::{
@@ -257,7 +257,7 @@ interface models {
     );
     let rendered = add_message_to_string(
         &[descriptor_path(&root)],
-        "WorkflowExecution",
+        "temporal.api.common.v1.WorkflowExecution",
         &[input_path.clone(), linked_inputs_path(&root)],
     )
     .unwrap();
@@ -278,7 +278,7 @@ interface models {
     );
     let rendered = add_message_to_string(
         &[descriptor_path(&root)],
-        "WorkflowExecution",
+        "temporal.api.common.v1.WorkflowExecution",
         &[input_path, linked_inputs_path(&root)],
     )
     .unwrap();
@@ -489,13 +489,7 @@ fn scaffolded_oneof_wit_passes_compiler_planning() {
         load_api_spec_from_wit_for_language_with_inputs(Language::Python, &[wit_path]).unwrap();
     let descriptors = DescriptorIndex::load(&descriptor_path).unwrap();
 
-    generate_source(
-        Language::Python,
-        spec,
-        &descriptors,
-        &SupportFiles::default(),
-    )
-    .unwrap();
+    generate_source(Language::Python, spec, &descriptors, "unused_support").unwrap();
 }
 
 #[test]

@@ -2,39 +2,7 @@
 
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
-import {
-  retryPolicyFromProto,
-  retryPolicyToProto,
-  workflowTypeFromProto,
-  workflowTypeToProto,
-  signalFunctionName,
-  functionInputTypes,
-  taskQueueFromProto,
-  taskQueueToProto,
-  workflowNamespace,
-  payloadFromProto,
-  payloadToProto,
-  payloadsToProto,
-  payloadsFromProto,
-  valueToPayload,
-  payloadToValue,
-  memoFromProto,
-  memoToProto,
-  headerFromProto,
-  headerToProto,
-  durationFromProto,
-  durationToProto,
-  searchAttributesFromProto,
-  searchAttributesToProto,
-  priorityFromProto,
-  priorityToProto,
-  versioningOverrideFromProto,
-  versioningOverrideToProto,
-  workflowIdReusePolicyFromProto,
-  workflowIdReusePolicyToProto,
-  workflowIdConflictPolicyFromProto,
-  workflowIdConflictPolicyToProto,
-} from "./support";
+import * as support from "../../support/temporal_model_converters";
 
 export function requiredField<T>(
   value: T | null | undefined,
@@ -53,7 +21,7 @@ function requestArgsFromPayloads(
   if (payloads == null) {
     return undefined;
   }
-  return payloadsFromProto(payloads);
+  return support.payloadsFromProto(payloads);
 }
 
 function requestArgsToPayloads(
@@ -63,7 +31,7 @@ function requestArgsToPayloads(
   if (args == null) {
     return undefined;
   }
-  return payloadsToProto(args, functionInputTypes(functionValue));
+  return support.payloadsToProto(args, support.functionInputTypes(functionValue));
 }
 
 /**
@@ -326,7 +294,7 @@ function signalWithStartWorkflowRequestFromProto<
   }
   return {
     workflow: requiredField(
-      workflowTypeFromProto(
+      support.workflowTypeFromProto(
         requiredField(proto.workflowType, "SignalWithStartWorkflowRequest", "workflow"),
       ),
       "SignalWithStartWorkflowRequest",
@@ -339,7 +307,7 @@ function signalWithStartWorkflowRequestFromProto<
       "id",
     ),
     taskQueue: requiredField(
-      taskQueueFromProto(
+      support.taskQueueFromProto(
         requiredField(proto.taskQueue, "SignalWithStartWorkflowRequest", "taskQueue"),
       ),
       "SignalWithStartWorkflowRequest",
@@ -354,65 +322,68 @@ function signalWithStartWorkflowRequestFromProto<
     executionTimeout:
       proto.workflowExecutionTimeout == null
         ? undefined
-        : durationFromProto(proto.workflowExecutionTimeout),
+        : support.durationFromProto(proto.workflowExecutionTimeout),
     runTimeout:
       proto.workflowRunTimeout == null
         ? undefined
-        : durationFromProto(proto.workflowRunTimeout),
+        : support.durationFromProto(proto.workflowRunTimeout),
     taskTimeout:
       proto.workflowTaskTimeout == null
         ? undefined
-        : durationFromProto(proto.workflowTaskTimeout),
+        : support.durationFromProto(proto.workflowTaskTimeout),
     idReusePolicy:
       proto.workflowIdReusePolicy == null
         ? common.WorkflowIdReusePolicy.ALLOW_DUPLICATE
-        : workflowIdReusePolicyFromProto(proto.workflowIdReusePolicy),
+        : support.workflowIdReusePolicyFromProto(proto.workflowIdReusePolicy),
     idConflictPolicy:
       proto.workflowIdConflictPolicy == null
         ? undefined
-        : workflowIdConflictPolicyFromProto(proto.workflowIdConflictPolicy),
+        : support.workflowIdConflictPolicyFromProto(proto.workflowIdConflictPolicy),
     retryPolicy:
-      proto.retryPolicy == null ? undefined : retryPolicyFromProto(proto.retryPolicy),
+      proto.retryPolicy == null
+        ? undefined
+        : support.retryPolicyFromProto(proto.retryPolicy),
     cronSchedule: proto.cronSchedule ?? undefined,
-    memo: proto.memo == null ? undefined : memoFromProto(proto.memo),
+    memo: proto.memo == null ? undefined : support.memoFromProto(proto.memo),
     searchAttributes:
       proto.searchAttributes == null
         ? undefined
-        : searchAttributesFromProto(proto.searchAttributes),
-    priority: proto.priority == null ? undefined : priorityFromProto(proto.priority),
+        : support.searchAttributesFromProto(proto.searchAttributes),
+    priority:
+      proto.priority == null ? undefined : support.priorityFromProto(proto.priority),
     versioningOverride:
       proto.versioningOverride == null
         ? undefined
-        : versioningOverrideFromProto(proto.versioningOverride),
+        : support.versioningOverrideFromProto(proto.versioningOverride),
     startDelay:
       proto.workflowStartDelay == null
         ? undefined
-        : durationFromProto(proto.workflowStartDelay),
+        : support.durationFromProto(proto.workflowStartDelay),
     staticSummary:
       proto.userMetadata == null
         ? undefined
         : proto.userMetadata.summary == null
           ? undefined
-          : payloadFromProto(proto.userMetadata.summary) == null
+          : support.payloadFromProto(proto.userMetadata.summary) == null
             ? undefined
-            : payloadToValue<string>(
+            : support.payloadToValue<string>(
                 (proto.userMetadata.summary == null
                   ? undefined
-                  : payloadFromProto(proto.userMetadata.summary))!,
+                  : support.payloadFromProto(proto.userMetadata.summary))!,
               ),
     staticDetails:
       proto.userMetadata == null
         ? undefined
         : proto.userMetadata.details == null
           ? undefined
-          : payloadFromProto(proto.userMetadata.details) == null
+          : support.payloadFromProto(proto.userMetadata.details) == null
             ? undefined
-            : payloadToValue<string>(
+            : support.payloadToValue<string>(
                 (proto.userMetadata.details == null
                   ? undefined
-                  : payloadFromProto(proto.userMetadata.details))!,
+                  : support.payloadFromProto(proto.userMetadata.details))!,
               ),
-    headers: proto.header == null ? undefined : headerFromProto(proto.header),
+    headers: proto.header == null ? undefined : support.headerFromProto(proto.header),
     namespace: requiredField(
       proto.namespace === "" ? undefined : proto.namespace,
       "sourced field",
@@ -444,27 +415,29 @@ function signalWithStartWorkflowRequestToProto<
     return undefined;
   }
   return {
-    workflowType: workflowTypeToProto(
+    workflowType: support.workflowTypeToProto(
       requiredField(model.workflow, "SignalWithStartWorkflowRequest", "workflow"),
     ),
     input: requestArgsToPayloads(model.args, model.workflow),
     workflowId: requiredField(model.id, "SignalWithStartWorkflowRequest", "id"),
-    taskQueue: taskQueueToProto(
+    taskQueue: support.taskQueueToProto(
       requiredField(model.taskQueue, "SignalWithStartWorkflowRequest", "taskQueue"),
     ),
-    signalName: signalFunctionName(
+    signalName: support.signalFunctionName(
       requiredField(model.signal, "SignalWithStartWorkflowRequest", "signal"),
     ),
     signalInput: requestArgsToPayloads(model.signalArgs, model.signal),
     workflowExecutionTimeout:
       model.executionTimeout == null
         ? undefined
-        : durationToProto(model.executionTimeout),
+        : support.durationToProto(model.executionTimeout),
     workflowRunTimeout:
-      model.runTimeout == null ? undefined : durationToProto(model.runTimeout),
+      model.runTimeout == null ? undefined : support.durationToProto(model.runTimeout),
     workflowTaskTimeout:
-      model.taskTimeout == null ? undefined : durationToProto(model.taskTimeout),
-    workflowIdReusePolicy: workflowIdReusePolicyToProto(
+      model.taskTimeout == null
+        ? undefined
+        : support.durationToProto(model.taskTimeout),
+    workflowIdReusePolicy: support.workflowIdReusePolicyToProto(
       model.idReusePolicy == null
         ? common.WorkflowIdReusePolicy.ALLOW_DUPLICATE
         : model.idReusePolicy,
@@ -472,22 +445,25 @@ function signalWithStartWorkflowRequestToProto<
     workflowIdConflictPolicy:
       model.idConflictPolicy == null
         ? undefined
-        : workflowIdConflictPolicyToProto(model.idConflictPolicy),
+        : support.workflowIdConflictPolicyToProto(model.idConflictPolicy),
     retryPolicy:
-      model.retryPolicy == null ? undefined : retryPolicyToProto(model.retryPolicy),
+      model.retryPolicy == null
+        ? undefined
+        : support.retryPolicyToProto(model.retryPolicy),
     cronSchedule: model.cronSchedule,
-    memo: model.memo == null ? undefined : memoToProto(model.memo),
+    memo: model.memo == null ? undefined : support.memoToProto(model.memo),
     searchAttributes:
       model.searchAttributes == null
         ? undefined
-        : searchAttributesToProto(model.searchAttributes),
-    priority: model.priority == null ? undefined : priorityToProto(model.priority),
+        : support.searchAttributesToProto(model.searchAttributes),
+    priority:
+      model.priority == null ? undefined : support.priorityToProto(model.priority),
     versioningOverride:
       model.versioningOverride == null
         ? undefined
-        : versioningOverrideToProto(model.versioningOverride),
+        : support.versioningOverrideToProto(model.versioningOverride),
     workflowStartDelay:
-      model.startDelay == null ? undefined : durationToProto(model.startDelay),
+      model.startDelay == null ? undefined : support.durationToProto(model.startDelay),
     userMetadata:
       model.staticSummary == null && model.staticDetails == null
         ? undefined
@@ -495,14 +471,14 @@ function signalWithStartWorkflowRequestToProto<
             summary:
               model.staticSummary == null
                 ? undefined
-                : valueToPayload(model.staticSummary),
+                : support.valueToPayload(model.staticSummary),
             details:
               model.staticDetails == null
                 ? undefined
-                : valueToPayload(model.staticDetails),
+                : support.valueToPayload(model.staticDetails),
           },
-    header: model.headers == null ? undefined : headerToProto(model.headers),
-    namespace: model.namespace ?? workflowNamespace(),
+    header: model.headers == null ? undefined : support.headerToProto(model.headers),
+    namespace: model.namespace ?? support.workflowNamespace(),
   };
 }
 
@@ -543,8 +519,10 @@ function userMetadataFromProto(
     return undefined;
   }
   return {
-    staticSummary: proto.summary == null ? undefined : payloadFromProto(proto.summary),
-    staticDetails: proto.details == null ? undefined : payloadFromProto(proto.details),
+    staticSummary:
+      proto.summary == null ? undefined : support.payloadFromProto(proto.summary),
+    staticDetails:
+      proto.details == null ? undefined : support.payloadFromProto(proto.details),
   };
 }
 
@@ -556,9 +534,13 @@ function userMetadataToProto(
   }
   return {
     summary:
-      model.staticSummary == null ? undefined : payloadToProto(model.staticSummary),
+      model.staticSummary == null
+        ? undefined
+        : support.payloadToProto(model.staticSummary),
     details:
-      model.staticDetails == null ? undefined : payloadToProto(model.staticDetails),
+      model.staticDetails == null
+        ? undefined
+        : support.payloadToProto(model.staticDetails),
   };
 }
 

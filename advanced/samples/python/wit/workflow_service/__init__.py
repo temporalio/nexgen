@@ -9,7 +9,7 @@ import nexusrpc
 import temporalio.converter
 from . import services as _services
 from .operations.signal_with_start_workflow import signal_with_start_workflow
-from ._support import signal_with_start_workflow_serialization_context
+import temporal_support as _support
 
 __all__ = [
     "signal_with_start_workflow",
@@ -44,6 +44,6 @@ __nexus_operation_registry__ = {
         "SignalWithStartWorkflowExecution",
     ): _NexusOperationInfo(
         operation=_services.WorkflowService.signal_with_start_workflow,
-        serialization_context=signal_with_start_workflow_serialization_context,
+        serialization_context=_support.signal_with_start_workflow_serialization_context,
     ),
 }

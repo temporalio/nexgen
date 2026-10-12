@@ -7,6 +7,7 @@ import (
 
 	activity "go.temporal.io/api/activity/v1"
 	command "go.temporal.io/api/command/v1"
+	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -81,28 +82,28 @@ type ActivityOptions struct {
 func (m ActivityOptions) toProto(ctx workflow.Context) (*activity.ActivityOptions, error) {
 	message := &activity.ActivityOptions{}
 	{
-		converted, err := taskQueueToProto(ctx, m.TaskQueue)
+		converted, err := support.TaskQueueToProto(ctx, m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
 		message.TaskQueue = converted
 	}
 	{
-		converted, err := retryPolicyToProto(ctx, &m.RetryPolicy)
+		converted, err := support.RetryPolicyToProto(ctx, &m.RetryPolicy)
 		if err != nil {
 			return nil, err
 		}
 		message.RetryPolicy = converted
 	}
 	{
-		converted, err := durationToProto(ctx, m.ScheduleToCloseTimeout)
+		converted, err := support.DurationToProto(ctx, m.ScheduleToCloseTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := priorityToProto(ctx, m.Priority)
+		converted, err := support.PriorityToProto(ctx, m.Priority)
 		if err != nil {
 			return nil, err
 		}
@@ -114,14 +115,14 @@ func (m ActivityOptions) toProto(ctx workflow.Context) (*activity.ActivityOption
 func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOptions) (ActivityOptions, error) {
 	value := ActivityOptions{}
 	{
-		converted, err := taskQueueFromProto(ctx, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(ctx, proto.GetTaskQueue())
 		if err != nil {
 			return value, err
 		}
 		value.TaskQueue = converted
 	}
 	{
-		converted, err := retryPolicyFromProto(ctx, proto.GetRetryPolicy())
+		converted, err := support.RetryPolicyFromProto(ctx, proto.GetRetryPolicy())
 		if err != nil {
 			return value, err
 		}
@@ -130,14 +131,14 @@ func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOpti
 		}
 	}
 	{
-		converted, err := durationFromProto(ctx, proto.GetScheduleToCloseTimeout())
+		converted, err := support.DurationFromProto(ctx, proto.GetScheduleToCloseTimeout())
 		if err != nil {
 			return value, err
 		}
 		value.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := priorityFromProto(ctx, proto.GetPriority())
+		converted, err := support.PriorityFromProto(ctx, proto.GetPriority())
 		if err != nil {
 			return value, err
 		}
@@ -154,7 +155,7 @@ type FailureContainer struct {
 func (m FailureContainer) toProto(ctx workflow.Context) (*command.FailWorkflowExecutionCommandAttributes, error) {
 	message := &command.FailWorkflowExecutionCommandAttributes{}
 	{
-		converted, err := failureToProto(ctx, m.Failure)
+		converted, err := support.FailureToProto(ctx, m.Failure)
 		if err != nil {
 			return nil, err
 		}
@@ -166,7 +167,7 @@ func (m FailureContainer) toProto(ctx workflow.Context) (*command.FailWorkflowEx
 func failureContainerFromProto(ctx workflow.Context, proto *command.FailWorkflowExecutionCommandAttributes) (FailureContainer, error) {
 	value := FailureContainer{}
 	{
-		converted, err := failureFromProto(ctx, proto.GetFailure())
+		converted, err := support.FailureFromProto(ctx, proto.GetFailure())
 		if err != nil {
 			return value, err
 		}

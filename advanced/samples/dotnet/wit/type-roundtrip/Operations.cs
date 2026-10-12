@@ -10,6 +10,7 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Google.Protobuf.WellKnownTypes;
 using Temporalio.Workflows;
+using Nexgen.Support;
 
 namespace Nexgen.TypeRoundtripService
 {

@@ -7,7 +7,7 @@ import temporalio.converter
 import temporalio.nexus.system
 from typing_extensions import assert_type
 
-from wit.proto_generic_python import (
+from wit.proto_generic import (
     PayloadBackedContext,
     PayloadBackedEnvelope,
     PayloadBackedOutput,

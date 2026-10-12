@@ -1,5 +1,5 @@
 // Drives the `nexgen` binary over the WIT/proto CLI surface (`--descriptors`,
-// `--native-api`, `--support-file`), all behind the `advanced` feature.
+// `--native-api`, `--support-package`), all behind the `advanced` feature.
 #![cfg(feature = "advanced")]
 
 use std::collections::BTreeMap;
@@ -220,7 +220,7 @@ fn generate_to_string_with_inputs(
         },
         language,
         input_paths: input_paths.to_vec(),
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: descriptor_paths.to_vec(),
         output_path: output_path.clone(),
         format: false,
@@ -320,24 +320,18 @@ fn unique_output_path(label: &str) -> PathBuf {
 }
 
 #[test]
-fn cli_generates_go_support_file_from_parameter() {
+fn cli_uses_go_support_package_only_when_converters_are_needed() {
     let root = project_root();
     let temp_dir = unique_output_path("go-support-file-input");
     fs::create_dir_all(&temp_dir).unwrap();
-    let support_path = temp_dir.join("custom_support.go");
     let output_path = temp_dir.join("output");
-    fs::write(
-        &support_path,
-        "package placeholder\n\nfunc CustomSupportHook() string {\n\treturn \"custom\"\n}\n",
-    )
-    .unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
         .args([
             "go",
             wit_input_path(&root, "user-service").to_str().unwrap(),
-            "--support-file",
-            support_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
             "--output",
             output_path.to_str().unwrap(),
         ])
@@ -349,15 +343,14 @@ fn cli_generates_go_support_file_from_parameter() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    // The explicit support file is emitted even though the WIT-direct
-    // user-service package performs no proto conversion, and its package
-    // declaration is rewritten to the generated package name, which is the
-    // output directory's basename (Go convention: package name = directory
-    // name).
-    let support_contents = fs::read_to_string(output_path.join("support.go")).unwrap();
-    assert!(support_contents.starts_with("package output\n"));
-    assert!(support_contents.contains("func CustomSupportHook() string"));
+    // A package with no hand-written converters must not import unused support.
+    assert!(!output_path.join("support.go").exists());
     assert!(output_path.join("userservice.go").is_file());
+    assert!(
+        !fs::read_to_string(output_path.join("userservice.go"))
+            .unwrap()
+            .contains("\"example.com/nexgen/support\"")
+    );
     assert!(!output_path.join("api.go").exists());
     fs::remove_dir_all(temp_dir).unwrap();
 }
@@ -387,6 +380,8 @@ fn cli_generates_go_with_package_self_imports_removed() {
             temp_input_path.to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -431,6 +426,8 @@ fn cli_rejects_go_output_directory_mismatched_with_namespace() {
             temp_input_path.to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -456,6 +453,8 @@ fn cli_rejects_output_at_filesystem_root() {
             wit_input_path(&root, "user-service").to_str().unwrap(),
             "--output",
             "/",
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -488,6 +487,8 @@ fn cli_preserves_existing_output_directory_contents() {
             wit_input_path(&root, "user-service").to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -533,6 +534,8 @@ fn cli_overwrites_previously_generated_files_in_place() {
             wit_input_path(&root, "user-service").to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -570,7 +573,7 @@ interface namespace-service {
   /// @nexus.proto "temporal.api.namespace.v1.NamespaceInfo"
   record namespace-info {
     name: option<string>,
-    /// @nexus.source go="NamespaceData()"
+    /// @nexus.source go="NamespaceData(ctx)"
     data: option<map<string, string>>,
     /// @nexus.omit
     state: placeholder,
@@ -596,18 +599,72 @@ interface namespace-service {
 
     let rendered = generate_to_string_with_inputs(
         nexgen::language::Language::Go,
-        &[wit_path],
+        &[wit_path.clone()],
         &[descriptor_path(&root)],
     )
     .unwrap();
 
     // The sourced map is bound to a field-unique local, evaluated once, and
     // copied into a properly typed proto map.
-    assert!(rendered.contains("sourcedData := NamespaceData()"));
+    assert!(rendered.contains("sourcedData := support.NamespaceData(ctx)"));
     assert!(rendered.contains("if len(sourcedData) > 0 {"));
     assert!(rendered.contains("message.Data = make(map[string]string, len(sourcedData))"));
     assert!(rendered.contains("for k, v := range sourcedData {"));
     assert!(rendered.contains("message.Data[k] = v"));
+    assert!(rendered.contains("support \"example.com/nexgen/support\""));
+
+    // With no other converter to register the package, a sourced field alone
+    // must import the support package and qualify its helper invocation.
+    let module_root = temp_dir.join("module");
+    fs::create_dir_all(module_root.join("support")).unwrap();
+    for file in ["go.mod", "go.sum"] {
+        fs::copy(
+            root.join("advanced/samples/go").join(file),
+            module_root.join(file),
+        )
+        .unwrap();
+    }
+    fs::write(
+        module_root.join("support/support.go"),
+        "package support\nimport \"go.temporal.io/sdk/workflow\"\nfunc NamespaceData(ctx workflow.Context) map[string]string { return map[string]string{\"namespace\": \"test\"} }\n",
+    )
+    .unwrap();
+    let output_path = module_root.join("generated");
+    generate_to_file(&GenerateRequest {
+        config: nexgen::nexgen_config::NexgenConfig {
+            mode: nexgen::generator::GenerationMode::NativeApi,
+            ..Default::default()
+        },
+        language: nexgen::language::Language::Go,
+        input_paths: vec![wit_path],
+        support_package: Some("go.temporal.io/sdk/advanced/samples/go/support".into()),
+        descriptor_paths: vec![descriptor_path(&root)],
+        output_path: output_path.clone(),
+        format: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let generated = read_go_output_files(&output_path);
+    assert!(generated
+        .values()
+        .any(|file| file.contains("support \"go.temporal.io/sdk/advanced/samples/go/support\"")));
+    assert!(
+        generated
+            .values()
+            .any(|file| file.contains("support.NamespaceData(ctx)"))
+    );
+    let build = Command::new("go")
+        .args(["test", "./..."])
+        .current_dir(&module_root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -943,7 +1000,7 @@ fn go_json_package_name_derives_from_output_directory_name() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![json_input_path(&root, "chat")],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1151,7 +1208,7 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
     assert!(!rendered.contains("runtime.FuncForPC"));
     assert_eq!(
         rendered
-            .matches("workflowName := workflowFunctionName(ctx, workflow)")
+            .matches("workflowName := support.WorkflowFunctionName(ctx, workflow)")
             .count(),
         2
     );
@@ -1361,7 +1418,7 @@ fn go_type_roundtrip_generates_proto_conversions() {
 
     // Aliased proto imports derived from the descriptors' `go_package` option.
     assert!(rendered.contains("activity \"go.temporal.io/api/activity/v1\""));
-    assert!(rendered.contains("common \"go.temporal.io/api/common/v1\""));
+    assert!(rendered.contains("support \"example.com/nexgen/support\""));
 
     // Optional override-typed fields are rendered as pointers; the required
     // retry-policy field stays a value. (Assertions use the un-gofmt'd output,
@@ -1385,10 +1442,13 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("\t// Priority - Optional.\n\tPriority *temporal.Priority"));
     // Optional override fields pass the pointer straight to the nil-safe
     // converter; the required field passes its address.
-    assert!(rendered.contains("converted, err := retryPolicyToProto(ctx, &m.RetryPolicy)"));
-    assert!(rendered.contains("converted, err := taskQueueToProto(ctx, m.TaskQueue)"));
-    assert!(rendered.contains("converted, err := priorityToProto(ctx, m.Priority)"));
-    assert!(rendered.contains("converted, err := durationToProto(ctx, m.ScheduleToCloseTimeout)"));
+    assert!(rendered.contains("converted, err := support.RetryPolicyToProto(ctx, &m.RetryPolicy)"));
+    assert!(rendered.contains("converted, err := support.TaskQueueToProto(ctx, m.TaskQueue)"));
+    assert!(rendered.contains("converted, err := support.PriorityToProto(ctx, m.Priority)"));
+    assert!(
+        rendered
+            .contains("converted, err := support.DurationToProto(ctx, m.ScheduleToCloseTimeout)")
+    );
     assert!(rendered.contains("return message, nil"));
 
     // Generated model gets a context-aware FromProto constructor. Optional
@@ -1397,9 +1457,14 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains(
         "func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOptions) (ActivityOptions, error) {"
     ));
-    assert!(rendered.contains("converted, err := taskQueueFromProto(ctx, proto.GetTaskQueue())"));
     assert!(
-        rendered.contains("converted, err := retryPolicyFromProto(ctx, proto.GetRetryPolicy())")
+        rendered
+            .contains("converted, err := support.TaskQueueFromProto(ctx, proto.GetTaskQueue())")
+    );
+    assert!(
+        rendered.contains(
+            "converted, err := support.RetryPolicyFromProto(ctx, proto.GetRetryPolicy())"
+        )
     );
     assert!(rendered.contains("value.RetryPolicy = *converted"));
     // Operation functions convert the request to proto before the SDK call and
@@ -1411,16 +1476,8 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("var result activity.ActivityOptions"));
     assert!(rendered.contains("value, err := activityOptionsFromProto(ctx, &result)"));
 
-    // The hand-written support fragment is emitted alongside the generated
-    // service file with the pointer-in/pointer-out converter contract.
-    assert!(rendered.contains("### support.go"));
-    assert!(
-        rendered.contains("func retryPolicyToProto(_ workflow.Context, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {")
-    );
-    assert!(
-        rendered
-            .contains("func retryPolicyFromProto(_ workflow.Context, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {")
-    );
+    // Converters live in the caller's package; none are copied into output.
+    assert!(!rendered.contains("### support.go"));
 }
 
 #[test]
@@ -1498,7 +1555,7 @@ interface workflow-service {
 
   /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest"
   record cancel-request {
-    /// @nexus.source go="workflowNamespace()"
+    /// @nexus.source go="WorkflowNamespace(ctx)"
     namespace: string,
     /// @nexus.omit
     workflow-execution: placeholder,
@@ -1529,6 +1586,9 @@ interface workflow-service {
         &[descriptor_path(&root)],
     )
     .unwrap();
+    assert!(rendered.contains("support.WorkflowNamespace(ctx)"));
+    assert!(!rendered.contains("support.support.WorkflowNamespace(ctx)"));
+    assert!(!rendered.contains("workflow.GetInfo(ctx).Namespace"));
 
     assert!(
         rendered
@@ -1664,7 +1724,7 @@ fn go_rejects_inputs_flattening_to_the_same_module_file() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![temp_dir.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path,
         format: false,
@@ -1717,7 +1777,7 @@ fn go_rejects_reserved_generated_name_collision() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![temp_dir.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path,
         format: false,
@@ -1747,7 +1807,7 @@ fn go_rejects_single_input_output_named_definitions_with_a_remedy() {
     let request = |output_name: &str| GenerateRequest {
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join(output_name),
         format: false,
@@ -1780,7 +1840,7 @@ fn go_rejects_single_input_output_named_definitions_with_a_remedy() {
 }
 
 #[test]
-fn go_rejects_multi_input_module_colliding_with_support_file() {
+fn go_multi_input_module_named_support_has_no_support_file_collision() {
     let temp_dir = unique_output_path("go-json-module-support-collision");
     fs::create_dir_all(&temp_dir).unwrap();
     fs::write(
@@ -1793,41 +1853,25 @@ fn go_rejects_multi_input_module_colliding_with_support_file() {
         r#"{"title":"OtherModel","type":"object","properties":{"id":{"type":"string"}}}"#,
     )
     .unwrap();
-    let support_path = temp_dir.join("custom.go");
-    fs::write(&support_path, "package generated\n").unwrap();
-
-    let error = generate_to_file(&GenerateRequest {
+    generate_to_file(&GenerateRequest {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![temp_dir.clone()],
-        support_paths: vec![support_path],
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("output"),
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
     })
-    .expect_err("the input module must not be overwritten by support.go");
-
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("support.go"));
-    assert!(first_source.contains("support.json"), "{first_source}");
-    assert_eq!(second_source, "generated Go support file");
-    assert!(remedy.contains("support.json"), "{remedy}");
-    assert!(!remedy.contains("custom.go"), "{remedy}");
+    .expect("support.json may now generate support.go without a copied support file");
+    assert!(temp_dir.join("output/support.go").is_file());
+    assert!(temp_dir.join("output/other.go").is_file());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
-fn go_rejects_single_json_output_name_colliding_with_support_file() {
+fn go_json_output_named_support_has_no_support_file_collision() {
     let temp_dir = unique_output_path("go-json-output-support-collision");
     fs::create_dir_all(&temp_dir).unwrap();
     let input_path = temp_dir.join("model.json");
@@ -1836,42 +1880,25 @@ fn go_rejects_single_json_output_name_colliding_with_support_file() {
         r#"{"title":"Model","type":"object","properties":{"id":{"type":"string"}}}"#,
     )
     .unwrap();
-    let support_path = temp_dir.join("custom.go");
-    fs::write(&support_path, "package generated\n").unwrap();
-
-    let error = generate_to_file(&GenerateRequest {
+    generate_to_file(&GenerateRequest {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: vec![support_path],
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("support"),
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
     })
-    .expect_err("the output-named module must not be overwritten by support.go");
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("support.go"));
-    assert_eq!(
-        first_source,
-        "Go module derived from output directory `support`"
-    );
-    assert_eq!(second_source, "generated Go support file");
-    assert!(remedy.contains("--output"), "{remedy}");
+    .expect("support output name is no longer reserved for copied fragments");
+    assert!(temp_dir.join("support/support.go").is_file());
+    assert!(temp_dir.join("support/definitions.go").is_file());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
-fn go_rejects_single_wit_service_name_colliding_with_support_file() {
+fn go_wit_service_named_support_has_no_support_file_collision() {
     let temp_dir = unique_output_path("go-wit-service-support-collision");
     fs::create_dir_all(&temp_dir).unwrap();
     let input_path = temp_dir.join("support.wit");
@@ -1892,41 +1919,19 @@ interface support {
 "#,
     )
     .unwrap();
-    let support_path = temp_dir.join("custom.go");
-    fs::write(&support_path, "package generated\n").unwrap();
-
-    let error = generate_to_file(&GenerateRequest {
+    generate_to_file(&GenerateRequest {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path.clone()],
-        support_paths: vec![support_path],
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("output"),
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
     })
-    .expect_err("the service-named module must not be overwritten by support.go");
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("support.go"));
-    assert!(
-        first_source.contains("service declaration `Support`"),
-        "{first_source}"
-    );
-    assert!(
-        first_source.contains(&input_path.display().to_string()),
-        "{first_source}"
-    );
-    assert_eq!(second_source, "generated Go support file");
-    assert!(remedy.contains("rename service `Support`"), "{remedy}");
+    .expect("the service may now own support.go");
+    assert!(temp_dir.join("output/support.go").is_file());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -1942,6 +1947,8 @@ fn generate_formatted_go_json_output(
         json_input_path(root, example_id).to_str().unwrap(),
         "--output",
         output_path.to_str().unwrap(),
+        "--support-package",
+        "example.com/nexgen/support",
     ]);
     if native_api {
         command.arg("--native-api");
@@ -1973,7 +1980,7 @@ fn go_json_names_inline_object_union_branch() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2011,7 +2018,7 @@ fn go_json_decodes_element_position_unions() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2110,7 +2117,7 @@ fn go_json_recursively_converts_and_validates_element_positions() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2244,7 +2251,7 @@ fn go_json_validates_non_object_union_branch_constraints() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2303,7 +2310,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2348,7 +2355,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2424,7 +2431,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2528,7 +2535,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2637,7 +2644,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2682,7 +2689,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2775,7 +2782,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -2841,7 +2848,7 @@ fn go_json_wave3_pairwise_runtime_matrix() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3122,7 +3129,7 @@ fn go_json_cross_module_go_name_override_moves_every_reference() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3158,7 +3165,7 @@ fn go_json_bare_ref_root_is_a_runtime_alias_for_operation_io() {
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::Go,
         input_paths: vec![input],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3252,7 +3259,7 @@ fn go_json_override_moves_member_derived_names_only() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3317,7 +3324,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("out"),
         format: false,
@@ -3339,7 +3346,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Java,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: None,
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("pkg"),
         format: false,
@@ -3402,7 +3409,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("out"),
         format: false,
@@ -3453,7 +3460,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3512,7 +3519,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3624,7 +3631,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3774,7 +3781,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3850,7 +3857,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4031,7 +4038,7 @@ properties:
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4093,7 +4100,7 @@ properties:
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4178,7 +4185,7 @@ fn go_json_semantic_helper_names_participate_in_p15() {
         let error = generate_to_file(&GenerateRequest {
             language: nexgen::language::Language::Go,
             input_paths: vec![input_path],
-            support_paths: Vec::new(),
+            support_package: Some("example.com/nexgen/support".into()),
             descriptor_paths: Vec::new(),
             output_path: temp_dir.join(format!("out-{case}")),
             format: false,
@@ -4217,7 +4224,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4307,7 +4314,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4433,7 +4440,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4492,7 +4499,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4584,7 +4591,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4704,7 +4711,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,

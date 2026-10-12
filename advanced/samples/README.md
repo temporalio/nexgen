@@ -16,6 +16,12 @@ Advanced generation examples. Two flavors live here:
 For the beginner-friendly JSON Schema definitions samples, see
 [`../../samples/`](../../samples/).
 
+To use hand-written support code with WIT generation, start with the
+[support-package guide](../../GUIDE.md#integrating-a-support-package) and the
+sample-project instructions for
+[Go](go/README.md), [Python](python/README.md),
+[TypeScript](typescript/README.md), and [.NET](dotnet/README.md).
+
 ## WIT examples
 
 ### `function-execution`
@@ -66,12 +72,30 @@ For the beginner-friendly JSON Schema definitions samples, see
 - Python: [`python/wit/type_roundtrip/`](python/wit/type_roundtrip/), [`python/tests/test_type_roundtrip.py`](python/tests/test_type_roundtrip.py)
 - TypeScript: [`typescript/wit/type-roundtrip/`](typescript/wit/type-roundtrip/), [`typescript/tests/type-roundtrip.test.ts`](typescript/tests/type-roundtrip.test.ts)
 
+### `notification-service`
+
+- WIT: [`inputs/notification-service.wit`](inputs/notification-service.wit)
+- .NET: [`dotnet/wit/notification-service/`](dotnet/wit/notification-service/), [`dotnet/tests/NotificationServiceChecks.cs`](dotnet/tests/NotificationServiceChecks.cs)
+- Python: [`python/wit/notification_service/`](python/wit/notification_service/), [`python/tests/test_notification_service.py`](python/tests/test_notification_service.py)
+
+### `proto-oneof`
+
+- WIT: [`inputs/proto-oneof.wit`](inputs/proto-oneof.wit)
+- .NET: [`dotnet/wit/proto-oneof/`](dotnet/wit/proto-oneof/), [`dotnet/tests/ProtoOneofChecks.cs`](dotnet/tests/ProtoOneofChecks.cs)
+- Python: [`python/wit/proto_oneof/`](python/wit/proto_oneof/), [`python/tests/test_proto_oneof.py`](python/tests/test_proto_oneof.py)
+
+### `proto-generic`
+
+- WIT: [`inputs/proto-generic.wit`](inputs/proto-generic.wit)
+- .NET: [`dotnet/wit/proto-generic/`](dotnet/wit/proto-generic/), [`dotnet/tests/ProtoGenericChecks.cs`](dotnet/tests/ProtoGenericChecks.cs)
+- Python: [`python/wit/proto_generic/`](python/wit/proto_generic/), [`python/tests/test_proto_generic.py`](python/tests/test_proto_generic.py)
+
 ## Supporting files
 
 - [`inputs/deps/`](inputs/deps/): reusable Temporal semantic/common type WIT inputs linked into proto-backed example generation.
 - [`descriptors/temporal_api.bin`](descriptors/temporal_api.bin): Temporal API descriptor set used by proto-backed examples.
 - [`wire/proto/`](wire/proto/): proto wire fixtures used by the proto-compatibility tests.
-- Per-language notes: [`dotnet/README.md`](dotnet/README.md), [`go/README.md`](go/README.md), [`java/README.md`](java/README.md), [`python/README.md`](python/README.md), [`typescript/README.md`](typescript/README.md).
+- Per-language notes: [`dotnet/README.md`](dotnet/README.md), [`go/README.md`](go/README.md), [`java/`](java/) (no user support package), [`python/README.md`](python/README.md), [`typescript/README.md`](typescript/README.md).
 
 ## Regenerating
 

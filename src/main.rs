@@ -25,13 +25,13 @@ struct Cli {
 enum Commands {
     #[cfg(feature = "advanced")]
     #[command(about = "Generate C# / .NET bindings")]
-    Dotnet(GenerateArgs),
+    Dotnet(SupportPackageGenerateArgs),
     #[command(about = "Generate Go bindings")]
-    Go(GenerateArgs),
+    Go(SupportPackageGenerateArgs),
     #[command(about = "Generate Java bindings")]
     Java(JavaGenerateArgs),
     #[command(about = "Generate Python bindings")]
-    Python(GenerateArgs),
+    Python(SupportPackageGenerateArgs),
     #[command(alias = "ts", about = "Generate TypeScript bindings (alias: ts)")]
     Typescript(TypescriptGenerateArgs),
     #[cfg(feature = "advanced")]
@@ -54,9 +54,6 @@ struct GenerateArgs {
     #[arg(value_name = "INPUT", required = true)]
     inputs: Vec<PathBuf>,
     #[cfg(feature = "advanced")]
-    #[arg(long = "support-file")]
-    support_paths: Vec<PathBuf>,
-    #[cfg(feature = "advanced")]
     #[arg(long)]
     descriptors: Vec<PathBuf>,
     #[arg(long)]
@@ -74,6 +71,15 @@ struct GenerateArgs {
 }
 
 #[derive(Args)]
+struct SupportPackageGenerateArgs {
+    #[command(flatten)]
+    common: GenerateArgs,
+    /// Import path or namespace of the user-owned support package (required for WIT).
+    #[arg(long = "support-package")]
+    support_package: Option<String>,
+}
+
+#[derive(Args)]
 struct JavaGenerateArgs {
     #[command(flatten)]
     common: GenerateArgs,
@@ -87,6 +93,9 @@ struct JavaGenerateArgs {
 struct TypescriptGenerateArgs {
     #[command(flatten)]
     common: GenerateArgs,
+    /// Import specifier of the user-owned support package (required for WIT).
+    #[arg(long = "support-package")]
+    support_package: Option<String>,
     /// TypeScript-only: the in-memory representation for materialized temporal
     /// `format` fields (date-time/date/time/duration).
     #[arg(long = "date-time-types", value_enum, default_value_t = CliTsDateTimeTypes::String)]
@@ -152,36 +161,44 @@ fn main() -> ExitCode {
         #[cfg(feature = "advanced")]
         Commands::Dotnet(args) => generate_to_file(&generate_request(
             Language::Dotnet,
-            args,
+            args.common,
             Default::default(),
             None,
+            args.support_package,
         )),
         Commands::Go(args) => generate_to_file(&generate_request(
             Language::Go,
-            args,
+            args.common,
             Default::default(),
             None,
+            args.support_package,
         )),
         Commands::Java(args) => generate_to_file(&generate_request(
             Language::Java,
             args.common,
             Default::default(),
             Some(args.package_name),
+            None,
         )),
         Commands::Python(args) => {
             #[cfg(feature = "advanced")]
             {
-                let system_nexus = args.system_nexus;
+                let system_nexus = args.common.system_nexus;
                 let config = NexgenConfig {
-                    mode: if args.generate_native_api {
+                    mode: if args.common.generate_native_api {
                         nexgen::generator::GenerationMode::NativeApi
                     } else {
                         nexgen::generator::GenerationMode::DefinitionsOnly
                     },
                     system_nexus,
                 };
-                let mut request =
-                    generate_request(Language::Python, args, Default::default(), None);
+                let mut request = generate_request(
+                    Language::Python,
+                    args.common,
+                    Default::default(),
+                    None,
+                    args.support_package,
+                );
                 request.config = config;
                 generate_to_file(&request)
             }
@@ -189,9 +206,10 @@ fn main() -> ExitCode {
             {
                 generate_to_file(&generate_request(
                     Language::Python,
-                    args,
+                    args.common,
                     Default::default(),
                     None,
+                    args.support_package,
                 ))
             }
         }
@@ -212,6 +230,7 @@ fn main() -> ExitCode {
                     args.common,
                     args.ts_date_time_types.into(),
                     None,
+                    args.support_package,
                 );
                 request.config = config;
                 generate_to_file(&request)
@@ -223,6 +242,7 @@ fn main() -> ExitCode {
                     args.common,
                     args.ts_date_time_types.into(),
                     None,
+                    args.support_package,
                 ))
             }
         }
@@ -258,6 +278,7 @@ fn generate_request(
     args: GenerateArgs,
     ts_date_time_types: TsDateTimeTypes,
     java_package_name: Option<String>,
+    support_package: Option<String>,
 ) -> GenerateRequest {
     GenerateRequest {
         #[cfg(feature = "advanced")]
@@ -273,10 +294,7 @@ fn generate_request(
         config: Default::default(),
         language,
         input_paths: args.inputs,
-        #[cfg(feature = "advanced")]
-        support_paths: args.support_paths,
-        #[cfg(not(feature = "advanced"))]
-        support_paths: Vec::new(),
+        support_package,
         #[cfg(feature = "advanced")]
         descriptor_paths: args.descriptors,
         #[cfg(not(feature = "advanced"))]
@@ -288,5 +306,48 @@ fn generate_request(
         format: false,
         java_package_name,
         ts_date_time_types,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cli, Commands};
+    use clap::Parser;
+
+    #[test]
+    fn support_package_option_is_available_but_not_a_json_schema_requirement() {
+        for language in ["go", "python", "typescript"] {
+            assert!(
+                Cli::try_parse_from(["nexgen", language, "input.json", "--output", "out"]).is_ok()
+            );
+            assert!(
+                Cli::try_parse_from([
+                    "nexgen",
+                    language,
+                    "input.json",
+                    "--output",
+                    "out",
+                    "--support-package",
+                    "sample_support",
+                ])
+                .is_ok()
+            );
+        }
+        #[cfg(feature = "advanced")]
+        assert!(Cli::try_parse_from(["nexgen", "dotnet", "input.wit", "--output", "out"]).is_ok());
+        assert!(matches!(
+            Cli::try_parse_from([
+                "nexgen",
+                "java",
+                "input.json",
+                "--output",
+                "out",
+                "--package-name",
+                "out",
+            ])
+            .unwrap()
+            .command,
+            Commands::Java(_)
+        ));
     }
 }

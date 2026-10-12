@@ -206,6 +206,21 @@ fn validate_python(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
         run(log, &root, "uv", &["run", "ruff", "format", "--check", "."])?;
         run(log, &root, "uv", &["run", "basedpyright", "--warnings"])?;
         run(log, &root, "uv", &["run", "pytest"])?;
+        run(
+            log,
+            &root,
+            "uv",
+            &[
+                "run",
+                "--isolated",
+                "--python",
+                "3.10",
+                "--locked",
+                "python",
+                "-m",
+                "pytest",
+            ],
+        )?;
     }
     Ok(())
 }

@@ -153,7 +153,12 @@ impl Workspace {
             config: Default::default(),
             language: target.language(),
             input_paths: schemas.to_vec(),
-            support_paths: Vec::new(),
+            support_package: match target {
+                Target::Go => Some("samples/go/support".into()),
+                Target::Python => Some("conformance_support".into()),
+                Target::TypeScript => Some("./support".into()),
+                Target::Java => None,
+            },
             descriptor_paths: Vec::new(),
             output_path: output_path.clone(),
             format: false,

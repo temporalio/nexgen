@@ -3,7 +3,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use nexgen::SupportFiles;
 use nexgen::descriptors::DescriptorIndex;
 use nexgen::generator::generate_source;
 use nexgen::language::Language;
@@ -102,7 +101,15 @@ interface api {
 fn generate(language: Language, path: &Path) -> nexgen::error::Result<String> {
     let spec = load_api_spec_from_wit_for_language_with_inputs(language, &[path.to_path_buf()])?;
     let descriptors = DescriptorIndex::load(&descriptor_path())?;
-    generate_source(language, spec, &descriptors, &SupportFiles::default())
+    let support_package = match language {
+        Language::Dotnet => "Nexgen.Support",
+        Language::Go => "example.com/nexgen/support",
+        Language::TypeScript => "./support",
+        Language::Python => "temporal_support",
+        Language::Java => "",
+        _ => "",
+    };
+    generate_source(language, spec, &descriptors, support_package)
 }
 
 #[test]
@@ -155,16 +162,24 @@ fn unsupported_backend_rejects_reachable_generic_proto_carrier() {
 }
 
 #[test]
-fn dotnet_rejects_generic_proto_models_until_sdk_supports_generic_converters() {
+fn dotnet_converts_generic_proto_carriers() {
     let temp = tempfile::tempdir().unwrap();
     let path = write_generic_carrier_fixture(temp.path());
-    let error = generate(Language::Dotnet, &path).unwrap_err();
+    let output = generate(Language::Dotnet, &path).unwrap();
+    assert!(output.contains("typeof(GenericRequest<>.TransferTypeConverter)"));
     assert!(
-        error.to_string().contains(
-            "dotnet protobuf transfer-type conversion does not yet support generic model"
-        ),
-        "{error}"
+        output.contains("if (wire.Details != null && wire.Details.Payloads_.Count > 1)"),
+        "{output}"
     );
+    assert!(output.contains(
+        "throw new System.InvalidOperationException($\"expected at most one payload in GenericRequest.Details, found {wire.Details.Payloads_.Count}\");"
+    ));
+    assert!(output.contains(
+        "Details = wire.Details == null ? default : (wire.Details.Payloads_.Count == 0 ? default! : Nexgen.Support.ProtoExtensions.FromPayloads<TInput>(wire.Details)[0]),"
+    ));
+    assert!(output.contains(
+        "proto.Details = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { details });"
+    ));
 }
 
 #[test]

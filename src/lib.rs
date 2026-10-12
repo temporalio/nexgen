@@ -18,24 +18,21 @@ use descriptors::DescriptorIndex;
 use error::Result;
 use generator::{GenerateFilesOptions, GeneratedFiles, GeneratedOutputLayout, GenerationMode};
 use language::Language;
-use spec::SupportFragmentSpec;
-use spec::{ApiSpecNode, ApiSpecTree, CompilerPass};
+use spec::{ApiSpecTree, CompilerPass};
 
 pub use add_rpc::{
     AddMessageRequest, AddRpcRequest, add_message_to_file, add_message_to_string, add_rpc_to_file,
     add_rpc_to_string,
 };
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SupportFiles {
-    pub fragments: Vec<SupportFragmentSpec>,
-}
-
 pub struct GenerateRequest {
     pub config: nexgen_config::NexgenConfig,
     pub language: Language,
     pub input_paths: Vec<PathBuf>,
-    pub support_paths: Vec<PathBuf>,
+    /// Import path or namespace of a user-owned support package. Required for
+    /// WIT generation in Go, Python, TypeScript and .NET; not used for Java
+    /// or ordinary JSON Schema generation.
+    pub support_package: Option<String>,
     pub descriptor_paths: Vec<PathBuf>,
     pub output_path: PathBuf,
     pub format: bool,
@@ -63,12 +60,23 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
         });
     }
 
+    if parser::is_wit_input(&request.input_paths)?
+        && matches!(
+            request.language,
+            Language::Dotnet | Language::Go | Language::Python | Language::TypeScript
+        )
+        && request.support_package.as_deref().is_none_or(str::is_empty)
+    {
+        return Err(error::Error::MissingSupportPackage {
+            language: request.language,
+        });
+    }
+
     let tree = parser::load_api_spec_tree_for_language_with_inputs(
         request.language,
         &request.input_paths,
     )?;
     let descriptors = DescriptorIndex::load_many(&request.descriptor_paths)?;
-    let support = load_support_files_for_tree(request.language, &tree, &request.support_paths)?;
     let options = GenerateFilesOptions {
         go_output_dir_name: if request.language == Language::Go {
             output_dir_name(&request.output_path)?
@@ -81,8 +89,9 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
             None
         },
         ts_date_time_types: request.ts_date_time_types,
+        support_package: request.support_package.clone(),
     };
-    let generated = compile_tree_to_files(request.language, tree, &descriptors, &support, options)?;
+    let generated = compile_tree_to_files(request.language, tree, &descriptors, options)?;
     print_warnings(&generated);
 
     write_generated_files(&request.output_path, &generated)?;
@@ -101,7 +110,6 @@ pub(crate) fn compile_tree_to_files(
     language: Language,
     authored_tree: ApiSpecTree,
     descriptors: &DescriptorIndex,
-    support: &SupportFiles,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     let mode = nexgen_config::current().mode;
@@ -133,7 +141,7 @@ pub(crate) fn compile_tree_to_files(
     // planned IR -> emitted JSON names -> render target-language files
     let name_resolution = planning::EmittedNameResolutionPass::new(language, &planned_tree)?;
     let generator_ready_tree = name_resolution.apply(planned_tree)?;
-    generator::generate_files_from_planned_tree(language, &generator_ready_tree, support, options)
+    generator::generate_files_from_planned_tree(language, &generator_ready_tree, options)
 }
 
 /// The output directory's basename, used as the Go package name — matching
@@ -337,93 +345,13 @@ fn format_formatter_command(program: &str, args: &[String]) -> String {
         .join(" ")
 }
 
-fn load_support_files_for_tree(
-    language: Language,
-    tree: &ApiSpecTree,
-    support_paths: &[PathBuf],
-) -> Result<SupportFiles> {
-    if !support_paths.is_empty() {
-        return Ok(SupportFiles {
-            fragments: load_support_fragments_from_paths(language, support_paths)?,
-        });
-    }
-    let mut fragments = Vec::new();
-    collect_tree_support_fragments(language, &tree.root, &mut fragments);
-    Ok(SupportFiles { fragments })
-}
-
-fn collect_tree_support_fragments(
-    language: Language,
-    node: &ApiSpecNode,
-    fragments: &mut Vec<SupportFragmentSpec>,
-) {
-    match node {
-        ApiSpecNode::Leaf(leaf) => {
-            fragments.extend(leaf.spec.support.fragments_for_language(language).to_vec());
-        }
-        ApiSpecNode::Branch(branch) => {
-            for child in branch.children.values() {
-                collect_tree_support_fragments(language, child, fragments);
-            }
-        }
-    }
-}
-
-fn load_support_fragments_from_paths(
-    language: Language,
-    support_paths: &[PathBuf],
-) -> Result<Vec<SupportFragmentSpec>> {
-    support_paths
-        .iter()
-        .map(|path| {
-            let contents = fs::read_to_string(path).map_err(|source| error::Error::ReadFile {
-                path: path.clone(),
-                source,
-            })?;
-            Ok(SupportFragmentSpec {
-                path: path.to_string_lossy().replace('\\', "/"),
-                namespace: infer_support_namespace(language, &contents),
-                contents,
-            })
-        })
-        .collect()
-}
-
-fn infer_support_namespace(language: Language, contents: &str) -> Option<String> {
-    match language {
-        Language::Dotnet => infer_dotnet_namespace(contents),
-        _ => None,
-    }
-}
-
-fn infer_dotnet_namespace(contents: &str) -> Option<String> {
-    for line in contents.lines() {
-        let line = line.trim_start();
-        if line.starts_with("//") {
-            continue;
-        }
-        let mut parts = line.split_whitespace();
-        if parts.next() != Some("namespace") {
-            continue;
-        }
-        let namespace = parts
-            .next()
-            .unwrap_or("")
-            .trim_end_matches(|character| character == '{' || character == ';');
-        if !namespace.is_empty() {
-            return Some(namespace.to_string());
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;
     use std::path::PathBuf;
 
     use super::{
-        GenerateRequest, format_formatter_command, formatter_command, infer_dotnet_namespace,
+        GenerateRequest, format_formatter_command, formatter_command, generate_to_file,
         output_dir_name, resolve_java_package,
     };
     use crate::language::Language;
@@ -433,12 +361,50 @@ mod tests {
             config: Default::default(),
             language: Language::Java,
             input_paths: Vec::new(),
-            support_paths: Vec::new(),
+            support_package: None,
             descriptor_paths: Vec::new(),
             output_path: PathBuf::from(output_path),
             format: false,
             java_package_name: java_package_name.map(str::to_string),
             ts_date_time_types: Default::default(),
+        }
+    }
+
+    #[test]
+    fn wit_requires_support_package_before_reading_input() {
+        for language in [
+            Language::Dotnet,
+            Language::Go,
+            Language::Python,
+            Language::TypeScript,
+        ] {
+            let mut request = java_request("/tmp/example", None);
+            request.language = language;
+            request.input_paths = vec![PathBuf::from("missing.wit")];
+            assert!(matches!(
+                generate_to_file(&request).unwrap_err(),
+                crate::error::Error::MissingSupportPackage { language: missing } if missing == language
+            ));
+        }
+    }
+
+    #[test]
+    fn json_schema_does_not_require_a_support_package() {
+        let temp = tempfile::tempdir().unwrap();
+        let input =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples/schemas/chat.nexusrpc.yaml");
+        for language in [
+            Language::Dotnet,
+            Language::Go,
+            Language::Python,
+            Language::TypeScript,
+        ] {
+            let mut request = java_request("/tmp/example", None);
+            request.language = language;
+            request.input_paths = vec![input.clone()];
+            request.output_path = temp.path().join(language.as_str());
+            generate_to_file(&request).unwrap();
+            assert!(request.output_path.exists());
         }
     }
 
@@ -504,29 +470,6 @@ mod tests {
             output_dir_name(Path::new("/")).unwrap_err(),
             crate::error::Error::OutputPathIsRoot { path } if path == Path::new("/")
         ));
-    }
-
-    #[test]
-    fn infers_dotnet_support_namespace_from_file() {
-        assert_eq!(
-            infer_dotnet_namespace(
-                r#"
-using System;
-
-namespace Nexgen.Support
-{
-    internal static class TemporalSupport { }
-}
-"#
-            )
-            .as_deref(),
-            Some("Nexgen.Support")
-        );
-        assert_eq!(
-            infer_dotnet_namespace("namespace Nexgen.Support;\ninternal static class Support { }")
-                .as_deref(),
-            Some("Nexgen.Support")
-        );
     }
 
     #[test]

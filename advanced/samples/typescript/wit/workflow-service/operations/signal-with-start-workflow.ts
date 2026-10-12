@@ -6,7 +6,7 @@ import * as workflow from "../../../../workflow";
 import { workflowService } from "../services";
 import type { SignalWithStartWorkflowRequest } from "../models";
 import type { ExternalWorkflowHandle } from "../../../../workflow";
-import { workflowNamespace } from "../support";
+import * as support from "../../../support/temporal_model_converters";
 
 type SignalWithStartWorkflowInput<
   WorkflowFn extends (...args: any[]) => Promise<any> = (
@@ -37,7 +37,7 @@ export async function signalWithStartWorkflow<
 ): Promise<ExternalWorkflowHandle> {
   const request = {
     ...requestInput,
-    namespace: workflowNamespace(),
+    namespace: support.workflowNamespace(),
   } as SignalWithStartWorkflowRequest<WorkflowFn, SignalValue>;
   const client = nexus.createNexusServiceClient({
     service: workflowService,

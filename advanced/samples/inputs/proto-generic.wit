@@ -1,0 +1,41 @@
+/// Payload-backed generic proto models, including concrete type arguments that
+/// propagate through nested proto-backed records.
+package temporal:nexus@1.0.0;
+
+world system {
+  export proto-generic;
+}
+
+interface proto-generic {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.type-parameter
+  type context-t = placeholder;
+
+  /// @nexus.proto "temporal.api.compute.v1.ComputeProvider"
+  record payload-backed-output {
+    /// @nexus.omit
+    %type: placeholder,
+    details: output-t,
+    /// @nexus.omit
+    nexus-endpoint: placeholder,
+  }
+
+  /// @nexus.proto "temporal.api.compute.v1.ComputeScaler"
+  record payload-backed-context {
+    /// @nexus.omit
+    %type: placeholder,
+    details: context-t,
+  }
+
+  /// @nexus.proto "temporal.api.compute.v1.ComputeConfigScalingGroup"
+  record payload-backed-envelope {
+    /// @nexus.omit
+    task-queue-types: placeholder,
+    provider: payload-backed-output,
+    scaler: payload-backed-context,
+  }
+}

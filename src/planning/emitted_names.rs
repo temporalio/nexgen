@@ -25,7 +25,6 @@ use super::{
     PlannedAliasType, PlannedEnumType, PlannedFamily, PlannedFieldData, PlannedFlagsType,
     PlannedJsonType, PlannedOperationData, PlannedProtoType, PlannedRecordData, PlannedRecordType,
     PlannedResource, PlannedResourceType, PlannedSpec, PlannedSpecData, PlannedVariantType,
-    SupportSpec,
 };
 
 pub(crate) struct EmittedNameResolutionPass {
@@ -192,9 +191,6 @@ impl ApiSpecTransform<PlannedFamily, PlannedFamily> for EmittedNameMapper<'_> {
         value
     }
     fn map_text(&mut self, value: LanguageStringSpec) -> LanguageStringSpec {
-        value
-    }
-    fn map_support(&mut self, value: SupportSpec) -> SupportSpec {
         value
     }
 }

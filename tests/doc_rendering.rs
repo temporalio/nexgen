@@ -81,7 +81,8 @@ fn generate(language: nexgen::language::Language, java_package_name: Option<&str
         config: Default::default(),
         language,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: (language != nexgen::language::Language::Java)
+            .then(|| "unused_support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,

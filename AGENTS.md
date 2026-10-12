@@ -12,6 +12,10 @@
   full command passing. It covers Rust formatting and tests plus the checked-in
   Python, TypeScript, Go, Java, and .NET sample projects.
 
+  ```sh
+  cargo validate python
+  ```
+
 - When running Rust tests directly, pass the feature flag to test the "advanced" features:
 
   ```sh
@@ -25,9 +29,9 @@ When asked to create a stack of pull requests, use the
 than creating and linking the PRs manually.
 
 - If `gh stack` is unavailable, install it with `gh extension install
-  github/gh-stack`.
+github/gh-stack`.
 - Initialize the stack from its trunk branch, normally with `gh stack init
-  --base main <bottom-branch>`, then add each successive layer from the current
+--base main <bottom-branch>`, then add each successive layer from the current
   top branch with `gh stack add <branch>`.
 - Commit each layer independently. Use `gh stack push` to publish every branch
   and `gh stack submit` to create the PRs with the correct parent branches.
@@ -81,8 +85,16 @@ justification for why it belongs where it is planned in the architecture.
   rule, or processing flow changes. JSON Schema architecture lives under
   `specs/json-schema/`, especially `pipeline.md` and `PRINCIPLES.md`.
 - Update `GUIDE.md` when WIT authoring or generated WIT-facing behavior changes.
-- Update `CHANGELOG.md` only for public-facing changes, such as CLI flags,
-  generated APIs, or externally visible behavior. Use the `Unreleased` section.
+- For public-facing changes (CLI flags, generated APIs, or externally visible
+  behavior), add a new fragment in `changelog/<category>/` instead of editing
+  `CHANGELOG.md`. Categories are `added`, `stabilized`, `changed`, `deprecated`,
+  `breaking-changes`, `fixed`, and `security`. Use `stabilized` when a feature
+  is no longer experimental.
+- Choose a fun, whimsical lowercase kebab-case filename, such as
+  `moonwalking-marshmallow.md`. Keep entries concise, ideally a sentence or two.
+  Each nonempty line becomes one bullet; omit the leading `-`. Multiple items
+  from one PR can share a fragment, but unrelated PRs should have separate files.
+- `CHANGELOG.md` contains completed releases only. See `changelog/README.md`.
 
 ## Compatibility
 

@@ -5,19 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.8] - 2026-10-09
 
 ### Added
 
-### Changed
-
-### Deprecated
+- .NET native-API generation now converts protobuf oneof-backed variants and
+  generic proto-backed records whose type parameters are carried by Temporal
+  `Payload` or `Payloads` fields. Generic models register open generic
+  transfer-type converters and require `Temporalio` 1.19.0 or newer. The
+  `notification-service`, `proto-oneof`, and `proto-generic` (previously
+  `proto-generic-python`) examples are now generated for .NET.
 
 ### Breaking Changes
 
+- Go, Python, TypeScript, and .NET WIT generation now require `--support-package`
+  (Java and JSON Schema generation are unchanged). Support code is imported
+  from that caller-owned package instead of copied from `--support-file` or
+  `@nexus.support`; support-namespace directives are removed. `@nexus.source`
+  now names a helper call relative to the configured support package. Nexgen
+  prefixes that call and imports support for every sourced field. The
+  per-language `<lang>-support-import` options are removed.
+  `@nexus.output-transform` remains an authored expression.
+- .NET generic type parameters now use the C# `T` prefix. For example, the
+  authored `output-t` alias generates `TOutput` instead of `OutputT`.
+
 ### Fixed
 
-### Security
+- Operation-free WIT interfaces now honor `@nexus.namespace`, and .NET names
+  their namespace after the interface (`Nexgen.<InterfaceName>`) instead of
+  falling back to `Nexgen.Generated`.
+
+## [0.2.7] - 2026-10-01
+
+### Changed
+
+- Operation-free WIT interfaces now generate their public models without an
+  empty service definition or client.
+- Generated Python protobuf model converters now encode and decode oneof
+  variants with `match` statements over the typed field and the protobuf
+  `WhichOneof` case, and trust their static types. Serializing a value that is
+  not one of the declared variants, or decoding a oneof case unknown to the
+  generated model, no longer raises a dedicated `ValueError`/`TypeError`.
 
 ## [0.2.6] - 2026-09-17
 

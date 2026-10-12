@@ -37,6 +37,13 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@6255b92812bf51d292e488b61469267a391267f6 # stable
 
+      - name: Check out shared changelog tool
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: temporalio/sdk-rust
+          ref: 38f831515fb4be0e4e0bbcfe9504d0ffbbb43a0f
+          path: .changelog-tool
+
       - name: Read crate metadata
         id: crate
         run: |
@@ -61,12 +68,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.crate.outputs.tag }}
           RELEASE_TITLE: ${{ steps.crate.outputs.name }} ${{ steps.crate.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.crate.outputs.version }}
         run: |
+          cargo run --quiet \
+            --manifest-path .changelog-tool/crates/changelog-release-notes/Cargo.toml \
+            --bin changelog-tool -- notes --repo "$GITHUB_WORKSPACE" \
+            --version "$RELEASE_VERSION" > "$RUNNER_TEMP/release-notes.md"
           gh release create "$RELEASE_TAG" \
             --target "$GITHUB_SHA" \
             --draft \
             --title "$RELEASE_TITLE" \
-            --generate-notes
+            --notes-file "$RUNNER_TEMP/release-notes.md"
 
   attach-binaries:
     name: Attach release binaries
