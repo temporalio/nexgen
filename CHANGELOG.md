@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.9] - 2026-10-12
+
+### Added
+
+- Add multiple proto messages to one WIT scaffold with repeated `add-message --message`, or select all messages in a descriptor-set proto file with `--file`.
+- Go WIT generation supports workflow function name extractors, including registered Temporal workflow names.
+
+### Fixed
+
+- Unify `add-message` and both `add-rpc` paths so reconciliation restores missing owned fields and declarations throughout reachable mapped records, validates linked records without editing dependencies, and detects oneof case drift while preserving intentional refinements.
+- Preserve explicit proto field mappings when generated names do not round-trip; reject unrepresentable oneof member names instead of emitting an invalid mapping.
+- Reconcile existing `add-message` WIT records with selected proto messages, restoring missing records and fields instead of silently returning unchanged output.
+
 ## [0.2.8] - 2026-10-09
 
 ### Added

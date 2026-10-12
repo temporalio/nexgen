@@ -1,2 +1,0 @@
-Unify `add-message` and both `add-rpc` paths so reconciliation restores missing owned fields and declarations throughout reachable mapped records, validates linked records without editing dependencies, and detects oneof case drift while preserving intentional refinements.
-Preserve explicit proto field mappings when generated names do not round-trip; reject unrepresentable oneof member names instead of emitting an invalid mapping.
