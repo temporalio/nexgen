@@ -21,8 +21,8 @@ import (
 
 const workflowServiceName = "temporal.api.workflowservice.v1.WorkflowService"
 
-func signalWithStartWorkflow(ctx workflow.Context, input string) string {
-	return input
+func signalWithStartWorkflow(ctx workflow.Context, input string) error {
+	return nil
 }
 
 type emptyPayloadsDataConverter struct {
@@ -63,6 +63,9 @@ func TestWorkflowServiceIntegrationSuite(t *testing.T) {
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
+	s.env.RegisterWorkflowWithOptions(signalWithStartWorkflow, workflow.RegisterOptions{
+		Name: "registered-alias",
+	})
 	retryPolicy := &temporal.RetryPolicy{MaximumAttempts: 3}
 	searchKey := temporal.NewSearchAttributeKeyKeyword("CustomKeyword")
 	searchAttributes := temporal.NewSearchAttributes(searchKey.ValueSet("search-value"))
@@ -122,6 +125,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.Require().Len(s.calls, 2)
 
 	typedRequest := s.calls[0]
+	s.Equal("registered-alias", typedRequest.GetWorkflowType().GetName())
 	s.Equal("wake-up", typedRequest.GetSignalName())
 	s.Require().NotNil(typedRequest.GetSignalInput())
 	s.Len(typedRequest.GetSignalInput().GetPayloads(), 1)
@@ -141,6 +145,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.Equal(int32(7), typedRequest.GetPriority().GetPriorityKey())
 
 	variadicRequest := s.calls[1]
+	s.Equal("ExampleWorkflow", variadicRequest.GetWorkflowType().GetName())
 	// A nil signal argument is still one argument and therefore one payload;
 	// it does not mean that the signal has no arguments.
 	s.Require().NotNil(variadicRequest.GetSignalInput())
