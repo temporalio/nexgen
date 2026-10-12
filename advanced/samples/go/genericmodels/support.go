@@ -14,20 +14,19 @@ import (
 	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/worker"
-	"go.temporal.io/sdk/workflow"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // --- Duration (google.protobuf.Duration) ---
 
-func durationToProto(_ workflow.Context, d *time.Duration) (*durationpb.Duration, error) {
+func durationToProto(_ converter.DataConverter, d *time.Duration) (*durationpb.Duration, error) {
 	if d == nil {
 		return nil, nil
 	}
 	return durationpb.New(*d), nil
 }
 
-func durationFromProto(_ workflow.Context, d *durationpb.Duration) (*time.Duration, error) {
+func durationFromProto(_ converter.DataConverter, d *durationpb.Duration) (*time.Duration, error) {
 	if d == nil {
 		return nil, nil
 	}
@@ -37,14 +36,14 @@ func durationFromProto(_ workflow.Context, d *durationpb.Duration) (*time.Durati
 
 // --- TaskQueue (temporal.api.taskqueue.v1.TaskQueue) ---
 
-func taskQueueToProto(_ workflow.Context, name *string) (*taskqueue.TaskQueue, error) {
+func taskQueueToProto(_ converter.DataConverter, name *string) (*taskqueue.TaskQueue, error) {
 	if name == nil {
 		return nil, nil
 	}
 	return &taskqueue.TaskQueue{Name: *name, Kind: enums.TASK_QUEUE_KIND_NORMAL}, nil
 }
 
-func taskQueueFromProto(_ workflow.Context, tq *taskqueue.TaskQueue) (*string, error) {
+func taskQueueFromProto(_ converter.DataConverter, tq *taskqueue.TaskQueue) (*string, error) {
 	if tq == nil {
 		return nil, nil
 	}
@@ -54,11 +53,11 @@ func taskQueueFromProto(_ workflow.Context, tq *taskqueue.TaskQueue) (*string, e
 
 // --- RetryPolicy (temporal.api.common.v1.RetryPolicy) ---
 
-func retryPolicyToProto(_ workflow.Context, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {
+func retryPolicyToProto(_ converter.DataConverter, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {
 	return internal.ConvertToPBRetryPolicy(p), nil
 }
 
-func retryPolicyFromProto(_ workflow.Context, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {
+func retryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {
 	if p == nil {
 		return nil, nil
 	}
@@ -78,14 +77,14 @@ func retryPolicyFromProto(_ workflow.Context, p *common.RetryPolicy) (*temporal.
 
 // --- Priority (temporal.api.common.v1.Priority) ---
 
-func priorityToProto(_ workflow.Context, p *temporal.Priority) (*common.Priority, error) {
+func priorityToProto(_ converter.DataConverter, p *temporal.Priority) (*common.Priority, error) {
 	if p == nil {
 		return nil, nil
 	}
 	return internal.ConvertToPBPriority(*p), nil
 }
 
-func priorityFromProto(_ workflow.Context, p *common.Priority) (*temporal.Priority, error) {
+func priorityFromProto(_ converter.DataConverter, p *common.Priority) (*temporal.Priority, error) {
 	if p == nil {
 		return nil, nil
 	}
@@ -98,14 +97,14 @@ func priorityFromProto(_ workflow.Context, p *common.Priority) (*temporal.Priori
 
 // --- WorkflowType (temporal.api.common.v1.WorkflowType) ---
 
-func workflowTypeToProto(_ workflow.Context, name *string) (*common.WorkflowType, error) {
+func workflowTypeToProto(_ converter.DataConverter, name *string) (*common.WorkflowType, error) {
 	if name == nil {
 		return nil, nil
 	}
 	return &common.WorkflowType{Name: *name}, nil
 }
 
-func workflowTypeFromProto(_ workflow.Context, t *common.WorkflowType) (*string, error) {
+func workflowTypeFromProto(_ converter.DataConverter, t *common.WorkflowType) (*string, error) {
 	if t == nil {
 		return nil, nil
 	}
@@ -114,32 +113,32 @@ func workflowTypeFromProto(_ workflow.Context, t *common.WorkflowType) (*string,
 }
 
 // --- Payload / Payloads (temporal.api.common.v1.Payload[s]) ---
-func payloadToProto(ctx workflow.Context, value any) (*common.Payload, error) {
-	return internal.GetDataConverterFromWorkflowContext(ctx).ToPayload(value)
+func payloadToProto(dc converter.DataConverter, value any) (*common.Payload, error) {
+	return dc.ToPayload(value)
 }
 
-func payloadFromProto(ctx workflow.Context, payload *common.Payload) (any, error) {
+func payloadFromProto(dc converter.DataConverter, payload *common.Payload) (any, error) {
 	if payload == nil {
 		return nil, nil
 	}
 	var value any
-	if err := internal.GetDataConverterFromWorkflowContext(ctx).FromPayload(payload, &value); err != nil {
+	if err := dc.FromPayload(payload, &value); err != nil {
 		return nil, err
 	}
 	return value, nil
 }
 
-func payloadsToProto(ctx workflow.Context, values []any) (*common.Payloads, error) {
-	return internal.GetDataConverterFromWorkflowContext(ctx).ToPayloads(values...)
+func payloadsToProto(dc converter.DataConverter, values []any) (*common.Payloads, error) {
+	return dc.ToPayloads(values...)
 }
 
-func payloadsFromProto(ctx workflow.Context, payloads *common.Payloads) ([]any, error) {
+func payloadsFromProto(dc converter.DataConverter, payloads *common.Payloads) ([]any, error) {
 	if payloads == nil {
 		return nil, nil
 	}
 	values := make([]any, 0, len(payloads.GetPayloads()))
 	for _, payload := range payloads.GetPayloads() {
-		value, err := payloadFromProto(ctx, payload)
+		value, err := payloadFromProto(dc, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -150,40 +149,40 @@ func payloadsFromProto(ctx workflow.Context, payloads *common.Payloads) ([]any, 
 
 // --- Failure (temporal.api.failure.v1.Failure) ---
 
-func failureToProto(ctx workflow.Context, value error) (*failurepb.Failure, error) {
+func failureToProto(dc converter.DataConverter, value error) (*failurepb.Failure, error) {
 	failureConverter := temporal.NewDefaultFailureConverter(temporal.DefaultFailureConverterOptions{
-		DataConverter: internal.GetDataConverterFromWorkflowContext(ctx),
+		DataConverter: dc,
 	})
 	return failureConverter.ErrorToFailure(value), nil
 }
 
-func failureFromProto(ctx workflow.Context, failure *failurepb.Failure) (error, error) {
+func failureFromProto(dc converter.DataConverter, failure *failurepb.Failure) (error, error) {
 	if failure == nil {
 		return nil, nil
 	}
 	failureConverter := temporal.NewDefaultFailureConverter(temporal.DefaultFailureConverterOptions{
-		DataConverter: internal.GetDataConverterFromWorkflowContext(ctx),
+		DataConverter: dc,
 	})
 	return failureConverter.FailureToError(failure), nil
 }
 
 // --- Memo (temporal.api.common.v1.Memo) ---
 
-func memoToProto(ctx workflow.Context, memo map[string]any) (*common.Memo, error) {
+func memoToProto(dc converter.DataConverter, memo map[string]any) (*common.Memo, error) {
 	return internal.GetWorkflowMemo(
 		memo,
-		internal.GetDataConverterFromWorkflowContext(ctx),
-		internal.GetWorkflowEnvironment(ctx).TryUse(internal.SDKFlagMemoUserDCEncode),
+		dc,
+		true,
 	)
 }
 
-func memoFromProto(ctx workflow.Context, memo *common.Memo) (map[string]any, error) {
+func memoFromProto(dc converter.DataConverter, memo *common.Memo) (map[string]any, error) {
 	if memo == nil {
 		return nil, nil
 	}
 	result := make(map[string]any, len(memo.GetFields()))
 	for key, payload := range memo.GetFields() {
-		value, err := payloadFromProto(ctx, payload)
+		value, err := payloadFromProto(dc, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -192,13 +191,13 @@ func memoFromProto(ctx workflow.Context, memo *common.Memo) (map[string]any, err
 	return result, nil
 }
 
-func headerToProto(ctx workflow.Context, header map[string]any) (*common.Header, error) {
+func headerToProto(dc converter.DataConverter, header map[string]any) (*common.Header, error) {
 	if header == nil {
 		return nil, nil
 	}
 	fields := make(map[string]*common.Payload, len(header))
 	for key, value := range header {
-		payload, err := payloadToProto(ctx, value)
+		payload, err := payloadToProto(dc, value)
 		if err != nil {
 			return nil, fmt.Errorf("encode workflow header error: %v", err)
 		}
@@ -207,13 +206,13 @@ func headerToProto(ctx workflow.Context, header map[string]any) (*common.Header,
 	return &common.Header{Fields: fields}, nil
 }
 
-func headerFromProto(ctx workflow.Context, header *common.Header) (map[string]any, error) {
+func headerFromProto(dc converter.DataConverter, header *common.Header) (map[string]any, error) {
 	if header == nil {
 		return nil, nil
 	}
 	result := make(map[string]any, len(header.GetFields()))
 	for key, payload := range header.GetFields() {
-		value, err := payloadFromProto(ctx, payload)
+		value, err := payloadFromProto(dc, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -224,14 +223,14 @@ func headerFromProto(ctx workflow.Context, header *common.Header) (map[string]an
 
 // --- SearchAttributes (temporal.api.common.v1.SearchAttributes) ---
 
-func searchAttributesToProto(_ workflow.Context, searchAttributes *temporal.SearchAttributes) (*common.SearchAttributes, error) {
+func searchAttributesToProto(_ converter.DataConverter, searchAttributes *temporal.SearchAttributes) (*common.SearchAttributes, error) {
 	if searchAttributes == nil {
 		return nil, nil
 	}
 	return internal.SerializeSearchAttributes(nil, *searchAttributes)
 }
 
-func searchAttributesFromProto(_ workflow.Context, searchAttributes *common.SearchAttributes) (*temporal.SearchAttributes, error) {
+func searchAttributesFromProto(_ converter.DataConverter, searchAttributes *common.SearchAttributes) (*temporal.SearchAttributes, error) {
 	if searchAttributes == nil {
 		return nil, nil
 	}
@@ -284,14 +283,14 @@ func searchAttributesFromProto(_ workflow.Context, searchAttributes *common.Sear
 
 // --- VersioningOverride (temporal.api.workflow.v1.VersioningOverride) ---
 
-func versioningOverrideToProto(_ workflow.Context, versioningOverride *client.VersioningOverride) (*workflowpb.VersioningOverride, error) {
+func versioningOverrideToProto(_ converter.DataConverter, versioningOverride *client.VersioningOverride) (*workflowpb.VersioningOverride, error) {
 	if versioningOverride == nil {
 		return nil, nil
 	}
 	return internal.VersioningOverrideToProto(*versioningOverride), nil
 }
 
-func versioningOverrideFromProto(_ workflow.Context, versioningOverride *workflowpb.VersioningOverride) (*client.VersioningOverride, error) {
+func versioningOverrideFromProto(_ converter.DataConverter, versioningOverride *workflowpb.VersioningOverride) (*client.VersioningOverride, error) {
 	if versioningOverride == nil {
 		return nil, nil
 	}

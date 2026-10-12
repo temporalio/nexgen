@@ -3,13 +3,12 @@
 package typeroundtrip
 
 import (
-	"context"
-	"errors"
 	"time"
 
 	activity "go.temporal.io/api/activity/v1"
 	command "go.temporal.io/api/command/v1"
 	"go.temporal.io/sdk/converter"
+	commonconverter "go.temporal.io/sdk/internal/common/converter"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -59,31 +58,31 @@ type ActivityOptions struct {
 	Priority *temporal.Priority
 }
 
-func activityOptionsToProto(ctx workflow.Context, m *ActivityOptions) (*activity.ActivityOptions, error) {
+func activityOptionsToProto(dc converter.DataConverter, m *ActivityOptions) (*activity.ActivityOptions, error) {
 	message := &activity.ActivityOptions{}
 	{
-		converted, err := taskQueueToProto(ctx, m.TaskQueue)
+		converted, err := taskQueueToProto(dc, m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
 		message.TaskQueue = converted
 	}
 	{
-		converted, err := retryPolicyToProto(ctx, &m.RetryPolicy)
+		converted, err := retryPolicyToProto(dc, &m.RetryPolicy)
 		if err != nil {
 			return nil, err
 		}
 		message.RetryPolicy = converted
 	}
 	{
-		converted, err := durationToProto(ctx, m.ScheduleToCloseTimeout)
+		converted, err := durationToProto(dc, m.ScheduleToCloseTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := priorityToProto(ctx, m.Priority)
+		converted, err := priorityToProto(dc, m.Priority)
 		if err != nil {
 			return nil, err
 		}
@@ -92,17 +91,17 @@ func activityOptionsToProto(ctx workflow.Context, m *ActivityOptions) (*activity
 	return message, nil
 }
 
-func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOptions, out *ActivityOptions) error {
+func activityOptionsFromProto(dc converter.DataConverter, proto *activity.ActivityOptions, out *ActivityOptions) error {
 	*out = ActivityOptions{}
 	{
-		converted, err := taskQueueFromProto(ctx, proto.GetTaskQueue())
+		converted, err := taskQueueFromProto(dc, proto.GetTaskQueue())
 		if err != nil {
 			return err
 		}
 		out.TaskQueue = converted
 	}
 	{
-		converted, err := retryPolicyFromProto(ctx, proto.GetRetryPolicy())
+		converted, err := retryPolicyFromProto(dc, proto.GetRetryPolicy())
 		if err != nil {
 			return err
 		}
@@ -111,14 +110,14 @@ func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOpti
 		}
 	}
 	{
-		converted, err := durationFromProto(ctx, proto.GetScheduleToCloseTimeout())
+		converted, err := durationFromProto(dc, proto.GetScheduleToCloseTimeout())
 		if err != nil {
 			return err
 		}
 		out.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := priorityFromProto(ctx, proto.GetPriority())
+		converted, err := priorityFromProto(dc, proto.GetPriority())
 		if err != nil {
 			return err
 		}
@@ -128,13 +127,7 @@ func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOpti
 }
 
 func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return converter.NewContextualTransferTypeConverter(
-		func(context.Context, *ActivityOptions) (*activity.ActivityOptions, error) {
-			return nil, errors.New("nexgen: transfer type converter outside a workflow")
-		},
-		func(context.Context, *activity.ActivityOptions, *ActivityOptions) error {
-			return errors.New("nexgen: transfer type converter outside a workflow")
-		},
+	return commonconverter.NewContextualTransferTypeConverter(
 		activityOptionsToProto,
 		activityOptionsFromProto,
 	)
@@ -145,10 +138,10 @@ type FailureContainer struct {
 	Failure error
 }
 
-func failureContainerToProto(ctx workflow.Context, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
+func failureContainerToProto(dc converter.DataConverter, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
 	message := &command.FailWorkflowExecutionCommandAttributes{}
 	{
-		converted, err := failureToProto(ctx, m.Failure)
+		converted, err := failureToProto(dc, m.Failure)
 		if err != nil {
 			return nil, err
 		}
@@ -157,10 +150,10 @@ func failureContainerToProto(ctx workflow.Context, m *FailureContainer) (*comman
 	return message, nil
 }
 
-func failureContainerFromProto(ctx workflow.Context, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
+func failureContainerFromProto(dc converter.DataConverter, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
 	*out = FailureContainer{}
 	{
-		converted, err := failureFromProto(ctx, proto.GetFailure())
+		converted, err := failureFromProto(dc, proto.GetFailure())
 		if err != nil {
 			return err
 		}
@@ -170,13 +163,7 @@ func failureContainerFromProto(ctx workflow.Context, proto *command.FailWorkflow
 }
 
 func (FailureContainer) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return converter.NewContextualTransferTypeConverter(
-		func(context.Context, *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
-			return nil, errors.New("nexgen: transfer type converter outside a workflow")
-		},
-		func(context.Context, *command.FailWorkflowExecutionCommandAttributes, *FailureContainer) error {
-			return errors.New("nexgen: transfer type converter outside a workflow")
-		},
+	return commonconverter.NewContextualTransferTypeConverter(
 		failureContainerToProto,
 		failureContainerFromProto,
 	)

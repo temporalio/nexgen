@@ -252,7 +252,11 @@ func (s *WorkflowServiceIntegrationSuite) TestModelIsConvertedInsideThePayloadCo
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		return ws.SignalWithStartWorkflow(
 			ctx,
-			ws.SignalWithStartWorkflowOptions{ID: "target-workflow-id", TaskQueue: "my-task-queue"},
+			ws.SignalWithStartWorkflowOptions{
+				ID:        "target-workflow-id",
+				TaskQueue: "my-task-queue",
+				Memo:      map[string]any{"memo-key": "memo-value"},
+			},
 			"wake-up",
 			"signal-value",
 			"ExampleWorkflow",
@@ -282,6 +286,7 @@ func (s *WorkflowServiceIntegrationSuite) TestModelIsConvertedInsideThePayloadCo
 
 	workflowArg := stringAt("workflow-input")
 	signalArg := stringAt("signal-value")
+	memoValue := stringAt("memo-value")
 	request := indexOf(func(entry recordedEncode) bool {
 		_, ok := entry.Value.(*workflowservicepb.SignalWithStartWorkflowExecutionRequest)
 		return ok
@@ -289,12 +294,14 @@ func (s *WorkflowServiceIntegrationSuite) TestModelIsConvertedInsideThePayloadCo
 
 	s.Require().NotEqual(-1, workflowArg, "workflow argument was not encoded by the SDK's data converter")
 	s.Require().NotEqual(-1, signalArg, "signal argument was not encoded by the SDK's data converter")
+	s.Require().NotEqual(-1, memoValue, "memo value was not encoded by the SDK's data converter")
 	s.Require().NotEqual(-1, request, "the SDK's data converter never received the transfer value")
 
 	// The inner user payloads are encoded while the SDK converts the model,
 	// i.e. strictly before the resulting proto reaches the data converter.
 	s.Less(workflowArg, request)
 	s.Less(signalArg, request)
+	s.Less(memoValue, request)
 
 	// The transfer value -- the proto envelope -- is encoded under the Nexus
 	// operation's serialization context.
@@ -307,14 +314,9 @@ func (s *WorkflowServiceIntegrationSuite) TestModelIsConvertedInsideThePayloadCo
 		recorded[request].Context,
 	)
 
-	// The inner user payloads are encoded under the workflow serialization
-	// context reachable from the workflow.Context handed to the transfer
-	// converter. That context is the *calling* workflow's today; redirecting it
-	// to the target workflow is what @nexus.serialization-context will do.
-	callerContext := converter.WorkflowSerializationContext{
-		Namespace:  "default-test-namespace",
-		WorkflowID: "default-test-workflow-id",
-	}
-	s.Equal(callerContext, recorded[workflowArg].Context)
-	s.Equal(callerContext, recorded[signalArg].Context)
+	// Without registry policy, nested values use the active Nexus-scoped
+	// converter supplied to the transfer callbacks, just like the envelope.
+	s.Equal(recorded[request].Context, recorded[workflowArg].Context)
+	s.Equal(recorded[request].Context, recorded[signalArg].Context)
+	s.Equal(recorded[request].Context, recorded[memoValue].Context)
 }

@@ -90,8 +90,8 @@ pub(in crate::generator) enum GoConversionKind {
     /// `ToProto(*Native) *Proto`, each returning `nil` for `nil` input. The
     /// converter owns nil passthrough; the caller supplies/consumes pointers.
     OverrideConverter,
-    /// A generated model converter: `modelFromProto(ctx, *Proto, *Model) error`
-    /// and `modelToProto(ctx, *Model) (*Proto, error)`. Optional fields are
+    /// A generated model converter: `modelFromProto(dc, *Proto, *Model) error`
+    /// and `modelToProto(dc, *Model) (*Proto, error)`. Optional fields are
     /// guarded by the caller rather than relying on nil passthrough.
     ModelConverter,
 }
@@ -188,6 +188,17 @@ impl ModelBackend {
     }
 
     pub(in crate::generator) fn set_model_wire(&self, key: String, wire: RenderedModelWire) {
+        if !self.package.is_self_import("go.temporal.io/sdk/converter")
+            && !self
+                .package
+                .is_self_import("go.temporal.io/sdk/internal/common/converter")
+        {
+            self.imports.borrow_mut().register(&GoProtoRef {
+                import_path: "go.temporal.io/sdk/converter".to_string(),
+                alias: "converter".to_string(),
+                type_name: "DataConverter".to_string(),
+            });
+        }
         self.wire_models.borrow_mut().insert(key, wire);
     }
 
@@ -224,8 +235,7 @@ impl ModelBackend {
         Ok(())
     }
 
-    /// Whether any transfer-type converter will be emitted. Drives the
-    /// `context`/`errors` imports.
+    /// Whether any transfer-type converter will be emitted. Drives SDK imports.
     pub(in crate::generator) fn renders_transfer_type_converters(&self) -> bool {
         !self.transfer_models.borrow().is_empty()
     }
@@ -242,7 +252,7 @@ impl ModelBackend {
         };
         render_model_converters(output, model, wire, &self.package);
         if self.transfer_models.borrow().contains(key) {
-            render_model_transfer_type_converter(output, model, wire, &self.package);
+            render_model_transfer_type_converter(output, model, &self.package);
         }
     }
 }
@@ -454,9 +464,9 @@ fn go_message_conversion(
             let native_is_nilable_value = crate::generator::go::go_type_is_nilable(&type_name);
             return Ok(GoValueConversion {
                 kind: GoConversionKind::OverrideConverter,
-                from_proto: Box::new(move |expr, _| format!("{from}(ctx, {expr})")),
+                from_proto: Box::new(move |expr, _| format!("{from}(dc, {expr})")),
                 decoded_model_type: None,
-                to_proto: Box::new(move |expr| format!("{to}(ctx, {expr})")),
+                to_proto: Box::new(move |expr| format!("{to}(dc, {expr})")),
                 fallible: true,
                 to_proto_takes_pointer: !native_is_nilable_value,
                 from_proto_returns_pointer: !native_is_nilable_value,
@@ -469,9 +479,9 @@ fn go_message_conversion(
         let to = go_default_to_proto_name(&message.info.full_name);
         return Ok(GoValueConversion {
             kind: GoConversionKind::OverrideConverter,
-            from_proto: Box::new(move |expr, _| format!("{from}(ctx, {expr})")),
+            from_proto: Box::new(move |expr, _| format!("{from}(dc, {expr})")),
             decoded_model_type: None,
-            to_proto: Box::new(move |expr| format!("{to}(ctx, {expr})")),
+            to_proto: Box::new(move |expr| format!("{to}(dc, {expr})")),
             fallible: true,
             to_proto_takes_pointer: true,
             from_proto_returns_pointer: true,
@@ -491,9 +501,9 @@ fn go_message_conversion(
         let to_proto = format!("{base}ToProto");
         return Ok(GoValueConversion {
             kind: GoConversionKind::ModelConverter,
-            from_proto: Box::new(move |expr, out| format!("{from_proto}(ctx, {expr}, {out})")),
+            from_proto: Box::new(move |expr, out| format!("{from_proto}(dc, {expr}, {out})")),
             decoded_model_type: Some(message.model_name.clone()),
-            to_proto: Box::new(move |expr| format!("{to_proto}(ctx, {expr})")),
+            to_proto: Box::new(move |expr| format!("{to_proto}(dc, {expr})")),
             fallible: true,
             to_proto_takes_pointer: true,
             from_proto_returns_pointer: false,
@@ -644,7 +654,7 @@ pub(in crate::generator) struct OperationBinding {
     input_to_proto: Option<String>,
     /// Assignments that populate the request model's `@nexus.source` fields
     /// from their source expressions, emitted at the top of the operation
-    /// function where `ctx` is in scope.
+    /// function where `dc` is prepared from the workflow context.
     input_sourced_assignments: Vec<String>,
     /// Proto type expression for the response, or `None` for void operations.
     output_proto_type: Option<String>,
@@ -670,6 +680,7 @@ struct RenderedResourceReturn {
     resource_type_name: String,
     local_lines: Vec<String>,
     field_initializers: Vec<RenderedResourceFieldInitializer>,
+    requires_data_converter: bool,
 }
 
 #[derive(Debug)]
@@ -678,6 +689,15 @@ struct RenderedResourceFieldInitializer {
 }
 
 impl OperationBinding {
+    pub(in crate::generator) fn requires_data_converter(&self) -> bool {
+        self.input_to_proto.is_some()
+            || self.output_from_proto.is_some()
+            || self
+                .resource_return
+                .as_ref()
+                .is_some_and(|resource| resource.requires_data_converter)
+    }
+
     pub(in crate::generator) fn requires_fmt(&self) -> bool {
         self.output_returns_pointer
     }
@@ -974,6 +994,11 @@ pub(in crate::generator) fn render_operation_function_proto(
     render_operation_future_return_type(output, package);
     output.push_str(" {\n");
 
+    if binding.requires_data_converter() {
+        output.push_str("\tdc := ");
+        output.push_str(&package.workflow_data_converter());
+        output.push_str("(ctx)\n");
+    }
     for assignment in &binding.input_sourced_assignments {
         output.push('\t');
         output.push_str(assignment);
@@ -993,7 +1018,7 @@ pub(in crate::generator) fn render_operation_function_proto(
             output.push_str("\t}\n");
             "requestProto"
         }
-        // The request model implements `workflow.ValueWithTransferTypeConverter`,
+        // The request model implements `converter.ValueWithTransferTypeConverter`,
         // so the SDK converts it to proto while encoding the payload.
         None => "request",
     };
@@ -1046,7 +1071,7 @@ pub(in crate::generator) fn render_operation_function_proto(
             output.push_str("\t\t}\n");
         });
     } else if let Some(model_type) = binding.output_model_type.as_deref() {
-        // The response model implements `workflow.ValueWithTransferTypeConverter`,
+        // The response model implements `converter.ValueWithTransferTypeConverter`,
         // so the SDK decodes the proto payload and runs the transfer converter
         // before handing us the model.
         render_operation_future_adapter(output, package, model_type, false, |output| {
@@ -1174,6 +1199,7 @@ fn build_rendered_resource_return(
 ) -> Result<RenderedResourceReturn> {
     let mut local_lines = Vec::new();
     let mut field_initializers = Vec::new();
+    let mut requires_data_converter = false;
 
     for binding in &resource_return.bindings {
         let field = resource
@@ -1219,7 +1245,7 @@ fn build_rendered_resource_return(
             ResolvedResourceBindingSource::ResultField {
                 proto_field_name, ..
             } => {
-                let (lines, expr) = resource_return_proto_field_source(
+                let (lines, expr, uses_data_converter) = resource_return_proto_field_source(
                     field,
                     "result",
                     proto_field_name,
@@ -1234,6 +1260,7 @@ fn build_rendered_resource_return(
                     ),
                     reason,
                 })?;
+                requires_data_converter |= uses_data_converter;
                 local_lines.extend(lines);
                 (expr, false)
             }
@@ -1264,6 +1291,7 @@ fn build_rendered_resource_return(
         resource_type_name: resource_return.resource_type_name.clone(),
         local_lines,
         field_initializers,
+        requires_data_converter,
     })
 }
 
@@ -1274,7 +1302,7 @@ fn resource_return_proto_field_source(
     api_plan: &PlannedSpec,
     backend: &ModelBackend,
     package: &GoPackageContext,
-) -> GoConversionResult<(Vec<String>, String)> {
+) -> GoConversionResult<(Vec<String>, String, bool)> {
     let local = resource_return_local_name(&field.name);
     let proto_field = go_proto_field_name(proto_field_name);
     let getter = format!("{source}.Get{proto_field}()");
@@ -1288,7 +1316,7 @@ fn resource_return_proto_field_source(
     match &field_kind {
         PlannedFieldKind::Singular(value) => {
             let conversion = go_value_conversion(value, api_plan, backend, package)?;
-            Ok(resource_return_singular_proto_source(
+            let (lines, expr) = resource_return_singular_proto_source(
                 field,
                 value,
                 &conversion,
@@ -1296,7 +1324,8 @@ fn resource_return_proto_field_source(
                 &local,
                 &native_type,
                 "return nil, err",
-            ))
+            );
+            Ok((lines, expr, conversion.fallible))
         }
         PlannedFieldKind::Repeated(value) => {
             let conversion = go_value_conversion(value, api_plan, backend, package)?;
@@ -1348,7 +1377,7 @@ fn resource_return_proto_field_source(
                 }
             }
             lines.push("}".to_string());
-            Ok((lines, local))
+            Ok((lines, local, conversion.fallible))
         }
         PlannedFieldKind::Map { key: _, value } => {
             let conversion = go_value_conversion(value, api_plan, backend, package)?;
@@ -1403,7 +1432,7 @@ fn resource_return_proto_field_source(
             }
             lines.push("\t}".to_string());
             lines.push("}".to_string());
-            Ok((lines, local))
+            Ok((lines, local, conversion.fallible))
         }
     }
 }
@@ -1709,26 +1738,19 @@ fn build_field_conversion(
 /// (workflow args, signal args, memo) must be encoded by the converter the SDK
 /// has selected for the operation, not by the caller's.
 ///
-/// Only the workflow-context variants are implemented: encoding needs a
-/// `workflow.Context` to reach the workflow's data converter, and there is no
-/// `context.Context`-flavoured equivalent in the SDK. The other variants return
-/// an error rather than silently falling back to the default converter.
+/// Both callbacks use the supplied data converter directly for nested values.
 fn render_model_transfer_type_converter(
     output: &mut String,
     model: &RenderedModel,
-    wire: &RenderedModelWire,
     package: &GoPackageContext,
 ) {
     let (model_ident, _) = split_go_type_decl_name(&model.name);
-    let proto_value_type = wire.proto_type.trim_start_matches('*');
     let base = go_unexported_name(model_ident);
     let from_proto_fn = format!("{base}FromProto");
     let to_proto_fn = format!("{base}ToProto");
 
     let new_converter = package.new_transfer_type_converter();
     let converter_type = package.transfer_type_converter_type();
-    let context_context = package.context_context_type();
-    let errors_new = package.errors_new();
 
     // A value receiver opts in both `T` and `*T`. The SDK caches the returned
     // converter by model type, so no generated package-level cache is needed.
@@ -1736,15 +1758,7 @@ fn render_model_transfer_type_converter(
     output.push_str(&format!(
         "func ({model_ident}) TransferTypeConverter() ({converter_type}, error) {{\n"
     ));
-    output.push_str(&format!(
-        "\treturn {new_converter}(\n"
-    ));
-    output.push_str(&format!(
-        "\t\tfunc({context_context}, *{model_ident}) (*{proto_value_type}, error) {{\n\t\t\treturn nil, {errors_new}(\"nexgen: transfer type converter outside a workflow\")\n\t\t}},\n"
-    ));
-    output.push_str(&format!(
-        "\t\tfunc({context_context}, *{proto_value_type}, *{model_ident}) error {{\n\t\t\treturn {errors_new}(\"nexgen: transfer type converter outside a workflow\")\n\t\t}},\n"
-    ));
+    output.push_str(&format!("\treturn {new_converter}(\n"));
     output.push_str(&format!("\t\t{to_proto_fn},\n\t\t{from_proto_fn},\n"));
     output.push_str("\t)\n}\n");
 }
@@ -2147,8 +2161,8 @@ fn render_model_converters(
     output.push('\n');
     output.push_str("func ");
     output.push_str(&base);
-    output.push_str("ToProto(ctx ");
-    output.push_str(&package.workflow_context_type());
+    output.push_str("ToProto(dc ");
+    output.push_str(&package.data_converter_type());
     output.push_str(", m *");
     output.push_str(&model.name);
     output.push_str(") (");
@@ -2170,8 +2184,8 @@ fn render_model_converters(
     output.push('\n');
     output.push_str("func ");
     output.push_str(&base);
-    output.push_str("FromProto(ctx ");
-    output.push_str(&package.workflow_context_type());
+    output.push_str("FromProto(dc ");
+    output.push_str(&package.data_converter_type());
     output.push_str(", proto ");
     output.push_str(&wire.proto_type);
     output.push_str(", out *");

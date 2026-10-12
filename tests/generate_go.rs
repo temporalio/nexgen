@@ -1379,7 +1379,7 @@ fn go_type_roundtrip_generates_proto_conversions() {
     // Generated model gets a context-aware encoding function that accepts a
     // pointer and returns the proto message and conversion errors.
     assert!(rendered
-        .contains("func activityOptionsToProto(ctx workflow.Context, m *ActivityOptions) (*activity.ActivityOptions, error) {"));
+        .contains("func activityOptionsToProto(dc converter.DataConverter, m *ActivityOptions) (*activity.ActivityOptions, error) {"));
     assert!(rendered.contains("message := &activity.ActivityOptions{}"));
     assert!(rendered.contains(
         "type ActivityOptions struct {\n\t// TaskQueue - Optional.\n\tTaskQueue *string"
@@ -1390,30 +1390,28 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("\t// Priority - Optional.\n\tPriority *temporal.Priority"));
     // Optional override fields pass the pointer straight to the nil-safe
     // converter; the required field passes its address.
-    assert!(rendered.contains("converted, err := retryPolicyToProto(ctx, &m.RetryPolicy)"));
-    assert!(rendered.contains("converted, err := taskQueueToProto(ctx, m.TaskQueue)"));
-    assert!(rendered.contains("converted, err := priorityToProto(ctx, m.Priority)"));
-    assert!(rendered.contains("converted, err := durationToProto(ctx, m.ScheduleToCloseTimeout)"));
+    assert!(rendered.contains("converted, err := retryPolicyToProto(dc, &m.RetryPolicy)"));
+    assert!(rendered.contains("converted, err := taskQueueToProto(dc, m.TaskQueue)"));
+    assert!(rendered.contains("converted, err := priorityToProto(dc, m.Priority)"));
+    assert!(rendered.contains("converted, err := durationToProto(dc, m.ScheduleToCloseTimeout)"));
     assert!(rendered.contains("return message, nil"));
 
-    // Generated model gets a context-aware FromProto output callback. Optional
+    // Generated model gets a converter-aware FromProto output callback. Optional
     // override fields assign the converter's pointer result directly; the
     // required field is dereferenced with a nil guard.
     assert!(rendered.contains(
-        "func activityOptionsFromProto(ctx workflow.Context, proto *activity.ActivityOptions, out *ActivityOptions) error {"
+        "func activityOptionsFromProto(dc converter.DataConverter, proto *activity.ActivityOptions, out *ActivityOptions) error {"
     ));
-    assert!(rendered.contains("converted, err := taskQueueFromProto(ctx, proto.GetTaskQueue())"));
+    assert!(rendered.contains("converted, err := taskQueueFromProto(dc, proto.GetTaskQueue())"));
     assert!(
-        rendered.contains("converted, err := retryPolicyFromProto(ctx, proto.GetRetryPolicy())")
+        rendered.contains("converted, err := retryPolicyFromProto(dc, proto.GetRetryPolicy())")
     );
     assert!(rendered.contains("out.RetryPolicy = *converted"));
     // The model constructs a transfer-type converter, so the SDK
     // runs model<->proto conversion inside the payload converter.
+    assert!(rendered.contains("return commonconverter.NewContextualTransferTypeConverter("));
     assert!(rendered.contains(
-        "return converter.NewContextualTransferTypeConverter("
-    ));
-    assert!(rendered.contains(
-        "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn converter.NewContextualTransferTypeConverter"
+        "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewContextualTransferTypeConverter"
     ));
     assert!(rendered.contains("\t\tactivityOptionsToProto,\n\t\tactivityOptionsFromProto,\n"));
     assert!(rendered.contains("\t*out = ActivityOptions{}\n"));
@@ -1432,11 +1430,11 @@ fn go_type_roundtrip_generates_proto_conversions() {
     // service file with the pointer-in/pointer-out converter contract.
     assert!(rendered.contains("### support.go"));
     assert!(
-        rendered.contains("func retryPolicyToProto(_ workflow.Context, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {")
+        rendered.contains("func retryPolicyToProto(_ converter.DataConverter, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {")
     );
     assert!(
         rendered
-            .contains("func retryPolicyFromProto(_ workflow.Context, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {")
+            .contains("func retryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {")
     );
 }
 
@@ -1458,25 +1456,26 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
 
     // Construction happens in the method; the SDK owns caching by model type.
-    assert!(rendered.contains(
-        "return converter.NewContextualTransferTypeConverter("
-    ));
+    assert!(rendered.contains("return commonconverter.NewContextualTransferTypeConverter("));
     // Value receiver, so both the model and a pointer to it opt in.
     assert!(rendered.contains(
-        "func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn converter.NewContextualTransferTypeConverter"
+        "func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewContextualTransferTypeConverter"
     ));
 
-    // Conversion needs a workflow.Context, so the context-free and
-    // context.Context variants fail loudly instead of silently misconverting.
+    // Exactly two callbacks receive the SDK-selected data converter.
     assert!(rendered.contains(
-        "\t\tfunc(context.Context, *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {\n\t\t\treturn nil, errors.New(\"nexgen: transfer type converter outside a workflow\")\n\t\t},\n"
+        "\treturn commonconverter.NewContextualTransferTypeConverter(\n\t\tsignalWithStartWorkflowRequestToProto,\n\t\tsignalWithStartWorkflowRequestFromProto,\n\t)\n"
     ));
-    assert!(rendered.contains(
-        "\t\tfunc(context.Context, *workflowservice.SignalWithStartWorkflowExecutionRequest, *signalWithStartWorkflowRequest) error {\n\t\t\treturn errors.New(\"nexgen: transfer type converter outside a workflow\")\n\t\t},\n"
-    ));
-    assert!(rendered.contains(
-        "\t\tsignalWithStartWorkflowRequestToProto,\n\t\tsignalWithStartWorkflowRequestFromProto,\n"
-    ));
+    assert!(
+        rendered.contains("func signalWithStartWorkflowRequestToProto(dc converter.DataConverter,")
+    );
+    assert!(
+        rendered
+            .contains("func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter,")
+    );
+    assert!(!rendered.contains("GetDataConverterFromWorkflowContext"));
+    assert!(!rendered.contains("SDKFlagMemoUserDCEncode"));
+    assert!(rendered.contains("memo,\n\t\tdc,\n\t\ttrue,"));
 
     // Operation responses decode into the model, not the proto.
     assert!(rendered.contains(
@@ -1485,8 +1484,9 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     assert!(rendered.contains("\t\tvar value SignalWithStartWorkflowResponse\n"));
     assert!(!rendered.contains("requestProto"));
 
-    // Inline non-workflow callbacks need `context` and `errors`.
-    assert!(rendered.contains("\t\"context\"\n\t\"errors\"\n"));
+    assert!(rendered.contains("commonconverter \"go.temporal.io/sdk/internal/common/converter\""));
+    assert!(!rendered.contains("\"context\""));
+    assert!(!rendered.contains("\"errors\""));
     assert!(!rendered.contains("transferTypeConverterOutsideWorkflow"));
     assert!(!rendered.contains("NeedsWorkflowContext"));
     assert!(!rendered.contains("TransferTypeConverterErr"));
@@ -1520,7 +1520,7 @@ fn go_nested_model_encoding_bridges_pointer_arguments() {
             package: Some("test".into()),
             syntax: Some("proto3".into()),
             options: Some(FileOptions {
-                go_package: Some("example.com/test/wire;wire".into()),
+                go_package: Some("go.temporal.io/sdk/advanced/samples/go/wire;wire".into()),
                 ..Default::default()
             }),
             message_type: vec![
@@ -1634,11 +1634,8 @@ world api {
     assert!(!files.contains_key(&PathBuf::from("support.go")));
     let root = project_root();
     let module = fs::read_to_string(root.join("advanced/samples/go/go.mod")).unwrap();
-    fs::write(
-        temp_dir.join("go.mod"),
-        module.replace("go.temporal.io/sdk/advanced/samples/go", "example.com/test"),
-    )
-    .unwrap();
+    // The generated contextual factory is SDK-internal.
+    fs::write(temp_dir.join("go.mod"), module).unwrap();
     fs::copy(
         root.join("advanced/samples/go/go.sum"),
         temp_dir.join("go.sum"),
@@ -1652,7 +1649,10 @@ world api {
     .unwrap();
     fs::write(
         output_path.join("conversion_test.go"),
-        include_str!("fixtures/go_nested_conversion_test.go"),
+        include_str!("fixtures/go_nested_conversion_test.go").replace(
+            "example.com/test/wire",
+            "go.temporal.io/sdk/advanced/samples/go/wire",
+        ),
     )
     .unwrap();
     let status = Command::new("go")
@@ -1664,39 +1664,39 @@ world api {
     assert!(status.success(), "standalone nested Go model tests failed");
 
     assert!(
-        rendered
-            .contains("func childToProto(ctx workflow.Context, m *Child) (*wire.Child, error) {"),
+        rendered.contains(
+            "func childToProto(dc converter.DataConverter, m *Child) (*wire.Child, error) {"
+        ),
         "{rendered}"
     );
     assert!(rendered.contains(
-        "func childFromProto(ctx workflow.Context, proto *wire.Child, out *Child) error {"
+        "func childFromProto(dc converter.DataConverter, proto *wire.Child, out *Child) error {"
     ));
-    assert!(rendered.contains("converted, err := childToProto(ctx, &m.Required)"));
+    assert!(rendered.contains("converted, err := childToProto(dc, &m.Required)"));
+    assert!(
+        rendered
+            .contains("if m.Optional != nil {\n\t\tconverted, err := childToProto(dc, m.Optional)")
+    );
+    assert!(rendered.contains(
+        "for _, item := range m.Children {\n\t\tconverted, err := childToProto(dc, &item)"
+    ));
     assert!(
         rendered.contains(
-            "if m.Optional != nil {\n\t\tconverted, err := childToProto(ctx, m.Optional)"
+            "for k, v := range m.Entries {\n\t\t\tconverted, err := childToProto(dc, &v)"
         )
     );
     assert!(rendered.contains(
-        "for _, item := range m.Children {\n\t\tconverted, err := childToProto(ctx, &item)"
-    ));
-    assert!(
-        rendered.contains(
-            "for k, v := range m.Entries {\n\t\t\tconverted, err := childToProto(ctx, &v)"
-        )
-    );
-    assert!(rendered.contains(
-        "if proto.GetOptional() != nil {\n\t\tout.Optional = new(Child)\n\t\tif err := childFromProto(ctx, proto.GetOptional(), out.Optional); err != nil {"
+        "if proto.GetOptional() != nil {\n\t\tout.Optional = new(Child)\n\t\tif err := childFromProto(dc, proto.GetOptional(), out.Optional); err != nil {"
     ));
     assert!(rendered.contains("out.Optional = new(Child)"));
     assert!(rendered.contains(
-        "if err := childFromProto(ctx, proto.GetRequired(), &out.Required); err != nil {"
+        "if err := childFromProto(dc, proto.GetRequired(), &out.Required); err != nil {"
     ));
     assert!(rendered.contains(
-        "for _, item := range proto.GetChildren() {\n\t\tvar converted Child\n\t\tif err := childFromProto(ctx, item, &converted); err != nil {"
+        "for _, item := range proto.GetChildren() {\n\t\tvar converted Child\n\t\tif err := childFromProto(dc, item, &converted); err != nil {"
     ));
     assert!(rendered.contains(
-        "for k, v := range proto.GetEntries() {\n\t\t\tvar converted Child\n\t\t\tif err := childFromProto(ctx, v, &converted); err != nil {"
+        "for k, v := range proto.GetEntries() {\n\t\t\tvar converted Child\n\t\t\tif err := childFromProto(dc, v, &converted); err != nil {"
     ));
     assert!(rendered.contains("\t*out = Parent{}\n"));
     assert!(rendered.contains("out.Children = append(out.Children, converted)"));

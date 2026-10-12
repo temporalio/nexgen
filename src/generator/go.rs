@@ -558,7 +558,7 @@ impl GoPackageContext {
         Ok(package_name)
     }
 
-    fn is_self_import(&self, import_path: &str) -> bool {
+    pub(in crate::generator) fn is_self_import(&self, import_path: &str) -> bool {
         self.import_path
             .as_deref()
             .is_some_and(|self_import| self_import == import_path)
@@ -603,6 +603,9 @@ impl GoPackageContext {
     }
 
     pub(in crate::generator) fn transfer_type_converter_type(&self) -> String {
+        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
+            return "TransferTypeConverter".to_string();
+        }
         self.qualified_expr(
             "go.temporal.io/sdk/converter",
             "converter.TransferTypeConverter",
@@ -610,18 +613,25 @@ impl GoPackageContext {
     }
 
     pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
+        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
+            "NewContextualTransferTypeConverter".to_string()
+        } else {
+            "commonconverter.NewContextualTransferTypeConverter".to_string()
+        }
+    }
+
+    pub(in crate::generator) fn data_converter_type(&self) -> String {
+        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
+            return "DataConverter".to_string();
+        }
+        self.qualified_expr("go.temporal.io/sdk/converter", "converter.DataConverter")
+    }
+
+    pub(in crate::generator) fn workflow_data_converter(&self) -> String {
         self.qualified_expr(
-            "go.temporal.io/sdk/converter",
-            "converter.NewContextualTransferTypeConverter",
+            "go.temporal.io/sdk/internal",
+            "internal.GetDataConverterFromWorkflowContext",
         )
-    }
-
-    pub(in crate::generator) fn context_context_type(&self) -> String {
-        self.qualified_expr("context", "context.Context")
-    }
-
-    pub(in crate::generator) fn errors_new(&self) -> String {
-        self.qualified_expr("errors", "errors.New")
     }
 
     fn qualified_expr(&self, import_path: &str, code_expr: &str) -> String {
@@ -1140,7 +1150,14 @@ impl<'a> ApiPlanner<'a> {
             service.endpoint.as_deref() == Some("__temporal_system")
                 && !service.operations.is_empty()
         });
-        if has_system_operations && !self.package.is_self_import("go.temporal.io/sdk/internal") {
+        let has_eager_conversion = services.iter().flat_map(|s| &s.operations).any(|op| {
+            op.wire_binding
+                .as_ref()
+                .is_some_and(|binding| binding.requires_data_converter())
+        });
+        if (has_system_operations || has_eager_conversion)
+            && !self.package.is_self_import("go.temporal.io/sdk/internal")
+        {
             self.imports
                 .insert("go.temporal.io/sdk/internal".to_string());
         }
@@ -1170,16 +1187,15 @@ impl<'a> ApiPlanner<'a> {
             self.imports.insert("runtime".to_string());
             self.imports.insert("strings".to_string());
         }
-        // Transfer-type converters reject non-workflow conversion inline.
+        // Transfer-type callbacks use the converter selected by the SDK.
         if self.external_models.renders_transfer_type_converters() {
-            if !self.package.is_self_import("go.temporal.io/sdk/converter") {
+            if !self.package.is_self_import("go.temporal.io/sdk/converter")
+                && !self
+                    .package
+                    .is_self_import("go.temporal.io/sdk/internal/common/converter")
+            {
                 self.imports
                     .insert("go.temporal.io/sdk/converter".to_string());
-            }
-            for import in ["context", "errors"] {
-                if !self.package.is_self_import(import) {
-                    self.imports.insert(import.to_string());
-                }
             }
         }
         let model_fragments = self.external_models.render_models()?;
@@ -1204,7 +1220,17 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
-        let external_imports = self.external_models.imports();
+        let mut external_imports = self.external_models.imports();
+        if self.external_models.renders_transfer_type_converters()
+            && !self
+                .package
+                .is_self_import("go.temporal.io/sdk/internal/common/converter")
+        {
+            external_imports.push((
+                "go.temporal.io/sdk/internal/common/converter".to_string(),
+                "commonconverter".to_string(),
+            ));
+        }
         let output = render_file(
             &self.package,
             &self.imports,
@@ -5147,6 +5173,32 @@ fn render_forwarding_wrapper(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn contextual_factory_avoids_self_import_namespace() {
+        let package = super::GoPackageContext {
+            package_name: "converter".to_string(),
+            import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
+        };
+        assert_eq!(
+            package.new_transfer_type_converter(),
+            "NewContextualTransferTypeConverter"
+        );
+        assert_eq!(package.data_converter_type(), "DataConverter");
+        assert_eq!(
+            package.transfer_type_converter_type(),
+            "TransferTypeConverter"
+        );
+        let package = super::GoPackageContext {
+            package_name: "workflow".to_string(),
+            import_path: Some("go.temporal.io/sdk/workflow".to_string()),
+        };
+        assert_eq!(
+            package.new_transfer_type_converter(),
+            "commonconverter.NewContextualTransferTypeConverter"
+        );
+        assert_eq!(package.workflow_context_type(), "Context");
+    }
+
     #[test]
     fn recognizes_builtin_nilable_types() {
         for type_expr in ["any", "error", "[]byte", "map[string]any"] {
