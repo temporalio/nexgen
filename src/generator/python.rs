@@ -21,10 +21,10 @@ use crate::planning::{
 };
 use crate::planning::{RequestPlan, ResolvedResourceBindingSource};
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec,
-    FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec, LanguageImportStyle, ModulePath,
-    OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec, SelectedTextSpec,
-    TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    AliasTypeSpec, EnumSpec, EnumValueSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec,
+    FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec,
+    LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility,
+    RecordSpec, SelectedTextSpec, TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -1697,8 +1697,13 @@ impl<'a> ApiPlanner<'a> {
 
         let imports = resolved_type.imports.clone();
 
-        if let Some(default_value) = &field.default_value {
-            let default_expr = enum_default_expr(&resolved_type, &default_value.enum_case);
+        if field.default_value.is_some() {
+            let default_value = field
+                .data
+                .default_enum_value
+                .as_ref()
+                .expect("planned field default enum value should be resolved");
+            let default_expr = enum_default_expr(&resolved_type, default_value);
             return Ok(RenderedField {
                 attr_name: attr_name.clone(),
                 annotation: python_field_annotation(
@@ -3270,12 +3275,12 @@ fn python_function_annotation_from_args(
 
 pub(in crate::generator) fn enum_default_expr(
     resolved_type: &ResolvedFieldType,
-    enum_case: &str,
+    enum_value: &EnumValueSpec,
 ) -> String {
     let value_name = if resolved_type.wire_conversion.is_some() {
-        enum_case.to_shouty_snake_case()
+        enum_value.name.to_shouty_snake_case()
     } else {
-        enum_case.to_upper_camel_case()
+        enum_value.name.clone()
     };
     format!("{}.{}", resolved_type.annotation, value_name)
 }
@@ -7699,6 +7704,46 @@ mod tests {
             super::python_dataclass_source_default_expr(&with_args),
             "_support.Helpers.namespace(request.id, fallback='default')"
         );
+    }
+
+    #[test]
+    fn enum_defaults_use_resolved_identity_for_native_and_converter_aliases() {
+        let mut resolved_type = super::ResolvedFieldType {
+            annotation: "AliasPolicy".to_string(),
+            imports: super::PythonImports::default(),
+            kind: super::ResolvedFieldKind::Enum,
+            wire_conversion: None,
+        };
+        let mut default_value = crate::spec::EnumValueSpec {
+            name: "AllowDuplicate".to_string(),
+            wire_name: "allow-duplicate".to_string(),
+            number: 7,
+        };
+        let native_default = super::enum_default_expr(&resolved_type, &default_value);
+        assert_eq!(native_default, "AliasPolicy.AllowDuplicate");
+        assert_eq!(
+            super::python_parameter_default_expr(&super::PythonFieldDefaultKind::Expression(
+                native_default
+            )),
+            Some("AliasPolicy.AllowDuplicate".to_string())
+        );
+
+        // A proto descriptor name can include a prefix absent from the resolved
+        // semantic name. SDK enum members still use SHOUTY_SNAKE casing.
+        default_value.wire_name = "WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE".to_string();
+        resolved_type.annotation = "WorkflowIDReusePolicy".to_string();
+        resolved_type.wire_conversion = Some(super::WireValueConversion {
+            annotation: "int".to_string(),
+            from_wire: "WorkflowIDReusePolicy({wire})".to_string(),
+            to_wire: "int({value})".to_string(),
+            imports: super::PythonImports::default(),
+            supports_unpacked_input: false,
+        });
+        let sdk_default = super::enum_default_expr(&resolved_type, &default_value);
+        assert_eq!(sdk_default, "WorkflowIDReusePolicy.ALLOW_DUPLICATE");
+        let mut rendered = String::new();
+        super::render_python_default_expr(&mut rendered, &sdk_default, "    ");
+        assert_eq!(rendered, " = WorkflowIDReusePolicy.ALLOW_DUPLICATE");
     }
 
     #[test]

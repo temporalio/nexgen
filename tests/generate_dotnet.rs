@@ -659,6 +659,9 @@ fn dotnet_renders_proto_backed_temporal_types() {
     assert!(rendered.contains("ExecutionTimeout = options.ExecutionTimeout"));
     assert!(rendered.contains("proto.RetryPolicy = retryPolicy.ToProto();"));
     assert!(rendered.contains("proto.WorkflowExecutionTimeout = executionTimeout.ToProto();"));
+    assert!(rendered.contains(
+        "if (IdReusePolicy is { } idReusePolicy)\n            {\n                proto.WorkflowIdReusePolicy = idReusePolicy;\n            }\n            else\n            {\n                proto.WorkflowIdReusePolicy = Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate;\n            }"
+    ));
     assert!(rendered.contains("public IReadOnlyCollection<object?>? Args { get; init; }"));
     assert!(rendered.contains("proto.Input = Nexgen.Support.ProtoExtensions.ToPayloads(args);"));
     assert!(rendered.contains("Args = args,"));

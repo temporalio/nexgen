@@ -21,8 +21,8 @@ use language::Language;
 use spec::{ApiSpecTree, CompilerPass};
 
 pub use add_rpc::{
-    AddMessageRequest, AddRpcRequest, add_message_to_file, add_message_to_string, add_rpc_to_file,
-    add_rpc_to_string,
+    AddMessageRequest, AddRpcRequest, add_message_to_file, add_message_to_string,
+    add_messages_to_string, add_rpc_to_file, add_rpc_to_string,
 };
 
 pub struct GenerateRequest {

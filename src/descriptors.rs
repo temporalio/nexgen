@@ -100,6 +100,33 @@ impl DescriptorIndex {
         self.messages.get(normalized)
     }
 
+    pub fn messages_in_file(&self, file_name: &str) -> Result<Vec<&MessageMetadata>> {
+        if !self
+            .files
+            .iter()
+            .any(|file| file.name.as_deref() == Some(file_name))
+        {
+            return Err(Error::UnknownDescriptorFile {
+                name: file_name.to_string(),
+            });
+        }
+        let mut messages = self
+            .messages
+            .values()
+            .filter(|message| {
+                message.file_name.as_deref() == Some(file_name)
+                    && !message
+                        .descriptor
+                        .options
+                        .as_ref()
+                        .and_then(|options| options.map_entry)
+                        .unwrap_or(false)
+            })
+            .collect::<Vec<_>>();
+        messages.sort_by(|left, right| left.full_name.cmp(&right.full_name));
+        Ok(messages)
+    }
+
     pub fn enumeration(&self, full_name: &str) -> Option<&EnumMetadata> {
         let normalized = full_name.trim_start_matches('.');
         self.enums.get(normalized)

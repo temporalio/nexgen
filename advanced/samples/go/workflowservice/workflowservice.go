@@ -96,6 +96,8 @@ func (m signalWithStartWorkflowRequest) toProto(ctx workflow.Context) (*workflow
 	}
 	if m.WorkflowIDReusePolicy != nil {
 		message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy((*m.WorkflowIDReusePolicy))
+	} else {
+		message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy(1)
 	}
 	if m.WorkflowIDConflictPolicy != nil {
 		message.WorkflowIdConflictPolicy = enums.WorkflowIdConflictPolicy((*m.WorkflowIDConflictPolicy))
