@@ -109,9 +109,11 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 		}
 
 		var variadicResult ws.SignalWithStartWorkflowResponse
+		defaultOpts := opts
+		defaultOpts.WorkflowIDReusePolicy = 0
 		return ws.SignalWithStartWorkflow(
 			ctx,
-			opts,
+			defaultOpts,
 			"wake-up",
 			nil,
 			"ExampleWorkflow",
@@ -145,6 +147,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.Equal(int32(7), typedRequest.GetPriority().GetPriorityKey())
 
 	variadicRequest := s.calls[1]
+	s.Equal(enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE, variadicRequest.GetWorkflowIdReusePolicy())
 	// A nil signal argument is still one argument and therefore one payload;
 	// it does not mean that the signal has no arguments.
 	s.Require().NotNil(variadicRequest.GetSignalInput())

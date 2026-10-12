@@ -106,6 +106,9 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.NotNull(call.SignalArgs);
             Assert.Single(call.SignalArgs);
             Assert.Equal(TimeSpan.FromSeconds(30), call.ExecutionTimeout);
+            Assert.Equal(
+                Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate,
+                call.IdReusePolicy);
             Assert.NotNull(call.RetryPolicy);
             Assert.Equal(3, call.RetryPolicy.MaximumAttempts);
             Assert.NotNull(call.UserMetadata);
