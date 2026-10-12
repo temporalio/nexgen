@@ -64,7 +64,7 @@ func TestWorkflowServiceIntegrationSuite(t *testing.T) {
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
 	s.env.RegisterWorkflowWithOptions(signalWithStartWorkflow, workflow.RegisterOptions{
-		Name: "registered-alias",
+		Name: "registered-workflow",
 	})
 	retryPolicy := &temporal.RetryPolicy{MaximumAttempts: 3}
 	searchKey := temporal.NewSearchAttributeKeyKeyword("CustomKeyword")
@@ -125,7 +125,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.Require().Len(s.calls, 2)
 
 	typedRequest := s.calls[0]
-	s.Equal("registered-alias", typedRequest.GetWorkflowType().GetName())
+	s.Equal("registered-workflow", typedRequest.GetWorkflowType().GetName())
 	s.Equal("wake-up", typedRequest.GetSignalName())
 	s.Require().NotNil(typedRequest.GetSignalInput())
 	s.Len(typedRequest.GetSignalInput().GetPayloads(), 1)

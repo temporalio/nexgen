@@ -917,6 +917,16 @@ impl GoExternalModels {
         }
     }
 
+    fn function_with_support_helper(&self, function: &FunctionFieldSpec) -> FunctionFieldSpec {
+        let mut function = function.clone();
+        if let Self::Proto(backend) = self {
+            function.name_extractor = function
+                .name_extractor
+                .map(|name| backend.support_converter(name));
+        }
+        function
+    }
+
     fn has_message_wire_type(&self, message: &PlannedMessageType) -> bool {
         match self {
             Self::Json(backend) => backend.has_message_wire_type(message),
@@ -1113,7 +1123,9 @@ impl<'a> ApiPlanner<'a> {
                 }
             }
         }
-        let needs_function_name_inlining = services.iter().any(service_uses_function_name_inlining);
+        let needs_manual_function_name_inlining = services
+            .iter()
+            .any(service_uses_manual_function_name_inlining);
 
         // Operation wrapper functions require the workflow package.
         let has_operations = services.iter().any(|s| !s.operations.is_empty());
@@ -1150,7 +1162,7 @@ impl<'a> ApiPlanner<'a> {
         {
             self.imports.insert("fmt".to_string());
         }
-        if needs_function_name_inlining {
+        if needs_manual_function_name_inlining {
             self.imports.insert("reflect".to_string());
             self.imports.insert("runtime".to_string());
             self.imports.insert("strings".to_string());
@@ -1319,12 +1331,14 @@ impl<'a> ApiPlanner<'a> {
                     let planned_field = planned_field?;
                     let function = match &planned_field.role {
                         PlannedFieldRole::Function(function) if planned_field.required => {
-                            Some(function.clone())
+                            Some(self.external_models.function_with_support_helper(function))
                         }
                         _ => None,
                     };
                     let function_args = match &planned_field.role {
-                        PlannedFieldRole::FunctionArgs(function) => Some(function.clone()),
+                        PlannedFieldRole::FunctionArgs(function) => {
+                            Some(self.external_models.function_with_support_helper(function))
+                        }
                         _ => None,
                     };
                     let embed_in_options = !planned_field.required
@@ -1750,7 +1764,7 @@ impl<'a> ApiPlanner<'a> {
     }
 }
 
-fn service_uses_function_name_inlining(service: &RenderedService<'_>) -> bool {
+fn service_uses_manual_function_name_inlining(service: &RenderedService<'_>) -> bool {
     service.operations.iter().any(|operation| {
         operation.unpacked_input.as_ref().is_some_and(|params| {
             params.iter().any(|param| {

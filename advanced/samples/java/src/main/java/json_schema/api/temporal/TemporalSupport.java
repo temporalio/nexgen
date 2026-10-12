@@ -14,9 +14,9 @@ import org.jspecify.annotations.Nullable;
 public final class TemporalSupport {
     private TemporalSupport() {}
 
-    private static final Pattern DATE_TIME = Pattern.compile("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-7]):[0-5][0-9]|18:00))\\z");
+    private static final Pattern DATE_TIME = Pattern.compile("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-3]):[0-5][0-9]|14:00))\\z");
     private static final Pattern DATE = Pattern.compile("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\\z");
-    private static final Pattern TIME = Pattern.compile("^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-7]):[0-5][0-9]|18:00))?\\z");
+    private static final Pattern TIME = Pattern.compile("^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-3]):[0-5][0-9]|14:00))?\\z");
     private static final Pattern DURATION = Pattern.compile("^PT(?:[0-9]+H(?:[0-9]+M(?:[0-9]+S)?)?|[0-9]+M(?:[0-9]+S)?|[0-9]+S)\\z");
     private static final long MAX_DURATION_SECONDS = Long.MAX_VALUE / 1_000_000_000L;
 
@@ -214,9 +214,9 @@ public final class TemporalSupport {
         if (offsetSeconds % 60 != 0) {
             violations.add(new Violation(path, "must be a valid " + name + ", got " + value
                     + ": the UTC offset " + offset + " is not a whole number of minutes"));
-        } else if (offsetSeconds < -18 * 60 * 60 || offsetSeconds > 18 * 60 * 60) {
+        } else if (offsetSeconds < -14 * 60 * 60 || offsetSeconds > 14 * 60 * 60) {
             violations.add(new Violation(path, "must be a valid " + name + ", got " + value
-                    + ": the UTC offset is outside -18:00 through +18:00"));
+                    + ": the UTC offset is outside -14:00 through +14:00"));
         }
     }
 

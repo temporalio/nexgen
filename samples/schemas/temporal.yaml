@@ -5,7 +5,7 @@
 # Duration, Python datetime / date / time / timedelta, and — per
 # `--date-time-types` — a TS string / Date / Temporal type). The wire is
 # produced by the generator-owned serializer (RFC 3339 with materialized
-# offsets limited to -18:00 through +18:00, original offset preserved,
+# offsets limited to -14:00 through +14:00, original offset preserved,
 # `+00:00`/`-00:00` → `Z`, trailing fractional zeros trimmed; duration
 # canonicalized to time-only `PT…H…M…S`). See
 # json-schema/features/format.md (Materialization).

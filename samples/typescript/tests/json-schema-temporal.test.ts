@@ -67,9 +67,11 @@ describe("json-schema temporal (--date-time-types=string, default)", () => {
       { createdAt: "2021-06-15T12:30:45", timeout: "PT0S" },
       { createdAt: "0000-01-01T00:00:00Z", timeout: "PT0S" },
       { createdAt: "2021-06-15T12:30:45Z", birthday: "0000-01-01", timeout: "PT0S" },
-      { createdAt: "2021-06-15T12:30:45+18:01", timeout: "PT0S" },
+      { createdAt: "2021-06-15T12:30:45+14:01", timeout: "PT0S" },
+      { createdAt: "2021-06-15T12:30:45-18:00", timeout: "PT0S" },
       { createdAt: "2021-06-15T12:30:45-23:59", timeout: "PT0S" },
-      { createdAt: "2021-06-15T12:30:45Z", alarm: "09:00:00+18:01", timeout: "PT0S" },
+      { createdAt: "2021-06-15T12:30:45Z", alarm: "09:00:00+14:01", timeout: "PT0S" },
+      { createdAt: "2021-06-15T12:30:45Z", alarm: "09:00:00+18:00", timeout: "PT0S" },
       { createdAt: "2021-06-15T12:30:45Z", alarm: "09:00:00-23:59", timeout: "PT0S" },
     ]) {
       const body = { birthday: "2000-01-01", alarm: "09:00:00", ...bad };
@@ -90,7 +92,7 @@ describe("json-schema temporal (--date-time-types=string, default)", () => {
   });
 
   test("offset boundaries are enforced on parse and serialize", () => {
-    for (const offset of ["+18:00", "-18:00"]) {
+    for (const offset of ["+14:00", "-14:00"]) {
       const value = stringTemporalTransferTypeConverter.fromTransferType({
         createdAt: `2021-06-15T12:30:45${offset}`,
         birthday: "2000-01-01",
@@ -109,7 +111,7 @@ describe("json-schema temporal (--date-time-types=string, default)", () => {
       alarm: "09:00:00",
       timeout: "PT0S",
     });
-    for (const offset of ["+18:01", "-18:01", "+23:59", "-23:59"]) {
+    for (const offset of ["+14:01", "-14:01", "+18:00", "-18:00", "+23:59", "-23:59"]) {
       expect(() =>
         encodeModel(stringTemporalTransferTypeConverter, {
           ...valid,

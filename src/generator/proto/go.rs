@@ -117,7 +117,7 @@ impl ModelBackend {
         }
     }
 
-    fn support_converter(&self, name: String) -> String {
+    pub(in crate::generator) fn support_converter(&self, name: String) -> String {
         if self.support_package.is_some() {
             self.register_support_import();
             format!("support.{name}")
