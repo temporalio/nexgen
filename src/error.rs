@@ -183,6 +183,9 @@ pub enum Error {
     #[error("message name `{name}` is ambiguous; matches: {matches:?}")]
     AmbiguousMessageName { name: String, matches: Vec<String> },
 
+    #[error("proto file `{name}` was not found in the descriptor set")]
+    UnknownDescriptorFile { name: String },
+
     #[error("cannot generate add-rpc WIT for `{context}`: {reason}")]
     UnsupportedAddRpc { context: String, reason: String },
 

@@ -300,12 +300,39 @@ when extending an existing WIT file, put that file first. A linked input can be 
 single WIT file, a WIT package directory, or a directory containing WIT package
 directories, so `advanced/samples/inputs/deps` links every package under it.
 
-`add-message` follows the same input convention. It emits the selected message
-and all reachable proto message/enum types without adding an operation. The
+`add-message` follows the same input convention. Repeat `--message` to select
+multiple messages, or pass `--file` with a proto file name from the descriptor
+set (for example `acme/oneof/v1/service.proto`) to select all its messages.
+Both options can be combined. A descriptor set binary is supplied with
+`--descriptors`; `--file` is the name of a proto source inside that set, not a
+path to a proto file on disk. The selections and all reachable proto
+message/enum types are emitted together without adding an operation. A
+standalone scaffold with multiple messages exports an interface named `messages`;
+one with a single message retains the message-derived interface name. The
 operation-free interface still emits and re-exports its owned model
 declarations; linked dependency declarations remain tree-shaken unless an owned
 model references them. When extending an existing WIT file, its world must
 export exactly one interface.
+
+### Reconcile existing WIT
+
+Both scaffold commands reconcile reachable mapped records: `add-message` starts
+at the selected messages, and `add-rpc` starts at the request and response.
+Adding a new RPC and updating an existing RPC use the same model checks.
+Missing owned records and fields are added, including grouped oneof fields.
+Incompatible mappings and fields removed from the proto produce an error rather
+than deleting authored WIT.
+
+Reconciliation follows mapped child records, visiting shared messages once,
+but preserves explicit omissions, compatible substitutions, opaque
+external type mappings, and supported proto carrier type parameters such as
+`output-t`. Linked records are checked without editing their dependency files;
+an incomplete linked record must be fixed in its owning WIT package.
+Comparing the resulting WIT with the checked-in input catches missing
+declarations in CI. A second run on reconciled WIT makes no further changes.
+The completed scaffold is parsed before it is returned or written. A recursive
+proto graph that cannot be represented by WIT record types fails validation;
+an opaque mapping can intentionally stop expansion at that boundary.
 
 ### Protobuf oneofs
 
@@ -314,7 +341,10 @@ Every message remains a record, with an `option<variant>` field for each
 oneof—even when the message contains only one oneof. Scaffolding stays optional
 because protobuf descriptors permit a oneof to be unset. Authors can remove
 `option<>` to assert that exactly one case is required by their model. Existing
-WIT mappings must use the same grouped-record shape.
+WIT mappings must use the same grouped-record shape. Reused variants may have
+custom WIT names; their `@nexus.proto` source, cases, and payloads are validated.
+Proto oneof member names must round-trip through WIT's snake-case wire naming;
+the scaffolder rejects a name that cannot be represented without changing it.
 
 Python native-API generation converts both authored shapes bidirectionally.
 For `option<variant>`, an unset protobuf oneof decodes to `None`, and encoding
@@ -356,6 +386,20 @@ Generate WIT for a standalone proto message tree:
 cargo run --features advanced -- add-message \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --message WorkflowExecutionInfo \
+  --input advanced/samples/inputs/deps
+```
+
+Add several messages, or every message defined in a proto file in the descriptor set:
+
+```bash
+cargo run --features advanced -- add-message \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --message WorkflowExecutionInfo --message WorkflowExecution \
+  --input advanced/samples/inputs/deps
+
+cargo run --features advanced -- add-message \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --file temporal/api/common/v1/message.proto \
   --input advanced/samples/inputs/deps
 ```
 

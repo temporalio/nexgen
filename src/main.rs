@@ -137,8 +137,12 @@ struct AddRpcArgs {
 struct AddMessageArgs {
     #[arg(long, required = true)]
     descriptors: Vec<PathBuf>,
-    #[arg(long)]
-    message: String,
+    /// Proto message name; may be repeated.
+    #[arg(long = "message", required_unless_present = "files")]
+    messages: Vec<String>,
+    /// Proto file name in the descriptor set; include all its messages. May be repeated.
+    #[arg(long = "file")]
+    files: Vec<String>,
     #[arg(long = "input")]
     inputs: Vec<PathBuf>,
     #[arg(long)]
@@ -256,7 +260,8 @@ fn main() -> ExitCode {
         #[cfg(feature = "advanced")]
         Commands::AddMessage(args) => add_message_to_file(&AddMessageRequest {
             descriptor_paths: args.descriptors,
-            message_name: args.message,
+            message_names: args.messages,
+            file_names: args.files,
             input_paths: args.inputs,
             output_path: args.output,
         }),

@@ -1897,3 +1897,18 @@ type workflow-function = placeholder;
 
 This directive has no effect on code generation -- it only affects the scaffold
 commands.
+
+### Scaffolding existing proto-backed models
+
+The advanced `add-message` and `add-rpc` commands share record reconciliation.
+Selected messages, or the RPC request and response, supply the roots. Both
+commands check reachable mapped child records, add missing owned declarations
+and fields, and reject stale or incompatible fields. Reused oneof variants are
+checked for missing or extra cases and incompatible payloads.
+
+Explicit `@nexus.omit` fields and compatible substitutions remain intentional
+boundaries. Opaque proto type mappings are preserved rather than expanded into
+records, and type parameters backed by the supported Payload/Payloads carriers
+are preserved. Linked records are validated but not edited; missing fields
+there must be fixed in the dependency package. Reconciliation completes before
+the output is written, and rerunning it on complete WIT leaves the model unchanged.
