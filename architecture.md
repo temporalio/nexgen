@@ -110,26 +110,3 @@ flowchart LR
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
   the consuming module can only resolve it from the tree-wide manifest.
-
-## Proto-to-WIT scaffolding
-
-The advanced `add-message` and `add-rpc` commands are authoring tools outside
-the compiler-pass spine. `src/add_rpc.rs` owns their shared `ProtoWitBuilder`
-and `ModelChanges` plan; this is not an additional compiler pass.
-
-`add-message` supplies selected messages as roots. `add-rpc` supplies its request
-and response messages, whether the operation is new or already present. Both
-resolve missing declarations and reconcile reachable mapped records through
-the same traversal. Messages are visited once to handle cycles and shared
-children. Field comparisons do not generate declarations or imports.
-
-The traversal preserves explicit omission, compatible substitutions, generic
-carrier type parameters, and opaque external mappings as boundaries. Reused
-oneof variants are checked against their source, cases, and case payloads.
-Owned records can receive missing fields; linked records are checked but their
-dependency packages are never edited. Conflicts fail before the plan is applied.
-The shared plan applies imports, new declarations, and record additions within
-the target interface. Operation insertion or signature validation remains the
-responsibility of `add-rpc`.
-The command validates the completed WIT before returning or writing it.
-Unrepresentable recursive record graphs fail rather than emitting invalid WIT.
