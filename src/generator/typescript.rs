@@ -26,10 +26,10 @@ use crate::planning::{
 };
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec, FunctionFieldSpec,
-    FunctionResultSpec, IntSpec, LanguageImportSpec, LanguageImportStyle, ModulePath,
-    OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec, SelectedTextSpec,
-    TypeReplacementSpec, TypeSpec, VariantSpec,
+    AliasTypeSpec, EnumSpec, EnumValueSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec,
+    FunctionFieldSpec, FunctionResultSpec, IntSpec, LanguageImportSpec, LanguageImportStyle,
+    ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
+    SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -1054,7 +1054,12 @@ impl<'a> ApiPlanner<'a> {
             };
         }
 
-        if let Some(default_value) = &field.default_value {
+        if field.default_value.is_some() {
+            let default_value = field
+                .data
+                .default_enum_value
+                .as_ref()
+                .expect("planned field default enum value should be resolved");
             let mut requirements = resolved_type.requirements.clone();
             return RenderedField {
                 name: generated_field_name.to_string(),
@@ -1068,13 +1073,13 @@ impl<'a> ApiPlanner<'a> {
                 from_wire_expr: defaulted_enum_from_wire_expr(
                     &resolved_type,
                     wire_field_expr,
-                    &default_value.enum_case,
+                    default_value,
                     &mut requirements,
                 ),
                 to_wire_expr: defaulted_enum_to_wire_expr(
                     &resolved_type,
                     &generated_field_name,
-                    &default_value.enum_case,
+                    default_value,
                     &mut requirements,
                 ),
                 flattened_fields: Vec::new(),
@@ -1737,10 +1742,10 @@ fn function_field_from_wire_expr(
 fn defaulted_enum_from_wire_expr(
     resolved_type: &ResolvedFieldType,
     wire_value_expr: &str,
-    enum_case: &str,
+    enum_value: &EnumValueSpec,
     requirements: &mut TypeScriptRequirements,
 ) -> String {
-    let default_expr = enum_default_expr(resolved_type, enum_case, requirements);
+    let default_expr = enum_default_expr(resolved_type, enum_value, requirements);
     format!(
         "{wire_value_expr} == null ? {default_expr} : {}",
         enum_from_wire_expr(resolved_type, wire_value_expr)
@@ -1790,11 +1795,11 @@ fn optional_to_wire_expr_from_expr(resolved_type: &ResolvedFieldType, value_expr
 fn defaulted_enum_to_wire_expr(
     resolved_type: &ResolvedFieldType,
     field_name: &str,
-    enum_case: &str,
+    enum_value: &EnumValueSpec,
     requirements: &mut TypeScriptRequirements,
 ) -> String {
     let value_expr = format!("model.{field_name}");
-    let default_expr = enum_default_expr(resolved_type, enum_case, requirements);
+    let default_expr = enum_default_expr(resolved_type, enum_value, requirements);
     enum_to_wire_expr(
         resolved_type,
         &format!("({value_expr} == null ? {default_expr} : {value_expr})"),
@@ -1873,7 +1878,7 @@ fn enum_from_wire_expr(resolved_type: &ResolvedFieldType, expr: &str) -> String 
 
 fn enum_default_expr(
     resolved_type: &ResolvedFieldType,
-    enum_case: &str,
+    enum_value: &EnumValueSpec,
     requirements: &mut TypeScriptRequirements,
 ) -> String {
     // Defaults are emitted as runtime enum-member references. Record the namespace
@@ -1885,9 +1890,9 @@ fn enum_default_expr(
             .insert(namespace.to_string());
     }
     let value_name = if resolved_type.wire_conversion.is_some() {
-        enum_case.to_shouty_snake_case()
+        enum_value.name.to_shouty_snake_case()
     } else {
-        enum_case.to_upper_camel_case()
+        enum_value.name.clone()
     };
     format!("{}.{}", resolved_type.annotation, value_name)
 }
@@ -6647,6 +6652,89 @@ mod tests {
             "support.customConverter"
         );
         assert_eq!(support_reference("(x) => x"), "(x) => x");
+    }
+
+    #[test]
+    fn enum_defaults_use_resolved_native_alias() {
+        let resolved_type = super::ResolvedFieldType {
+            annotation: "policies.AliasPolicy".to_string(),
+            kind: super::ResolvedFieldKind::Enum,
+            requirements: super::TypeScriptRequirements::default(),
+            wire_conversion: None,
+        };
+        let default_value = crate::spec::EnumValueSpec {
+            name: "AllowDuplicate".to_string(),
+            wire_name: "allow-duplicate".to_string(),
+            number: 7,
+        };
+        let mut requirements = super::TypeScriptRequirements::default();
+        assert_eq!(
+            super::defaulted_enum_from_wire_expr(
+                &resolved_type,
+                "message.policy",
+                &default_value,
+                &mut requirements
+            ),
+            "message.policy == null ? policies.AliasPolicy.AllowDuplicate : message.policy as policies.AliasPolicy"
+        );
+        assert_eq!(
+            super::defaulted_enum_to_wire_expr(
+                &resolved_type,
+                "policy",
+                &default_value,
+                &mut requirements
+            ),
+            "(model.policy == null ? policies.AliasPolicy.AllowDuplicate : model.policy) as any"
+        );
+        assert_eq!(
+            requirements.value_namespace_imports,
+            std::collections::BTreeSet::from(["policies".to_string()])
+        );
+    }
+
+    #[test]
+    fn enum_defaults_use_resolved_proto_identity_with_sdk_conversions() {
+        let resolved_type = super::ResolvedFieldType {
+            annotation: "workflow.WorkflowIdReusePolicy".to_string(),
+            kind: super::ResolvedFieldKind::Enum,
+            requirements: super::TypeScriptRequirements::default(),
+            wire_conversion: Some(super::WireValueConversion {
+                annotation: "number".to_string(),
+                from_wire: "decodePolicy({wire})".to_string(),
+                to_wire: "encodePolicy({value})".to_string(),
+                function_name_to_wire: None,
+                wire_function_names: None,
+                uses_rendered_model_annotation: false,
+            }),
+        };
+        let default_value = crate::spec::EnumValueSpec {
+            name: "AllowDuplicate".to_string(),
+            wire_name: "WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE".to_string(),
+            number: 7,
+        };
+        let mut requirements = super::TypeScriptRequirements::default();
+        assert_eq!(
+            super::defaulted_enum_from_wire_expr(
+                &resolved_type,
+                "message.policy",
+                &default_value,
+                &mut requirements
+            ),
+            "message.policy == null ? workflow.WorkflowIdReusePolicy.ALLOW_DUPLICATE : decodePolicy(message.policy)"
+        );
+        assert_eq!(
+            super::defaulted_enum_to_wire_expr(
+                &resolved_type,
+                "policy",
+                &default_value,
+                &mut requirements
+            ),
+            "encodePolicy((model.policy == null ? workflow.WorkflowIdReusePolicy.ALLOW_DUPLICATE : model.policy))"
+        );
+        assert_eq!(
+            requirements.value_namespace_imports,
+            std::collections::BTreeSet::from(["workflow".to_string()])
+        );
     }
 
     fn sample_input_path(root: &std::path::Path) -> PathBuf {
