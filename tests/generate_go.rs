@@ -1175,6 +1175,331 @@ interface collision-service {
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
+// Keep these fixtures independent of the Temporal sample directives: changing
+// a wire field's spelling must not change Go's public callable policy.
+fn go_descriptor_fixture(signal_directives: &str, args_field: &str) -> String {
+    format!(
+        r#"package test:go-descriptors@1.0.0;
+
+world test-world {{
+  export descriptor-service;
+}}
+
+interface functions {{
+  type placeholder = string;
+  /// @nexus.type go="any"
+  type payload = placeholder;
+  type payloads = list<payload>;
+  /// @nexus.type go="go.temporal.io/sdk/workflow:workflow.Context"
+  type context = placeholder;
+
+  /// @nexus.function-args varargs=true param="args"
+  workflow-call: func(ctx: context, args: payloads) -> string;
+  /// @nexus.function
+  ///   primary=true
+  ///   signature="workflow-call"
+  ///   args-field="input"
+  ///   alternate-type="string"
+  ///   result-type-parameter="WorkflowResult"
+  type workflow-function = placeholder;
+
+  /// @nexus.function-args varargs=true
+  signal-call: func(signal-args: payloads) -> string;
+  /// @nexus.function
+  ///   signature="signal-call"
+  ///   args-field="{args_field}"
+  ///   alternate-type="string"
+{signal_directives}
+  type signal-function = placeholder;
+}}
+
+/// @nexus.endpoint "descriptor-endpoint"
+interface descriptor-service {{
+  use functions.{{workflow-function, signal-function, payloads}};
+  record execute-request {{
+    workflow: workflow-function,
+    signal: signal-function,
+  }}
+  execute: func(request: execute-request);
+}}
+"#
+    )
+}
+
+fn render_go_descriptor_fixture(wit: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let temp_dir = unique_output_path("go-descriptor-input");
+    fs::create_dir_all(&temp_dir)?;
+    let input = temp_dir.join("descriptor-service.wit");
+    fs::write(&input, wit)?;
+    let result = generate_to_string_with_inputs(nexgen::language::Language::Go, &[input], &[]);
+    fs::remove_dir_all(temp_dir)?;
+    result
+}
+
+// Compile the actual generated files, not hand-copied declarations. The
+// fixtures normally exercise reflection fallback; extractor cases supply the
+// one support helper they explicitly request.
+fn compile_go_descriptor_fixture(rendered: &str) {
+    let module_root = unique_output_path("go-descriptor-compile");
+    let output_path = module_root.join("output");
+    fs::create_dir_all(&output_path).unwrap();
+    for file in ["go.mod", "go.sum"] {
+        fs::copy(
+            project_root().join("advanced/samples/go").join(file),
+            module_root.join(file),
+        )
+        .unwrap();
+    }
+    for section in rendered.split("### ").skip(1) {
+        let (file, source) = section.split_once('\n').unwrap();
+        fs::write(
+            output_path.join(file),
+            source.replace(
+                "example.com/nexgen/support",
+                "go.temporal.io/sdk/advanced/samples/go/support",
+            ),
+        )
+        .unwrap();
+    }
+    fs::create_dir_all(module_root.join("support")).unwrap();
+    fs::write(
+        module_root.join("support/support.go"),
+        r#"package support
+import "go.temporal.io/sdk/workflow"
+func DescriptorName(ctx workflow.Context, value any) string { return "descriptor" }
+"#,
+    )
+    .unwrap();
+    let build = Command::new("go")
+        .args(["test", "./..."])
+        .current_dir(&module_root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "generated fixture failed to compile:\nstdout: {}\nstderr: {}\n{rendered}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    fs::remove_dir_all(module_root).unwrap();
+}
+
+#[test]
+fn go_explicit_descriptors_control_signal_api_and_packing_independent_of_wire_name() {
+    for args_field in ["signal-input", "notification-payloads"] {
+        for (args_type, public_args, packing) in [
+            ("any", "signalArg any", "[]any{signalArg}"),
+            ("[]string", "signalArg []string", "[]any{signalArg}"),
+        ] {
+            let directives =
+                format!("  ///   go-value-type=\"string\"\n  ///   go-args-type=\"{args_type}\"");
+            let rendered =
+                render_go_descriptor_fixture(&go_descriptor_fixture(&directives, args_field))
+                    .unwrap();
+            assert!(
+                rendered.contains(&format!(
+                    "\tsignal string,\n\t{public_args},\n\tworkflow any,\n\targs ...any,\n"
+                )),
+                "{args_field}/{args_type}:\n{rendered}"
+            );
+            assert!(
+                rendered.contains(&format!("\t\tSignalArgs: {packing},")),
+                "{rendered}"
+            );
+            assert!(!rendered.contains("SignalF interface"), "{rendered}");
+            compile_go_descriptor_fixture(&rendered);
+        }
+    }
+}
+
+#[test]
+fn go_signature_signal_input_uses_callable_fallback_and_secondary_generic_in_typed_wrapper() {
+    let rendered =
+        render_go_descriptor_fixture(&go_descriptor_fixture("", "signal-input")).unwrap();
+    assert!(
+        rendered.contains("SignalF interface{ ~string | func(...any) string }"),
+        "{rendered}"
+    );
+    assert!(
+        rendered
+            .contains("\tsignal SignalF,\n\tsignalArgs []any,\n\tworkflow any,\n\targs ...any,"),
+        "{rendered}"
+    );
+    let typed = rendered.split("func ExecuteTyped[").nth(1).unwrap();
+    assert!(typed.contains("SignalF interface{ ~string | func(...any) string }"));
+    assert!(typed.contains("\tsignal SignalF,\n\tsignalArgs []any,"));
+    assert!(typed.contains("\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"));
+    assert!(typed.contains("reflect.ValueOf(signal)"));
+    assert!(typed.contains("\t\tSignal: signalName,"));
+    assert!(typed.contains("\t\tSignalArgs: signalArgs,"));
+    assert!(typed.contains("\t\tArgs: []any{arg},"));
+    compile_go_descriptor_fixture(&rendered);
+}
+
+#[test]
+fn go_ignores_typescript_only_function_descriptors() {
+    let baseline =
+        render_go_descriptor_fixture(&go_descriptor_fixture("", "signal-input")).unwrap();
+    let typescript = render_go_descriptor_fixture(&go_descriptor_fixture(
+        r#"  ///   typescript-value-type="common.SignalDefinition<any[]>"
+  ///   typescript-args-type="Value extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
+  ///   typescript-name-extractor="signalFunctionName"
+  ///   typescript-import="@temporalio/common""#,
+        "signal-input",
+    ))
+    .unwrap();
+    assert_eq!(baseline, typescript);
+}
+
+#[test]
+fn go_primary_variadic_group_is_last_and_secondary_groups_keep_authored_order() {
+    let wit = go_descriptor_fixture("", "signal-input")
+        .replace(
+            "  type signal-function = placeholder;",
+            r#"  type signal-function = placeholder;
+  /// @nexus.function-args varargs=true
+  other-call: func(other-args: payloads) -> string;
+  /// @nexus.function
+  ///   signature="other-call"
+  ///   args-field="other-payloads"
+  ///   alternate-type="string"
+  type other-function = placeholder;"#,
+        )
+        .replace(
+            "workflow-function, signal-function, payloads",
+            "workflow-function, signal-function, other-function, payloads",
+        )
+        .replace(
+            "    signal: signal-function,",
+            "    signal: signal-function,\n    other: other-function,",
+        );
+    let rendered = render_go_descriptor_fixture(&wit).unwrap();
+    assert!(
+        rendered.contains(
+            "\tsignal SignalF,\n\tsignalArgs []any,\n\tother OtherF,\n\totherArgs []any,\n\tworkflow any,\n\targs ...any,"
+        ),
+        "{rendered}"
+    );
+    let typed = rendered.split("func ExecuteTyped[").nth(1).unwrap();
+    assert!(typed.contains("OtherF interface{ ~string | func(...any) string }"));
+    assert!(
+        typed.contains(
+            "\tsignal SignalF,\n\tsignalArgs []any,\n\tother OtherF,\n\totherArgs []any,\n\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"
+        ),
+        "{typed}"
+    );
+    assert!(typed.contains("reflect.ValueOf(other)"));
+    assert!(typed.contains("\t\tOtherArgs: otherArgs,"));
+    compile_go_descriptor_fixture(&rendered);
+
+    // Swap only the secondary groups. Their relative ordering must follow the
+    // authored request, rather than a special case for signal-input.
+    let swapped = wit.replace(
+        "    signal: signal-function,\n    other: other-function,",
+        "    other: other-function,\n    signal: signal-function,",
+    );
+    let rendered = render_go_descriptor_fixture(&swapped).unwrap();
+    assert!(
+        rendered.contains(
+            "\tother OtherF,\n\totherArgs []any,\n\tsignal SignalF,\n\tsignalArgs []any,\n\tworkflow any,\n\targs ...any,"
+        ),
+        "{rendered}"
+    );
+    compile_go_descriptor_fixture(&rendered);
+}
+
+#[test]
+fn go_final_secondary_signature_args_are_variadic_without_primary_signature_varargs() {
+    let baseline = go_descriptor_fixture("", "signal-input");
+    let fixed = baseline.replace(
+            "  /// @nexus.function-args varargs=true param=\"args\"\n  workflow-call: func(ctx: context, args: payloads) -> string;",
+            "  workflow-call: func(name: string) -> string;",
+        );
+    let descriptor = baseline.replace(
+        "  ///   primary=true",
+        "  ///   primary=true\n  ///   go-value-type=\"any\"\n  ///   go-args-type=\"[]string\"\n  ///   go-name-extractor=\"DescriptorName\"",
+    );
+    for (name, wit, primary_params) in [
+        ("fixed", fixed, "\tworkflow WorkflowF,\n\tname string,"),
+        ("descriptor", descriptor, "\tworkflow any,\n\targ []string,"),
+    ] {
+        let rendered = render_go_descriptor_fixture(&wit).unwrap();
+        assert!(
+            rendered.contains(&format!(
+                "{primary_params}\n\tsignal SignalF,\n\tsignalArgs ...any,"
+            )),
+            "{name}:\n{rendered}"
+        );
+        assert!(!rendered.contains("func ExecuteTyped["), "{rendered}");
+        assert!(rendered.contains("\t\tSignalArgs: signalArgs,"));
+        compile_go_descriptor_fixture(&rendered);
+    }
+}
+
+#[test]
+fn go_rejects_descriptors_on_fixed_argument_functions_with_go_diagnostic() {
+    let wit = go_descriptor_fixture(
+        "  ///   go-value-type=\"string\"\n  ///   go-args-type=\"any\"",
+        "signal-input",
+    )
+    .replace(
+        "  /// @nexus.function-args varargs=true\n  signal-call: func(signal-args: payloads) -> string;",
+        "  signal-call: func(signal-arg: string) -> string;",
+    );
+    let error = render_go_descriptor_fixture(&wit).unwrap_err();
+    let error = error
+        .downcast_ref::<nexgen::error::Error>()
+        .expect("descriptor rejection should preserve the generator error type");
+    match error {
+        nexgen::error::Error::UnsupportedGoType { context, reason } => {
+            assert!(context.to_lowercase().contains("signal"), "{error}");
+            assert!(reason.contains("fixed"), "{error}");
+            assert!(reason.contains("descriptor"), "{error}");
+        }
+        other => panic!("expected UnsupportedGoType, got {other:?}"),
+    }
+}
+
+#[test]
+fn go_callable_descriptor_invokes_extractor_and_composite_types_import_and_compile() {
+    for (value_type, args_type, public_type, import) in [
+        ("func(...any) string", "any", "func(...any) string", None),
+        (
+            "[]time.Duration",
+            "any",
+            "[]time.Duration",
+            Some("\"time\""),
+        ),
+        (
+            "func(context.Context) any",
+            "any",
+            "func(context.Context) any",
+            Some("\"context\""),
+        ),
+    ] {
+        let directives = format!(
+            "  ///   go-value-type=\"{value_type}\"\n  ///   go-args-type=\"{args_type}\"\n  ///   go-name-extractor=\"DescriptorName\""
+        );
+        let rendered = render_go_descriptor_fixture(&go_descriptor_fixture(
+            &directives,
+            "notification-payloads",
+        ))
+        .unwrap();
+        assert!(
+            rendered.contains(&format!("\tsignal {public_type},")),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("signalName := support.DescriptorName(ctx, signal)"),
+            "{rendered}"
+        );
+        if let Some(import) = import {
+            assert!(rendered.contains(import), "{rendered}");
+        }
+        compile_go_descriptor_fixture(&rendered);
+    }
+}
+
 #[test]
 fn go_temporal_function_constraints_use_workflow_context_prefix() {
     let root = project_root();
@@ -1198,14 +1523,16 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
         rendered.contains("\tsignal string,\n\tsignalArg any,\n\tworkflow any,\n\targs ...any,\n")
     );
     assert!(rendered.contains("\targs ...any,\n"));
-    assert!(rendered.contains("switch rv := reflect.ValueOf(workflow); rv.Kind()"));
+    assert!(!rendered.contains("\"reflect\""));
+    assert!(!rendered.contains("\"runtime\""));
+    assert!(!rendered.contains("\"strings\""));
+    assert!(!rendered.contains("runtime.FuncForPC"));
     assert_eq!(
         rendered
-            .matches("switch rv := reflect.ValueOf(workflow); rv.Kind()")
+            .matches("workflowName := support.WorkflowFunctionName(ctx, workflow)")
             .count(),
-        1
+        2
     );
-    assert!(!rendered.contains("switch rv := reflect.ValueOf(signal); rv.Kind()"));
     assert!(rendered.contains("\t\tWorkflow: workflowName,\n"));
     assert!(rendered.contains("\t\tSignal: signal,\n"));
     assert!(rendered.contains("\t\tArgs: args,\n"));

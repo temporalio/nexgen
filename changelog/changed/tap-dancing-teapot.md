@@ -1,0 +1,1 @@
+Go convenience wrappers derive function argument grouping and variadic placement from their signatures and primary role, not argument-field names. Signals retain their name-and-single-payload API through explicit Go representation overrides.

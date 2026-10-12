@@ -149,6 +149,33 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.Len(variadicRequest.GetInput().GetPayloads(), 2)
 }
 
+func (s *WorkflowServiceIntegrationSuite) TestSliceSignalArgumentRemainsOnePayload() {
+	signalArg := []string{"one", "two"}
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		opts := ws.SignalWithStartWorkflowOptions{ID: "workflow-id"}
+		if err := ws.SignalWithStartWorkflowTyped(
+			ctx, opts, "wake-up", signalArg, signalWithStartWorkflow, "workflow-input",
+		).Get(ctx, nil); err != nil {
+			return err
+		}
+		return ws.SignalWithStartWorkflow(
+			ctx, opts, "wake-up", signalArg, "ExampleWorkflow", "workflow-input",
+		).Get(ctx, nil)
+	})
+
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+	s.Require().Len(s.calls, 2)
+	for _, request := range s.calls {
+		payloads := request.GetSignalInput()
+		s.Require().NotNil(payloads)
+		s.Require().Len(payloads.GetPayloads(), 1)
+		var decoded []string
+		s.NoError(converter.GetDefaultDataConverter().FromPayloads(payloads, &decoded))
+		s.Equal(signalArg, decoded)
+	}
+}
+
 func (s *WorkflowServiceIntegrationSuite) TestEmptyPayloadsAreDelegatedToDataConverter() {
 	s.env.SetDataConverter(emptyPayloadsDataConverter{converter.GetDefaultDataConverter()})
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*ws.SignalWithStartWorkflowResponse, error) {

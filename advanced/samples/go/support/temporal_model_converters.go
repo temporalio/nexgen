@@ -23,6 +23,16 @@ func WorkflowNamespace(ctx workflow.Context) string {
 	return workflow.GetInfo(ctx).Namespace
 }
 
+// WorkflowFunctionName resolves workflow functions using the worker's registry,
+// including explicitly registered aliases.
+func WorkflowFunctionName(ctx workflow.Context, value any) string {
+	name, err := internal.GetWorkflowFunctionName(internal.GetWorkflowEnvironment(ctx).GetRegistry(), value)
+	if err != nil {
+		panic(err)
+	}
+	return name
+}
+
 // --- Duration (google.protobuf.Duration) ---
 
 func DurationToProto(_ workflow.Context, d *time.Duration) (*durationpb.Duration, error) {

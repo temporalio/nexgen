@@ -1373,6 +1373,17 @@ alias.
 | `converter`                    | Reuse the same conversion helper name in all languages.                        | Calls the helper when converting the function field to proto.                                               |
 | `<language>-converter`         | Use language-specific conversion helper names.                                 | Python uses `python-converter`; TypeScript uses `typescript-converter`.                                     |
 | `result` / `<language>-result` | Direct field-level form when there is no type alias `signature`.               | Supplies the callable result annotation directly. Prefer `signature` for authored aliases.                  |
+| `go-value-type` / `go-args-type` | Override the Go reference and argument representation together.              | A string reference passes through as its name; the argument override is one payload, even for slice types. |
+| `go-name-extractor`            | Resolve callable names with a support helper.                                  | Calls the helper with `(ctx, value)` instead of runtime function-name extraction.                          |
+
+Go argument overrides require a variadic signature with one list-backed
+argument field. For example, `go-value-type="string" go-args-type="any"`
+exposes a name and one opaque payload, packed into the wire argument list.
+Without an override, Go groups each reference with its signature-derived
+arguments, preserves the other groups' authored order, and places primary
+variadic arguments last. Only a final argument list uses `...T`; other lists
+use `[]T`. An explicit primary descriptor replaces signature-derived typing,
+so no additional `Typed` wrapper is emitted.
 
 `@nexus.function-args` options:
 
