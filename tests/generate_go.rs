@@ -1461,6 +1461,101 @@ fn go_rejects_descriptors_on_fixed_argument_functions_with_go_diagnostic() {
 }
 
 #[test]
+fn go_rejects_model_parameters_colliding_with_wrapper_generics_during_planning() {
+    let fixture = r#"package test:generic@1.0.0;
+world system { export service; }
+interface functions {
+  type placeholder = string;
+  /// @nexus.type go="any"
+  type payload = placeholder;
+  /// @nexus.type go="go.temporal.io/sdk/workflow:workflow.Context"
+  type workflow-context = placeholder;
+  /// @nexus.function-args varargs=true param="input"
+  workflow-call: func(ctx: workflow-context, input: list<payload>) -> placeholder;
+  /// @nexus.function
+  ///   primary=true
+  ///   signature="workflow-call"
+  ///   args-field="input"
+  ///   alternate-type="string"
+  ///   result-type-parameter="WorkflowResult"
+  type workflow-function = placeholder;
+}
+/// @nexus.endpoint "test"
+interface service {
+  use functions.{placeholder, workflow-function};
+  /// @nexus.type-parameter
+  type workflow-arg = placeholder;
+  record request {
+    context: workflow-arg,
+    workflow: workflow-function,
+  }
+  run: func(request: request);
+}
+"#;
+    for (authored, reserved, wrapper) in [
+        ("workflow-arg", "WorkflowArg", "Typed"),
+        ("workflow-result", "WorkflowResult", "Typed"),
+        ("workflow-f", "WorkflowF", ""),
+    ] {
+        let mut wit = fixture.replace("workflow-arg", authored);
+        if reserved == "WorkflowF" {
+            wit = wit.replace("primary=true", "primary=false");
+        }
+        let error = render_go_descriptor_fixture(&wit).unwrap_err();
+        match error.downcast_ref::<nexgen::error::Error>().unwrap() {
+            nexgen::error::Error::UnsupportedGoType { context, reason } => {
+                assert!(context.to_lowercase().contains("run"), "{error}");
+                assert!(context.contains(wrapper), "{error}");
+                assert!(
+                    reason.contains(&format!("model type parameter `{reserved}`")),
+                    "{error}"
+                );
+                assert!(
+                    reason.contains(&format!("generated reserved name `{reserved}`")),
+                    "{error}"
+                );
+            }
+            other => panic!("expected early UnsupportedGoType, got {other:?}"),
+        }
+    }
+    // Noncolliding model names keep the generated names, and the whole fixture
+    // compiles: rejection is about the wrapper namespace, not generic models.
+    let valid = fixture.replace("workflow-arg", "context-t");
+    let rendered = render_go_descriptor_fixture(&valid).unwrap();
+    assert!(
+        rendered.contains("func RunTyped[ContextT any, WorkflowArg any, WorkflowResult any]"),
+        "{rendered}"
+    );
+    compile_go_descriptor_fixture(&rendered);
+}
+
+#[test]
+fn go_rejects_collisions_between_generated_wrapper_type_parameters() {
+    let fixture = go_descriptor_fixture("", "signal-input");
+    for reserved in ["WorkflowArg", "SignalF"] {
+        let wit = fixture.replace(
+            "result-type-parameter=\"WorkflowResult\"",
+            &format!("result-type-parameter=\"{reserved}\""),
+        );
+        let error = render_go_descriptor_fixture(&wit).unwrap_err();
+        match error.downcast_ref::<nexgen::error::Error>().unwrap() {
+            nexgen::error::Error::UnsupportedGoType { context, reason } => {
+                assert!(context.contains("Typed"), "{error}");
+                assert!(
+                    reason.contains(&format!("generated type parameter `{reserved}`")),
+                    "{error}"
+                );
+                assert!(
+                    reason.contains(&format!("generated reserved name `{reserved}`")),
+                    "{error}"
+                );
+            }
+            other => panic!("expected early UnsupportedGoType, got {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn go_callable_descriptor_invokes_extractor_and_composite_types_import_and_compile() {
     for (value_type, args_type, public_type, import) in [
         ("func(...any) string", "any", "func(...any) string", None),

@@ -1084,6 +1084,12 @@ impl<'a> ApiPlanner<'a> {
         for service in &services {
             for operation in &service.operations {
                 if let Some(params) = &operation.unpacked_input {
+                    validate_wrapper_type_parameters(
+                        operation,
+                        params,
+                        &self.package,
+                        &visibility,
+                    )?;
                     for param in params {
                         if let Some(function) = &param.function
                             && function
@@ -4332,6 +4338,76 @@ fn required_function_type_parameters(
         .collect()
 }
 
+fn typed_wrapper_type_parameter_names(primary: &RenderedUnpackedParam) -> (String, String) {
+    let function = primary.function.as_ref().unwrap();
+    (
+        format!("{}Arg", primary.field_name),
+        function
+            .result_type_parameter
+            .clone()
+            .unwrap_or_else(|| format!("{}Result", primary.field_name)),
+    )
+}
+
+// Planning and both wrapper renderers share the complete declaration namespace.
+fn wrapper_type_parameters(
+    operation: &RenderedOperation<'_>,
+    params: &[RenderedUnpackedParam],
+    typed_primary: Option<&RenderedUnpackedParam>,
+    package: &GoPackageContext,
+    visibility: &GoVisibility,
+) -> Vec<(String, String)> {
+    let mut declarations = operation
+        .model_type_parameters
+        .iter()
+        .map(|usage| (usage.parameter.name.clone(), "any".to_string()))
+        .collect::<Vec<_>>();
+    declarations.extend(required_function_type_parameters(
+        params, package, visibility,
+    ));
+    if let Some(primary) = typed_primary {
+        let (arg, result) = typed_wrapper_type_parameter_names(primary);
+        declarations.extend([(arg, "any".to_string()), (result, "any".to_string())]);
+    }
+    declarations
+}
+
+fn validate_wrapper_type_parameters(
+    operation: &RenderedOperation<'_>,
+    params: &[RenderedUnpackedParam],
+    package: &GoPackageContext,
+    visibility: &GoVisibility,
+) -> Result<()> {
+    let typed_primary = unary_primary_varargs_function_param(params);
+    for primary in std::iter::once(None).chain(typed_primary.map(Some)) {
+        let mut occupied = BTreeMap::new();
+        for (index, (name, _)) in
+            wrapper_type_parameters(operation, params, primary, package, visibility)
+                .into_iter()
+                .enumerate()
+        {
+            let source = if index < operation.model_type_parameters.len() {
+                format!("model type parameter `{name}`")
+            } else {
+                format!("generated type parameter `{name}`")
+            };
+            if let Some(previous) = occupied.insert(name.clone(), source) {
+                return Err(Error::UnsupportedGoType {
+                    context: format!(
+                        "operation `{}`{} wrapper",
+                        operation.name,
+                        if primary.is_some() { " Typed" } else { "" }
+                    ),
+                    reason: format!(
+                        "{previous} collides with generated reserved name `{name}` in the Go generic parameter namespace"
+                    ),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 fn go_function_constraint(
     function: &FunctionFieldSpec,
     params: &[RenderedUnpackedParam],
@@ -4725,14 +4801,7 @@ fn render_convenience_wrapper(
     visibility: &GoVisibility,
 ) {
     let exported_name = go_field_name(operation.name);
-    let mut type_params = operation
-        .model_type_parameters
-        .iter()
-        .map(|usage| (usage.parameter.name.clone(), "any".to_string()))
-        .collect::<Vec<_>>();
-    type_params.extend(required_function_type_parameters(
-        params, package, visibility,
-    ));
+    let type_params = wrapper_type_parameters(operation, params, None, package, visibility);
 
     let positional_params = ordered_positional_params(params);
     let input_docs = wrapper_input_docs(positional_params.iter().copied());
@@ -4975,28 +5044,14 @@ fn render_typed_convenience_wrapper(
     let function = primary.function.as_ref().unwrap();
     let exported_name = format!("{}Typed", go_field_name(operation.name));
     let options_name = format!("{}Options", go_field_name(operation.name));
-    let arg_type = format!("{}Arg", primary.field_name);
-    let result_type = function
-        .result_type_parameter
-        .clone()
-        .unwrap_or_else(|| format!("{}Result", primary.field_name));
+    let (arg_type, result_type) = typed_wrapper_type_parameter_names(primary);
     let mut signature = vec![(
         "opts".to_string(),
         go_generic_reference(&options_name, &operation.model_type_parameters, false),
     )];
     let positional = ordered_positional_params(params);
-    let mut type_params = operation
-        .model_type_parameters
-        .iter()
-        .map(|p| (p.parameter.name.clone(), "any".to_string()))
-        .collect::<Vec<_>>();
-    type_params.extend(required_function_type_parameters(
-        params, package, visibility,
-    ));
-    type_params.extend([
-        (arg_type.clone(), "any".to_string()),
-        (result_type.clone(), "any".to_string()),
-    ]);
+    let type_params =
+        wrapper_type_parameters(operation, params, Some(primary), package, visibility);
     for (index, param) in positional.iter().enumerate() {
         if param.field_name == primary.field_name {
             let mut args = match &function.args {
