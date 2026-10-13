@@ -8,6 +8,7 @@ import (
 	common "go.temporal.io/api/common/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/converter"
+	"go.temporal.io/sdk/internal"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
 	"go.temporal.io/sdk/workflow"
 )
@@ -83,9 +84,13 @@ func startWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowse
 }
 
 func (startWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewContextualTransferTypeConverter(
-		startWorkflowRequestToProto,
-		startWorkflowRequestFromProto,
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		func(cfg *commonconverter.SystemNexusConfig, m *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
+			return startWorkflowRequestToProto(cfg.DataConverter, m)
+		},
+		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.StartWorkflowExecutionRequest, out *startWorkflowRequest) error {
+			return startWorkflowRequestFromProto(cfg.DataConverter, proto, out)
+		},
 	)
 }
 
@@ -125,9 +130,13 @@ func cancelWorkflowRequestFromProto(dc converter.DataConverter, proto *workflows
 }
 
 func (cancelWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewContextualTransferTypeConverter(
-		cancelWorkflowRequestToProto,
-		cancelWorkflowRequestFromProto,
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		func(cfg *commonconverter.SystemNexusConfig, m *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
+			return cancelWorkflowRequestToProto(cfg.DataConverter, m)
+		},
+		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.RequestCancelWorkflowExecutionRequest, out *cancelWorkflowRequest) error {
+			return cancelWorkflowRequestFromProto(cfg.DataConverter, proto, out)
+		},
 	)
 }
 
@@ -195,7 +204,7 @@ func (u *StartedWorkflow) GetResult(ctx workflow.Context) workflow.Future {
 
 func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
 	request.namespace = workflow.GetInfo(ctx).Namespace
-	c := workflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "StartWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
@@ -212,7 +221,7 @@ func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.
 
 func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
 	request.namespace = workflow.GetInfo(ctx).Namespace
-	c := workflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "RestartWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
@@ -229,7 +238,7 @@ func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflo
 
 func cancelWorkflow(ctx workflow.Context, request cancelWorkflowRequest) workflow.Future {
 	request.namespace = workflow.GetInfo(ctx).Namespace
-	c := workflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "CancelWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
@@ -285,9 +294,13 @@ func cancelWorkflowResponseFromProto(dc converter.DataConverter, proto *workflow
 }
 
 func (CancelWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewContextualTransferTypeConverter(
-		cancelWorkflowResponseToProto,
-		cancelWorkflowResponseFromProto,
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		func(cfg *commonconverter.SystemNexusConfig, m *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
+			return cancelWorkflowResponseToProto(cfg.DataConverter, m)
+		},
+		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.RequestCancelWorkflowExecutionResponse, out *CancelWorkflowResponse) error {
+			return cancelWorkflowResponseFromProto(cfg.DataConverter, proto, out)
+		},
 	)
 }
 

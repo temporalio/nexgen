@@ -8,6 +8,7 @@ import (
 	activity "go.temporal.io/api/activity/v1"
 	command "go.temporal.io/api/command/v1"
 	"go.temporal.io/sdk/converter"
+	"go.temporal.io/sdk/internal"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -16,7 +17,7 @@ import (
 // --- Operations (internal) ---
 
 func activityOptionsOperation(ctx workflow.Context, request ActivityOptions) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
+	c := internal.NewSystemNexusClient("TypeRoundtripService")
 	fut := c.ExecuteOperation(ctx, "ActivityOptionsOperation", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
@@ -31,7 +32,7 @@ func activityOptionsOperation(ctx workflow.Context, request ActivityOptions) wor
 }
 
 func failureOperation(ctx workflow.Context, request FailureContainer) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
+	c := internal.NewSystemNexusClient("TypeRoundtripService")
 	fut := c.ExecuteOperation(ctx, "FailureOperation", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
@@ -127,9 +128,13 @@ func activityOptionsFromProto(dc converter.DataConverter, proto *activity.Activi
 }
 
 func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewContextualTransferTypeConverter(
-		activityOptionsToProto,
-		activityOptionsFromProto,
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		func(cfg *commonconverter.SystemNexusConfig, m *ActivityOptions) (*activity.ActivityOptions, error) {
+			return activityOptionsToProto(cfg.DataConverter, m)
+		},
+		func(cfg *commonconverter.SystemNexusConfig, proto *activity.ActivityOptions, out *ActivityOptions) error {
+			return activityOptionsFromProto(cfg.DataConverter, proto, out)
+		},
 	)
 }
 
@@ -163,9 +168,13 @@ func failureContainerFromProto(dc converter.DataConverter, proto *command.FailWo
 }
 
 func (FailureContainer) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewContextualTransferTypeConverter(
-		failureContainerToProto,
-		failureContainerFromProto,
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		func(cfg *commonconverter.SystemNexusConfig, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
+			return failureContainerToProto(cfg.DataConverter, m)
+		},
+		func(cfg *commonconverter.SystemNexusConfig, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
+			return failureContainerFromProto(cfg.DataConverter, proto, out)
+		},
 	)
 }
 

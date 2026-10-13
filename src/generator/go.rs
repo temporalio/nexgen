@@ -625,9 +625,9 @@ impl GoPackageContext {
 
     pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
         if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            "NewContextualTransferTypeConverter".to_string()
+            "NewSystemNexusTransferTypeConverter".to_string()
         } else {
-            "commonconverter.NewContextualTransferTypeConverter".to_string()
+            "commonconverter.NewSystemNexusTransferTypeConverter".to_string()
         }
     }
 
@@ -636,6 +636,14 @@ impl GoPackageContext {
             return "DataConverter".to_string();
         }
         self.qualified_expr("go.temporal.io/sdk/converter", "converter.DataConverter")
+    }
+
+    pub(in crate::generator) fn system_nexus_config_type(&self) -> String {
+        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
+            "SystemNexusConfig".to_string()
+        } else {
+            "commonconverter.SystemNexusConfig".to_string()
+        }
     }
 
     pub(in crate::generator) fn workflow_data_converter(&self) -> String {
@@ -2076,7 +2084,7 @@ fn render_operation_registry(
     if !keys.is_empty() {
         let register = package.qualified_expr(
             "go.temporal.io/sdk/internal",
-            "internal.RegisterNexusOperationRegistry",
+            "internal.UpdateNexusOperationRegistry",
         );
         output.push_str(&format!(
             "\nfunc init() {{\n\t{register}(NexusOperationRegistry)\n}}\n"
@@ -5558,6 +5566,31 @@ mod tests {
     }
 
     #[test]
+    fn client_selection_uses_runtime_endpoint_without_requiring_context_helper() {
+        for endpoint in ["__temporal_system", "temporal-system", "sample-service"] {
+            for annotated in [false, true] {
+                let files =
+                    generate_context_operation(endpoint, "temporal.RetryPolicy", annotated, true)
+                        .unwrap();
+                let source = &files[&PathBuf::from("sampleservice.go")];
+                if endpoint == "__temporal_system" {
+                    assert!(
+                        source.contains("internal.NewSystemNexusClient("),
+                        "{source}"
+                    );
+                    assert!(!source.contains("workflow.NewNexusClient("), "{source}");
+                } else {
+                    assert!(
+                        source.contains(&format!("workflow.NewNexusClient(\"{endpoint}\",")),
+                        "{source}"
+                    );
+                    assert!(!source.contains("NewSystemNexusClient"), "{source}");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn serialization_context_rejects_external_operation_inputs() {
         for endpoint in ["__temporal_system", "temporal-system"] {
             for native_type in ["temporal.RetryPolicy", "*temporal.RetryPolicy"] {
@@ -5612,6 +5645,15 @@ mod tests {
         );
         assert!(source.contains("TransferTypeConverter()"), "{source}");
         assert!(
+            source.contains("func(cfg *commonconverter.SystemNexusConfig, m *"),
+            "{source}"
+        );
+        assert!(source.contains("ToProto(cfg.DataConverter, m)"), "{source}");
+        assert!(
+            source.contains("FromProto(cfg.DataConverter, proto, out)"),
+            "{source}"
+        );
+        assert!(
             source.contains("retryPolicyToProto(dc, m.RetryPolicy)"),
             "{source}"
         );
@@ -5622,7 +5664,7 @@ mod tests {
     }
 
     #[test]
-    fn contextual_factory_avoids_self_import_namespace() {
+    fn system_nexus_factory_avoids_self_import_namespace() {
         let package = super::GoPackageContext {
             package_name: "converter".to_string(),
             import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
@@ -5630,9 +5672,10 @@ mod tests {
         };
         assert_eq!(
             package.new_transfer_type_converter(),
-            "NewContextualTransferTypeConverter"
+            "NewSystemNexusTransferTypeConverter"
         );
         assert_eq!(package.data_converter_type(), "DataConverter");
+        assert_eq!(package.system_nexus_config_type(), "SystemNexusConfig");
         assert_eq!(
             package.transfer_type_converter_type(),
             "TransferTypeConverter"
@@ -5644,9 +5687,13 @@ mod tests {
         };
         assert_eq!(
             package.new_transfer_type_converter(),
-            "commonconverter.NewContextualTransferTypeConverter"
+            "commonconverter.NewSystemNexusTransferTypeConverter"
         );
         assert_eq!(package.workflow_context_type(), "Context");
+        assert_eq!(
+            package.system_nexus_config_type(),
+            "commonconverter.SystemNexusConfig"
+        );
     }
 
     #[test]

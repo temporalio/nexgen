@@ -252,7 +252,7 @@ impl ModelBackend {
         };
         render_model_converters(output, model, wire, &self.package);
         if self.transfer_models.borrow().contains(key) {
-            render_model_transfer_type_converter(output, model, &self.package);
+            render_model_transfer_type_converter(output, model, wire, &self.package);
         }
     }
 }
@@ -1751,10 +1751,11 @@ fn build_field_conversion(
 /// (workflow args, signal args, memo) must be encoded by the converter the SDK
 /// has selected for the operation, not by the caller's.
 ///
-/// Both callbacks use the supplied data converter directly for nested values.
+/// Both callbacks explicitly extract the configured data converter for nested values.
 fn render_model_transfer_type_converter(
     output: &mut String,
     model: &RenderedModel,
+    wire: &RenderedModelWire,
     package: &GoPackageContext,
 ) {
     let (model_ident, _) = split_go_type_decl_name(&model.name);
@@ -1764,6 +1765,9 @@ fn render_model_transfer_type_converter(
 
     let new_converter = package.new_transfer_type_converter();
     let converter_type = package.transfer_type_converter_type();
+    let config_type = package.system_nexus_config_type();
+    let model_type = &model.name;
+    let proto_type = &wire.proto_type;
 
     // A value receiver opts in both `T` and `*T`. The SDK caches the returned
     // converter by model type, so no generated package-level cache is needed.
@@ -1772,7 +1776,12 @@ fn render_model_transfer_type_converter(
         "func ({model_ident}) TransferTypeConverter() ({converter_type}, error) {{\n"
     ));
     output.push_str(&format!("\treturn {new_converter}(\n"));
-    output.push_str(&format!("\t\t{to_proto_fn},\n\t\t{from_proto_fn},\n"));
+    output.push_str(&format!(
+        "\t\tfunc(cfg *{config_type}, m *{model_type}) ({proto_type}, error) {{\n\t\t\treturn {to_proto_fn}(cfg.DataConverter, m)\n\t\t}},\n"
+    ));
+    output.push_str(&format!(
+        "\t\tfunc(cfg *{config_type}, proto {proto_type}, out *{model_type}) error {{\n\t\t\treturn {from_proto_fn}(cfg.DataConverter, proto, out)\n\t\t}},\n"
+    ));
     output.push_str("\t)\n}\n");
 }
 

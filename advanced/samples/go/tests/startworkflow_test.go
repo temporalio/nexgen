@@ -2,13 +2,16 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nexus-rpc/sdk-go/nexus"
 	"github.com/stretchr/testify/suite"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
+	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/testsuite"
+	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
 	sw "go.temporal.io/sdk/advanced/samples/go/startworkflow"
@@ -25,6 +28,7 @@ type StartWorkflowIntegrationSuite struct {
 
 func (s *StartWorkflowIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
+	s.env.SetDataConverter(systemServerDataConverter())
 	s.calls = nil
 
 	start := nexus.NewSyncOperation("StartWorkflow",
@@ -137,4 +141,35 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 	s.Equal("start-id", resourceCancel.GetWorkflowExecution().GetWorkflowId())
 	s.Equal("start-run", resourceCancel.GetWorkflowExecution().GetRunId())
 	s.Equal("resource-cancel", resourceCancel.GetReason())
+}
+
+func (s *StartWorkflowIntegrationSuite) TestOrdinaryEndpointsRejectNativeRequest() {
+	var request any
+	s.env.SetWorkerOptions(worker.Options{Interceptors: []interceptor.WorkerInterceptor{
+		&replaceNexusInputInterceptor{replace: func(input any) any {
+			request = input
+			return input
+		}},
+	}})
+
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		if err := sw.StartWorkflow(ctx, sw.StartWorkflowOptions{
+			Workflow: "typed-workflow", WorkflowID: "start-id", TaskQueue: "start-queue",
+		}).Get(ctx, nil); err != nil {
+			return err
+		}
+		for _, endpoint := range []string{"temporal-system", "ordinary-endpoint"} {
+			client := workflow.NewNexusClient(endpoint, startWorkflowServiceName)
+			err := client.ExecuteOperation(ctx, "StartWorkflow", request, workflow.NexusOperationOptions{}).Get(ctx, nil)
+			if err == nil {
+				return fmt.Errorf("endpoint %q accepted a system-only native request", endpoint)
+			}
+			s.ErrorContains(err, "without a system Nexus config", endpoint)
+		}
+		return nil
+	})
+
+	s.Require().NoError(s.env.GetWorkflowError())
+	s.Require().Len(s.calls, 1)
+	s.Equal("StartWorkflow", s.calls[0].Operation)
 }

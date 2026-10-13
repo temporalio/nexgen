@@ -20,11 +20,23 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
+	"google.golang.org/protobuf/proto"
 
 	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice"
 )
 
 const workflowServiceName = "temporal.api.workflowservice.v1.WorkflowService"
+
+// The system server consumes and returns binary protobuf, not Nexus handler
+// payloads encoded by the application's converter.
+func systemServerDataConverter() converter.DataConverter {
+	return converter.NewCompositeDataConverter(
+		converter.NewNilPayloadConverter(),
+		converter.NewByteSlicePayloadConverter(),
+		converter.NewProtoPayloadConverter(),
+		converter.NewJSONPayloadConverter(),
+	)
+}
 
 func signalWithStartWorkflow(ctx workflow.Context, input string) string {
 	return input
@@ -55,15 +67,41 @@ type recordingDataConverter struct {
 	converter.DataConverter
 	serializationContext converter.SerializationContext
 	recorded             *[]recordedEncode
+	envelopes            *[]*common.Payload
 	mu                   *sync.Mutex
 }
 
 func newRecordingDataConverter() recordingDataConverter {
 	return recordingDataConverter{
-		DataConverter: converter.GetDefaultDataConverter(),
-		recorded:      &[]recordedEncode{},
-		mu:            &sync.Mutex{},
+		DataConverter: converter.NewCodecDataConverter(converter.GetDefaultDataConverter(), envelopeRejectingCodec{
+			PayloadCodec: converter.NewZlibCodec(converter.ZlibCodecOptions{AlwaysEncode: true}),
+		}),
+		recorded:  &[]recordedEncode{},
+		envelopes: &[]*common.Payload{},
+		mu:        &sync.Mutex{},
 	}
+}
+
+type envelopeRejectingCodec struct {
+	converter.PayloadCodec
+}
+
+func (c envelopeRejectingCodec) Encode(payloads []*common.Payload) ([]*common.Payload, error) {
+	for _, payload := range payloads {
+		if len(payload.Metadata[converter.MetadataMessageType]) != 0 {
+			return nil, errors.New("user codec must not encode an operation envelope")
+		}
+	}
+	return c.PayloadCodec.Encode(payloads)
+}
+
+func (c envelopeRejectingCodec) Decode(payloads []*common.Payload) ([]*common.Payload, error) {
+	for _, payload := range payloads {
+		if len(payload.Metadata[converter.MetadataMessageType]) != 0 {
+			return nil, errors.New("user codec must not decode an operation envelope")
+		}
+	}
+	return c.PayloadCodec.Decode(payloads)
 }
 
 func (c recordingDataConverter) WithSerializationContext(ctx converter.SerializationContext) converter.DataConverter {
@@ -71,15 +109,47 @@ func (c recordingDataConverter) WithSerializationContext(ctx converter.Serializa
 		DataConverter:        converter.WithDataConverterSerializationContext(c.DataConverter, ctx),
 		serializationContext: ctx,
 		recorded:             c.recorded,
+		envelopes:            c.envelopes,
 		mu:                   c.mu,
 	}
 }
 
 func (c recordingDataConverter) ToPayload(value any) (*common.Payload, error) {
+	// Handler responses model the server's fixed protobuf encoding.
+	if _, response := value.(*workflowservicepb.SignalWithStartWorkflowExecutionResponse); response {
+		payload, err := converter.NewProtoPayloadConverter().ToPayload(value)
+		if err == nil {
+			payload.Metadata["__temporal_system_payload"] = []byte("true")
+		}
+		return payload, err
+	}
+	// The testsuite also rebuilds decoded requests with the caller's converter.
+	if _, callerScoped := c.serializationContext.(converter.WorkflowSerializationContext); callerScoped {
+		switch value.(type) {
+		case *workflowservicepb.SignalWithStartWorkflowExecutionRequest:
+			return converter.NewProtoPayloadConverter().ToPayload(value)
+		}
+	}
 	c.mu.Lock()
 	*c.recorded = append(*c.recorded, recordedEncode{c.serializationContext, value})
 	c.mu.Unlock()
 	return c.DataConverter.ToPayload(value)
+}
+
+func (c recordingDataConverter) FromPayload(payload *common.Payload, value any) error {
+	switch value.(type) {
+	case **workflowservicepb.SignalWithStartWorkflowExecutionRequest:
+		if _, marked := payload.Metadata["__temporal_system_payload"]; marked {
+			c.mu.Lock()
+			*c.envelopes = append(*c.envelopes, proto.Clone(payload).(*common.Payload))
+			c.mu.Unlock()
+		}
+		return converter.NewProtoPayloadConverter().FromPayload(payload, value)
+	case **workflowservicepb.SignalWithStartWorkflowExecutionResponse:
+		return converter.NewProtoPayloadConverter().FromPayload(payload, value)
+	default:
+		return c.DataConverter.FromPayload(payload, value)
+	}
 }
 
 func (c recordingDataConverter) ToPayloads(values ...any) (*common.Payloads, error) {
@@ -105,13 +175,6 @@ type oneShotRecordingDataConverter struct {
 
 func (c oneShotRecordingDataConverter) WithSerializationContext(ctx converter.SerializationContext) converter.DataConverter {
 	return struct{ converter.DataConverter }{c.recordingDataConverter.WithSerializationContext(ctx)}
-}
-
-func nexusOperationSerializationContext() converter.NexusSerializationContext {
-	return converter.NexusSerializationContext{
-		Endpoint: "__temporal_system", Service: workflowServiceName,
-		Operation: "SignalWithStartWorkflowExecution",
-	}
 }
 
 // replaceNexusInputInterceptor lets the test replace a native input before the
@@ -160,6 +223,7 @@ type WorkflowServiceIntegrationSuite struct {
 
 func (s *WorkflowServiceIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
+	s.env.SetDataConverter(systemServerDataConverter())
 	s.calls = nil
 
 	signalWithStart := nexus.NewSyncOperation("SignalWithStartWorkflowExecution",
@@ -267,10 +331,10 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestEmptyPayloadsAreDelegatedToDataConverter() {
-	s.env.SetDataConverter(emptyPayloadsDataConverter{converter.GetDefaultDataConverter()})
-	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*ws.SignalWithStartWorkflowResponse, error) {
+	s.env.SetDataConverter(emptyPayloadsDataConverter{systemServerDataConverter()})
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		var result ws.SignalWithStartWorkflowResponse
-		return &result, ws.SignalWithStartWorkflow(
+		return ws.SignalWithStartWorkflow(
 			ctx,
 			ws.SignalWithStartWorkflowOptions{ID: "workflow-id"},
 			"wake-up",
@@ -316,8 +380,8 @@ func (s *WorkflowServiceIntegrationSuite) TestConversionFailureSurfacesOnTheFutu
 // TestModelIsConvertedInsideThePayloadConverter is the acceptance test for the
 // transfer-type port. The generated code no longer builds the proto itself;
 // the SDK's transfer-type machinery does it during payload conversion. The
-// inner user payloads use the target workflow context, while the outer proto
-// uses the Nexus operation context.
+// inner user payloads use the target workflow context and full user converter,
+// while the outer proto bypasses the user converter and codec.
 func (s *WorkflowServiceIntegrationSuite) TestModelIsConvertedInsideThePayloadConverter() {
 	s.checkSerializationContexts(false)
 }
@@ -414,7 +478,13 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 			}
 			future := client.ExecuteOperation(ctx, key.Operation, nativeRequest, workflow.NexusOperationOptions{})
 			var response ws.SignalWithStartWorkflowResponse
-			if err := future.Get(ctx, &response); err != nil {
+			err := future.Get(ctx, &response)
+			if endpoint != "__temporal_system" {
+				if err == nil {
+					return errors.New("ordinary endpoint accepted a system-only native request")
+				}
+				s.ErrorContains(err, "without a system Nexus config", endpoint)
+			} else if err != nil {
 				return err
 			}
 		}
@@ -422,7 +492,7 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 	})
 
 	s.Require().NoError(s.env.GetWorkflowError())
-	s.Require().Len(s.calls, 4)
+	s.Require().Len(s.calls, 2)
 	for _, call := range s.calls {
 		s.Equal("intercepted-target", call.GetWorkflowId())
 		s.Equal("default-test-namespace", call.GetNamespace())
@@ -431,7 +501,6 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 		Namespace: "default-test-namespace", WorkflowID: "intercepted-target",
 	}
 	innerEncodes := map[converter.SerializationContext]int{}
-	envelopes := map[string]int{}
 	for _, encoded := range recorder.snapshot() {
 		switch value := encoded.Value.(type) {
 		case string:
@@ -439,17 +508,77 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 				innerEncodes[encoded.Context]++
 			}
 		case *workflowservicepb.SignalWithStartWorkflowExecutionRequest:
-			if sc, ok := encoded.Context.(converter.NexusSerializationContext); ok {
-				s.Equal(workflowServiceName, sc.Service)
-				s.Equal(key.Operation, sc.Operation)
-				envelopes[sc.Endpoint]++
+			s.Fail("user converter received an operation envelope", "context: %v", encoded.Context)
+		}
+	}
+	s.Equal(map[converter.SerializationContext]int{target: 2}, innerEncodes)
+	s.checkRawEnvelopes(recorder, 2)
+}
+
+func (s *WorkflowServiceIntegrationSuite) TestOrdinaryEndpointsIgnoreRegisteredTargetContext() {
+	key := internal.NexusOperationKey{
+		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
+	}
+	s.Require().NotNil(ws.NexusOperationRegistry[key].SerializationContext)
+	s.env = s.NewTestWorkflowEnvironment()
+	recorder := newRecordingDataConverter()
+	s.env.SetDataConverter(oneShotRecordingDataConverter{recorder})
+	service := nexus.NewService(workflowServiceName)
+	s.Require().NoError(service.Register(nexus.NewSyncOperation(key.Operation,
+		func(ctx context.Context, input string, opts nexus.StartOperationOptions) (string, error) {
+			return input, nil
+		})))
+	s.env.RegisterNexusService(service)
+	endpoints := []string{"temporal-system", "ordinary-endpoint"}
+
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		for _, endpoint := range endpoints {
+			client := workflow.NewNexusClient(endpoint, workflowServiceName)
+			var result string
+			if err := client.ExecuteOperation(ctx, key.Operation, endpoint+"-input", workflow.NexusOperationOptions{}).Get(ctx, &result); err != nil {
+				return err
+			}
+			if result != endpoint+"-input" {
+				return errors.New("ordinary endpoint response did not round trip")
+			}
+		}
+		return nil
+	})
+
+	s.Require().NoError(s.env.GetWorkflowError())
+	for _, endpoint := range endpoints {
+		want := converter.NexusSerializationContext{
+			Endpoint: endpoint, Service: key.Service, Operation: key.Operation,
+		}
+		found := false
+		for _, encoded := range recorder.snapshot() {
+			if encoded.Value == endpoint+"-input" && encoded.Context == want {
+				found = true
+			}
+		}
+		s.True(found, "ordinary input must use its Nexus scope: %s", endpoint)
+	}
+	s.checkRawEnvelopes(recorder, 0)
+}
+
+func (s *WorkflowServiceIntegrationSuite) checkRawEnvelopes(recorder recordingDataConverter, count int) {
+	recorder.mu.Lock()
+	envelopes := append([]*common.Payload(nil), (*recorder.envelopes)...)
+	recorder.mu.Unlock()
+	s.Require().Len(envelopes, count, "server must consume marked raw protobuf envelopes")
+	for _, payload := range envelopes {
+		s.Equal([]byte("binary/protobuf"), payload.Metadata[converter.MetadataEncoding])
+		s.Equal([]byte("temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"), payload.Metadata[converter.MetadataMessageType])
+		s.Equal([]byte("true"), payload.Metadata["__temporal_system_payload"])
+		var request workflowservicepb.SignalWithStartWorkflowExecutionRequest
+		s.Require().NoError(proto.Unmarshal(payload.Data, &request))
+		s.NotEmpty(request.GetWorkflowId())
+		for _, args := range []*common.Payloads{request.GetInput(), request.GetSignalInput()} {
+			for _, nested := range args.GetPayloads() {
+				s.Equal([]byte("binary/zlib"), nested.Metadata[converter.MetadataEncoding], "target arguments must use the user codec")
 			}
 		}
 	}
-	s.Equal(map[converter.SerializationContext]int{target: 4}, innerEncodes)
-	s.Equal(map[string]int{
-		"__temporal_system": 2, "temporal-system": 1, "ordinary-endpoint": 1,
-	}, envelopes, "outer envelopes remain Nexus-scoped on every endpoint")
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryCopiesEntries() {
@@ -523,7 +652,8 @@ func (s *WorkflowServiceIntegrationSuite) checkSerializationContextsWithTarget(o
 	} {
 		s.Require().NotNil(payload, value)
 		var decoded string
-		s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(payload, &decoded))
+		s.Equal([]byte("binary/zlib"), payload.Metadata[converter.MetadataEncoding], value)
+		s.Require().NoError(recorder.DataConverter.FromPayload(payload, &decoded))
 		s.Equal(value, decoded)
 	}
 
@@ -545,26 +675,13 @@ func (s *WorkflowServiceIntegrationSuite) checkSerializationContextsWithTarget(o
 
 	workflowArg := stringAt("workflow-input")
 	signalArg := stringAt("signal-value")
-	request := indexOf(func(entry recordedEncode) bool {
-		_, ok := entry.Value.(*workflowservicepb.SignalWithStartWorkflowExecutionRequest)
-		return ok
-	})
-
 	s.Require().NotEqual(-1, workflowArg, "workflow argument was not encoded by the SDK's data converter")
 	s.Require().NotEqual(-1, signalArg, "signal argument was not encoded by the SDK's data converter")
-	s.Require().NotEqual(-1, request, "the SDK's data converter never received the transfer value")
-
-	// The inner user payloads are encoded while the SDK converts the model,
-	// i.e. strictly before the resulting proto reaches the data converter.
-	s.Less(workflowArg, request)
-	s.Less(signalArg, request)
-
-	// The transfer value -- the proto envelope -- is encoded under the Nexus
-	// operation's serialization context.
-	s.Equal(
-		nexusOperationSerializationContext(),
-		recorded[request].Context,
-	)
+	for _, entry := range recorded {
+		_, envelope := entry.Value.(*workflowservicepb.SignalWithStartWorkflowExecutionRequest)
+		s.False(envelope, "user converter must not receive the outer request")
+	}
+	s.checkRawEnvelopes(recorder, 1)
 
 	s.Equal(targetContext, recorded[workflowArg].Context)
 	s.Equal(targetContext, recorded[signalArg].Context)
@@ -573,7 +690,6 @@ func (s *WorkflowServiceIntegrationSuite) checkSerializationContextsWithTarget(o
 	for _, value := range []string{"target-memo", "target-summary", "target-details"} {
 		i := stringAt(value)
 		s.Require().NotEqual(-1, i, "%s was not encoded by the user converter", value)
-		s.Less(i, request)
 		s.Equal(targetContext, recorded[i].Context, value)
 	}
 	caller := stringAt("caller-after")
@@ -622,8 +738,8 @@ func (s *WorkflowServiceIntegrationSuite) TestConcurrentOperationsKeepTargetCont
 		calledTargets = append(calledTargets, call.GetWorkflowId())
 		s.Equal("default-test-namespace", call.GetNamespace())
 		var input, signal string
-		s.Require().NoError(converter.GetDefaultDataConverter().FromPayloads(call.GetInput(), &input))
-		s.Require().NoError(converter.GetDefaultDataConverter().FromPayloads(call.GetSignalInput(), &signal))
+		s.Require().NoError(recorder.DataConverter.FromPayloads(call.GetInput(), &input))
+		s.Require().NoError(recorder.DataConverter.FromPayloads(call.GetSignalInput(), &signal))
 		s.Equal(call.GetWorkflowId()+"-input", input)
 		s.Equal(call.GetWorkflowId()+"-signal", signal)
 	}
@@ -642,7 +758,6 @@ func (s *WorkflowServiceIntegrationSuite) TestConcurrentOperationsKeepTargetCont
 		}
 	}
 	seen := make(map[string]int)
-	envelopes := make(map[string]int)
 	for _, entry := range recorder.snapshot() {
 		switch value := entry.Value.(type) {
 		case string:
@@ -651,23 +766,11 @@ func (s *WorkflowServiceIntegrationSuite) TestConcurrentOperationsKeepTargetCont
 				seen[value]++
 			}
 		case *workflowservicepb.SignalWithStartWorkflowExecutionRequest:
-			target := value.GetWorkflowId()
-			s.Contains(targets, target)
-			if _, ok := entry.Context.(converter.NexusSerializationContext); ok {
-				s.Equal(nexusOperationSerializationContext(), entry.Context, target)
-				envelopes[target]++
-			} else {
-				// testNexusHandler.StartOperation rebuilds the decoded input as
-				// a LazyValue using the test environment's caller-scoped converter.
-				// This is separate from the real outer operation encoding above.
-				s.Equal(want["caller-after"], entry.Context, "test harness re-encode for %s", target)
-			}
+			s.Fail("user converter received an operation envelope", "target: %s", value.GetWorkflowId())
 		}
 	}
 	for value := range want {
 		s.Equal(1, seen[value], "%s must be encoded once in its own context", value)
 	}
-	for _, target := range targets {
-		s.Equal(1, envelopes[target], "outer operation envelope for %s must be encoded once in the Nexus context", target)
-	}
+	s.checkRawEnvelopes(recorder, len(targets))
 }

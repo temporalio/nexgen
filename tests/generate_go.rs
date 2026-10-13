@@ -1409,11 +1409,16 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("out.RetryPolicy = *converted"));
     // The model constructs a transfer-type converter, so the SDK
     // runs model<->proto conversion inside the payload converter.
-    assert!(rendered.contains("return commonconverter.NewContextualTransferTypeConverter("));
+    assert!(rendered.contains("return commonconverter.NewSystemNexusTransferTypeConverter("));
     assert!(rendered.contains(
-        "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewContextualTransferTypeConverter"
+        "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewSystemNexusTransferTypeConverter"
     ));
-    assert!(rendered.contains("\t\tactivityOptionsToProto,\n\t\tactivityOptionsFromProto,\n"));
+    assert!(rendered.contains(
+        "func(cfg *commonconverter.SystemNexusConfig, m *ActivityOptions) (*activity.ActivityOptions, error) {\n\t\t\treturn activityOptionsToProto(cfg.DataConverter, m)"
+    ));
+    assert!(rendered.contains(
+        "func(cfg *commonconverter.SystemNexusConfig, proto *activity.ActivityOptions, out *ActivityOptions) error {\n\t\t\treturn activityOptionsFromProto(cfg.DataConverter, proto, out)"
+    ));
     assert!(rendered.contains("\t*out = ActivityOptions{}\n"));
     assert!(!rendered.contains("\tvalue := ActivityOptions{}"));
     // Operation functions therefore hand the model straight to the SDK and
@@ -1456,15 +1461,18 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
 
     // Construction happens in the method; the SDK owns caching by model type.
-    assert!(rendered.contains("return commonconverter.NewContextualTransferTypeConverter("));
+    assert!(rendered.contains("return commonconverter.NewSystemNexusTransferTypeConverter("));
     // Value receiver, so both the model and a pointer to it opt in.
     assert!(rendered.contains(
-        "func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewContextualTransferTypeConverter"
+        "func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewSystemNexusTransferTypeConverter"
     ));
 
-    // Exactly two callbacks receive the SDK-selected data converter.
+    // Exactly two callbacks adapt the explicit SDK config to reusable helpers.
     assert!(rendered.contains(
-        "\treturn commonconverter.NewContextualTransferTypeConverter(\n\t\tsignalWithStartWorkflowRequestToProto,\n\t\tsignalWithStartWorkflowRequestFromProto,\n\t)\n"
+        "func(cfg *commonconverter.SystemNexusConfig, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {\n\t\t\treturn signalWithStartWorkflowRequestToProto(cfg.DataConverter, m)"
+    ));
+    assert!(rendered.contains(
+        "func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {\n\t\t\treturn signalWithStartWorkflowRequestFromProto(cfg.DataConverter, proto, out)"
     ));
     assert!(
         rendered.contains("func signalWithStartWorkflowRequestToProto(dc converter.DataConverter,")
@@ -2165,9 +2173,11 @@ fn go_serialization_context_registry_uses_wire_names_and_typed_adapter() {
     assert!(!registry.contains("NexusOperationInfo"));
     assert!(!registry.contains("nexgenOperationInfo"));
     assert!(!registry.contains("// NexusOperationRegistry"));
-    assert!(compact.contains(
-        "func init() { internal.RegisterNexusOperationRegistry(NexusOperationRegistry) }"
-    ));
+    assert!(
+        compact.contains(
+            "func init() { internal.UpdateNexusOperationRegistry(NexusOperationRegistry) }"
+        )
+    );
     assert!(compact.contains(
         "var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry"
     ));
@@ -2269,7 +2279,7 @@ fn go_serialization_context_mixed_endpoints_register_only_system_operations() {
     assert!(!registry.contains("otherContext"));
     assert_eq!(
         registry
-            .matches("RegisterNexusOperationRegistry(NexusOperationRegistry)")
+            .matches("UpdateNexusOperationRegistry(NexusOperationRegistry)")
             .count(),
         1
     );
@@ -2382,7 +2392,7 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
         compact.contains("var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry{}")
     );
     assert!(!registry.contains("func init()"));
-    assert!(!registry.contains("RegisterNexusOperationRegistry"));
+    assert!(!registry.contains("UpdateNexusOperationRegistry"));
     assert!(!registry.contains("nexgenOperationInfo"));
     assert!(!registry.contains("requestContext"));
     assert!(!main.contains("\"reflect\""));

@@ -301,9 +301,13 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 }
 
 func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewContextualTransferTypeConverter(
-		signalWithStartWorkflowRequestToProto,
-		signalWithStartWorkflowRequestFromProto,
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		func(cfg *commonconverter.SystemNexusConfig, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
+			return signalWithStartWorkflowRequestToProto(cfg.DataConverter, m)
+		},
+		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
+			return signalWithStartWorkflowRequestFromProto(cfg.DataConverter, proto, out)
+		},
 	)
 }
 
@@ -423,9 +427,13 @@ func signalWithStartWorkflowResponseFromProto(dc converter.DataConverter, proto 
 }
 
 func (SignalWithStartWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewContextualTransferTypeConverter(
-		signalWithStartWorkflowResponseToProto,
-		signalWithStartWorkflowResponseFromProto,
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		func(cfg *commonconverter.SystemNexusConfig, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
+			return signalWithStartWorkflowResponseToProto(cfg.DataConverter, m)
+		},
+		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
+			return signalWithStartWorkflowResponseFromProto(cfg.DataConverter, proto, out)
+		},
 	)
 }
 
@@ -669,5 +677,5 @@ var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperat
 }
 
 func init() {
-	internal.RegisterNexusOperationRegistry(NexusOperationRegistry)
+	internal.UpdateNexusOperationRegistry(NexusOperationRegistry)
 }

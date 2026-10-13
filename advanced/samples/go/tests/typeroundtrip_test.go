@@ -30,6 +30,7 @@ type TypeRoundtripIntegrationSuite struct {
 
 func (s *TypeRoundtripIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
+	s.env.SetDataConverter(systemServerDataConverter())
 	s.calls = nil
 
 	activityOptionsOp := nexus.NewSyncOperation("ActivityOptionsOperation",
@@ -186,17 +187,16 @@ func (s *TypeRoundtripIntegrationSuite) TestFailureOperationPreservesAbsence() {
 func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly() {
 	policy := temporal.RetryPolicy{MaximumAttempts: 5}
 
-	// Workflow result encoding and decoding must also work without a workflow
-	// context: model callbacks only need the converter supplied by the SDK.
-	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*tr.ActivityOptions, error) {
-		var result tr.ActivityOptions
-		return &result, tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{RetryPolicy: policy}).Get(ctx, &result)
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*typeRoundtripResults, error) {
+		var result typeRoundtripResults
+		return &result, tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{RetryPolicy: policy}).Get(ctx, &result.ActivityOption)
 	})
 
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
-	var result tr.ActivityOptions
-	s.NoError(s.env.GetWorkflowResult(&result))
+	var results typeRoundtripResults
+	s.NoError(s.env.GetWorkflowResult(&results))
+	result := results.ActivityOption
 	s.Equal(int32(5), result.RetryPolicy.MaximumAttempts)
 	// Optional fields that were never supplied remain absent after the round
 	// trip, which is distinct from present fields containing their zero value.
@@ -208,4 +208,35 @@ func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly
 	s.Equal("ActivityOptionsOperation", s.calls[0].Operation)
 	handlerInput := s.calls[0].Input.(*activitypb.ActivityOptions)
 	s.Equal(int32(5), handlerInput.GetRetryPolicy().GetMaximumAttempts())
+}
+
+func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsRequiresSystemNexusConfig() {
+	dc := converter.GetDefaultDataConverter()
+	_, err := dc.ToPayload(tr.ActivityOptions{RetryPolicy: temporal.RetryPolicy{MaximumAttempts: 5}})
+	s.ErrorContains(err, "without a system Nexus config")
+
+	payload, err := dc.ToPayload(&activitypb.ActivityOptions{})
+	s.Require().NoError(err)
+	var result tr.ActivityOptions
+	s.ErrorContains(dc.FromPayload(payload, &result), "without a system Nexus config")
+}
+
+func (s *TypeRoundtripIntegrationSuite) TestOrdinaryEndpointsRejectSystemModels() {
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		for _, endpoint := range []string{"temporal-system", "ordinary-endpoint"} {
+			client := workflow.NewNexusClient(endpoint, typeRoundtripServiceName)
+			err := client.ExecuteOperation(ctx, "ActivityOptionsOperation",
+				tr.ActivityOptions{RetryPolicy: temporal.RetryPolicy{MaximumAttempts: 5}},
+				workflow.NexusOperationOptions{},
+			).Get(ctx, nil)
+			if err == nil {
+				return fmt.Errorf("endpoint %q accepted a system-only model", endpoint)
+			}
+			s.ErrorContains(err, "without a system Nexus config", endpoint)
+		}
+		return nil
+	})
+
+	s.Require().NoError(s.env.GetWorkflowError())
+	s.Empty(s.calls)
 }
