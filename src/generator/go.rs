@@ -645,14 +645,6 @@ impl GoPackageContext {
         )
     }
 
-    pub(in crate::generator) fn context_context_type(&self) -> String {
-        self.qualified_expr("context", "context.Context")
-    }
-
-    pub(in crate::generator) fn errors_new(&self) -> String {
-        self.qualified_expr("errors", "errors.New")
-    }
-
     pub(in crate::generator) fn serialization_context_type(&self) -> String {
         self.qualified_expr(
             "go.temporal.io/sdk/converter",
@@ -5594,7 +5586,7 @@ mod tests {
                     .unwrap();
             let source = &files[&PathBuf::from("sampleservice.go")];
             assert!(
-                source.contains("requestProto, err := retryPolicyToProto(ctx, &request)"),
+                source.contains("requestProto, err := retryPolicyToProto(dc, &request)"),
                 "{source}"
             );
             assert!(
@@ -5602,7 +5594,7 @@ mod tests {
                 "{source}"
             );
             assert!(
-                source.contains("retryPolicyFromProto(ctx, &result)"),
+                source.contains("retryPolicyFromProto(dc, &result)"),
                 "{source}"
             );
         }
@@ -5620,11 +5612,11 @@ mod tests {
         );
         assert!(source.contains("TransferTypeConverter()"), "{source}");
         assert!(
-            source.contains("retryPolicyToProto(ctx, m.RetryPolicy)"),
+            source.contains("retryPolicyToProto(dc, m.RetryPolicy)"),
             "{source}"
         );
         assert!(
-            source.contains("retryPolicyFromProto(ctx, &result)"),
+            source.contains("retryPolicyFromProto(dc, &result)"),
             "{source}"
         );
     }
@@ -5634,6 +5626,7 @@ mod tests {
         let package = super::GoPackageContext {
             package_name: "converter".to_string(),
             import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
+            has_serialization_context: false,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
@@ -5647,6 +5640,7 @@ mod tests {
         let package = super::GoPackageContext {
             package_name: "workflow".to_string(),
             import_path: Some("go.temporal.io/sdk/workflow".to_string()),
+            has_serialization_context: false,
         };
         assert_eq!(
             package.new_transfer_type_converter(),

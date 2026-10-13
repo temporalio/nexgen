@@ -1839,7 +1839,7 @@ fn go_serialization_context_is_only_emitted_for_a_selected_helper() {
         assert!(!rendered.contains("nexgenWithOperationSerializationContext"));
         assert!(!rendered.contains("SerializationContext() converter.SerializationContext"));
         assert!(!rendered.contains("nexgenPayloadContext"));
-        assert!(rendered.contains("return m.toProto(ctx)"));
+        assert!(rendered.contains("cancelRequestToProto(dc converter.DataConverter,"));
     }
 }
 
@@ -1940,16 +1940,13 @@ fn go_serialization_context_wrapper_assigns_sources_before_sdk() {
     assert!(sourced < execute);
     assert!(!rendered.contains("nexgenWithOperationSerializationContext"));
     assert!(rendered.contains("\tnamespace string\n"));
-    assert!(rendered.contains("m.toProto(ctx)"));
-    assert!(rendered.contains("cancelRequestFromProto(ctx, message)"));
+    assert!(rendered.contains("cancelRequestToProto(dc converter.DataConverter,"));
+    assert!(rendered.contains("cancelRequestFromProto(dc converter.DataConverter,"));
     assert!(!rendered.contains("SerializationContext()"));
     assert!(!rendered.contains("SerializationContextProvider"));
     assert!(!rendered.contains("GetNexusOperationInnerDataConverter"));
     // Nested model conversion inherits the local converter; it must not reselect it.
-    let to_proto = rendered
-        .split("func (m cancelRequest) toProto(")
-        .nth(1)
-        .unwrap();
+    let to_proto = rendered.split("func cancelRequestToProto(").nth(1).unwrap();
     let body = to_proto.split("\n}\n").next().unwrap();
     assert!(!body.contains("nexgenPayloadContext"));
     assert!(!body.contains("nexgenWithOperationSerializationContext"));
@@ -1977,7 +1974,7 @@ fn go_serialization_context_rejects_non_proto_operation_requests() {
 #[test]
 fn go_serialization_context_deferred_models_use_sdk_context() {
     let root = project_root();
-    // Deferred transfer callbacks use the context supplied by the SDK.
+    // Deferred transfer callbacks use the data converter supplied by the SDK.
     let rendered = generate_to_string_with_inputs(
         nexgen::language::Language::Go,
         &example_input_paths(&root, "workflow-service"),
@@ -2100,6 +2097,7 @@ fn assert_registry_entry(registry: &str, service: &str, operation: &str, helper:
     let compact: String = registry.chars().filter(|c| !c.is_whitespace()).collect();
     let key = format!("Service:\"{service}\",Operation:\"{operation}\"");
     assert!(!compact.contains("InputType:"), "{registry}");
+    assert!(!compact.contains("InputToTransfer:"), "{registry}");
     let Some(helper) = helper else {
         assert!(!compact.contains(&key), "{registry}");
         return;
@@ -2305,10 +2303,10 @@ import (
 func requestContext(request temporal.RetryPolicy) converter.SerializationContext {
     return converter.WorkflowSerializationContext{Namespace: "target-namespace", WorkflowID: "target-workflow"}
 }
-func retryPolicyToProto(ctx workflow.Context, value *temporal.RetryPolicy) (*common.RetryPolicy, error) {
+func retryPolicyToProto(dc converter.DataConverter, value *temporal.RetryPolicy) (*common.RetryPolicy, error) {
     return &common.RetryPolicy{}, nil
 }
-func retryPolicyFromProto(ctx workflow.Context, value *common.RetryPolicy) (*temporal.RetryPolicy, error) {
+func retryPolicyFromProto(dc converter.DataConverter, value *common.RetryPolicy) (*temporal.RetryPolicy, error) {
     return &temporal.RetryPolicy{}, nil
 }
 func transformPolicy(ctx workflow.Context, value *common.RetryPolicy) (string, error) {
@@ -2364,7 +2362,7 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     let main = go_registry_main(&files);
     let registry = go_registry_section(main);
     let conversion = operation
-        .find("requestProto, err := retryPolicyToProto(ctx, &request)")
+        .find("requestProto, err := retryPolicyToProto(dc, &request)")
         .unwrap();
     let error = operation[conversion..]
         .find("resultSettable.SetError(err)")
@@ -2376,7 +2374,7 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     assert!(conversion < error && error < execute, "{operation}");
     assert!(operation.contains("workflow.NewNexusClient(\"sample-service\", \"SampleService\")"));
     assert_eq!(operation.matches("retryPolicyToProto(").count(), 1);
-    assert!(operation.contains("value, err := retryPolicyFromProto(ctx, &result)"));
+    assert!(operation.contains("value, err := retryPolicyFromProto(dc, &result)"));
     assert!(!operation.contains("requestContext("));
     assert_eq!(main.matches("\"go.temporal.io/sdk/temporal\"").count(), 1);
     let compact = registry.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -2388,12 +2386,12 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     assert!(!registry.contains("nexgenOperationInfo"));
     assert!(!registry.contains("requestContext"));
     assert!(!main.contains("\"reflect\""));
-    assert!(!main.contains("\"go.temporal.io/sdk/converter\""));
+    assert!(main.contains("\"go.temporal.io/sdk/converter\""));
     assert_no_generated_context_plumbing(&files);
 }
 
 #[test]
-fn go_serialization_context_preserves_owned_input_and_uses_ctx_for_eager_output() {
+fn go_serialization_context_preserves_owned_input_and_uses_dc_for_eager_output() {
     let files = render_go_serialization_context_fixture(
         &format!("{GO_CONTEXT_OWNED_REQUEST}\n{GO_CONTEXT_OVERRIDE_TYPES}"),
         r#"/// @nexus.serialization-context go="requestContext"
@@ -2406,10 +2404,10 @@ fn go_serialization_context_preserves_owned_input_and_uses_ctx_for_eager_output(
     assert!(!operation.contains("requestProto"));
 
     assert!(
-        compact.contains("value, err := retryPolicyFromProto(ctx, &result)"),
+        compact.contains("value, err := retryPolicyFromProto(dc, &result)"),
         "{operation}"
     );
-    assert!(operation.contains("return m.toProto(ctx)"));
+    assert!(operation.contains("contextRequestToProto(dc converter.DataConverter,"));
     let execute = operation
         .find("c.ExecuteOperation(ctx, \"Roundtrip\", request,")
         .unwrap();
@@ -2424,7 +2422,7 @@ fn go_serialization_context_preserves_owned_input_and_uses_ctx_for_eager_output(
     );
     assert_eq!(
         operation
-            .matches("value, err := retryPolicyFromProto(ctx, &result)")
+            .matches("value, err := retryPolicyFromProto(dc, &result)")
             .count(),
         1
     );
