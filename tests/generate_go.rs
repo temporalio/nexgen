@@ -1642,7 +1642,7 @@ world api {
     assert!(!files.contains_key(&PathBuf::from("support.go")));
     let root = project_root();
     let module = fs::read_to_string(root.join("advanced/samples/go/go.mod")).unwrap();
-    // The generated contextual factory is SDK-internal.
+    // The generated system Nexus factory is SDK-internal.
     fs::write(temp_dir.join("go.mod"), module).unwrap();
     fs::copy(
         root.join("advanced/samples/go/go.sum"),
@@ -1650,17 +1650,123 @@ world api {
     )
     .unwrap();
     fs::create_dir(temp_dir.join("wire")).unwrap();
+    // Conversion helpers need only the wire shape, not protobuf serialization.
     fs::write(
         temp_dir.join("wire/wire.go"),
-        include_str!("fixtures/go_nested_wire.go"),
+        r#"package wire
+
+type Child struct {
+	Name string
+}
+
+func (m *Child) GetName() string {
+	if m == nil {
+		return ""
+	}
+	return m.Name
+}
+
+type Parent struct {
+	Required *Child
+	Optional *Child
+	Children []*Child
+	Entries  map[string]*Child
+}
+
+func (m *Parent) GetRequired() *Child {
+	if m == nil {
+		return nil
+	}
+	return m.Required
+}
+
+func (m *Parent) GetOptional() *Child {
+	if m == nil {
+		return nil
+	}
+	return m.Optional
+}
+
+func (m *Parent) GetChildren() []*Child {
+	if m == nil {
+		return nil
+	}
+	return m.Children
+}
+
+func (m *Parent) GetEntries() map[string]*Child {
+	if m == nil {
+		return nil
+	}
+	return m.Entries
+}
+"#,
     )
     .unwrap();
     fs::write(
         output_path.join("conversion_test.go"),
-        include_str!("fixtures/go_nested_conversion_test.go").replace(
-            "example.com/test/wire",
-            "go.temporal.io/sdk/advanced/samples/go/wire",
-        ),
+        r#"package output
+
+import (
+	"reflect"
+	"testing"
+
+	"go.temporal.io/sdk/advanced/samples/go/wire"
+	"go.temporal.io/sdk/converter"
+)
+
+func TestNestedConversionRoundTrip(t *testing.T) {
+	dc := converter.GetDefaultDataConverter()
+	for _, tt := range []struct {
+		name  string
+		model Parent
+		proto *wire.Parent
+	}{
+		{
+			name: "all fields",
+			model: Parent{
+				Required: Child{Name: "required"},
+				Optional: &Child{Name: "optional"},
+				Children: []Child{{Name: "first"}, {Name: "second"}},
+				Entries:  map[string]Child{"first": {Name: "first"}, "second": {Name: "second"}},
+			},
+			proto: &wire.Parent{
+				Required: &wire.Child{Name: "required"},
+				Optional: &wire.Child{Name: "optional"},
+				Children: []*wire.Child{{Name: "first"}, {Name: "second"}},
+				Entries:  map[string]*wire.Child{"first": {Name: "first"}, "second": {Name: "second"}},
+			},
+		},
+		{
+			name:  "required only",
+			model: Parent{Required: Child{Name: "required"}},
+			proto: &wire.Parent{Required: &wire.Child{Name: "required"}},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			encoded, err := parentToProto(dc, &tt.model)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(encoded, tt.proto) {
+				t.Fatalf("encoded = %#v, want %#v", encoded, tt.proto)
+			}
+			decoded := Parent{
+				Required: Child{Name: "stale"},
+				Optional: &Child{Name: "stale"},
+				Children: []Child{{Name: "stale"}},
+				Entries:  map[string]Child{"stale": {Name: "stale"}},
+			}
+			if err := parentFromProto(dc, encoded, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(decoded, tt.model) {
+				t.Fatalf("decoded = %#v, want %#v", decoded, tt.model)
+			}
+		})
+	}
+}
+"#,
     )
     .unwrap();
     let status = Command::new("go")
@@ -1757,7 +1863,66 @@ world api {
     }
     fs::write(
         output_path.join("conversion_test.go"),
-        include_str!("fixtures/go_model_conversion_test.go"),
+        r#"package output
+
+import (
+	"strings"
+	"testing"
+
+	common "go.temporal.io/api/common/v1"
+	sdk "go.temporal.io/api/sdk/v1"
+	"go.temporal.io/sdk/converter"
+)
+
+func TestUserMetadataConversion(t *testing.T) {
+	dc := converter.NewCodecDataConverter(
+		converter.GetDefaultDataConverter(),
+		converter.NewZlibCodec(converter.ZlibCodecOptions{AlwaysEncode: true}),
+	)
+	want := UserMetadata{StaticSummary: "summary", StaticDetails: "details"}
+	message, err := userMetadataToProto(dc, &want)
+	if err != nil {
+		t.Fatalf("encode user metadata: %v", err)
+	}
+	for name, payload := range map[string]*common.Payload{
+		"summary": message.GetSummary(),
+		"details": message.GetDetails(),
+	} {
+		if got := string(payload.GetMetadata()[converter.MetadataEncoding]); got != "binary/zlib" {
+			t.Fatalf("%s encoding = %q, want binary/zlib from supplied converter", name, got)
+		}
+	}
+	var out UserMetadata
+	if err := userMetadataFromProto(dc, message, &out); err != nil {
+		t.Fatalf("decode user metadata with supplied converter: %v", err)
+	}
+	if out != want {
+		t.Fatalf("roundtrip = %#v, want %#v", out, want)
+	}
+	if err := userMetadataFromProto(dc, &sdk.UserMetadata{}, &out); err != nil {
+		t.Fatalf("decode empty user metadata: %v", err)
+	}
+	if out != (UserMetadata{}) {
+		t.Fatalf("reused output = %#v, want zero user metadata", out)
+	}
+
+	wrongType, err := dc.ToPayload(42)
+	if err != nil {
+		t.Fatalf("encode wrong-type payload: %v", err)
+	}
+	if err := userMetadataFromProto(dc, &sdk.UserMetadata{Summary: wrongType}, &out); err == nil ||
+		!strings.Contains(err.Error(), "StaticSummary has unexpected type") {
+		t.Fatalf("decode non-string summary error = %v, want field-specific type error", err)
+	}
+	invalid := &common.Payload{
+		Metadata: map[string][]byte{converter.MetadataEncoding: []byte("binary/zlib")},
+		Data:     []byte("not zlib"),
+	}
+	if err := userMetadataFromProto(dc, &sdk.UserMetadata{Details: invalid}, &out); err == nil {
+		t.Fatal("decode invalid compressed details succeeded, want converter error")
+	}
+}
+"#,
     )
     .unwrap();
     let status = Command::new("go")
@@ -2111,17 +2276,6 @@ fn assert_registry_entry(registry: &str, service: &str, operation: &str, helper:
         return;
     };
     assert_eq!(compact.matches(&key).count(), 1, "{registry}");
-    let lines = registry
-        .lines()
-        .map(str::trim)
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert!(
-        lines.contains(&format!(
-            "Service: \"{service}\",\nOperation: \"{operation}\",\n"
-        )),
-        "{registry}"
-    );
     let entry = compact.split(&key).nth(1).unwrap();
     let value = entry.trim_start_matches(',').strip_prefix("}:").unwrap();
     let input_type = value
@@ -2182,7 +2336,7 @@ fn go_serialization_context_registry_uses_wire_names_and_typed_adapter() {
         "var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry"
     ));
     assert!(compact.contains("return requestContext(request.(contextRequest))"));
-    assert_eq!(registry.matches("\"reflect\"").count(), 1);
+    assert!(!registry.contains("\"reflect\""));
     assert_eq!(
         registry.matches("\"go.temporal.io/sdk/converter\"").count(),
         1
@@ -2396,7 +2550,8 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     assert!(!registry.contains("nexgenOperationInfo"));
     assert!(!registry.contains("requestContext"));
     assert!(!main.contains("\"reflect\""));
-    assert!(main.contains("\"go.temporal.io/sdk/converter\""));
+    assert!(!main.contains("\"go.temporal.io/sdk/converter\""));
+    assert!(main.contains("dc := internal.GetDataConverterFromWorkflowContext(ctx)"));
     assert_no_generated_context_plumbing(&files);
 }
 
@@ -2704,9 +2859,9 @@ fn go_serialization_context_registry_can_resolve_known_model_imports() {
     // This source-generation fixture tests import resolution, not helper linkage.
     // No support fragment supplies the temporal import used by the override.
     let files = render_go_serialization_context_fixture(
-        GO_CONTEXT_OVERRIDE_TYPES,
+        &format!("{GO_CONTEXT_OWNED_REQUEST}\n{GO_CONTEXT_OVERRIDE_TYPES}"),
         r#"/// @nexus.serialization-context go="temporal.Context"
-        roundtrip: func(request: retry-policy) -> retry-policy;"#,
+        roundtrip: func(request: context-request) -> retry-policy;"#,
         "package generated\n",
     );
     let registry = go_registry_main(&files);
