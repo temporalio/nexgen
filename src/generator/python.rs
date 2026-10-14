@@ -7651,18 +7651,16 @@ fn is_python_keyword(name: &str) -> bool {
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
-    use std::path::{Path, PathBuf};
-    use std::process::Command;
+    use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::descriptors::DescriptorIndex;
     use crate::error::Error;
     use crate::generator::{
-        GenerateFilesOptions, GeneratedOutputLayout, GenerationMode,
-        generate_files_for_tree_with_mode_and_options, generate_source,
+        GenerateFilesOptions, GenerationMode, generate_files_for_tree_with_mode_and_options,
+        generate_source,
     };
     use crate::language::Language;
-    use crate::nexgen_config::{NexgenConfig, current, scope};
     use crate::spec::ApiSpecTree;
     use crate::spec::{LanguageImportSpec, LanguageImportStyle};
 
@@ -7826,16 +7824,6 @@ mod tests {
         std::env::temp_dir().join(format!("nex-gen-python-{label}-{unique}"))
     }
 
-    fn write_package(dir: &Path, files: &BTreeMap<PathBuf, String>) {
-        for (relative_path, contents) in files {
-            let path = dir.join(relative_path);
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).unwrap();
-            }
-            fs::write(path, contents).unwrap();
-        }
-    }
-
     #[test]
     fn optional_imports_are_selected_from_generic_references() {
         let mut module_imports = std::collections::BTreeSet::new();
@@ -7909,98 +7897,6 @@ class Example(enum.Enum):
             &language_imports,
         );
         assert!(!output.contains("import temporalio.workflow\n"));
-    }
-
-    fn read_python_package_files(dir: &Path) -> BTreeMap<PathBuf, String> {
-        fn visit(root: &Path, dir: &Path, files: &mut BTreeMap<PathBuf, String>) {
-            let mut entries = fs::read_dir(dir)
-                .unwrap()
-                .map(|entry| entry.unwrap().path())
-                .collect::<Vec<_>>();
-            entries.sort();
-            for path in entries {
-                if path.is_dir() {
-                    visit(root, &path, files);
-                } else if path.extension().and_then(|extension| extension.to_str()) == Some("py") {
-                    if path
-                        .file_name()
-                        .and_then(|file_name| file_name.to_str())
-                        .is_some_and(|file_name| file_name.starts_with("test_"))
-                    {
-                        continue;
-                    }
-                    files.insert(
-                        path.strip_prefix(root).unwrap().to_path_buf(),
-                        fs::read_to_string(&path).unwrap(),
-                    );
-                }
-            }
-        }
-
-        let mut files = BTreeMap::new();
-        visit(dir, dir, &mut files);
-        files
-    }
-
-    fn format_python_output(
-        root: &std::path::Path,
-        files: &BTreeMap<PathBuf, String>,
-    ) -> BTreeMap<PathBuf, String> {
-        let temp_dir = unique_temp_dir("format");
-        fs::create_dir_all(&temp_dir).unwrap();
-        write_package(&temp_dir, files);
-        let status = Command::new("uv")
-            .current_dir(root.join("advanced/samples/python"))
-            .args([
-                "run",
-                "ruff",
-                "format",
-                "--line-length",
-                "88",
-                temp_dir.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap();
-        assert!(status.success());
-        let formatted = read_python_package_files(&temp_dir);
-        fs::remove_dir_all(&temp_dir).unwrap();
-        formatted
-    }
-
-    #[test]
-    fn renders_sample_with_versioned_header() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let spec = crate::parser::load_api_spec_from_wit_for_language_with_inputs(
-            Language::Python,
-            &example_input_paths(&root, sample_input_path(&root)),
-        )
-        .unwrap();
-        let descriptors =
-            DescriptorIndex::load(&root.join("advanced/samples/descriptors/temporal_api.bin"))
-                .unwrap();
-        let _scope = scope(NexgenConfig {
-            system_nexus: true,
-            ..current()
-        });
-        let generated = generate_files_for_tree_with_mode_and_options(
-            Language::Python,
-            ApiSpecTree::single(spec.clone()),
-            &descriptors,
-            GenerationMode::NativeApi,
-            GenerateFilesOptions {
-                support_package: Some("temporal_support".to_string()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        assert_eq!(generated.layout, GeneratedOutputLayout::Directory);
-        let output = format_python_output(&root, &generated.files);
-        assert!(
-            output.values().any(|contents| {
-                contents.contains(concat!("nexgen v", env!("CARGO_PKG_VERSION")))
-            })
-        );
-        assert!(!output.is_empty());
     }
 
     #[test]

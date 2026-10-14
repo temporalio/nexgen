@@ -6536,22 +6536,14 @@ mod tests {
         render_support_import_if, render_typescript_requirement_imports, sourced_support_call,
         support_reference,
     };
-    use std::collections::BTreeMap;
-    use std::fs;
     use std::path::Path;
     use std::path::PathBuf;
-    use std::process::Command;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::descriptors::DescriptorIndex;
-    use crate::generator::{
-        GenerateFilesOptions, GeneratedOutputLayout, GenerationMode,
-        generate_files_for_tree_with_mode_and_options, generate_source,
-    };
+    use crate::generator::generate_source;
     use crate::language::Language;
     use crate::nexgen_config::{NexgenConfig, current, scope};
     use crate::planning::PlannedType;
-    use crate::spec::ApiSpecTree;
     use crate::spec::IntSpec;
 
     #[test]
@@ -6751,113 +6743,6 @@ mod tests {
 
     fn example_input_paths(root: &std::path::Path, input_path: PathBuf) -> Vec<PathBuf> {
         vec![input_path, linked_inputs_path(root)]
-    }
-
-    fn ensure_typescript_dependencies(root: &std::path::Path) {
-        let example_dir = root.join("advanced/samples/typescript");
-        if example_dir.join("node_modules").exists() {
-            return;
-        }
-
-        let status = Command::new("npm")
-            .current_dir(&example_dir)
-            .args(["install", "--no-fund", "--no-audit"])
-            .status()
-            .unwrap();
-        assert!(status.success());
-    }
-
-    fn read_typescript_output_files(dir: &Path) -> BTreeMap<PathBuf, String> {
-        fn visit(root: &Path, dir: &Path, files: &mut BTreeMap<PathBuf, String>) {
-            let mut entries = fs::read_dir(dir)
-                .unwrap()
-                .map(|entry| entry.unwrap().path())
-                .collect::<Vec<_>>();
-            entries.sort();
-            for path in entries {
-                if path.is_dir() {
-                    visit(root, &path, files);
-                } else if path.extension().and_then(|extension| extension.to_str()) == Some("ts") {
-                    files.insert(
-                        path.strip_prefix(root).unwrap().to_path_buf(),
-                        fs::read_to_string(&path).unwrap(),
-                    );
-                }
-            }
-        }
-
-        let mut files = BTreeMap::new();
-        visit(dir, dir, &mut files);
-        files
-    }
-
-    #[test]
-    fn renders_sample_with_versioned_header() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let spec = crate::parser::load_api_spec_from_wit_for_language_with_inputs(
-            Language::TypeScript,
-            &example_input_paths(&root, sample_input_path(&root)),
-        )
-        .unwrap();
-        let descriptors =
-            DescriptorIndex::load(&root.join("advanced/samples/descriptors/temporal_api.bin"))
-                .unwrap();
-        let _scope = scope(NexgenConfig {
-            system_nexus: true,
-            ..current()
-        });
-        let generated = generate_files_for_tree_with_mode_and_options(
-            Language::TypeScript,
-            ApiSpecTree::single(spec.clone()),
-            &descriptors,
-            GenerationMode::NativeApi,
-            GenerateFilesOptions {
-                support_package: Some("./support".to_string()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        assert_eq!(generated.layout, GeneratedOutputLayout::Directory);
-
-        ensure_typescript_dependencies(&root);
-        let temp_dir = std::env::temp_dir().join(format!(
-            "nexgen-typescript-snapshot-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        fs::create_dir_all(&temp_dir).unwrap();
-        for (relative_path, contents) in &generated.files {
-            let path = temp_dir.join(relative_path);
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).unwrap();
-            }
-            fs::write(path, contents).unwrap();
-        }
-        let status = Command::new("npm")
-            .current_dir(root.join("advanced/samples/typescript"))
-            .args([
-                "exec",
-                "--",
-                "prettier",
-                "--write",
-                "--print-width",
-                "88",
-                temp_dir.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap();
-        assert!(status.success());
-
-        let output = read_typescript_output_files(&temp_dir);
-        assert!(
-            output.values().all(|contents| {
-                contents.contains(concat!("nexgen v", env!("CARGO_PKG_VERSION")))
-            })
-        );
-        assert!(!output.is_empty());
-        let _ = fs::remove_dir_all(temp_dir);
     }
 
     #[test]

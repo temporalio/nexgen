@@ -1,3 +1,5 @@
+//! Hostile documentation syntax checks shared by language integration targets.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -56,7 +58,7 @@ $defs:
 "##;
 
 fn project_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
 fn unique_temp_dir(label: &str) -> PathBuf {
@@ -171,8 +173,7 @@ fn assert_hostile_comment_lines_fit(rendered: &str) {
     }
 }
 
-#[test]
-fn go_hostile_documentation_is_wrapped_and_syntax_safe() {
+pub fn go_hostile_documentation_is_wrapped_and_syntax_safe() {
     let output = generate(nexgen::language::Language::Go, None);
     let rendered = joined_files(&output, "go");
     assert!(rendered.contains("// Hostile title */ & <summary>\n//\n// Type prose"));
@@ -213,8 +214,7 @@ fn go_hostile_documentation_is_wrapped_and_syntax_safe() {
     fs::remove_dir_all(output.parent().unwrap()).unwrap();
 }
 
-#[test]
-fn typescript_hostile_documentation_is_wrapped_escaped_and_typechecks() {
+pub fn typescript_hostile_documentation_is_wrapped_escaped_and_typechecks() {
     let output = generate(nexgen::language::Language::TypeScript, None);
     let rendered = joined_files(&output, "ts");
     assert!(rendered.contains(" * Hostile title * / & <summary>\n *\n * Type prose"));
@@ -273,8 +273,7 @@ fn typescript_hostile_documentation_is_wrapped_escaped_and_typechecks() {
     fs::remove_dir_all(output.parent().unwrap()).unwrap();
 }
 
-#[test]
-fn python_hostile_documentation_is_wrapped_escaped_and_parses() {
+pub fn python_hostile_documentation_is_wrapped_escaped_and_parses() {
     let output = generate(nexgen::language::Language::Python, None);
     let rendered = joined_files(&output, "py");
     assert!(rendered.contains("\"\"\"Hostile title */ & <summary>\n\n    Type prose"));
@@ -301,8 +300,7 @@ for path in pathlib.Path(sys.argv[1]).rglob("*.py"):
     fs::remove_dir_all(output.parent().unwrap()).unwrap();
 }
 
-#[test]
-fn java_hostile_documentation_is_wrapped_escaped_and_compiles() {
+pub fn java_hostile_documentation_is_wrapped_escaped_and_compiles() {
     let output = generate(
         nexgen::language::Language::Java,
         Some("json_schema.hostile"),

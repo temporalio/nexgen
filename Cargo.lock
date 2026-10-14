@@ -297,6 +297,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nexgen-validation-tests"
+version = "0.0.0"
+dependencies = [
+ "heck",
+ "nexgen",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

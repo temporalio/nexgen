@@ -91,3 +91,6 @@ jobs:
 
       - name: Validate .NET samples
         run: cargo validate dotnet
+
+      - name: Validate cross-language conformance
+        run: cargo validate conformance

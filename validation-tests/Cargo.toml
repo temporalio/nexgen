@@ -1,0 +1,13 @@
+[package]
+name = "nexgen-validation-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+heck = "0.5"
+nexgen = { path = "..", features = ["advanced"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tempfile = "3.23"
+toml = "1.1"

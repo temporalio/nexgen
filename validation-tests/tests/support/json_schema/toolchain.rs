@@ -39,6 +39,12 @@ use serde_json::{Map, Value, json};
 /// The four JSON-Schema targets, in the order reports list them.
 pub const TARGETS: [Target; 4] = [Target::Go, Target::Java, Target::Python, Target::TypeScript];
 
+/// An explicit target limits validation to that backend; absent selection
+/// preserves the complete cross-target checks.
+pub fn selected_targets(target: Option<Target>) -> Vec<Target> {
+    target.map_or_else(|| TARGETS.to_vec(), |target| vec![target])
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Target {
     Go,
@@ -78,7 +84,7 @@ impl std::fmt::Display for Target {
 }
 
 pub fn repository_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
 /// A scratch tree the harness generates into and runs toolchains in.
@@ -537,7 +543,7 @@ pub fn run_go(workspace: &Workspace, cases: &[PlanCase]) -> Result<TargetVerdict
     let root = prepare_go_module(workspace)?;
     fs::write(
         root.join("runner.go"),
-        include_str!("../../samples/conformance/runners/runner.go"),
+        include_str!("../../../../samples/conformance/runners/runner.go"),
     )
     .map_err(|error| error.to_string())?;
 
@@ -668,7 +674,7 @@ pub fn run_python(workspace: &Workspace, cases: &[PlanCase]) -> Result<TargetVer
     let runner = root.join("runner.py");
     fs::write(
         &runner,
-        include_str!("../../samples/conformance/runners/runner.py"),
+        include_str!("../../../../samples/conformance/runners/runner.py"),
     )
     .map_err(|error| error.to_string())?;
     let plan_path = root.join("plan.json");
@@ -749,7 +755,7 @@ pub fn run_typescript(workspace: &Workspace, cases: &[PlanCase]) -> Result<Targe
     link_node_modules(&root)?;
     fs::write(
         root.join("runner.test.ts"),
-        include_str!("../../samples/conformance/runners/runner.test.ts"),
+        include_str!("../../../../samples/conformance/runners/runner.test.ts"),
     )
     .map_err(|error| error.to_string())?;
     fs::write(root.join("registry.ts"), typescript_registry(cases))
@@ -933,7 +939,7 @@ pub fn run_java(workspace: &Workspace, cases: &[PlanCase]) -> Result<TargetVerdi
     let runner_source = root.join("Runner.java");
     fs::write(
         &runner_source,
-        include_str!("../../samples/conformance/runners/Runner.java"),
+        include_str!("../../../../samples/conformance/runners/Runner.java"),
     )
     .map_err(|error| error.to_string())?;
     javac(&root, &classes, std::slice::from_ref(&runner_source))
