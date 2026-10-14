@@ -1666,6 +1666,27 @@ Cannot be combined with `@nexus.source`.
 
 ---
 
+### @nexus.experimental
+
+**Placement:** Interface, record, variant, or operation (function)
+**Syntax:** `@nexus.experimental`
+
+Adds an experimental API warning to the generated declaration's documentation.
+The directive takes no arguments. Mark declarations individually; marking an
+interface does not implicitly mark its types. For variants, the warning belongs
+to the variant declaration, not its individual cases, in Python, TypeScript, Go,
+and .NET.
+
+```wit
+/// @nexus.experimental
+variant outcome {
+  success(string),
+  failure(string),
+}
+```
+
+---
+
 ### @nexus.doc
 
 **Placement:** Record, record field, variant, variant case, or operation (function)

@@ -5,6 +5,7 @@ world system {
 }
 
 /// @nexus.doc "Notification models for Nexus Handler Callbacks."
+/// @nexus.experimental
 interface notification-service {
   use nexus:temporal-types/model@1.0.0.{
     failure,
@@ -20,6 +21,7 @@ interface notification-service {
   type output-t = placeholder;
 
   /// @nexus.doc "The successful output or failure of the source operation."
+  /// @nexus.experimental
   /// @nexus.proto "temporal.api.notificationservice.v1.OnCompleteRequest.result"
   variant on-complete-request-result {
     /// @nexus.doc "The source operation completed successfully with this output."
@@ -29,6 +31,7 @@ interface notification-service {
   }
 
   /// @nexus.doc "A notification that reports that a source operation completed."
+  /// @nexus.experimental
   /// @nexus.proto "temporal.api.notificationservice.v1.OnCompleteRequest"
   record on-complete-request {
     /// @nexus.doc "The successful output or failure of the source operation."
@@ -38,6 +41,7 @@ interface notification-service {
   }
 
   /// @nexus.doc "An empty response that acknowledges a completion notification."
+  /// @nexus.experimental
   /// @nexus.proto "temporal.api.notificationservice.v1.OnCompleteResponse"
   record on-complete-response {
   }

@@ -868,6 +868,7 @@ pub struct VariantSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub full_name: String,
     pub doc: F::Text,
+    pub experimental: bool,
     pub cases: Vec<VariantCaseSpec<F>>,
     pub source: Option<ExternalVariantSourceSpec<F>>,
 }
@@ -1107,6 +1108,7 @@ impl<F: TypeFamily> VariantSpec<F> {
             name: self.name,
             full_name: self.full_name,
             doc: map.map_text(self.doc),
+            experimental: self.experimental,
             cases: self
                 .cases
                 .into_iter()

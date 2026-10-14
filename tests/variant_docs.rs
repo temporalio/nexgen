@@ -132,10 +132,10 @@ fn python_proto_variant_docs_render_on_alias_and_case_classes() {
     );
     let models = fs::read_to_string(output.join("models.py")).unwrap();
     assert!(models.contains(
-        "class OnCompleteRequest(typing.Generic[OutputT, SourceContextT]):\n    \"\"\"A notification that reports that a source operation completed.\"\"\""
+        "class OnCompleteRequest(typing.Generic[OutputT, SourceContextT]):\n    \"\"\"A notification that reports that a source operation completed.\n\n    .. warning::\n        This API is experimental and subject to change.\n    \"\"\""
     ));
     assert!(models.contains(
-        "class OnCompleteResponse:\n    \"\"\"An empty response that acknowledges a completion notification.\"\"\""
+        "class OnCompleteResponse:\n    \"\"\"An empty response that acknowledges a completion notification.\n\n    .. warning::\n        This API is experimental and subject to change.\n    \"\"\""
     ));
     assert!(models.contains(
         "class OnCompleteRequestResultSuccess(typing.Generic[OutputT]):\n    \"\"\"The source operation completed successfully with this output.\"\"\""
@@ -143,9 +143,49 @@ fn python_proto_variant_docs_render_on_alias_and_case_classes() {
     assert!(models.contains(
         "class OnCompleteRequestResultFailure:\n    \"\"\"The source operation failed, including timeout, cancellation, and application\n    errors.\n    \"\"\""
     ));
-    assert!(
-        models.contains(")\n\"\"\"The successful output or failure of the source operation.\"\"\"")
-    );
+    assert!(models.contains(
+        ")\n\"\"\"The successful output or failure of the source operation.\n\n.. warning::\n    This API is experimental and subject to change.\n\"\"\""
+    ));
+    // Only the two records and variant alias carry warnings, not case classes.
+    assert_eq!(models.matches(".. warning::").count(), 3);
     assert_python_parses(&output);
     fs::remove_dir_all(output.parent().unwrap()).unwrap();
+}
+
+#[test]
+fn experimental_variants_render_warnings_without_marking_cases() {
+    let source = VARIANTS
+        .replace(
+            "  variant choice {",
+            "  /// @nexus.experimental\n  variant choice {",
+        )
+        .replace(
+            "  variant single {",
+            "  /// @nexus.experimental\n  variant single {",
+        );
+    for language in [Language::Python, Language::TypeScript] {
+        let output = generate(language, &source, &[]);
+        let models = fs::read_to_string(output.join(match language {
+            Language::Python => "models.py",
+            Language::TypeScript => "models.ts",
+            _ => unreachable!(),
+        }))
+        .unwrap();
+        if language == Language::Python {
+            assert!(models.contains(
+                "\"\"\"Python variant.\n\n.. warning::\n    This API is experimental and subject to change.\n\"\"\""
+            ));
+            assert_eq!(models.matches(".. warning::").count(), 2);
+            assert_python_parses(&output);
+        } else {
+            assert!(models.contains(
+                " * TypeScript variant.\n *\n * @experimental This API is experimental and subject to change.\n */\nexport type Choice"
+            ));
+            assert_eq!(models.matches("@experimental").count(), 2);
+            assert!(models.contains(
+                "/**\n * @experimental This API is experimental and subject to change.\n */\nexport type Single"
+            ));
+        }
+        fs::remove_dir_all(output.parent().unwrap()).unwrap();
+    }
 }

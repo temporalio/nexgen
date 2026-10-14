@@ -13,6 +13,7 @@ namespace Nexgen.NotificationService
     /// <summary>
     /// The successful output or failure of the source operation.
     /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public abstract record OnCompleteRequestResult<TOutput>
     {
@@ -34,6 +35,7 @@ namespace Nexgen.NotificationService
     /// <summary>
     /// A notification that reports that a source operation completed.
     /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteRequest<,>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record OnCompleteRequest<TOutput, TSourceContext>
@@ -100,6 +102,7 @@ namespace Nexgen.NotificationService
         /// <summary>
         /// Converts this model to and from its generated transfer type.
         /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
@@ -117,6 +120,7 @@ namespace Nexgen.NotificationService
     /// <summary>
     /// An empty response that acknowledges a completion notification.
     /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteResponse.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record OnCompleteResponse
@@ -135,6 +139,7 @@ namespace Nexgen.NotificationService
         /// <summary>
         /// Converts this model to and from its generated transfer type.
         /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>

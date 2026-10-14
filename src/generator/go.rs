@@ -100,6 +100,7 @@ struct PlannedVariant {
     info: PlannedTypeInfo,
     name: String,
     doc: SelectedTextSpec,
+    experimental: bool,
     type_parameters: Vec<crate::spec::TypeParameterUsage>,
     cases: Vec<PlannedVariantCase>,
 }
@@ -398,6 +399,7 @@ fn planned_variant(variant: &VariantSpec<PlannedFamily>, spec: &PlannedSpec) -> 
         info: local_type_info(&variant.full_name),
         name: variant.name.clone(),
         doc: variant.doc.clone(),
+        experimental: variant.experimental,
         type_parameters: spec.variant_type_parameters(&variant.full_name),
         cases: variant
             .cases
@@ -1641,6 +1643,7 @@ impl<'a> ApiPlanner<'a> {
             RenderedVariant {
                 name: variant_name.clone(),
                 doc: planned_variant.doc.clone(),
+                experimental: planned_variant.experimental,
                 type_parameters: planned_variant.type_parameters.clone(),
                 marker_method: format!("is{variant_name}"),
                 cases,
@@ -1962,6 +1965,8 @@ struct RenderedVariant {
     name: String,
     /// Selected documentation for the public variant interface.
     doc: SelectedTextSpec,
+    /// Whether the public variant interface carries an experimental warning.
+    experimental: bool,
     /// Enclosing generic parameters, carried by every case.
     type_parameters: Vec<crate::spec::TypeParameterUsage>,
     /// Unexported marker method name (e.g. `"isNotificationTarget"`).
@@ -3576,6 +3581,16 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 fn render_variant(output: &mut String, variant: &RenderedVariant) {
     if let Some(doc) = variant.doc.value() {
         render_go_doc_comment(output, "", doc);
+    }
+    if variant.experimental {
+        if variant.doc.value().is_some() {
+            output.push_str("//\n");
+        }
+        render_go_doc_comment(
+            output,
+            "",
+            "WARNING: This API is experimental and may change in the future.",
+        );
     }
     output.push_str("type ");
     output.push_str(&go_generic_declaration_name(

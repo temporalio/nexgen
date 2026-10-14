@@ -161,7 +161,14 @@ fn render_oneof_variant_body(variant: &RenderedVariant) -> String {
     body.push_str(" = ");
     if variant.cases.is_empty() {
         body.push_str("typing.Never\n");
-        render_python_docstring(&mut body, "", variant.doc.as_deref(), &[], None, false);
+        render_python_docstring(
+            &mut body,
+            "",
+            variant.doc.as_deref(),
+            &[],
+            None,
+            variant.experimental,
+        );
         return body;
     }
     if variant.cases.len() > 1 {
@@ -178,7 +185,14 @@ fn render_oneof_variant_body(variant: &RenderedVariant) -> String {
         body.push_str("\n)");
     }
     body.push('\n');
-    render_python_docstring(&mut body, "", variant.doc.as_deref(), &[], None, false);
+    render_python_docstring(
+        &mut body,
+        "",
+        variant.doc.as_deref(),
+        &[],
+        None,
+        variant.experimental,
+    );
     body
 }
 

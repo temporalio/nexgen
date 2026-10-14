@@ -205,6 +205,64 @@ interface api {
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
+#[test]
+fn dotnet_experimental_variant_warning_applies_only_to_base_records() {
+    let temp_dir = unique_output_path("dotnet-experimental-variants");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let wit_path = temp_dir.join("variants.wit");
+    fs::write(
+        &wit_path,
+        r#"package temporal:variant-warnings@1.0.0;
+world system { export api; }
+/// @nexus.endpoint "api"
+interface api {
+  /// @nexus.doc "Documented variant."
+  /// @nexus.experimental
+  variant documented {
+    /// @nexus.doc "Documented case."
+    first(string),
+  }
+  /// @nexus.experimental
+  variant undocumented {
+    second,
+  }
+  variant stable {
+    third,
+  }
+  record request {
+    documented: documented,
+    undocumented: undocumented,
+    stable: stable,
+  }
+  run: func(request: request);
+}
+"#,
+    )
+    .unwrap();
+
+    let rendered = generate_dotnet_to_string(&[wit_path], &[]);
+    let rendered = rendered
+        .lines()
+        .map(|line| line.strip_prefix("    ").unwrap_or(line))
+        .collect::<Vec<_>>()
+        .join("\n");
+    const WARNING: &str =
+        "/// <remarks>WARNING: This API is experimental and may change in the future.</remarks>";
+    assert!(rendered.contains(&format!(
+        "/// <summary>\n/// Documented variant.\n/// </summary>\n{WARNING}\n[GeneratedCode(\"nexgen\", null)]\npublic abstract record Documented"
+    )));
+    assert!(rendered.contains(&format!(
+        "{WARNING}\n[GeneratedCode(\"nexgen\", null)]\npublic abstract record Undocumented"
+    )));
+    assert!(rendered.contains(
+        "    /// <summary>\n    /// Documented case.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record First("
+    ));
+    assert!(rendered.contains("public sealed record Second : Undocumented;"));
+    assert!(rendered.contains("public abstract record Stable"));
+    assert_eq!(rendered.matches(WARNING).count(), 2);
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
 fn generate_dotnet_output(root: &Path, example_id: &str, output_path: &Path) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
     command
@@ -826,7 +884,7 @@ fn dotnet_notification_models_convert_generic_oneofs_without_service() {
     assert!(!files.contains_key(&PathBuf::from("Operations.cs")));
     assert!(models.contains("namespace Nexgen.NotificationService\n{"));
     assert!(models.contains(
-        "    /// <summary>\n    /// The successful output or failure of the source operation.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    public abstract record OnCompleteRequestResult<TOutput>"
+        "    /// <summary>\n    /// The successful output or failure of the source operation.\n    /// </summary>\n    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>\n    [GeneratedCode(\"nexgen\", null)]\n    public abstract record OnCompleteRequestResult<TOutput>"
     ));
     assert!(models.contains(
         "        /// <summary>\n        /// The source operation completed successfully with this output.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        public sealed record Success(TOutput Value)"

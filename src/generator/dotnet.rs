@@ -570,7 +570,7 @@ impl<'a> ApiPlanner<'a> {
             .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
             .collect::<Vec<_>>()
             .join(", ");
-        render_xml_summary(output, "", variant.doc.value(), false);
+        render_xml_summary(output, "", variant.doc.value(), variant.experimental);
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
         output.push_str("public abstract record ");

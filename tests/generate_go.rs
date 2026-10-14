@@ -2179,6 +2179,55 @@ interface api {
 }
 
 #[test]
+fn go_experimental_variant_warning_applies_only_to_interfaces() {
+    let temp_dir = unique_output_path("go-experimental-variants");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let wit_path = temp_dir.join("variants.wit");
+    fs::write(
+        &wit_path,
+        r#"package temporal:variant-warnings@1.0.0;
+world system { export api; }
+/// @nexus.endpoint "api"
+interface api {
+  /// @nexus.doc "Documented variant."
+  /// @nexus.experimental
+  variant documented {
+    /// @nexus.doc "Documented case."
+    first(string),
+  }
+  /// @nexus.experimental
+  variant undocumented {
+    second,
+  }
+  variant stable {
+    third,
+  }
+  record request {
+    documented: documented,
+    undocumented: undocumented,
+    stable: stable,
+  }
+  run: func(request: request);
+}
+"#,
+    )
+    .unwrap();
+
+    let rendered =
+        generate_to_string_with_inputs(nexgen::language::Language::Go, &[wit_path], &[]).unwrap();
+    const WARNING: &str = "// WARNING: This API is experimental and may change in the future.";
+    assert!(rendered.contains(&format!(
+        "// Documented variant.\n//\n{WARNING}\ntype Documented interface {{"
+    )));
+    assert!(rendered.contains(&format!("{WARNING}\ntype Undocumented interface {{")));
+    assert!(rendered.contains("// Documented case.\ntype DocumentedFirst struct {"));
+    assert!(rendered.contains("type UndocumentedSecond struct{}"));
+    assert!(rendered.contains("type Stable interface {"));
+    assert_eq!(rendered.matches(WARNING).count(), 2);
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
 fn go_rejects_inputs_flattening_to_the_same_module_file() {
     // Two distinct input files -- `full_name.json` at the root and
     // `full/name.json` in a subdirectory -- flatten to the same Go module file

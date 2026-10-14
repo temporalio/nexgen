@@ -1633,6 +1633,7 @@ impl<'a> ApiPlanner<'a> {
             full_name: variant_spec.full_name.clone(),
             name: variant_spec.name.clone(),
             doc: variant_spec.doc.value().map(str::to_string),
+            experimental: variant_spec.experimental,
             type_parameters: self
                 .api_plan
                 .variant_type_parameters(&variant_spec.full_name)
@@ -2574,6 +2575,7 @@ pub(in crate::generator) struct RenderedVariant {
     pub(in crate::generator) full_name: String,
     pub(in crate::generator) name: String,
     pub(in crate::generator) doc: Option<String>,
+    pub(in crate::generator) experimental: bool,
     pub(in crate::generator) type_parameters: Vec<String>,
     pub(in crate::generator) cases: Vec<RenderedVariantCase>,
 }
@@ -5205,7 +5207,14 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
     output.push_str(" = ");
     if variant.cases.is_empty() {
         output.push_str("typing.Never\n");
-        render_python_docstring(output, "", variant.doc.as_deref(), &[], None, false);
+        render_python_docstring(
+            output,
+            "",
+            variant.doc.as_deref(),
+            &[],
+            None,
+            variant.experimental,
+        );
         return;
     }
     if multiline {
@@ -5247,7 +5256,14 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
         output.push(')');
     }
     output.push('\n');
-    render_python_docstring(output, "", variant.doc.as_deref(), &[], None, false);
+    render_python_docstring(
+        output,
+        "",
+        variant.doc.as_deref(),
+        &[],
+        None,
+        variant.experimental,
+    );
 }
 
 fn render_resource_client_binder(output: &mut String, resource: &PlannedResource) {

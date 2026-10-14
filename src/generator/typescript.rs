@@ -824,6 +824,7 @@ impl<'a> ApiPlanner<'a> {
             RenderedVariant {
                 name: planned_variant.name.clone(),
                 doc: planned_variant.doc.value().map(str::to_string),
+                experimental: planned_variant.experimental,
                 type_parameters: self
                     .api_plan
                     .variant_type_parameters(&planned_variant.full_name)
@@ -2907,6 +2908,7 @@ struct RenderedFlag {
 struct RenderedVariant {
     name: String,
     doc: Option<String>,
+    experimental: bool,
     type_parameters: Vec<String>,
     cases: Vec<RenderedVariantCase>,
 }
@@ -4626,7 +4628,12 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 }
 
 fn render_variant(output: &mut String, variant: &RenderedVariant) {
-    render_typescript_doc_comment(output, "", variant.doc.as_deref(), &[]);
+    render_typescript_doc_comment(
+        output,
+        "",
+        variant.doc.as_deref(),
+        &experimental_doc_tag(variant.experimental),
+    );
     output.push_str("export type ");
     output.push_str(&variant.name);
     if !variant.type_parameters.is_empty() {
