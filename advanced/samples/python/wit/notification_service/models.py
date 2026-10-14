@@ -17,6 +17,8 @@ SourceContextT = typing.TypeVar("SourceContextT")
 
 @dataclasses.dataclass(slots=True)
 class OnCompleteRequest(typing.Generic[OutputT, SourceContextT]):
+    """A notification that reports that a source operation completed."""
+
     result: OnCompleteRequestResult[OutputT]
     source_context: SourceContextT
 
@@ -93,6 +95,8 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class OnCompleteResponse:
+    """An empty response that acknowledges a completion notification."""
+
     pass
 
 
@@ -133,14 +137,21 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class OnCompleteRequestResultSuccess(typing.Generic[OutputT]):
+    """The source operation completed successfully with this output."""
+
     value: OutputT
 
 
 @dataclasses.dataclass(slots=True)
 class OnCompleteRequestResultFailure:
+    """The source operation failed, including timeout, cancellation, and application
+    errors.
+    """
+
     value: BaseException
 
 
 OnCompleteRequestResult = (
     OnCompleteRequestResultSuccess[OutputT] | OnCompleteRequestResultFailure
 )
+"""The successful output or failure of the source operation."""

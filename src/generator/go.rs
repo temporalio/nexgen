@@ -99,6 +99,7 @@ struct PlannedFlag {
 struct PlannedVariant {
     info: PlannedTypeInfo,
     name: String,
+    doc: SelectedTextSpec,
     type_parameters: Vec<crate::spec::TypeParameterUsage>,
     cases: Vec<PlannedVariantCase>,
 }
@@ -106,6 +107,7 @@ struct PlannedVariant {
 #[derive(Debug, Clone)]
 struct PlannedVariantCase {
     name: String,
+    doc: SelectedTextSpec,
     payload: Option<PlannedValueType>,
 }
 
@@ -395,12 +397,14 @@ fn planned_variant(variant: &VariantSpec<PlannedFamily>, spec: &PlannedSpec) -> 
     PlannedVariant {
         info: local_type_info(&variant.full_name),
         name: variant.name.clone(),
+        doc: variant.doc.clone(),
         type_parameters: spec.variant_type_parameters(&variant.full_name),
         cases: variant
             .cases
             .iter()
             .map(|case| PlannedVariantCase {
                 name: case.name.clone(),
+                doc: case.doc.clone(),
                 payload: case
                     .payload
                     .as_ref()
@@ -1628,6 +1632,7 @@ impl<'a> ApiPlanner<'a> {
                 .transpose()?;
             cases.push(RenderedVariantCase {
                 struct_name: format!("{variant_name}{case_suffix}"),
+                doc: case.doc.clone(),
                 payload_type,
             });
         }
@@ -1635,6 +1640,7 @@ impl<'a> ApiPlanner<'a> {
             planned_variant.info.full_name.clone(),
             RenderedVariant {
                 name: variant_name.clone(),
+                doc: planned_variant.doc.clone(),
                 type_parameters: planned_variant.type_parameters.clone(),
                 marker_method: format!("is{variant_name}"),
                 cases,
@@ -1954,6 +1960,8 @@ struct RenderedFlag {
 struct RenderedVariant {
     /// Go interface type name (e.g. `"NotificationTarget"`).
     name: String,
+    /// Selected documentation for the public variant interface.
+    doc: SelectedTextSpec,
     /// Enclosing generic parameters, carried by every case.
     type_parameters: Vec<crate::spec::TypeParameterUsage>,
     /// Unexported marker method name (e.g. `"isNotificationTarget"`).
@@ -1968,6 +1976,8 @@ struct RenderedVariant {
 struct RenderedVariantCase {
     /// Go struct name combining variant and case (e.g. `"NotificationTargetEmail"`).
     struct_name: String,
+    /// Selected documentation for the public case struct.
+    doc: SelectedTextSpec,
     /// Go type of the payload field, or `None` for payload-less cases.
     payload_type: Option<String>,
 }
@@ -3564,6 +3574,9 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 /// func (NotificationTargetNone) isNotificationTarget() {}
 /// ```
 fn render_variant(output: &mut String, variant: &RenderedVariant) {
+    if let Some(doc) = variant.doc.value() {
+        render_go_doc_comment(output, "", doc);
+    }
     output.push_str("type ");
     output.push_str(&go_generic_declaration_name(
         &variant.name,
@@ -3586,6 +3599,9 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
 
     for case in &variant.cases {
         output.push('\n');
+        if let Some(doc) = case.doc.value() {
+            render_go_doc_comment(output, "", doc);
+        }
         output.push_str("type ");
         output.push_str(&go_generic_declaration_name(
             &case.struct_name,

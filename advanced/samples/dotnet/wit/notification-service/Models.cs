@@ -10,18 +10,30 @@ using Temporalio.Converters;
 namespace Nexgen.NotificationService
 {
 
+    /// <summary>
+    /// The successful output or failure of the source operation.
+    /// </summary>
     [GeneratedCode("nexgen", null)]
     public abstract record OnCompleteRequestResult<TOutput>
     {
         private OnCompleteRequestResult() { }
 
+        /// <summary>
+        /// The source operation completed successfully with this output.
+        /// </summary>
         [GeneratedCode("nexgen", null)]
         public sealed record Success(TOutput Value) : OnCompleteRequestResult<TOutput>;
 
+        /// <summary>
+        /// The source operation failed, including timeout, cancellation, and application errors.
+        /// </summary>
         [GeneratedCode("nexgen", null)]
         public sealed record Failure(System.Exception Value) : OnCompleteRequestResult<TOutput>;
     }
 
+    /// <summary>
+    /// A notification that reports that a source operation completed.
+    /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteRequest<,>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record OnCompleteRequest<TOutput, TSourceContext>
@@ -35,7 +47,13 @@ namespace Nexgen.NotificationService
             SourceContext = sourceContext;
         }
 
+        /// <summary>
+        /// The successful output or failure of the source operation.
+        /// </summary>
         public OnCompleteRequestResult<TOutput> Result { get; init; }
+        /// <summary>
+        /// User-supplied data associated with the source invocation.
+        /// </summary>
         public TSourceContext SourceContext { get; init; }
 
         internal static OnCompleteRequest<TOutput, TSourceContext> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)
@@ -96,6 +114,9 @@ namespace Nexgen.NotificationService
 
     }
 
+    /// <summary>
+    /// An empty response that acknowledges a completion notification.
+    /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteResponse.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record OnCompleteResponse

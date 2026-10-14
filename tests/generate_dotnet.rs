@@ -127,6 +127,84 @@ fn generate_dotnet_files(
     files
 }
 
+#[test]
+fn dotnet_variant_and_case_docs_render_on_public_records() {
+    let temp_dir = unique_output_path("dotnet-variant-docs");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let wit_path = temp_dir.join("variant-docs.wit");
+    fs::write(
+        &wit_path,
+        r#"package temporal:variant-docs@1.0.0;
+
+world system {
+  export api;
+}
+
+/// @nexus.endpoint "api"
+interface api {
+  /// @nexus.doc "Default variant doc." dotnet="Dotnet variant <doc> & more."
+  variant choice {
+    /// @nexus.doc "Default payload doc." dotnet="Dotnet payload <doc> & more."
+    text(string),
+    /// @nexus.doc "Default empty doc." dotnet="Dotnet empty <doc> & more."
+    none,
+  }
+
+  /// @nexus.doc "Default-only variant doc."
+  variant fallback {
+    /// @nexus.doc "Default-only payload doc."
+    text(string),
+    /// @nexus.doc "Default-only empty doc."
+    none,
+  }
+
+  record request {
+    choice: choice,
+    fallback: fallback,
+  }
+
+  run: func(request: request);
+}
+"#,
+    )
+    .unwrap();
+
+    let rendered = generate_dotnet_to_string(&[wit_path], &[]);
+    // Generated files wrap declarations in an indented namespace block.
+    let rendered = rendered
+        .lines()
+        .map(|line| line.strip_prefix("    ").unwrap_or(line))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        rendered.contains(
+            "/// <summary>\n/// Dotnet variant &lt;doc&gt; &amp; more.\n/// </summary>\n[GeneratedCode(\"nexgen\", null)]\npublic abstract record Choice"
+        ),
+        "{rendered}"
+    );
+    assert!(rendered.contains(
+        "    /// <summary>\n    /// Dotnet payload &lt;doc&gt; &amp; more.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record Text("
+    ));
+    assert!(rendered.contains(
+        "    /// <summary>\n    /// Dotnet empty &lt;doc&gt; &amp; more.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record None :"
+    ));
+    assert!(rendered.contains(
+        "/// <summary>\n/// Default-only variant doc.\n/// </summary>\n[GeneratedCode(\"nexgen\", null)]\npublic abstract record Fallback"
+    ));
+    assert!(rendered.contains(
+        "    /// <summary>\n    /// Default-only payload doc.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record Text("
+    ));
+    assert!(
+        rendered.contains(
+            "    /// <summary>\n    /// Default-only empty doc.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record None :"
+        )
+    );
+    assert!(!rendered.contains("Default variant doc."));
+    assert!(!rendered.contains("Default payload doc."));
+    assert!(!rendered.contains("Default empty doc."));
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
 fn generate_dotnet_output(root: &Path, example_id: &str, output_path: &Path) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
     command
@@ -747,6 +825,24 @@ fn dotnet_notification_models_convert_generic_oneofs_without_service() {
     assert!(!files.contains_key(&PathBuf::from("Services.cs")));
     assert!(!files.contains_key(&PathBuf::from("Operations.cs")));
     assert!(models.contains("namespace Nexgen.NotificationService\n{"));
+    assert!(models.contains(
+        "    /// <summary>\n    /// The successful output or failure of the source operation.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    public abstract record OnCompleteRequestResult<TOutput>"
+    ));
+    assert!(models.contains(
+        "        /// <summary>\n        /// The source operation completed successfully with this output.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        public sealed record Success(TOutput Value)"
+    ));
+    assert!(models.contains(
+        "        /// <summary>\n        /// The source operation failed, including timeout, cancellation, and application errors.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        public sealed record Failure(System.Exception Value)"
+    ));
+    assert!(
+        models.contains("    /// A notification that reports that a source operation completed.")
+    );
+    assert!(models.contains(
+        "        /// User-supplied data associated with the source invocation.\n        /// </summary>\n        public TSourceContext SourceContext"
+    ));
+    assert!(
+        models.contains("    /// An empty response that acknowledges a completion notification.")
+    );
     assert!(models.contains(
         "[Temporalio.Converters.TemporalTransferTypeConverter(typeof(OnCompleteRequest<,>.TransferTypeConverter))]"
     ));

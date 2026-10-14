@@ -17,7 +17,8 @@ import temporal_support as _support
 
 @dataclasses.dataclass(slots=True, kw_only=True)
 class SignalWithStartWorkflowRequest:
-    """
+    """Request fields for signaling a workflow, starting it first if needed.
+
     .. warning::
         This API is experimental and subject to change.
     """
@@ -222,7 +223,8 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class UserMetadata:
-    """
+    """Static metadata for a workflow execution.
+
     .. warning::
         This API is experimental and subject to change.
     """
@@ -275,7 +277,8 @@ temporalio.converter.transfer_type_convertible(_UserMetadataTransferTypeConverte
 
 @dataclasses.dataclass(slots=True)
 class SignalWithStartWorkflowResponse:
-    """
+    """Result of signaling a workflow and starting it if needed.
+
     .. warning::
         This API is experimental and subject to change.
     """

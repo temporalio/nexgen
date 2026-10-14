@@ -2123,6 +2123,62 @@ interface doc-service {
 }
 
 #[test]
+fn go_variant_and_case_docs_render_on_public_types() {
+    let temp_dir = unique_output_path("go-variant-docs");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let wit_path = temp_dir.join("variant-docs.wit");
+    fs::write(
+        &wit_path,
+        r#"package temporal:variant-docs@1.0.0;
+
+world system {
+  export api;
+}
+
+/// @nexus.endpoint "api"
+interface api {
+  /// @nexus.doc "Default variant doc." go="Go variant doc."
+  variant choice {
+    /// @nexus.doc "Default payload doc." go="Go payload doc."
+    text(string),
+    /// @nexus.doc "Default empty doc." go="Go empty doc."
+    none,
+  }
+
+  /// @nexus.doc "Default-only variant doc."
+  variant fallback {
+    /// @nexus.doc "Default-only payload doc."
+    text(string),
+    /// @nexus.doc "Default-only empty doc."
+    none,
+  }
+
+  record request {
+    choice: choice,
+    fallback: fallback,
+  }
+
+  run: func(request: request);
+}
+"#,
+    )
+    .unwrap();
+
+    let rendered =
+        generate_to_string_with_inputs(nexgen::language::Language::Go, &[wit_path], &[]).unwrap();
+    assert!(rendered.contains("// Go variant doc.\ntype Choice interface {"));
+    assert!(rendered.contains("// Go payload doc.\ntype ChoiceText struct {"));
+    assert!(rendered.contains("// Go empty doc.\ntype ChoiceNone struct{}"));
+    assert!(rendered.contains("// Default-only variant doc.\ntype Fallback interface {"));
+    assert!(rendered.contains("// Default-only payload doc.\ntype FallbackText struct {"));
+    assert!(rendered.contains("// Default-only empty doc.\ntype FallbackNone struct{}"));
+    assert!(!rendered.contains("Default variant doc."));
+    assert!(!rendered.contains("Default payload doc."));
+    assert!(!rendered.contains("Default empty doc."));
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
 fn go_rejects_inputs_flattening_to_the_same_module_file() {
     // Two distinct input files -- `full_name.json` at the root and
     // `full/name.json` in a subdirectory -- flatten to the same Go module file

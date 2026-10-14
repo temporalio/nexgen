@@ -813,11 +813,19 @@ fn build_wit_variant_spec(
 
     let type_name = type_def.name.as_deref().unwrap_or("unnamed-type");
     let context = format!("type `{}`", wit_type_full_name(resolve, type_id));
+    let directives = parse_directives(type_def.docs.contents.as_deref(), path, &context)?;
+    let doc = directive(&directives, "doc", path, &context)?
+        .map(directive_language_string)
+        .unwrap_or_default();
     let cases = variant
         .cases
         .iter()
         .map(|case| {
             let case_context = format!("{context} case `{}`", case.name);
+            let directives = parse_directives(case.docs.contents.as_deref(), path, &case_context)?;
+            let doc = directive(&directives, "doc", path, &case_context)?
+                .map(directive_language_string)
+                .unwrap_or_default();
             let payload = case
                 .ty
                 .as_ref()
@@ -829,6 +837,7 @@ fn build_wit_variant_spec(
             Ok(VariantCaseSpec {
                 name: case.name.clone(),
                 wire_name: case.name.to_snake_case(),
+                doc,
                 payload,
             })
         })
@@ -836,6 +845,7 @@ fn build_wit_variant_spec(
     Ok(Some(VariantSpec {
         name: type_name.to_upper_camel_case(),
         full_name: wit_type_full_name(resolve, type_id),
+        doc,
         cases,
         source: build_variant_source(type_def, path, "")?,
     }))

@@ -1668,10 +1668,10 @@ Cannot be combined with `@nexus.source`.
 
 ### @nexus.doc
 
-**Placement:** Record field or operation (function)
+**Placement:** Record, record field, variant, variant case, or operation (function)
 **Syntax:** `@nexus.doc "<text>" [returns="<text>"]`
-Per-language overrides: `python="<text>"` `typescript="<text>"` `go="<text>"`
-Return docs: `python-returns="<text>"` `typescript-returns="<text>"` `go-returns="<text>"`
+Per-language overrides: `python="<text>"` `typescript="<text>"` `go="<text>"` `dotnet="<text>"` `java="<text>"`
+Return docs: `python-returns="<text>"` `typescript-returns="<text>"` `go-returns="<text>"` `dotnet-returns="<text>"` `java-returns="<text>"`
 
 Adds documentation to generated code. The default text applies to all languages;
 per-language keys override for specific targets. The `returns` key generates
@@ -1684,6 +1684,23 @@ Javadoc text) so authored content cannot break the generated source.
 ///   "Signal a workflow, starting it first if needed."
 ///   returns="A workflow handle to the started workflow."
 signal-with-start-workflow: func(...) -> ...;
+```
+
+Variant documentation is emitted by Python, TypeScript, Go, and .NET; Java does
+not currently generate WIT variants. Python emits an attribute docstring after
+the variant type alias, comments beside tagged-tuple cases, and class docstrings
+on protobuf oneof-backed cases. TypeScript emits JSDoc on the union and its
+branches; Go emits godoc on the interface and case structs; .NET emits XML
+documentation on the base record and nested case records.
+
+```wit
+/// @nexus.doc "Where to send a notification."
+variant notification-target {
+  /// @nexus.doc "Send to an email address." python="Send to the given email address."
+  email(string),
+  /// @nexus.doc "Do not send a notification."
+  none,
+}
 ```
 
 ---
