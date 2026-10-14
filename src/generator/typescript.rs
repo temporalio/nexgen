@@ -810,6 +810,7 @@ impl<'a> ApiPlanner<'a> {
                     .map(|payload| self.resolve_planned_value_type(payload));
                 RenderedVariantCase {
                     name: case.name.clone(),
+                    doc: case.doc.value().map(str::to_string),
                     payload_annotation: payload.as_ref().map(|payload| payload.annotation.clone()),
                     requirements: payload
                         .as_ref()
@@ -822,6 +823,8 @@ impl<'a> ApiPlanner<'a> {
             planned_variant.full_name.clone(),
             RenderedVariant {
                 name: planned_variant.name.clone(),
+                doc: planned_variant.doc.value().map(str::to_string),
+                experimental: planned_variant.experimental,
                 type_parameters: self
                     .api_plan
                     .variant_type_parameters(&planned_variant.full_name)
@@ -2904,6 +2907,8 @@ struct RenderedFlag {
 #[derive(Debug)]
 struct RenderedVariant {
     name: String,
+    doc: Option<String>,
+    experimental: bool,
     type_parameters: Vec<String>,
     cases: Vec<RenderedVariantCase>,
 }
@@ -2911,6 +2916,7 @@ struct RenderedVariant {
 #[derive(Debug)]
 struct RenderedVariantCase {
     name: String,
+    doc: Option<String>,
     payload_annotation: Option<String>,
     requirements: TypeScriptRequirements,
 }
@@ -4622,6 +4628,12 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 }
 
 fn render_variant(output: &mut String, variant: &RenderedVariant) {
+    render_typescript_doc_comment(
+        output,
+        "",
+        variant.doc.as_deref(),
+        &experimental_doc_tag(variant.experimental),
+    );
     output.push_str("export type ");
     output.push_str(&variant.name);
     if !variant.type_parameters.is_empty() {
@@ -4635,6 +4647,7 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
         return;
     }
     for (index, case) in variant.cases.iter().enumerate() {
+        render_typescript_doc_comment(output, "  ", case.doc.as_deref(), &[]);
         output.push_str("  | { tag: ");
         output.push_str(&typescript_string_literal(&case.name));
         if let Some(payload_annotation) = &case.payload_annotation {

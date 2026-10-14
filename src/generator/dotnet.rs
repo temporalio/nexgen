@@ -570,6 +570,7 @@ impl<'a> ApiPlanner<'a> {
             .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
             .collect::<Vec<_>>()
             .join(", ");
+        render_xml_summary(output, "", variant.doc.value(), variant.experimental);
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
         output.push_str("public abstract record ");
@@ -585,6 +586,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("() { }\n\n");
         for (index, case) in variant.cases.iter().enumerate() {
             let case_name = csharp_type_name(&case.name);
+            render_xml_summary(output, "    ", case.doc.value(), false);
             output.push_str("    ");
             output.push_str(GENERATED_CODE_ATTRIBUTE);
             output.push('\n');

@@ -1532,6 +1532,7 @@ impl<'a> ApiPlanner<'a> {
             RenderedModel {
                 full_name: full_name.to_string(),
                 name: planned_model.name.clone(),
+                doc: planned_model.doc.value().map(str::to_string),
                 type_parameters: api_plan
                     .record_type_parameters(full_name)
                     .into_iter()
@@ -1605,6 +1606,7 @@ impl<'a> ApiPlanner<'a> {
             .map(|case| -> Result<_> {
                 Ok(RenderedVariantCase {
                     name: case.name.clone(),
+                    doc: case.doc.value().map(str::to_string),
                     type_parameters: case
                         .payload
                         .as_ref()
@@ -1630,6 +1632,8 @@ impl<'a> ApiPlanner<'a> {
         let rendered_variant = RenderedVariant {
             full_name: variant_spec.full_name.clone(),
             name: variant_spec.name.clone(),
+            doc: variant_spec.doc.value().map(str::to_string),
+            experimental: variant_spec.experimental,
             type_parameters: self
                 .api_plan
                 .variant_type_parameters(&variant_spec.full_name)
@@ -2176,7 +2180,14 @@ fn render_record_model(
         output.push_str("])");
     }
     output.push_str(":\n");
-    render_python_docstring(output, "    ", None, &[], None, model.experimental);
+    render_python_docstring(
+        output,
+        "    ",
+        model.doc.as_deref(),
+        &[],
+        None,
+        model.experimental,
+    );
 
     let wire_lines = wire_block
         .map(|block| block.class_body_lines.as_slice())
@@ -2563,6 +2574,8 @@ struct RenderedFlag {
 pub(in crate::generator) struct RenderedVariant {
     pub(in crate::generator) full_name: String,
     pub(in crate::generator) name: String,
+    pub(in crate::generator) doc: Option<String>,
+    pub(in crate::generator) experimental: bool,
     pub(in crate::generator) type_parameters: Vec<String>,
     pub(in crate::generator) cases: Vec<RenderedVariantCase>,
 }
@@ -2570,6 +2583,7 @@ pub(in crate::generator) struct RenderedVariant {
 #[derive(Debug)]
 pub(in crate::generator) struct RenderedVariantCase {
     pub(in crate::generator) name: String,
+    pub(in crate::generator) doc: Option<String>,
     pub(in crate::generator) type_parameters: Vec<String>,
     pub(in crate::generator) payload_annotation: Option<String>,
 }
@@ -2604,6 +2618,7 @@ fn sort_python_model_names(
 pub(in crate::generator) struct RenderedModel {
     pub(in crate::generator) full_name: String,
     pub(in crate::generator) name: String,
+    pub(in crate::generator) doc: Option<String>,
     pub(in crate::generator) type_parameters: Vec<String>,
     pub(in crate::generator) experimental: bool,
     pub(in crate::generator) fields: Vec<RenderedField>,
@@ -5187,18 +5202,43 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 }
 
 fn render_variant(output: &mut String, variant: &RenderedVariant) {
+    let multiline = variant.cases.len() > 1 || variant.cases.iter().any(|case| case.doc.is_some());
     output.push_str(variant.name.as_str());
     output.push_str(" = ");
     if variant.cases.is_empty() {
         output.push_str("typing.Never\n");
+        render_python_docstring(
+            output,
+            "",
+            variant.doc.as_deref(),
+            &[],
+            None,
+            variant.experimental,
+        );
         return;
     }
-    if variant.cases.len() > 1 {
-        output.push_str("(\n    ");
+    if multiline {
+        output.push_str("(\n");
     }
     for (index, case) in variant.cases.iter().enumerate() {
-        if index > 0 {
-            output.push_str("\n    | ");
+        if multiline {
+            if let Some(doc) = &case.doc {
+                let mut lines = Vec::new();
+                for line in doc.trim().lines() {
+                    push_wrapped_python_docstring_line(
+                        &mut lines,
+                        "    # ",
+                        "    # ",
+                        line.trim(),
+                        PYTHON_FORMAT_LINE_LENGTH,
+                    );
+                }
+                for line in lines {
+                    output.push_str(&line);
+                    output.push('\n');
+                }
+            }
+            output.push_str(if index == 0 { "    " } else { "    | " });
         }
         output.push_str("tuple[typing.Literal[");
         output.push_str(&python_string_literal(&case.name));
@@ -5208,11 +5248,22 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
             output.push_str(payload_annotation);
         }
         output.push(']');
+        if multiline {
+            output.push('\n');
+        }
     }
-    if variant.cases.len() > 1 {
-        output.push_str("\n)");
+    if multiline {
+        output.push(')');
     }
     output.push('\n');
+    render_python_docstring(
+        output,
+        "",
+        variant.doc.as_deref(),
+        &[],
+        None,
+        variant.experimental,
+    );
 }
 
 fn render_resource_client_binder(output: &mut String, resource: &PlannedResource) {

@@ -813,11 +813,20 @@ fn build_wit_variant_spec(
 
     let type_name = type_def.name.as_deref().unwrap_or("unnamed-type");
     let context = format!("type `{}`", wit_type_full_name(resolve, type_id));
+    let directives = parse_directives(type_def.docs.contents.as_deref(), path, &context)?;
+    let experimental = experimental_directive(&directives, path, &context)?;
+    let doc = directive(&directives, "doc", path, &context)?
+        .map(directive_language_string)
+        .unwrap_or_default();
     let cases = variant
         .cases
         .iter()
         .map(|case| {
             let case_context = format!("{context} case `{}`", case.name);
+            let directives = parse_directives(case.docs.contents.as_deref(), path, &case_context)?;
+            let doc = directive(&directives, "doc", path, &case_context)?
+                .map(directive_language_string)
+                .unwrap_or_default();
             let payload = case
                 .ty
                 .as_ref()
@@ -829,6 +838,7 @@ fn build_wit_variant_spec(
             Ok(VariantCaseSpec {
                 name: case.name.clone(),
                 wire_name: case.name.to_snake_case(),
+                doc,
                 payload,
             })
         })
@@ -836,6 +846,8 @@ fn build_wit_variant_spec(
     Ok(Some(VariantSpec {
         name: type_name.to_upper_camel_case(),
         full_name: wit_type_full_name(resolve, type_id),
+        doc,
+        experimental,
         cases,
         source: build_variant_source(type_def, path, "")?,
     }))
@@ -4580,6 +4592,50 @@ interface workflow-service {
                 .unwrap()
                 .experimental
         );
+    }
+
+    #[test]
+    fn parses_and_validates_experimental_variants() {
+        let wit = r#"
+package example:variants;
+world system { export models; }
+interface models {
+  /// @nexus.experimental
+  variant preview {
+    value(string),
+    none,
+  }
+  variant stable {
+    none,
+  }
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let variants = spec
+            .variants()
+            .map(|(_, variant)| variant)
+            .collect::<Vec<_>>();
+        assert!(
+            variants
+                .iter()
+                .find(|variant| variant.name == "Preview")
+                .unwrap()
+                .experimental
+        );
+        assert!(
+            !variants
+                .iter()
+                .find(|variant| variant.name == "Stable")
+                .unwrap()
+                .experimental
+        );
+        let invalid = wit.replace(
+            "@nexus.experimental",
+            "@nexus.experimental reason=\"preview\"",
+        );
+        let error = parse_result(Language::Python, &invalid).unwrap_err();
+        assert!(error.to_string().contains("@nexus.experimental"));
+        assert!(error.to_string().contains("does not take arguments"));
     }
 
     #[test]
