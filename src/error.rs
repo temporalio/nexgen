@@ -134,6 +134,11 @@ pub enum Error {
     #[error("language `{language}` is not implemented yet")]
     UnsupportedLanguage { language: Language },
 
+    #[error(
+        "generating {language} from WIT requires `--support-package` with a non-empty package reference"
+    )]
+    MissingSupportPackage { language: Language },
+
     #[error("{language} protobuf conversion does not yet support oneof group `{message}.{oneof}`")]
     UnsupportedProtoOneofConversion {
         language: Language,
@@ -177,6 +182,9 @@ pub enum Error {
 
     #[error("message name `{name}` is ambiguous; matches: {matches:?}")]
     AmbiguousMessageName { name: String, matches: Vec<String> },
+
+    #[error("proto file `{name}` was not found in the descriptor set")]
+    UnknownDescriptorFile { name: String },
 
     #[error("cannot generate add-rpc WIT for `{context}`: {reason}")]
     UnsupportedAddRpc { context: String, reason: String },

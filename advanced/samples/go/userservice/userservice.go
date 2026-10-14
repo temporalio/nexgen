@@ -12,9 +12,24 @@ type getUserRequest struct {
 	UserID string
 }
 
+// GetUserID returns the UserID field.
+func (m getUserRequest) GetUserID() string {
+	return m.UserID
+}
+
 type updateEmailRequest struct {
 	UserID string
 	Email  string
+}
+
+// GetUserID returns the UserID field.
+func (m updateEmailRequest) GetUserID() string {
+	return m.UserID
+}
+
+// GetEmail returns the Email field.
+func (m updateEmailRequest) GetEmail() string {
+	return m.Email
 }
 
 // --- Resources ---

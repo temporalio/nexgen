@@ -4,14 +4,12 @@ package workflowservice
 
 import (
 	"fmt"
-	"reflect"
-	"runtime"
-	"strings"
 	"time"
 
 	enums "go.temporal.io/api/enums/v1"
 	sdk "go.temporal.io/api/sdk/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
+	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"
@@ -46,17 +44,122 @@ type signalWithStartWorkflowRequest struct {
 	namespace                string
 }
 
+// GetWorkflow returns the Workflow field.
+func (m signalWithStartWorkflowRequest) GetWorkflow() string {
+	return m.Workflow
+}
+
+// GetArgs returns the Args field.
+func (m signalWithStartWorkflowRequest) GetArgs() []any {
+	return m.Args
+}
+
+// GetID returns the ID field.
+func (m signalWithStartWorkflowRequest) GetID() string {
+	return m.ID
+}
+
+// GetTaskQueue returns the TaskQueue field.
+func (m signalWithStartWorkflowRequest) GetTaskQueue() string {
+	return m.TaskQueue
+}
+
+// GetSignal returns the Signal field.
+func (m signalWithStartWorkflowRequest) GetSignal() string {
+	return m.Signal
+}
+
+// GetSignalArgs returns the SignalArgs field.
+func (m signalWithStartWorkflowRequest) GetSignalArgs() []any {
+	return m.SignalArgs
+}
+
+// GetWorkflowExecutionTimeout returns the WorkflowExecutionTimeout field.
+func (m signalWithStartWorkflowRequest) GetWorkflowExecutionTimeout() *time.Duration {
+	return m.WorkflowExecutionTimeout
+}
+
+// GetWorkflowRunTimeout returns the WorkflowRunTimeout field.
+func (m signalWithStartWorkflowRequest) GetWorkflowRunTimeout() *time.Duration {
+	return m.WorkflowRunTimeout
+}
+
+// GetWorkflowTaskTimeout returns the WorkflowTaskTimeout field.
+func (m signalWithStartWorkflowRequest) GetWorkflowTaskTimeout() *time.Duration {
+	return m.WorkflowTaskTimeout
+}
+
+// GetWorkflowIDReusePolicy returns the WorkflowIDReusePolicy field.
+func (m signalWithStartWorkflowRequest) GetWorkflowIDReusePolicy() *enums.WorkflowIdReusePolicy {
+	return m.WorkflowIDReusePolicy
+}
+
+// GetWorkflowIDConflictPolicy returns the WorkflowIDConflictPolicy field.
+func (m signalWithStartWorkflowRequest) GetWorkflowIDConflictPolicy() *enums.WorkflowIdConflictPolicy {
+	return m.WorkflowIDConflictPolicy
+}
+
+// GetRetryPolicy returns the RetryPolicy field.
+func (m signalWithStartWorkflowRequest) GetRetryPolicy() *temporal.RetryPolicy {
+	return m.RetryPolicy
+}
+
+// GetCronSchedule returns the CronSchedule field.
+func (m signalWithStartWorkflowRequest) GetCronSchedule() *string {
+	return m.CronSchedule
+}
+
+// GetMemo returns the Memo field.
+func (m signalWithStartWorkflowRequest) GetMemo() map[string]any {
+	return m.Memo
+}
+
+// GetTypedSearchAttributes returns the TypedSearchAttributes field.
+func (m signalWithStartWorkflowRequest) GetTypedSearchAttributes() temporal.SearchAttributes {
+	return m.TypedSearchAttributes
+}
+
+// GetPriority returns the Priority field.
+func (m signalWithStartWorkflowRequest) GetPriority() *temporal.Priority {
+	return m.Priority
+}
+
+// GetVersioningOverride returns the VersioningOverride field.
+func (m signalWithStartWorkflowRequest) GetVersioningOverride() client.VersioningOverride {
+	return m.VersioningOverride
+}
+
+// GetStartDelay returns the StartDelay field.
+func (m signalWithStartWorkflowRequest) GetStartDelay() *time.Duration {
+	return m.StartDelay
+}
+
+// GetUserMetadata returns the UserMetadata field.
+func (m signalWithStartWorkflowRequest) GetUserMetadata() *UserMetadata {
+	return m.UserMetadata
+}
+
+// GetHeaders returns the Headers field.
+func (m signalWithStartWorkflowRequest) GetHeaders() map[string]any {
+	return m.Headers
+}
+
+// GetNamespace returns the namespace field.
+func (m signalWithStartWorkflowRequest) GetNamespace() string {
+	return m.namespace
+}
+
 func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
 	message := &workflowservice.SignalWithStartWorkflowExecutionRequest{}
 	{
-		converted, err := workflowTypeToProto(dc, &m.Workflow)
+		converted, err := support.WorkflowTypeToProto(dc, &m.Workflow)
 		if err != nil {
 			return nil, err
 		}
 		message.WorkflowType = converted
 	}
 	{
-		converted, err := payloadsToProto(dc, m.Args)
+		converted, err := support.PayloadsToProto(dc, m.Args)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +167,7 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 	}
 	message.WorkflowId = m.ID
 	{
-		converted, err := taskQueueToProto(dc, &m.TaskQueue)
+		converted, err := support.TaskQueueToProto(dc, &m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
@@ -72,28 +175,28 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 	}
 	message.SignalName = m.Signal
 	{
-		converted, err := payloadsToProto(dc, m.SignalArgs)
+		converted, err := support.PayloadsToProto(dc, m.SignalArgs)
 		if err != nil {
 			return nil, err
 		}
 		message.SignalInput = converted
 	}
 	{
-		converted, err := durationToProto(dc, m.WorkflowExecutionTimeout)
+		converted, err := support.DurationToProto(dc, m.WorkflowExecutionTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.WorkflowExecutionTimeout = converted
 	}
 	{
-		converted, err := durationToProto(dc, m.WorkflowRunTimeout)
+		converted, err := support.DurationToProto(dc, m.WorkflowRunTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.WorkflowRunTimeout = converted
 	}
 	{
-		converted, err := durationToProto(dc, m.WorkflowTaskTimeout)
+		converted, err := support.DurationToProto(dc, m.WorkflowTaskTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -101,12 +204,14 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 	}
 	if m.WorkflowIDReusePolicy != nil {
 		message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy((*m.WorkflowIDReusePolicy))
+	} else {
+		message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy(1)
 	}
 	if m.WorkflowIDConflictPolicy != nil {
 		message.WorkflowIdConflictPolicy = enums.WorkflowIdConflictPolicy((*m.WorkflowIDConflictPolicy))
 	}
 	{
-		converted, err := retryPolicyToProto(dc, m.RetryPolicy)
+		converted, err := support.RetryPolicyToProto(dc, m.RetryPolicy)
 		if err != nil {
 			return nil, err
 		}
@@ -116,35 +221,35 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 		message.CronSchedule = (*m.CronSchedule)
 	}
 	{
-		converted, err := memoToProto(dc, m.Memo)
+		converted, err := support.MemoToProto(dc, m.Memo)
 		if err != nil {
 			return nil, err
 		}
 		message.Memo = converted
 	}
 	{
-		converted, err := searchAttributesToProto(dc, &m.TypedSearchAttributes)
+		converted, err := support.SearchAttributesToProto(dc, &m.TypedSearchAttributes)
 		if err != nil {
 			return nil, err
 		}
 		message.SearchAttributes = converted
 	}
 	{
-		converted, err := priorityToProto(dc, m.Priority)
+		converted, err := support.PriorityToProto(dc, m.Priority)
 		if err != nil {
 			return nil, err
 		}
 		message.Priority = converted
 	}
 	{
-		converted, err := versioningOverrideToProto(dc, &m.VersioningOverride)
+		converted, err := support.VersioningOverrideToProto(dc, &m.VersioningOverride)
 		if err != nil {
 			return nil, err
 		}
 		message.VersioningOverride = converted
 	}
 	{
-		converted, err := durationToProto(dc, m.StartDelay)
+		converted, err := support.DurationToProto(dc, m.StartDelay)
 		if err != nil {
 			return nil, err
 		}
@@ -158,7 +263,7 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 		message.UserMetadata = converted
 	}
 	{
-		converted, err := headerToProto(dc, m.Headers)
+		converted, err := support.HeaderToProto(dc, m.Headers)
 		if err != nil {
 			return nil, err
 		}
@@ -171,7 +276,7 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
 	*out = signalWithStartWorkflowRequest{}
 	{
-		converted, err := workflowTypeFromProto(dc, proto.GetWorkflowType())
+		converted, err := support.WorkflowTypeFromProto(dc, proto.GetWorkflowType())
 		if err != nil {
 			return err
 		}
@@ -180,7 +285,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		}
 	}
 	{
-		converted, err := payloadsFromProto(dc, proto.GetInput())
+		converted, err := support.PayloadsFromProto(dc, proto.GetInput())
 		if err != nil {
 			return err
 		}
@@ -188,7 +293,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 	}
 	out.ID = proto.GetWorkflowId()
 	{
-		converted, err := taskQueueFromProto(dc, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(dc, proto.GetTaskQueue())
 		if err != nil {
 			return err
 		}
@@ -198,28 +303,28 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 	}
 	out.Signal = proto.GetSignalName()
 	{
-		converted, err := payloadsFromProto(dc, proto.GetSignalInput())
+		converted, err := support.PayloadsFromProto(dc, proto.GetSignalInput())
 		if err != nil {
 			return err
 		}
 		out.SignalArgs = converted
 	}
 	{
-		converted, err := durationFromProto(dc, proto.GetWorkflowExecutionTimeout())
+		converted, err := support.DurationFromProto(dc, proto.GetWorkflowExecutionTimeout())
 		if err != nil {
 			return err
 		}
 		out.WorkflowExecutionTimeout = converted
 	}
 	{
-		converted, err := durationFromProto(dc, proto.GetWorkflowRunTimeout())
+		converted, err := support.DurationFromProto(dc, proto.GetWorkflowRunTimeout())
 		if err != nil {
 			return err
 		}
 		out.WorkflowRunTimeout = converted
 	}
 	{
-		converted, err := durationFromProto(dc, proto.GetWorkflowTaskTimeout())
+		converted, err := support.DurationFromProto(dc, proto.GetWorkflowTaskTimeout())
 		if err != nil {
 			return err
 		}
@@ -234,7 +339,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		out.WorkflowIDConflictPolicy = &converted
 	}
 	{
-		converted, err := retryPolicyFromProto(dc, proto.GetRetryPolicy())
+		converted, err := support.RetryPolicyFromProto(dc, proto.GetRetryPolicy())
 		if err != nil {
 			return err
 		}
@@ -245,14 +350,14 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		out.CronSchedule = &converted
 	}
 	{
-		converted, err := memoFromProto(dc, proto.GetMemo())
+		converted, err := support.MemoFromProto(dc, proto.GetMemo())
 		if err != nil {
 			return err
 		}
 		out.Memo = converted
 	}
 	{
-		converted, err := searchAttributesFromProto(dc, proto.GetSearchAttributes())
+		converted, err := support.SearchAttributesFromProto(dc, proto.GetSearchAttributes())
 		if err != nil {
 			return err
 		}
@@ -261,14 +366,14 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		}
 	}
 	{
-		converted, err := priorityFromProto(dc, proto.GetPriority())
+		converted, err := support.PriorityFromProto(dc, proto.GetPriority())
 		if err != nil {
 			return err
 		}
 		out.Priority = converted
 	}
 	{
-		converted, err := versioningOverrideFromProto(dc, proto.GetVersioningOverride())
+		converted, err := support.VersioningOverrideFromProto(dc, proto.GetVersioningOverride())
 		if err != nil {
 			return err
 		}
@@ -277,7 +382,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		}
 	}
 	{
-		converted, err := durationFromProto(dc, proto.GetWorkflowStartDelay())
+		converted, err := support.DurationFromProto(dc, proto.GetWorkflowStartDelay())
 		if err != nil {
 			return err
 		}
@@ -290,7 +395,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		}
 	}
 	{
-		converted, err := headerFromProto(dc, proto.GetHeader())
+		converted, err := support.HeaderFromProto(dc, proto.GetHeader())
 		if err != nil {
 			return err
 		}
@@ -314,7 +419,7 @@ func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.Transfe
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
-	request.namespace = workflow.GetInfo(ctx).Namespace
+	request.namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -345,17 +450,27 @@ type UserMetadata struct {
 	StaticDetails string
 }
 
+// GetStaticSummary returns the StaticSummary field.
+func (m UserMetadata) GetStaticSummary() string {
+	return m.StaticSummary
+}
+
+// GetStaticDetails returns the StaticDetails field.
+func (m UserMetadata) GetStaticDetails() string {
+	return m.StaticDetails
+}
+
 func userMetadataToProto(dc converter.DataConverter, m *UserMetadata) (*sdk.UserMetadata, error) {
 	message := &sdk.UserMetadata{}
 	{
-		converted, err := payloadToProto(dc, m.StaticSummary)
+		converted, err := support.PayloadToProto(dc, m.StaticSummary)
 		if err != nil {
 			return nil, err
 		}
 		message.Summary = converted
 	}
 	{
-		converted, err := payloadToProto(dc, m.StaticDetails)
+		converted, err := support.PayloadToProto(dc, m.StaticDetails)
 		if err != nil {
 			return nil, err
 		}
@@ -367,7 +482,7 @@ func userMetadataToProto(dc converter.DataConverter, m *UserMetadata) (*sdk.User
 func userMetadataFromProto(dc converter.DataConverter, proto *sdk.UserMetadata, out *UserMetadata) error {
 	*out = UserMetadata{}
 	if proto.GetSummary() != nil {
-		converted, err := payloadFromProto(dc, proto.GetSummary())
+		converted, err := support.PayloadFromProto(dc, proto.GetSummary())
 		if err != nil {
 			return err
 		}
@@ -378,7 +493,7 @@ func userMetadataFromProto(dc converter.DataConverter, proto *sdk.UserMetadata, 
 		out.StaticSummary = typed
 	}
 	if proto.GetDetails() != nil {
-		converted, err := payloadFromProto(dc, proto.GetDetails())
+		converted, err := support.PayloadFromProto(dc, proto.GetDetails())
 		if err != nil {
 			return err
 		}
@@ -400,6 +515,16 @@ type SignalWithStartWorkflowResponse struct {
 	//
 	// Optional.
 	Started *bool
+}
+
+// GetRunID returns the RunID field.
+func (m SignalWithStartWorkflowResponse) GetRunID() *string {
+	return m.RunID
+}
+
+// GetStarted returns the Started field.
+func (m SignalWithStartWorkflowResponse) GetStarted() *bool {
+	return m.Started
 }
 
 func signalWithStartWorkflowResponseToProto(dc converter.DataConverter, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
@@ -551,20 +676,7 @@ func SignalWithStartWorkflow(
 	if opts.StartDelay != 0 {
 		startDelay = &opts.StartDelay
 	}
-	workflowName := ""
-	{
-		switch rv := reflect.ValueOf(workflow); rv.Kind() {
-		case reflect.String:
-			workflowName = rv.String()
-		case reflect.Func:
-			fullName := runtime.FuncForPC(rv.Pointer()).Name()
-			elements := strings.Split(fullName, ".")
-			shortName := elements[len(elements)-1]
-			workflowName = strings.TrimSuffix(shortName, "-fm")
-		default:
-			panic("nexgen function name requires string or function")
-		}
-	}
+	workflowName := support.WorkflowFunctionName(ctx, workflow)
 	return signalWithStartWorkflow(ctx, signalWithStartWorkflowRequest{
 		Workflow:                 workflowName,
 		Args:                     args,
@@ -632,14 +744,7 @@ func SignalWithStartWorkflowTyped[WorkflowArg any, WorkflowResult any](
 	if opts.StartDelay != 0 {
 		startDelay = &opts.StartDelay
 	}
-	workflowName := ""
-	{
-		rv := reflect.ValueOf(workflow)
-		fullName := runtime.FuncForPC(rv.Pointer()).Name()
-		elements := strings.Split(fullName, ".")
-		shortName := elements[len(elements)-1]
-		workflowName = strings.TrimSuffix(shortName, "-fm")
-	}
+	workflowName := support.WorkflowFunctionName(ctx, workflow)
 	return signalWithStartWorkflow(ctx, signalWithStartWorkflowRequest{
 		Workflow:                 workflowName,
 		Args:                     []any{arg},
@@ -671,7 +776,7 @@ var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperat
 		Operation: "SignalWithStartWorkflowExecution",
 	}: {
 		SerializationContext: func(request any) converter.SerializationContext {
-			return signalWithStartWorkflowSerializationContext(request.(signalWithStartWorkflowRequest))
+			return support.SignalWithStartWorkflowSerializationContext(request.(signalWithStartWorkflowRequest))
 		},
 	},
 }

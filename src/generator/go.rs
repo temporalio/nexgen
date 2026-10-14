@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use heck::{ToKebabCase, ToSnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
 
-use crate::SupportFiles;
 use crate::error::{Error, Result};
 use crate::generator::render_request_plan;
 use crate::generator::{
@@ -17,11 +16,10 @@ use crate::planning::{
     PlannedResourceMethodResultKind as PlannedResourceMethodResult, PlannedSpec, PlannedType,
 };
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec,
+    AliasTypeSpec, EnumSpec, EnumValueSpec, ExternalTypeSpec, FieldDefaultSpec, FlagsSpec,
     FunctionArgsSpec as GenericFunctionArgsSpec, FunctionFieldSpec as GenericFunctionFieldSpec,
-    FunctionResultSpec as GenericFunctionResultSpec, IntSpec, LanguageStringSpec, ModulePath,
-    OperationSpec, RecordFieldSpec, RecordSpec, SupportFragmentSpec, TypeReplacementSpec, TypeSpec,
-    VariantSpec,
+    FunctionResultSpec as GenericFunctionResultSpec, IntSpec, ModulePath, OperationSpec,
+    RecordFieldSpec, RecordSpec, SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecLeaf, ApiSpecNode, ApiSpecTree};
 
@@ -58,6 +56,7 @@ pub struct GoOptions {
     /// non-root name -- `generate_to_file` resolves and validates it before
     /// generation runs.
     pub(crate) output_dir_name: String,
+    pub(crate) support_package: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,10 +113,12 @@ struct PlannedVariantCase {
 pub(in crate::generator) struct PlannedField {
     pub(in crate::generator) proto_name: String,
     pub(in crate::generator) authored_name: String,
-    pub(in crate::generator) doc: Option<LanguageStringSpec>,
-    annotation_override: Option<LanguageStringSpec>,
-    pub(in crate::generator) flattened_annotation_override: Option<LanguageStringSpec>,
+    pub(in crate::generator) doc: Option<SelectedTextSpec>,
+    annotation_override: Option<SelectedTextSpec>,
+    pub(in crate::generator) flattened_annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) required: bool,
+    pub(in crate::generator) default_value: Option<FieldDefaultSpec>,
+    pub(in crate::generator) default_enum_value: Option<EnumValueSpec>,
     role: PlannedFieldRole,
     pub(in crate::generator) kind: PlannedFieldKind,
 }
@@ -153,7 +154,7 @@ pub(in crate::generator) enum PlannedValueType {
         err: Option<Box<PlannedValueType>>,
     },
     External {
-        type_name: LanguageStringSpec,
+        type_name: SelectedTextSpec,
         fallback: Box<PlannedValueType>,
     },
     Unknown,
@@ -173,7 +174,7 @@ pub(in crate::generator) enum PlannedScalarType {
 pub(in crate::generator) struct PlannedEnumType {
     pub(in crate::generator) info: Option<PlannedTypeInfo>,
     pub(in crate::generator) name: Option<String>,
-    pub(in crate::generator) replacement: Option<TypeReplacementSpec>,
+    pub(in crate::generator) replacement: Option<TypeReplacementSpec<PlannedFamily>>,
 }
 
 #[derive(Debug, Clone)]
@@ -192,7 +193,7 @@ pub(in crate::generator) struct PlannedVariantType {
 pub(in crate::generator) struct PlannedMessageType {
     pub(in crate::generator) info: PlannedTypeInfo,
     pub(in crate::generator) model_name: String,
-    pub(in crate::generator) replacement: Option<TypeReplacementSpec>,
+    pub(in crate::generator) replacement: Option<TypeReplacementSpec<PlannedFamily>>,
     pub(in crate::generator) authored_type: Option<PlannedType>,
     pub(in crate::generator) source: PlannedMessageSource,
 }
@@ -210,8 +211,8 @@ fn local_type_info(full_name: &str) -> PlannedTypeInfo {
         package: String::new(),
         file_name: None,
         file_options: None,
-        reference: LanguageStringSpec::default(),
-        type_name: LanguageStringSpec::default(),
+        reference: SelectedTextSpec::default(),
+        type_name: SelectedTextSpec::default(),
     }
 }
 
@@ -353,6 +354,8 @@ pub(in crate::generator) fn planned_field(
         annotation_override: field.annotation.clone(),
         flattened_annotation_override: field.flattened_annotation.clone(),
         required: field.required,
+        default_value: field.default_value.clone(),
+        default_enum_value: field.data.default_enum_value.clone(),
         role,
         kind: planned_field_kind(&field.field_type, spec),
     }
@@ -392,7 +395,7 @@ fn planned_variant(variant: &VariantSpec<PlannedFamily>, spec: &PlannedSpec) -> 
     PlannedVariant {
         info: local_type_info(&variant.full_name),
         name: variant.name.clone(),
-        type_parameters: spec.variant_type_parameters(&variant.full_name, Language::Go),
+        type_parameters: spec.variant_type_parameters(&variant.full_name),
         cases: variant
             .cases
             .iter()
@@ -504,6 +507,7 @@ pub(in crate::generator) struct GoPackageContext {
     package_name: String,
     import_path: Option<String>,
     pub(in crate::generator) has_serialization_context: bool,
+    support_package: Option<String>,
 }
 
 impl GoPackageContext {
@@ -516,7 +520,7 @@ impl GoPackageContext {
         // unqualified accordingly.
         let import_path = api_plan
             .primary_namespace()
-            .and_then(|namespace| namespace.for_language(Language::Go))
+            .and_then(|namespace| namespace.value())
             .map(str::to_string);
         let package_name = Self::derive_package_name(&options.output_dir_name)?;
 
@@ -544,12 +548,8 @@ impl GoPackageContext {
                 .services
                 .iter()
                 .flat_map(|service| &service.operations)
-                .any(|operation| {
-                    operation
-                        .serialization_context
-                        .for_language(Language::Go)
-                        .is_some()
-                }),
+                .any(|operation| operation.serialization_context.value().is_some()),
+            support_package: options.support_package.clone(),
         })
     }
 
@@ -576,14 +576,20 @@ impl GoPackageContext {
     }
 
     pub(in crate::generator) fn go_type_expr(&self, type_expr: &str) -> String {
-        let (import_path, code_expr) = parse_go_import(type_expr);
-        if import_path
-            .as_deref()
-            .is_some_and(|import_path| self.is_self_import(import_path))
-        {
-            return self.unqualify_self_expr(&code_expr);
+        let (imports, code_expr) = parse_go_expr(type_expr);
+        if imports.iter().any(|path| self.is_self_import(path)) {
+            self.unqualify_self_expr(&code_expr)
+        } else {
+            code_expr
         }
-        code_expr
+    }
+
+    fn function_name_extractor(&self, reference: &str) -> String {
+        if self.support_package.is_some() && !reference.contains('.') {
+            format!("support.{reference}")
+        } else {
+            self.go_type_expr(reference)
+        }
     }
 
     pub(in crate::generator) fn workflow_context_type(&self) -> String {
@@ -692,12 +698,11 @@ struct GoGenerationResult {
 /// by the file that declares it.
 fn generate_in_tree(
     api_plan: &PlannedSpec,
-    support_fragments: &[SupportFragmentSpec],
     options: &GoOptions,
     tree_models: &[PlannedJsonType],
     primary_origin: GeneratedFileOrigin,
 ) -> Result<GoGenerationResult> {
-    ApiPlanner::new(api_plan, options, tree_models)?.generate(support_fragments, primary_origin)
+    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin)
 }
 
 /// Every JSON model declared anywhere in the generate closure.
@@ -711,12 +716,11 @@ fn collect_tree_json_models(leaves: &[&ApiSpecLeaf<PlannedFamily>]) -> Vec<Plann
 
 pub(crate) fn generate_tree(
     tree: &ApiSpecTree<PlannedFamily>,
-    support: &SupportFiles,
     options: &GoOptions,
 ) -> Result<GeneratedFiles> {
     match &tree.root {
-        ApiSpecNode::Leaf(leaf) => generate_single_leaf(leaf, support, options),
-        ApiSpecNode::Branch(branch) => generate_branch_tree(branch, support, options),
+        ApiSpecNode::Leaf(leaf) => generate_single_leaf(leaf, options),
+        ApiSpecNode::Branch(branch) => generate_branch_tree(branch, options),
     }
 }
 
@@ -726,7 +730,6 @@ pub(crate) fn generate_tree(
 /// `definitions.go` alongside the one model file, rather than inlined into it.
 fn generate_single_leaf(
     leaf: &ApiSpecLeaf<PlannedFamily>,
-    support: &SupportFiles,
     options: &GoOptions,
 ) -> Result<GeneratedFiles> {
     let primary_origin = if go_tree_has_json_models(&[leaf]) {
@@ -736,8 +739,7 @@ fn generate_single_leaf(
     } else {
         GeneratedFileOrigin::fixed("generated Go API module")
     };
-    let mut generated =
-        generate_in_tree(&leaf.spec, &support.fragments, options, &[], primary_origin)?;
+    let mut generated = generate_in_tree(&leaf.spec, options, &[], primary_origin)?;
     if go_tree_has_json_models(&[leaf]) {
         let package_name = GoPackageContext::new(&leaf.spec, options)?.package_name;
         let definitions_path = PathBuf::from("definitions.go");
@@ -757,7 +759,6 @@ fn generate_single_leaf(
 
 fn generate_branch_tree(
     branch: &ApiSpecBranch<PlannedFamily>,
-    support: &SupportFiles,
     options: &GoOptions,
 ) -> Result<GeneratedFiles> {
     let mut leaves = Vec::new();
@@ -793,7 +794,6 @@ fn generate_branch_tree(
         leaf_spec.module_path = root.clone();
         let generated = generate_in_tree(
             &leaf_spec,
-            &[],
             options,
             &tree_models,
             GeneratedFileOrigin::input_module(Language::Go, &leaf.source_path),
@@ -814,16 +814,6 @@ fn generate_branch_tree(
             PathBuf::from("definitions.go"),
             json::render_definitions_file(&package_name, &tree_models)?,
             GeneratedFileOrigin::fixed("generated Go validation runtime"),
-        )?;
-    }
-
-    // Hand-written support fragments (rare for JSON inputs) are emitted once.
-    let support_fragments = support_fragments_for_plans(&leaves, support);
-    if !support_fragments.is_empty() {
-        files.insert(
-            PathBuf::from("support.go"),
-            render_support_file(&support_fragments, &package_name),
-            GeneratedFileOrigin::fixed("generated Go support file"),
         )?;
     }
 
@@ -855,20 +845,6 @@ fn go_tree_has_json_models(leaves: &[&ApiSpecLeaf<PlannedFamily>]) -> bool {
             .map(|(_, binding)| binding)
             .any(|binding| binding.json_model().is_some())
     })
-}
-
-fn support_fragments_for_plans(
-    plans: &[&ApiSpecLeaf<PlannedFamily>],
-    support: &SupportFiles,
-) -> Vec<SupportFragmentSpec> {
-    if !support.fragments.is_empty() {
-        return support.fragments.clone();
-    }
-    plans
-        .iter()
-        .flat_map(|leaf| leaf.spec.support.fragments_for_language(Language::Go))
-        .cloned()
-        .collect()
 }
 
 fn collect_leaf_specs<'a>(
@@ -935,13 +911,20 @@ fn plan_uses_json_models(api_plan: &PlannedSpec) -> bool {
 }
 
 impl GoExternalModels {
-    fn new(api_plan: &PlannedSpec, package: GoPackageContext) -> Self {
+    fn new(
+        api_plan: &PlannedSpec,
+        package: GoPackageContext,
+        support_package: Option<&str>,
+    ) -> Self {
         if plan_uses_json_models(api_plan) {
             Self::Json(json::ModelBackend::new(
                 crate::nexgen_config::current().mode == GenerationMode::NativeApi,
             ))
         } else {
-            Self::Proto(proto::ModelBackend::new(package))
+            Self::Proto(proto::ModelBackend::new(
+                package,
+                support_package.map(str::to_string),
+            ))
         }
     }
 
@@ -995,6 +978,16 @@ impl GoExternalModels {
             Self::Json(backend) => backend.model_type_annotation(model_type),
             Self::Proto(backend) => backend.model_type_annotation(model_type),
         }
+    }
+
+    fn function_with_support_helper(&self, function: &FunctionFieldSpec) -> FunctionFieldSpec {
+        let mut function = function.clone();
+        if let Self::Proto(backend) = self {
+            function.name_extractor = function
+                .name_extractor
+                .map(|name| backend.support_converter(name));
+        }
+        function
     }
 
     fn has_message_wire_type(&self, message: &PlannedMessageType) -> bool {
@@ -1093,7 +1086,11 @@ impl<'a> ApiPlanner<'a> {
         collect_imports_from_plan(api_plan, &mut imports);
         imports.retain(|import_path| !package.is_self_import(import_path));
 
-        let mut external_models = GoExternalModels::new(api_plan, package.clone());
+        let mut external_models = GoExternalModels::new(
+            api_plan,
+            package.clone(),
+            options.support_package.as_deref(),
+        );
         external_models.adopt_tree_models(tree_models);
         external_models.prepare(api_plan)?;
 
@@ -1109,11 +1106,7 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    fn generate(
-        mut self,
-        support_fragments: &[SupportFragmentSpec],
-        primary_origin: GeneratedFileOrigin,
-    ) -> Result<GoGenerationResult> {
+    fn generate(mut self, primary_origin: GeneratedFileOrigin) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
         if self.package.has_serialization_context
             && self.external_models.renders_operation_references()
@@ -1186,7 +1179,41 @@ impl<'a> ApiPlanner<'a> {
             }
         }
 
-        let needs_function_name_inlining = services.iter().any(service_uses_function_name_inlining);
+        for service in &services {
+            for operation in &service.operations {
+                if let Some(params) = &operation.unpacked_input {
+                    validate_wrapper_type_parameters(
+                        operation,
+                        params,
+                        &self.package,
+                        &visibility,
+                    )?;
+                    for param in params {
+                        if let Some(function) = &param.function
+                            && function
+                                .type_descriptor
+                                .as_ref()
+                                .and_then(|d| d.args_type.value())
+                                .is_some()
+                            && (!matches!(function.args, FunctionArgsSpec::Varargs { .. })
+                                || function.arg_fields.len() != 1
+                                || !params.iter().any(|arg| {
+                                    arg.function_args.as_ref() == Some(function)
+                                        && arg.go_type.starts_with("[]")
+                                }))
+                        {
+                            return Err(Error::UnsupportedGoType {
+                                context: format!("function `{}`", param.field_name),
+                                reason: "an explicit Go args descriptor requires one list-backed varargs args field; fixed signatures are unsupported".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        let needs_manual_function_name_inlining = services
+            .iter()
+            .any(service_uses_manual_function_name_inlining);
 
         // Operation wrapper functions require the workflow package.
         let has_operations = services.iter().any(|s| !s.operations.is_empty());
@@ -1223,14 +1250,14 @@ impl<'a> ApiPlanner<'a> {
                     field
                         .flattened_annotation
                         .as_ref()
-                        .and_then(|annotation| annotation.for_language(Language::Go))
+                        .and_then(|annotation| annotation.value())
                         .is_some()
                 })
             })
         {
             self.imports.insert("fmt".to_string());
         }
-        if needs_function_name_inlining {
+        if needs_manual_function_name_inlining {
             self.imports.insert("reflect".to_string());
             self.imports.insert("runtime".to_string());
             self.imports.insert("strings".to_string());
@@ -1280,13 +1307,7 @@ impl<'a> ApiPlanner<'a> {
             ));
         }
         let registry = if self.package.has_serialization_context {
-            render_operation_registry(
-                &self.package,
-                &services,
-                &self.imports,
-                &external_imports,
-                support_fragments,
-            )?
+            render_operation_registry(&self.package, &services, &self.imports, &external_imports)?
         } else {
             GoOperationRegistry::default()
         };
@@ -1310,6 +1331,31 @@ impl<'a> ApiPlanner<'a> {
             } else {
                 external_imports.push((path.clone(), alias.clone()));
             }
+        }
+        if services
+            .iter()
+            .flat_map(|s| &s.operations)
+            .filter_map(|o| o.unpacked_input.as_ref())
+            .flatten()
+            .any(|p| {
+                p.function.as_ref().is_some_and(|f| {
+                    !function_value_is_string(f)
+                        && f.name_extractor.as_ref().is_some_and(|helper| {
+                            self.package
+                                .function_name_extractor(helper)
+                                .starts_with("support.")
+                        })
+                })
+            })
+            && let Some(path) = &self.package.support_package
+            && !external_imports
+                .iter()
+                .any(|(existing, _)| existing == path)
+        {
+            external_imports.push((path.clone(), "support".to_string()));
+        }
+        for model in self.models.values() {
+            validate_model_getter_names(model)?;
         }
         let output = render_file(
             &self.package,
@@ -1338,18 +1384,6 @@ impl<'a> ApiPlanner<'a> {
         };
         files.insert(file_name, output, primary_origin)?;
 
-        // Emit hand-written support fragments (e.g. proto converter functions)
-        // in one support file. Like the TypeScript backend, all fragments are
-        // emitted unconditionally, even when nothing in the generated code
-        // references them.
-        if !support_fragments.is_empty() {
-            files.insert(
-                PathBuf::from("support.go"),
-                render_support_file(support_fragments, &self.package.package_name),
-                GeneratedFileOrigin::fixed("generated Go support file"),
-            )?;
-        }
-
         Ok(GoGenerationResult {
             files,
             warnings: Vec::new(),
@@ -1374,10 +1408,7 @@ impl<'a> ApiPlanner<'a> {
         let output = operation_output(operation, self.api_plan);
         self.resolve_message_types(&input)?;
         let model_type_parameters = record_for_message(self.api_plan, &input)
-            .map(|record| {
-                self.api_plan
-                    .record_type_parameters(&record.full_name, Language::Go)
-            })
+            .map(|record| self.api_plan.record_type_parameters(&record.full_name))
             .unwrap_or_default();
         let input_type = go_generic_reference(
             &resolve_message_go_type(&input, &self.external_models),
@@ -1385,10 +1416,7 @@ impl<'a> ApiPlanner<'a> {
             false,
         );
         let go_output_transform = operation.output_transform.as_ref().and_then(|transform| {
-            Some((
-                transform.type_name.for_language(Language::Go)?,
-                transform.transform.for_language(Language::Go)?,
-            ))
+            Some((transform.type_name.value()?, transform.transform.value()?))
         });
         let raw_output_type = if go_output_transform.is_some() {
             match &output {
@@ -1449,12 +1477,14 @@ impl<'a> ApiPlanner<'a> {
                     let planned_field = planned_field?;
                     let function = match &planned_field.role {
                         PlannedFieldRole::Function(function) if planned_field.required => {
-                            Some(function.clone())
+                            Some(self.external_models.function_with_support_helper(function))
                         }
                         _ => None,
                     };
                     let function_args = match &planned_field.role {
-                        PlannedFieldRole::FunctionArgs(function) => Some(function.clone()),
+                        PlannedFieldRole::FunctionArgs(function) => {
+                            Some(self.external_models.function_with_support_helper(function))
+                        }
                         _ => None,
                     };
                     let embed_in_options = !planned_field.required
@@ -1492,15 +1522,15 @@ impl<'a> ApiPlanner<'a> {
                 .collect()
         });
 
-        let serialization_context_expr = operation.serialization_context.for_language(Language::Go);
+        let serialization_context_expr = operation.serialization_context.value();
         if let Some(helper) = serialization_context_expr {
             validate_go_serialization_context_helper(helper, &operation.name)?;
         }
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
-            doc: operation.doc.for_language(Language::Go),
-            return_doc: operation.return_doc.for_language(Language::Go),
+            doc: operation.doc.value(),
+            return_doc: operation.return_doc.value(),
             func_name: go_unexported_name(&operation.name),
             input_type,
             model_type_parameters,
@@ -1617,7 +1647,7 @@ impl<'a> ApiPlanner<'a> {
                         &variant_type.name,
                         &self
                             .api_plan
-                            .variant_type_parameters(&variant_type.info.full_name, Language::Go),
+                            .variant_type_parameters(&variant_type.info.full_name),
                         false,
                     ),
                 })
@@ -1639,9 +1669,7 @@ impl<'a> ApiPlanner<'a> {
                     .map(|record| {
                         go_generic_reference(
                             &base,
-                            &self
-                                .api_plan
-                                .record_type_parameters(&record.full_name, Language::Go),
+                            &self.api_plan.record_type_parameters(&record.full_name),
                             false,
                         )
                     })
@@ -1682,7 +1710,7 @@ impl<'a> ApiPlanner<'a> {
                 type_name,
                 fallback,
             } => {
-                if let Some(annotation) = type_name.for_language(Language::Go) {
+                if let Some(annotation) = type_name.value() {
                     Ok(ResolvedGoType {
                         type_expr: self.package.go_type_expr(annotation),
                     })
@@ -1767,7 +1795,7 @@ impl<'a> ApiPlanner<'a> {
             record_for_message(self.api_plan, message).map(|planned_model| {
                 let parameters = self
                     .api_plan
-                    .record_type_parameters(&planned_model.full_name, Language::Go);
+                    .record_type_parameters(&planned_model.full_name);
                 let planned_fields = planned_model
                     .model_fields()
                     .map(|(field_name, field)| {
@@ -1842,7 +1870,7 @@ impl<'a> ApiPlanner<'a> {
             .flattened_annotation_override
             .as_ref()
             .or(field.annotation_override.as_ref())
-            .and_then(|annotation| annotation.for_language(Language::Go))
+            .and_then(|annotation| annotation.value())
             .map(|annotation| self.package.go_type_expr(annotation));
 
         let go_type = if let Some(annotated) = annotated_go_type {
@@ -1876,7 +1904,7 @@ impl<'a> ApiPlanner<'a> {
             doc: field
                 .doc
                 .as_ref()
-                .and_then(|doc| doc.for_language(Language::Go))
+                .and_then(|doc| doc.value())
                 .map(str::to_string),
             go_type,
             required: field.required,
@@ -1903,12 +1931,15 @@ impl<'a> ApiPlanner<'a> {
     }
 }
 
-fn service_uses_function_name_inlining(service: &RenderedService<'_>) -> bool {
+fn service_uses_manual_function_name_inlining(service: &RenderedService<'_>) -> bool {
     service.operations.iter().any(|operation| {
         operation.unpacked_input.as_ref().is_some_and(|params| {
-            params
-                .iter()
-                .any(|param| param.required && param.function.is_some())
+            params.iter().any(|param| {
+                param.required
+                    && param.function.as_ref().is_some_and(|function| {
+                        !function_value_is_string(function) && function.name_extractor.is_none()
+                    })
+            })
         })
     })
 }
@@ -1962,7 +1993,6 @@ fn render_operation_registry(
     services: &[RenderedService<'_>],
     model_imports: &BTreeSet<String>,
     external_imports: &[(String, String)],
-    support_fragments: &[SupportFragmentSpec],
 ) -> Result<GoOperationRegistry> {
     let services: Vec<_> = services
         .iter()
@@ -1989,17 +2019,8 @@ fn render_operation_registry(
             path.rsplit('/').next().unwrap_or(path).to_string(),
         )
     }));
-    for fragment in support_fragments {
-        for import in parse_support_fragment(&fragment.contents).imports {
-            let (alias, path) = import.split_once('"').unwrap_or(("", ""));
-            let path = path.split('"').next().unwrap_or_default();
-            let alias = if alias.trim().is_empty() {
-                path.rsplit('/').next().unwrap_or_default()
-            } else {
-                alias.trim()
-            };
-            candidates.push((path.to_string(), alias.to_string()));
-        }
+    if let Some(path) = &package.support_package {
+        candidates.push((path.clone(), "support".to_string()));
     }
     let mut imports = BTreeMap::new();
     if has_helpers && !package.is_self_import("go.temporal.io/sdk/converter") {
@@ -2023,7 +2044,15 @@ fn render_operation_registry(
                     operation.serialization_context_expr.is_some()
                         && operation.input_type.contains(&format!("{alias}."))
                 });
-        if (!helper_packages.contains(alias.as_str()) && !used_by_input_type)
+        let used_by_unqualified_helper = alias == "support"
+            && services
+                .iter()
+                .flat_map(|service| &service.operations)
+                .filter_map(|operation| operation.serialization_context_expr)
+                .any(|helper| !helper.contains('.'));
+        if (!helper_packages.contains(alias.as_str())
+            && !used_by_input_type
+            && !used_by_unqualified_helper)
             || package.is_self_import(&path)
         {
             continue;
@@ -2057,6 +2086,7 @@ fn render_operation_registry(
             let Some(helper) = operation.serialization_context_expr else {
                 continue;
             };
+            let helper = package.function_name_extractor(helper);
             if !keys.insert((service.wire_name, operation.wire_name)) {
                 return Err(Error::InvalidWitDirective {
                     path: PathBuf::from("<go-plan>"),
@@ -2097,127 +2127,6 @@ fn render_operation_registry(
             .collect(),
         body: output,
     })
-}
-
-fn render_support_file(fragments: &[SupportFragmentSpec], package_name: &str) -> String {
-    if let [fragment] = fragments {
-        return rewrite_support_package(&fragment.contents, package_name);
-    }
-
-    let mut prelude = String::new();
-    let mut imports = BTreeSet::new();
-    let mut bodies = Vec::new();
-    for fragment in fragments {
-        let parsed = parse_support_fragment(&fragment.contents);
-        if prelude.is_empty() {
-            prelude = parsed.prelude;
-        } else if !parsed.prelude.trim().is_empty() {
-            bodies.push(parsed.prelude.trim().to_string());
-        }
-        imports.extend(parsed.imports);
-        if !parsed.body.trim().is_empty() {
-            bodies.push(parsed.body.trim().to_string());
-        }
-    }
-
-    let mut output = String::new();
-    if !prelude.trim().is_empty() {
-        output.push_str(prelude.trim_end());
-        output.push('\n');
-    }
-    output.push_str("package ");
-    output.push_str(package_name);
-    output.push_str("\n\n");
-    if !imports.is_empty() {
-        output.push_str("import (\n");
-        for import in imports {
-            output.push('\t');
-            output.push_str(&import);
-            output.push('\n');
-        }
-        output.push_str(")\n\n");
-    }
-    output.push_str(&bodies.join("\n\n"));
-    output.push('\n');
-    output
-}
-
-/// Replaces the `package <name>` declaration in a Go support fragment with the
-/// generated package name, preserving the rest of the file. If no package
-/// declaration is found, the original contents are returned unchanged.
-fn rewrite_support_package(contents: &str, package_name: &str) -> String {
-    let mut result = String::with_capacity(contents.len());
-    let mut replaced = false;
-    for line in contents.lines() {
-        if !replaced && line.trim_start().starts_with("package ") {
-            result.push_str("package ");
-            result.push_str(package_name);
-            replaced = true;
-        } else {
-            result.push_str(line);
-        }
-        result.push('\n');
-    }
-    result
-}
-
-#[derive(Default)]
-struct ParsedSupportFragment {
-    prelude: String,
-    imports: BTreeSet<String>,
-    body: String,
-}
-
-fn parse_support_fragment(contents: &str) -> ParsedSupportFragment {
-    let lines = contents.lines().collect::<Vec<_>>();
-    let Some(package_index) = lines
-        .iter()
-        .position(|line| line.trim_start().starts_with("package "))
-    else {
-        return ParsedSupportFragment {
-            body: contents.to_string(),
-            ..Default::default()
-        };
-    };
-
-    let mut parsed = ParsedSupportFragment {
-        prelude: lines[..package_index].join("\n"),
-        ..Default::default()
-    };
-    let mut index = package_index + 1;
-    skip_blank_lines(&lines, &mut index);
-
-    while index < lines.len() {
-        let line = lines[index].trim_start();
-        if line == "import (" {
-            index += 1;
-            while index < lines.len() && lines[index].trim() != ")" {
-                let import = lines[index].trim();
-                if !import.is_empty() {
-                    parsed.imports.insert(import.to_string());
-                }
-                index += 1;
-            }
-            if index < lines.len() {
-                index += 1;
-            }
-        } else if let Some(import) = line.strip_prefix("import ") {
-            parsed.imports.insert(import.trim().to_string());
-            index += 1;
-        } else {
-            break;
-        }
-        skip_blank_lines(&lines, &mut index);
-    }
-
-    parsed.body = lines[index..].join("\n");
-    parsed
-}
-
-fn skip_blank_lines(lines: &[&str], index: &mut usize) {
-    while *index < lines.len() && lines[*index].trim().is_empty() {
-        *index += 1;
-    }
 }
 
 /// Derives a valid Go package name from a Nexus endpoint string by stripping
@@ -2614,8 +2523,7 @@ impl GoVisibilityMarker<'_> {
             .output_transform
             .as_ref()
             .is_some_and(|transform| {
-                transform.type_name.for_language(Language::Go).is_some()
-                    && transform.transform.for_language(Language::Go).is_some()
+                transform.type_name.value().is_some() && transform.transform.value().is_some()
             })
         {
             return;
@@ -2712,7 +2620,7 @@ impl GoVisibilityMarker<'_> {
                 type_name,
                 fallback,
             } => {
-                if type_name.for_language(Language::Go).is_none() {
+                if type_name.value().is_none() {
                     self.mark_value_type(fallback);
                 }
             }
@@ -2920,12 +2828,12 @@ fn resolve_message_go_type(
 /// annotation) is stripped and will be collected separately by
 /// [`collect_imports`].
 pub(in crate::generator) fn go_replacement_type_name(
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
     package: &GoPackageContext,
 ) -> Option<String> {
     replacement
         .type_name
-        .for_language(Language::Go)
+        .value()
         .map(|annotation| package.go_type_expr(annotation))
 }
 
@@ -2953,7 +2861,7 @@ pub(in crate::generator) fn go_authored_type_annotation(wit_type: &PlannedType) 
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => type_name
-            .for_language(Language::Go)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| go_authored_type_annotation(target)),
         TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message))) => {
@@ -3239,6 +3147,49 @@ fn parse_go_import(type_expr: &str) -> (Option<String>, String) {
     (None, type_expr.to_string())
 }
 
+/// Parse package references at any depth without treating Go punctuation as
+/// part of a module path. The same walk drives public rendering and imports.
+fn parse_go_expr(expr: &str) -> (BTreeSet<String>, String) {
+    // A leading explicit import applies to the entire expression, including
+    // composite forms such as `example.org/types:[]types.Value`.
+    if let Some((path, code)) = expr.split_once(':')
+        && !path
+            .chars()
+            .any(|ch| matches!(ch, '[' | ']' | '(' | ')' | '*' | ' '))
+    {
+        return (BTreeSet::from([path.to_string()]), code.to_string());
+    }
+    let mut imports = BTreeSet::new();
+    let mut rendered = String::new();
+    let mut token = String::new();
+    let flush = |token: &mut String, rendered: &mut String, imports: &mut BTreeSet<String>| {
+        if token.is_empty() {
+            return;
+        }
+        let (prefix, reference) = token
+            .strip_prefix("...")
+            .map(|s| ("...", s))
+            .unwrap_or(("", token.as_str()));
+        let (import, code) = parse_go_import(reference);
+        if let Some(import) = import {
+            imports.insert(import);
+        }
+        rendered.push_str(prefix);
+        rendered.push_str(&code);
+        token.clear();
+    };
+    for ch in expr.chars() {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '/' | ':' | '-') {
+            token.push(ch);
+        } else {
+            flush(&mut token, &mut rendered, &mut imports);
+            rendered.push(ch);
+        }
+    }
+    flush(&mut token, &mut rendered, &mut imports);
+    (imports, rendered)
+}
+
 /// Walks the [`PlannedSpec`] and collects Go import paths from any `@nexus.type`
 /// annotations that embed a module path (e.g. `go.temporal.io/sdk/temporal.RetryPolicy`).
 fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<String>) {
@@ -3268,10 +3219,9 @@ fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<Stri
                 collect_imports_from_message_type(&output, imports);
             }
             if let Some(transform) = &operation.output_transform {
-                if let (Some(annotation), Some(_expr)) = (
-                    transform.type_name.for_language(Language::Go),
-                    transform.transform.for_language(Language::Go),
-                ) {
+                if let (Some(annotation), Some(_expr)) =
+                    (transform.type_name.value(), transform.transform.value())
+                {
                     let (import_path, _) = parse_go_import(annotation);
                     if let Some(path) = import_path {
                         imports.insert(path);
@@ -3283,6 +3233,22 @@ fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<Stri
 }
 
 fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTreeSet<String>) {
+    if !function_value_is_string(function)
+        && let Some(helper) = &function.name_extractor
+        && !helper.starts_with("support.")
+    {
+        imports.extend(parse_go_expr(helper).0);
+    }
+    if let Some(descriptor) = &function.type_descriptor {
+        for text in [&descriptor.value_type, &descriptor.args_type] {
+            if let Some(import) = text.import() {
+                imports.insert(import.to_string());
+            } else if let Some(value) = text.value() {
+                imports.extend(parse_go_expr(value).0);
+            }
+        }
+        return;
+    }
     match &function.args {
         FunctionArgsSpec::Varargs { prefix, .. } => {
             for arg in prefix {
@@ -3298,7 +3264,7 @@ fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTr
     match &function.result {
         FunctionResultSpec::Authored(result) => collect_imports_from_authored_type(result, imports),
         FunctionResultSpec::Annotation(result) => {
-            if let Some(annotation) = result.for_language(Language::Go) {
+            if let Some(annotation) = result.value() {
                 let (import_path, _) = parse_go_import(annotation);
                 if let Some(path) = import_path {
                     imports.insert(path);
@@ -3333,7 +3299,7 @@ fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTre
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => {
-            if let Some(annotation) = type_name.for_language(Language::Go) {
+            if let Some(annotation) = type_name.value() {
                 let (import_path, _) = parse_go_import(annotation);
                 if let Some(path) = import_path {
                     imports.insert(path);
@@ -3349,7 +3315,7 @@ fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTre
 /// Collects Go imports from a message type's replacement or authored type.
 fn collect_imports_from_message_type(message: &PlannedMessageType, imports: &mut BTreeSet<String>) {
     if let Some(replacement) = &message.replacement {
-        if let Some(annotation) = replacement.type_name.for_language(Language::Go) {
+        if let Some(annotation) = replacement.type_name.value() {
             let (import_path, _) = parse_go_import(annotation);
             if let Some(path) = import_path {
                 imports.insert(path);
@@ -3379,7 +3345,7 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
             type_name,
             fallback,
         } => {
-            if let Some(annotation) = type_name.for_language(Language::Go) {
+            if let Some(annotation) = type_name.value() {
                 let (import_path, _) = parse_go_import(annotation);
                 if let Some(path) = import_path {
                     imports.insert(path);
@@ -3390,7 +3356,7 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
         }
         PlannedValueType::Enum(enum_type) => {
             if let Some(replacement) = &enum_type.replacement {
-                if let Some(annotation) = replacement.type_name.for_language(Language::Go) {
+                if let Some(annotation) = replacement.type_name.value() {
                     let (import_path, _) = parse_go_import(annotation);
                     if let Some(path) = import_path {
                         imports.insert(path);
@@ -3400,7 +3366,7 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
         }
         PlannedValueType::Message(message_type) => {
             if let Some(replacement) = &message_type.replacement {
-                if let Some(annotation) = replacement.type_name.for_language(Language::Go) {
+                if let Some(annotation) = replacement.type_name.value() {
                     let (import_path, _) = parse_go_import(annotation);
                     if let Some(path) = import_path {
                         imports.insert(path);
@@ -3522,7 +3488,7 @@ fn render_file(
         for (path, alias) in external_imports {
             output.push('\t');
             let default_alias = path.rsplit('/').next().unwrap_or(path);
-            if alias != default_alias {
+            if alias != default_alias || alias == "support" {
                 output.push_str(alias);
                 output.push(' ');
             }
@@ -4065,7 +4031,73 @@ fn render_model(
         output.push_str("}\n");
     }
 
+    render_model_getters(output, model);
     external_models.render_model_converters(output, key, model);
+}
+
+fn model_getter_name(field: &RenderedField) -> String {
+    let name = if field.sourced {
+        field
+            .name
+            .strip_suffix('_')
+            .filter(|name| is_go_keyword(name))
+            .unwrap_or(&field.name)
+    } else {
+        &field.name
+    };
+    let mut chars = name.chars();
+    let exported = match chars.next() {
+        Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
+        None => String::new(),
+    };
+    format!("Get{exported}")
+}
+
+// Go fields and methods share a namespace. Validate final native names here,
+// rather than reserving Go getter names in the language-neutral pipeline.
+fn validate_model_getter_names(model: &RenderedModel) -> Result<()> {
+    let mut occupied = BTreeMap::new();
+    for field in &model.fields {
+        occupied.insert(field.name.clone(), format!("field `{}`", field.name));
+    }
+    for field in &model.fields {
+        let getter = model_getter_name(field);
+        if let Some(previous) =
+            occupied.insert(getter.clone(), format!("getter for field `{}`", field.name))
+        {
+            return Err(Error::UnsupportedGoType {
+                context: format!("record model `{}`", model.name),
+                reason: format!(
+                    "getter `{getter}` for field `{}` conflicts with {previous}; rename the conflicting field",
+                    field.name
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn render_model_getters(output: &mut String, model: &RenderedModel) {
+    let (ident, parameters) = split_go_type_decl_name(&model.name);
+    let receiver = if parameters.is_empty() {
+        ident.to_string()
+    } else {
+        let names = parameters
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .split(',')
+            .filter_map(|parameter| parameter.split_whitespace().next())
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{ident}[{names}]")
+    };
+    for field in &model.fields {
+        let getter = model_getter_name(field);
+        output.push_str(&format!(
+            "\n// {getter} returns the {} field.\nfunc (m {receiver}) {getter}() {} {{\n\treturn m.{}\n}}\n",
+            field.name, field.go_type, field.name
+        ));
+    }
 }
 
 /// Renders a WIT resource as a Go struct with its constructor fields.
@@ -4293,7 +4325,7 @@ fn resolve_resource_value_type_with_struct_flag(
             type_name,
             fallback,
         } => {
-            if let Some(annotation) = type_name.for_language(Language::Go) {
+            if let Some(annotation) = type_name.value() {
                 (package.go_type_expr(annotation), false)
             } else {
                 resolve_resource_value_type_with_struct_flag(fallback, package)
@@ -4399,7 +4431,7 @@ fn render_resource_methods(
                         required: true,
                         embed_in_options: false,
                     };
-                    render_function_name_inline_assignment(output, &synthetic);
+                    render_function_name_inline_assignment(output, &synthetic, package);
                     name_var
                 });
 
@@ -4741,7 +4773,7 @@ fn required_function_type_parameters(
         .iter()
         .filter_map(|param| {
             let function = param.function.as_ref()?;
-            if is_go_signal_function(function)
+            if function.type_descriptor.as_ref().and_then(|d| d.value_type.value()).is_some()
                 || function.alternate_type.is_none()
                 || (function.primary
                     && matches!(function.args, FunctionArgsSpec::Varargs { ref prefix, .. } if !prefix.is_empty()))
@@ -4754,6 +4786,76 @@ fn required_function_type_parameters(
             ))
         })
         .collect()
+}
+
+fn typed_wrapper_type_parameter_names(primary: &RenderedUnpackedParam) -> (String, String) {
+    let function = primary.function.as_ref().unwrap();
+    (
+        format!("{}Arg", primary.field_name),
+        function
+            .result_type_parameter
+            .clone()
+            .unwrap_or_else(|| format!("{}Result", primary.field_name)),
+    )
+}
+
+// Planning and both wrapper renderers share the complete declaration namespace.
+fn wrapper_type_parameters(
+    operation: &RenderedOperation<'_>,
+    params: &[RenderedUnpackedParam],
+    typed_primary: Option<&RenderedUnpackedParam>,
+    package: &GoPackageContext,
+    visibility: &GoVisibility,
+) -> Vec<(String, String)> {
+    let mut declarations = operation
+        .model_type_parameters
+        .iter()
+        .map(|usage| (usage.parameter.name.clone(), "any".to_string()))
+        .collect::<Vec<_>>();
+    declarations.extend(required_function_type_parameters(
+        params, package, visibility,
+    ));
+    if let Some(primary) = typed_primary {
+        let (arg, result) = typed_wrapper_type_parameter_names(primary);
+        declarations.extend([(arg, "any".to_string()), (result, "any".to_string())]);
+    }
+    declarations
+}
+
+fn validate_wrapper_type_parameters(
+    operation: &RenderedOperation<'_>,
+    params: &[RenderedUnpackedParam],
+    package: &GoPackageContext,
+    visibility: &GoVisibility,
+) -> Result<()> {
+    let typed_primary = unary_primary_varargs_function_param(params);
+    for primary in std::iter::once(None).chain(typed_primary.map(Some)) {
+        let mut occupied = BTreeMap::new();
+        for (index, (name, _)) in
+            wrapper_type_parameters(operation, params, primary, package, visibility)
+                .into_iter()
+                .enumerate()
+        {
+            let source = if index < operation.model_type_parameters.len() {
+                format!("model type parameter `{name}`")
+            } else {
+                format!("generated type parameter `{name}`")
+            };
+            if let Some(previous) = occupied.insert(name.clone(), source) {
+                return Err(Error::UnsupportedGoType {
+                    context: format!(
+                        "operation `{}`{} wrapper",
+                        operation.name,
+                        if primary.is_some() { " Typed" } else { "" }
+                    ),
+                    reason: format!(
+                        "{previous} collides with generated reserved name `{name}` in the Go generic parameter namespace"
+                    ),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn go_function_constraint(
@@ -4803,7 +4905,7 @@ fn go_function_constraint(
             go_authored_function_type_expr(result, package, visibility)
         }
         FunctionResultSpec::Annotation(result) => result
-            .for_language(Language::Go)
+            .value()
             .map(|result| package.go_type_expr(result))
             .map(|result| visibility.rewrite_go_expr(&result))
             .unwrap_or_else(|| "any".to_string()),
@@ -4831,42 +4933,61 @@ fn go_function_type_expr(
         .to_string()
 }
 
-fn is_go_signal_function(function: &FunctionFieldSpec) -> bool {
-    !function.primary
-        && function.args_field == "signal_input"
-        && matches!(function.alternate_type.as_ref(), Some(TypeSpec::String))
+fn function_value_is_string(function: &FunctionFieldSpec) -> bool {
+    function
+        .type_descriptor
+        .as_ref()
+        .and_then(|d| d.value_type.value())
+        == Some("string")
 }
 
-fn is_go_signal_param(param: &RenderedUnpackedParam) -> bool {
-    param.function.as_ref().is_some_and(is_go_signal_function)
-}
-
-fn is_go_signal_args_param(param: &RenderedUnpackedParam) -> bool {
+fn has_explicit_args(param: &RenderedUnpackedParam) -> bool {
     param
         .function_args
         .as_ref()
-        .is_some_and(is_go_signal_function)
+        .and_then(|f| f.type_descriptor.as_ref())
+        .and_then(|d| d.args_type.value())
+        .is_some()
 }
 
 fn ordered_positional_params(params: &[RenderedUnpackedParam]) -> Vec<&RenderedUnpackedParam> {
-    let mut ordered = Vec::new();
-    for signal in params.iter().filter(|param| is_go_signal_param(param)) {
-        ordered.push(signal);
-        if let Some(function) = &signal.function
-            && let Some(args) = params
-                .iter()
-                .find(|param| param.function_args.as_ref() == Some(function))
-        {
-            ordered.push(args);
-        }
-    }
+    let mut ordered: Vec<&RenderedUnpackedParam> = Vec::new();
     for param in params.iter().filter(|param| param_is_positional(param)) {
+        if param.function_args.is_some() {
+            continue;
+        }
         if !ordered
             .iter()
             .any(|item| item.field_name == param.field_name)
         {
             ordered.push(param);
+            if let Some(function) = &param.function {
+                ordered.extend(
+                    params
+                        .iter()
+                        .filter(|arg| arg.function_args.as_ref() == Some(function)),
+                );
+            }
         }
+    }
+    if let Some(primary) = params.iter().find(|p| {
+        p.function.as_ref().is_some_and(|f| {
+            f.primary
+                && f.type_descriptor.is_none()
+                && matches!(f.args, FunctionArgsSpec::Varargs { .. })
+        })
+    }) {
+        let function = primary.function.as_ref().unwrap();
+        let mut group = Vec::new();
+        ordered.retain(|p| {
+            if p.field_name == primary.field_name || p.function_args.as_ref() == Some(function) {
+                group.push(*p);
+                false
+            } else {
+                true
+            }
+        });
+        ordered.extend(group);
     }
     ordered
 }
@@ -4904,7 +5025,7 @@ fn go_authored_function_type_expr(
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => type_name
-            .for_language(Language::Go)
+            .value()
             .map(|annotation| package.go_type_expr(annotation))
             .unwrap_or_else(|| go_authored_function_type_expr(target, package, visibility)),
         _ => go_authored_type_annotation(wit_type),
@@ -4915,7 +5036,10 @@ fn go_authored_function_type_expr(
 fn primary_varargs_args_param(params: &[RenderedUnpackedParam]) -> Option<&RenderedUnpackedParam> {
     let primary_function = params.iter().find_map(|param| {
         let function = param.function.as_ref()?;
-        if function.primary && matches!(function.args, FunctionArgsSpec::Varargs { .. }) {
+        if function.primary
+            && function.type_descriptor.is_none()
+            && matches!(function.args, FunctionArgsSpec::Varargs { .. })
+        {
             Some(function)
         } else {
             None
@@ -4935,7 +5059,9 @@ fn unary_primary_varargs_function_param(
 ) -> Option<&RenderedUnpackedParam> {
     let function_param = params.iter().find(|param| {
         param.function.as_ref().is_some_and(|function| {
-            function.primary && matches!(function.args, FunctionArgsSpec::Varargs { .. })
+            function.primary
+                && function.type_descriptor.is_none()
+                && matches!(function.args, FunctionArgsSpec::Varargs { .. })
         })
     })?;
     let function = function_param.function.as_ref()?;
@@ -4953,29 +5079,50 @@ fn render_operation_wrapper_return_type(output: &mut String, package: &GoPackage
     render_operation_future_return_type(output, package);
 }
 
-fn render_function_name_inlining(output: &mut String, params: &[RenderedUnpackedParam]) {
+fn render_function_name_inlining(
+    output: &mut String,
+    params: &[RenderedUnpackedParam],
+    package: &GoPackageContext,
+) {
     for param in params {
         if param
             .function
             .as_ref()
-            .is_some_and(|function| !is_go_signal_function(function))
+            .is_some_and(|function| !function_value_is_string(function))
         {
             let name = function_name_local_var_for_params(param, params);
-            render_function_name_inline_assignment_named(output, param, &name);
+            render_function_name_inline_assignment_named(output, param, &name, package);
         }
     }
 }
 
-fn render_function_name_inline_assignment(output: &mut String, param: &RenderedUnpackedParam) {
+fn render_function_name_inline_assignment(
+    output: &mut String,
+    param: &RenderedUnpackedParam,
+    package: &GoPackageContext,
+) {
     let name_var = function_name_local_var(param);
-    render_function_name_inline_assignment_named(output, param, &name_var);
+    render_function_name_inline_assignment_named(output, param, &name_var, package);
 }
 
 fn render_function_name_inline_assignment_named(
     output: &mut String,
     param: &RenderedUnpackedParam,
     name_var: &str,
+    package: &GoPackageContext,
 ) {
+    if let Some(helper) = param
+        .function
+        .as_ref()
+        .and_then(|f| f.name_extractor.as_deref())
+    {
+        output.push_str(&format!(
+            "\t{name_var} := {}(ctx, {})\n",
+            package.function_name_extractor(helper),
+            param.param_name
+        ));
+        return;
+    }
     let accepts_alternate = param
         .function
         .as_ref()
@@ -5040,21 +5187,6 @@ fn function_name_local_var_for_params(
     }
 }
 
-fn render_exact_function_name_assignment(output: &mut String, param: &RenderedUnpackedParam) {
-    let name_var = function_name_local_var(param);
-    output.push('\t');
-    output.push_str(&name_var);
-    output.push_str(" := \"\"\n\t{\n");
-    output.push_str("\t\trv := reflect.ValueOf(");
-    output.push_str(&param.param_name);
-    output.push_str(")\n");
-    output.push_str("\t\tfullName := runtime.FuncForPC(rv.Pointer()).Name()\n");
-    output.push_str("\t\telements := strings.Split(fullName, \".\")\n");
-    output.push_str("\t\tshortName := elements[len(elements)-1]\n\t\t");
-    output.push_str(&name_var);
-    output.push_str(" = strings.TrimSuffix(shortName, \"-fm\")\n\t}\n");
-}
-
 fn wrapper_input_docs<'a>(
     params: impl IntoIterator<Item = &'a RenderedUnpackedParam>,
 ) -> Vec<(String, String)> {
@@ -5065,8 +5197,8 @@ fn wrapper_input_docs<'a>(
             if doc.is_empty() {
                 None
             } else {
-                let name = if is_go_signal_args_param(param) {
-                    signal_args_public_param_name(param)
+                let name = if has_explicit_args(param) {
+                    singular_args_public_param_name(param)
                 } else {
                     param.param_name.clone()
                 };
@@ -5119,14 +5251,7 @@ fn render_convenience_wrapper(
     visibility: &GoVisibility,
 ) {
     let exported_name = go_field_name(operation.name);
-    let mut type_params = operation
-        .model_type_parameters
-        .iter()
-        .map(|usage| (usage.parameter.name.clone(), "any".to_string()))
-        .collect::<Vec<_>>();
-    type_params.extend(required_function_type_parameters(
-        params, package, visibility,
-    ));
+    let type_params = wrapper_type_parameters(operation, params, None, package, visibility);
 
     let positional_params = ordered_positional_params(params);
     let input_docs = wrapper_input_docs(positional_params.iter().copied());
@@ -5140,33 +5265,14 @@ fn render_convenience_wrapper(
             false,
         ),
     )];
-    signature_params.extend(positional_params.iter().copied().map(|p| {
-        let (name, ty) = if is_go_signal_param(p) {
-            (p.param_name.clone(), "string".to_string())
-        } else if is_go_signal_args_param(p) {
-            (signal_args_public_param_name(p), "any".to_string())
-        } else if let Some(function) = &p.function {
-            let ty = if unary_primary_varargs_function_param(params)
-                .is_some_and(|primary| primary.field_name == p.field_name)
-            {
-                "any".to_string()
-            } else if function.alternate_type.is_some() {
-                function_type_parameter_name(p)
-            } else {
-                go_function_type_expr(function, params, package, visibility)
-            };
-            (p.param_name.clone(), ty)
-        } else if let Some(function) = &p.function_args {
-            let ty = if matches!(function.args, FunctionArgsSpec::Varargs { .. }) {
-                format!("...{}", go_variadic_element_type(&p.public_go_type))
-            } else {
-                p.public_go_type.clone()
-            };
-            (p.param_name.clone(), ty)
-        } else {
-            (p.param_name.clone(), p.public_go_type.clone())
-        };
-        (name, ty)
+    signature_params.extend(positional_params.iter().enumerate().map(|(index, p)| {
+        wrapper_param_signature(
+            p,
+            params,
+            index + 1 == positional_params.len(),
+            package,
+            visibility,
+        )
     }));
 
     // The signature is multi-line when it has more than 3 parameters total
@@ -5221,7 +5327,7 @@ fn render_convenience_wrapper(
     // sourcing required fields from positional args and optional fields from
     // opts.
     render_public_default_punning_locals(output, params);
-    render_function_name_inlining(output, params);
+    render_function_name_inlining(output, params, package);
     output.push_str("\treturn ");
     output.push_str(&operation.func_name);
     output.push_str("(ctx, ");
@@ -5231,13 +5337,17 @@ fn render_convenience_wrapper(
         output.push_str("\t\t");
         output.push_str(&param.field_name);
         output.push_str(": ");
-        if is_go_signal_param(param) {
+        if param
+            .function
+            .as_ref()
+            .is_some_and(function_value_is_string)
+        {
             output.push_str(&param.param_name);
-        } else if is_go_signal_args_param(param) {
+        } else if has_explicit_args(param) {
             output.push_str(&format!(
                 "{}{{{}}}",
                 param.go_type,
-                signal_args_public_param_name(param)
+                singular_args_public_param_name(param)
             ));
         } else if param.function.is_some() {
             output.push_str(&function_name_local_var_for_params(param, params));
@@ -5260,12 +5370,60 @@ fn render_convenience_wrapper(
     output.push_str("}\n");
 }
 
-fn signal_args_public_param_name(param: &RenderedUnpackedParam) -> String {
+fn singular_args_public_param_name(param: &RenderedUnpackedParam) -> String {
     param
         .param_name
         .strip_suffix("Args")
         .map(|prefix| format!("{prefix}Arg"))
+        .or_else(|| (param.param_name == "args").then(|| "arg".to_string()))
         .unwrap_or_else(|| param.param_name.clone())
+}
+
+fn wrapper_param_signature(
+    param: &RenderedUnpackedParam,
+    params: &[RenderedUnpackedParam],
+    final_param: bool,
+    package: &GoPackageContext,
+    visibility: &GoVisibility,
+) -> (String, String) {
+    if let Some(function) = &param.function {
+        let ty = if let Some(value) = function
+            .type_descriptor
+            .as_ref()
+            .and_then(|d| d.value_type.value())
+        {
+            visibility.rewrite_go_expr(&package.go_type_expr(value))
+        } else if unary_primary_varargs_function_param(params)
+            .is_some_and(|p| p.field_name == param.field_name)
+        {
+            "any".to_string()
+        } else if function.alternate_type.is_some() {
+            function_type_parameter_name(param)
+        } else {
+            go_function_type_expr(function, params, package, visibility)
+        };
+        (param.param_name.clone(), ty)
+    } else if let Some(function) = &param.function_args {
+        if let Some(args) = function
+            .type_descriptor
+            .as_ref()
+            .and_then(|d| d.args_type.value())
+        {
+            (
+                singular_args_public_param_name(param),
+                visibility.rewrite_go_expr(&package.go_type_expr(args)),
+            )
+        } else {
+            let ty = if final_param && matches!(function.args, FunctionArgsSpec::Varargs { .. }) {
+                format!("...{}", go_variadic_element_type(&param.public_go_type))
+            } else {
+                param.public_go_type.clone()
+            };
+            (param.param_name.clone(), ty)
+        }
+    } else {
+        (param.param_name.clone(), param.public_go_type.clone())
+    }
 }
 
 fn render_public_default_punning_locals(output: &mut String, params: &[RenderedUnpackedParam]) {
@@ -5336,13 +5494,15 @@ fn render_typed_convenience_wrapper(
     let function = primary.function.as_ref().unwrap();
     let exported_name = format!("{}Typed", go_field_name(operation.name));
     let options_name = format!("{}Options", go_field_name(operation.name));
-    let arg_type = format!("{}Arg", primary.field_name);
-    let result_type = function
-        .result_type_parameter
-        .clone()
-        .unwrap_or_else(|| format!("{}Result", primary.field_name));
-    let mut signature = vec![("opts".to_string(), options_name)];
-    for param in ordered_positional_params(params) {
+    let (arg_type, result_type) = typed_wrapper_type_parameter_names(primary);
+    let mut signature = vec![(
+        "opts".to_string(),
+        go_generic_reference(&options_name, &operation.model_type_parameters, false),
+    )];
+    let positional = ordered_positional_params(params);
+    let type_params =
+        wrapper_type_parameters(operation, params, Some(primary), package, visibility);
+    for (index, param) in positional.iter().enumerate() {
         if param.field_name == primary.field_name {
             let mut args = match &function.args {
                 FunctionArgsSpec::Varargs { prefix, .. } => prefix
@@ -5359,10 +5519,14 @@ fn render_typed_convenience_wrapper(
             signature.push(("arg".to_string(), arg_type.clone()));
         } else if param.function_args.as_ref() == Some(function) {
             continue;
-        } else if is_go_signal_param(param) {
-            signature.push((param.param_name.clone(), "string".to_string()));
-        } else if is_go_signal_args_param(param) {
-            signature.push((signal_args_public_param_name(param), "any".to_string()));
+        } else {
+            signature.push(wrapper_param_signature(
+                param,
+                params,
+                index + 1 == positional.len(),
+                package,
+                visibility,
+            ));
         }
     }
     render_operation_doc_comment(
@@ -5373,16 +5537,20 @@ fn render_typed_convenience_wrapper(
     output.push_str("func ");
     output.push_str(&exported_name);
     output.push('[');
-    output.push_str(&arg_type);
-    output.push_str(" any, ");
-    output.push_str(&result_type);
-    output.push_str(" any]");
+    output.push_str(
+        &type_params
+            .iter()
+            .map(|(name, constraint)| format!("{name} {constraint}"))
+            .collect::<Vec<_>>()
+            .join(", "),
+    );
+    output.push(']');
     render_operation_params(output, &signature, package);
     output.push(' ');
     render_operation_wrapper_return_type(output, package);
     output.push_str(" {\n");
     render_public_default_punning_locals(output, params);
-    render_exact_function_name_assignment(output, primary);
+    render_function_name_inlining(output, params, package);
     output.push_str("\treturn ");
     output.push_str(&operation.func_name);
     output.push_str("(ctx, ");
@@ -5393,17 +5561,25 @@ fn render_typed_convenience_wrapper(
         output.push_str(&param.field_name);
         output.push_str(": ");
         if param.field_name == primary.field_name {
-            output.push_str(&function_name_local_var(param));
+            output.push_str(&function_name_local_var_for_params(param, params));
         } else if param.function_args.as_ref() == Some(function) {
             output.push_str(&format!("{}{{arg}}", param.go_type));
-        } else if is_go_signal_param(param) {
+        } else if param
+            .function
+            .as_ref()
+            .is_some_and(function_value_is_string)
+        {
             output.push_str(&param.param_name);
-        } else if is_go_signal_args_param(param) {
+        } else if has_explicit_args(param) {
             output.push_str(&format!(
                 "{}{{{}}}",
                 param.go_type,
-                signal_args_public_param_name(param)
+                singular_args_public_param_name(param)
             ));
+        } else if param.function.is_some() {
+            output.push_str(&function_name_local_var_for_params(param, params));
+        } else if param.function_args.is_some() {
+            output.push_str(&param.param_name);
         } else if param.default_punning_zero.is_some() {
             output.push_str(&param.param_name);
         } else if param.embed_in_options {
@@ -5468,6 +5644,167 @@ mod tests {
 
     use crate::error::{Error, Result};
     use crate::{GenerateRequest, generate_to_file};
+
+    fn generate_record_models(declarations: &str) -> Result<String> {
+        let temp = tempfile::tempdir().unwrap();
+        let input = temp.path().join("models.wit");
+        std::fs::write(
+            &input,
+            format!(
+                "package test:models@1.0.0;\nworld model-world {{ export models; }}\ninterface models {{\n{declarations}\n}}"
+            ),
+        )
+        .unwrap();
+        let output = temp.path().join("generated");
+        generate_to_file(&GenerateRequest {
+            config: crate::nexgen_config::NexgenConfig {
+                mode: crate::generator::GenerationMode::NativeApi,
+                ..Default::default()
+            },
+            language: crate::language::Language::Go,
+            input_paths: vec![input],
+            support_package: Some("example.com/nexgen/support".to_string()),
+            descriptor_paths: Vec::new(),
+            output_path: output.clone(),
+            format: false,
+            java_package_name: None,
+            ts_date_time_types: Default::default(),
+        })?;
+        Ok(std::fs::read_dir(output)
+            .unwrap()
+            .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap())
+            .collect::<Vec<_>>()
+            .join("\n"))
+    }
+
+    #[test]
+    fn record_getters_use_value_receivers_and_native_field_types() {
+        let source = generate_record_models(
+            r#"enum status { ready, waiting }
+            type request-alias = request;
+            record request {
+                id: string,
+                status: status,
+                maybe: option<u32>,
+                values: list<string>,
+                /// @nexus.type go="map[string]int32"
+                lookup: list<tuple<string, u32>>,
+                /// @nexus.type go="time.Duration"
+                elapsed: u64,
+                /// @nexus.source go="WorkflowNamespace(ctx)"
+                namespace: string,
+                /// @nexus.source go="RequestType(ctx)"
+                %type: string,
+            }
+            read: func(request: request) -> request;"#,
+        )
+        .unwrap();
+        for (getter, field, go_type) in [
+            ("GetID", "ID", "string"),
+            ("GetMaybe", "Maybe", "*int32"),
+            ("GetValues", "Values", "[]string"),
+            ("GetLookup", "Lookup", "map[string]int32"),
+            ("GetElapsed", "Elapsed", "time.Duration"),
+            ("GetNamespace", "namespace", "string"),
+            ("GetType", "type_", "string"),
+        ] {
+            assert!(
+                source.contains(&format!(
+                    "func (m Request) {getter}() {go_type} {{\n\treturn m.{field}\n}}"
+                )),
+                "{source}"
+            );
+        }
+        assert!(!source.contains("func (m *Request) Get"), "{source}");
+        assert!(!source.contains("if m == nil"), "{source}");
+        for receiver in ["ReadOptions", "Status", "RequestAlias"] {
+            assert!(
+                !source.contains(&format!("func (m {receiver}) Get")),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn record_getters_preserve_generic_receiver_arguments() {
+        let source = generate_record_models(
+            r#"type placeholder = string;
+            /// @nexus.type-parameter
+            type value-t = placeholder;
+            /// @nexus.type-parameter
+            type other-t = placeholder;
+            record pair {
+                value: value-t,
+                other: option<other-t>,
+                history: list<value-t>,
+                tuple-value: tuple<value-t, other-t>,
+                result-value: result<value-t, other-t>,
+            }
+            read: func(request: pair) -> pair;"#,
+        )
+        .unwrap();
+        for (getter, go_type) in [
+            ("GetValue", "ValueT"),
+            ("GetOther", "*OtherT"),
+            ("GetHistory", "[]ValueT"),
+        ] {
+            assert!(
+                source.contains(&format!(
+                    "func (m Pair[ValueT, OtherT]) {getter}() {go_type}"
+                )),
+                "{source}"
+            );
+        }
+        // Tuple and result helpers use grouped constraints in their declarations.
+        assert!(
+            source.contains("func (m tuple2[T1, T2]) GetFirst() T1"),
+            "{source}"
+        );
+        assert!(
+            source.contains("func (m result[T, E]) GetError() E"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn record_getters_reject_field_method_collisions() {
+        let error =
+            generate_record_models(
+                "record request { id: string, get-id: string }\nread: func(request: request) -> request;",
+            )
+            .unwrap_err();
+        let Error::UnsupportedGoType { context, reason } = error else {
+            panic!("unexpected error: {error}");
+        };
+        assert!(context.contains("Request"), "{context}");
+        assert!(reason.contains("getter `GetID` for field `ID`"), "{reason}");
+        assert!(reason.contains("field `GetID`"), "{reason}");
+        assert!(reason.contains("rename"), "{reason}");
+    }
+
+    #[test]
+    fn record_getters_reject_duplicate_methods_for_private_and_public_fields() {
+        let model = super::RenderedModel {
+            name: "Request".to_string(),
+            fields: ["ID", "iD"]
+                .into_iter()
+                .map(|name| super::RenderedField {
+                    name: name.to_string(),
+                    doc: None,
+                    go_type: "string".to_string(),
+                    required: true,
+                    sourced: name == "iD",
+                })
+                .collect(),
+        };
+        let error = super::validate_model_getter_names(&model).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("conflicts with getter for field `ID`"),
+            "{error}"
+        );
+    }
 
     fn generate_context_operation(
         endpoint: &str,
@@ -5546,7 +5883,7 @@ mod tests {
             },
             language: crate::language::Language::Go,
             input_paths: vec![input],
-            support_paths: Vec::new(),
+            support_package: Some("example.com/nexgen/support".to_string()),
             descriptor_paths: vec![descriptor],
             output_path: output.clone(),
             format: false,
@@ -5619,7 +5956,7 @@ mod tests {
                     .unwrap();
             let source = &files[&PathBuf::from("sampleservice.go")];
             assert!(
-                source.contains("requestProto, err := retryPolicyToProto(dc, &request)"),
+                source.contains("requestProto, err := support.RetryPolicyToProto(dc, &request)"),
                 "{source}"
             );
             assert!(
@@ -5627,7 +5964,7 @@ mod tests {
                 "{source}"
             );
             assert!(
-                source.contains("retryPolicyFromProto(dc, &result)"),
+                source.contains("support.RetryPolicyFromProto(dc, &result)"),
                 "{source}"
             );
         }
@@ -5645,6 +5982,12 @@ mod tests {
         );
         assert!(source.contains("TransferTypeConverter()"), "{source}");
         assert!(
+            source.contains(
+                "func (m request) GetRetryPolicy() *temporal.RetryPolicy {\n\treturn m.RetryPolicy\n}"
+            ),
+            "{source}"
+        );
+        assert!(
             source.contains("func(cfg *commonconverter.SystemNexusConfig, m *"),
             "{source}"
         );
@@ -5654,11 +5997,11 @@ mod tests {
             "{source}"
         );
         assert!(
-            source.contains("retryPolicyToProto(dc, m.RetryPolicy)"),
+            source.contains("support.RetryPolicyToProto(dc, m.RetryPolicy)"),
             "{source}"
         );
         assert!(
-            source.contains("retryPolicyFromProto(dc, &result)"),
+            source.contains("support.RetryPolicyFromProto(dc, &result)"),
             "{source}"
         );
     }
@@ -5669,6 +6012,7 @@ mod tests {
             package_name: "converter".to_string(),
             import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
             has_serialization_context: false,
+            support_package: None,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
@@ -5684,6 +6028,7 @@ mod tests {
             package_name: "workflow".to_string(),
             import_path: Some("go.temporal.io/sdk/workflow".to_string()),
             has_serialization_context: false,
+            support_package: None,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
@@ -5694,6 +6039,46 @@ mod tests {
             package.system_nexus_config_type(),
             "commonconverter.SystemNexusConfig"
         );
+    }
+
+    #[test]
+    fn parses_package_references_inside_composite_types() {
+        for (authored, expected, paths) in [
+            ("[]time.Duration", "[]time.Duration", vec!["time"]),
+            (
+                "func(context.Context) any",
+                "func(context.Context) any",
+                vec!["context"],
+            ),
+            (
+                "func(context.Context, ...time.Duration) error",
+                "func(context.Context, ...time.Duration) error",
+                vec!["context", "time"],
+            ),
+            (
+                "[]example.org/models.Value",
+                "[]models.Value",
+                vec!["example.org/models"],
+            ),
+            (
+                "map[string]*example.org/models:models.Value",
+                "map[string]*models.Value",
+                vec!["example.org/models"],
+            ),
+            (
+                "example.org/models:[]models.Value",
+                "[]models.Value",
+                vec!["example.org/models"],
+            ),
+        ] {
+            let (imports, rendered) = super::parse_go_expr(authored);
+            assert_eq!(rendered, expected);
+            assert_eq!(
+                imports,
+                paths.into_iter().map(str::to_string).collect(),
+                "{authored}"
+            );
+        }
     }
 
     #[test]

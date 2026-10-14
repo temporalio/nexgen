@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 
@@ -18,8 +17,8 @@ use crate::planning::{
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec,
-    FunctionFieldSpec, IntSpec, OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec,
-    SupportFragmentSpec, TypeSpec, VariantSpec,
+    FunctionFieldSpec, IntSpec, OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
+    VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -98,6 +97,7 @@ impl<'a> ApiPlanner<'a> {
         if models.iter().any(|model| {
             self.external_models
                 .model_uses_support_extensions(model, self.api_plan)
+                || model.sourced_fields().next().is_some()
         }) && let Some(support_namespace) = self.support_namespace
         {
             imports.push(support_namespace);
@@ -151,6 +151,9 @@ impl<'a> ApiPlanner<'a> {
         {
             imports.push("Temporalio.Workflows");
         }
+        if let Some(support_namespace) = self.support_namespace {
+            imports.push(support_namespace);
+        }
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
         for service in &self.api_plan.services {
@@ -191,6 +194,9 @@ impl<'a> ApiPlanner<'a> {
             "Google.Protobuf.WellKnownTypes",
             "Temporalio.Workflows",
         ];
+        if let Some(support_namespace) = self.support_namespace {
+            imports.push(support_namespace);
+        }
         let module_imports = dotnet_module_imports(self.api_plan);
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
@@ -209,6 +215,9 @@ impl<'a> ApiPlanner<'a> {
             "System.Threading.Tasks",
             "Temporalio.Workflows",
         ];
+        if let Some(support_namespace) = self.support_namespace {
+            imports.push(support_namespace);
+        }
         let module_imports = dotnet_module_imports(self.api_plan);
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
@@ -320,10 +329,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(".Operations[");
             output.push_str(&csharp_string_literal(&operation.wire_name));
             output.push_str("]");
-            if let Some(serialization_context) = operation
-                .serialization_context
-                .for_language(Language::Dotnet)
-            {
+            if let Some(serialization_context) = operation.serialization_context.value() {
                 output.push_str(",\n            serializationContext: ");
                 output.push_str(&qualify_dotnet_support_reference(
                     serialization_context,
@@ -344,10 +350,7 @@ impl<'a> ApiPlanner<'a> {
         for operation in &service.operations {
             self.render_operation_options_type(output, operation);
         }
-        let explicit_operations_class = service
-            .operations_class
-            .for_language(Language::Dotnet)
-            .is_some();
+        let explicit_operations_class = service.operations_class.value().is_some();
         render_xml_summary(
             output,
             "",
@@ -561,9 +564,7 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn render_variant(&self, output: &mut String, variant: &PlannedVariant) {
-        let type_parameters = self
-            .api_plan
-            .variant_type_parameters(&variant.full_name, Language::Dotnet);
+        let type_parameters = self.api_plan.variant_type_parameters(&variant.full_name);
         let type_arguments = type_parameters
             .iter()
             .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
@@ -626,9 +627,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str(" record ");
         let type_name = csharp_type_name(&model.name);
         output.push_str(&type_name);
-        let type_parameters = self
-            .api_plan
-            .record_type_parameters(&model.full_name, Language::Dotnet);
+        let type_parameters = self.api_plan.record_type_parameters(&model.full_name);
         if !type_parameters.is_empty() {
             output.push('<');
             output.push_str(
@@ -943,7 +942,7 @@ impl<'a> ApiPlanner<'a> {
         }
         let type_parameters = self
             .api_plan
-            .record_type_parameters(&model.full_name, Language::Dotnet)
+            .record_type_parameters(&model.full_name)
             .into_iter()
             .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
             .collect::<Vec<_>>();
@@ -1261,7 +1260,7 @@ impl<'a> ApiPlanner<'a> {
     ) -> Vec<crate::spec::TypeParameterUsage> {
         operation
             .input_type()
-            .map(|input| self.api_plan.type_parameters(input, Language::Dotnet))
+            .map(|input| self.api_plan.type_parameters(input))
             .unwrap_or_default()
     }
 
@@ -1287,9 +1286,7 @@ impl<'a> ApiPlanner<'a> {
     fn dotnet_erased_model_type(&self, model_type: &PlannedType) -> String {
         if let PlannedType::Record(record) = model_type {
             let base = csharp_type_name(&record.model_name);
-            let parameters = self
-                .api_plan
-                .record_type_parameters(&record.full_name, Language::Dotnet);
+            let parameters = self.api_plan.record_type_parameters(&record.full_name);
             if !parameters.is_empty() {
                 return format!(
                     "{}<{}>",
@@ -1305,7 +1302,7 @@ impl<'a> ApiPlanner<'a> {
 
     fn operation_return_type(&self, operation: &PlannedOperation) -> String {
         if let Some(transform) = &operation.output_transform
-            && let Some(type_name) = transform.type_name.for_language(Language::Dotnet)
+            && let Some(type_name) = transform.type_name.value()
         {
             return type_name.to_string();
         }
@@ -1319,7 +1316,7 @@ impl<'a> ApiPlanner<'a> {
         if let PlannedType::Record(record) = model_type
             && !self
                 .api_plan
-                .record_type_parameters(&record.full_name, Language::Dotnet)
+                .record_type_parameters(&record.full_name)
                 .is_empty()
         {
             return self.operation_input_type(model_type);
@@ -1354,9 +1351,7 @@ impl<'a> ApiPlanner<'a> {
 
     fn operation_output_type(&self, operation: &PlannedOperation) -> String {
         if let Some(PlannedType::Record(record)) = operation.output_type() {
-            let parameters = self
-                .api_plan
-                .record_type_parameters(&record.full_name, Language::Dotnet);
+            let parameters = self.api_plan.record_type_parameters(&record.full_name);
             if !parameters.is_empty() {
                 let input_parameters = self
                     .operation_model_parameters(operation)
@@ -1534,9 +1529,7 @@ impl<'a> ApiPlanner<'a> {
             PlannedType::Flags(flags) => csharp_type_name(&flags.name),
             PlannedType::Variant(variant) => {
                 let base = csharp_type_name(&variant.name);
-                let parameters = self
-                    .api_plan
-                    .variant_type_parameters(&variant.full_name, Language::Dotnet);
+                let parameters = self.api_plan.variant_type_parameters(&variant.full_name);
                 if parameters.is_empty() {
                     base
                 } else {
@@ -1567,9 +1560,7 @@ impl<'a> ApiPlanner<'a> {
                     }
                     PlannedType::Record(record) => {
                         let base = csharp_type_name(&record.model_name);
-                        let parameters = self
-                            .api_plan
-                            .record_type_parameters(&record.full_name, Language::Dotnet);
+                        let parameters = self.api_plan.record_type_parameters(&record.full_name);
                         if parameters.is_empty() {
                             base
                         } else {
@@ -1616,7 +1607,7 @@ impl<'a> ApiPlanner<'a> {
                 target: fallback,
                 ..
             })) => type_name
-                .for_language(Language::Dotnet)
+                .value()
                 .map(str::to_string)
                 .unwrap_or_else(|| self.dotnet_value_type(fallback)),
         }
@@ -1658,7 +1649,7 @@ impl<'a> ApiPlanner<'a> {
     ) -> String {
         if let Some(annotation) = model
             .field_flattened_annotation(field_name)
-            .and_then(|annotation| annotation.for_language(Language::Dotnet))
+            .and_then(|annotation| annotation.value())
         {
             if field.required {
                 annotation.to_string()
@@ -2022,7 +2013,7 @@ impl DotNetExternalModels {
             && api_plan.record(&record.full_name).is_some()
         {
             let base = csharp_type_name(&record.model_name);
-            let parameters = api_plan.record_type_parameters(&record.full_name, Language::Dotnet);
+            let parameters = api_plan.record_type_parameters(&record.full_name);
             return if parameters.is_empty() {
                 base
             } else {
@@ -2164,18 +2155,15 @@ impl ExternalModelBackend for DotNetExternalModels {
 
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: Option<&str>,
 ) -> Result<GeneratedFiles> {
     let generated = match &tree.root {
-        ApiSpecNode::Leaf(leaf) => {
-            let support_fragments = support_fragments_for_plan(&leaf.spec, support);
-            generate_leaf(
-                &leaf.spec,
-                &support_fragments,
-                GeneratedFileOrigin::fixed("generated .NET package module"),
-            )
-        }
-        ApiSpecNode::Branch(branch) => generate_tree(branch, support),
+        ApiSpecNode::Leaf(leaf) => generate_leaf(
+            &leaf.spec,
+            support_package,
+            GeneratedFileOrigin::fixed("generated .NET package module"),
+        ),
+        ApiSpecNode::Branch(branch) => generate_tree(branch, support_package),
     }?;
     Ok(GeneratedFiles {
         layout: crate::generator::GeneratedOutputLayout::Directory,
@@ -2191,17 +2179,21 @@ struct DotnetGenerationResult {
 
 fn generate_leaf(
     api_plan: &PlannedSpec,
-    support_fragments: &[SupportFragmentSpec],
+    support_package: Option<&str>,
     module_origin: GeneratedFileOrigin,
 ) -> Result<DotnetGenerationResult> {
     let mode = crate::nexgen_config::current().mode;
-    let support_namespace = dotnet_support_namespace(support_fragments)?;
-    let generator = ApiPlanner::new(api_plan, support_namespace.as_deref())?;
-    validate_dotnet_support_references(
-        api_plan,
-        &generator.external_models,
-        support_namespace.as_deref(),
-    )?;
+    if let Some(support_package) = support_package {
+        validate_dotnet_support_name(support_package).map_err(|reason| {
+            Error::InvalidSupportNamespace {
+                language: Language::Dotnet,
+                namespace: support_package.to_string(),
+                reason,
+            }
+        })?;
+    }
+    let generator = ApiPlanner::new(api_plan, support_package)?;
+    validate_dotnet_support_references(api_plan, &generator.external_models, support_package)?;
     let namespace = dotnet_namespace(api_plan);
     let mut files = GeneratedFileMap::default();
     files.insert(
@@ -2244,13 +2236,6 @@ fn generate_leaf(
             "Resources.cs",
             generator.render_resources_file(&namespace),
             module_origin,
-        )?;
-    }
-    for fragment in support_fragments {
-        files.insert(
-            support_fragment_path(fragment)?,
-            render_support_file(&fragment.contents),
-            GeneratedFileOrigin::support_fragment(Language::Dotnet, &fragment.path),
         )?;
     }
     Ok(DotnetGenerationResult {
@@ -2374,28 +2359,27 @@ impl<'a> ApiPlanner<'a> {
 
 fn generate_tree(
     branch: &ApiSpecBranch<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: Option<&str>,
 ) -> Result<DotnetGenerationResult> {
     let mut files = GeneratedFileMap::default();
     let mut warnings = Vec::new();
     for node in branch.children.values() {
-        generate_tree_node(node, support, &mut files, &mut warnings)?;
+        generate_tree_node(node, support_package, &mut files, &mut warnings)?;
     }
     Ok(DotnetGenerationResult { files, warnings })
 }
 
 fn generate_tree_node(
     node: &ApiSpecNode<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: Option<&str>,
     files: &mut GeneratedFileMap,
     warnings: &mut Vec<String>,
 ) -> Result<()> {
     match node {
         ApiSpecNode::Leaf(leaf) => {
-            let support_fragments = support_fragments_for_plan(&leaf.spec, support);
             let generated = generate_leaf(
                 &leaf.spec,
-                &support_fragments,
+                support_package,
                 GeneratedFileOrigin::input_module(Language::Dotnet, &leaf.source_path),
             )?;
             warnings.extend(generated.warnings);
@@ -2405,52 +2389,11 @@ fn generate_tree_node(
         }
         ApiSpecNode::Branch(branch) => {
             for node in branch.children.values() {
-                generate_tree_node(node, support, files, warnings)?;
+                generate_tree_node(node, support_package, files, warnings)?;
             }
             Ok(())
         }
     }
-}
-
-fn support_fragments_for_plan(
-    plan: &PlannedSpec,
-    support: &crate::SupportFiles,
-) -> Vec<SupportFragmentSpec> {
-    if support.fragments.is_empty() {
-        plan.support
-            .fragments_for_language(Language::Dotnet)
-            .to_vec()
-    } else {
-        support.fragments.clone()
-    }
-}
-
-fn dotnet_support_namespace(support_fragments: &[SupportFragmentSpec]) -> Result<Option<String>> {
-    let mut namespace = None::<String>;
-    for fragment in support_fragments {
-        let Some(fragment_namespace) = fragment.namespace.as_deref() else {
-            continue;
-        };
-        validate_dotnet_support_name(fragment_namespace).map_err(|reason| {
-            Error::InvalidSupportNamespace {
-                language: Language::Dotnet,
-                namespace: fragment_namespace.to_string(),
-                reason,
-            }
-        })?;
-        if let Some(existing) = &namespace {
-            if existing != fragment_namespace {
-                return Err(Error::InvalidSupportNamespace {
-                    language: Language::Dotnet,
-                    namespace: fragment_namespace.to_string(),
-                    reason: format!("conflicts with support namespace `{existing}`"),
-                });
-            }
-        } else {
-            namespace = Some(fragment_namespace.to_string());
-        }
-    }
-    Ok(namespace)
 }
 
 fn validate_dotnet_support_references(
@@ -2460,19 +2403,13 @@ fn validate_dotnet_support_references(
 ) -> Result<()> {
     for service in &api_plan.services {
         for operation in &service.operations {
-            if let Some(reference) = operation
-                .serialization_context
-                .for_language(Language::Dotnet)
-            {
+            if let Some(reference) = operation.serialization_context.value() {
                 validate_dotnet_support_reference(reference, support_namespace)?;
             }
         }
     }
     for model in api_plan.records().map(|(_, record)| record) {
-        for (_, sourced_field, source_expr) in model.sourced_fields() {
-            if let Some(reference) = source_expr.strip_suffix("()") {
-                validate_dotnet_support_reference(reference, support_namespace)?;
-            }
+        for (_, sourced_field, _) in model.sourced_fields() {
             validate_dotnet_field_kind_support_references(
                 &sourced_field.field_type,
                 external_models,
@@ -2563,20 +2500,6 @@ fn is_valid_csharp_identifier(name: &str) -> bool {
         && chars.all(|character| character == '_' || character.is_ascii_alphanumeric())
 }
 
-pub(in crate::generator) fn qualify_dotnet_support_call(
-    source_expr: &str,
-    support_namespace: Option<&str>,
-) -> String {
-    if let Some(reference) = source_expr.strip_suffix("()") {
-        format!(
-            "{}()",
-            qualify_dotnet_support_reference(reference, support_namespace)
-        )
-    } else {
-        source_expr.to_string()
-    }
-}
-
 pub(in crate::generator) fn qualify_dotnet_support_reference(
     reference: &str,
     support_namespace: Option<&str>,
@@ -2589,6 +2512,18 @@ pub(in crate::generator) fn qualify_dotnet_support_reference(
     } else {
         format!("{prefix}.{reference}")
     }
+}
+
+// `@nexus.source` supplies an invocation, not a bare reference. Qualify only
+// its helper path so authored arguments (including nested calls) stay intact.
+fn dotnet_source_expr(source_expr: &str, support_namespace: Option<&str>) -> String {
+    let Some((helper, arguments)) = source_expr.split_once('(') else {
+        return source_expr.to_string();
+    };
+    format!(
+        "{}({arguments}",
+        qualify_dotnet_support_reference(helper, support_namespace)
+    )
 }
 
 fn generated_file_prelude(namespace: &str, imports: &[&str]) -> String {
@@ -2607,19 +2542,6 @@ fn generated_file_prelude(namespace: &str, imports: &[&str]) -> String {
     output.push_str("namespace ");
     output.push_str(namespace);
     output.push_str("\n{\n\n");
-    output
-}
-
-fn render_support_file(contents: &str) -> String {
-    let mut output = String::new();
-    if !contents.trim_start().starts_with("// <auto-generated") {
-        output.push_str(GENERATED_HEADER);
-        output.push('\n');
-    }
-    if !contents.contains("#nullable") {
-        output.push_str("#nullable enable\n");
-    }
-    output.push_str(contents);
     output
 }
 
@@ -2644,8 +2566,8 @@ fn indent_namespace_body(output: &mut String) {
     }
 }
 
-fn dotnet_doc(spec: &crate::spec::LanguageStringSpec) -> Option<&str> {
-    spec.for_language(Language::Dotnet)
+fn dotnet_doc(spec: &crate::spec::SelectedTextSpec) -> Option<&str> {
+    spec.value()
 }
 
 fn render_operation_xml_doc(
@@ -2976,7 +2898,7 @@ fn render_flattened_generic_parameters(
     api_plan: &PlannedSpec,
 ) {
     let mut generics = api_plan
-        .record_type_parameters(&model.full_name, Language::Dotnet)
+        .record_type_parameters(&model.full_name)
         .into_iter()
         .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
         .collect::<Vec<_>>();
@@ -3041,7 +2963,7 @@ fn render_flattened_method_body(
     }
     output.push_str("        var request = new ");
     output.push_str(&csharp_type_name(&model.name));
-    let model_parameters = api_plan.record_type_parameters(&model.full_name, Language::Dotnet);
+    let model_parameters = api_plan.record_type_parameters(&model.full_name);
     if !model_parameters.is_empty() {
         output.push('<');
         output.push_str(
@@ -3079,7 +3001,7 @@ fn render_flattened_method_body(
     constructor_args.extend(
         model
             .sourced_fields()
-            .map(|(_, _, source_expr)| qualify_dotnet_support_call(source_expr, support_namespace)),
+            .map(|(_, _, source_expr)| dotnet_source_expr(source_expr, support_namespace)),
     );
     output.push('(');
     output.push_str(&constructor_args.join(", "));
@@ -3513,7 +3435,8 @@ fn resource_method_flattened_operation_call_args(
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
 ) -> Option<Vec<String>> {
-    let source_exprs = resource_method_request_field_exprs(request_plan, model, api_plan)?;
+    let source_exprs =
+        resource_method_request_field_exprs(request_plan, model, api_plan, support_namespace)?;
     let overload = flattened_overloads(model)
         .into_iter()
         .find(|overload| !overload.has_expression_functions())?;
@@ -3590,13 +3513,13 @@ fn resource_method_request_model_init_expr(
         }
         field_exprs.push((
             model_field,
-            resource_method_request_value_expr(&field.value, api_plan)?,
+            resource_method_request_value_expr(&field.value, api_plan, support_namespace)?,
         ));
     }
     let sourced_field_exprs = type_name_override.is_none().then(|| {
         model
             .sourced_fields()
-            .map(|(_, _, source_expr)| qualify_dotnet_support_call(source_expr, support_namespace))
+            .map(|(_, _, source_expr)| dotnet_source_expr(source_expr, support_namespace))
             .collect()
     });
     Some(model_init_expr(
@@ -3626,6 +3549,7 @@ fn resource_method_request_field_exprs(
     request_plan: &RequestPlan,
     model: &PlannedModel,
     api_plan: &PlannedSpec,
+    support_namespace: Option<&str>,
 ) -> Option<BTreeMap<String, String>> {
     let RequestPlan::Construct { fields, .. } = request_plan else {
         return None;
@@ -3636,7 +3560,7 @@ fn resource_method_request_field_exprs(
             model.public_fields().find(|(field_name, candidate)| {
                 candidate.name == field.field_name || *field_name == field.field_name
             })?;
-        let expr = resource_method_request_value_expr(&field.value, api_plan)?;
+        let expr = resource_method_request_value_expr(&field.value, api_plan, support_namespace)?;
         source_exprs.insert(model_field.name.clone(), expr.clone());
         source_exprs.insert(model_field_name.to_string(), expr);
     }
@@ -3657,6 +3581,7 @@ fn resource_method_request_source_expr(
 fn resource_method_request_value_expr(
     request_plan: &RequestPlan,
     api_plan: &PlannedSpec,
+    support_namespace: Option<&str>,
 ) -> Option<String> {
     match request_plan {
         RequestPlan::Source(RequestPlanSource::ResourceField(name)) => Some(csharp_type_name(name)),
@@ -3666,7 +3591,7 @@ fn resource_method_request_value_expr(
         RequestPlan::Construct { .. } => resource_method_request_model_init_expr(
             request_plan,
             api_plan,
-            None,
+            support_namespace,
             None,
             ResourceMethodRequestInitKind::AllFields,
         ),
@@ -3708,7 +3633,7 @@ fn operation_transform_expression(
     api_plan: &PlannedSpec,
 ) -> String {
     if let Some(transform) = &operation.output_transform
-        && let Some(expression) = transform.transform.for_language(Language::Dotnet)
+        && let Some(expression) = transform.transform.value()
     {
         return expression
             .replace("request", request_expr)
@@ -3884,7 +3809,7 @@ fn dotnet_authored_type(wit_type: &PlannedType) -> String {
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             target, type_name, ..
         })) => type_name
-            .for_language(Language::Dotnet)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| dotnet_authored_type(target)),
     }
@@ -3923,24 +3848,6 @@ fn value_uses_result(value: &PlannedType) -> bool {
     }
 }
 
-fn support_fragment_path(fragment: &SupportFragmentSpec) -> Result<PathBuf> {
-    let path = PathBuf::from(&fragment.path);
-    if path.extension().and_then(|extension| extension.to_str()) != Some("cs") {
-        return Err(Error::InvalidGeneratedPath {
-            path,
-            reason: ".NET support files must end with `.cs`".to_string(),
-        });
-    }
-    let file_name = path
-        .file_name()
-        .ok_or_else(|| Error::InvalidGeneratedPath {
-            path: path.clone(),
-            reason: "support path must have a file name".to_string(),
-        })?
-        .to_os_string();
-    Ok(PathBuf::from("Support").join(file_name))
-}
-
 fn dotnet_namespace(api_plan: &PlannedSpec) -> String {
     if crate::nexgen_config::current().system_nexus {
         return "Temporalio.Workflows".to_string();
@@ -3950,7 +3857,7 @@ fn dotnet_namespace(api_plan: &PlannedSpec) -> String {
     }
     api_plan
         .primary_namespace()
-        .and_then(|namespace| namespace.for_language(Language::Dotnet))
+        .and_then(|namespace| namespace.value())
         .map(ToOwned::to_owned)
         .or_else(|| {
             api_plan
@@ -3994,7 +3901,7 @@ fn dotnet_module_namespace(module_path: &crate::spec::ModulePath) -> String {
 fn dotnet_operations_class_name(service: &PlannedService) -> String {
     service
         .operations_class
-        .for_language(Language::Dotnet)
+        .value()
         .map(csharp_type_name)
         .unwrap_or_else(|| "Operations".to_string())
 }
@@ -4042,14 +3949,14 @@ fn validate_type_parameter_names(api_plan: &PlannedSpec) -> Result<()> {
         };
         (
             full_name,
-            api_plan.record_type_parameters(full_name, Language::Dotnet),
+            api_plan.record_type_parameters(full_name),
             reserved,
         )
     });
     let variants = api_plan.variants().map(|(full_name, _)| {
         (
             full_name,
-            api_plan.variant_type_parameters(full_name, Language::Dotnet),
+            api_plan.variant_type_parameters(full_name),
             &[][..],
         )
     });
@@ -4216,7 +4123,33 @@ const CSHARP_KEYWORDS: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::csharp_type_parameter_name;
+    use super::{csharp_type_parameter_name, dotnet_source_expr};
+
+    #[test]
+    fn sourced_helper_is_qualified_without_changing_its_arguments() {
+        assert_eq!(
+            dotnet_source_expr(
+                "TemporalWorkflowContext.WorkflowNamespace()",
+                Some("Nexgen.Support")
+            ),
+            "Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()"
+        );
+        assert_eq!(
+            dotnet_source_expr(
+                "Helpers.Lookup(\"a,b\", Other.Call(1, 2))",
+                Some("Nexgen.Support")
+            ),
+            "Nexgen.Support.Helpers.Lookup(\"a,b\", Other.Call(1, 2))"
+        );
+        assert_eq!(
+            dotnet_source_expr("Nexgen.Support.Helpers.Lookup(42)", Some("Nexgen.Support")),
+            "Nexgen.Support.Helpers.Lookup(42)"
+        );
+        assert_eq!(
+            dotnet_source_expr("Helpers.Lookup(42)", None),
+            "Helpers.Lookup(42)"
+        );
+    }
 
     #[test]
     fn type_parameter_names_put_the_t_first() {

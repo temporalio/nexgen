@@ -8,23 +8,18 @@ import json
 import pathlib
 import re
 import subprocess
-import sys
 from collections.abc import Sequence
 
-if __package__ is None or __package__ == "":
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-
-CHANGELOG_HEADERS = (
-    "Added",
-    "Changed",
-    "Deprecated",
-    "Breaking Changes",
-    "Fixed",
-    "Security",
-)
 VERSION_RE = re.compile(r"[0-9]+(?:\.[0-9]+)+(?:[a-zA-Z0-9_.+-]+)?")
-_CHANGELOG_HEADING_RE = re.compile(r"^## \[(?P<version>[^\]]+)\](?:\s+-\s+.*)?\s*$")
-_CHANGELOG_SUBHEADING_RE = re.compile(r"^### (?P<header>.+?)\s*$")
+CHANGELOG_CATEGORIES = (
+    "added",
+    "stabilized",
+    "changed",
+    "deprecated",
+    "breaking-changes",
+    "fixed",
+    "security",
+)
 _RELEASE_FILES = (
     "CHANGELOG.md",
     "Cargo.toml",
@@ -52,42 +47,46 @@ def parse_date(date: str) -> datetime.date:
         raise ValueError(f"Invalid release date {date!r}; expected YYYY-MM-DD") from err
 
 
-def finalize_changelog_release(
-    text: str,
+def prepare_changelog(
+    repo_root: pathlib.Path,
     *,
     version: str,
     release_date: datetime.date,
-) -> str:
-    validate_version(version)
-    lines = text.splitlines()
-
-    # A previous invocation may have completed the changelog update before
-    # failing later (for example, while pushing or opening the PR). Preserve
-    # that completed step so the command can safely resume.
-    if _find_version_section(lines, version) is not None:
-        return text
-
-    unreleased = _find_version_section(lines, "Unreleased")
-    if unreleased is None:
-        raise RuntimeError("Could not find changelog section for 'Unreleased'")
-
-    heading_index, section_start, section_end = unreleased
-    unreleased_lines = _strip_empty_changelog_headers(
-        _strip_outer_blank_lines(lines[section_start:section_end])
+) -> None:
+    # Resume without consuming entries added after this release was prepared.
+    changelog_path = repo_root / "CHANGELOG.md"
+    text = changelog_path.read_text(encoding="utf-8")
+    if re.search(rf"(?m)^## \[{re.escape(version)}\](?:\s+-[^\n]*)?$", text):
+        return
+    sections = []
+    fragments = []
+    for category in CHANGELOG_CATEGORIES:
+        entries = []
+        for path in sorted((repo_root / "changelog" / category).glob("*.md")):
+            lines = [
+                line
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            if not lines:
+                raise RuntimeError(f"Empty changelog fragment: {path}")
+            entries.extend(f"- {line}\n" for line in lines)
+            fragments.append(path)
+        if entries:
+            heading = category.replace("-", " ").title()
+            if category == "breaking-changes":
+                heading = f":boom: {heading}"
+            sections.append(f"### {heading}\n\n{''.join(entries)}\n")
+    first_release = text.find("## [")
+    preamble = text if first_release == -1 else text[:first_release]
+    history = "" if first_release == -1 else text[first_release:]
+    changelog_path.write_text(
+        f"{preamble.rstrip()}\n\n## [{version}] - {release_date.isoformat()}\n\n"
+        f"{''.join(sections)}{history}",
+        encoding="utf-8",
     )
-    if not unreleased_lines:
-        raise RuntimeError("Changelog section for 'Unreleased' is empty")
-
-    next_lines = [
-        *lines[:heading_index],
-        *_seeded_unreleased_lines(),
-        f"## [{version}] - {release_date.isoformat()}",
-        "",
-        *unreleased_lines,
-        "",
-        *lines[section_end:],
-    ]
-    return "\n".join(_collapse_blank_lines(next_lines)).rstrip() + "\n"
+    for fragment in fragments:
+        fragment.unlink()
 
 
 def replace_manifest_version(text: str, version: str) -> str:
@@ -121,10 +120,13 @@ def create_release_branch(repo_root: pathlib.Path, version: str) -> None:
     if current_branch == branch:
         return
 
-    branch_exists = subprocess.run(
-        ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
-        cwd=repo_root,
-    ).returncode == 0
+    branch_exists = (
+        subprocess.run(
+            ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+            cwd=repo_root,
+        ).returncode
+        == 0
+    )
     if branch_exists:
         subprocess.run(["git", "switch", branch], cwd=repo_root, check=True)
     else:
@@ -155,12 +157,16 @@ def ensure_clean_worktree(repo_root: pathlib.Path) -> None:
         )
 
 
-def ensure_only_release_changes(repo_root: pathlib.Path) -> None:
+def ensure_only_release_changes(
+    repo_root: pathlib.Path,
+    fragments: set[str],
+) -> None:
     unexpected_files = {
         path
         for path in changed_files(repo_root)
         if path not in _RELEASE_FILE_SET
         and not path.startswith(_GENERATED_SAMPLE_DIRECTORIES)
+        and not (path in fragments and not (repo_root / path).exists())
     }
     if unexpected_files:
         raise RuntimeError(
@@ -190,6 +196,7 @@ def commit_release_changes(repo_root: pathlib.Path, version: str) -> None:
             "--all",
             "--",
             *_RELEASE_FILES,
+            "changelog/",
             *_GENERATED_SAMPLE_DIRECTORIES,
         ],
         cwd=repo_root,
@@ -242,9 +249,14 @@ def create_release_pr(repo_root: pathlib.Path, version: str) -> tuple[str, bool]
     prs = json.loads(existing_prs.stdout)
     open_prs = [pr for pr in prs if pr["state"] == "OPEN"]
     if open_prs:
+        subprocess.run(
+            ["gh", "pr", "edit", open_prs[0]["url"], "--add-label", "skip-changelog"],
+            cwd=repo_root,
+            check=True,
+        )
         return open_prs[0]["url"], False
     if prs:
-        prior_prs = ", ".join(f'{pr["state"].lower()} {pr["url"]}' for pr in prs)
+        prior_prs = ", ".join(f"{pr['state'].lower()} {pr['url']}" for pr in prs)
         raise RuntimeError(
             f"Found {prior_prs} for release branch {branch!r}. "
             "Reopen that PR or use a new release branch before resuming."
@@ -263,6 +275,8 @@ def create_release_pr(repo_root: pathlib.Path, version: str) -> tuple[str, bool]
             f"Prepare release {version}",
             "--body",
             f"Prepare nexgen release {version}.",
+            "--label",
+            "skip-changelog",
         ],
         cwd=repo_root,
         check=True,
@@ -273,72 +287,6 @@ def create_release_pr(repo_root: pathlib.Path, version: str) -> tuple[str, bool]
     if not url:
         raise RuntimeError("GitHub CLI created a PR but did not return its URL")
     return url, True
-
-
-def _seeded_unreleased_lines() -> list[str]:
-    lines = ["## [Unreleased]", ""]
-    for header in CHANGELOG_HEADERS:
-        lines.extend([f"### {header}", ""])
-    return lines
-
-
-def _strip_empty_changelog_headers(lines: list[str]) -> list[str]:
-    filtered: list[str] = []
-    index = 0
-    while index < len(lines):
-        match = _CHANGELOG_SUBHEADING_RE.match(lines[index])
-        if not match or match.group("header") not in CHANGELOG_HEADERS:
-            filtered.append(lines[index])
-            index += 1
-            continue
-
-        next_index = index + 1
-        while next_index < len(lines) and not lines[next_index].startswith("### "):
-            next_index += 1
-
-        content = lines[index + 1 : next_index]
-        if any(line.strip() for line in content):
-            filtered.append(lines[index])
-            filtered.extend(content)
-        index = next_index
-
-    return _strip_outer_blank_lines(filtered)
-
-
-def _find_version_section(
-    lines: list[str],
-    version: str,
-) -> tuple[int, int, int] | None:
-    for index, line in enumerate(lines):
-        match = _CHANGELOG_HEADING_RE.match(line)
-        if match and match.group("version") == version:
-            section_end = len(lines)
-            for end_index in range(index + 1, len(lines)):
-                if lines[end_index].startswith("## "):
-                    section_end = end_index
-                    break
-            return index, index + 1, section_end
-    return None
-
-
-def _strip_outer_blank_lines(lines: list[str]) -> list[str]:
-    while lines and not lines[0].strip():
-        lines.pop(0)
-    while lines and not lines[-1].strip():
-        lines.pop()
-    return lines
-
-
-def _collapse_blank_lines(lines: list[str]) -> list[str]:
-    collapsed: list[str] = []
-    previous_blank = False
-    for line in lines:
-        blank = not line.strip()
-        if blank and previous_blank:
-            continue
-        collapsed.append(line)
-        previous_blank = blank
-    return collapsed
 
 
 def _replace_once(
@@ -357,8 +305,8 @@ def _replace_once(
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Bump the crate version, roll CHANGELOG.md's Unreleased section "
-            "into a dated release section, regenerate checked-in samples, "
+            "Bump the crate version, assemble and consume changelog fragments, "
+            "regenerate checked-in samples, "
             "and verify Cargo.lock."
         )
     )
@@ -381,15 +329,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     ensure_clean_worktree(repo_root)
     create_release_branch(repo_root, version)
 
-    changelog_path = repo_root / "CHANGELOG.md"
+    fragments = {
+        str(path.relative_to(repo_root))
+        for path in (repo_root / "changelog").glob("*/*.md")
+    }
     manifest_path = repo_root / "Cargo.toml"
     lock_path = repo_root / "Cargo.lock"
 
-    changelog_text = finalize_changelog_release(
-        changelog_path.read_text(encoding="utf-8"),
-        version=version,
-        release_date=release_date,
-    )
     manifest_text = (
         replace_manifest_version(
             manifest_path.read_text(encoding="utf-8"),
@@ -405,15 +351,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         + "\n"
     )
 
-    changelog_path.write_text(changelog_text, encoding="utf-8")
     manifest_path.write_text(manifest_text, encoding="utf-8")
     lock_path.write_text(lock_text, encoding="utf-8")
 
     if not args.skip_lock:
         verify_lockfile(repo_root)
 
+    prepare_changelog(repo_root, version=version, release_date=release_date)
     regenerate_samples(repo_root)
-    ensure_only_release_changes(repo_root)
+    ensure_only_release_changes(repo_root, fragments)
     commit_release_changes(repo_root, version)
     push_release_branch(repo_root, version)
     pr_url, created_pr = create_release_pr(repo_root, version)

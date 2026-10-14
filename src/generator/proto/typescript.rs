@@ -5,7 +5,7 @@ use crate::error::{Error, Result};
 use crate::generator::ExternalModelBackend;
 use crate::generator::typescript::{
     RenderedExternalModelFragments, RenderedModel, WireFunctionNames, WireValueConversion,
-    generic_model_annotation, render_named_generic_function_start,
+    generic_model_annotation, render_named_generic_function_start, support_reference,
     typescript_authored_type_annotation, typescript_generated_field_name, typescript_ident,
 };
 use crate::language::Language;
@@ -225,33 +225,34 @@ pub(crate) fn typescript_default_to_proto_name(name: &str) -> String {
 
 pub(crate) fn typescript_from_proto_converter(
     name: &str,
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
 ) -> String {
-    replacement
-        .from_proto
-        .for_language(Language::TypeScript)
-        .map(str::to_string)
-        .unwrap_or_else(|| typescript_default_from_proto_name(name))
+    support_reference(
+        &replacement
+            .from_proto
+            .value()
+            .map(str::to_string)
+            .unwrap_or_else(|| typescript_default_from_proto_name(name)),
+    )
 }
 
 pub(crate) fn typescript_to_proto_converter(
     name: &str,
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
 ) -> String {
-    replacement
-        .to_proto
-        .for_language(Language::TypeScript)
-        .map(str::to_string)
-        .unwrap_or_else(|| typescript_default_to_proto_name(name))
+    support_reference(
+        &replacement
+            .to_proto
+            .value()
+            .map(str::to_string)
+            .unwrap_or_else(|| typescript_default_to_proto_name(name)),
+    )
 }
 
 pub(crate) fn typescript_replacement_type_name(
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
 ) -> Option<String> {
-    replacement
-        .type_name
-        .for_language(Language::TypeScript)
-        .map(str::to_string)
+    replacement.type_name.value().map(str::to_string)
 }
 
 pub(in crate::generator) fn message_override_conversion(
@@ -288,15 +289,15 @@ pub(in crate::generator) fn message_override_conversion(
             annotation: typescript_authored_type_annotation(authored_type),
             from_wire: format!(
                 "{}({{wire}})",
-                typescript_default_from_proto_name(&proto.proto.full_name)
+                support_reference(&typescript_default_from_proto_name(&proto.proto.full_name))
             ),
             to_wire: format!(
                 "{}({{value}})",
-                typescript_default_to_proto_name(&proto.proto.full_name)
+                support_reference(&typescript_default_to_proto_name(&proto.proto.full_name))
             ),
             function_name_to_wire: Some(format!(
                 "{}({{name}})",
-                typescript_default_to_proto_name(&proto.proto.full_name)
+                support_reference(&typescript_default_to_proto_name(&proto.proto.full_name))
             )),
             wire_function_names: None,
             uses_rendered_model_annotation: false,

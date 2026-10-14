@@ -105,6 +105,7 @@ pub(in crate::generator) type GoConversionResult<T> = std::result::Result<T, Str
 #[derive(Debug)]
 pub(in crate::generator) struct ModelBackend {
     package: GoPackageContext,
+    support_package: Option<String>,
     imports: RefCell<GoImportCollector>,
     proto_models: BTreeMap<String, PlannedTypeInfo>,
     wire_models: RefCell<BTreeMap<String, RenderedModelWire>>,
@@ -115,10 +116,18 @@ pub(in crate::generator) struct ModelBackend {
 }
 
 impl ModelBackend {
-    pub(in crate::generator) fn new(package: GoPackageContext) -> Self {
+    pub(in crate::generator) fn new(
+        package: GoPackageContext,
+        support_package: Option<String>,
+    ) -> Self {
+        let mut imports = GoImportCollector::default();
+        if support_package.is_some() {
+            imports.used_aliases.insert("support".to_string());
+        }
         Self {
             package,
-            imports: RefCell::new(GoImportCollector::default()),
+            support_package,
+            imports: RefCell::new(imports),
             proto_models: BTreeMap::new(),
             wire_models: RefCell::new(BTreeMap::new()),
             transfer_models: RefCell::new(BTreeSet::new()),
@@ -127,6 +136,24 @@ impl ModelBackend {
 
     pub(in crate::generator) fn imports(&self) -> Ref<'_, GoImportCollector> {
         self.imports.borrow()
+    }
+
+    fn register_support_import(&self) {
+        if let Some(path) = &self.support_package {
+            self.imports
+                .borrow_mut()
+                .by_path
+                .insert(path.clone(), "support".to_string());
+        }
+    }
+
+    pub(in crate::generator) fn support_converter(&self, name: String) -> String {
+        if self.support_package.is_some() {
+            self.register_support_import();
+            format!("support.{name}")
+        } else {
+            name
+        }
     }
 
     pub(in crate::generator) fn message_proto_type(
@@ -219,7 +246,7 @@ impl ModelBackend {
         }
         if let Some(record) = record_for_message(api_plan, message)
             && !api_plan
-                .record_type_parameters(&record.full_name, Language::Go)
+                .record_type_parameters(&record.full_name)
                 .is_empty()
         {
             return Err(Error::UnsupportedGoProtoConversion {
@@ -310,7 +337,7 @@ impl ExternalModelBackend<PlannedValueType> for ModelBackend {
             })),
             PlannedValueType::Enum(enum_type) => Some(go_enum_conversion(enum_type, self)),
             PlannedValueType::Message(message_type) => {
-                Some(go_message_conversion(message_type, &self.package))
+                Some(go_message_conversion(message_type, self))
             }
             _ => None,
         }
@@ -455,12 +482,16 @@ fn go_enum_conversion(
 
 fn go_message_conversion(
     message: &PlannedMessageType,
-    package: &GoPackageContext,
+    backend: &ModelBackend,
 ) -> GoConversionResult<GoValueConversion> {
     if let Some(replacement) = &message.replacement {
-        if let Some(type_name) = go_replacement_type_name(replacement, package) {
-            let from = go_from_proto_converter(&message.info.full_name, replacement);
-            let to = go_to_proto_converter(&message.info.full_name, replacement);
+        if let Some(type_name) = go_replacement_type_name(replacement, &backend.package) {
+            let from = backend.support_converter(go_from_proto_converter(
+                &message.info.full_name,
+                replacement,
+            ));
+            let to = backend
+                .support_converter(go_to_proto_converter(&message.info.full_name, replacement));
             let native_is_nilable_value = crate::generator::go::go_type_is_nilable(&type_name);
             return Ok(GoValueConversion {
                 kind: GoConversionKind::OverrideConverter,
@@ -475,8 +506,8 @@ fn go_message_conversion(
     }
 
     if message.authored_type.is_some() {
-        let from = go_default_from_proto_name(&message.info.full_name);
-        let to = go_default_to_proto_name(&message.info.full_name);
+        let from = backend.support_converter(go_default_from_proto_name(&message.info.full_name));
+        let to = backend.support_converter(go_default_to_proto_name(&message.info.full_name));
         return Ok(GoValueConversion {
             kind: GoConversionKind::OverrideConverter,
             from_proto: Box::new(move |expr, _| format!("{from}(dc, {expr})")),
@@ -516,43 +547,83 @@ fn go_message_conversion(
     ))
 }
 
-fn leaf_lower_camel(full_name: &str) -> String {
-    use heck::ToLowerCamelCase;
+fn leaf_upper_camel(full_name: &str) -> String {
+    use heck::ToUpperCamelCase;
     full_name
         .rsplit('.')
         .next()
         .unwrap_or(full_name)
-        .to_lower_camel_case()
+        .to_upper_camel_case()
 }
 
 fn go_default_from_proto_name(full_name: &str) -> String {
-    format!("{}FromProto", leaf_lower_camel(full_name))
+    format!("{}FromProto", leaf_upper_camel(full_name))
 }
 
 fn go_default_to_proto_name(full_name: &str) -> String {
-    format!("{}ToProto", leaf_lower_camel(full_name))
+    format!("{}ToProto", leaf_upper_camel(full_name))
 }
 
 fn go_from_proto_converter(
     full_name: &str,
-    replacement: &crate::spec::TypeReplacementSpec,
+    replacement: &crate::spec::TypeReplacementSpec<PlannedFamily>,
 ) -> String {
     replacement
         .from_proto
-        .for_language(Language::Go)
+        .value()
         .map(str::to_string)
         .unwrap_or_else(|| go_default_from_proto_name(full_name))
 }
 
 fn go_to_proto_converter(
     full_name: &str,
-    replacement: &crate::spec::TypeReplacementSpec,
+    replacement: &crate::spec::TypeReplacementSpec<PlannedFamily>,
 ) -> String {
     replacement
         .to_proto
-        .for_language(Language::Go)
+        .value()
         .map(str::to_string)
         .unwrap_or_else(|| go_default_to_proto_name(full_name))
+}
+
+#[cfg(test)]
+mod converter_name_tests {
+    use super::{
+        go_default_from_proto_name, go_default_to_proto_name, go_from_proto_converter,
+        go_to_proto_converter,
+    };
+    use crate::spec::{SelectedTextSpec, TypeReplacementSpec};
+
+    #[test]
+    fn exports_derived_names_but_preserves_authored_go_names() {
+        assert_eq!(
+            go_default_from_proto_name("temporal.api.HTTPPayload"),
+            "HttpPayloadFromProto"
+        );
+        assert_eq!(
+            go_default_to_proto_name("temporal.api.HTTPPayload"),
+            "HttpPayloadToProto"
+        );
+        let replacement = TypeReplacementSpec {
+            type_name: SelectedTextSpec::default(),
+            from_proto: SelectedTextSpec {
+                value: Some("FromHTTPProto".to_string()),
+                ..Default::default()
+            },
+            to_proto: SelectedTextSpec {
+                value: Some("ToHTTPProto".to_string()),
+                ..Default::default()
+            },
+        };
+        assert_eq!(
+            go_from_proto_converter("temporal.api.HTTPPayload", &replacement),
+            "FromHTTPProto"
+        );
+        assert_eq!(
+            go_to_proto_converter("temporal.api.HTTPPayload", &replacement),
+            "ToHTTPProto"
+        );
+    }
 }
 
 /// Builds the [`GoValueConversion`] for a single planned value type,
@@ -822,8 +893,8 @@ impl ModelBackend {
                         .output_transform
                         .as_ref()
                         .is_some_and(|transform| {
-                            transform.type_name.for_language(Language::Go).is_some()
-                                && transform.transform.for_language(Language::Go).is_some()
+                            transform.type_name.value().is_some()
+                                && transform.transform.value().is_some()
                         });
                 let resource_return = if let Some(resource_return) =
                     &planned_op.data.output_resource_return
@@ -915,6 +986,7 @@ impl ModelBackend {
                         planned_model
                             .sourced_fields()
                             .map(|(field_name, _, source_expr)| {
+                                let source_expr = self.support_converter(source_expr.to_string());
                                 format!(
                                     "request.{} = {source_expr}",
                                     go_model_field_name(field_name, true)
@@ -1655,11 +1727,13 @@ fn build_field_conversion(
         PlannedFieldKind::Singular(value) => {
             let conversion = go_value_conversion(value, api_plan, backend, &backend.package)?;
             let field_is_pointer = native_go_type.starts_with('*');
+            let default_expr = default_enum_proto_expr(field, backend)?;
             let to_lines = singular_to_proto_lines(
                 &conversion,
                 &receiver,
                 &proto_field,
                 field_is_pointer,
+                default_expr.as_deref(),
                 "return nil, err",
             );
             let mut from_lines = singular_from_proto_lines(
@@ -1672,7 +1746,7 @@ fn build_field_conversion(
             if field
                 .flattened_annotation_override
                 .as_ref()
-                .and_then(|annotation| annotation.for_language(Language::Go))
+                .and_then(|annotation| annotation.value())
                 .is_some()
                 && !conversion.from_proto_returns_pointer
             {
@@ -1797,6 +1871,24 @@ fn go_model_field_name(authored_name: &str, sourced: bool) -> String {
     }
 }
 
+fn default_enum_proto_expr(
+    field: &crate::generator::go::PlannedField,
+    backend: &ModelBackend,
+) -> GoConversionResult<Option<String>> {
+    let Some(default) = &field.default_value else {
+        return Ok(None);
+    };
+    let PlannedFieldKind::Singular(value) = &field.kind else {
+        return Err("a default can only be applied to a singular enum field".to_string());
+    };
+    let enum_value = field
+        .default_enum_value
+        .as_ref()
+        .ok_or_else(|| format!("default enum case `{}` was not resolved", default.enum_case))?;
+    let proto_type = backend.value_proto_type(value)?;
+    Ok(Some(format!("{proto_type}({})", enum_value.number)))
+}
+
 /// `ToProto` lines for a singular field.
 ///
 /// `field_is_pointer` indicates whether the native struct field is rendered as
@@ -1808,6 +1900,7 @@ fn singular_to_proto_lines(
     receiver: &str,
     proto_field: &str,
     field_is_pointer: bool,
+    default_expr: Option<&str>,
     error_return: &str,
 ) -> Vec<String> {
     let assign = |converted: &str| format!("message.{proto_field} = {converted}");
@@ -1848,7 +1941,7 @@ fn singular_to_proto_lines(
                     format!("(*{receiver})")
                 };
                 let converted = (conversion.to_proto)(&arg);
-                if conversion.fallible {
+                let mut lines = if conversion.fallible {
                     vec![
                         format!("if {receiver} != nil {{"),
                         format!("\tconverted, err := {converted}"),
@@ -1856,15 +1949,19 @@ fn singular_to_proto_lines(
                         format!("\t\t{error_return}"),
                         "\t}".to_string(),
                         format!("\t{}", assign("converted")),
-                        "}".to_string(),
                     ]
                 } else {
                     vec![
                         format!("if {receiver} != nil {{"),
                         format!("\t{}", assign(&converted)),
-                        "}".to_string(),
                     ]
+                };
+                if let Some(default_expr) = default_expr {
+                    lines.push("} else {".to_string());
+                    lines.push(format!("\t{}", assign(default_expr)));
                 }
+                lines.push("}".to_string());
+                lines
             } else {
                 let arg = if conversion.to_proto_takes_pointer {
                     format!("&{receiver}")

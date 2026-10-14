@@ -53,12 +53,12 @@ fn cli_debug_wit_dir_writes_prepared_workspace() {
             .is_file()
     );
     assert!(
-        output_dir
+        !output_dir
             .join("deps/nexus-temporal-types/python/temporal_model_converters.py")
             .is_file()
     );
     assert!(
-        output_dir
+        !output_dir
             .join("deps/nexus-temporal-types/typescript/temporal_model_converters.ts")
             .is_file()
     );

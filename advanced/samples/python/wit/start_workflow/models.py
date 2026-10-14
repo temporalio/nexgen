@@ -9,15 +9,7 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.converter
 
-from ._support import (
-    duration_from_proto,
-    duration_to_proto,
-    task_queue_from_proto,
-    task_queue_to_proto,
-    workflow_namespace,
-    workflow_type_from_proto,
-    workflow_type_to_proto,
-)
+import temporal_support as _support
 
 
 @dataclasses.dataclass(slots=True)
@@ -26,7 +18,7 @@ class StartWorkflowRequest:
     workflow_id: str
     task_queue: str
     workflow_start_delay: datetime.timedelta | None = None
-    namespace: str = dataclasses.field(default_factory=workflow_namespace)
+    namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
 
 
 class _StartWorkflowRequestTransferTypeConverter(
@@ -50,18 +42,20 @@ class _StartWorkflowRequestTransferTypeConverter(
     ) -> StartWorkflowRequest:
         if not value.HasField("workflow_type"):
             raise ValueError("missing required field StartWorkflowRequest.workflow")
-        workflow = workflow_type_from_proto(value.workflow_type)
+        workflow = _support.workflow_type_from_proto(value.workflow_type)
         if not value.workflow_id:
             raise ValueError("missing required field StartWorkflowRequest.workflow_id")
         workflow_id = value.workflow_id
         if not value.HasField("task_queue"):
             raise ValueError("missing required field StartWorkflowRequest.task_queue")
-        task_queue = task_queue_from_proto(value.task_queue)
+        task_queue = _support.task_queue_from_proto(value.task_queue)
         return StartWorkflowRequest(
             workflow=workflow,
             workflow_id=workflow_id,
             task_queue=task_queue,
-            workflow_start_delay=duration_from_proto(value.workflow_start_delay)
+            workflow_start_delay=_support.duration_from_proto(
+                value.workflow_start_delay
+            )
             if value.HasField("workflow_start_delay")
             else None,
             namespace=value.namespace,
@@ -73,12 +67,12 @@ class _StartWorkflowRequestTransferTypeConverter(
         value: StartWorkflowRequest,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest:
         message = temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest()
-        message.workflow_type.CopyFrom(workflow_type_to_proto(value.workflow))
+        message.workflow_type.CopyFrom(_support.workflow_type_to_proto(value.workflow))
         message.workflow_id = value.workflow_id
-        message.task_queue.CopyFrom(task_queue_to_proto(value.task_queue))
+        message.task_queue.CopyFrom(_support.task_queue_to_proto(value.task_queue))
         if value.workflow_start_delay is not None:
             message.workflow_start_delay.CopyFrom(
-                duration_to_proto(value.workflow_start_delay)
+                _support.duration_to_proto(value.workflow_start_delay)
             )
         message.namespace = value.namespace
         return message
@@ -135,7 +129,7 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True, kw_only=True)
 class CancelWorkflowRequest:
-    namespace: str = dataclasses.field(default_factory=workflow_namespace)
+    namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
     workflow_execution: WorkflowExecution
     reason: str | None = None
 

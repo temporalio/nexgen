@@ -10,7 +10,6 @@ pub struct ApiSpec<F: TypeFamily = AuthoredFamily> {
     pub module_path: ModulePath,
     pub data: F::SpecData,
     pub version: String,
-    pub support: F::Support,
     pub services: Vec<ServiceSpec<F>>,
     /// The authored scope that owns this input's models when it defines no
     /// services, such as an operation-free WIT interface. Backends use it to
@@ -116,9 +115,9 @@ impl std::fmt::Display for Symbol {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct AuthoredResourceType {
+pub struct ResourceTypeSpec<F: TypeFamily = AuthoredFamily> {
     pub name: Symbol,
-    pub wire_type: Option<ExternalTypeSpec<AuthoredFamily>>,
+    pub wire_type: Option<ExternalTypeSpec<F>>,
     /// The named type alias through which this resource is referenced.
     ///
     /// A resource return is lowered into its wire-facing result model. Keeping
@@ -127,7 +126,10 @@ pub struct AuthoredResourceType {
     pub alias: Option<DeclaredTypeName>,
 }
 
-impl AuthoredResourceType {
+pub type AuthoredResourceType = ResourceTypeSpec<AuthoredFamily>;
+pub(crate) type SelectedResourceType = ResourceTypeSpec<SelectedFamily>;
+
+impl<F: TypeFamily> ResourceTypeSpec<F> {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: Symbol::new(name),
@@ -138,6 +140,19 @@ impl AuthoredResourceType {
 
     pub fn as_str(&self) -> &str {
         self.name.as_str()
+    }
+
+    pub(crate) fn map_names_with<G: TypeFamily, M: ApiSpecTransform<F, G>>(
+        self,
+        map: &mut M,
+    ) -> ResourceTypeSpec<G> {
+        ResourceTypeSpec {
+            name: self.name,
+            wire_type: self
+                .wire_type
+                .map(|wire_type| wire_type.map_names_with(map)),
+            alias: self.alias,
+        }
     }
 }
 
@@ -151,13 +166,13 @@ pub struct DeclaredTypeName {
     pub full_name: String,
 }
 
-impl AsRef<str> for AuthoredResourceType {
+impl<F: TypeFamily> AsRef<str> for ResourceTypeSpec<F> {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
-impl std::fmt::Display for AuthoredResourceType {
+impl<F: TypeFamily> std::fmt::Display for ResourceTypeSpec<F> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.name.fmt(formatter)
     }
@@ -179,20 +194,12 @@ pub trait TypeFamily {
     type OperationData: std::fmt::Debug + Clone + PartialEq;
     type FieldData: std::fmt::Debug + Clone + PartialEq;
     type Text: TextSpec;
-    type Support: SupportSpecFamily;
 }
 
-/// Text metadata carried by an API-spec stage. `for_language` remains a small
-/// compatibility shim for emitters during the migration; selected text ignores
-/// its argument because selection has already happened.
+/// Structural text operations shared by authored and selected API-spec stages.
+/// Language selection belongs to authored text, not this family-neutral trait.
 pub trait TextSpec: std::fmt::Debug + Clone + PartialEq {
-    fn for_language(&self, language: Language) -> Option<&str>;
-    fn import_for_language(&self, language: Language) -> Option<&str>;
     fn is_empty(&self) -> bool;
-}
-
-pub trait SupportSpecFamily: std::fmt::Debug + Clone + PartialEq {
-    fn fragments_for_language(&self, language: Language) -> &[SupportFragmentSpec];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,7 +221,6 @@ impl TypeFamily for AuthoredFamily {
     type OperationData = ();
     type FieldData = ();
     type Text = LanguageStringSpec;
-    type Support = SupportSpec;
 }
 
 /// Name family after target-language selection. It preserves the `ApiSpec<F>`
@@ -228,7 +234,7 @@ impl TypeFamily for SelectedFamily {
     type Enum = Symbol;
     type Flags = Symbol;
     type Variant = Symbol;
-    type Resource = AuthoredResourceType;
+    type Resource = SelectedResourceType;
     type Proto = Symbol;
     type Json = JsonModelSpec<Symbol>;
     type Alias = Symbol;
@@ -238,7 +244,6 @@ impl TypeFamily for SelectedFamily {
     type OperationData = ();
     type FieldData = ();
     type Text = SelectedTextSpec;
-    type Support = SelectedSupportSpec;
 }
 
 /// Maps one structural `ApiSpec` family into another.
@@ -266,7 +271,18 @@ pub trait ApiSpecTransform<From: TypeFamily, To: TypeFamily> {
         data: From::FieldData,
     ) -> To::FieldData;
     fn map_text(&mut self, text: From::Text) -> To::Text;
-    fn map_support(&mut self, support: From::Support) -> To::Support;
+
+    /// Map descriptor text while preserving structure unless a pass explicitly
+    /// normalizes the descriptor for its output family.
+    fn map_function_type_descriptor(
+        &mut self,
+        descriptor: FunctionTypeDescriptorSpec<From>,
+    ) -> Option<FunctionTypeDescriptorSpec<To>> {
+        Some(FunctionTypeDescriptorSpec {
+            value_type: self.map_text(descriptor.value_type),
+            args_type: self.map_text(descriptor.args_type),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -411,7 +427,6 @@ impl<F: TypeFamily> ApiSpec<F> {
             module_path: self.module_path,
             data: map.map_spec_data(self.data),
             version: self.version,
-            support: map.map_support(self.support),
             services: self
                 .services
                 .into_iter()
@@ -620,44 +635,6 @@ impl<F: TypeFamily> ServiceSpec<F> {
             data,
         }
     }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SupportSpec {
-    pub fragments: BTreeMap<Language, Vec<SupportFragmentSpec>>,
-}
-
-impl SupportSpec {
-    pub fn fragments_for_language(&self, language: Language) -> &[SupportFragmentSpec] {
-        self.fragments
-            .get(&language)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
-    }
-}
-
-impl SupportSpecFamily for SupportSpec {
-    fn fragments_for_language(&self, language: Language) -> &[SupportFragmentSpec] {
-        self.fragments_for_language(language)
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct SelectedSupportSpec {
-    pub(crate) fragments: Vec<SupportFragmentSpec>,
-}
-
-impl SupportSpecFamily for SelectedSupportSpec {
-    fn fragments_for_language(&self, _language: Language) -> &[SupportFragmentSpec] {
-        &self.fragments
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SupportFragmentSpec {
-    pub path: String,
-    pub contents: String,
-    pub namespace: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -955,7 +932,7 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn sourced_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)> {
         self.fields.iter().filter_map(|(name, field)| {
-            let RecordFieldVisibility::Sourced { source_expr } = &field.visibility else {
+            let RecordFieldVisibility::Sourced { source_expr, .. } = &field.visibility else {
                 return None;
             };
             Some((name.as_str(), field, source_expr.as_str()))
@@ -1013,7 +990,7 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn field_source(&self, field_name: &str) -> Option<&str> {
         self.fields.get(field_name).and_then(|field| {
-            let RecordFieldVisibility::Sourced { source_expr } = &field.visibility else {
+            let RecordFieldVisibility::Sourced { source_expr, .. } = &field.visibility else {
                 return None;
             };
             Some(source_expr.as_str())
@@ -1200,34 +1177,30 @@ impl LanguageStringSpec {
 }
 
 impl TextSpec for LanguageStringSpec {
-    fn for_language(&self, language: Language) -> Option<&str> {
-        LanguageStringSpec::for_language(self, language)
-    }
-
-    fn import_for_language(&self, language: Language) -> Option<&str> {
-        LanguageStringSpec::import_for_language(self, language)
-    }
-
     fn is_empty(&self) -> bool {
         LanguageStringSpec::is_empty(self)
     }
 }
 
+/// One target's text and optional import, selected before binding and planning.
+/// This type deliberately cannot perform language selection.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct SelectedTextSpec {
     pub(crate) value: Option<String>,
     pub(crate) import: Option<String>,
 }
 
-impl TextSpec for SelectedTextSpec {
-    fn for_language(&self, _language: Language) -> Option<&str> {
+impl SelectedTextSpec {
+    pub(crate) fn value(&self) -> Option<&str> {
         self.value.as_deref()
     }
 
-    fn import_for_language(&self, _language: Language) -> Option<&str> {
+    pub(crate) fn import(&self) -> Option<&str> {
         self.import.as_deref()
     }
+}
 
+impl TextSpec for SelectedTextSpec {
     fn is_empty(&self) -> bool {
         self.value.is_none()
     }
@@ -1707,53 +1680,35 @@ where
     F::Record: AsRef<str>,
     F::Variant: AsRef<str>,
 {
-    /// Returns the model parameters in first-use order. Language-specific
-    /// field annotations are authoritative, so an overridden field does not
-    /// contribute parameters for that language.
-    pub(crate) fn record_type_parameters(
-        &self,
-        record_name: &str,
-        language: Language,
-    ) -> Vec<TypeParameterUsage> {
+    /// Returns the model parameters in first-use order. Selected field
+    /// annotations are authoritative, so an overridden field does not
+    /// contribute parameters.
+    pub(crate) fn record_type_parameters(&self, record_name: &str) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_record_type_parameters(record_name, language, &mut visiting, &mut parameters);
+        self.collect_record_type_parameters(record_name, &mut visiting, &mut parameters);
         parameters.into_values().collect()
     }
 
     /// Returns a variant's parameters in first-use order, recursively walking
     /// case payload containers and referenced records/variants.
-    pub(crate) fn variant_type_parameters(
-        &self,
-        variant_name: &str,
-        language: Language,
-    ) -> Vec<TypeParameterUsage> {
+    pub(crate) fn variant_type_parameters(&self, variant_name: &str) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_variant_type_parameters(
-            variant_name,
-            language,
-            &mut visiting,
-            &mut parameters,
-        );
+        self.collect_variant_type_parameters(variant_name, &mut visiting, &mut parameters);
         parameters.into_values().collect()
     }
 
-    pub(crate) fn type_parameters(
-        &self,
-        value: &TypeSpec<F>,
-        language: Language,
-    ) -> Vec<TypeParameterUsage> {
+    pub(crate) fn type_parameters(&self, value: &TypeSpec<F>) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_type_parameters(value, language, &mut visiting, &mut parameters);
+        self.collect_type_parameters(value, &mut visiting, &mut parameters);
         parameters.into_values().collect()
     }
 
     fn collect_record_type_parameters(
         &self,
         record_name: &str,
-        language: Language,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
     ) {
@@ -1766,11 +1721,11 @@ where
                     || field
                         .annotation
                         .as_ref()
-                        .is_some_and(|annotation| annotation.for_language(language).is_some())
+                        .is_some_and(|annotation| !annotation.is_empty())
                 {
                     continue;
                 }
-                self.collect_type_parameters(&field.field_type, language, visiting, parameters);
+                self.collect_type_parameters(&field.field_type, visiting, parameters);
             }
         }
         visiting.remove(record_name);
@@ -1779,7 +1734,6 @@ where
     fn collect_variant_type_parameters(
         &self,
         variant_name: &str,
-        language: Language,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
     ) {
@@ -1789,7 +1743,7 @@ where
         if let Some(variant) = self.variant(variant_name) {
             for case in &variant.cases {
                 if let Some(payload) = &case.payload {
-                    self.collect_type_parameters(payload, language, visiting, parameters);
+                    self.collect_type_parameters(payload, visiting, parameters);
                 }
             }
         }
@@ -1799,7 +1753,6 @@ where
     fn collect_type_parameters(
         &self,
         value: &TypeSpec<F>,
-        language: Language,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
     ) {
@@ -1815,36 +1768,33 @@ where
                 }
             }
             TypeSpec::Option(inner) | TypeSpec::List(inner) => {
-                self.collect_type_parameters(inner, language, visiting, parameters)
+                self.collect_type_parameters(inner, visiting, parameters)
             }
             TypeSpec::Tuple(items) => {
                 for item in items {
-                    self.collect_type_parameters(item, language, visiting, parameters);
+                    self.collect_type_parameters(item, visiting, parameters);
                 }
             }
             TypeSpec::Map(key, value) => {
-                self.collect_type_parameters(key, language, visiting, parameters);
-                self.collect_type_parameters(value, language, visiting, parameters);
+                self.collect_type_parameters(key, visiting, parameters);
+                self.collect_type_parameters(value, visiting, parameters);
             }
             TypeSpec::Result { ok, err } => {
                 if let Some(ok) = ok {
-                    self.collect_type_parameters(ok, language, visiting, parameters);
+                    self.collect_type_parameters(ok, visiting, parameters);
                 }
                 if let Some(err) = err {
-                    self.collect_type_parameters(err, language, visiting, parameters);
+                    self.collect_type_parameters(err, visiting, parameters);
                 }
             }
             TypeSpec::Record(record) => {
-                self.collect_record_type_parameters(record.as_ref(), language, visiting, parameters)
+                self.collect_record_type_parameters(record.as_ref(), visiting, parameters)
             }
-            TypeSpec::Variant(variant) => self.collect_variant_type_parameters(
-                variant.as_ref(),
-                language,
-                visiting,
-                parameters,
-            ),
+            TypeSpec::Variant(variant) => {
+                self.collect_variant_type_parameters(variant.as_ref(), visiting, parameters)
+            }
             TypeSpec::External(ExternalTypeSpec::Alias(alias)) => {
-                self.collect_type_parameters(&alias.target, language, visiting, parameters)
+                self.collect_type_parameters(&alias.target, visiting, parameters)
             }
             TypeSpec::Bool
             | TypeSpec::Int(_)
@@ -1902,19 +1852,6 @@ pub struct FunctionTypeDescriptorSpec<F: TypeFamily = AuthoredFamily> {
     pub args_type: F::Text,
 }
 
-impl<F: TypeFamily> FunctionTypeDescriptorSpec<F> {
-    fn map_names_with<G, M>(self, map: &mut M) -> FunctionTypeDescriptorSpec<G>
-    where
-        G: TypeFamily,
-        M: ApiSpecTransform<F, G>,
-    {
-        FunctionTypeDescriptorSpec {
-            value_type: map.map_text(self.value_type),
-            args_type: map.map_text(self.args_type),
-        }
-    }
-}
-
 impl<F: TypeFamily> FunctionFieldSpec<F> {
     fn map_names_with<G, M>(self, map: &mut M) -> FunctionFieldSpec<G>
     where
@@ -1936,7 +1873,7 @@ impl<F: TypeFamily> FunctionFieldSpec<F> {
             result_type_parameter: self.result_type_parameter,
             type_descriptor: self
                 .type_descriptor
-                .map(|descriptor| descriptor.map_names_with(map)),
+                .and_then(|descriptor| map.map_function_type_descriptor(descriptor)),
         }
     }
 }

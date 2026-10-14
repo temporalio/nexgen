@@ -38,8 +38,8 @@ func systemServerDataConverter() converter.DataConverter {
 	)
 }
 
-func signalWithStartWorkflow(ctx workflow.Context, input string) string {
-	return input
+func signalWithStartWorkflow(ctx workflow.Context, input string) error {
+	return nil
 }
 
 type emptyPayloadsDataConverter struct {
@@ -244,6 +244,9 @@ func TestWorkflowServiceIntegrationSuite(t *testing.T) {
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
+	s.env.RegisterWorkflowWithOptions(signalWithStartWorkflow, workflow.RegisterOptions{
+		Name: "registered-workflow",
+	})
 	retryPolicy := &temporal.RetryPolicy{MaximumAttempts: 3}
 	searchKey := temporal.NewSearchAttributeKeyKeyword("CustomKeyword")
 	searchAttributes := temporal.NewSearchAttributes(searchKey.ValueSet("search-value"))
@@ -287,9 +290,11 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 		}
 
 		var variadicResult ws.SignalWithStartWorkflowResponse
+		defaultOpts := opts
+		defaultOpts.WorkflowIDReusePolicy = 0
 		return ws.SignalWithStartWorkflow(
 			ctx,
-			opts,
+			defaultOpts,
 			"wake-up",
 			nil,
 			"ExampleWorkflow",
@@ -303,6 +308,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.Require().Len(s.calls, 2)
 
 	typedRequest := s.calls[0]
+	s.Equal("registered-workflow", typedRequest.GetWorkflowType().GetName())
 	s.Equal("wake-up", typedRequest.GetSignalName())
 	s.Require().NotNil(typedRequest.GetSignalInput())
 	s.Len(typedRequest.GetSignalInput().GetPayloads(), 1)
@@ -322,12 +328,41 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.Equal(int32(7), typedRequest.GetPriority().GetPriorityKey())
 
 	variadicRequest := s.calls[1]
+	s.Equal("ExampleWorkflow", variadicRequest.GetWorkflowType().GetName())
+	s.Equal(enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE, variadicRequest.GetWorkflowIdReusePolicy())
 	// A nil signal argument is still one argument and therefore one payload;
 	// it does not mean that the signal has no arguments.
 	s.Require().NotNil(variadicRequest.GetSignalInput())
 	s.Len(variadicRequest.GetSignalInput().GetPayloads(), 1)
 	s.Require().NotNil(variadicRequest.GetInput())
 	s.Len(variadicRequest.GetInput().GetPayloads(), 2)
+}
+
+func (s *WorkflowServiceIntegrationSuite) TestSliceSignalArgumentRemainsOnePayload() {
+	signalArg := []string{"one", "two"}
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		opts := ws.SignalWithStartWorkflowOptions{ID: "workflow-id"}
+		if err := ws.SignalWithStartWorkflowTyped(
+			ctx, opts, "wake-up", signalArg, signalWithStartWorkflow, "workflow-input",
+		).Get(ctx, nil); err != nil {
+			return err
+		}
+		return ws.SignalWithStartWorkflow(
+			ctx, opts, "wake-up", signalArg, "ExampleWorkflow", "workflow-input",
+		).Get(ctx, nil)
+	})
+
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+	s.Require().Len(s.calls, 2)
+	for _, request := range s.calls {
+		payloads := request.GetSignalInput()
+		s.Require().NotNil(payloads)
+		s.Require().Len(payloads.GetPayloads(), 1)
+		var decoded []string
+		s.NoError(converter.GetDefaultDataConverter().FromPayloads(payloads, &decoded))
+		s.Equal(signalArg, decoded)
+	}
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestEmptyPayloadsAreDelegatedToDataConverter() {

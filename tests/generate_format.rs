@@ -68,6 +68,8 @@ mod format_tests {
                 descriptor_path(&root).to_str().unwrap(),
                 "--output",
                 output_path.to_str().unwrap(),
+                "--support-package",
+                "temporal_support",
                 "--format",
             ])
             .status()
@@ -99,6 +101,8 @@ mod format_tests {
                 descriptor_path(&root).to_str().unwrap(),
                 "--output",
                 output_path.to_str().unwrap(),
+                "--support-package",
+                "./support",
                 "--format",
             ])
             .status()

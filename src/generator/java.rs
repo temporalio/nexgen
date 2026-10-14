@@ -18,7 +18,6 @@ const JAVA_FORMAT_LINE_LENGTH: usize = 88;
 
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
-    _support: &crate::SupportFiles,
     base_package: Option<&str>,
 ) -> Result<GeneratedFiles> {
     let base_package = base_package.unwrap_or(DEFAULT_PACKAGE);
@@ -113,10 +112,7 @@ pub(crate) fn generate(
 
         for service in &leaf.spec.services {
             let contents = render_service_file(service, module, base_package, &all_models)?;
-            let service_ident = service
-                .code_name
-                .for_language(crate::language::Language::Java)
-                .unwrap_or(&service.name);
+            let service_ident = service.code_name.value().unwrap_or(&service.name);
             let path = module_dir.join(format!("{service_ident}.java"));
             files.insert(
                 path,
@@ -235,7 +231,7 @@ fn render_service_file(
     let mut body = String::new();
     render_service_javadoc(
         &mut body,
-        service.doc.for_language(crate::language::Language::Java),
+        service.doc.value(),
         service.deprecated,
         "service",
     );
@@ -247,10 +243,7 @@ fn render_service_file(
         } else {
             ""
         },
-        service
-            .code_name
-            .for_language(crate::language::Language::Java)
-            .unwrap_or(&service.name)
+        service.code_name.value().unwrap_or(&service.name)
     ));
 
     for (index, operation) in service.operations.iter().enumerate() {
@@ -259,7 +252,7 @@ fn render_service_file(
         }
         render_service_javadoc_indented(
             &mut body,
-            operation.doc.for_language(crate::language::Language::Java),
+            operation.doc.value(),
             operation.deprecated,
             "operation",
         );
@@ -288,7 +281,7 @@ fn render_service_file(
         };
         let method = operation
             .code_name
-            .for_language(crate::language::Language::Java)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| operation.name.to_lower_camel_case());
         match &input {

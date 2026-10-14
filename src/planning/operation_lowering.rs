@@ -10,14 +10,14 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 use crate::spec::{
-    ApiSpecTransform, AuthoredResourceType, ExternalTypeSourceSpec, ExternalTypeSpec,
-    JsonModelSpec, ProtoTypeSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec, Symbol,
+    ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec, JsonModelSpec, ProtoTypeSpec,
+    RecordFieldSpec, RecordFieldVisibility, RecordSpec, SelectedResourceType, Symbol,
     TypeDeclEntry, TypeDeclSpec, TypeSpec,
 };
 
 use super::{
     OperationBoundFamily, OperationBoundOperation, OperationBoundResource,
-    ResolvedResourceBindingSource, SelectedSupportSpec, SelectedTextSpec,
+    ResolvedResourceBindingSource, SelectedTextSpec,
 };
 
 /// Operation-bound IR after resource-return structures become explicit records.
@@ -30,7 +30,7 @@ impl crate::spec::TypeFamily for OperationLoweredFamily {
     type Enum = Symbol;
     type Flags = Symbol;
     type Variant = Symbol;
-    type Resource = AuthoredResourceType;
+    type Resource = SelectedResourceType;
     type Proto = Symbol;
     type Json = JsonModelSpec<Symbol>;
     type Alias = Symbol;
@@ -40,7 +40,6 @@ impl crate::spec::TypeFamily for OperationLoweredFamily {
     type OperationData = OperationBoundOperation;
     type FieldData = ();
     type Text = SelectedTextSpec;
-    type Support = SelectedSupportSpec;
 }
 
 pub(crate) struct OperationLoweringPass;
@@ -169,7 +168,7 @@ impl ApiSpecTransform<OperationBoundFamily, OperationLoweredFamily> for Operatio
     fn map_variant(&mut self, value: Symbol) -> Symbol {
         value
     }
-    fn map_resource(&mut self, value: AuthoredResourceType) -> AuthoredResourceType {
+    fn map_resource(&mut self, value: SelectedResourceType) -> SelectedResourceType {
         value
     }
     fn map_proto(&mut self, value: Symbol) -> Symbol {
@@ -199,9 +198,6 @@ impl ApiSpecTransform<OperationBoundFamily, OperationLoweredFamily> for Operatio
     }
     fn map_field_data(&mut self, _: &str, _: &str, _: ()) {}
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
-        value
-    }
-    fn map_support(&mut self, value: super::SelectedSupportSpec) -> super::SelectedSupportSpec {
         value
     }
 }

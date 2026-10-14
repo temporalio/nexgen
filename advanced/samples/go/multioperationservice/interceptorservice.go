@@ -13,6 +13,11 @@ type request struct {
 	ID string
 }
 
+// GetID returns the ID field.
+func (m request) GetID() string {
+	return m.ID
+}
+
 // --- Operations (internal) ---
 
 func firstOperation(ctx workflow.Context, request request) workflow.Future {
@@ -32,6 +37,11 @@ func secondOperation(ctx workflow.Context, request request) workflow.Future {
 type Response struct {
 	// Value - Required.
 	Value string
+}
+
+// GetValue returns the Value field.
+func (m Response) GetValue() string {
+	return m.Value
 }
 
 type FirstOperationOptions struct {

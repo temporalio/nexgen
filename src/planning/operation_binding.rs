@@ -27,7 +27,7 @@ impl TypeFamily for OperationBoundFamily {
     type Enum = Symbol;
     type Flags = Symbol;
     type Variant = Symbol;
-    type Resource = AuthoredResourceType;
+    type Resource = SelectedResourceType;
     type Proto = Symbol;
     type Json = JsonModelSpec<Symbol>;
     type Alias = Symbol;
@@ -37,7 +37,6 @@ impl TypeFamily for OperationBoundFamily {
     type OperationData = OperationBoundOperation;
     type FieldData = ();
     type Text = SelectedTextSpec;
-    type Support = SelectedSupportSpec;
 }
 
 pub(crate) struct OperationBindingPass;
@@ -112,7 +111,7 @@ impl ApiSpecTransform<ResourceBoundFamily, OperationBoundFamily> for OperationBi
     fn map_variant(&mut self, value: Symbol) -> Symbol {
         value
     }
-    fn map_resource(&mut self, value: AuthoredResourceType) -> AuthoredResourceType {
+    fn map_resource(&mut self, value: SelectedResourceType) -> SelectedResourceType {
         value
     }
     fn map_proto(&mut self, value: Symbol) -> Symbol {
@@ -137,9 +136,6 @@ impl ApiSpecTransform<ResourceBoundFamily, OperationBoundFamily> for OperationBi
     }
     fn map_field_data(&mut self, _: &str, _: &str, _: ()) {}
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
-        value
-    }
-    fn map_support(&mut self, value: SelectedSupportSpec) -> SelectedSupportSpec {
         value
     }
 }

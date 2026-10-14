@@ -78,6 +78,12 @@ pub fn load_api_spec_tree_for_language_with_inputs(
     }
 }
 
+/// CLI validation uses the same format detection as parsing, before entering
+/// the input-format-neutral compiler pipeline.
+pub(crate) fn is_wit_input(input_paths: &[PathBuf]) -> Result<bool> {
+    Ok(detect_input_format(input_paths)? == InputFormat::Wit)
+}
+
 fn detect_input_format(input_paths: &[PathBuf]) -> Result<InputFormat> {
     let Some((first, rest)) = input_paths.split_first() else {
         return Err(Error::InvalidWit {

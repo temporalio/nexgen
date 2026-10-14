@@ -1339,13 +1339,13 @@ impl ModelBackend {
         for service in &api_plan.services {
             let service_var = service
                 .code_name
-                .for_language(crate::language::Language::Go)
+                .value()
                 .map(str::to_string)
                 .unwrap_or_else(|| go_field_name(&service.name));
             render_go_doc_comment(
                 &mut output,
                 "",
-                service.doc.for_language(crate::language::Language::Go),
+                service.doc.value(),
                 &format!(
                     "{service_var} is the Nexus service binding for {:?}.",
                     service.wire_name
@@ -1363,7 +1363,7 @@ impl ModelBackend {
                 render_go_doc_comment(
                     &mut output,
                     "\t",
-                    operation.doc.for_language(crate::language::Language::Go),
+                    operation.doc.value(),
                     &format!(
                         "{operation_field} is the {:?} Nexus operation.",
                         operation.wire_name
@@ -1433,7 +1433,7 @@ fn go_code_without_comments(output: &str) -> String {
 fn go_operation_field(operation: &crate::spec::OperationSpec<PlannedFamily>) -> String {
     operation
         .code_name
-        .for_language(crate::language::Language::Go)
+        .value()
         .map(str::to_string)
         .unwrap_or_else(|| go_field_name(&operation.name))
 }
@@ -1447,14 +1447,14 @@ fn render_service_client(
 ) -> Result<()> {
     let service_var = service
         .code_name
-        .for_language(crate::language::Language::Go)
+        .value()
         .map(str::to_string)
         .unwrap_or_else(|| go_field_name(&service.name));
     let client_name = format!("{service_var}Client");
     render_go_doc_comment(
         output,
         "",
-        service.doc.for_language(crate::language::Language::Go),
+        service.doc.value(),
         &format!(
             "{client_name} is a client for the {:?} Nexus service.",
             service.wire_name
@@ -1487,7 +1487,7 @@ fn render_service_client(
         render_go_doc_comment(
             output,
             "",
-            operation.doc.for_language(crate::language::Language::Go),
+            operation.doc.value(),
             &format!(
                 "{operation_field} invokes the {:?} Nexus operation.",
                 operation.wire_name
@@ -1569,7 +1569,7 @@ fn operation_io_type(
             .unwrap_or_else(|| record_ref.model_name.clone())),
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec { type_name, .. })) => {
             Ok(type_name
-                .for_language(crate::language::Language::Go)
+                .value()
                 .map(|annotation| package.go_type_expr(annotation))
                 .unwrap_or_else(|| "any".to_string()))
         }
@@ -5385,15 +5385,15 @@ func checkTemporalYear(name string, v time.Time, path string, errs *[]Violation)
 	return false
 }
 
-// checkTemporalOffset asserts the wire's whole-minute, +/-18-hour offset range.
+// checkTemporalOffset asserts the wire's whole-minute, +/-14-hour offset range.
 // A Go Location carries arbitrary seconds and magnitude, both wider than the
 // materialized wire grammar.
 func checkTemporalOffset(name string, v time.Time, path string, errs *[]Violation) {
 	_, offset := v.Zone()
 	if offset%60 != 0 {
 		*errs = append(*errs, Violation{path, fmt.Sprintf("must be a valid %s, got %v: the UTC offset %d seconds is not a whole number of minutes", name, v, offset)})
-	} else if offset < -18*60*60 || offset > 18*60*60 {
-		*errs = append(*errs, Violation{path, fmt.Sprintf("must be a valid %s, got %v: the UTC offset is outside -18:00 through +18:00", name, v)})
+	} else if offset < -14*60*60 || offset > 14*60*60 {
+		*errs = append(*errs, Violation{path, fmt.Sprintf("must be a valid %s, got %v: the UTC offset is outside -14:00 through +14:00", name, v)})
 	}
 }
 

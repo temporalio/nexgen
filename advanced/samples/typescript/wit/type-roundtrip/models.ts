@@ -2,18 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
-import {
-  retryPolicyFromProto,
-  retryPolicyToProto,
-  taskQueueFromProto,
-  taskQueueToProto,
-  failureFromProto,
-  failureToProto,
-  durationFromProto,
-  durationToProto,
-  priorityFromProto,
-  priorityToProto,
-} from "./support";
+import * as support from "../../support/temporal_model_converters";
 
 export function requiredField<T>(
   value: T | null | undefined,
@@ -41,9 +30,9 @@ function activityOptionsFromProto(
   }
   return {
     taskQueue:
-      proto.taskQueue == null ? undefined : taskQueueFromProto(proto.taskQueue),
+      proto.taskQueue == null ? undefined : support.taskQueueFromProto(proto.taskQueue),
     retryPolicy: requiredField(
-      retryPolicyFromProto(
+      support.retryPolicyFromProto(
         requiredField(proto.retryPolicy, "ActivityOptions", "retryPolicy"),
       ),
       "ActivityOptions",
@@ -52,8 +41,9 @@ function activityOptionsFromProto(
     scheduleToCloseTimeout:
       proto.scheduleToCloseTimeout == null
         ? undefined
-        : durationFromProto(proto.scheduleToCloseTimeout),
-    priority: proto.priority == null ? undefined : priorityFromProto(proto.priority),
+        : support.durationFromProto(proto.scheduleToCloseTimeout),
+    priority:
+      proto.priority == null ? undefined : support.priorityFromProto(proto.priority),
   };
 }
 
@@ -64,15 +54,17 @@ function activityOptionsToProto(
     return undefined;
   }
   return {
-    taskQueue: model.taskQueue == null ? undefined : taskQueueToProto(model.taskQueue),
-    retryPolicy: retryPolicyToProto(
+    taskQueue:
+      model.taskQueue == null ? undefined : support.taskQueueToProto(model.taskQueue),
+    retryPolicy: support.retryPolicyToProto(
       requiredField(model.retryPolicy, "ActivityOptions", "retryPolicy"),
     ),
     scheduleToCloseTimeout:
       model.scheduleToCloseTimeout == null
         ? undefined
-        : durationToProto(model.scheduleToCloseTimeout),
-    priority: model.priority == null ? undefined : priorityToProto(model.priority),
+        : support.durationToProto(model.scheduleToCloseTimeout),
+    priority:
+      model.priority == null ? undefined : support.priorityToProto(model.priority),
   };
 }
 
@@ -99,7 +91,8 @@ function failureContainerFromProto(
     return undefined;
   }
   return {
-    failure: proto.failure == null ? undefined : failureFromProto(proto.failure),
+    failure:
+      proto.failure == null ? undefined : support.failureFromProto(proto.failure),
   };
 }
 
@@ -110,7 +103,7 @@ function failureContainerToProto(
     return undefined;
   }
   return {
-    failure: model.failure == null ? undefined : failureToProto(model.failure),
+    failure: model.failure == null ? undefined : support.failureToProto(model.failure),
   };
 }
 

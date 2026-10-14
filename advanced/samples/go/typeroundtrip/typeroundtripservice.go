@@ -7,6 +7,7 @@ import (
 
 	activity "go.temporal.io/api/activity/v1"
 	command "go.temporal.io/api/command/v1"
+	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
@@ -59,31 +60,51 @@ type ActivityOptions struct {
 	Priority *temporal.Priority
 }
 
+// GetTaskQueue returns the TaskQueue field.
+func (m ActivityOptions) GetTaskQueue() *string {
+	return m.TaskQueue
+}
+
+// GetRetryPolicy returns the RetryPolicy field.
+func (m ActivityOptions) GetRetryPolicy() temporal.RetryPolicy {
+	return m.RetryPolicy
+}
+
+// GetScheduleToCloseTimeout returns the ScheduleToCloseTimeout field.
+func (m ActivityOptions) GetScheduleToCloseTimeout() *time.Duration {
+	return m.ScheduleToCloseTimeout
+}
+
+// GetPriority returns the Priority field.
+func (m ActivityOptions) GetPriority() *temporal.Priority {
+	return m.Priority
+}
+
 func activityOptionsToProto(dc converter.DataConverter, m *ActivityOptions) (*activity.ActivityOptions, error) {
 	message := &activity.ActivityOptions{}
 	{
-		converted, err := taskQueueToProto(dc, m.TaskQueue)
+		converted, err := support.TaskQueueToProto(dc, m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
 		message.TaskQueue = converted
 	}
 	{
-		converted, err := retryPolicyToProto(dc, &m.RetryPolicy)
+		converted, err := support.RetryPolicyToProto(dc, &m.RetryPolicy)
 		if err != nil {
 			return nil, err
 		}
 		message.RetryPolicy = converted
 	}
 	{
-		converted, err := durationToProto(dc, m.ScheduleToCloseTimeout)
+		converted, err := support.DurationToProto(dc, m.ScheduleToCloseTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := priorityToProto(dc, m.Priority)
+		converted, err := support.PriorityToProto(dc, m.Priority)
 		if err != nil {
 			return nil, err
 		}
@@ -95,14 +116,14 @@ func activityOptionsToProto(dc converter.DataConverter, m *ActivityOptions) (*ac
 func activityOptionsFromProto(dc converter.DataConverter, proto *activity.ActivityOptions, out *ActivityOptions) error {
 	*out = ActivityOptions{}
 	{
-		converted, err := taskQueueFromProto(dc, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(dc, proto.GetTaskQueue())
 		if err != nil {
 			return err
 		}
 		out.TaskQueue = converted
 	}
 	{
-		converted, err := retryPolicyFromProto(dc, proto.GetRetryPolicy())
+		converted, err := support.RetryPolicyFromProto(dc, proto.GetRetryPolicy())
 		if err != nil {
 			return err
 		}
@@ -111,14 +132,14 @@ func activityOptionsFromProto(dc converter.DataConverter, proto *activity.Activi
 		}
 	}
 	{
-		converted, err := durationFromProto(dc, proto.GetScheduleToCloseTimeout())
+		converted, err := support.DurationFromProto(dc, proto.GetScheduleToCloseTimeout())
 		if err != nil {
 			return err
 		}
 		out.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := priorityFromProto(dc, proto.GetPriority())
+		converted, err := support.PriorityFromProto(dc, proto.GetPriority())
 		if err != nil {
 			return err
 		}
@@ -143,10 +164,15 @@ type FailureContainer struct {
 	Failure error
 }
 
+// GetFailure returns the Failure field.
+func (m FailureContainer) GetFailure() error {
+	return m.Failure
+}
+
 func failureContainerToProto(dc converter.DataConverter, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
 	message := &command.FailWorkflowExecutionCommandAttributes{}
 	{
-		converted, err := failureToProto(dc, m.Failure)
+		converted, err := support.FailureToProto(dc, m.Failure)
 		if err != nil {
 			return nil, err
 		}
@@ -158,7 +184,7 @@ func failureContainerToProto(dc converter.DataConverter, m *FailureContainer) (*
 func failureContainerFromProto(dc converter.DataConverter, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
 	*out = FailureContainer{}
 	{
-		converted, err := failureFromProto(dc, proto.GetFailure())
+		converted, err := support.FailureFromProto(dc, proto.GetFailure())
 		if err != nil {
 			return err
 		}

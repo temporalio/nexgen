@@ -18,10 +18,40 @@ type executeFunctionRequest struct {
 	Enabled  bool
 }
 
+// GetFunction returns the Function field.
+func (m executeFunctionRequest) GetFunction() string {
+	return m.Function
+}
+
+// GetName returns the Name field.
+func (m executeFunctionRequest) GetName() string {
+	return m.Name
+}
+
+// GetEnabled returns the Enabled field.
+func (m executeFunctionRequest) GetEnabled() bool {
+	return m.Enabled
+}
+
 type executeCountedFunctionRequest struct {
 	Function string
 	Name     string
 	Count    int32
+}
+
+// GetFunction returns the Function field.
+func (m executeCountedFunctionRequest) GetFunction() string {
+	return m.Function
+}
+
+// GetName returns the Name field.
+func (m executeCountedFunctionRequest) GetName() string {
+	return m.Name
+}
+
+// GetCount returns the Count field.
+func (m executeCountedFunctionRequest) GetCount() int32 {
+	return m.Count
 }
 
 type executeNamedFunctionRequest struct {
@@ -30,14 +60,49 @@ type executeNamedFunctionRequest struct {
 	Enabled  bool
 }
 
+// GetFunction returns the Function field.
+func (m executeNamedFunctionRequest) GetFunction() string {
+	return m.Function
+}
+
+// GetName returns the Name field.
+func (m executeNamedFunctionRequest) GetName() string {
+	return m.Name
+}
+
+// GetEnabled returns the Enabled field.
+func (m executeNamedFunctionRequest) GetEnabled() bool {
+	return m.Enabled
+}
+
 type executeVarargsFunctionRequest struct {
 	Function string
 	Args     []string
 }
 
+// GetFunction returns the Function field.
+func (m executeVarargsFunctionRequest) GetFunction() string {
+	return m.Function
+}
+
+// GetArgs returns the Args field.
+func (m executeVarargsFunctionRequest) GetArgs() []string {
+	return m.Args
+}
+
 type executeNamedVarargsFunctionRequest struct {
 	Function string
 	Args     []string
+}
+
+// GetFunction returns the Function field.
+func (m executeNamedVarargsFunctionRequest) GetFunction() string {
+	return m.Function
+}
+
+// GetArgs returns the Args field.
+func (m executeNamedVarargsFunctionRequest) GetArgs() []string {
+	return m.Args
 }
 
 // --- Operations (internal) ---
@@ -79,9 +144,19 @@ type ExecuteFunctionResult struct {
 	Value string
 }
 
+// GetValue returns the Value field.
+func (m ExecuteFunctionResult) GetValue() string {
+	return m.Value
+}
+
 type ExecuteCountedFunctionResult struct {
 	// Value - Required.
 	Value string
+}
+
+// GetValue returns the Value field.
+func (m ExecuteCountedFunctionResult) GetValue() string {
+	return m.Value
 }
 
 type ExecuteNamedFunctionResult struct {
@@ -89,14 +164,29 @@ type ExecuteNamedFunctionResult struct {
 	Value string
 }
 
+// GetValue returns the Value field.
+func (m ExecuteNamedFunctionResult) GetValue() string {
+	return m.Value
+}
+
 type ExecuteVarargsFunctionResult struct {
 	// Value - Required.
 	Value string
 }
 
+// GetValue returns the Value field.
+func (m ExecuteVarargsFunctionResult) GetValue() string {
+	return m.Value
+}
+
 type ExecuteNamedVarargsFunctionResult struct {
 	// Value - Required.
 	Value string
+}
+
+// GetValue returns the Value field.
+func (m ExecuteNamedVarargsFunctionResult) GetValue() string {
+	return m.Value
 }
 
 type ExecuteFunctionOptions struct {

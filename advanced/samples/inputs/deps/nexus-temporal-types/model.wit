@@ -1,9 +1,3 @@
-/// @nexus.support
-///   python="python/temporal_model_converters.py"
-///   typescript="typescript/temporal_model_converters.ts"
-///   go="go/temporal_model_converters.go"
-///   dotnet="dotnet/TemporalSupport.cs"
-/// @nexus.support-namespace dotnet="Nexgen.Support"
 package nexus:temporal-types@1.0.0;
 
 interface model {
@@ -86,6 +80,7 @@ interface model {
   ///   args-field="input"
   ///   result-type-parameter="WorkflowResult"
   ///   alternate-type="workflow-type"
+  ///   go-name-extractor="WorkflowFunctionName"
   ///   dotnet-name-extractor="TemporalFunctionNames.WorkflowName"
   ///   dotnet-call-extractor="TemporalFunctionNames.ExtractCall"
   /// @nexus.add-rpc-compatible-with "workflow-type"
@@ -95,6 +90,8 @@ interface model {
   ///   signature="signal-call"
   ///   args-field="signal-input"
   ///   alternate-type="string"
+  ///   go-value-type="string"
+  ///   go-args-type="any"
   ///   python-converter="signal_function_to_proto"
   ///   typescript-name-extractor="signalFunctionName"
   ///   dotnet-name-extractor="TemporalFunctionNames.SignalName"

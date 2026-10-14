@@ -7,6 +7,7 @@ import (
 
 	common "go.temporal.io/api/common/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
+	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
@@ -23,10 +24,35 @@ type startWorkflowRequest struct {
 	namespace          string
 }
 
+// GetWorkflow returns the Workflow field.
+func (m startWorkflowRequest) GetWorkflow() string {
+	return m.Workflow
+}
+
+// GetWorkflowID returns the WorkflowID field.
+func (m startWorkflowRequest) GetWorkflowID() string {
+	return m.WorkflowID
+}
+
+// GetTaskQueue returns the TaskQueue field.
+func (m startWorkflowRequest) GetTaskQueue() string {
+	return m.TaskQueue
+}
+
+// GetWorkflowStartDelay returns the WorkflowStartDelay field.
+func (m startWorkflowRequest) GetWorkflowStartDelay() *time.Duration {
+	return m.WorkflowStartDelay
+}
+
+// GetNamespace returns the namespace field.
+func (m startWorkflowRequest) GetNamespace() string {
+	return m.namespace
+}
+
 func startWorkflowRequestToProto(dc converter.DataConverter, m *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
 	message := &workflowservice.StartWorkflowExecutionRequest{}
 	{
-		converted, err := workflowTypeToProto(dc, &m.Workflow)
+		converted, err := support.WorkflowTypeToProto(dc, &m.Workflow)
 		if err != nil {
 			return nil, err
 		}
@@ -34,14 +60,14 @@ func startWorkflowRequestToProto(dc converter.DataConverter, m *startWorkflowReq
 	}
 	message.WorkflowId = m.WorkflowID
 	{
-		converted, err := taskQueueToProto(dc, &m.TaskQueue)
+		converted, err := support.TaskQueueToProto(dc, &m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
 		message.TaskQueue = converted
 	}
 	{
-		converted, err := durationToProto(dc, m.WorkflowStartDelay)
+		converted, err := support.DurationToProto(dc, m.WorkflowStartDelay)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +80,7 @@ func startWorkflowRequestToProto(dc converter.DataConverter, m *startWorkflowReq
 func startWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowservice.StartWorkflowExecutionRequest, out *startWorkflowRequest) error {
 	*out = startWorkflowRequest{}
 	{
-		converted, err := workflowTypeFromProto(dc, proto.GetWorkflowType())
+		converted, err := support.WorkflowTypeFromProto(dc, proto.GetWorkflowType())
 		if err != nil {
 			return err
 		}
@@ -64,7 +90,7 @@ func startWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowse
 	}
 	out.WorkflowID = proto.GetWorkflowId()
 	{
-		converted, err := taskQueueFromProto(dc, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(dc, proto.GetTaskQueue())
 		if err != nil {
 			return err
 		}
@@ -73,7 +99,7 @@ func startWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowse
 		}
 	}
 	{
-		converted, err := durationFromProto(dc, proto.GetWorkflowStartDelay())
+		converted, err := support.DurationFromProto(dc, proto.GetWorkflowStartDelay())
 		if err != nil {
 			return err
 		}
@@ -98,6 +124,21 @@ type cancelWorkflowRequest struct {
 	WorkflowExecution WorkflowExecution
 	Reason            *string
 	namespace         string
+}
+
+// GetWorkflowExecution returns the WorkflowExecution field.
+func (m cancelWorkflowRequest) GetWorkflowExecution() WorkflowExecution {
+	return m.WorkflowExecution
+}
+
+// GetReason returns the Reason field.
+func (m cancelWorkflowRequest) GetReason() *string {
+	return m.Reason
+}
+
+// GetNamespace returns the namespace field.
+func (m cancelWorkflowRequest) GetNamespace() string {
+	return m.namespace
 }
 
 func cancelWorkflowRequestToProto(dc converter.DataConverter, m *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
@@ -142,6 +183,11 @@ func (cancelWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConv
 
 type startWorkflowResult struct {
 	RunID *string
+}
+
+// GetRunID returns the RunID field.
+func (m startWorkflowResult) GetRunID() *string {
+	return m.RunID
 }
 
 func startWorkflowResultToProto(dc converter.DataConverter, m *startWorkflowResult) (*workflowservice.StartWorkflowExecutionResponse, error) {
@@ -203,7 +249,7 @@ func (u *StartedWorkflow) GetResult(ctx workflow.Context) workflow.Future {
 // --- Operations (internal) ---
 
 func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
-	request.namespace = workflow.GetInfo(ctx).Namespace
+	request.namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "StartWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -220,7 +266,7 @@ func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.
 }
 
 func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
-	request.namespace = workflow.GetInfo(ctx).Namespace
+	request.namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "RestartWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -237,7 +283,7 @@ func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflo
 }
 
 func cancelWorkflow(ctx workflow.Context, request cancelWorkflowRequest) workflow.Future {
-	request.namespace = workflow.GetInfo(ctx).Namespace
+	request.namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "CancelWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -259,6 +305,16 @@ type WorkflowExecution struct {
 	WorkflowID string
 	// RunID - Optional.
 	RunID *string
+}
+
+// GetWorkflowID returns the WorkflowID field.
+func (m WorkflowExecution) GetWorkflowID() string {
+	return m.WorkflowID
+}
+
+// GetRunID returns the RunID field.
+func (m WorkflowExecution) GetRunID() *string {
+	return m.RunID
 }
 
 func workflowExecutionToProto(dc converter.DataConverter, m *WorkflowExecution) (*common.WorkflowExecution, error) {

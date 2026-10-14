@@ -14,7 +14,7 @@
     <Compile Include="../wit/workflow-service/Models.cs" Link="GeneratedWorkflowService/Models.cs" />
     <Compile Include="../wit/workflow-service/Operations.cs" Link="GeneratedWorkflowService/Operations.cs" />
     <Compile Include="../wit/workflow-service/Services.cs" Link="GeneratedWorkflowService/Services.cs" />
-    <Compile Include="../wit/workflow-service/Support/*.cs" Link="GeneratedWorkflowService/Support/%(Filename)%(Extension)" />
+    <Compile Include="../TemporalSupport/*.cs" Link="TemporalSupport/%(Filename)%(Extension)" />
     <Compile Include="../wit/type-roundtrip/Models.cs" Link="GeneratedTypeRoundtrip/Models.cs" />
     <Compile Include="../wit/notification-service/Models.cs" Link="GeneratedNotificationService/Models.cs" />
     <Compile Include="../wit/proto-oneof/Models.cs" Link="GeneratedProtoOneof/Models.cs" />

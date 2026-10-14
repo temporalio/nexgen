@@ -18,8 +18,8 @@ The generator picks its input format from the file extension, so the same
 (`.json`/`.yaml`/`.yml`) inputs.
 
 > [!IMPORTANT]
-> Everything on this page — the `dotnet` target, the `--support-file`,
-> `--descriptors`, `--format`, and `--native-api` flags, and the `add-rpc` and
+> The `dotnet` target, the `--descriptors`, `--format`, and `--native-api`
+> flags, and the `add-rpc` and
 > `debug-wit-dir` subcommands — is
 > gated behind the `advanced` Cargo feature, which is off by default. Build or
 > run with `--features advanced` (as every command below does), or produce a
@@ -45,6 +45,13 @@ and `advanced/samples/typescript/wit/<example-name>/`; Go output lives under
 each language's `tests/` directory where present. See
 [`samples/README.md`](samples/README.md) for links to each example's WIT,
 generated code, and tests.
+
+The linked `nexus:temporal-types` WIT package describes semantic types, while
+authored language-specific Temporal converters live in each sample project:
+`go/support/`, `python/temporal_support/`, `typescript/support/`, and
+`dotnet/TemporalSupport/`. `cargo build-examples` passes the appropriate
+`support_package` for each output; generated example directories may be safely
+replaced without deleting these authored helpers.
 
 - [`user-service`](samples/inputs/user-service.wit): a small WIT-direct API showing the basic shape of an operation returning a resource and a resource method that calls another operation.
 - [`type-showcase`](samples/inputs/type-showcase.wit): a WIT-direct API focused on type coverage, including records, enums, flags, variants, results, maps, tuples, resources, resource methods, and no-result operations.
@@ -124,6 +131,7 @@ Generate Python:
 ```bash
 cargo run --features advanced -- python \
   advanced/samples/inputs/user-service.wit \
+  --support-package temporal_support \
   --output /tmp/user_service
 ```
 
@@ -134,6 +142,7 @@ Generate TypeScript:
 ```bash
 cargo run --features advanced -- typescript \
   advanced/samples/inputs/user-service.wit \
+  --support-package ./support \
   --output /tmp/user-service
 ```
 
@@ -142,6 +151,7 @@ Generate Go:
 ```bash
 cargo run --features advanced -- go \
   advanced/samples/inputs/user-service.wit \
+  --support-package go.temporal.io/sdk/advanced/samples/go/support \
   --output /tmp/userservice
 ```
 
@@ -150,6 +160,7 @@ Generate .NET:
 ```bash
 cargo run --features advanced -- dotnet \
   advanced/samples/inputs/user-service.wit \
+  --support-package Nexgen.Support \
   --output /tmp/user-service-dotnet
 ```
 
@@ -171,7 +182,6 @@ The WIT file defines the public surface. `@nexus` directives carry the parts WIT
 
 - service endpoint names
 - service wire names
-- support file paths
 - language-native service namespaces/packages
 - language-native override types
 - flattened API-only field types
@@ -190,20 +200,26 @@ Input WIT files can set generated service namespaces/packages with
 `go="go.temporal.io/sdk/workflow"`. For Go, the import path's final segment is
 used as the package name and the full path is used to remove self-imports.
 
-Input WIT files can add support code with `@nexus.support`. Python support fragments are copied into the generated private `_support` package, TypeScript support fragments are emitted as `support.ts` next to the generated `index.ts`, and .NET support fragments are copied under `Support/`.
-
-Support code can also be supplied outside WIT with repeatable `--support-file`
-arguments on the language subcommand. Explicit support files apply to the
-selected language, are appended after WIT-declared support, and use the same generated
-layout as `@nexus.support` fragments. .NET support files infer their support
-namespace from the C# `namespace` declaration in the file:
+Go, Python, TypeScript and .NET WIT generation require one `--support-package`
+import path or namespace per invocation; JSON Schema generation does not.
+The package is hand-written and
+stays in the user's project; nexgen imports its helpers instead of reading,
+copying, or generating that code. Java does not use this option. Follow the
+[per-language setup and helper contract](../GUIDE.md#integrating-a-support-package)
+before running generation. For example:
 
 ```bash
 cargo run --features advanced -- python \
   advanced/samples/inputs/user-service.wit \
-  --support-file /path/to/custom_support.py \
+  --support-package temporal_support \
   --output /tmp/user_service
 ```
+
+`@nexus.source` values are calls to helpers in the configured support package.
+Include the call and its arguments, but do not add the package prefix (for
+example `python="workflow_namespace()"` or `go="WorkflowNamespace(ctx)"`).
+Nexgen adds the prefix and imports support. `@nexus.output-transform`
+remains a raw authored expression.
 
 ## Proto Backing
 
@@ -237,7 +253,7 @@ interface workflow-service {
     task-queue: task-queue,
     /// @nexus.proto-field "signal_name"
     signal: signal-function,
-    /// @nexus.source "workflow_namespace()"
+    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
     namespace: option<string>,
   }
 
@@ -265,6 +281,7 @@ cargo run --features advanced -- python \
   advanced/samples/inputs/workflow-service.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --support-package temporal_support \
   --native-api \
   --output /tmp/workflow_service
 ```
@@ -283,12 +300,39 @@ when extending an existing WIT file, put that file first. A linked input can be 
 single WIT file, a WIT package directory, or a directory containing WIT package
 directories, so `advanced/samples/inputs/deps` links every package under it.
 
-`add-message` follows the same input convention. It emits the selected message
-and all reachable proto message/enum types without adding an operation. The
+`add-message` follows the same input convention. Repeat `--message` to select
+multiple messages, or pass `--file` with a proto file name from the descriptor
+set (for example `acme/oneof/v1/service.proto`) to select all its messages.
+Both options can be combined. A descriptor set binary is supplied with
+`--descriptors`; `--file` is the name of a proto source inside that set, not a
+path to a proto file on disk. The selections and all reachable proto
+message/enum types are emitted together without adding an operation. A
+standalone scaffold with multiple messages exports an interface named `messages`;
+one with a single message retains the message-derived interface name. The
 operation-free interface still emits and re-exports its owned model
 declarations; linked dependency declarations remain tree-shaken unless an owned
 model references them. When extending an existing WIT file, its world must
 export exactly one interface.
+
+### Reconcile existing WIT
+
+Both scaffold commands reconcile reachable mapped records: `add-message` starts
+at the selected messages, and `add-rpc` starts at the request and response.
+Adding a new RPC and updating an existing RPC use the same model checks.
+Missing owned records and fields are added, including grouped oneof fields.
+Incompatible mappings and fields removed from the proto produce an error rather
+than deleting authored WIT.
+
+Reconciliation follows mapped child records, visiting shared messages once,
+but preserves explicit omissions, compatible substitutions, opaque
+external type mappings, and supported proto carrier type parameters such as
+`output-t`. Linked records are checked without editing their dependency files;
+an incomplete linked record must be fixed in its owning WIT package.
+Comparing the resulting WIT with the checked-in input catches missing
+declarations in CI. A second run on reconciled WIT makes no further changes.
+The completed scaffold is parsed before it is returned or written. A recursive
+proto graph that cannot be represented by WIT record types fails validation;
+an opaque mapping can intentionally stop expansion at that boundary.
 
 ### Protobuf oneofs
 
@@ -297,7 +341,10 @@ Every message remains a record, with an `option<variant>` field for each
 oneof—even when the message contains only one oneof. Scaffolding stays optional
 because protobuf descriptors permit a oneof to be unset. Authors can remove
 `option<>` to assert that exactly one case is required by their model. Existing
-WIT mappings must use the same grouped-record shape.
+WIT mappings must use the same grouped-record shape. Reused variants may have
+custom WIT names; their `@nexus.proto` source, cases, and payloads are validated.
+Proto oneof member names must round-trip through WIT's snake-case wire naming;
+the scaffolder rejects a name that cannot be represented without changing it.
 
 Python native-API generation converts both authored shapes bidirectionally.
 For `option<variant>`, an unset protobuf oneof decodes to `None`, and encoding
@@ -339,6 +386,20 @@ Generate WIT for a standalone proto message tree:
 cargo run --features advanced -- add-message \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --message WorkflowExecutionInfo \
+  --input advanced/samples/inputs/deps
+```
+
+Add several messages, or every message defined in a proto file in the descriptor set:
+
+```bash
+cargo run --features advanced -- add-message \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --message WorkflowExecutionInfo --message WorkflowExecution \
+  --input advanced/samples/inputs/deps
+
+cargo run --features advanced -- add-message \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --file temporal/api/common/v1/message.proto \
   --input advanced/samples/inputs/deps
 ```
 

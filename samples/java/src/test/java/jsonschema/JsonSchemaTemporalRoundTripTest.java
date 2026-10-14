@@ -103,7 +103,7 @@ final class JsonSchemaTemporalRoundTripTest {
 
     @Test
     void offsetBoundariesAreEnforcedInBothDirections() throws IOException {
-        for (String offset : new String[] {"+18:00", "-18:00"}) {
+        for (String offset : new String[] {"+14:00", "-14:00"}) {
             String json = "{\"createdAt\":\"2021-06-15T12:30:45" + offset
                     + "\",\"birthday\":\"2000-01-01\",\"alarm\":\"09:00:00.123456789123"
                     + offset + "\",\"timeout\":\"PT0S\"}";
@@ -117,7 +117,7 @@ final class JsonSchemaTemporalRoundTripTest {
             assertEquals("09:00:00.123456789123" + offset, encoded.get("alarm").textValue());
         }
 
-        for (String offset : new String[] {"+18:01", "-18:01", "+23:59", "-23:59"}) {
+        for (String offset : new String[] {"+14:01", "-14:01", "+18:00", "-18:00", "+23:59", "-23:59"}) {
             assertThrows(Exception.class, () -> decodeBody(
                     "{\"createdAt\":\"2021-06-15T12:30:45" + offset
                             + "\",\"birthday\":\"2000-01-01\",\"alarm\":\"09:00:00\",\"timeout\":\"PT0S\"}"));
@@ -142,7 +142,23 @@ final class JsonSchemaTemporalRoundTripTest {
                 valid.getArchivedOn());
         assertThrows(Exception.class, () -> encode(invalidDateTime));
 
-        for (String offset : new String[] {"+18:01", "-18:01", "+23:59", "-23:59"}) {
+        // OffsetDateTime admits up to +/-18:00, wider than the materialized domain.
+        for (int hours : new int[] {15, -15, 18, -18}) {
+            Temporal outOfRange = new Temporal(
+                    OffsetDateTime.of(2021, 6, 15, 12, 30, 45, 0, ZoneOffset.ofHours(hours)),
+                    valid.getBirthday(),
+                    valid.getAlarm(),
+                    valid.getTimeout(),
+                    valid.getUpdatedAt(),
+                    valid.getExpiresOn(),
+                    valid.getReminder(),
+                    valid.getRetryDelay(),
+                    valid.getDeletedAt(),
+                    valid.getArchivedOn());
+            assertThrows(Exception.class, () -> encode(outOfRange));
+        }
+
+        for (String offset : new String[] {"+14:01", "-14:01", "+18:00", "-18:00", "+23:59", "-23:59"}) {
             Temporal invalidTime = new Temporal(
                     valid.getCreatedAt(),
                     valid.getBirthday(),

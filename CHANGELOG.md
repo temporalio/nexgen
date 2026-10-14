@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.9] - 2026-10-12
+
+### Added
+
+- Add multiple proto messages to one WIT scaffold with repeated `add-message --message`, or select all messages in a descriptor-set proto file with `--file`.
+- Go WIT generation supports workflow function name extractors, including registered Temporal workflow names.
+
+### Fixed
+
+- Unify `add-message` and both `add-rpc` paths so reconciliation restores missing owned fields and declarations throughout reachable mapped records, validates linked records without editing dependencies, and detects oneof case drift while preserving intentional refinements.
+- Preserve explicit proto field mappings when generated names do not round-trip; reject unrepresentable oneof member names instead of emitting an invalid mapping.
+- Reconcile existing `add-message` WIT records with selected proto messages, restoring missing records and fields instead of silently returning unchanged output.
+
+## [0.2.8] - 2026-10-09
 
 ### Added
 
@@ -32,6 +45,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot be used as top-level workflow return values or activity arguments.
 - Go generation rejects `@nexus.omit` fields used as resource constructor
   arguments.
+### Breaking Changes
+
+- Materialized JSON Schema `time` and `date-time` offsets are now limited to
+  `-14:00` through `+14:00` (previously `-18:00` through `+18:00`); at hour 14,
+  only minute 00 is valid. Real-world offsets span `-12:00` through `+14:00`,
+  and `±14:00` is the narrowest range every target's native carrier accepts
+  (.NET `DateTimeOffset` caps there), so the authored offset always round-trips.
+  Deserialization and serialization reject wider offsets in every target.
+- Go, Python, TypeScript, and .NET WIT generation now require `--support-package`
+  (Java and JSON Schema generation are unchanged). Support code is imported
+  from that caller-owned package instead of copied from `--support-file` or
+  `@nexus.support`; support-namespace directives are removed. `@nexus.source`
+  now names a helper call relative to the configured support package. Nexgen
+  prefixes that call and imports support for every sourced field. The
+  per-language `<lang>-support-import` options are removed.
+  `@nexus.output-transform` remains an authored expression.
 - .NET generic type parameters now use the C# `T` prefix. For example, the
   authored `output-t` alias generates `TOutput` instead of `OutputT`.
 
@@ -40,8 +69,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Operation-free WIT interfaces now honor `@nexus.namespace`, and .NET names
   their namespace after the interface (`Nexgen.<InterfaceName>`) instead of
   falling back to `Nexgen.Generated`.
-
-### Security
 
 ## [0.2.7] - 2026-10-01
 

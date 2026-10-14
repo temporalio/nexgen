@@ -8,12 +8,7 @@ import typing_extensions
 import temporalio.api.notificationservice.v1.request_response_pb2
 import temporalio.converter
 
-from ._support import (
-    failure_from_proto,
-    failure_to_proto,
-    payload_from_proto,
-    payload_to_proto,
-)
+import temporal_support as _support
 
 
 OutputT = typing.TypeVar("OutputT")
@@ -55,11 +50,13 @@ class _OnCompleteRequestTransferTypeConverter(
         match value.WhichOneof("result"):
             case "success":
                 _oneof_result = OnCompleteRequestResultSuccess(
-                    typing.cast(OutputT, payload_from_proto(value.success, output_type))
+                    typing.cast(
+                        OutputT, _support.payload_from_proto(value.success, output_type)
+                    )
                 )
             case "failure":
                 _oneof_result = OnCompleteRequestResultFailure(
-                    failure_from_proto(value.failure)
+                    _support.failure_from_proto(value.failure)
                 )
             case None:
                 raise ValueError("missing required field OnCompleteRequest.result")
@@ -67,7 +64,7 @@ class _OnCompleteRequestTransferTypeConverter(
             raise ValueError("missing required field OnCompleteRequest.source_context")
         source_context = typing.cast(
             SourceContextT,
-            payload_from_proto(value.source_context, source_context_type),
+            _support.payload_from_proto(value.source_context, source_context_type),
         )
         return OnCompleteRequest(
             result=_oneof_result,
@@ -82,10 +79,10 @@ class _OnCompleteRequestTransferTypeConverter(
         message = temporalio.api.notificationservice.v1.request_response_pb2.OnCompleteRequest()
         match value.result:
             case OnCompleteRequestResultSuccess():
-                message.success.CopyFrom(payload_to_proto(value.result.value))
+                message.success.CopyFrom(_support.payload_to_proto(value.result.value))
             case OnCompleteRequestResultFailure():
-                message.failure.CopyFrom(failure_to_proto(value.result.value))
-        message.source_context.CopyFrom(payload_to_proto(value.source_context))
+                message.failure.CopyFrom(_support.failure_to_proto(value.result.value))
+        message.source_context.CopyFrom(_support.payload_to_proto(value.source_context))
         return message
 
 

@@ -11,6 +11,7 @@
     <!-- The generated interceptor partial requires matching SDK changes. -->
     <Compile Include="wit/multi-operation-service/**/*.cs"
              Exclude="wit/multi-operation-service/SystemNexusWorkflowOutboundInterceptor.cs" />
+    <Compile Include="TemporalSupport/*.cs" />
   </ItemGroup>
 
   <ItemGroup>

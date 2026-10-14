@@ -159,9 +159,11 @@ def test_unknown_member_is_rejected() -> None:
         ("timeout", "P1Y", "duration"),  # calendar duration
         ("birthday", "2021-02-29", "date"),  # invalid calendar date
         ("createdAt", "2021-06-15T12:30:45", "date-time"),  # missing offset
-        ("createdAt", "2021-06-15T12:30:45+18:01", "date-time"),
+        ("createdAt", "2021-06-15T12:30:45+14:01", "date-time"),
+        ("createdAt", "2021-06-15T12:30:45-18:00", "date-time"),
         ("createdAt", "2021-06-15T12:30:45-23:59", "date-time"),
-        ("alarm", "09:00:00+18:01", "time"),
+        ("alarm", "09:00:00+14:01", "time"),
+        ("alarm", "09:00:00+18:00", "time"),
         ("alarm", "09:00:00-23:59", "time"),
     ],
 )
@@ -367,10 +369,12 @@ def test_serialize_rejects_temporal_values_the_wire_form_cannot_carry() -> None:
         ("alarm", unrepresentable("time", offset_time, sub_minute_detail))
     ]
 
-    # Both materialized clock formats use the same inclusive +/-18:00 domain.
+    # Both materialized clock formats use the same inclusive +/-14:00 domain.
     for seconds in (
-        18 * 3600 + 60,
-        -(18 * 3600 + 60),
+        14 * 3600 + 60,
+        -(14 * 3600 + 60),
+        18 * 3600,
+        -18 * 3600,
         23 * 3600 + 59 * 60,
         -(23 * 3600 + 59 * 60),
     ):
@@ -384,10 +388,10 @@ def test_serialize_rejects_temporal_values_the_wire_form_cannot_carry() -> None:
                 "createdAt" if field == "created_at" else "alarm"
             )
             assert violations[0][1].endswith(
-                "the UTC offset is outside -18:00 through +18:00"
+                "the UTC offset is outside -14:00 through +14:00"
             )
 
-    for seconds, suffix in ((18 * 3600, "+18:00"), (-18 * 3600, "-18:00")):
+    for seconds, suffix in ((14 * 3600, "+14:00"), (-14 * 3600, "-14:00")):
         zone = datetime.timezone(datetime.timedelta(seconds=seconds))
         model = dataclasses.replace(
             parse(),

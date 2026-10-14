@@ -1,5 +1,5 @@
 // Drives the `nexgen` binary over the WIT/proto CLI surface (`--descriptors`,
-// `--native-api`, `--support-file`), all behind the `advanced` feature.
+// `--native-api`, `--support-package`), all behind the `advanced` feature.
 #![cfg(feature = "advanced")]
 
 use std::collections::BTreeMap;
@@ -220,7 +220,7 @@ fn generate_to_string_with_inputs(
         },
         language,
         input_paths: input_paths.to_vec(),
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: descriptor_paths.to_vec(),
         output_path: output_path.clone(),
         format: false,
@@ -320,24 +320,18 @@ fn unique_output_path(label: &str) -> PathBuf {
 }
 
 #[test]
-fn cli_generates_go_support_file_from_parameter() {
+fn cli_uses_go_support_package_only_when_converters_are_needed() {
     let root = project_root();
     let temp_dir = unique_output_path("go-support-file-input");
     fs::create_dir_all(&temp_dir).unwrap();
-    let support_path = temp_dir.join("custom_support.go");
     let output_path = temp_dir.join("output");
-    fs::write(
-        &support_path,
-        "package placeholder\n\nfunc CustomSupportHook() string {\n\treturn \"custom\"\n}\n",
-    )
-    .unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
         .args([
             "go",
             wit_input_path(&root, "user-service").to_str().unwrap(),
-            "--support-file",
-            support_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
             "--output",
             output_path.to_str().unwrap(),
         ])
@@ -349,15 +343,14 @@ fn cli_generates_go_support_file_from_parameter() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    // The explicit support file is emitted even though the WIT-direct
-    // user-service package performs no proto conversion, and its package
-    // declaration is rewritten to the generated package name, which is the
-    // output directory's basename (Go convention: package name = directory
-    // name).
-    let support_contents = fs::read_to_string(output_path.join("support.go")).unwrap();
-    assert!(support_contents.starts_with("package output\n"));
-    assert!(support_contents.contains("func CustomSupportHook() string"));
+    // A package with no hand-written converters must not import unused support.
+    assert!(!output_path.join("support.go").exists());
     assert!(output_path.join("userservice.go").is_file());
+    assert!(
+        !fs::read_to_string(output_path.join("userservice.go"))
+            .unwrap()
+            .contains("\"example.com/nexgen/support\"")
+    );
     assert!(!output_path.join("api.go").exists());
     fs::remove_dir_all(temp_dir).unwrap();
 }
@@ -387,6 +380,8 @@ fn cli_generates_go_with_package_self_imports_removed() {
             temp_input_path.to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -431,6 +426,8 @@ fn cli_rejects_go_output_directory_mismatched_with_namespace() {
             temp_input_path.to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -456,6 +453,8 @@ fn cli_rejects_output_at_filesystem_root() {
             wit_input_path(&root, "user-service").to_str().unwrap(),
             "--output",
             "/",
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -488,6 +487,8 @@ fn cli_preserves_existing_output_directory_contents() {
             wit_input_path(&root, "user-service").to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -533,6 +534,8 @@ fn cli_overwrites_previously_generated_files_in_place() {
             wit_input_path(&root, "user-service").to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
+            "--support-package",
+            "example.com/nexgen/support",
         ])
         .output()
         .unwrap();
@@ -570,7 +573,7 @@ interface namespace-service {
   /// @nexus.proto "temporal.api.namespace.v1.NamespaceInfo"
   record namespace-info {
     name: option<string>,
-    /// @nexus.source go="NamespaceData()"
+    /// @nexus.source go="NamespaceData(ctx)"
     data: option<map<string, string>>,
     /// @nexus.omit
     state: placeholder,
@@ -596,7 +599,7 @@ interface namespace-service {
 
     let rendered = generate_to_string_with_inputs(
         nexgen::language::Language::Go,
-        &[wit_path],
+        &[wit_path.clone()],
         &[descriptor_path(&root)],
     )
     .unwrap();
@@ -607,7 +610,7 @@ interface namespace-service {
         rendered
             .contains("type namespaceInfo struct {\n\tName *string\n\tdata map[string]string\n}")
     );
-    assert!(rendered.contains("\trequest.data = NamespaceData()\n"));
+    assert!(rendered.contains("\trequest.data = support.NamespaceData(ctx)\n"));
     // The sourced map is then converted like any other model field, and it now
     // round-trips back out of the proto as well.
     assert!(rendered.contains("if len(m.data) > 0 {"));
@@ -615,6 +618,60 @@ interface namespace-service {
     assert!(rendered.contains("for k, v := range m.data {"));
     assert!(rendered.contains("message.Data[k] = v"));
     assert!(rendered.contains("out.data = make(map[string]string, len(proto.GetData()))"));
+    assert!(rendered.contains("support \"example.com/nexgen/support\""));
+
+    // With no other converter to register the package, a sourced field alone
+    // must import the support package and qualify its helper invocation.
+    let module_root = temp_dir.join("module");
+    fs::create_dir_all(module_root.join("support")).unwrap();
+    for file in ["go.mod", "go.sum"] {
+        fs::copy(
+            root.join("advanced/samples/go").join(file),
+            module_root.join(file),
+        )
+        .unwrap();
+    }
+    fs::write(
+        module_root.join("support/support.go"),
+        "package support\nimport \"go.temporal.io/sdk/workflow\"\nfunc NamespaceData(ctx workflow.Context) map[string]string { return map[string]string{\"namespace\": \"test\"} }\n",
+    )
+    .unwrap();
+    let output_path = module_root.join("generated");
+    generate_to_file(&GenerateRequest {
+        config: nexgen::nexgen_config::NexgenConfig {
+            mode: nexgen::generator::GenerationMode::NativeApi,
+            ..Default::default()
+        },
+        language: nexgen::language::Language::Go,
+        input_paths: vec![wit_path],
+        support_package: Some("go.temporal.io/sdk/advanced/samples/go/support".into()),
+        descriptor_paths: vec![descriptor_path(&root)],
+        output_path: output_path.clone(),
+        format: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let generated = read_go_output_files(&output_path);
+    assert!(generated
+        .values()
+        .any(|file| file.contains("support \"go.temporal.io/sdk/advanced/samples/go/support\"")));
+    assert!(
+        generated
+            .values()
+            .any(|file| file.contains("support.NamespaceData(ctx)"))
+    );
+    let build = Command::new("go")
+        .args(["test", "./..."])
+        .current_dir(&module_root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -950,7 +1007,7 @@ fn go_json_package_name_derives_from_output_directory_name() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![json_input_path(&root, "chat")],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -1125,6 +1182,426 @@ interface collision-service {
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
+// Keep these fixtures independent of the Temporal sample directives: changing
+// a wire field's spelling must not change Go's public callable policy.
+fn go_descriptor_fixture(signal_directives: &str, args_field: &str) -> String {
+    format!(
+        r#"package test:go-descriptors@1.0.0;
+
+world test-world {{
+  export descriptor-service;
+}}
+
+interface functions {{
+  type placeholder = string;
+  /// @nexus.type go="any"
+  type payload = placeholder;
+  type payloads = list<payload>;
+  /// @nexus.type go="go.temporal.io/sdk/workflow:workflow.Context"
+  type context = placeholder;
+
+  /// @nexus.function-args varargs=true param="args"
+  workflow-call: func(ctx: context, args: payloads) -> string;
+  /// @nexus.function
+  ///   primary=true
+  ///   signature="workflow-call"
+  ///   args-field="input"
+  ///   alternate-type="string"
+  ///   result-type-parameter="WorkflowResult"
+  type workflow-function = placeholder;
+
+  /// @nexus.function-args varargs=true
+  signal-call: func(signal-args: payloads) -> string;
+  /// @nexus.function
+  ///   signature="signal-call"
+  ///   args-field="{args_field}"
+  ///   alternate-type="string"
+{signal_directives}
+  type signal-function = placeholder;
+}}
+
+/// @nexus.endpoint "descriptor-endpoint"
+interface descriptor-service {{
+  use functions.{{workflow-function, signal-function, payloads}};
+  record execute-request {{
+    workflow: workflow-function,
+    signal: signal-function,
+  }}
+  execute: func(request: execute-request);
+}}
+"#
+    )
+}
+
+fn render_go_descriptor_fixture(wit: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let temp_dir = unique_output_path("go-descriptor-input");
+    fs::create_dir_all(&temp_dir)?;
+    let input = temp_dir.join("descriptor-service.wit");
+    fs::write(&input, wit)?;
+    let result = generate_to_string_with_inputs(nexgen::language::Language::Go, &[input], &[]);
+    fs::remove_dir_all(temp_dir)?;
+    result
+}
+
+// Compile the actual generated files, not hand-copied declarations. The
+// fixtures normally exercise reflection fallback; extractor cases supply the
+// one support helper they explicitly request.
+fn compile_go_descriptor_fixture(rendered: &str) {
+    let module_root = unique_output_path("go-descriptor-compile");
+    let output_path = module_root.join("output");
+    fs::create_dir_all(&output_path).unwrap();
+    for file in ["go.mod", "go.sum"] {
+        fs::copy(
+            project_root().join("advanced/samples/go").join(file),
+            module_root.join(file),
+        )
+        .unwrap();
+    }
+    for section in rendered.split("### ").skip(1) {
+        let (file, source) = section.split_once('\n').unwrap();
+        fs::write(
+            output_path.join(file),
+            source.replace(
+                "example.com/nexgen/support",
+                "go.temporal.io/sdk/advanced/samples/go/support",
+            ),
+        )
+        .unwrap();
+    }
+    fs::create_dir_all(module_root.join("support")).unwrap();
+    fs::write(
+        module_root.join("support/support.go"),
+        r#"package support
+import "go.temporal.io/sdk/workflow"
+func DescriptorName(ctx workflow.Context, value any) string { return "descriptor" }
+"#,
+    )
+    .unwrap();
+    let build = Command::new("go")
+        .args(["test", "./..."])
+        .current_dir(&module_root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "generated fixture failed to compile:\nstdout: {}\nstderr: {}\n{rendered}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    fs::remove_dir_all(module_root).unwrap();
+}
+
+#[test]
+fn go_explicit_descriptors_control_signal_api_and_packing_independent_of_wire_name() {
+    for args_field in ["signal-input", "notification-payloads"] {
+        for (args_type, public_args, packing) in [
+            ("any", "signalArg any", "[]any{signalArg}"),
+            ("[]string", "signalArg []string", "[]any{signalArg}"),
+        ] {
+            let directives =
+                format!("  ///   go-value-type=\"string\"\n  ///   go-args-type=\"{args_type}\"");
+            let rendered =
+                render_go_descriptor_fixture(&go_descriptor_fixture(&directives, args_field))
+                    .unwrap();
+            assert!(
+                rendered.contains(&format!(
+                    "\tsignal string,\n\t{public_args},\n\tworkflow any,\n\targs ...any,\n"
+                )),
+                "{args_field}/{args_type}:\n{rendered}"
+            );
+            assert!(
+                rendered.contains(&format!("\t\tSignalArgs: {packing},")),
+                "{rendered}"
+            );
+            assert!(!rendered.contains("SignalF interface"), "{rendered}");
+            compile_go_descriptor_fixture(&rendered);
+        }
+    }
+}
+
+#[test]
+fn go_signature_signal_input_uses_callable_fallback_and_secondary_generic_in_typed_wrapper() {
+    let rendered =
+        render_go_descriptor_fixture(&go_descriptor_fixture("", "signal-input")).unwrap();
+    assert!(
+        rendered.contains("SignalF interface{ ~string | func(...any) string }"),
+        "{rendered}"
+    );
+    assert!(
+        rendered
+            .contains("\tsignal SignalF,\n\tsignalArgs []any,\n\tworkflow any,\n\targs ...any,"),
+        "{rendered}"
+    );
+    let typed = rendered.split("func ExecuteTyped[").nth(1).unwrap();
+    assert!(typed.contains("SignalF interface{ ~string | func(...any) string }"));
+    assert!(typed.contains("\tsignal SignalF,\n\tsignalArgs []any,"));
+    assert!(typed.contains("\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"));
+    assert!(typed.contains("reflect.ValueOf(signal)"));
+    assert!(typed.contains("\t\tSignal: signalName,"));
+    assert!(typed.contains("\t\tSignalArgs: signalArgs,"));
+    assert!(typed.contains("\t\tArgs: []any{arg},"));
+    compile_go_descriptor_fixture(&rendered);
+}
+
+#[test]
+fn go_ignores_typescript_only_function_descriptors() {
+    let baseline =
+        render_go_descriptor_fixture(&go_descriptor_fixture("", "signal-input")).unwrap();
+    let typescript = render_go_descriptor_fixture(&go_descriptor_fixture(
+        r#"  ///   typescript-value-type="common.SignalDefinition<any[]>"
+  ///   typescript-args-type="Value extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
+  ///   typescript-name-extractor="signalFunctionName"
+  ///   typescript-import="@temporalio/common""#,
+        "signal-input",
+    ))
+    .unwrap();
+    assert_eq!(baseline, typescript);
+}
+
+#[test]
+fn go_primary_variadic_group_is_last_and_secondary_groups_keep_authored_order() {
+    let wit = go_descriptor_fixture("", "signal-input")
+        .replace(
+            "  type signal-function = placeholder;",
+            r#"  type signal-function = placeholder;
+  /// @nexus.function-args varargs=true
+  other-call: func(other-args: payloads) -> string;
+  /// @nexus.function
+  ///   signature="other-call"
+  ///   args-field="other-payloads"
+  ///   alternate-type="string"
+  type other-function = placeholder;"#,
+        )
+        .replace(
+            "workflow-function, signal-function, payloads",
+            "workflow-function, signal-function, other-function, payloads",
+        )
+        .replace(
+            "    signal: signal-function,",
+            "    signal: signal-function,\n    other: other-function,",
+        );
+    let rendered = render_go_descriptor_fixture(&wit).unwrap();
+    assert!(
+        rendered.contains(
+            "\tsignal SignalF,\n\tsignalArgs []any,\n\tother OtherF,\n\totherArgs []any,\n\tworkflow any,\n\targs ...any,"
+        ),
+        "{rendered}"
+    );
+    let typed = rendered.split("func ExecuteTyped[").nth(1).unwrap();
+    assert!(typed.contains("OtherF interface{ ~string | func(...any) string }"));
+    assert!(
+        typed.contains(
+            "\tsignal SignalF,\n\tsignalArgs []any,\n\tother OtherF,\n\totherArgs []any,\n\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"
+        ),
+        "{typed}"
+    );
+    assert!(typed.contains("reflect.ValueOf(other)"));
+    assert!(typed.contains("\t\tOtherArgs: otherArgs,"));
+    compile_go_descriptor_fixture(&rendered);
+
+    // Swap only the secondary groups. Their relative ordering must follow the
+    // authored request, rather than a special case for signal-input.
+    let swapped = wit.replace(
+        "    signal: signal-function,\n    other: other-function,",
+        "    other: other-function,\n    signal: signal-function,",
+    );
+    let rendered = render_go_descriptor_fixture(&swapped).unwrap();
+    assert!(
+        rendered.contains(
+            "\tother OtherF,\n\totherArgs []any,\n\tsignal SignalF,\n\tsignalArgs []any,\n\tworkflow any,\n\targs ...any,"
+        ),
+        "{rendered}"
+    );
+    compile_go_descriptor_fixture(&rendered);
+}
+
+#[test]
+fn go_final_secondary_signature_args_are_variadic_without_primary_signature_varargs() {
+    let baseline = go_descriptor_fixture("", "signal-input");
+    let fixed = baseline.replace(
+            "  /// @nexus.function-args varargs=true param=\"args\"\n  workflow-call: func(ctx: context, args: payloads) -> string;",
+            "  workflow-call: func(name: string) -> string;",
+        );
+    let descriptor = baseline.replace(
+        "  ///   primary=true",
+        "  ///   primary=true\n  ///   go-value-type=\"any\"\n  ///   go-args-type=\"[]string\"\n  ///   go-name-extractor=\"DescriptorName\"",
+    );
+    for (name, wit, primary_params) in [
+        ("fixed", fixed, "\tworkflow WorkflowF,\n\tname string,"),
+        ("descriptor", descriptor, "\tworkflow any,\n\targ []string,"),
+    ] {
+        let rendered = render_go_descriptor_fixture(&wit).unwrap();
+        assert!(
+            rendered.contains(&format!(
+                "{primary_params}\n\tsignal SignalF,\n\tsignalArgs ...any,"
+            )),
+            "{name}:\n{rendered}"
+        );
+        assert!(!rendered.contains("func ExecuteTyped["), "{rendered}");
+        assert!(rendered.contains("\t\tSignalArgs: signalArgs,"));
+        compile_go_descriptor_fixture(&rendered);
+    }
+}
+
+#[test]
+fn go_rejects_descriptors_on_fixed_argument_functions_with_go_diagnostic() {
+    let wit = go_descriptor_fixture(
+        "  ///   go-value-type=\"string\"\n  ///   go-args-type=\"any\"",
+        "signal-input",
+    )
+    .replace(
+        "  /// @nexus.function-args varargs=true\n  signal-call: func(signal-args: payloads) -> string;",
+        "  signal-call: func(signal-arg: string) -> string;",
+    );
+    let error = render_go_descriptor_fixture(&wit).unwrap_err();
+    let error = error
+        .downcast_ref::<nexgen::error::Error>()
+        .expect("descriptor rejection should preserve the generator error type");
+    match error {
+        nexgen::error::Error::UnsupportedGoType { context, reason } => {
+            assert!(context.to_lowercase().contains("signal"), "{error}");
+            assert!(reason.contains("fixed"), "{error}");
+            assert!(reason.contains("descriptor"), "{error}");
+        }
+        other => panic!("expected UnsupportedGoType, got {other:?}"),
+    }
+}
+
+#[test]
+fn go_rejects_model_parameters_colliding_with_wrapper_generics_during_planning() {
+    let fixture = r#"package test:generic@1.0.0;
+world system { export service; }
+interface functions {
+  type placeholder = string;
+  /// @nexus.type go="any"
+  type payload = placeholder;
+  /// @nexus.type go="go.temporal.io/sdk/workflow:workflow.Context"
+  type workflow-context = placeholder;
+  /// @nexus.function-args varargs=true param="input"
+  workflow-call: func(ctx: workflow-context, input: list<payload>) -> placeholder;
+  /// @nexus.function
+  ///   primary=true
+  ///   signature="workflow-call"
+  ///   args-field="input"
+  ///   alternate-type="string"
+  ///   result-type-parameter="WorkflowResult"
+  type workflow-function = placeholder;
+}
+/// @nexus.endpoint "test"
+interface service {
+  use functions.{placeholder, workflow-function};
+  /// @nexus.type-parameter
+  type workflow-arg = placeholder;
+  record request {
+    context: workflow-arg,
+    workflow: workflow-function,
+  }
+  run: func(request: request);
+}
+"#;
+    for (authored, reserved, wrapper) in [
+        ("workflow-arg", "WorkflowArg", "Typed"),
+        ("workflow-result", "WorkflowResult", "Typed"),
+        ("workflow-f", "WorkflowF", ""),
+    ] {
+        let mut wit = fixture.replace("workflow-arg", authored);
+        if reserved == "WorkflowF" {
+            wit = wit.replace("primary=true", "primary=false");
+        }
+        let error = render_go_descriptor_fixture(&wit).unwrap_err();
+        match error.downcast_ref::<nexgen::error::Error>().unwrap() {
+            nexgen::error::Error::UnsupportedGoType { context, reason } => {
+                assert!(context.to_lowercase().contains("run"), "{error}");
+                assert!(context.contains(wrapper), "{error}");
+                assert!(
+                    reason.contains(&format!("model type parameter `{reserved}`")),
+                    "{error}"
+                );
+                assert!(
+                    reason.contains(&format!("generated reserved name `{reserved}`")),
+                    "{error}"
+                );
+            }
+            other => panic!("expected early UnsupportedGoType, got {other:?}"),
+        }
+    }
+    // Noncolliding model names keep the generated names, and the whole fixture
+    // compiles: rejection is about the wrapper namespace, not generic models.
+    let valid = fixture.replace("workflow-arg", "context-t");
+    let rendered = render_go_descriptor_fixture(&valid).unwrap();
+    assert!(
+        rendered.contains("func RunTyped[ContextT any, WorkflowArg any, WorkflowResult any]"),
+        "{rendered}"
+    );
+    compile_go_descriptor_fixture(&rendered);
+}
+
+#[test]
+fn go_rejects_collisions_between_generated_wrapper_type_parameters() {
+    let fixture = go_descriptor_fixture("", "signal-input");
+    for reserved in ["WorkflowArg", "SignalF"] {
+        let wit = fixture.replace(
+            "result-type-parameter=\"WorkflowResult\"",
+            &format!("result-type-parameter=\"{reserved}\""),
+        );
+        let error = render_go_descriptor_fixture(&wit).unwrap_err();
+        match error.downcast_ref::<nexgen::error::Error>().unwrap() {
+            nexgen::error::Error::UnsupportedGoType { context, reason } => {
+                assert!(context.contains("Typed"), "{error}");
+                assert!(
+                    reason.contains(&format!("generated type parameter `{reserved}`")),
+                    "{error}"
+                );
+                assert!(
+                    reason.contains(&format!("generated reserved name `{reserved}`")),
+                    "{error}"
+                );
+            }
+            other => panic!("expected early UnsupportedGoType, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn go_callable_descriptor_invokes_extractor_and_composite_types_import_and_compile() {
+    for (value_type, args_type, public_type, import) in [
+        ("func(...any) string", "any", "func(...any) string", None),
+        (
+            "[]time.Duration",
+            "any",
+            "[]time.Duration",
+            Some("\"time\""),
+        ),
+        (
+            "func(context.Context) any",
+            "any",
+            "func(context.Context) any",
+            Some("\"context\""),
+        ),
+    ] {
+        let directives = format!(
+            "  ///   go-value-type=\"{value_type}\"\n  ///   go-args-type=\"{args_type}\"\n  ///   go-name-extractor=\"DescriptorName\""
+        );
+        let rendered = render_go_descriptor_fixture(&go_descriptor_fixture(
+            &directives,
+            "notification-payloads",
+        ))
+        .unwrap();
+        assert!(
+            rendered.contains(&format!("\tsignal {public_type},")),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("signalName := support.DescriptorName(ctx, signal)"),
+            "{rendered}"
+        );
+        if let Some(import) = import {
+            assert!(rendered.contains(import), "{rendered}");
+        }
+        compile_go_descriptor_fixture(&rendered);
+    }
+}
+
 #[test]
 fn go_temporal_function_constraints_use_workflow_context_prefix() {
     let root = project_root();
@@ -1148,18 +1625,23 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
         rendered.contains("\tsignal string,\n\tsignalArg any,\n\tworkflow any,\n\targs ...any,\n")
     );
     assert!(rendered.contains("\targs ...any,\n"));
-    assert!(rendered.contains("switch rv := reflect.ValueOf(workflow); rv.Kind()"));
-    assert_eq!(
-        rendered
-            .matches("switch rv := reflect.ValueOf(workflow); rv.Kind()")
-            .count(),
-        1
-    );
-    assert!(!rendered.contains("switch rv := reflect.ValueOf(signal); rv.Kind()"));
     assert!(rendered.contains("\t\tWorkflow: workflowName,\n"));
     assert!(rendered.contains("\t\tSignal: signal,\n"));
     assert!(rendered.contains("\t\tArgs: args,\n"));
     assert!(rendered.contains("\t\tSignalArgs: []any{signalArg},\n"));
+    assert!(rendered.contains(
+        "\tif m.WorkflowIDReusePolicy != nil {\n\t\tmessage.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy((*m.WorkflowIDReusePolicy))\n\t} else {\n\t\tmessage.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy(1)\n\t}"
+    ));
+    assert!(!rendered.contains("\"reflect\""));
+    assert!(!rendered.contains("\"runtime\""));
+    assert!(!rendered.contains("\"strings\""));
+    assert!(!rendered.contains("runtime.FuncForPC"));
+    assert_eq!(
+        rendered
+            .matches("workflowName := support.WorkflowFunctionName(ctx, workflow)")
+            .count(),
+        2
+    );
     assert!(rendered.contains(
         "c := internal.NewSystemNexusClient(\"temporal.api.workflowservice.v1.WorkflowService\")"
     ));
@@ -1366,7 +1848,7 @@ fn go_type_roundtrip_generates_proto_conversions() {
 
     // Aliased proto imports derived from the descriptors' `go_package` option.
     assert!(rendered.contains("activity \"go.temporal.io/api/activity/v1\""));
-    assert!(rendered.contains("common \"go.temporal.io/api/common/v1\""));
+    assert!(rendered.contains("support \"example.com/nexgen/support\""));
 
     // Optional override-typed fields are rendered as pointers; the required
     // retry-policy field stays a value. (Assertions use the un-gofmt'd output,
@@ -1390,10 +1872,13 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("\t// Priority - Optional.\n\tPriority *temporal.Priority"));
     // Optional override fields pass the pointer straight to the nil-safe
     // converter; the required field passes its address.
-    assert!(rendered.contains("converted, err := retryPolicyToProto(dc, &m.RetryPolicy)"));
-    assert!(rendered.contains("converted, err := taskQueueToProto(dc, m.TaskQueue)"));
-    assert!(rendered.contains("converted, err := priorityToProto(dc, m.Priority)"));
-    assert!(rendered.contains("converted, err := durationToProto(dc, m.ScheduleToCloseTimeout)"));
+    assert!(rendered.contains("converted, err := support.RetryPolicyToProto(dc, &m.RetryPolicy)"));
+    assert!(rendered.contains("converted, err := support.TaskQueueToProto(dc, m.TaskQueue)"));
+    assert!(rendered.contains("converted, err := support.PriorityToProto(dc, m.Priority)"));
+    assert!(
+        rendered
+            .contains("converted, err := support.DurationToProto(dc, m.ScheduleToCloseTimeout)")
+    );
     assert!(rendered.contains("return message, nil"));
 
     // Generated model gets a converter-aware FromProto output callback. Optional
@@ -1402,9 +1887,12 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains(
         "func activityOptionsFromProto(dc converter.DataConverter, proto *activity.ActivityOptions, out *ActivityOptions) error {"
     ));
-    assert!(rendered.contains("converted, err := taskQueueFromProto(dc, proto.GetTaskQueue())"));
     assert!(
-        rendered.contains("converted, err := retryPolicyFromProto(dc, proto.GetRetryPolicy())")
+        rendered.contains("converted, err := support.TaskQueueFromProto(dc, proto.GetTaskQueue())")
+    );
+    assert!(
+        rendered
+            .contains("converted, err := support.RetryPolicyFromProto(dc, proto.GetRetryPolicy())")
     );
     assert!(rendered.contains("out.RetryPolicy = *converted"));
     // The model constructs a transfer-type converter, so the SDK
@@ -1431,16 +1919,8 @@ fn go_type_roundtrip_generates_proto_conversions() {
         "\t\tvar value ActivityOptions\n\t\tif err := fut.Get(ctx, &value); err != nil {"
     ));
 
-    // The hand-written support fragment is emitted alongside the generated
-    // service file with the pointer-in/pointer-out converter contract.
-    assert!(rendered.contains("### support.go"));
-    assert!(
-        rendered.contains("func retryPolicyToProto(_ converter.DataConverter, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {")
-    );
-    assert!(
-        rendered
-            .contains("func retryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {")
-    );
+    // Converters live in the caller's package; none are copied into output.
+    assert!(!rendered.contains("### support.go"));
 }
 
 #[test]
@@ -1458,7 +1938,7 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     assert!(rendered.contains("\tnamespace string\n"));
     assert!(rendered.contains("\tmessage.Namespace = m.namespace\n"));
     assert!(rendered.contains("\tout.namespace = proto.GetNamespace()\n"));
-    assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
+    assert!(rendered.contains("\trequest.namespace = support.WorkflowNamespace(ctx)\n"));
 
     // Construction happens in the method; the SDK owns caching by model type.
     assert!(rendered.contains("return commonconverter.NewSystemNexusTransferTypeConverter("));
@@ -1483,7 +1963,7 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     );
     assert!(!rendered.contains("GetDataConverterFromWorkflowContext"));
     assert!(!rendered.contains("SDKFlagMemoUserDCEncode"));
-    assert!(rendered.contains("memo,\n\t\tdc,\n\t\ttrue,"));
+    assert!(rendered.contains("support.MemoToProto(dc, m.Memo)"));
 
     // Operation responses decode into the model, not the proto.
     assert!(rendered.contains(
@@ -1629,7 +2109,7 @@ world api {
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: vec![descriptor_path],
         output_path: output_path.clone(),
         format: false,
@@ -1715,6 +2195,20 @@ import (
 	"go.temporal.io/sdk/converter"
 )
 
+type childView interface {
+	GetName() string
+}
+
+type parentView interface {
+	GetRequired() Child
+	GetOptional() *Child
+	GetChildren() []Child
+	GetEntries() map[string]Child
+}
+
+var _ childView = Child{}
+var _ parentView = Parent{}
+
 func TestNestedConversionRoundTrip(t *testing.T) {
 	dc := converter.GetDefaultDataConverter()
 	for _, tt := range []struct {
@@ -1744,6 +2238,22 @@ func TestNestedConversionRoundTrip(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			var view parentView = tt.model
+			getters := []struct {
+				name string
+				got  any
+				want any
+			}{
+				{"required", view.GetRequired(), tt.model.Required},
+				{"optional", view.GetOptional(), tt.model.Optional},
+				{"children", view.GetChildren(), tt.model.Children},
+				{"entries", view.GetEntries(), tt.model.Entries},
+			}
+			for _, getter := range getters {
+				if !reflect.DeepEqual(getter.got, getter.want) {
+					t.Fatalf("%s getter = %#v, want %#v", getter.name, getter.got, getter.want)
+				}
+			}
 			encoded, err := parentToProto(dc, &tt.model)
 			if err != nil {
 				t.Fatal(err)
@@ -1846,7 +2356,7 @@ world api {
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path, linked_inputs_path(&root)],
-        support_paths: Vec::new(),
+        support_package: Some("go.temporal.io/sdk/advanced/samples/go/support".into()),
         descriptor_paths: vec![descriptor_path(&root)],
         output_path: output_path.clone(),
         format: true,
@@ -1861,6 +2371,12 @@ world api {
         )
         .unwrap();
     }
+    fs::create_dir(temp_dir.join("support")).unwrap();
+    fs::copy(
+        root.join("advanced/samples/go/support/temporal_model_converters.go"),
+        temp_dir.join("support/temporal_model_converters.go"),
+    )
+    .unwrap();
     fs::write(
         output_path.join("conversion_test.go"),
         r#"package output
@@ -1951,8 +2467,7 @@ fn render_go_serialization_context(
     fs::write(
         &wit_path,
         format!(
-            r#"/// @nexus.support go="context.go"
-package temporal:serialization-context@1.0.0;
+            r#"package temporal:serialization-context@1.0.0;
 
 world system {{
   export sample-service;
@@ -1964,7 +2479,7 @@ interface sample-service {{
 
   {proto}
   record cancel-request {{
-    /// @nexus.source go="workflow.GetInfo(ctx).Namespace"
+    /// @nexus.source go="WorkflowNamespace(ctx)"
     namespace: string,
     /// @nexus.omit
     workflow-execution: placeholder,
@@ -1985,10 +2500,6 @@ interface sample-service {{
 }}
 "#
         ),
-    )?;
-    fs::write(
-        temp_dir.join("context.go"),
-        "package generated\n\nimport \"go.temporal.io/sdk/converter\"\nimport helpers \"example.com/contexthelpers\"\n\nfunc requestContext(request cancelRequest) converter.SerializationContext { return nil }\n",
     )?;
     let result = generate_to_string_with_inputs(
         nexgen::language::Language::Go,
@@ -2029,8 +2540,8 @@ fn go_serialization_context_prefers_go_helper_over_default() {
         ),
     ] {
         let rendered = render_go_serialization_context(directive, true).unwrap();
-        assert!(rendered.contains(&format!("return {helper}(request.(")));
-        assert!(!rendered.contains("return defaultContext("));
+        assert!(rendered.contains(&format!("return support.{helper}(request.(")));
+        assert!(!rendered.contains("return support.defaultContext("));
         assert!(!rendered.contains("python_context(request)"));
     }
 }
@@ -2039,7 +2550,7 @@ fn go_serialization_context_prefers_go_helper_over_default() {
 fn go_serialization_context_accepts_only_go_helper_references() {
     for helper in [
         "requestContext",
-        "helpers.Context",
+        "support.Context",
         "_requestContext",
         "Context2",
     ] {
@@ -2048,6 +2559,11 @@ fn go_serialization_context_accepts_only_go_helper_references() {
         assert!(!rendered.contains("### serialization_context.go"));
         assert!(!rendered.contains("### registry.go"));
         assert!(rendered.contains("// --- Registry ---"));
+        let helper = if helper.contains('.') {
+            helper.to_string()
+        } else {
+            format!("support.{helper}")
+        };
         assert!(rendered.contains(&format!("return {helper}(request.(")));
     }
     for helper in [
@@ -2105,7 +2621,7 @@ fn go_serialization_context_wrapper_assigns_sources_before_sdk() {
     )
     .unwrap();
     let sourced = rendered
-        .find("request.namespace = workflow.GetInfo(ctx).Namespace")
+        .find("request.namespace = support.WorkflowNamespace(ctx)")
         .unwrap();
     let execute = rendered
         .find("c.ExecuteOperation(ctx, \"Cancel\", request,")
@@ -2159,15 +2675,10 @@ fn go_serialization_context_deferred_models_use_sdk_context() {
     assert!(rendered.contains("// --- Registry ---"));
     assert!(!rendered.contains("nexgenWithOperationSerializationContext"));
     assert!(!rendered.contains("nexgenPayloadContext"));
-    let support = rendered.split("### support.go\n").nth(1).unwrap();
-    let support = support.split("\n### ").next().unwrap();
-    assert!(support.contains("func signalWithStartWorkflowSerializationContext("));
-    assert!(support.contains("func retryPolicyToProto("));
-    assert_eq!(
-        support.matches("\"go.temporal.io/sdk/converter\"").count(),
-        1
-    );
-    assert!(!support.contains("func nexgenPayloadContext("));
+    assert!(!rendered.contains("### support.go"));
+    assert!(rendered.contains("support.SignalWithStartWorkflowSerializationContext(request.("));
+    assert!(rendered.contains("support.RetryPolicyToProto(dc,"));
+    assert!(!rendered.contains("func nexgenPayloadContext("));
 }
 
 fn render_go_serialization_context_fixture(
@@ -2194,7 +2705,7 @@ fn try_render_go_serialization_context_fixture(
 fn try_render_go_serialization_context_fixture_at_endpoint(
     declarations: &str,
     operations: &str,
-    support: &str,
+    _support: &str,
     endpoint: &str,
 ) -> Result<BTreeMap<PathBuf, String>, Box<dyn std::error::Error>> {
     let temp_dir = unique_output_path("go-serialization-context-conversions");
@@ -2203,8 +2714,7 @@ fn try_render_go_serialization_context_fixture_at_endpoint(
     fs::write(
         &wit_path,
         format!(
-            r#"/// @nexus.support go="context.go"
-package temporal:context-conversions@1.0.0;
+            r#"package temporal:context-conversions@1.0.0;
 world system {{ export sample-service; }}
 /// @nexus.endpoint "{endpoint}"
 interface sample-service {{
@@ -2215,7 +2725,6 @@ interface sample-service {{
         ),
     )
     .unwrap();
-    fs::write(temp_dir.join("context.go"), support).unwrap();
     let output_path = temp_dir.join("output");
     let result = generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
@@ -2224,7 +2733,7 @@ interface sample-service {{
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![wit_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: vec![descriptor_path(&project_root())],
         output_path: output_path.clone(),
         // Run gofmt over every file to check the IIFE's Go syntax as well as
@@ -2274,6 +2783,11 @@ fn assert_registry_entry(registry: &str, service: &str, operation: &str, helper:
     let Some(helper) = helper else {
         assert!(!compact.contains(&key), "{registry}");
         return;
+    };
+    let helper = if helper.contains('.') {
+        helper.to_string()
+    } else {
+        format!("support.{helper}")
     };
     assert_eq!(compact.matches(&key).count(), 1, "{registry}");
     let entry = compact.split(&key).nth(1).unwrap();
@@ -2335,7 +2849,7 @@ fn go_serialization_context_registry_uses_wire_names_and_typed_adapter() {
     assert!(compact.contains(
         "var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry"
     ));
-    assert!(compact.contains("return requestContext(request.(contextRequest))"));
+    assert!(compact.contains("return support.requestContext(request.(contextRequest))"));
     assert!(!registry.contains("\"reflect\""));
     assert_eq!(
         registry.matches("\"go.temporal.io/sdk/converter\"").count(),
@@ -2526,7 +3040,7 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     let main = go_registry_main(&files);
     let registry = go_registry_section(main);
     let conversion = operation
-        .find("requestProto, err := retryPolicyToProto(dc, &request)")
+        .find("requestProto, err := support.RetryPolicyToProto(dc, &request)")
         .unwrap();
     let error = operation[conversion..]
         .find("resultSettable.SetError(err)")
@@ -2537,8 +3051,8 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
         .unwrap();
     assert!(conversion < error && error < execute, "{operation}");
     assert!(operation.contains("workflow.NewNexusClient(\"sample-service\", \"SampleService\")"));
-    assert_eq!(operation.matches("retryPolicyToProto(").count(), 1);
-    assert!(operation.contains("value, err := retryPolicyFromProto(dc, &result)"));
+    assert_eq!(operation.matches("support.RetryPolicyToProto(").count(), 1);
+    assert!(operation.contains("value, err := support.RetryPolicyFromProto(dc, &result)"));
     assert!(!operation.contains("requestContext("));
     assert_eq!(main.matches("\"go.temporal.io/sdk/temporal\"").count(), 1);
     let compact = registry.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -2569,7 +3083,7 @@ fn go_serialization_context_preserves_owned_input_and_uses_dc_for_eager_output()
     assert!(!operation.contains("requestProto"));
 
     assert!(
-        compact.contains("value, err := retryPolicyFromProto(dc, &result)"),
+        compact.contains("value, err := support.RetryPolicyFromProto(dc, &result)"),
         "{operation}"
     );
     assert!(operation.contains("contextRequestToProto(dc converter.DataConverter,"));
@@ -2587,7 +3101,7 @@ fn go_serialization_context_preserves_owned_input_and_uses_dc_for_eager_output()
     );
     assert_eq!(
         operation
-            .matches("value, err := retryPolicyFromProto(dc, &result)")
+            .matches("value, err := support.RetryPolicyFromProto(dc, &result)")
             .count(),
         1
     );
@@ -2640,7 +3154,7 @@ fn go_serialization_context_shared_model_has_one_registry_entry_per_operation() 
     let registry = go_registry_main(&files);
     assert_eq!(
         registry
-            .matches("return requestContext(request.(contextRequest))")
+            .matches("return support.requestContext(request.(contextRequest))")
             .count(),
         2
     );
@@ -2809,7 +3323,8 @@ fn go_serialization_context_allows_model_field_named_serialization_context() {
     );
     let model = &files[Path::new("sampleservice.go")];
     assert!(model.contains("SerializationContext string"));
-    assert!(!model.contains("SerializationContext()"));
+    assert!(model.contains(") GetSerializationContext() string"));
+    assert!(!model.contains(") SerializationContext()"));
     assert_registry_entry(
         go_registry_main(&files),
         "SampleService",
@@ -2903,7 +3418,7 @@ func requestContext(request contextRequest) converter.WorkflowSerializationConte
 fn go_serialization_context_imports_qualified_helper_alias_once_in_main() {
     let files = render_go_serialization_context_fixture(
         GO_CONTEXT_OWNED_REQUEST,
-        r#"/// @nexus.serialization-context go="helpers.Context"
+        r#"/// @nexus.serialization-context go="support.Context"
         roundtrip: func(request: context-request);"#,
         &GO_CONTEXT_OVERRIDE_SUPPORT
             .replace(
@@ -2915,20 +3430,20 @@ fn go_serialization_context_imports_qualified_helper_alias_once_in_main() {
     );
     let registry = go_registry_main(&files);
     assert!(
-        registry.contains("helpers \"example.com/contexthelpers\""),
+        registry.contains("\"example.com/nexgen/support\""),
         "{registry}"
     );
     assert_eq!(
-        registry.matches("\"example.com/contexthelpers\"").count(),
+        registry.matches("\"example.com/nexgen/support\"").count(),
         1
     );
     assert_registry_entry(
         registry,
         "SampleService",
         "Roundtrip",
-        Some("helpers.Context"),
+        Some("support.Context"),
     );
-    assert!(files[Path::new("support.go")].contains("helpers \"example.com/contexthelpers\""));
+    assert!(!files.contains_key(Path::new("support.go")));
 }
 
 #[test]
@@ -2941,7 +3456,7 @@ fn go_proto_resource_return_converts_request_and_constructs_resource() {
     )
     .unwrap();
 
-    assert!(rendered.contains("\trequest.namespace = workflow.GetInfo(ctx).Namespace\n"));
+    assert!(rendered.contains("\trequest.namespace = support.WorkflowNamespace(ctx)\n"));
     assert!(rendered.contains(
         "fut := c.ExecuteOperation(ctx, \"StartWorkflow\", request, workflow.NexusOperationOptions{})"
     ));
@@ -3006,7 +3521,7 @@ interface workflow-service {
 
   /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest"
   record cancel-request {
-    /// @nexus.source go="workflowNamespace()"
+    /// @nexus.source go="WorkflowNamespace(ctx)"
     namespace: string,
     /// @nexus.omit
     workflow-execution: placeholder,
@@ -3037,6 +3552,9 @@ interface workflow-service {
         &[descriptor_path(&root)],
     )
     .unwrap();
+    assert!(rendered.contains("support.WorkflowNamespace(ctx)"));
+    assert!(!rendered.contains("support.support.WorkflowNamespace(ctx)"));
+    assert!(!rendered.contains("workflow.GetInfo(ctx).Namespace"));
 
     assert!(rendered.contains("value := NewSignalResult(request.namespace, result.GetStarted())"));
     fs::remove_dir_all(temp_dir).unwrap();
@@ -3169,7 +3687,7 @@ fn go_rejects_inputs_flattening_to_the_same_module_file() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![temp_dir.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path,
         format: false,
@@ -3222,7 +3740,7 @@ fn go_rejects_reserved_generated_name_collision() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![temp_dir.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path,
         format: false,
@@ -3252,7 +3770,7 @@ fn go_rejects_single_input_output_named_definitions_with_a_remedy() {
     let request = |output_name: &str| GenerateRequest {
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join(output_name),
         format: false,
@@ -3285,7 +3803,7 @@ fn go_rejects_single_input_output_named_definitions_with_a_remedy() {
 }
 
 #[test]
-fn go_rejects_multi_input_module_colliding_with_support_file() {
+fn go_multi_input_module_named_support_has_no_support_file_collision() {
     let temp_dir = unique_output_path("go-json-module-support-collision");
     fs::create_dir_all(&temp_dir).unwrap();
     fs::write(
@@ -3298,41 +3816,25 @@ fn go_rejects_multi_input_module_colliding_with_support_file() {
         r#"{"title":"OtherModel","type":"object","properties":{"id":{"type":"string"}}}"#,
     )
     .unwrap();
-    let support_path = temp_dir.join("custom.go");
-    fs::write(&support_path, "package generated\n").unwrap();
-
-    let error = generate_to_file(&GenerateRequest {
+    generate_to_file(&GenerateRequest {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![temp_dir.clone()],
-        support_paths: vec![support_path],
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("output"),
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
     })
-    .expect_err("the input module must not be overwritten by support.go");
-
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("support.go"));
-    assert!(first_source.contains("support.json"), "{first_source}");
-    assert_eq!(second_source, "generated Go support file");
-    assert!(remedy.contains("support.json"), "{remedy}");
-    assert!(!remedy.contains("custom.go"), "{remedy}");
+    .expect("support.json may now generate support.go without a copied support file");
+    assert!(temp_dir.join("output/support.go").is_file());
+    assert!(temp_dir.join("output/other.go").is_file());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
-fn go_rejects_single_json_output_name_colliding_with_support_file() {
+fn go_json_output_named_support_has_no_support_file_collision() {
     let temp_dir = unique_output_path("go-json-output-support-collision");
     fs::create_dir_all(&temp_dir).unwrap();
     let input_path = temp_dir.join("model.json");
@@ -3341,42 +3843,25 @@ fn go_rejects_single_json_output_name_colliding_with_support_file() {
         r#"{"title":"Model","type":"object","properties":{"id":{"type":"string"}}}"#,
     )
     .unwrap();
-    let support_path = temp_dir.join("custom.go");
-    fs::write(&support_path, "package generated\n").unwrap();
-
-    let error = generate_to_file(&GenerateRequest {
+    generate_to_file(&GenerateRequest {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: vec![support_path],
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("support"),
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
     })
-    .expect_err("the output-named module must not be overwritten by support.go");
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("support.go"));
-    assert_eq!(
-        first_source,
-        "Go module derived from output directory `support`"
-    );
-    assert_eq!(second_source, "generated Go support file");
-    assert!(remedy.contains("--output"), "{remedy}");
+    .expect("support output name is no longer reserved for copied fragments");
+    assert!(temp_dir.join("support/support.go").is_file());
+    assert!(temp_dir.join("support/definitions.go").is_file());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
-fn go_rejects_single_wit_service_name_colliding_with_support_file() {
+fn go_wit_service_named_support_has_no_support_file_collision() {
     let temp_dir = unique_output_path("go-wit-service-support-collision");
     fs::create_dir_all(&temp_dir).unwrap();
     let input_path = temp_dir.join("support.wit");
@@ -3397,41 +3882,19 @@ interface support {
 "#,
     )
     .unwrap();
-    let support_path = temp_dir.join("custom.go");
-    fs::write(&support_path, "package generated\n").unwrap();
-
-    let error = generate_to_file(&GenerateRequest {
+    generate_to_file(&GenerateRequest {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path.clone()],
-        support_paths: vec![support_path],
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("output"),
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
     })
-    .expect_err("the service-named module must not be overwritten by support.go");
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("support.go"));
-    assert!(
-        first_source.contains("service declaration `Support`"),
-        "{first_source}"
-    );
-    assert!(
-        first_source.contains(&input_path.display().to_string()),
-        "{first_source}"
-    );
-    assert_eq!(second_source, "generated Go support file");
-    assert!(remedy.contains("rename service `Support`"), "{remedy}");
+    .expect("the service may now own support.go");
+    assert!(temp_dir.join("output/support.go").is_file());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -3447,6 +3910,8 @@ fn generate_formatted_go_json_output(
         json_input_path(root, example_id).to_str().unwrap(),
         "--output",
         output_path.to_str().unwrap(),
+        "--support-package",
+        "example.com/nexgen/support",
     ]);
     if native_api {
         command.arg("--native-api");
@@ -3478,7 +3943,7 @@ fn go_json_names_inline_object_union_branch() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3516,7 +3981,7 @@ fn go_json_decodes_element_position_unions() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3615,7 +4080,7 @@ fn go_json_recursively_converts_and_validates_element_positions() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3749,7 +4214,7 @@ fn go_json_validates_non_object_union_branch_constraints() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3808,7 +4273,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3853,7 +4318,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -3929,7 +4394,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4033,7 +4498,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4142,7 +4607,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4187,7 +4652,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4280,7 +4745,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4346,7 +4811,7 @@ fn go_json_wave3_pairwise_runtime_matrix() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4627,7 +5092,7 @@ fn go_json_cross_module_go_name_override_moves_every_reference() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4663,7 +5128,7 @@ fn go_json_bare_ref_root_is_a_runtime_alias_for_operation_io() {
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::Go,
         input_paths: vec![input],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4757,7 +5222,7 @@ fn go_json_override_moves_member_derived_names_only() {
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -4822,7 +5287,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir.clone()],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("out"),
         format: false,
@@ -4844,7 +5309,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Java,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: None,
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("pkg"),
         format: false,
@@ -4907,7 +5372,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: temp_dir.join("out"),
         format: false,
@@ -4958,7 +5423,7 @@ services:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5017,7 +5482,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5129,7 +5594,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5279,7 +5744,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5355,7 +5820,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5409,12 +5874,14 @@ func TestMaterializedSerializeChecks(t *testing.T) {
     }
 
     subMinuteOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 30))
-    justOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 18*60*60+60))
-    negativeJustOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", -(18*60*60+60)))
+    justOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 14*60*60+60))
+    negativeJustOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", -(14*60*60+60)))
+    formerBoundaryOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 18*60*60))
+    negativeFormerBoundaryOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", -18*60*60))
     wideOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", 23*60*60+59*60))
     negativeWideOutOfRangeOffset := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", -(23*60*60+59*60)))
     overflowYear := time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)
-    for name, value := range map[string]time.Time{"sub-minute offset": subMinuteOffset, "offset +18:01": justOutOfRangeOffset, "offset -18:01": negativeJustOutOfRangeOffset, "offset +23:59": wideOutOfRangeOffset, "offset -23:59": negativeWideOutOfRangeOffset, "year 10000": overflowYear} {
+    for name, value := range map[string]time.Time{"sub-minute offset": subMinuteOffset, "offset +14:01": justOutOfRangeOffset, "offset -14:01": negativeJustOutOfRangeOffset, "offset +18:00": formerBoundaryOffset, "offset -18:00": negativeFormerBoundaryOffset, "offset +23:59": wideOutOfRangeOffset, "offset -23:59": negativeWideOutOfRangeOffset, "year 10000": overflowYear} {
         model := base
         model.When = &value
         if _, err := json.Marshal(model); err == nil {
@@ -5422,7 +5889,7 @@ func TestMaterializedSerializeChecks(t *testing.T) {
         }
     }
 
-    for _, seconds := range []int{18 * 60 * 60, -18 * 60 * 60} {
+    for _, seconds := range []int{14 * 60 * 60, -14 * 60 * 60} {
         boundary := time.Date(2021, 6, 15, 12, 30, 45, 0, time.FixedZone("", seconds))
         boundaryModel := base
         boundaryModel.When = &boundary
@@ -5437,7 +5904,7 @@ func TestMaterializedSerializeChecks(t *testing.T) {
         }
     }
 
-    for name, value := range map[string]time.Time{"offset +18:01": justOutOfRangeOffset, "offset -18:01": negativeJustOutOfRangeOffset, "offset +23:59": wideOutOfRangeOffset, "offset -23:59": negativeWideOutOfRangeOffset} {
+    for name, value := range map[string]time.Time{"offset +14:01": justOutOfRangeOffset, "offset -14:01": negativeJustOutOfRangeOffset, "offset +18:00": formerBoundaryOffset, "offset -18:00": negativeFormerBoundaryOffset, "offset +23:59": wideOutOfRangeOffset, "offset -23:59": negativeWideOutOfRangeOffset} {
         model := base
         model.Clock = &value
         if _, err := json.Marshal(model); err == nil {
@@ -5536,7 +6003,7 @@ properties:
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5598,7 +6065,7 @@ properties:
     generate_to_file(&GenerateRequest {
         language: nexgen::language::Language::Go,
         input_paths: vec![input_dir],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5683,7 +6150,7 @@ fn go_json_semantic_helper_names_participate_in_p15() {
         let error = generate_to_file(&GenerateRequest {
             language: nexgen::language::Language::Go,
             input_paths: vec![input_path],
-            support_paths: Vec::new(),
+            support_package: Some("example.com/nexgen/support".into()),
             descriptor_paths: Vec::new(),
             output_path: temp_dir.join(format!("out-{case}")),
             format: false,
@@ -5722,7 +6189,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5812,7 +6279,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5938,7 +6405,7 @@ $defs:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -5997,7 +6464,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -6089,7 +6556,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,
@@ -6209,7 +6676,7 @@ properties:
         config: Default::default(),
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
-        support_paths: Vec::new(),
+        support_package: Some("example.com/nexgen/support".into()),
         descriptor_paths: Vec::new(),
         output_path: output_path.clone(),
         format: false,

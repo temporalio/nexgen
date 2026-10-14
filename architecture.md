@@ -46,9 +46,11 @@ flowchart LR
         authoredForBinding[AuthoredFamily]
         validated[AuthoredFamily<br/>validated]
         selected[SelectedFamily]
+        selectedValidated[SelectedFamily<br/>validated]
 
         authoredForBinding -->|AuthoredValidationPass| validated
         validated -->|LanguageSelectionPass| selected
+        selected -->|SelectedValidationPass| selectedValidated
     end
 
     subgraph bind["Resource & Operation Binding"]
@@ -84,7 +86,7 @@ flowchart LR
     end
 
     authored --> authoredForBinding
-    selected --> selectedForBinding
+    selectedValidated --> selectedForBinding
     operationBound --> operationBoundForPlanning
     reachable --> reachableForEmission
 ```
@@ -95,13 +97,18 @@ flowchart LR
   constraints.
 - `LanguageSelectionPass` selects the target-language values from authored
   language maps.
+- `SelectedValidationPass` validates the selected generic surface after selection.
 - `ResourceResolutionPass` resolves resource-method and resource-return facts
   from the API spec and descriptors.
 - `OperationBindingPass` attaches resolved resource facts to their owning
   operations and resources.
 - `OperationLoweringPass` turns wire-backed resource returns into explicit
   result records.
-- `TypePlanningPass` materializes target-ready type metadata.
+- `TypePlanningPass` materializes target-ready type metadata, including resolved
+  enum defaults on record fields. Defaults identify a member of a declared enum
+  or a descriptor-backed enum, following aliases; language backends render that
+  member using the API type's naming and conversion conventions rather than
+  resolving the authored case again.
 - `ReachabilityPass` removes declarations outside the generated surface.
 - `EmittedNameResolutionPass` resolves final emitted JSON model identifiers. Its
   name manifest spans the whole tree, not one leaf: a `$ref` across input files

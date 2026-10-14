@@ -14,7 +14,7 @@ use crate::generator::json_schema::{java, python, typescript};
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, ExternalTypeBindingSpec, ExternalTypeSpec, JsonModelBindingSpec, JsonModelSpec,
-    LanguageStringSpec, ModulePath, OperationSpec, ServiceSpec, SupportSpec, Symbol, TypeDeclEntry,
+    LanguageStringSpec, ModulePath, OperationSpec, ServiceSpec, Symbol, TypeDeclEntry,
     TypeDeclSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecLeaf, ApiSpecNode, ApiSpecTree};
@@ -1346,7 +1346,6 @@ fn api_spec_from_parsed_json_documents(
         module_path: ModulePath::default(),
         data: (),
         version: "0.0.0".to_string(),
-        support: SupportSpec::default(),
         services,
         model_scope: None,
         types,

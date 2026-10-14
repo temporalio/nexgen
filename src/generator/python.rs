@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use heck::{ToShoutySnakeCase, ToSnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
@@ -21,10 +21,10 @@ use crate::planning::{
 };
 use crate::planning::{RequestPlan, ResolvedResourceBindingSource};
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec,
-    FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec, LanguageImportStyle,
-    LanguageStringSpec, ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility,
-    RecordSpec, SupportFragmentSpec, TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    AliasTypeSpec, EnumSpec, EnumValueSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec,
+    FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec,
+    LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility,
+    RecordSpec, SelectedTextSpec, TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -47,14 +47,13 @@ struct PythonGenerationResult {
 
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: &str,
 ) -> Result<GeneratedFiles> {
     match &tree.root {
         ApiSpecNode::Leaf(leaf) => {
-            let support_fragments = support_fragments_for_plan(&leaf.spec, support);
             let generated = generate_leaf(
                 &leaf.spec,
-                &support_fragments,
+                support_package,
                 GeneratedFileOrigin::fixed("generated Python package module"),
             )?;
             Ok(GeneratedFiles {
@@ -63,37 +62,35 @@ pub(crate) fn generate(
                 warnings: generated.warnings,
             })
         }
-        ApiSpecNode::Branch(branch) => generate_tree(branch, support),
+        ApiSpecNode::Branch(branch) => generate_tree(branch, support_package),
     }
 }
 
 fn generate_leaf(
     api_plan: &PlannedSpec,
-    support_fragments: &[SupportFragmentSpec],
+    support_package: &str,
     module_origin: GeneratedFileOrigin,
 ) -> Result<PythonGenerationResult> {
-    reject_support_namespaces(Language::Python, support_fragments)?;
     let inline_model_rebuilds = api_plan
         .data
         .module_imports
         .values()
         .all(BTreeSet::is_empty);
-    ApiPlanner::new(api_plan, inline_model_rebuilds, None)?.build(support_fragments, module_origin)
+    ApiPlanner::new(api_plan, inline_model_rebuilds, None, support_package)?.build(module_origin)
 }
 
 fn generate_leaf_with_model_hoists(
     api_plan: &PlannedSpec,
-    support_fragments: &[SupportFragmentSpec],
+    support_package: &str,
     model_hoists: &PythonModelHoists,
     module_origin: GeneratedFileOrigin,
 ) -> Result<PythonGenerationResult> {
-    reject_support_namespaces(Language::Python, support_fragments)?;
-    ApiPlanner::new(api_plan, true, Some(model_hoists))?.build(support_fragments, module_origin)
+    ApiPlanner::new(api_plan, true, Some(model_hoists), support_package)?.build(module_origin)
 }
 
 fn generate_tree(
     branch: &ApiSpecBranch<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: &str,
 ) -> Result<GeneratedFiles> {
     let model_hoists = tree_model_hoists(branch)?;
     let mut files = GeneratedFileMap::default();
@@ -120,7 +117,7 @@ fn generate_tree(
     for (name, node) in &branch.children {
         let exported_names = generate_tree_node(
             node,
-            support,
+            support_package,
             &model_hoists,
             &mut files,
             &mut warnings,
@@ -144,7 +141,7 @@ fn generate_tree(
 
 fn generate_tree_node(
     node: &ApiSpecNode<PlannedFamily>,
-    support: &crate::SupportFiles,
+    support_package: &str,
     model_hoists: &PythonModelHoists,
     files: &mut GeneratedFileMap,
     warnings: &mut Vec<String>,
@@ -152,10 +149,9 @@ fn generate_tree_node(
 ) -> Result<BTreeSet<String>> {
     match node {
         ApiSpecNode::Leaf(leaf) => {
-            let support_fragments = support_fragments_for_plan(&leaf.spec, support);
             let generated = generate_leaf_with_model_hoists(
                 &leaf.spec,
-                &support_fragments,
+                support_package,
                 model_hoists,
                 GeneratedFileOrigin::input_module(Language::Python, &leaf.source_path),
             )?;
@@ -170,7 +166,7 @@ fn generate_tree_node(
             for (name, node) in &branch.children {
                 let exported_names = generate_tree_node(
                     node,
-                    support,
+                    support_package,
                     model_hoists,
                     files,
                     warnings,
@@ -276,21 +272,9 @@ fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
         .collect()
 }
 
-fn support_fragments_for_plan(
-    plan: &PlannedSpec,
-    support: &crate::SupportFiles,
-) -> Vec<SupportFragmentSpec> {
-    if support.fragments.is_empty() {
-        plan.support
-            .fragments_for_language(Language::Python)
-            .to_vec()
-    } else {
-        support.fragments.clone()
-    }
-}
-
 struct ApiPlanner<'a> {
     api_plan: &'a PlannedSpec,
+    support_package: &'a str,
     inline_model_rebuilds: bool,
     model_hoists: Option<&'a PythonModelHoists>,
     external_models: PythonExternalModels,
@@ -476,6 +460,7 @@ impl<'a> ApiPlanner<'a> {
         api_plan: &'a PlannedSpec,
         inline_model_rebuilds: bool,
         model_hoists: Option<&'a PythonModelHoists>,
+        support_package: &'a str,
     ) -> Result<Self> {
         let external_models = if let Some(model_hoists) = model_hoists {
             PythonExternalModels::new_with_hoists(api_plan, model_hoists)?
@@ -484,6 +469,7 @@ impl<'a> ApiPlanner<'a> {
         };
         Ok(Self {
             api_plan,
+            support_package,
             inline_model_rebuilds,
             model_hoists,
             external_models,
@@ -495,11 +481,7 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    fn build(
-        mut self,
-        support_fragments: &[SupportFragmentSpec],
-        module_origin: GeneratedFileOrigin,
-    ) -> Result<PythonGenerationResult> {
+    fn build(mut self, module_origin: GeneratedFileOrigin) -> Result<PythonGenerationResult> {
         let api_plan = self.api_plan;
         let services = api_plan
             .services
@@ -512,15 +494,9 @@ impl<'a> ApiPlanner<'a> {
                     .collect::<Result<Vec<_>>>()?;
 
                 Ok(RenderedService {
-                    name: service
-                        .code_name
-                        .for_language(Language::Python)
-                        .unwrap_or(&service.name),
+                    name: service.code_name.value().unwrap_or(&service.name),
                     wire_name: &service.wire_name,
-                    doc: service
-                        .doc
-                        .for_language(Language::Python)
-                        .map(str::to_string),
+                    doc: service.doc.value().map(str::to_string),
                     endpoint: service.endpoint.clone(),
                     experimental: service.experimental,
                     deprecated: service.deprecated,
@@ -553,12 +529,8 @@ impl<'a> ApiPlanner<'a> {
             self.render_model_fragments(model_refs.as_slice(), variant_refs.as_slice())?;
         validate_python_generated_names(self.api_plan, &model_fragments.generated_names)?;
 
-        let (files, exported_names) = self.render_package(
-            &model_fragments,
-            &services,
-            support_fragments,
-            module_origin,
-        )?;
+        let (files, exported_names) =
+            self.render_package(&model_fragments, &services, module_origin)?;
         Ok(PythonGenerationResult {
             files,
             warnings: Vec::new(),
@@ -580,12 +552,10 @@ impl<'a> ApiPlanner<'a> {
         &self,
         model_fragments: &RenderedModelFragments,
         services: &[RenderedService<'_>],
-        support_fragments: &[SupportFragmentSpec],
         module_origin: GeneratedFileOrigin,
     ) -> Result<(GeneratedFileMap, BTreeSet<String>)> {
         let mode = crate::nexgen_config::current().mode;
         let mut files = GeneratedFileMap::default();
-        render_support_package(&mut files, support_fragments)?;
         files.insert_multi(
             self.external_models.render_support_files()?,
             GeneratedFileOrigin::fixed("generated Python external-model runtime"),
@@ -634,8 +604,6 @@ impl<'a> ApiPlanner<'a> {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
-        let support_names = support_export_names(support_fragments);
-
         let rendered_model_names = model_names.iter().cloned().collect::<BTreeSet<_>>();
         let mut package_model_names = if self.model_hoists.is_some() {
             rendered_model_names.clone()
@@ -662,7 +630,7 @@ impl<'a> ApiPlanner<'a> {
                     &package_model_names,
                     &resource_names,
                     &resource_operation_owners,
-                    &support_names,
+                    self.support_package,
                     self.api_plan,
                     self.model_hoists,
                     root_package_imports,
@@ -698,11 +666,17 @@ impl<'a> ApiPlanner<'a> {
             self.flags.values().collect::<Vec<_>>().as_slice(),
             variants.as_slice(),
             model_fragments,
-            &support_names,
+            self.support_package,
             &self.language_imports,
             self.api_plan,
             self.inline_model_rebuilds,
             self.model_hoists,
+            self.models.values().any(|model| {
+                planned_record(self.api_plan, &model.full_name)
+                    .fields
+                    .values()
+                    .any(|field| matches!(field.visibility, RecordFieldVisibility::Sourced { .. }))
+            }),
         )? {
             files.insert("models.py", models_source, module_origin.clone())?;
         }
@@ -755,7 +729,7 @@ impl<'a> ApiPlanner<'a> {
                         &bound_operations,
                         &operation_model_names,
                         &resource_names,
-                        &support_names,
+                        self.support_package,
                     ),
                     GeneratedFileOrigin::resource(Language::Python, service.name, &resource.name),
                 )?;
@@ -777,7 +751,7 @@ impl<'a> ApiPlanner<'a> {
                             operation,
                             &operation_model_names,
                             &resource_names,
-                            &support_names,
+                            self.support_package,
                             &self.language_imports,
                             self.api_plan,
                             self.model_hoists,
@@ -802,7 +776,7 @@ impl<'a> ApiPlanner<'a> {
         bound_operations: &[ResourceBoundOperation<'_>],
         model_names: &[String],
         resource_names: &[String],
-        support_names: &[String],
+        support_package: &str,
     ) -> String {
         let mut module_imports = bound_operations
             .iter()
@@ -904,10 +878,7 @@ impl<'a> ApiPlanner<'a> {
         if !used_resource_names.is_empty() {
             render_named_python_import(&mut output, ".", &used_resource_names);
         }
-        let used_support_names = used_python_symbol_imports(&body, support_names);
-        if !used_support_names.is_empty() {
-            render_named_python_import(&mut output, ".._support", &used_support_names);
-        }
+        render_support_import(&mut output, &body, support_package, false);
         if !body.is_empty() {
             output.push('\n');
             output.push('\n');
@@ -1119,7 +1090,7 @@ impl<'a> ApiPlanner<'a> {
                 target,
                 ..
             })) => type_name
-                .for_language(Language::Python)
+                .value()
                 .map(str::to_string)
                 .unwrap_or_else(|| self.python_resource_value_annotation(target)),
         }
@@ -1166,9 +1137,7 @@ impl<'a> ApiPlanner<'a> {
                         .service_model_ref(input, "models", self.api_plan);
                 let input_conversion = self.resolve_message_value_conversion(input)?;
                 let annotation = if let PlannedType::Record(record) = input {
-                    let parameters = self
-                        .api_plan
-                        .record_type_parameters(&record.full_name, Language::Python);
+                    let parameters = self.api_plan.record_type_parameters(&record.full_name);
                     python_generic_record_annotation(&input_conversion.annotation, &parameters)
                 } else {
                     input_conversion.annotation.clone()
@@ -1177,9 +1146,7 @@ impl<'a> ApiPlanner<'a> {
                     descriptor_type_ref: if let PlannedType::Record(record) = input {
                         python_erased_generic_record_annotation(
                             &type_ref,
-                            &self
-                                .api_plan
-                                .record_type_parameters(&record.full_name, Language::Python),
+                            &self.api_plan.record_type_parameters(&record.full_name),
                         )
                     } else {
                         type_ref.clone()
@@ -1240,7 +1207,7 @@ impl<'a> ApiPlanner<'a> {
             }
         };
         let model_input_parameters = input
-            .map(|input| self.api_plan.type_parameters(input, Language::Python))
+            .map(|input| self.api_plan.type_parameters(input))
             .unwrap_or_default();
         let model_input_identities = model_input_parameters
             .iter()
@@ -1248,7 +1215,7 @@ impl<'a> ApiPlanner<'a> {
             .collect::<BTreeSet<_>>();
         let model_output_parameters = operation
             .output_type()
-            .map(|output| self.api_plan.type_parameters(output, Language::Python))
+            .map(|output| self.api_plan.type_parameters(output))
             .unwrap_or_default();
         let generic_model_types =
             !model_input_parameters.is_empty() || !model_output_parameters.is_empty();
@@ -1260,12 +1227,7 @@ impl<'a> ApiPlanner<'a> {
         let output_annotation_default =
             erase_python_type_parameters(&output_annotation_default, &model_output_only_parameters);
         let overload_output_annotation = output_transform
-            .and_then(|transform| {
-                transform
-                    .type_name
-                    .for_language(crate::language::Language::Python)
-                    .map(str::to_string)
-            })
+            .and_then(|transform| transform.type_name.value().map(str::to_string))
             .or_else(|| {
                 output_resource_return
                     .as_ref()
@@ -1299,9 +1261,7 @@ impl<'a> ApiPlanner<'a> {
         let descriptor_output_ref = match operation.output_type() {
             Some(PlannedType::Record(record)) => python_erased_generic_record_annotation(
                 &output_ref,
-                &self
-                    .api_plan
-                    .record_type_parameters(&record.full_name, Language::Python),
+                &self.api_plan.record_type_parameters(&record.full_name),
             ),
             _ => output_ref.clone(),
         };
@@ -1310,19 +1270,13 @@ impl<'a> ApiPlanner<'a> {
             wire_name: operation.wire_name.as_str(),
             attr_name: operation
                 .code_name
-                .for_language(Language::Python)
+                .value()
                 .map(str::to_string)
                 .unwrap_or_else(|| python_ident(&operation.name.to_snake_case())),
             experimental: operation.experimental,
             deprecated: operation.deprecated,
-            doc: operation
-                .doc
-                .for_language(Language::Python)
-                .map(str::to_string),
-            return_doc: operation
-                .return_doc
-                .for_language(Language::Python)
-                .map(str::to_string),
+            doc: operation.doc.value().map(str::to_string),
+            return_doc: operation.return_doc.value().map(str::to_string),
             input: rendered_input,
             output_ref,
             descriptor_output_ref,
@@ -1331,16 +1285,12 @@ impl<'a> ApiPlanner<'a> {
             overload_output_annotation,
             output_type_parameters,
             output_type_expr,
-            output_transform_expr: output_transform.and_then(|transform| {
-                transform
-                    .transform
-                    .for_language(crate::language::Language::Python)
-                    .map(str::to_string)
-            }),
+            output_transform_expr: output_transform
+                .and_then(|transform| transform.transform.value().map(str::to_string)),
             serialization_context_expr: operation
                 .serialization_context
-                .for_language(crate::language::Language::Python)
-                .map(str::to_string),
+                .value()
+                .map(|helper| format!("_support.{helper}")),
             output_resource_return,
             output_direct_result,
             output_none: operation.output_type().is_none(),
@@ -1364,9 +1314,7 @@ impl<'a> ApiPlanner<'a> {
                 let conversion = self.resolve_message_value_conversion(model_type)?;
                 Ok(python_generic_record_annotation(
                     &conversion.annotation,
-                    &self
-                        .api_plan
-                        .record_type_parameters(&record.full_name, Language::Python),
+                    &self.api_plan.record_type_parameters(&record.full_name),
                 ))
             }
             _ => panic!("operation output annotation should be model-shaped"),
@@ -1451,7 +1399,7 @@ impl<'a> ApiPlanner<'a> {
                 doc: planned_field
                     .doc
                     .as_ref()
-                    .and_then(|doc| doc.for_language(Language::Python))
+                    .and_then(|doc| doc.value())
                     .map(str::to_string),
             });
             request_fields.push(RenderedUnpackedRequestField {
@@ -1540,7 +1488,7 @@ impl<'a> ApiPlanner<'a> {
                             attr_name: nested_rendered_field.attr_name.clone(),
                             annotation: nested_planned_model
                                 .field_flattened_annotation(nested_field_name)
-                                .and_then(|annotation| annotation.for_language(Language::Python))
+                                .and_then(|annotation| annotation.value())
                                 .map(|annotation| {
                                     if nested_planned_field.required {
                                         annotation.to_string()
@@ -1558,7 +1506,7 @@ impl<'a> ApiPlanner<'a> {
                             doc: nested_planned_field
                                 .doc
                                 .as_ref()
-                                .and_then(|doc| doc.for_language(Language::Python))
+                                .and_then(|doc| doc.value())
                                 .map(str::to_string),
                         }
                     },
@@ -1585,7 +1533,7 @@ impl<'a> ApiPlanner<'a> {
                 full_name: full_name.to_string(),
                 name: planned_model.name.clone(),
                 type_parameters: api_plan
-                    .record_type_parameters(full_name, Language::Python)
+                    .record_type_parameters(full_name)
                     .into_iter()
                     .map(|usage| usage.parameter.name)
                     .collect(),
@@ -1662,7 +1610,7 @@ impl<'a> ApiPlanner<'a> {
                         .as_ref()
                         .map(|payload| {
                             self.api_plan
-                                .type_parameters(payload, Language::Python)
+                                .type_parameters(payload)
                                 .into_iter()
                                 .map(|usage| usage.parameter.name)
                                 .collect()
@@ -1684,7 +1632,7 @@ impl<'a> ApiPlanner<'a> {
             name: variant_spec.name.clone(),
             type_parameters: self
                 .api_plan
-                .variant_type_parameters(&variant_spec.full_name, Language::Python)
+                .variant_type_parameters(&variant_spec.full_name)
                 .into_iter()
                 .map(|usage| usage.parameter.name)
                 .collect(),
@@ -1749,8 +1697,13 @@ impl<'a> ApiPlanner<'a> {
 
         let imports = resolved_type.imports.clone();
 
-        if let Some(default_value) = &field.default_value {
-            let default_expr = enum_default_expr(&resolved_type, &default_value.enum_case);
+        if field.default_value.is_some() {
+            let default_value = field
+                .data
+                .default_enum_value
+                .as_ref()
+                .expect("planned field default enum value should be resolved");
+            let default_expr = enum_default_expr(&resolved_type, default_value);
             return Ok(RenderedField {
                 attr_name: attr_name.clone(),
                 annotation: python_field_annotation(
@@ -1808,8 +1761,9 @@ impl<'a> ApiPlanner<'a> {
         source_expr: &str,
     ) -> Result<RenderedField> {
         let mut rendered = self.build_field(record, field_name, field)?;
-        rendered.default_kind = PythonFieldDefaultKind::Expression(source_expr.to_string());
-        rendered.default_expr = Some(python_dataclass_source_default_expr(source_expr));
+        let source_call = python_source_call(source_expr);
+        rendered.default_kind = PythonFieldDefaultKind::Expression(source_call.clone());
+        rendered.default_expr = Some(python_dataclass_source_default_expr(&source_call));
         Ok(rendered)
     }
 
@@ -1937,7 +1891,7 @@ fn resolve_python_value_type(
         PlannedType::Variant(variant_type) => ResolvedFieldType {
             annotation: python_generic_record_annotation(
                 &variant_type.name,
-                &api_plan.variant_type_parameters(&variant_type.full_name, Language::Python),
+                &api_plan.variant_type_parameters(&variant_type.full_name),
             ),
             imports: PythonImports::default(),
             kind: ResolvedFieldKind::Scalar,
@@ -1957,7 +1911,7 @@ fn resolve_python_value_type(
             let annotation = if let PlannedType::Record(record) = message_type {
                 python_generic_record_annotation(
                     &conversion.annotation,
-                    &api_plan.record_type_parameters(&record.full_name, Language::Python),
+                    &api_plan.record_type_parameters(&record.full_name),
                 )
             } else {
                 conversion.annotation.clone()
@@ -2044,7 +1998,7 @@ fn resolve_python_value_type(
             type_name, target, ..
         })) => {
             let mut resolved = resolve_python_value_type(api_plan, external_models, target)?;
-            if let Some(annotation) = type_name.for_language(Language::Python) {
+            if let Some(annotation) = type_name.value() {
                 resolved.annotation = annotation.to_string();
             }
             resolved
@@ -2298,7 +2252,7 @@ fn collect_model_type_imports(
 }
 
 fn collect_type_replacement_imports(
-    replacement: &TypeReplacementSpec,
+    replacement: &TypeReplacementSpec<PlannedFamily>,
     imports: &mut BTreeSet<LanguageImportSpec>,
 ) {
     collect_python_import(&replacement.type_name, imports);
@@ -2437,8 +2391,8 @@ fn collect_authored_type_imports(
     }
 }
 
-fn collect_python_import(spec: &LanguageStringSpec, imports: &mut BTreeSet<LanguageImportSpec>) {
-    if let Some(module) = spec.import_for_language(Language::Python) {
+fn collect_python_import(spec: &SelectedTextSpec, imports: &mut BTreeSet<LanguageImportSpec>) {
+    if let Some(module) = spec.import() {
         imports.insert(LanguageImportSpec {
             language: Language::Python,
             reference: module.to_string(),
@@ -2450,7 +2404,7 @@ fn collect_python_import(spec: &LanguageStringSpec, imports: &mut BTreeSet<Langu
         return;
     }
 
-    let Some(expression) = spec.for_language(Language::Python) else {
+    let Some(expression) = spec.value() else {
         return;
     };
     for module_path in python_qualified_module_paths(expression) {
@@ -2521,22 +2475,6 @@ fn is_builtin_python_import(module_path: &str) -> bool {
 
 fn is_python_identifier_start(ch: char) -> bool {
     ch.is_ascii_alphabetic() || ch == '_'
-}
-
-fn reject_support_namespaces(
-    language: Language,
-    support_fragments: &[SupportFragmentSpec],
-) -> Result<()> {
-    if let Some(namespace) = support_fragments
-        .iter()
-        .find_map(|fragment| fragment.namespace.as_deref())
-    {
-        return Err(Error::UnsupportedSupportNamespace {
-            language,
-            namespace: namespace.to_string(),
-        });
-    }
-    Ok(())
 }
 
 pub(crate) fn python_field_name(name: &str) -> String {
@@ -3011,10 +2949,9 @@ fn source_paths_label(paths: &BTreeSet<PathBuf>) -> String {
 
 fn python_function_result_annotation(result: &FunctionResultSpec<PlannedFamily>) -> String {
     match result {
-        FunctionResultSpec::Annotation(annotation) => annotation
-            .for_language(Language::Python)
-            .unwrap_or("typing.Any")
-            .to_string(),
+        FunctionResultSpec::Annotation(annotation) => {
+            annotation.value().unwrap_or("typing.Any").to_string()
+        }
         FunctionResultSpec::Authored(authored_type) => {
             python_authored_type_annotation(authored_type)
         }
@@ -3060,7 +2997,7 @@ pub(in crate::generator) fn python_authored_type_annotation(authored_type: &Plan
         TypeSpec::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name, target, ..
         })) => type_name
-            .for_language(Language::Python)
+            .value()
             .map(str::to_string)
             .unwrap_or_else(|| python_authored_type_annotation(target)),
         TypeSpec::External(ExternalTypeSpec::Proto(proto_name)) => proto_name
@@ -3259,7 +3196,7 @@ fn python_field_annotation(
     }
 
     if let Some(annotation) = &field.annotation {
-        if let Some(annotation) = annotation.for_language(Language::Python) {
+        if let Some(annotation) = annotation.value() {
             return annotation.to_string();
         }
     }
@@ -3338,12 +3275,12 @@ fn python_function_annotation_from_args(
 
 pub(in crate::generator) fn enum_default_expr(
     resolved_type: &ResolvedFieldType,
-    enum_case: &str,
+    enum_value: &EnumValueSpec,
 ) -> String {
     let value_name = if resolved_type.wire_conversion.is_some() {
-        enum_case.to_shouty_snake_case()
+        enum_value.name.to_shouty_snake_case()
     } else {
-        enum_case.to_upper_camel_case()
+        enum_value.name.clone()
     };
     format!("{}.{}", resolved_type.annotation, value_name)
 }
@@ -3452,85 +3389,6 @@ fn resource_operation_owners(services: &[RenderedService<'_>]) -> BTreeMap<Strin
     owners
 }
 
-fn render_support_package(
-    files: &mut GeneratedFileMap,
-    support_fragments: &[SupportFragmentSpec],
-) -> Result<Vec<String>> {
-    let mut module_names = Vec::new();
-    for fragment in support_fragments {
-        let module_name = support_module_name(fragment)?;
-        files.insert(
-            format!("_support/{module_name}.py"),
-            fragment.contents.clone(),
-            GeneratedFileOrigin::support_fragment(Language::Python, &fragment.path),
-        )?;
-        module_names.push(module_name);
-    }
-
-    if !module_names.is_empty() {
-        let mut output = String::new();
-        render_generated_file_header(&mut output);
-        output.push('\n');
-        for module_name in &module_names {
-            output.push_str("from .");
-            output.push_str(module_name);
-            output.push_str(" import *  # noqa: F401,F403\n");
-        }
-        files.insert(
-            "_support/__init__.py",
-            output,
-            GeneratedFileOrigin::fixed("generated Python support package initializer"),
-        )?;
-    }
-
-    Ok(module_names)
-}
-
-fn support_module_name(fragment: &SupportFragmentSpec) -> Result<String> {
-    let path = Path::new(&fragment.path);
-    let Some(file_name) = path.file_name() else {
-        return Err(Error::InvalidGeneratedPath {
-            path: path.to_path_buf(),
-            reason: "support path must have a file name".to_string(),
-        });
-    };
-    let Some(file_name) = file_name.to_str() else {
-        return Err(Error::InvalidGeneratedPath {
-            path: path.to_path_buf(),
-            reason: "support path must be valid UTF-8".to_string(),
-        });
-    };
-    let Some(module_name) = Path::new(file_name).file_stem() else {
-        return Err(Error::InvalidGeneratedPath {
-            path: path.to_path_buf(),
-            reason: "support path must have a module stem".to_string(),
-        });
-    };
-    let Some(module_name) = module_name.to_str() else {
-        return Err(Error::InvalidGeneratedPath {
-            path: path.to_path_buf(),
-            reason: "support path must be valid UTF-8".to_string(),
-        });
-    };
-    if Path::new(file_name)
-        .extension()
-        .and_then(|extension| extension.to_str())
-        != Some("py")
-    {
-        return Err(Error::InvalidGeneratedPath {
-            path: path.to_path_buf(),
-            reason: "Python support files must end with `.py`".to_string(),
-        });
-    }
-    if module_name.is_empty() {
-        return Err(Error::InvalidGeneratedPath {
-            path: path.to_path_buf(),
-            reason: "support module name cannot be empty".to_string(),
-        });
-    }
-    Ok(module_name.to_string())
-}
-
 pub(in crate::generator) fn render_generated_file_header(output: &mut String) {
     output.push_str(GENERATED_HEADER);
     output.push_str("\n\n");
@@ -3597,6 +3455,19 @@ fn used_python_symbol_imports(body: &str, candidates: &[String]) -> Vec<String> 
         .collect()
 }
 
+fn render_support_import(
+    output: &mut String,
+    body: &str,
+    support_package: &str,
+    sourced_support_import: bool,
+) {
+    if sourced_support_import || body.contains("_support.") {
+        output.push_str("import ");
+        output.push_str(support_package);
+        output.push_str(" as _support\n");
+    }
+}
+
 pub(in crate::generator) fn render_named_python_import(
     output: &mut String,
     module: &str,
@@ -3656,57 +3527,6 @@ fn render_named_python_import_with_indent(
     }
     output.push_str(indent);
     output.push_str(")\n");
-}
-
-fn top_level_python_symbols(source: &str) -> BTreeSet<String> {
-    let mut symbols = BTreeSet::new();
-
-    for line in source.lines() {
-        let line = line.trim_end();
-        if line.is_empty()
-            || line.starts_with(' ')
-            || line.starts_with('\t')
-            || line.starts_with('#')
-            || line.starts_with('@')
-            || line.starts_with("import ")
-            || line.starts_with("from ")
-        {
-            continue;
-        }
-
-        if let Some(name) = line
-            .strip_prefix("def ")
-            .and_then(|line| line.split('(').next())
-        {
-            symbols.insert(name.trim().to_string());
-            continue;
-        }
-        if let Some(name) = line
-            .strip_prefix("class ")
-            .and_then(|line| line.split(['(', ':']).next())
-        {
-            symbols.insert(name.trim().to_string());
-            continue;
-        }
-        if let Some((name, _)) = line.split_once('=') {
-            let name = name.trim();
-            if !name.is_empty() && name.chars().all(is_python_identifier_char) {
-                symbols.insert(name.to_string());
-            }
-        }
-    }
-
-    symbols
-}
-
-fn support_export_names(support_fragments: &[SupportFragmentSpec]) -> Vec<String> {
-    support_fragments
-        .iter()
-        .flat_map(|fragment| top_level_python_symbols(&fragment.contents))
-        .filter(|name| !name.starts_with('_'))
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
 }
 
 pub(in crate::generator) fn render_optional_python_imports(
@@ -3950,11 +3770,12 @@ fn render_models_module(
     flags: &[&RenderedFlags],
     variants: &[&RenderedVariant],
     model_fragments: &RenderedModelFragments,
-    support_names: &[String],
+    support_package: &str,
     language_imports: &[LanguageImportSpec],
     api_plan: &PlannedSpec,
     inline_model_rebuilds: bool,
     model_hoists: Option<&PythonModelHoists>,
+    sourced_support_import: bool,
 ) -> Result<Option<String>> {
     let mut module_imports = BTreeSet::new();
     module_imports.extend(model_fragments.module_imports.iter().cloned());
@@ -4077,12 +3898,11 @@ fn render_models_module(
             wrote_imports || wrote_relative_imports,
         )
     };
-    let used_support_names = used_python_symbol_imports(&body, support_names);
-    if !used_support_names.is_empty() {
+    if sourced_support_import || body.contains("_support.") {
         if wrote_imports || wrote_relative_imports || wrote_module_model_imports {
             output.push('\n');
         }
-        render_named_python_import(&mut output, "._support", &used_support_names);
+        render_support_import(&mut output, &body, support_package, sourced_support_import);
     }
     output.push('\n');
     output.push('\n');
@@ -4409,7 +4229,7 @@ fn render_operation_module(
     operation: &RenderedOperation<'_>,
     model_names: &[String],
     resource_names: &[String],
-    support_names: &[String],
+    support_package: &str,
     language_imports: &[LanguageImportSpec],
     api_plan: &PlannedSpec,
     model_hoists: Option<&PythonModelHoists>,
@@ -4490,10 +4310,7 @@ fn render_operation_module(
     if !used_resource_names.is_empty() {
         render_named_python_import(&mut output, ".._resources", &used_resource_names);
     }
-    let used_support_names = used_python_symbol_imports(&body, support_names);
-    if !used_support_names.is_empty() {
-        render_named_python_import(&mut output, ".._support", &used_support_names);
-    }
+    render_support_import(&mut output, &body, support_package, false);
     output.push('\n');
     output.push('\n');
     output.push_str(&body);
@@ -4839,7 +4656,7 @@ fn render_package_init(
     model_names: &[String],
     _resource_names: &[String],
     resource_operation_owners: &BTreeMap<String, String>,
-    support_names: &[String],
+    support_package: &str,
     _api_plan: &PlannedSpec,
     _model_hoists: Option<&PythonModelHoists>,
     root_package_imports: &RootPackageImports,
@@ -4862,8 +4679,6 @@ fn render_package_init(
         .map(endpoint_service_object_name)
         .collect::<Vec<_>>();
     let operation_registry_body = render_operation_registry_body(services);
-    let operation_registry_support_names =
-        used_python_symbol_imports(&operation_registry_body, support_names);
     let mut output = String::new();
     render_generated_file_header(&mut output);
     output.push('\n');
@@ -4910,9 +4725,12 @@ fn render_package_init(
             }
         }
     }
-    if !operation_registry_support_names.is_empty() {
-        render_named_python_import(&mut output, "._support", &operation_registry_support_names);
-    }
+    render_support_import(
+        &mut output,
+        &operation_registry_body,
+        support_package,
+        false,
+    );
     output.push_str("\n__all__ = [\n");
     for name in root_package_export_names(root_package_imports) {
         output.push_str("    ");
@@ -7652,6 +7470,10 @@ fn python_parameter_default_expr(default_kind: &PythonFieldDefaultKind) -> Optio
     }
 }
 
+fn python_source_call(source_expr: &str) -> String {
+    format!("_support.{source_expr}")
+}
+
 fn python_dataclass_source_default_expr(source_expr: &str) -> String {
     let source_provider = source_expr.strip_suffix("()").unwrap_or(source_expr);
     if source_provider
@@ -7748,14 +7570,14 @@ fn validate_python_generated_names<'a>(
     }
 
     for (_, record) in api_plan.records() {
-        for usage in api_plan.record_type_parameters(&record.full_name, Language::Python) {
+        for usage in api_plan.record_type_parameters(&record.full_name) {
             declarations
                 .entry(usage.parameter.name.clone())
                 .or_insert_with(|| format!("type parameter `{}`", usage.parameter.full_name));
         }
     }
     for (_, variant) in api_plan.variants() {
-        for usage in api_plan.variant_type_parameters(&variant.full_name, Language::Python) {
+        for usage in api_plan.variant_type_parameters(&variant.full_name) {
             declarations
                 .entry(usage.parameter.name.clone())
                 .or_insert_with(|| format!("type parameter `{}`", usage.parameter.full_name));
@@ -7833,7 +7655,6 @@ mod tests {
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::SupportFiles;
     use crate::descriptors::DescriptorIndex;
     use crate::error::Error;
     use crate::generator::{
@@ -7867,14 +7688,83 @@ mod tests {
 
     #[test]
     fn renders_source_provider_defaults_as_dataclass_factories() {
+        let no_args = super::python_source_call("workflow_namespace()");
+        assert_eq!(no_args, "_support.workflow_namespace()");
         assert_eq!(
-            super::python_dataclass_source_default_expr("workflow_namespace"),
-            "dataclasses.field(default_factory=workflow_namespace)"
+            super::python_dataclass_source_default_expr(&no_args),
+            "dataclasses.field(default_factory=_support.workflow_namespace)"
+        );
+        let with_args =
+            super::python_source_call("Helpers.namespace(request.id, fallback='default')");
+        assert_eq!(
+            with_args,
+            "_support.Helpers.namespace(request.id, fallback='default')"
         );
         assert_eq!(
-            super::python_dataclass_source_default_expr("workflow_namespace()"),
-            "dataclasses.field(default_factory=workflow_namespace)"
+            super::python_dataclass_source_default_expr(&with_args),
+            "_support.Helpers.namespace(request.id, fallback='default')"
         );
+    }
+
+    #[test]
+    fn enum_defaults_use_resolved_identity_for_native_and_converter_aliases() {
+        let mut resolved_type = super::ResolvedFieldType {
+            annotation: "AliasPolicy".to_string(),
+            imports: super::PythonImports::default(),
+            kind: super::ResolvedFieldKind::Enum,
+            wire_conversion: None,
+        };
+        let mut default_value = crate::spec::EnumValueSpec {
+            name: "AllowDuplicate".to_string(),
+            wire_name: "allow-duplicate".to_string(),
+            number: 7,
+        };
+        let native_default = super::enum_default_expr(&resolved_type, &default_value);
+        assert_eq!(native_default, "AliasPolicy.AllowDuplicate");
+        assert_eq!(
+            super::python_parameter_default_expr(&super::PythonFieldDefaultKind::Expression(
+                native_default
+            )),
+            Some("AliasPolicy.AllowDuplicate".to_string())
+        );
+
+        // A proto descriptor name can include a prefix absent from the resolved
+        // semantic name. SDK enum members still use SHOUTY_SNAKE casing.
+        default_value.wire_name = "WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE".to_string();
+        resolved_type.annotation = "WorkflowIDReusePolicy".to_string();
+        resolved_type.wire_conversion = Some(super::WireValueConversion {
+            annotation: "int".to_string(),
+            from_wire: "WorkflowIDReusePolicy({wire})".to_string(),
+            to_wire: "int({value})".to_string(),
+            imports: super::PythonImports::default(),
+            supports_unpacked_input: false,
+        });
+        let sdk_default = super::enum_default_expr(&resolved_type, &default_value);
+        assert_eq!(sdk_default, "WorkflowIDReusePolicy.ALLOW_DUPLICATE");
+        let mut rendered = String::new();
+        super::render_python_default_expr(&mut rendered, &sdk_default, "    ");
+        assert_eq!(rendered, " = WorkflowIDReusePolicy.ALLOW_DUPLICATE");
+    }
+
+    #[test]
+    fn sourced_fields_import_support_without_literal_helper_reference() {
+        let body = "value = workflow_namespace()\n";
+        let mut output = String::new();
+        super::render_support_import(&mut output, body, "temporal_support", true);
+        assert_eq!(output, "import temporal_support as _support\n");
+
+        output.clear();
+        super::render_support_import(&mut output, body, "temporal_support", false);
+        assert!(output.is_empty());
+
+        // Converter helpers still request the configured package without sourced fields.
+        super::render_support_import(
+            &mut output,
+            "value = _support.payload_to_proto(value)\n",
+            "temporal_support",
+            false,
+        );
+        assert_eq!(output, "import temporal_support as _support\n");
     }
 
     #[test]
@@ -8096,9 +7986,11 @@ class Example(enum.Enum):
             Language::Python,
             ApiSpecTree::single(spec.clone()),
             &descriptors,
-            &crate::SupportFiles::default(),
             GenerationMode::NativeApi,
-            GenerateFilesOptions::default(),
+            GenerateFilesOptions {
+                support_package: Some("temporal_support".to_string()),
+                ..Default::default()
+            },
         )
         .unwrap();
         assert_eq!(generated.layout, GeneratedOutputLayout::Directory);
@@ -8126,13 +8018,14 @@ class Example(enum.Enum):
             Language::Python,
             spec.clone(),
             &descriptors,
-            &crate::SupportFiles::default(),
+            "temporal_support",
         )
         .unwrap();
 
-        assert!(output.contains("from ._support import ("));
-        assert!(output.contains("retry_policy_to_proto,"));
-        assert!(output.contains("def retry_policy_from_proto("));
+        assert!(output.contains("import temporal_support as _support"));
+        assert!(output.contains("_support.retry_policy_to_proto("));
+        assert!(!output.contains("def retry_policy_from_proto("));
+        assert!(output.contains("_support.retry_policy_from_proto("));
         assert!(output.contains(
             "workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[object]]"
         ));
@@ -8144,7 +8037,7 @@ class Example(enum.Enum):
         assert!(output.contains("class SignalWithStartWorkflowRequest:"));
         assert!(output.contains("args: list[typing.Any] | None = None"));
         assert!(!output.contains("namespace: str | None = None"));
-        assert!(output.contains("dataclasses.field(default_factory=workflow_namespace)"));
+        assert!(output.contains("dataclasses.field(default_factory=_support.workflow_namespace)"));
         assert!(output.contains("message.namespace = value.namespace"));
         assert!(output.contains("result = await handle"));
         assert!(output.contains(
@@ -8177,9 +8070,11 @@ class Example(enum.Enum):
         assert!(output.contains("workflow_id_reuse_policy_to_proto(value.id_reuse_policy)"));
         assert!(output.contains("if value.id_conflict_policy is not None:"));
         assert!(output.contains("workflow_id_conflict_policy_to_proto(value.id_conflict_policy)"));
-        assert!(output.contains("message.input.CopyFrom(payloads_to_proto(value.args))"));
+        assert!(output.contains("message.input.CopyFrom(_support.payloads_to_proto(value.args))"));
         assert!(output.contains("headers: collections.abc.Mapping[str, typing.Any] | None = None"));
-        assert!(output.contains("message.header.CopyFrom(header_to_proto(value.headers))"));
+        assert!(
+            output.contains("message.header.CopyFrom(_support.header_to_proto(value.headers))")
+        );
         assert!(!output.contains("links:"));
         assert!(!output.contains("link_to_proto("));
         assert!(output.contains("async def _signal_with_start_workflow("));
@@ -8302,7 +8197,7 @@ class Example(enum.Enum):
             Language::Python,
             type_roundtrip_spec,
             &descriptors,
-            &crate::SupportFiles::default(),
+            "temporal_support",
         )
         .unwrap();
         assert!(
@@ -8362,7 +8257,7 @@ interface example-service {
             Language::Python,
             spec.clone(),
             &descriptors,
-            &crate::SupportFiles::default(),
+            "temporal_support",
         )
         .unwrap();
 
@@ -8421,9 +8316,11 @@ interface example-service {
             Language::Python,
             ApiSpecTree::single(spec.clone()),
             &descriptors,
-            &crate::SupportFiles::default(),
             GenerationMode::NativeApi,
-            GenerateFilesOptions::default(),
+            GenerateFilesOptions {
+                support_package: Some("temporal_support".to_string()),
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -8470,7 +8367,7 @@ interface example-service {
             Language::Python,
             spec.clone(),
             &descriptors,
-            &crate::SupportFiles::default(),
+            "temporal_support",
         )
         .unwrap();
 
@@ -8585,7 +8482,7 @@ interface workflow-service {
             Language::Python,
             spec.clone(),
             &descriptors,
-            &crate::SupportFiles::default(),
+            "temporal_support",
         )
         .unwrap_err();
 
@@ -8637,7 +8534,7 @@ interface example-service {
             Language::Python,
             spec.clone(),
             &descriptors,
-            &SupportFiles::default(),
+            "temporal_support",
         )
         .unwrap();
         assert!(
