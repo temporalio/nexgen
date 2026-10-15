@@ -616,6 +616,33 @@ Check.WriteFails(new Positive { Count = 1, Ratio = 0 }, "count: must be > 1, got
     );
 }
 
+#[test]
+fn csharp_json_number_multiple_of_is_ieee_fmod() {
+    let case = JsonCase::new("multiple-of");
+    case.write(
+        "multiples.yaml",
+        r#"type: object
+properties:
+  byFive: { type: number, multipleOf: 5 }
+  byThree: { type: number, multipleOf: 3 }
+  byTwo: { type: integer, multipleOf: 2 }
+"#,
+    );
+    let output = case.generate(&["multiples.yaml"]);
+    // `double % double` (IEEE fmod, as the other targets), never `decimal`.
+    assert_lacks(output.file("Models.cs"), &["decimal"]);
+    case.run(
+        r#"Check.ParseFails<Multiples>("{\"byFive\":1e23}", "byFive: must be a multiple of 5");
+Check.RoundTrip<Multiples>("{\"byThree\":1e300}", "{\"byThree\":1E+300}");
+Check.ParseFails<Multiples>("{\"byThree\":1e22}", "byThree: must be a multiple of 3");
+Check.RoundTrip<Multiples>("{\"byFive\":10}");
+Check.RoundTrip<Multiples>("{\"byFive\":-0}");
+Check.ParseFails<Multiples>("{\"byFive\":7}", "byFive: must be a multiple of 5");
+Check.ParseFails<Multiples>("{\"byTwo\":3}", "byTwo: must be a multiple of 2");
+Check.WriteFails(new Multiples { ByFive = 7 }, "byFive: must be a multiple of 5");"#,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
