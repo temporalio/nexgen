@@ -192,7 +192,7 @@ fn render_object_body(
             continue;
         };
         let ty = match &field.ty {
-            CsType::List(_) => continue,
+            CsType::List(..) => continue,
             other => other.name(),
         };
         out.push_str(&format!(
@@ -474,7 +474,7 @@ fn render_field_parse(out: &mut String, field: &FieldPlan, indent: &str) {
     out.push_str(&format!("{indent}}}\n{indent}else\n{indent}{{\n"));
     let element_nullable = field.nullable_items;
     let ty = match &field.ty {
-        CsType::List(element) => CsType::List(element.clone()),
+        CsType::List(element, nullable) => CsType::List(element.clone(), *nullable),
         other => other.clone(),
     };
     parse_into(
@@ -639,7 +639,7 @@ pub(super) fn parse_into(
                 sink(&parsed)
             ));
         }
-        CsType::List(element) => {
+        CsType::List(element, _) => {
             let nullable_elements = schema.items.as_deref().is_some_and(allows_null);
             let items = format!("items{depth}");
             let index = format!("index{depth}");
@@ -860,7 +860,7 @@ fn render_field_validate(out: &mut String, field: &FieldPlan, indent: &str) {
     let mut body = String::new();
     if !matches!(field.ty, CsType::ClosedValue { .. }) {
         let mut schema = field.schema.clone();
-        if !matches!(field.ty, CsType::List(_)) {
+        if !matches!(field.ty, CsType::List(..)) {
             schema.items = None;
         }
         member_checks(
@@ -931,7 +931,7 @@ fn render_map_entry_validate(
         "{indent}if (entry.Value is {{ }} member)\n{indent}{{\n"
     ));
     let mut schema = additional.schema.clone();
-    if !matches!(additional.ty, CsType::List(_)) {
+    if !matches!(additional.ty, CsType::List(..)) {
         schema.items = None;
     }
     member_checks(
@@ -1059,7 +1059,7 @@ pub(super) fn write_value(
         CsType::ClosedValue { wire, .. } => {
             write_value(out, wire, &format!("{value}.Value"), false, indent, depth)
         }
-        CsType::List(element) => {
+        CsType::List(element, _) => {
             let item = format!("item{depth}");
             out.push_str(&format!(
                 "{indent}writer.WriteStartArray();\n{indent}foreach (var {item} in {value})\n{indent}{{\n"
@@ -1339,7 +1339,7 @@ pub(super) fn render_union_interface(
 
 fn wrapper_value_type(variant: &UnionVariant) -> String {
     match &variant.underlying {
-        Some(CsType::List(element)) => format!(
+        Some(CsType::List(element, _)) => format!(
             "{}<{}>",
             super::types::READ_ONLY_LIST,
             element.element_name(variant.nullable_items)
@@ -1354,7 +1354,7 @@ fn wrapper_checks(variant: &UnionVariant, indent: &str) -> Option<String> {
     let ty = variant.underlying.as_ref()?;
     let mut body = String::new();
     let mut schema = variant.schema.clone();
-    if !matches!(ty, CsType::List(_)) {
+    if !matches!(ty, CsType::List(..)) {
         schema.items = None;
     }
     representability_checks(&mut body, ty, Some(&schema), "Value", "path", indent, 0);
@@ -1585,7 +1585,7 @@ fn render_union_read_wrapper(out: &mut String, variant: &UnionVariant, indent: &
     let checked = wrapper_checks(variant, "").is_some();
     let class = &variant.class;
     let mut schema = variant.schema.clone();
-    if !matches!(ty, CsType::List(_)) {
+    if !matches!(ty, CsType::List(..)) {
         // Branch constraints run through the wrapper's own `Validate`.
         schema = Schema {
             items: schema.items.clone(),
@@ -1596,7 +1596,7 @@ fn render_union_read_wrapper(out: &mut String, variant: &UnionVariant, indent: &
     out.push_str(&format!("{indent}var {start} = violations.Count;\n"));
     out.push_str(&format!("{indent}{class}? wrapped = null;\n"));
     let mut list_schema = variant.schema.clone();
-    let target_schema = if matches!(ty, CsType::List(_)) {
+    let target_schema = if matches!(ty, CsType::List(..)) {
         // The array wrapper's own constraints run over the wire array here;
         // element constraints run per element.
         list_schema.items = variant.schema.items.clone();
@@ -1619,7 +1619,7 @@ fn render_union_read_wrapper(out: &mut String, variant: &UnionVariant, indent: &
         indent,
         0,
     );
-    if checked && !matches!(ty, CsType::List(_)) {
+    if checked && !matches!(ty, CsType::List(..)) {
         out.push_str(&format!("{indent}wrapped?.Validate(path, violations);\n"));
     }
     out.push_str(&format!(

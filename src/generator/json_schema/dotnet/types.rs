@@ -88,7 +88,9 @@ pub(super) enum CsType {
     Ref {
         name: String,
     },
-    List(Box<CsType>),
+    /// A list of the element type; the flag is set when an element may be
+    /// `null`, so a nested list keeps its elements' nullability.
+    List(Box<CsType>, bool),
     /// An inline property-level union, nested in its declaring model.
     Union {
         name: String,
@@ -112,7 +114,9 @@ impl CsType {
             CsType::Ref { name } | CsType::Union { name } | CsType::ClosedValue { name, .. } => {
                 name.clone()
             }
-            CsType::List(element) => format!("{READ_ONLY_LIST}<{}>", element.name()),
+            CsType::List(element, nullable) => {
+                format!("{READ_ONLY_LIST}<{}>", element.element_name(*nullable))
+            }
             CsType::Temporal(kind) => temporal_type(*kind).to_string(),
             CsType::Bytes(_) => "byte[]".to_string(),
         }
@@ -180,13 +184,10 @@ pub(super) fn cs_type_for(schema: &Schema, context: &CsContext) -> CsType {
         Some("integer") => CsType::Long,
         Some("number") => CsType::Double,
         Some("boolean") => CsType::Boolean,
-        Some("array") => CsType::List(Box::new(
-            schema
-                .items
-                .as_deref()
-                .map(|item| cs_type_for(item, context))
-                .unwrap_or(CsType::String),
-        )),
+        Some("array") => match schema.items.as_deref() {
+            Some(item) => CsType::List(Box::new(cs_type_for(item, context)), allows_null(item)),
+            None => CsType::List(Box::new(CsType::String), false),
+        },
         _ => CsType::String,
     }
 }
@@ -423,8 +424,14 @@ pub(super) fn classify_union(
                     .as_deref()
                     .map(|item| cs_type_for(item, context))
                     .unwrap_or(CsType::String);
-                let mut variant = wrapper("Array", CsType::List(Box::new(item)), "Array", "array");
-                variant.nullable_items = member_schema.items.as_deref().is_some_and(allows_null);
+                let nullable_items = member_schema.items.as_deref().is_some_and(allows_null);
+                let mut variant = wrapper(
+                    "Array",
+                    CsType::List(Box::new(item), nullable_items),
+                    "Array",
+                    "array",
+                );
+                variant.nullable_items = nullable_items;
                 variants.push(variant);
             }
             _ => {}
@@ -521,7 +528,7 @@ impl FieldPlan {
     /// The declared property type: absent or null needs a nullable slot.
     pub(super) fn declared_type(&self) -> String {
         let base = match &self.ty {
-            CsType::List(element) => {
+            CsType::List(element, _) => {
                 format!(
                     "{READ_ONLY_LIST}<{}>",
                     element.element_name(self.nullable_items)
