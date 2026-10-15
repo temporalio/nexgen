@@ -185,3 +185,22 @@ fn csharp_cli_generates_json_schema_without_a_support_package() {
     );
     fs::remove_dir_all(temp).unwrap();
 }
+
+// ---------------------------------------------------------------------------
+// Annotations and keywords outside the subset
+// ---------------------------------------------------------------------------
+
+/// A keyword the shared loader refuses (P6 / P7.1) fails a C# generation
+/// before anything is emitted, so C# never approximates it.
+#[test]
+fn csharp_json_rejects_unsupported_keywords() {
+    let cases: &[(&str, &str)] = &[(
+        "type: object\nproperties:\n  doc: { type: string, contentMediaType: application/json }\n",
+        "`contentMediaType` is not supported",
+    )];
+    for (schema, expected) in cases {
+        let case = JsonCase::new("unsupported-keyword");
+        case.write("model.yaml", schema);
+        assert_has(&case.generate_err(&["model.yaml"]), &[expected]);
+    }
+}
