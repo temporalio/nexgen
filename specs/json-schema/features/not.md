@@ -41,7 +41,7 @@ Negation has no coherent typed lowering in the strict subset:
   bounds, a [[const]]/[[enum]] value set. `not` supplies none of these; it
   describes the *anti-set* of a subschema. Even the simplest case,
   `not: {type: string}` ("anything except a string"), has no static type across
-  the four targets: it spans every other JSON kind at once, so the only
+  the five targets: it spans every other JSON kind at once, so the only
   lowerings are to forfeit typing (`any`/`interface{}`/`Object`) or to invent a
   positive enumeration of "all kinds but one" that no source actually stated
   (**P1** — it would not round-trip identically). Negating a *constraint*
