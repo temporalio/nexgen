@@ -450,7 +450,7 @@ fn typed_matcher_guard(matcher: &Schema, element: &str, ty: &CsType) -> String {
 fn needs_unique_key(ty: &CsType) -> bool {
     match ty {
         CsType::Double | CsType::Temporal(_) | CsType::Bytes(_) => true,
-        CsType::List(inner) => needs_unique_key(inner),
+        CsType::List(inner, _) => needs_unique_key(inner),
         _ => false,
     }
 }
@@ -470,7 +470,7 @@ pub(super) fn unique_key(ty: &CsType, element: &str, depth: usize) -> String {
             "({element} is {{ }} {bound} ? (object)Base64Support.{}({bound}) : null)",
             content_encoding_format_fn(*encoding)
         ),
-        CsType::List(inner) if needs_unique_key(inner) => {
+        CsType::List(inner, _) if needs_unique_key(inner) => {
             let parameter = format!("uniqueKeyElement{depth}");
             format!(
                 "({element} is {{ }} {bound} ? (object)global::System.Linq.Enumerable.ToList(global::System.Linq.Enumerable.Select({bound}, {parameter} => {})) : null)",
@@ -899,7 +899,7 @@ pub(super) fn representability_checks(
         CsType::Ref { name } | CsType::Union { name } => out.push_str(&format!(
             "{indent}{name}.Converter.Validate({value}, {path}, violations);\n"
         )),
-        CsType::List(element) => {
+        CsType::List(element, _) => {
             let element_schema = schema.and_then(element_shape);
             let nullable_elements = schema
                 .and_then(|schema| schema.items.as_deref())

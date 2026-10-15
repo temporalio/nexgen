@@ -92,9 +92,9 @@ over `T`, where `T` is the recursive mapping of the element subschema `S`.
 Optional/nullable wrapping of the **array itself** is owned by [[required]] +
 [[nullability]]; this table is the bare collection type.
 
-| Element `T` from `items` | Go    | TypeScript | Python    | Java      |
-| ------------------------ | ----- | ---------- | --------- | --------- |
-| any supported `T`        | `[]T` | `T[]`      | `list[T]` | `List<T>` |
+| Element `T` from `items` | Go    | TypeScript | Python    | Java      | C#                 |
+| ------------------------ | ----- | ---------- | --------- | --------- | ------------------ |
+| any supported `T`        | `[]T` | `T[]`      | `list[T]` | `List<T>` | `IReadOnlyList<T>` |
 
 Notes:
 - **Elements recurse.** `T` is produced by the same pipeline as any field type:
@@ -147,6 +147,7 @@ row.
 | TypeScript | Hand-emitted `Array.isArray` guard, then a per-element loop running `T`'s checks; push `Violation { path: "tags[2]", reason }` per bad element into the list, throw one `PayloadValidationError` application failure.                                                                                                 |
 | Python     | The transfer type converter (PRINCIPLES Python §3) guards `isinstance(v, list)`, then loops the raw elements through `T`'s parse helper / converter, appending `Violation(path="tags[2]", reason=…)` per bad element and raising one generated `PayloadValidationError` application failure. The TypeScript parallel. |
 | Java       | the per-POJO collecting deserializer (PRINCIPLES Java §5) reads the array node, walks each element through `T`'s spec-strict/constraint helper, and collects `Violation{path:"tags[2]", reason}` into the one `PayloadValidationError` application failure. The Go parallel.                                          |
+| C#         | `Converter.Parse` enumerates the array, parses each element through `T`'s spec-strict/constraint path, and records `Violation{path:"tags[2]", reason}` into the one `PayloadValidationError` application failure.                                                                                                     |
 
 - **Path convention.** Element failures use bracketed indices appended to the
   field path (`tags[2]`, and for nested arrays `matrix[1][2]`), distinct from
@@ -297,7 +298,7 @@ collection.
   element-level nullability is expressed by the element subschema (the `oneOf`
   null pattern) and composes with the field wrapping. The empty-vs-`null`
   decision on a required non-nullable array — Go's `[]` substitution and the
-  other three targets' reject (Serialize-side) — is made there. Wrapping the
+  other four targets' reject (Serialize-side) — is made there. Wrapping the
   array does not change what its elements require of the emitter (Validator
   mapping).
 - **[[required]]**: orthogonal — decides whether the array member must be
