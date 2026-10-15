@@ -66,7 +66,6 @@ const PENDING: &[&str] = &[
     "pattern.md",
     "propertyNames.md",
     "ref.md",
-    "required.md",
     "services.md",
     "title.md",
     "uniqueItems.md",
