@@ -2661,6 +2661,58 @@ fn csharp_json_services_render_docs_deprecation_and_one_sided_io() {
     }
 }
 
+/// Descriptions become XML doc comments, which the compiler parses
+/// (CS1570 under warnings as errors): markup characters must be escaped and
+/// each line must stay inside its own `///` comment.
+#[test]
+fn csharp_json_xml_doc_comments_escape_markup() {
+    let case = JsonCase::new("xml-docs");
+    case.write(
+        "docs.nexusrpc.yaml",
+        r##"nexusrpc: "1.0.0"
+services:
+  Docs:
+    description: "Service <b>bold</b> & \"quoted\" </summary>"
+    operations:
+      read:
+        description: "Reads a <T> & returns it.\n*/ not a comment end\n/// not a doc comment"
+        input: { $ref: "#/$defs/Doc" }
+$defs:
+  Doc:
+    title: "Doc <title> & co"
+    description: "First line.\n\nSecond paragraph with <c>code</c> & ampersand.\n</summary><summary>"
+    type: object
+    properties:
+      legacy:
+        type: string
+        title: "Legacy id"
+        description: "Use `id` instead; 1 < 2 > 0."
+        deprecated: true
+      plain: { type: string, description: "Ends with a quote \"" }
+"##,
+    );
+    let output = case.generate_native(&["docs.nexusrpc.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "/// Doc &lt;title&gt; &amp; co",
+            "/// Second paragraph with &lt;c&gt;code&lt;/c&gt; &amp; ampersand.",
+            "/// &lt;/summary&gt;&lt;summary&gt;",
+            // A member's title, description and deprecation share one block.
+            "/// Legacy id\n        /// <para/>\n        /// Use `id` instead; 1 &lt; 2 &gt; 0.\n        /// </summary>\n        [global::System.Obsolete]\n        public string? Legacy { get; init; }",
+        ],
+    );
+    assert_has(
+        output.file("Services.cs"),
+        &[
+            "/// Service &lt;b&gt;bold&lt;/b&gt; &amp; \"quoted\" &lt;/summary&gt;",
+            "/// */ not a comment end",
+        ],
+    );
+    case.build();
+}
+
 // ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------
