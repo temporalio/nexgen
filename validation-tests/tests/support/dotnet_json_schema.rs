@@ -1045,6 +1045,50 @@ Check.WriteFails(
     );
 }
 
+/// `allOf` merges at load: the C# output is the one record the merged schema
+/// lowers to, with every branch's constraints and no trace of the combinator.
+#[test]
+fn csharp_json_all_of_merges_into_one_record() {
+    let case = JsonCase::new("all-of");
+    case.write(
+        "member.yaml",
+        r##"allOf:
+  - { $ref: "#/$defs/Named" }
+  - type: object
+    required: [age]
+    properties:
+      age: { type: integer, minimum: 0 }
+      code: { allOf: [{ type: string, minLength: 2 }, { minLength: 3, maxLength: 4 }] }
+$defs:
+  Named:
+    type: object
+    required: [name]
+    properties: { name: { type: string, minLength: 1 } }
+"##,
+    );
+    let output = case.generate(&["member.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "public sealed record Member\n",
+            "public required string Name { get; init; }",
+            "public required long Age { get; init; }",
+            "public string? Code { get; init; }",
+        ],
+    );
+    assert_lacks(models, &["AllOf"]);
+    case.run(
+        r#"Check.RoundTrip<Member>("{\"name\":\"n\",\"age\":1,\"code\":\"abc\"}");
+Check.ParseFails<Member>("{\"age\":1}", "name: required");
+Check.ParseFails<Member>("{\"name\":\"\",\"age\":-1,\"code\":\"ab\"}",
+    "name: must have length >= 1",
+    "age: must be >= 0",
+    "code: must have length >= 3");
+Check.WriteFails(new Member { Name = "n", Age = 1, Code = "abcde" }, "code: must have length <= 4");"#,
+    );
+}
+
 #[test]
 fn csharp_json_repaths_nested_violations_on_serialize() {
     let case = JsonCase::new("nested-paths");
