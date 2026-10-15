@@ -926,6 +926,39 @@ Check.WriteFails(new Handle { Name = "" }, "name: must have length >= 2, got 0")
     );
 }
 
+/// `string.Length` counts UTF-16 code units; length bounds count code points.
+#[test]
+fn csharp_json_lengths_count_code_points_not_utf16_units() {
+    let case = JsonCase::new("code-points");
+    case.write(
+        "lengths.yaml",
+        r##"type: object
+properties:
+  short: { type: string, maxLength: 4 }
+  long: { type: string, minLength: 2 }
+  tags: { type: array, items: { type: string }, contains: { type: string, maxLength: 1 } }
+  keyed: { $ref: "#/$defs/Keyed" }
+$defs:
+  Keyed:
+    type: object
+    additionalProperties: { type: integer }
+    propertyNames: { type: string, maxLength: 1 }
+"##,
+    );
+    let output = case.generate(&["lengths.yaml"]);
+    assert_lacks(output.file("Models.cs"), &[".Length <", ".Length >"]);
+    case.run(
+        r#"// "a😀b" is three code points but four UTF-16 units.
+Check.True("a😀b".Length == 4, "UTF-16 length");
+Check.RoundTrip<Lengths>("{\"short\":\"a😀bc\"}");
+Check.ParseFails<Lengths>("{\"short\":\"a😀bcd\"}", "short: must have length <= 4, got 5");
+Check.ParseFails<Lengths>("{\"long\":\"😀\"}", "long: must have length >= 2, got 1");
+Check.RoundTrip<Lengths>("{\"tags\":[\"😀\"]}");
+Check.RoundTrip<Lengths>("{\"keyed\":{\"😀\":1}}");
+Check.WriteFails(new Lengths { Long = "😀" }, "long: must have length >= 2, got 1");"#,
+    );
+}
+
 /// A record's compiler-generated equality compares arrays, lists and
 /// `JsonElement`s by reference; the generated `Equals`/`GetHashCode` compare
 /// them by content, so a value equals its own round trip.
