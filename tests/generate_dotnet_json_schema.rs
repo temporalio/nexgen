@@ -241,6 +241,10 @@ fn csharp_json_rejects_unsupported_keywords() {
             "type: object\nproperties:\n  v: { anyOf: [{ type: string }, { type: integer }] }\n",
             "`anyOf` is not supported",
         ),
+        (
+            "type: object\nproperties:\n  v: { type: string, not: { const: x } }\n",
+            "`not` is not supported",
+        ),
     ];
     for (schema, expected) in cases {
         let case = JsonCase::new("unsupported-keyword");
