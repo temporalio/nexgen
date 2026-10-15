@@ -727,6 +727,41 @@ Check.WriteFails(new Multiples { ByFive = 7 }, "byFive: must be a multiple of 5"
     );
 }
 
+#[test]
+fn csharp_json_large_portable_counts_compile() {
+    let case = JsonCase::new("large-counts");
+    case.write(
+        "counts.yaml",
+        r##"type: object
+minProperties: 2147483648
+maxProperties: 4294967295
+properties:
+  keys: { $ref: "#/$defs/Keys" }
+  text: { type: string, minLength: 2147483648, maxLength: 4294967295 }
+  values:
+    type: array
+    minItems: 2147483648
+    maxItems: 4294967295
+    items: { type: string }
+    contains: { type: string, minLength: 2147483648 }
+    minContains: 2147483648
+    maxContains: 4294967295
+$defs:
+  Keys:
+    type: object
+    additionalProperties: { type: string }
+    propertyNames: { type: string, minLength: 2147483648, maxLength: 4294967295 }
+"##,
+    );
+    let output = case.generate(&["counts.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &["must have at least 2147483648 items", "4294967295"],
+    );
+    // Every bound past `int.MaxValue` must still compile against `int` counts.
+    case.build();
+}
+
 // ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
