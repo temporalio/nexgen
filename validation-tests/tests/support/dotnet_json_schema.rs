@@ -377,6 +377,93 @@ fn csharp_json_examples_build_in_both_modes() {
 }
 
 // ---------------------------------------------------------------------------
+// Numbers
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csharp_json_rejects_non_finite_numbers_in_every_serialize_position() {
+    let case = JsonCase::new("non-finite");
+    case.write(
+        "finite.yaml",
+        r##"type: object
+required: [scalar, nested, metric, values]
+properties:
+  scalar: { type: number }
+  nested: { type: array, items: { type: array, items: { type: number } } }
+  metric: { oneOf: [{ type: number }, { type: string }] }
+  values: { $ref: "#/$defs/Values" }
+$defs:
+  Values:
+    type: object
+    additionalProperties: { type: array, items: { type: number } }
+"##,
+    );
+    case.generate(&["finite.yaml"]);
+    case.run(
+        r#"Check.WriteFails(
+    new Finite
+    {
+        Scalar = double.NaN,
+        Nested = new[] { new[] { 1.0, double.PositiveInfinity } },
+        Metric = new Finite.MetricUnion.MetricUnionNumber(double.NegativeInfinity),
+        Values = new Values { AdditionalProperties = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IReadOnlyList<double>> { ["k"] = new[] { double.NaN } } },
+    },
+    "scalar: must be a finite number",
+    "nested[0][1]: must be a finite number",
+    "metric: must be a finite number",
+    "values.k[0]: must be a finite number");
+// The wire cannot carry a non-finite number, and an overflowing literal is not one.
+Check.ParseFails<Finite>(
+    "{\"scalar\":1e400,\"nested\":[],\"metric\":1,\"values\":{}}",
+    "scalar: ");"#,
+    );
+}
+
+#[test]
+fn csharp_json_integer_domain_follows_the_shared_rules() {
+    let case = JsonCase::new("integer-domain");
+    case.write(
+        "numbers.yaml",
+        r#"type: object
+properties:
+  count: { type: integer }
+  bounded: { type: number, maximum: 9007199254740992 }
+  counts: { type: array, items: { type: number }, contains: { type: integer } }
+"#,
+    );
+    let output = case.generate(&["numbers.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &["public long? Count { get; init; }"],
+    );
+    case.run(
+        r#"// Integral spellings are integers; the decimal text decides, not the double.
+foreach (var (wire, canonical) in new[]
+{
+    ("1", "1"), ("1.0", "1"), ("1e2", "100"), ("100e-2", "1"), ("-0", "0"),
+    ("9007199254740991", "9007199254740991"), ("-9007199254740991", "-9007199254740991"),
+})
+{
+    Check.RoundTrip<Numbers>("{\"count\":" + wire + "}", "{\"count\":" + canonical + "}");
+}
+foreach (var wire in new[] { "1.5", "9007199254740992", "-9007199254740992", "4503599627370496.5", "1e400", "\"7\"", "true" })
+{
+    Check.ParseFails<Numbers>("{\"count\":" + wire + "}", "count: ");
+}
+// Number bounds compare in binary64: 2^53+1 rounds onto the bound.
+Check.RoundTrip<Numbers>("{\"bounded\":9007199254740993}", "{\"bounded\":9007199254740992}");
+Check.ParseFails<Numbers>("{\"bounded\":9007199254740995}", "bounded: must be <= 9007199254740992");
+Check.ParseFails<Numbers>("{\"bounded\":\"1\"}", "bounded: ");
+// A quoted number is a string, so it does not satisfy an integer matcher.
+Check.ParseFails<Numbers>("{\"counts\":[1.5]}", "counts: no element matches the required schema");
+Check.RoundTrip<Numbers>("{\"counts\":[1.5,2]}");
+// A `long` past the cap cannot reach the wire.
+Check.WriteFails(new Numbers { Count = 1L << 60 }, "count: exceeds ±(2^53-1) integer cap");
+Check.WriteFails(new Numbers { Count = -(1L << 53) }, "count: exceeds ±(2^53-1) integer cap");"#,
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
 
