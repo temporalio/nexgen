@@ -258,7 +258,7 @@ such a keyword today, and there is no per-module escape hatch at all
   type — service `ChatService` against a `$defs/ChatService`; see [[services]],
   which shares this one namespace.
 
-**Python / TypeScript / Java / .NET** — nesting keeps distinct input files in
+**Python / TypeScript / Java / C#** — nesting keeps distinct input files in
 distinct modules, so files no longer contend for one flat *module* name. What
 remains is a small set of **reserved generated names** per scope; an input file
 or directory that maps onto one → **load reject** naming that input and a rename
@@ -286,10 +286,10 @@ is reserved in every target — the union across languages — so an input named
 of them rejects regardless of which target is being generated. The rationale is
 specific to **module names**, and does not generalize to identifiers. A module
 name comes from the input file's path, not from any target's recasing, and one
-input set has to yield a coherent layout in all four targets, so the reservation
+input set has to yield a coherent layout in all five targets, so the reservation
 is settled once over the union. Identifier validity is the opposite case and
 legitimately does vary per target ([[properties]]): a member name may reject for
-one target and load for the other three. What may never vary per target is the
+one target and load for the other four. What may never vary per target is the
 accepted and rejected **wire** value set.
 
 Two further module-level load rejects belong to this namespace:
@@ -323,7 +323,7 @@ namespace, because two of them re-aggregate:
   the scope run-wide; which names enter it — declared, imported or synthesized —
   is **P15**'s, and a name synthesized beside a type has no narrower scope than
   the type itself.
-- **Java and .NET** give each module its own sub-package/namespace
+- **Java and C#** give each module its own sub-package/namespace
   (`com.example.api.content.page`, `Nexgen.Generated.Content.Page`) and emit no
   aggregating barrel, so two input files may each declare a `Page` and stay
   unambiguous. Their scope really is the module.
