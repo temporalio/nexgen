@@ -945,6 +945,57 @@ fn csharp_json_required_members_are_enforced_at_compile_time() {
 }
 
 #[test]
+fn csharp_json_nullable_properties_keep_their_shape_and_constraints() {
+    let case = JsonCase::new("nullable-shape");
+    case.write(
+        "nullable_shape.yaml",
+        r#"type: object
+required: [nullInt, nullTags]
+properties:
+  nullName: { oneOf: [{ type: string, minLength: 3, pattern: "^[a-z]+$" }, { type: "null" }] }
+  nullEnum: { oneOf: [{ type: string, enum: [a, b] }, { type: "null" }] }
+  nullEmail: { oneOf: [{ type: string, format: email }, { type: "null" }] }
+  nullInt: { oneOf: [{ type: integer, minimum: 1, maximum: 10 }, { type: "null" }] }
+  nullRatio: { oneOf: [{ type: number, multipleOf: 2 }, { type: "null" }] }
+  nullFlag: { oneOf: [{ type: boolean }, { type: "null" }] }
+  nullTags:
+    oneOf:
+      - { type: array, items: { type: string }, minItems: 2, contains: { type: string, minLength: 2 } }
+      - { type: "null" }
+"#,
+    );
+    let output = case.generate(&["nullable_shape.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "public NullEnumValue? NullEnum { get; init; }",
+            "public required long? NullInt { get; init; }",
+            "public double? NullRatio { get; init; }",
+            "public bool? NullFlag { get; init; }",
+            "public required global::System.Collections.Generic.IReadOnlyList<string>? NullTags { get; init; }",
+        ],
+    );
+    case.run(
+        r#"Check.RoundTrip<NullableShape>("{\"nullInt\":null,\"nullTags\":null}");
+Check.RoundTrip<NullableShape>(
+    "{\"nullName\":\"abc\",\"nullEnum\":\"a\",\"nullEmail\":\"x@example.com\",\"nullInt\":5,\"nullRatio\":4,\"nullFlag\":true,\"nullTags\":[\"ab\",\"c\"]}");
+Check.ParseFails<NullableShape>(
+    "{\"nullName\":\"ab\",\"nullEnum\":\"c\",\"nullEmail\":\"nope\",\"nullInt\":11,\"nullRatio\":3,\"nullTags\":[\"a\"]}",
+    "nullName: must have length >= 3",
+    "nullEnum: must be one of",
+    "nullEmail: must be a valid email",
+    "nullInt: must be <= 10",
+    "nullRatio: must be a multiple of 2",
+    "nullTags: must have at least 2 items",
+    "nullTags: no element matches the required schema");
+Check.ParseFails<NullableShape>("{\"nullName\":\"ABC\",\"nullInt\":0,\"nullTags\":null}",
+    "nullName: must match pattern",
+    "nullInt: must be >= 1");
+Check.WriteFails(new NullableShape { NullInt = 0, NullTags = null }, "nullInt: must be >= 1");"#,
+    );
+}
+
+#[test]
 fn csharp_json_nullable_elements_keep_constraints_at_every_depth() {
     let case = JsonCase::new("nullable-elements");
     case.write(
@@ -2469,6 +2520,50 @@ Check.ParseFails<Edges>("{\"integral\":[9007199254740993]}", "integral: no eleme
 Check.RoundTrip<Edges>("{\"integral\":[9007199254740991]}");
 Check.ParseFails<Edges>("{\"matrix\":[[1],[2,2]]}", "matrix[1]: duplicate items: element at index 1 equals index 0");
 Check.WriteFails(new Edges { Matrix = new[] { new long[] { 3, 3 } } }, "matrix[0]: duplicate items");"#,
+    );
+}
+
+#[test]
+fn csharp_json_collection_and_element_nullability_stay_independent() {
+    let case = JsonCase::new("collection-nullability");
+    case.write(
+        "event.yaml",
+        r#"type: object
+required: [timestamp, nullableCollection, nullableElement]
+properties:
+  timestamp: { type: string, format: date-time }
+  optionalTimestamp: { type: string, format: date-time }
+  optionalCollection: { type: array, items: { type: string, format: date-time } }
+  nullableCollection:
+    oneOf: [{ type: array, items: { type: string, format: date-time } }, { type: "null" }]
+  nullableElement:
+    type: array
+    items: { oneOf: [{ type: string, format: date-time }, { type: "null" }] }
+  bothCombined:
+    oneOf:
+      - { type: array, items: { oneOf: [{ type: string, format: date-time }, { type: "null" }] } }
+      - { type: "null" }
+"#,
+    );
+    let output = case.generate(&["event.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "public required global::System.DateTimeOffset Timestamp { get; init; }",
+            "public global::System.DateTimeOffset? OptionalTimestamp { get; init; }",
+            "IReadOnlyList<global::System.DateTimeOffset>? OptionalCollection { get; init; }",
+            "public required global::System.Collections.Generic.IReadOnlyList<global::System.DateTimeOffset>? NullableCollection { get; init; }",
+            "public required global::System.Collections.Generic.IReadOnlyList<global::System.DateTimeOffset?> NullableElement { get; init; }",
+            "IReadOnlyList<global::System.DateTimeOffset?>? BothCombined { get; init; }",
+        ],
+    );
+    case.run(
+        r#"const string stamp = "2024-01-01T00:00:00Z";
+Check.RoundTrip<Event>("{\"timestamp\":\"" + stamp + "\",\"nullableCollection\":null,\"nullableElement\":[null,\"" + stamp + "\"]}");
+Check.RoundTrip<Event>("{\"timestamp\":\"" + stamp + "\",\"nullableCollection\":[\"" + stamp + "\"],\"nullableElement\":[],\"bothCombined\":[null]}");
+Check.ParseFails<Event>("{\"timestamp\":\"" + stamp + "\",\"nullableCollection\":[null],\"nullableElement\":null}",
+    "nullableCollection[0]: explicit null not allowed",
+    "nullableElement: explicit null not allowed");"#,
     );
 }
 
