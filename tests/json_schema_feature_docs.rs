@@ -33,11 +33,6 @@ fn names_language(cell: &str, language: &str) -> bool {
     cell == language
 }
 
-/// Specs that do not document C# yet. Each leaves the list in the commit that
-/// documents C# there, and an entry that already does fails the test, so the
-/// list only shrinks.
-const PENDING: &[&str] = &["deprecated.md"];
-
 #[test]
 fn json_schema_specs_document_csharp_wherever_they_document_java() {
     let mut gaps = Vec::new();
@@ -45,7 +40,6 @@ fn json_schema_specs_document_csharp_wherever_they_document_java() {
         let text = fs::read_to_string(&path).expect("read spec");
         let name = path.file_name().unwrap().to_string_lossy().to_string();
         let lines: Vec<&str> = text.lines().collect();
-        let found = gaps.len();
 
         // Tables: a Java column needs a C# column; a Java row needs a C# row.
         let mut index = 0;
@@ -103,15 +97,6 @@ fn json_schema_specs_document_csharp_wherever_they_document_java() {
                     "{name}:{}: `{line}` has no `{prefix}` section beside it",
                     line_index + 1
                 ));
-            }
-        }
-        if PENDING.contains(&name.as_str()) {
-            if gaps.len() == found {
-                gaps.push(format!(
-                    "{name}: documents C# but is still listed in PENDING"
-                ));
-            } else {
-                gaps.truncate(found);
             }
         }
     }
