@@ -972,6 +972,23 @@ Check.WriteFails(new Pair { A = 1 }, "must have at least 2 properties, got 1");"
 }
 
 #[test]
+fn csharp_json_max_properties_counts_declared_and_extra_keys() {
+    let case = JsonCase::new("max-properties");
+    case.write(
+        "pair.yaml",
+        "type: object\nmaxProperties: 2\nproperties:\n  a: { type: integer }\nadditionalProperties: { type: integer }\n",
+    );
+    case.generate(&["pair.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Pair>("{\"a\":1,\"b\":2}");
+Check.ParseFails<Pair>("{\"a\":1,\"b\":2,\"c\":3}", "must have at most 2 properties, got 3");
+Check.WriteFails(
+    new Pair { A = 1, AdditionalProperties = new System.Collections.Generic.Dictionary<string, long> { ["b"] = 2, ["c"] = 3 } },
+    "must have at most 2 properties, got 3");"#,
+    );
+}
+
+#[test]
 fn csharp_json_repaths_nested_violations_on_serialize() {
     let case = JsonCase::new("nested-paths");
     case.write(
