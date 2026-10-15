@@ -36,7 +36,7 @@ fn names_language(cell: &str, language: &str) -> bool {
 /// Specs that do not document C# yet. Each leaves the list in the commit that
 /// documents C# there, and an entry that already does fails the test, so the
 /// list only shrinks.
-const PENDING: &[&str] = &["deprecated.md", "description.md", "services.md", "title.md"];
+const PENDING: &[&str] = &["deprecated.md", "description.md", "title.md"];
 
 #[test]
 fn json_schema_specs_document_csharp_wherever_they_document_java() {

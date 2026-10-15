@@ -11,6 +11,9 @@ using NexusRpc;
 namespace Nexgen.JsonSchema.Chat
 {
 
+    /// <summary>
+    /// Send messages and look up rooms.
+    /// </summary>
     [GeneratedCode("nexgen", null)]
     [NexusService("example.chat.v1.ChatService")]
     internal interface IChatService
