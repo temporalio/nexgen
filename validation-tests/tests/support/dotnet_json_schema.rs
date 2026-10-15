@@ -573,6 +573,33 @@ Check.WriteFails(new Floor { Count = 0, Ratio = 0.25 }, "count: must be >= 1, go
     );
 }
 
+#[test]
+fn csharp_json_maximum_is_inclusive_in_both_directions() {
+    let case = JsonCase::new("maximum");
+    case.write(
+        "ceiling.yaml",
+        "type: object\nproperties:\n  count: { type: integer, maximum: 10 }\n  ratio: { type: number, maximum: 2.5 }\n",
+    );
+    case.generate(&["ceiling.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Ceiling>("{\"count\":10,\"ratio\":2.5}");
+Check.ParseFails<Ceiling>("{\"count\":11,\"ratio\":2.75}", "count: must be <= 10, got 11", "ratio: must be <= 2.5, got 2.75");
+Check.WriteFails(new Ceiling { Count = 11, Ratio = 2.75 }, "count: must be <= 10, got 11", "ratio: must be <= 2.5, got 2.75");"#,
+    );
+
+    // A fractional bound on an integer field is a load error, not a
+    // comparison C# would round.
+    let fractional = JsonCase::new("maximum-fractional");
+    fractional.write(
+        "ceiling.yaml",
+        "type: object\nproperties:\n  count: { type: integer, maximum: 5.5 }\n",
+    );
+    assert_has(
+        &fractional.generate_err(&["ceiling.yaml"]),
+        &["`maximum` must be an integer bound on an `integer` field"],
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
