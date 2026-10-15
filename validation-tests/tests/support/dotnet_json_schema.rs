@@ -900,6 +900,32 @@ Check.ParseFails<Closed>(
 // .NET string and equality semantics
 // ---------------------------------------------------------------------------
 
+#[test]
+fn csharp_json_min_length_is_inclusive_in_both_directions() {
+    let case = JsonCase::new("min-length");
+    case.write(
+        "handle.yaml",
+        "type: object\nproperties:\n  name: { type: string, minLength: 2 }\n",
+    );
+    case.generate(&["handle.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Handle>("{\"name\":\"ab\"}");
+Check.ParseFails<Handle>("{\"name\":\"a\"}", "name: must have length >= 2, got 1");
+Check.WriteFails(new Handle { Name = "" }, "name: must have length >= 2, got 0");"#,
+    );
+
+    // Bounds no string satisfies are a load error.
+    let empty = JsonCase::new("min-length-empty");
+    empty.write(
+        "handle.yaml",
+        "type: object\nproperties:\n  name: { type: string, minLength: 3, maxLength: 2 }\n",
+    );
+    assert_has(
+        &empty.generate_err(&["handle.yaml"]),
+        &["`minLength` (3) exceeds `maxLength` (2)"],
+    );
+}
+
 /// A record's compiler-generated equality compares arrays, lists and
 /// `JsonElement`s by reference; the generated `Equals`/`GetHashCode` compare
 /// them by content, so a value equals its own round trip.
