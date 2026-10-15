@@ -955,6 +955,23 @@ Check.Equal(new System.DateOnly(2024, 2, 29), dates.AdditionalProperties["due"][
 }
 
 #[test]
+fn csharp_json_min_properties_counts_distinct_keys() {
+    let case = JsonCase::new("min-properties");
+    case.write(
+        "pair.yaml",
+        "type: object\nminProperties: 2\nproperties:\n  a: { type: integer }\nadditionalProperties: { type: integer }\n",
+    );
+    case.generate(&["pair.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Pair>("{\"a\":1,\"b\":2}");
+Check.ParseFails<Pair>("{\"a\":1}", "must have at least 2 properties, got 1");
+// A repeated key is one property.
+Check.ParseFails<Pair>("{\"a\":1,\"a\":2}", "must have at least 2 properties, got 1");
+Check.WriteFails(new Pair { A = 1 }, "must have at least 2 properties, got 1");"#,
+    );
+}
+
+#[test]
 fn csharp_json_repaths_nested_violations_on_serialize() {
     let case = JsonCase::new("nested-paths");
     case.write(
