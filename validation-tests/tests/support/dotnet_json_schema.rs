@@ -377,6 +377,37 @@ fn csharp_json_examples_build_in_both_modes() {
 }
 
 // ---------------------------------------------------------------------------
+// Unions
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csharp_json_assertion_only_format_branch_stays_a_string() {
+    let case = JsonCase::new("assertion-only-format");
+    case.write(
+        "assertion_only.yaml",
+        r#"title: AssertionOnly
+type: object
+properties:
+  contacts:
+    oneOf:
+      - { type: array, items: { type: string, format: email } }
+      - { type: boolean }
+"#,
+    );
+    let output = case.generate(&["assertion_only.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &["IReadOnlyList<string> Value { get; }"],
+    );
+    assert!(!output.has_file("TemporalSupport.cs"));
+    assert!(!output.has_file("Base64Support.cs"));
+    case.run(
+        r#"Check.RoundTrip<AssertionOnly>("{\"contacts\":[\"a@example.com\"]}");
+Check.ParseFails<AssertionOnly>("{\"contacts\":[\"nope\"]}", "contacts[0]: must be a valid email");"#,
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Presence, nullability and defaults
 // ---------------------------------------------------------------------------
 
@@ -854,6 +885,148 @@ Check.Equal("{\"a\":\"ab\",\"b\":1}", Check.Canonical(Check.Write(new Shape { A 
 // ---------------------------------------------------------------------------
 
 #[test]
+fn csharp_json_materialized_formats_use_native_types_at_every_position() {
+    let case = JsonCase::new("materialized");
+    case.write(
+        "materialized.yaml",
+        r##"type: object
+properties:
+  stamp: { type: string, format: date-time }
+  day: { type: string, format: date }
+  clock: { type: string, format: time }
+  span: { type: string, format: duration }
+  blob: { type: string, contentEncoding: base64 }
+  urlBlob: { type: string, contentEncoding: base64url }
+  stamps: { type: array, items: { type: string, format: date-time } }
+  days: { type: array, items: { type: array, items: { type: string, format: date } } }
+  byKey: { $ref: "#/$defs/ByKey" }
+  maybeStamps: { type: array, items: { oneOf: [{ type: string, format: date-time }, { type: "null" }] } }
+$defs:
+  ByKey:
+    type: object
+    additionalProperties: { type: array, items: { type: string, format: duration } }
+"##,
+    );
+    let output = case.generate(&["materialized.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "public global::System.DateTimeOffset? Stamp { get; init; }",
+            "public global::System.DateOnly? Day { get; init; }",
+            // No BCL type holds both offset-bearing and offset-less times.
+            "public string? Clock { get; init; }",
+            "public global::System.TimeSpan? Span { get; init; }",
+            "public byte[]? Blob { get; init; }",
+            "IReadOnlyList<global::System.DateTimeOffset>? Stamps { get; init; }",
+            "IReadOnlyList<global::System.Collections.Generic.IReadOnlyList<global::System.DateOnly>>? Days { get; init; }",
+            "IReadOnlyDictionary<string, global::System.Collections.Generic.IReadOnlyList<global::System.TimeSpan>> AdditionalProperties",
+            // A nullable value-type element is `Nullable<T>`.
+            "IReadOnlyList<global::System.DateTimeOffset?>? MaybeStamps { get; init; }",
+        ],
+    );
+    case.run(
+        r#"var parsed = Check.RoundTrip<Materialized>(
+    "{\"stamp\":\"2024-01-02T03:04:05.5+05:30\",\"day\":\"2024-02-29\",\"clock\":\"12:30:00Z\",\"span\":\"PT1H30M\",\"blob\":\"AQI=\",\"urlBlob\":\"-_8\",\"stamps\":[\"2024-01-02T03:04:05Z\"],\"days\":[[\"2024-01-01\"]],\"byKey\":{\"k\":[\"PT5S\"]},\"maybeStamps\":[null,\"2024-01-02T03:04:05Z\"]}");
+Check.Equal(new System.TimeSpan(5, 30, 0), parsed.Stamp!.Value.Offset, "offset is kept");
+Check.Equal(new System.DateOnly(2024, 2, 29), parsed.Day!.Value, "date");
+Check.Equal(System.TimeSpan.FromMinutes(90), parsed.Span!.Value, "duration");
+Check.Equal(System.TimeSpan.FromSeconds(5), parsed.ByKey!.AdditionalProperties["k"][0], "map duration");
+Check.True(parsed.UrlBlob is [0xFB, 0xFF], "base64url");
+// Duration and time spellings normalize to the canonical wire form.
+Check.RoundTrip<Materialized>("{\"span\":\"PT90M\"}", "{\"span\":\"PT1H30M\"}");
+Check.RoundTrip<Materialized>("{\"span\":\"PT3600S\"}", "{\"span\":\"PT1H\"}");
+Check.ParseFails<Materialized>("{\"day\":\"2023-02-29\"}", "day: must be a valid date");
+Check.ParseFails<Materialized>("{\"stamps\":[\"2024-01-02\"]}", "stamps[0]: must be a valid date-time");
+Check.ParseFails<Materialized>("{\"days\":[[\"x\"]]}", "days[0][0]: must be a valid date");
+Check.ParseFails<Materialized>("{\"byKey\":{\"k\":[\"P1M\"]}}", "byKey.k[0]: ");
+Check.ParseFails<Materialized>("{\"blob\":\"AQI\"}", "blob: ");
+Check.ParseFails<Materialized>("{\"urlBlob\":\"+/8=\"}", "urlBlob: ");
+// What the wire cannot carry is caught before writing.
+Check.WriteFails(new Materialized { Span = System.TimeSpan.FromSeconds(-1) }, "span: ");
+Check.WriteFails(new Materialized { Span = System.TimeSpan.FromMilliseconds(1500) }, "span: ");
+// `DateTimeOffset` itself refuses sub-minute and beyond-±14:00 offsets and
+// years past 9999, so those wire-grammar limits need no serialize check here.
+Check.WriteFails(new Materialized { Clock = "25:00:00Z" }, "clock: ");"#,
+    );
+}
+
+#[test]
+fn csharp_json_runtime_support_is_emitted_only_when_used() {
+    let case = JsonCase::new("runtime-support");
+    // Prose that names the runtime types selects nothing.
+    case.write(
+        "prose.yaml",
+        r#"description: DateTimeOffset and TemporalSupport are only mentioned here.
+type: object
+properties:
+  note: { type: string, description: "A base64 TimeSpan mention." }
+"#,
+    );
+    let output = case.generate(&["prose.yaml"]);
+    assert!(!output.has_file("TemporalSupport.cs"));
+    assert!(!output.has_file("Base64Support.cs"));
+    assert_has(
+        output.file("Models.cs"),
+        &["DateTimeOffset and TemporalSupport"],
+    );
+    case.build();
+
+    // A materialized value nested only inside a collection or map still needs it.
+    let nested = JsonCase::new("runtime-support-nested");
+    nested.write(
+        "nested.yaml",
+        r##"type: object
+properties:
+  dates: { type: array, items: { type: array, items: { type: string, format: date } } }
+  blobs: { $ref: "#/$defs/Blobs" }
+$defs:
+  Blobs:
+    type: object
+    additionalProperties: { type: string, contentEncoding: base64 }
+"##,
+    );
+    let output = nested.generate(&["nested.yaml"]);
+    assert!(output.has_file("TemporalSupport.cs"));
+    assert!(output.has_file("Base64Support.cs"));
+    nested.build();
+}
+
+#[test]
+fn csharp_json_temporal_constraints_cover_original_and_canonical_wire_values() {
+    let case = JsonCase::new("temporal-constraints");
+    case.write(
+        "dates.yaml",
+        r##"type: object
+additionalProperties: false
+required: [day, days, byName]
+properties:
+  day: { type: string, format: date, minLength: 10, pattern: "^2024-" }
+  days: { type: array, items: { type: string, format: date, pattern: "^2024-" } }
+  byName: { $ref: "#/$defs/DateMap" }
+$defs:
+  DateMap:
+    type: object
+    additionalProperties: { type: string, format: date, pattern: "^2024-" }
+"##,
+    );
+    case.generate(&["dates.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Dates>("{\"day\":\"2024-01-01\",\"days\":[\"2024-02-02\"],\"byName\":{\"x\":\"2024-03-03\"}}");
+Check.ParseFails<Dates>(
+    "{\"day\":\"2023-01-01\",\"days\":[\"2023-02-02\"],\"byName\":{\"x\":\"2023-03-03\"}}",
+    "day: must match pattern",
+    "days[0]: must match pattern",
+    "byName.x: must match pattern");
+var old = new System.DateOnly(2023, 1, 1);
+Check.WriteFails(
+    new Dates { Day = old, Days = new[] { old }, ByName = new DateMap { AdditionalProperties = new System.Collections.Generic.Dictionary<string, System.DateOnly> { ["x"] = old } } },
+    "day: must match pattern",
+    "days[0]: must match pattern",
+    "byName.x: must match pattern");"#,
+    );
+}
+
+#[test]
 fn csharp_json_materialized_closed_values_and_defaults_stay_native() {
     let case = JsonCase::new("materialized-closed");
     case.write(
@@ -941,6 +1114,57 @@ properties:
 }
 Check.WriteFails(new Newline { Word = "abc\n" }, "word: must match pattern");
 Check.WriteFails(new Newline { Clock = "12:00:00Z\n" }, "clock: ");"#,
+    );
+}
+
+/// `DateTimeOffset` resolves 100 ns, so a longer fraction is truncated to
+/// seven digits — P1 exception (b), the open `09#8` divergence shared with
+/// Python's microsecond `datetime`. Offsets reach exactly ±14:00.
+#[test]
+fn csharp_json_fractional_seconds_truncate_to_dotnet_resolution() {
+    let case = JsonCase::new("fractional-seconds");
+    case.write(
+        "fractional.yaml",
+        r#"type: object
+properties:
+  ts: { type: string, format: date-time }
+  wideDefault: { type: string, format: date-time, default: "2021-06-15t12:30:45.123456789012+14:00" }
+  minusBoundary: { type: string, format: date-time, default: "2021-06-15T12:30:45-14:00" }
+"#,
+    );
+    let output = case.generate(&["fractional.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &["TemporalSupport.ParseDateTimeLiteral(\"2021-06-15T12:30:45.123456789012+14:00\")"],
+    );
+    case.run(
+        r#"Check.RoundTrip<Fractional>(
+    "{\"ts\":\"2021-06-15T12:30:45.123456789Z\"}",
+    "{\"ts\":\"2021-06-15T12:30:45.1234567Z\"}");
+Check.RoundTrip<Fractional>("{\"ts\":\"2021-06-15T12:30:45.1234567Z\"}");
+// Trailing fractional zeros are not canonical.
+Check.RoundTrip<Fractional>("{\"ts\":\"2021-06-15T12:30:45.500Z\"}", "{\"ts\":\"2021-06-15T12:30:45.5Z\"}");
+Check.RoundTrip<Fractional>("{\"ts\":\"2021-06-15T12:30:45+14:00\"}");
+Check.RoundTrip<Fractional>("{\"ts\":\"2021-06-15T12:30:45-14:00\"}");
+Check.ParseFails<Fractional>("{\"ts\":\"2021-06-15T12:30:45+14:01\"}", "ts: must be a valid date-time");
+var defaults = Check.Parse<Fractional>("{}");
+Check.Equal(
+    new System.DateTimeOffset(2021, 6, 15, 12, 30, 45, System.TimeSpan.FromHours(14)).AddTicks(1234567),
+    defaults.WideDefaultOrDefault,
+    "a wide default literal truncates");
+Check.Equal(System.TimeSpan.FromHours(14), defaults.WideDefaultOrDefault.Offset, "+14:00 default");
+Check.Equal(System.TimeSpan.FromHours(-14), defaults.MinusBoundaryOrDefault.Offset, "-14:00 default");"#,
+    );
+
+    // An authored default outside the shared offset domain is a load error.
+    let invalid = JsonCase::new("fractional-seconds-invalid");
+    invalid.write(
+        "fractional.yaml",
+        "type: object\nproperties:\n  ts: { type: string, format: date-time, default: \"2021-06-15T12:30:45+14:01\" }\n",
+    );
+    assert_has(
+        &invalid.generate_err(&["fractional.yaml"]),
+        &["is not a valid date-time", "+14:01"],
     );
 }
 
