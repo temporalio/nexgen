@@ -380,6 +380,448 @@ fn csharp_json_examples_build_in_both_modes() {
 // Unions
 // ---------------------------------------------------------------------------
 
+const INLINE_OBJECT_BRANCH_SCHEMA: &str = r#"type: object
+properties:
+  payload:
+    oneOf:
+      - type: object
+        required: [text]
+        properties:
+          text: { type: string, minLength: 1 }
+      - { type: string }
+"#;
+
+#[test]
+fn csharp_json_names_inline_object_union_branch() {
+    let case = JsonCase::new("inline-object-branch");
+    case.write("detail.yaml", INLINE_OBJECT_BRANCH_SCHEMA);
+    let output = case.generate(&["detail.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "public interface PayloadUnion",
+            "public sealed class PayloadUnionString : PayloadUnion",
+            "public PayloadUnion? Payload { get; init; }",
+            // The object branch is a top-level record named after its owner
+            // and member, implementing the owner's nested union interface.
+            "public sealed record DetailPayloadObject : Detail.PayloadUnion",
+            "public required string Text { get; init; }",
+        ],
+    );
+    case.run(
+        r#"var object_ = Check.RoundTrip<Detail>("{\"payload\":{\"text\":\"hi\"}}");
+Check.True(object_.Payload is DetailPayloadObject { Text: "hi" }, "object branch");
+var text = Check.RoundTrip<Detail>("{\"payload\":\"plain\"}");
+Check.True(text.Payload is Detail.PayloadUnion.PayloadUnionString { Value: "plain" }, "string branch");
+Check.ParseFails<Detail>("{\"payload\":{\"text\":\"\"}}", "payload.text: must have length >= 1");
+Check.ParseFails<Detail>("{\"payload\":{}}", "payload.text: required");
+Check.ParseFails<Detail>("{\"payload\":5}", "payload: ");
+Check.WriteFails(new Detail { Payload = new DetailPayloadObject { Text = "" } }, "payload.text: must have length >= 1");"#,
+    );
+}
+
+const BRANCH_CONSTRAINT_SCHEMA: &str = r#"type: object
+properties:
+  value:
+    oneOf:
+      - { type: string, minLength: 3, pattern: "^[a-z]+$" }
+      - { type: integer, minimum: 1 }
+  listOrName:
+    oneOf:
+      - { type: array, items: { type: number }, minItems: 1, uniqueItems: true }
+      - { type: string, enum: [auto, manual] }
+"#;
+
+#[test]
+fn csharp_json_validates_non_object_union_branch_constraints() {
+    let case = JsonCase::new("branch-constraints");
+    case.write("bc.yaml", BRANCH_CONSTRAINT_SCHEMA);
+    let output = case.generate(&["bc.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "public sealed class ValueUnionString : ValueUnion",
+            "public sealed class ValueUnionInteger : ValueUnion",
+            "public sealed class ListOrNameUnionArray : ListOrNameUnion",
+            "global::System.Collections.Generic.IReadOnlyList<double> Value { get; }",
+            // `$` compiles to `\z`: .NET's `$` also matches before a final newline.
+            "^[a-z]+\\\\z",
+            "global::System.Text.RegularExpressions.RegexOptions.CultureInvariant",
+        ],
+    );
+    case.run(
+        r#"Check.RoundTrip<Bc>("{\"value\":\"abc\",\"listOrName\":[1,2.5]}");
+Check.RoundTrip<Bc>("{\"value\":7,\"listOrName\":\"auto\"}");
+Check.ParseFails<Bc>("{\"value\":\"ab\"}", "value: must have length >= 3");
+Check.ParseFails<Bc>("{\"value\":\"ABC\"}", "value: must match pattern");
+Check.ParseFails<Bc>("{\"value\":\"abc\\n\"}", "value: must match pattern");
+Check.ParseFails<Bc>("{\"value\":0}", "value: must be >= 1");
+Check.ParseFails<Bc>("{\"listOrName\":[]}", "listOrName: must have at least 1 items");
+Check.ParseFails<Bc>("{\"listOrName\":[1,1.0]}", "listOrName: duplicate items");
+Check.ParseFails<Bc>("{\"listOrName\":\"other\"}", "listOrName: must be one of");
+// The serialize side runs the same predicates over the in-memory branch.
+Check.WriteFails(new Bc { Value = new Bc.ValueUnion.ValueUnionString("ab") }, "value: must have length >= 3");
+Check.WriteFails(new Bc { Value = new Bc.ValueUnion.ValueUnionInteger(0) }, "value: must be >= 1");
+Check.WriteFails(
+    new Bc { ListOrName = new Bc.ListOrNameUnion.ListOrNameUnionArray(new double[] { 2, 2 }) },
+    "listOrName: duplicate items");
+Check.WriteFails(
+    new Bc { ListOrName = new Bc.ListOrNameUnion.ListOrNameUnionString("other") },
+    "listOrName: must be one of");"#,
+    );
+}
+
+#[test]
+fn csharp_json_inline_union_names_follow_the_emitted_member() {
+    let case = JsonCase::new("renamed-union");
+    case.write(
+        "renamed_union.yaml",
+        r#"title: RenamedUnion
+type: object
+properties:
+  serializer:
+    x-cs-name: Payload
+    oneOf: [{ type: string }, { type: integer }]
+"#,
+    );
+    let output = case.generate(&["renamed_union.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "public interface PayloadUnion",
+            "public PayloadUnion? Payload { get; init; }",
+            "\"serializer\"",
+        ],
+    );
+    assert_lacks(models, &["SerializerUnion", " Serializer {"]);
+    case.run(
+        r#"var parsed = Check.RoundTrip<RenamedUnion>("{\"serializer\":3}");
+Check.True(parsed.Payload is RenamedUnion.PayloadUnion.PayloadUnionInteger { Value: 3 }, "integer branch");"#,
+    );
+}
+
+const ELEMENT_UNION_SCHEMA: &str = r##"type: object
+properties:
+  segments: { type: array, items: { oneOf: [{ type: string }, { type: integer }] } }
+  choices: { type: array, items: { $ref: "#/$defs/Choice" } }
+  entries: { $ref: "#/$defs/Entries" }
+  slots: { type: array, items: { oneOf: [{ type: string }, { type: "null" }] } }
+  counts: { type: array, items: { oneOf: [{ type: integer }, { type: "null" }] } }
+$defs:
+  Choice: { oneOf: [{ type: string }, { type: boolean }] }
+  Entries:
+    type: object
+    additionalProperties: { oneOf: [{ type: string }, { type: integer }] }
+"##;
+
+#[test]
+fn csharp_json_decodes_element_position_unions() {
+    let case = JsonCase::new("element-unions");
+    case.write("bag.yaml", ELEMENT_UNION_SCHEMA);
+    let output = case.generate(&["bag.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            // Position-derived names: `<Model><Member>Item`, `<Map>Value`.
+            "public interface BagSegmentsItem",
+            "public sealed class BagSegmentsItemInteger : BagSegmentsItem",
+            "IReadOnlyList<BagSegmentsItem>? Segments { get; init; }",
+            "IReadOnlyList<Choice>? Choices { get; init; }",
+            "public interface EntriesValue",
+            "IReadOnlyDictionary<string, EntriesValue> AdditionalProperties",
+            // A nullable element is a nullable element type, for reference and
+            // value types alike.
+            "IReadOnlyList<string?>? Slots { get; init; }",
+            "IReadOnlyList<long?>? Counts { get; init; }",
+        ],
+    );
+    case.run(
+        r#"var bag = Check.RoundTrip<Bag>(
+    "{\"segments\":[\"a\",1],\"choices\":[\"x\",true],\"entries\":{\"k\":\"v\",\"n\":2},\"slots\":[\"a\",null],\"counts\":[1,null]}");
+Check.True(bag.Segments![1] is BagSegmentsItem.BagSegmentsItemInteger { Value: 1 }, "segments[1]");
+Check.True(bag.Entries!.AdditionalProperties["n"] is EntriesValue.EntriesValueInteger { Value: 2 }, "entries.n");
+Check.Equal<long?>(null, bag.Counts![1], "counts[1]");
+Check.ParseFails<Bag>("{\"segments\":[1.5]}", "segments[0]: ");
+Check.ParseFails<Bag>("{\"segments\":[null]}", "segments[0]: ");
+Check.ParseFails<Bag>("{\"entries\":{\"bad\":true}}", "entries.bad: ");
+Check.ParseFails<Bag>("{\"counts\":[\"1\"]}", "counts[0]: ");
+// A null smuggled into a non-nullable element is a violation, not a crash.
+Check.WriteFails(new Bag { Segments = new BagSegmentsItem[] { null! } }, "segments[0]: ");
+Check.WriteFails(
+    new Bag { Entries = new Entries { AdditionalProperties = new System.Collections.Generic.Dictionary<string, EntriesValue> { ["bad"] = null! } } },
+    "entries.bad: ");"#,
+    );
+}
+
+const DISCRIMINATED_SCHEMA: &str = r##"type: object
+required: [shape]
+properties:
+  shape: { $ref: "#/$defs/Shape" }
+  score: { type: integer, const: 1.0 }
+$defs:
+  Shape: { oneOf: [{ $ref: "#/$defs/Circle" }, { $ref: "#/$defs/Square" }] }
+  Circle:
+    type: object
+    required: [kind, r]
+    properties: { kind: { type: integer, const: 1 }, r: { type: number } }
+  Square:
+    type: object
+    required: [kind, side]
+    properties: { kind: { type: integer, const: 2 }, side: { type: number } }
+"##;
+
+#[test]
+fn csharp_json_dispatches_a_non_string_discriminant_by_value() {
+    let case = JsonCase::new("numeric-discriminant");
+    case.write("tagged.yaml", DISCRIMINATED_SCHEMA);
+    let output = case.generate(&["tagged.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "public interface Shape",
+            "public sealed record Circle : Shape",
+            "public sealed record Square : Shape",
+            "public static readonly KindValue V1 = new(1L);",
+            "public static readonly KindValue V2 = new(2L);",
+            // An integer const spelled `1.0` is the integer 1.
+            "public static readonly ScoreValue V1 = new(1L);",
+        ],
+    );
+    case.run(
+        r#"var circle = Check.RoundTrip<Tagged>("{\"shape\":{\"kind\":1,\"r\":2.5}}");
+Check.True(circle.Shape is Circle { R: 2.5 }, "circle");
+Check.True(Check.RoundTrip<Tagged>("{\"shape\":{\"kind\":2,\"side\":1}}").Shape is Square, "square");
+// The discriminant matches by JSON value, so `1.0` selects the `1` branch
+// and is re-emitted in its canonical spelling.
+Check.RoundTrip<Tagged>("{\"shape\":{\"kind\":1.0,\"r\":2.5}}", "{\"shape\":{\"kind\":1,\"r\":2.5}}");
+Check.RoundTrip<Tagged>("{\"shape\":{\"kind\":1,\"r\":1},\"score\":1.0}", "{\"shape\":{\"kind\":1,\"r\":1},\"score\":1}");
+Check.ParseFails<Tagged>("{\"shape\":{\"kind\":3,\"side\":1}}", "shape: ");
+Check.ParseFails<Tagged>("{\"shape\":{\"kind\":\"1\",\"r\":1}}", "shape: ");
+Check.ParseFails<Tagged>("{\"shape\":{\"kind\":1,\"r\":1},\"score\":2}", "score: must equal 1");"#,
+    );
+}
+
+#[test]
+fn csharp_json_dispatches_cross_module_ref_union_branches() {
+    let case = JsonCase::new("cross-module-union");
+    case.write(
+        "shapes.yaml",
+        r##"$defs:
+  Circle:
+    type: object
+    required: [kind]
+    properties: { kind: { type: string, const: circle }, r: { type: number } }
+  Square:
+    type: object
+    required: [kind]
+    properties: { kind: { type: string, const: square }, s: { type: number } }
+"##,
+    );
+    case.write(
+        "main.yaml",
+        r#"type: object
+properties:
+  shape:
+    oneOf:
+      - { $ref: "shapes.yaml#/$defs/Circle" }
+      - { $ref: "shapes.yaml#/$defs/Square" }
+      - { type: string }
+"#,
+    );
+    let output = case.generate(&["main.yaml", "shapes.yaml"]);
+    let shapes = output.file("shapes/Models.cs");
+    // A branch declared in another module implements the owner's interface.
+    assert_has(
+        shapes,
+        &[
+            "namespace Probe.Shapes",
+            "public sealed record Circle : global::Probe.Main.Main.ShapeUnion",
+        ],
+    );
+    case.run_with_usings(
+        &["Probe.Main", "Probe.Shapes"],
+        r#"Check.True(Check.RoundTrip<Main>("{\"shape\":{\"kind\":\"circle\",\"r\":1}}").Shape is Circle, "circle");
+Check.True(Check.RoundTrip<Main>("{\"shape\":{\"kind\":\"square\",\"s\":2}}").Shape is Square, "square");
+Check.True(Check.RoundTrip<Main>("{\"shape\":\"free\"}").Shape is Main.ShapeUnion.ShapeUnionString, "string");
+Check.ParseFails<Main>("{\"shape\":{\"kind\":\"tri\"}}", "shape: ");"#,
+    );
+}
+
+#[test]
+fn csharp_json_cross_file_named_union_is_declared_once() {
+    let case = JsonCase::new("cross-file-named-union");
+    case.write(
+        "shapes.nexusrpc.yaml",
+        r#"$defs:
+  Circle:
+    type: object
+    required: [kind]
+    properties: { kind: { type: string, const: circle }, r: { type: number } }
+  Square:
+    type: object
+    required: [kind]
+    properties: { kind: { type: string, const: square }, side: { type: number } }
+"#,
+    );
+    case.write(
+        "holder.nexusrpc.yaml",
+        r#"$defs:
+  Shape:
+    oneOf:
+      - { $ref: "shapes.nexusrpc.yaml#/$defs/Circle" }
+      - { $ref: "shapes.nexusrpc.yaml#/$defs/Square" }
+"#,
+    );
+    case.write(
+        "drawing.nexusrpc.yaml",
+        r#"$defs:
+  Drawing:
+    type: object
+    properties:
+      main: { $ref: "holder.nexusrpc.yaml#/$defs/Shape" }
+"#,
+    );
+    let output = case.generate(&["."]);
+    let all = output.all();
+    assert_eq!(all.matches("public interface Shape\n").count(), 1, "{all}");
+    assert_has(
+        output.file("shapes/Models.cs"),
+        &["public sealed record Circle : global::Probe.Holder.Shape"],
+    );
+    assert_has(
+        output.file("drawing/Models.cs"),
+        &["public global::Probe.Holder.Shape? Main { get; init; }"],
+    );
+    case.run_with_usings(
+        &["Probe.Drawing", "Probe.Shapes"],
+        r#"Check.True(Check.RoundTrip<Drawing>("{\"main\":{\"kind\":\"circle\",\"r\":1}}").Main is Circle, "circle");
+Check.ParseFails<Drawing>("{\"main\":{\"kind\":\"tri\"}}", "main: ");"#,
+    );
+}
+
+#[test]
+fn csharp_json_renamed_union_reference_binds_the_interface() {
+    let case = JsonCase::new("renamed-union-ref");
+    case.write(
+        "shapes.yaml",
+        r##"$defs:
+  Shape:
+    x-cs-name: ShapeCs
+    oneOf: [{ $ref: "#/$defs/Circle" }, { $ref: "#/$defs/Square" }]
+  Circle:
+    type: object
+    required: [kind]
+    properties: { kind: { type: string, const: circle } }
+  Square:
+    type: object
+    required: [kind]
+    properties: { kind: { type: string, const: square } }
+  Holder:
+    type: object
+    properties: { shape: { $ref: "#/$defs/Shape" } }
+"##,
+    );
+    let output = case.generate(&["shapes.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "public interface ShapeCs",
+            "public sealed record Circle : ShapeCs",
+            "public ShapeCs? Shape { get; init; }",
+        ],
+    );
+    assert_lacks(models, &["public interface Shape\n"]);
+    case.run(
+        r#"Check.True(Check.RoundTrip<Holder>("{\"shape\":{\"kind\":\"square\"}}").Shape is Square, "square");"#,
+    );
+}
+
+#[test]
+fn csharp_json_typed_map_union_branch_implements_the_interface() {
+    let case = JsonCase::new("union-map-branch");
+    case.write(
+        "union_map.yaml",
+        r#"type: object
+required: [scalarUnion]
+properties:
+  scalarUnion:
+    oneOf:
+      - { type: string }
+      - { type: integer }
+      - { type: array, items: { type: string } }
+      - { type: object, additionalProperties: { type: string } }
+"#,
+    );
+    let output = case.generate(&["union_map.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &["public sealed record UnionMapScalarUnionObject : UnionMap.ScalarUnionUnion"],
+    );
+    case.run(
+        r#"var parsed = Check.RoundTrip<UnionMap>("{\"scalarUnion\":{\"a\":\"b\"}}");
+Check.True(parsed.ScalarUnion is UnionMapScalarUnionObject map && map.AdditionalProperties["a"] == "b", "map branch");
+Check.RoundTrip<UnionMap>("{\"scalarUnion\":[\"x\"]}");
+Check.ParseFails<UnionMap>("{\"scalarUnion\":{\"a\":1}}", "scalarUnion.a: ");"#,
+    );
+}
+
+#[test]
+fn csharp_json_recursively_converts_union_array_branches() {
+    let case = JsonCase::new("union-array-branches");
+    case.write(
+        "probe.yaml",
+        r##"type: object
+properties:
+  events:
+    oneOf:
+      - { type: array, minItems: 1, items: { type: string, format: date-time } }
+      - { type: string }
+  blobs:
+    oneOf:
+      - { type: array, items: { type: string, contentEncoding: base64 } }
+      - { type: boolean }
+  children:
+    oneOf:
+      - { type: array, items: { $ref: "#/$defs/Child" } }
+      - { type: integer }
+$defs:
+  Child:
+    type: object
+    additionalProperties: false
+    required: [name]
+    properties: { name: { type: string, minLength: 2 } }
+"##,
+    );
+    let output = case.generate(&["probe.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "IReadOnlyList<global::System.DateTimeOffset> Value { get; }",
+            "IReadOnlyList<byte[]> Value { get; }",
+            "IReadOnlyList<Child> Value { get; }",
+        ],
+    );
+    assert!(output.has_file("TemporalSupport.cs"));
+    assert!(output.has_file("Base64Support.cs"));
+    case.run(
+        r#"var parsed = Check.RoundTrip<Probe.Probe>(
+    "{\"events\":[\"2024-01-02T03:04:05Z\"],\"blobs\":[\"AQI=\"],\"children\":[{\"name\":\"ab\"}]}");
+Check.True(parsed.Events is Probe.Probe.EventsUnion.EventsUnionArray { Value: [var at] } && at.Year == 2024, "events");
+Check.True(parsed.Blobs is Probe.Probe.BlobsUnion.BlobsUnionArray { Value: [[1, 2]] }, "blobs");
+Check.ParseFails<Probe.Probe>("{\"events\":[\"nope\"]}", "events[0]: must be a valid date-time");
+Check.ParseFails<Probe.Probe>("{\"events\":[]}", "events: must have at least 1 items");
+Check.ParseFails<Probe.Probe>("{\"blobs\":[\"*\"]}", "blobs[0]: ");
+Check.ParseFails<Probe.Probe>("{\"children\":[{\"name\":\"a\"}]}", "children[0].name: must have length >= 2");
+Check.WriteFails(
+    new Probe.Probe { Children = new Probe.Probe.ChildrenUnion.ChildrenUnionArray(new[] { new Child { Name = "a" } }) },
+    "children[0].name: must have length >= 2");"#,
+    );
+}
+
 #[test]
 fn csharp_json_assertion_only_format_branch_stays_a_string() {
     let case = JsonCase::new("assertion-only-format");
@@ -1984,6 +2426,21 @@ Check.ParseFails<Locals>("{\"violations\":\"v\",\"value\":\"x\",\"members\":\"m\
     "list: no element matches the required schema");
 Check.WriteFails(new Locals { Violations = "v", Hash = "h" }, "violations: must have length >= 2", "hash: must have length >= 2");"#,
     );
+}
+
+/// A union's interface is public, so a caller can implement it; writing such a
+/// value must be a violation at the member's path, not a crash.
+#[test]
+fn csharp_json_foreign_union_implementations_are_violations() {
+    let case = JsonCase::new("foreign-union");
+    case.write("bc.yaml", BRANCH_CONSTRAINT_SCHEMA);
+    case.generate(&["bc.yaml"]);
+    fs::write(
+        case.root.join("Foreign.cs"),
+        "namespace Probe\n{\n    public sealed class ForeignValue : Bc.ValueUnion { }\n}\n",
+    )
+    .unwrap();
+    case.run(r#"Check.WriteFails(new Bc { Value = new ForeignValue() }, "value: ");"#);
 }
 
 #[test]
