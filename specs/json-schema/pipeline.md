@@ -1,12 +1,11 @@
 # Loader → Generator pipeline
 
-A set of JSON Schema files becomes model code in four languages. The
-loader is language-agnostic: it parses, enforces the strict subset, and
-lowers everything to one shared type model. The generator emits that model
-for each target. The per-file document concerns the Parse step decides
-first — the two file modes and the `nexusrpc` / `$schema` root rules —
-live in [[input-files]]. See [PRINCIPLES.md](PRINCIPLES.md) and
-`features/<keyword>.md` for detail.
+A set of JSON Schema files becomes model code in four languages. The loader is
+language-agnostic: it parses, enforces the strict subset, and lowers everything
+to one shared type model. The generator emits that model for each target. The
+per-file document concerns the Parse step decides first — the two file modes and
+the `nexusrpc` / `$schema` root rules — live in [[input-files]]. See
+[PRINCIPLES.md](PRINCIPLES.md) and `features/<keyword>.md` for detail.
 
 *(Status: open — the JSON Schema front end takes the emitted target through
 parse: inline-shape hoist naming, identifier validation and `x-<lang>-name`
@@ -30,8 +29,8 @@ with every graph edge through it.
 Each source in that closure marks its exported type declarations: its file-root
 model when present, every referenced model in its `$defs` tree, and source-owned
 models synthesized for inline operation inputs or outputs. This neutral
-declaration metadata travels with the shared IR into reachability, and **no
-shared pass infers a source's public surface from external-type kind** —
+declaration metadata travels with the shared IR into reachability, and
+**no shared pass infers a source's public surface from external-type kind** —
 retention is driven by the declaration metadata alone. *(Status: open — the
 reachability and emitted-name passes do still branch on the JSON external-type
 kind for naming and traversal, so the stronger property, that no later shared

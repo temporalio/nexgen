@@ -1,8 +1,8 @@
 # Advanced: WIT-direct generation
 
 > [!WARNING]
-> This repository is experimental. Generated APIs, input formats, and CLI behavior
-> may change without compatibility guarantees.
+> This repository is experimental. Generated APIs, input formats, and CLI
+> behavior may change without compatibility guarantees.
 
 This is the advanced guide. For the JSON Schema getting-started guide, see the
 [root README](../README.md).
@@ -19,13 +19,12 @@ The generator picks its input format from the file extension, so the same
 
 > [!IMPORTANT]
 > The `dotnet` target, the `--descriptors`, `--format`, and `--native-api`
-> flags, and the `add-rpc` and
-> `debug-wit-dir` subcommands — is
-> gated behind the `advanced` Cargo feature, which is off by default. Build or
-> run with `--features advanced` (as every command below does), or produce a
-> binary that includes it with `cargo build --release --features advanced`.
-> The `cargo build-examples` alias instead runs
-> the repository-local `xtask` binary; they are not `nexgen` subcommands.
+> flags, and the `add-rpc` and `debug-wit-dir` subcommands — is gated behind the
+> `advanced` Cargo feature, which is off by default. Build or run with
+> `--features advanced` (as every command below does), or produce a binary that
+> includes it with `cargo build --release --features advanced`. The
+> `cargo build-examples` alias instead runs the repository-local `xtask` binary;
+> they are not `nexgen` subcommands.
 
 ## Contents
 
@@ -38,11 +37,12 @@ The generator picks its input format from the file extension, so the same
 ## Examples
 
 Each example starts with authored WIT under `advanced/samples/inputs/`.
-Checked-in generated output lives under `advanced/samples/python/wit/<example_name>/`
-and `advanced/samples/typescript/wit/<example-name>/`; Go output lives under
+Checked-in generated output lives under
+`advanced/samples/python/wit/<example_name>/` and
+`advanced/samples/typescript/wit/<example-name>/`; Go output lives under
 `advanced/samples/go/<example-name>/` and .NET output lives under
-`advanced/samples/dotnet/wit/<example-name>/`. Language-specific tests live under
-each language's `tests/` directory where present. See
+`advanced/samples/dotnet/wit/<example-name>/`. Language-specific tests live
+under each language's `tests/` directory where present. See
 [`samples/README.md`](samples/README.md) for links to each example's WIT,
 generated code, and tests.
 
@@ -53,14 +53,30 @@ authored language-specific Temporal converters live in each sample project:
 `support_package` for each output; generated example directories may be safely
 replaced without deleting these authored helpers.
 
-- [`user-service`](samples/inputs/user-service.wit): a small WIT-direct API showing the basic shape of an operation returning a resource and a resource method that calls another operation.
-- [`type-showcase`](samples/inputs/type-showcase.wit): a WIT-direct API focused on type coverage, including records, enums, flags, variants, results, maps, tuples, resources, resource methods, and no-result operations.
-- [`start-workflow`](samples/inputs/start-workflow.wit): a proto-backed Temporal workflow-start API that returns a generated resource handle with follow-up operations such as cancel, restart, and get-result.
-- [`workflow-service`](samples/inputs/workflow-service.wit): a proto-backed `SignalWithStartWorkflowExecution` example showing flattened APIs, function arguments, sourced fields, support converters, and output transforms.
-- [`type-roundtrip`](samples/inputs/type-roundtrip.wit): a proto-backed type roundtrip example for focused native/proto conversion coverage, including retry policies, activity options, durations, task queues, and priority.
-- [`notification-service`](samples/inputs/notification-service.wit): a proto-backed notification completion payload with generic source-context and output values, generated for Python and .NET.
-- [`proto-oneof`](samples/inputs/proto-oneof.wit): proto-backed models with required and optional protobuf oneofs, including a generic `Payloads`-carried case, generated for Python and .NET.
-- [`proto-generic`](samples/inputs/proto-generic.wit): generic proto-backed models whose type parameters are carried by `Payload` fields through nested records, generated for Python and .NET.
+- [`user-service`](samples/inputs/user-service.wit): a small WIT-direct API
+  showing the basic shape of an operation returning a resource and a resource
+  method that calls another operation.
+- [`type-showcase`](samples/inputs/type-showcase.wit): a WIT-direct API focused
+  on type coverage, including records, enums, flags, variants, results, maps,
+  tuples, resources, resource methods, and no-result operations.
+- [`start-workflow`](samples/inputs/start-workflow.wit): a proto-backed Temporal
+  workflow-start API that returns a generated resource handle with follow-up
+  operations such as cancel, restart, and get-result.
+- [`workflow-service`](samples/inputs/workflow-service.wit): a proto-backed
+  `SignalWithStartWorkflowExecution` example showing flattened APIs, function
+  arguments, sourced fields, support converters, and output transforms.
+- [`type-roundtrip`](samples/inputs/type-roundtrip.wit): a proto-backed type
+  roundtrip example for focused native/proto conversion coverage, including
+  retry policies, activity options, durations, task queues, and priority.
+- [`notification-service`](samples/inputs/notification-service.wit): a
+  proto-backed notification completion payload with generic source-context and
+  output values, generated for Python and .NET.
+- [`proto-oneof`](samples/inputs/proto-oneof.wit): proto-backed models with
+  required and optional protobuf oneofs, including a generic `Payloads`-carried
+  case, generated for Python and .NET.
+- [`proto-generic`](samples/inputs/proto-generic.wit): generic proto-backed
+  models whose type parameters are carried by `Payload` fields through nested
+  records, generated for Python and .NET.
 
 Rebuild the checked-in example outputs:
 
@@ -174,11 +190,15 @@ to run a formatter after generation:
 - Go: `gofmt -w`
 - .NET: no formatter is run
 
-The `user-service` example is intentionally small and WIT-native. The `type-showcase` example demonstrates broader WIT type coverage: records, enums, flags, variants, results, maps, tuples, resources, resource methods, and an operation with no return value without proto annotations.
+The `user-service` example is intentionally small and WIT-native. The
+`type-showcase` example demonstrates broader WIT type coverage: records, enums,
+flags, variants, results, maps, tuples, resources, resource methods, and an
+operation with no return value without proto annotations.
 
 ## WIT Directives
 
-The WIT file defines the public surface. `@nexus` directives carry the parts WIT does not express directly:
+The WIT file defines the public surface. `@nexus` directives carry the parts WIT
+does not express directly:
 
 - service endpoint names
 - service wire names
@@ -191,9 +211,13 @@ The WIT file defines the public surface. `@nexus` directives carry the parts WIT
 - output transforms
 - explicit resource method operation bindings
 - experimental service, operation, and record warnings
-- `@nexus.delay-load-temporalio-workflow` on Python services that must not import `temporalio.workflow` until an operation executes
+- `@nexus.delay-load-temporalio-workflow` on Python services that must not
+  import `temporalio.workflow` until an operation executes
 
-Resource methods bind to operations only when the method and operation have the same generated operation name. When they intentionally differ, mark the method with `@nexus.operation`, for example `/// @nexus.operation "cancel-workflow"` on `cancel: func(...)` to bind it to `cancel-workflow: func(...)`.
+Resource methods bind to operations only when the method and operation have the
+same generated operation name. When they intentionally differ, mark the method
+with `@nexus.operation`, for example `/// @nexus.operation "cancel-workflow"` on
+`cancel: func(...)` to bind it to `cancel-workflow: func(...)`.
 
 Input WIT files can set generated service namespaces/packages with
 `@nexus.namespace`, such as `dotnet="Temporalio.Workflows"` or
@@ -201,10 +225,10 @@ Input WIT files can set generated service namespaces/packages with
 used as the package name and the full path is used to remove self-imports.
 
 Go, Python, TypeScript and .NET WIT generation require one `--support-package`
-import path or namespace per invocation; JSON Schema generation does not.
-The package is hand-written and
-stays in the user's project; nexgen imports its helpers instead of reading,
-copying, or generating that code. Java does not use this option. Follow the
+import path or namespace per invocation; JSON Schema generation does not. The
+package is hand-written and stays in the user's project; nexgen imports its
+helpers instead of reading, copying, or generating that code. Java does not use
+this option. Follow the
 [per-language setup and helper contract](../GUIDE.md#integrating-a-support-package)
 before running generation. For example:
 
@@ -218,18 +242,22 @@ cargo run --features advanced -- python \
 `@nexus.source` values are calls to helpers in the configured support package.
 Include the call and its arguments, but do not add the package prefix (for
 example `python="workflow_namespace()"` or `go="WorkflowNamespace(ctx)"`).
-Nexgen adds the prefix and imports support. `@nexus.output-transform`
-remains a raw authored expression.
+Nexgen adds the prefix and imports support. `@nexus.output-transform` remains a
+raw authored expression.
 
 ## Proto Backing
 
-Proto backing is opt-in per WIT type. Use it when an operation should accept or return generated API models while converting to or from protobuf messages at the Nexus boundary.
+Proto backing is opt-in per WIT type. Use it when an operation should accept or
+return generated API models while converting to or from protobuf messages at the
+Nexus boundary.
 
 Proto-backed WIT uses:
 
-- `@nexus.proto` on a WIT type to identify the protobuf message or enum it represents
+- `@nexus.proto` on a WIT type to identify the protobuf message or enum it
+  represents
 - `@nexus.proto-field` when the WIT field name differs from the proto field name
-- `--descriptors` on `generate` so the generator can validate fields and derive proto conversion code
+- `--descriptors` on `generate` so the generator can validate fields and derive
+  proto conversion code
 
 Example:
 
@@ -286,30 +314,32 @@ cargo run --features advanced -- python \
   --output /tmp/workflow_service
 ```
 
-`--descriptors` can be passed more than once when a proto-backed API depends on multiple descriptor files. Duplicate files or duplicate symbols are rejected.
+`--descriptors` can be passed more than once when a proto-backed API depends on
+multiple descriptor files. Duplicate files or duplicate symbols are rejected.
 
 The examples include a reusable Temporal semantic/common type WIT input:
 
 - `nexus:temporal-types/model@1.0.0`
 
 Pass it as an additional positional input when generating an API that uses
-`nexus:temporal-types/model@1.0.0`. For `generate`, the first positional input is
-the API generation root and later inputs are linked into the parser workspace.
-For `add-rpc`, pass any WIT inputs needed to resolve shared types with `--input`;
-when extending an existing WIT file, put that file first. A linked input can be a
-single WIT file, a WIT package directory, or a directory containing WIT package
-directories, so `advanced/samples/inputs/deps` links every package under it.
+`nexus:temporal-types/model@1.0.0`. For `generate`, the first positional input
+is the API generation root and later inputs are linked into the parser
+workspace. For `add-rpc`, pass any WIT inputs needed to resolve shared types
+with `--input`; when extending an existing WIT file, put that file first. A
+linked input can be a single WIT file, a WIT package directory, or a directory
+containing WIT package directories, so `advanced/samples/inputs/deps` links
+every package under it.
 
 `add-message` follows the same input convention. Repeat `--message` to select
 multiple messages, or pass `--file` with a proto file name from the descriptor
-set (for example `acme/oneof/v1/service.proto`) to select all its messages.
-Both options can be combined. A descriptor set binary is supplied with
+set (for example `acme/oneof/v1/service.proto`) to select all its messages. Both
+options can be combined. A descriptor set binary is supplied with
 `--descriptors`; `--file` is the name of a proto source inside that set, not a
 path to a proto file on disk. The selections and all reachable proto
 message/enum types are emitted together without adding an operation. A
-standalone scaffold with multiple messages exports an interface named `messages`;
-one with a single message retains the message-derived interface name. The
-operation-free interface still emits and re-exports its owned model
+standalone scaffold with multiple messages exports an interface named
+`messages`; one with a single message retains the message-derived interface
+name. The operation-free interface still emits and re-exports its owned model
 declarations; linked dependency declarations remain tree-shaken unless an owned
 model references them. When extending an existing WIT file, its world must
 export exactly one interface.
@@ -318,21 +348,21 @@ export exactly one interface.
 
 Both scaffold commands reconcile reachable mapped records: `add-message` starts
 at the selected messages, and `add-rpc` starts at the request and response.
-Adding a new RPC and updating an existing RPC use the same model checks.
-Missing owned records and fields are added, including grouped oneof fields.
-Incompatible mappings and fields removed from the proto produce an error rather
-than deleting authored WIT.
+Adding a new RPC and updating an existing RPC use the same model checks. Missing
+owned records and fields are added, including grouped oneof fields. Incompatible
+mappings and fields removed from the proto produce an error rather than deleting
+authored WIT.
 
-Reconciliation follows mapped child records, visiting shared messages once,
-but preserves explicit omissions, compatible substitutions, opaque
-external type mappings, and supported proto carrier type parameters such as
-`output-t`. Linked records are checked without editing their dependency files;
-an incomplete linked record must be fixed in its owning WIT package.
-Comparing the resulting WIT with the checked-in input catches missing
-declarations in CI. A second run on reconciled WIT makes no further changes.
-The completed scaffold is parsed before it is returned or written. A recursive
-proto graph that cannot be represented by WIT record types fails validation;
-an opaque mapping can intentionally stop expansion at that boundary.
+Reconciliation follows mapped child records, visiting shared messages once, but
+preserves explicit omissions, compatible substitutions, opaque external type
+mappings, and supported proto carrier type parameters such as `output-t`. Linked
+records are checked without editing their dependency files; an incomplete linked
+record must be fixed in its owning WIT package. Comparing the resulting WIT with
+the checked-in input catches missing declarations in CI. A second run on
+reconciled WIT makes no further changes. The completed scaffold is parsed before
+it is returned or written. A recursive proto graph that cannot be represented by
+WIT record types fails validation; an opaque mapping can intentionally stop
+expansion at that boundary.
 
 ### Protobuf oneofs
 
@@ -342,17 +372,18 @@ oneof—even when the message contains only one oneof. Scaffolding stays optiona
 because protobuf descriptors permit a oneof to be unset. Authors can remove
 `option<>` to assert that exactly one case is required by their model. Existing
 WIT mappings must use the same grouped-record shape. Reused variants may have
-custom WIT names; their `@nexus.proto` source, cases, and payloads are validated.
-Proto oneof member names must round-trip through WIT's snake-case wire naming;
-the scaffolder rejects a name that cannot be represented without changing it.
+custom WIT names; their `@nexus.proto` source, cases, and payloads are
+validated. Proto oneof member names must round-trip through WIT's snake-case
+wire naming; the scaffolder rejects a name that cannot be represented without
+changing it.
 
-Python native-API generation converts both authored shapes bidirectionally.
-For `option<variant>`, an unset protobuf oneof decodes to `None`, and encoding
+Python native-API generation converts both authored shapes bidirectionally. For
+`option<variant>`, an unset protobuf oneof decodes to `None`, and encoding
 `None` leaves the oneof unset. A required `variant` has no `None` annotation or
-constructor default; decoding an unset oneof or encoding a runtime `None`
-raises `ValueError("missing required field Model.field")`. Each selected case
-uses the normal WIT variant tuple form `(tag, payload)`, and unknown authored
-tags continue to raise `ValueError`.
+constructor default; decoding an unset oneof or encoding a runtime `None` raises
+`ValueError("missing required field Model.field")`. Each selected case uses the
+normal WIT variant tuple form `(tag, payload)`, and unknown authored tags
+continue to raise `ValueError`.
 
 .NET native-API generation converts both shapes as well: the containing model
 switches over the protobuf oneof case to construct the variant's nested case
@@ -389,7 +420,8 @@ cargo run --features advanced -- add-message \
   --input advanced/samples/inputs/deps
 ```
 
-Add several messages, or every message defined in a proto file in the descriptor set:
+Add several messages, or every message defined in a proto file in the descriptor
+set:
 
 ```bash
 cargo run --features advanced -- add-message \
@@ -456,6 +488,6 @@ npm run typecheck
 ```
 
 `cargo test --all-features` runs Rust-only checks without language toolchains.
-Use `cargo validate <language>` to check generated sample freshness and run
-that language's compilation and runtime tests, or `cargo validate` for all
-languages. Use `cargo build-examples` when you want to refresh the samples.
+Use `cargo validate <language>` to check generated sample freshness and run that
+language's compilation and runtime tests, or `cargo validate` for all languages.
+Use `cargo build-examples` when you want to refresh the samples.

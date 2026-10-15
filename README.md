@@ -1,10 +1,10 @@
 # nexgen
 
-Generate code for Go, Java, Python, and TypeScript from **NexusRPC definition
-files** describing your services and the types they exchange. Each type becomes a
-typed model with a runtime validator, wired to the **Nexus service bindings** —
-one contract, shared across every language. Types are modeled with **JSON Schema
-2020-12**.
+Generate code for Go, Java, Python, and TypeScript from
+**NexusRPC definition files** describing your services and the types they
+exchange. Each type becomes a typed model with a runtime validator, wired to the
+**Nexus service bindings** — one contract, shared across every language. Types
+are modeled with **JSON Schema 2020-12**.
 
 > [!WARNING]
 > Under active development. The supported JSON Schema subset, CLI options, and
@@ -12,8 +12,8 @@ one contract, shared across every language. Types are modeled with **JSON Schema
 
 ## What it does
 
-Point `nexgen` at a definition file and it emits, per language, a typed model for
-every type in your schema plus one **shared validator** behind it. The same
+Point `nexgen` at a definition file and it emits, per language, a typed model
+for every type in your schema plus one **shared validator** behind it. The same
 validator runs on both sides of the wire — when a value is parsed and when it is
 serialized — so a payload can never enter or leave your service in a shape the
 contract forbids.
@@ -37,14 +37,14 @@ For contributor validation, changelog fragments, and releases, see
 Download the archive for your platform from the
 [latest GitHub release](https://github.com/temporalio/nexgen/releases/latest):
 
-| Platform | Archive target |
-| --- | --- |
-| Linux (x86-64) | `x86_64-unknown-linux-gnu` |
-| Linux (Arm64) | `aarch64-unknown-linux-gnu` |
-| macOS (Intel) | `x86_64-apple-darwin` |
-| macOS (Apple silicon) | `aarch64-apple-darwin` |
-| Windows (x86-64) | `x86_64-pc-windows-msvc` |
-| Windows (Arm64) | `aarch64-pc-windows-msvc` |
+| Platform              | Archive target              |
+| --------------------- | --------------------------- |
+| Linux (x86-64)        | `x86_64-unknown-linux-gnu`  |
+| Linux (Arm64)         | `aarch64-unknown-linux-gnu` |
+| macOS (Intel)         | `x86_64-apple-darwin`       |
+| macOS (Apple silicon) | `aarch64-apple-darwin`      |
+| Windows (x86-64)      | `x86_64-pc-windows-msvc`    |
+| Windows (Arm64)       | `aarch64-pc-windows-msvc`   |
 
 Extract the archive, then move `nexgen` (`nexgen.exe` on Windows) to a directory
 on your `PATH`.
@@ -53,20 +53,20 @@ on your `PATH`.
 
 Generated code requires at least these Temporal SDK and Nexus SDK versions:
 
-| Language | Temporal SDK | Nexus SDK |
-| --- | --- | --- |
-| Go | `go.temporal.io/sdk` v1.48.0 | `github.com/nexus-rpc/sdk-go` v0.7.0 |
-| Java | `io.temporal:temporal-sdk` 1.39.0 | `io.nexusrpc:nexus-sdk` 0.6.0-alpha |
-| Python | `temporalio` 1.32.0 | `nexus-rpc` 1.4.0 |
-| TypeScript | `@temporalio/*` 1.23.0 | `nexus-rpc` 0.0.3 |
+| Language   | Temporal SDK                      | Nexus SDK                            |
+| ---------- | --------------------------------- | ------------------------------------ |
+| Go         | `go.temporal.io/sdk` v1.48.0      | `github.com/nexus-rpc/sdk-go` v0.7.0 |
+| Java       | `io.temporal:temporal-sdk` 1.39.0 | `io.nexusrpc:nexus-sdk` 0.6.0-alpha  |
+| Python     | `temporalio` 1.32.0               | `nexus-rpc` 1.4.0                    |
+| TypeScript | `@temporalio/*` 1.23.0            | `nexus-rpc` 0.0.3                    |
 
 Keep all TypeScript `@temporalio/*` packages on the same version. Python's
 `temporalio` package installs its compatible `nexus-rpc` version transitively;
 declare `nexus-rpc` directly only if your dependency tooling requires it.
 
-Generated Java source uses JSpecify's `@NullMarked` and `@Nullable`
-annotations. Add JSpecify 1.0.0 to the compile classpath; it is not needed at
-runtime. For Gradle:
+Generated Java source uses JSpecify's `@NullMarked` and `@Nullable` annotations.
+Add JSpecify 1.0.0 to the compile classpath; it is not needed at runtime. For
+Gradle:
 
 ```groovy
 dependencies {
@@ -137,8 +137,8 @@ nexgen java samples/schemas/showcase.nexusrpc.yaml \
   --output ./gen/com/example/showcase --package-name com.example.showcase
 ```
 
-Choose how TypeScript represents temporal `format` fields (date-time, date, time,
-duration) in memory:
+Choose how TypeScript represents temporal `format` fields (date-time, date,
+time, duration) in memory:
 
 ```bash
 nexgen ts samples/schemas/temporal.yaml --output ./gen --date-time-types temporal
@@ -146,22 +146,23 @@ nexgen ts samples/schemas/temporal.yaml --output ./gen --date-time-types tempora
 
 - **`string`** (default) — every temporal field stays an RFC 3339 / ISO 8601
   string, exactly as it appears on the wire. No runtime dependency, runs on any
-  Node or browser, and round-trips losslessly (the original offset and sub-second
-  precision are preserved). The cost: you parse and compare the strings yourself,
-  and the type system won't distinguish a timestamp from any other `string`.
+  Node or browser, and round-trips losslessly (the original offset and
+  sub-second precision are preserved). The cost: you parse and compare the
+  strings yourself, and the type system won't distinguish a timestamp from any
+  other `string`.
 - **`date`** — `date-time` fields become a native JS `Date`; `date`, `time`, and
   `duration` stay strings, because a `Date` can't represent a date-only,
-  time-only, or duration value. Convenient for instant math via `.getTime()`, but
-  **lossy**: a `Date` is a UTC instant, so the original offset is folded away
-  (`2021-06-15T12:30:45.123456+02:00` → `2021-06-15T10:30:45.123Z`) and precision
-  is capped at milliseconds. Reach for it only when you already work in `Date`
-  and don't care about the offset.
+  time-only, or duration value. Convenient for instant math via `.getTime()`,
+  but **lossy**: a `Date` is a UTC instant, so the original offset is folded
+  away (`2021-06-15T12:30:45.123456+02:00` → `2021-06-15T10:30:45.123Z`) and
+  precision is capped at milliseconds. Reach for it only when you already work
+  in `Date` and don't care about the offset.
 - **`temporal`** — full-fidelity typed values from the TC39 Temporal API:
   `date-time` → `Temporal.ZonedDateTime`, `date` → `Temporal.PlainDate`,
   `duration` → `Temporal.Duration` (`time` stays a string). Preserves offset and
   sub-second precision and gives you real calendar/duration arithmetic, at the
-  cost of requiring the `Temporal` global — present in recent runtimes, otherwise
-  a polyfill.
+  cost of requiring the `Temporal` global — present in recent runtimes,
+  otherwise a polyfill.
 
 See what the output looks like without generating it yourself: the checked-in
 results live under `samples/{go,typescript,python,java}/`.
@@ -186,9 +187,9 @@ properties:
 required: [roomId]
 ```
 
-**Nexus document** — opt in with a root `nexusrpc: "1.0.0"` marker, which enables
-a `services` section. Now the root is an envelope: services and operations live
-at the top, and your types live in `$defs`:
+**Nexus document** — opt in with a root `nexusrpc: "1.0.0"` marker, which
+enables a `services` section. Now the root is an envelope: services and
+operations live at the top, and your types live in `$defs`:
 
 ```yaml
 nexusrpc: "1.0.0"
@@ -215,16 +216,17 @@ $defs:
     required: [messageId]
 ```
 
-An operation's `input` and `output` are each optional. When present, each must be
-an object type (this keeps schemas forward-compatible — a scalar today can't grow
-fields later). An omitted side simply means no input, or no output, for that
-direction.
+An operation's `input` and `output` are each optional. When present, each must
+be an object type (this keeps schemas forward-compatible — a scalar today can't
+grow fields later). An omitted side simply means no input, or no output, for
+that direction.
 
 The [`samples/schemas/`](samples/schemas/) directory holds example definitions:
 the pure-schema [`temporal.yaml`](samples/schemas/temporal.yaml), the Nexus
 document [`chat.nexusrpc.yaml`](samples/schemas/chat.nexusrpc.yaml), the
-feature-diverse [`showcase.nexusrpc.yaml`](samples/schemas/showcase.nexusrpc.yaml),
-and the multi-file closure under [`kb/`](samples/schemas/kb/).
+feature-diverse
+[`showcase.nexusrpc.yaml`](samples/schemas/showcase.nexusrpc.yaml), and the
+multi-file closure under [`kb/`](samples/schemas/kb/).
 
 ## Naming & overrides
 
@@ -266,13 +268,13 @@ $defs:
         x-java-const-name: SCHEMA_VERSION_V2
 ```
 
-`x-<lang>-name` sets the emitted identifier — one keyword per target: `x-go-name`,
-`x-ts-name`, `x-py-name` (note: the token is `py`, not `python`), and
-`x-java-name`. For the languages that emit *named* constants, `x-go-const-name` /
-`x-java-const-name` name the identifier for a `const`, and `x-go-enum-names` /
-`x-java-enum-names` name each `enum` member (keyed by its wire value). TypeScript
-and Python have no equivalent, because there a constant or enum member *is* its
-literal value.
+`x-<lang>-name` sets the emitted identifier — one keyword per target:
+`x-go-name`, `x-ts-name`, `x-py-name` (note: the token is `py`, not `python`),
+and `x-java-name`. For the languages that emit *named* constants,
+`x-go-const-name` / `x-java-const-name` name the identifier for a `const`, and
+`x-go-enum-names` / `x-java-enum-names` name each `enum` member (keyed by its
+wire value). TypeScript and Python have no equivalent, because there a constant
+or enum member *is* its literal value.
 
 ## Known cross-language divergences
 
@@ -280,93 +282,93 @@ Three edge cases do not yet behave identically in every target:
 
 - **Negative zero:** TypeScript serializes JSON `-0` as `0`. Go, Java, and
   Python preserve the sign.
-- **A very large fractional integer:** the JSON number
-  `4503599627370496.5` is rounded before validation by Python and TypeScript,
-  so they accept it as an integer. Go and Java retain the original `.5` and
-  reject it.
+- **A very large fractional integer:** the JSON number `4503599627370496.5` is
+  rounded before validation by Python and TypeScript, so they accept it as an
+  integer. Go and Java retain the original `.5` and reject it.
 - **Nanosecond timestamps in Python:** Python timestamps hold only six
-  fractional digits, so a value such as `.123456789` is re-emitted as
-  `.123456`. Go, Java, and TypeScript preserve all nine digits.
+  fractional digits, so a value such as `.123456789` is re-emitted as `.123456`.
+  Go, Java, and TypeScript preserve all nine digits.
 
 The conformance tests pin these differences so that any change is noticed.
 
 ## Supported JSON Schema features
 
-Support levels: **Full** (works as specified), **Partial** (a documented subset),
-**No** (deliberately rejected with a fix-it), **Planned** (accepted or deferred,
-not yet lowered).
+Support levels: **Full** (works as specified), **Partial** (a documented
+subset), **No** (deliberately rejected with a fix-it), **Planned** (accepted or
+deferred, not yet lowered).
 
 ### Core & objects
 
-| Feature | Support | Notes |
-|---|---|---|
-| `properties` | Full | Typed struct fields. |
-| `required` | Full | Presence enforced at runtime. |
-| `type` | Partial | Single-string form only; the array form is rejected. |
-| `default` | Full | Scalar; off-the-wire, materialized on read, never echoed. |
-| `additionalProperties` | Partial | Open (default), closed (`false`), or typed map (typed value). |
-| `minProperties` / `maxProperties` | Full | Runtime member count. |
-| `propertyNames` | Partial | Only on a map-shaped object. |
-| `dependentRequired` | Full | Runtime conditional-requirement assertion. |
+| Feature                           | Support | Notes                                                         |
+| --------------------------------- | ------- | ------------------------------------------------------------- |
+| `properties`                      | Full    | Typed struct fields.                                          |
+| `required`                        | Full    | Presence enforced at runtime.                                 |
+| `type`                            | Partial | Single-string form only; the array form is rejected.          |
+| `default`                         | Full    | Scalar; off-the-wire, materialized on read, never echoed.     |
+| `additionalProperties`            | Partial | Open (default), closed (`false`), or typed map (typed value). |
+| `minProperties` / `maxProperties` | Full    | Runtime member count.                                         |
+| `propertyNames`                   | Partial | Only on a map-shaped object.                                  |
+| `dependentRequired`               | Full    | Runtime conditional-requirement assertion.                    |
 
 ### Strings & numbers
 
-| Feature | Support | Notes |
-|---|---|---|
-| `minLength` / `maxLength` | Full | Runtime code-point count. |
-| `minimum` / `maximum` | Full | Runtime comparison. |
-| `exclusiveMinimum` / `exclusiveMaximum` | Full | Runtime comparison. |
-| `const` | Partial | Scalar values only; composite deferred. |
-| `enum` | Partial | Scalar values only; composite deferred. |
-| `format` | Partial | Curated portable subset, each asserted at runtime. |
-| `pattern` | Partial | Portable RE2-safe subset only. |
-| `multipleOf` | Partial | Positive integer divisor only. |
-| `contentEncoding` | Partial | `base64` / `base64url` only, materialized to native bytes. |
+| Feature                                 | Support | Notes                                                      |
+| --------------------------------------- | ------- | ---------------------------------------------------------- |
+| `minLength` / `maxLength`               | Full    | Runtime code-point count.                                  |
+| `minimum` / `maximum`                   | Full    | Runtime comparison.                                        |
+| `exclusiveMinimum` / `exclusiveMaximum` | Full    | Runtime comparison.                                        |
+| `const`                                 | Partial | Scalar values only; composite deferred.                    |
+| `enum`                                  | Partial | Scalar values only; composite deferred.                    |
+| `format`                                | Partial | Curated portable subset, each asserted at runtime.         |
+| `pattern`                               | Partial | Portable RE2-safe subset only.                             |
+| `multipleOf`                            | Partial | Positive integer divisor only.                             |
+| `contentEncoding`                       | Partial | `base64` / `base64url` only, materialized to native bytes. |
 
 ### Arrays
 
-| Feature | Support | Notes |
-|---|---|---|
-| `items` | Full | Homogeneous list (`type: array` + single `items`). |
-| `minItems` / `maxItems` | Full | Runtime element count. |
-| `minContains` / `maxContains` | Full | Runtime match-count bounds. |
-| `uniqueItems` | Partial | Scalar element types only. |
-| `contains` | Partial | Scalar matcher over scalar elements only. |
+| Feature                       | Support | Notes                                              |
+| ----------------------------- | ------- | -------------------------------------------------- |
+| `items`                       | Full    | Homogeneous list (`type: array` + single `items`). |
+| `minItems` / `maxItems`       | Full    | Runtime element count.                             |
+| `minContains` / `maxContains` | Full    | Runtime match-count bounds.                        |
+| `uniqueItems`                 | Partial | Scalar element types only.                         |
+| `contains`                    | Partial | Scalar matcher over scalar elements only.          |
 
 ### Composition & nullability
 
-| Feature | Support | Notes |
-|---|---|---|
-| `allOf` | Full | Load-time merge into one schema; only contradictory/unrepresentable branches reject. |
-| nullability | Full | The recognized `oneOf: [{type: T}, {type: "null"}]` pattern. |
-| `oneOf` | Partial | Branches must be separable by a decidable selector (≥2 branches). |
-| `$ref` / `$defs` | Partial | Named targets in local files only; no `$id`, no remote. |
-| `anyOf` | No | No coherent typed lowering in the strict subset. |
-| `not` | No | Negation has no coherent typed lowering. |
-| `if` / `then` / `else` | No | Conditional shape has no coherent lowering. |
-| `dependentSchemas` | No | Branches object shape on a runtime condition. |
-| `prefixItems` | No | Positional tuples don't lower coherently across targets. |
-| `unevaluatedProperties` / `unevaluatedItems` | No | No coherent lowering in the strict subset. |
-| `contentMediaType` / `contentSchema` | No | No coherent lowering / nowhere to emit. |
+| Feature                                      | Support | Notes                                                                                |
+| -------------------------------------------- | ------- | ------------------------------------------------------------------------------------ |
+| `allOf`                                      | Full    | Load-time merge into one schema; only contradictory/unrepresentable branches reject. |
+| nullability                                  | Full    | The recognized `oneOf: [{type: T}, {type: "null"}]` pattern.                         |
+| `oneOf`                                      | Partial | Branches must be separable by a decidable selector (≥2 branches).                    |
+| `$ref` / `$defs`                             | Partial | Named targets in local files only; no `$id`, no remote.                              |
+| `anyOf`                                      | No      | No coherent typed lowering in the strict subset.                                     |
+| `not`                                        | No      | Negation has no coherent typed lowering.                                             |
+| `if` / `then` / `else`                       | No      | Conditional shape has no coherent lowering.                                          |
+| `dependentSchemas`                           | No      | Branches object shape on a runtime condition.                                        |
+| `prefixItems`                                | No      | Positional tuples don't lower coherently across targets.                             |
+| `unevaluatedProperties` / `unevaluatedItems` | No      | No coherent lowering in the strict subset.                                           |
+| `contentMediaType` / `contentSchema`         | No      | No coherent lowering / nowhere to emit.                                              |
 
 ### Annotations & Nexus
 
-| Feature | Support | Notes |
-|---|---|---|
-| `title` / `description` | Full | Emitted as doc-comment summary/body. |
-| `deprecated` | Full | Native deprecation marker + doc note. |
-| `$comment` | Full | Accepted, silently dropped. |
-| `services` / `operations` | Full | First-class (Nexus documents). |
-| `examples` | Planned | Accepted and ignored; pending the doc-comment feature. |
-| `readOnly` | Planned | Deferred; needs request/response split-types. |
-| `writeOnly` | Planned | Deferred; a single type can't hold a per-direction field. |
-| `patternProperties` | Planned | Rejected in v1; a narrow single-pattern form is tracked. |
+| Feature                   | Support | Notes                                                     |
+| ------------------------- | ------- | --------------------------------------------------------- |
+| `title` / `description`   | Full    | Emitted as doc-comment summary/body.                      |
+| `deprecated`              | Full    | Native deprecation marker + doc note.                     |
+| `$comment`                | Full    | Accepted, silently dropped.                               |
+| `services` / `operations` | Full    | First-class (Nexus documents).                            |
+| `examples`                | Planned | Accepted and ignored; pending the doc-comment feature.    |
+| `readOnly`                | Planned | Deferred; needs request/response split-types.             |
+| `writeOnly`               | Planned | Deferred; a single type can't hold a per-direction field. |
+| `patternProperties`       | Planned | Rejected in v1; a narrow single-pattern form is tracked.  |
 
 ## Examples
 
 Sample inputs live under [`samples/schemas/`](samples/schemas/) and their
 generated output — in every language — under
-[`samples/`](samples/)`{go,typescript,python,java}/`. Two are worth starting with:
+[`samples/`](samples/)`{go,typescript,python,java}/`. Two are worth starting
+with:
 
 - [`showcase.nexusrpc.yaml`](samples/schemas/showcase.nexusrpc.yaml) — a tour
   exercising most of the supported subset in one file.
