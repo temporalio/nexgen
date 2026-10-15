@@ -955,6 +955,63 @@ Check.Equal(new System.DateOnly(2024, 2, 29), dates.AdditionalProperties["due"][
 }
 
 #[test]
+fn csharp_json_object_keywords_validate_both_ways() {
+    let case = JsonCase::new("object-keywords");
+    case.write(
+        "shapes.nexusrpc.yaml",
+        r#"nexusrpc: "1.0.0"
+$defs:
+  Defaulted:
+    type: object
+    properties:
+      status: { type: string, enum: [active, inactive], default: active }
+  Contact:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    maxProperties: 3
+    dependentRequired: { email: [name] }
+    properties:
+      name: { type: string }
+      email: { type: string }
+      phone: { type: string }
+  Trigger:
+    type: object
+    properties: { fire: { type: string } }
+    dependentRequired: { fire: [] }
+  Open:
+    type: object
+    properties: { a: { type: string } }
+  Empty:
+    type: object
+    additionalProperties: false
+"#,
+    );
+    let output = case.generate(&["shapes.nexusrpc.yaml"]);
+    // An enum default is typed as the closed value class.
+    assert_has(
+        output.file("Models.cs"),
+        &["public StatusValue StatusOrDefault => Status ?? StatusValue.Active;"],
+    );
+    case.run(
+        r#"Check.Equal(Defaulted.StatusValue.Active, Check.Parse<Defaulted>("{}").StatusOrDefault, "enum default");
+Check.ParseFails<Contact>("{}", "must have at least 1 properties");
+Check.ParseFails<Contact>("{\"email\":\"e\"}", "name: ");
+Check.RoundTrip<Contact>("{\"name\":\"n\",\"email\":\"e\"}");
+Check.WriteFails(new Contact(), "must have at least 1 properties");
+Check.WriteFails(new Contact { Email = "e" }, "name: ");
+Check.RoundTrip<Trigger>("{\"fire\":\"t\"}");
+Check.ParseFails<Empty>("{\"a\":1}", "a: unknown field");
+Check.RoundTrip<Empty>("{}");
+var open = Check.RoundTrip<Open>("{\"a\":\"x\",\"extra\":{\"n\":1.50}}");
+Check.Equal("{\"n\":1.50}", open.AdditionalProperties["extra"].GetRawText(), "unknown members stay verbatim");
+Check.WriteFails(
+    new Open { AdditionalProperties = new System.Collections.Generic.Dictionary<string, System.Text.Json.JsonElement> { ["a"] = System.Text.Json.JsonDocument.Parse("1").RootElement } },
+    "a: ");"#,
+    );
+}
+
+#[test]
 fn csharp_json_min_properties_counts_distinct_keys() {
     let case = JsonCase::new("min-properties");
     case.write(
