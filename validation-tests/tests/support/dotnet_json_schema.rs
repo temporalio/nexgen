@@ -600,6 +600,22 @@ Check.WriteFails(new Ceiling { Count = 11, Ratio = 2.75 }, "count: must be <= 10
     );
 }
 
+#[test]
+fn csharp_json_exclusive_minimum_excludes_the_bound() {
+    let case = JsonCase::new("exclusive-minimum");
+    case.write(
+        "positive.yaml",
+        "type: object\nproperties:\n  count: { type: integer, exclusiveMinimum: 1 }\n  ratio: { type: number, exclusiveMinimum: 0 }\n",
+    );
+    case.generate(&["positive.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Positive>("{\"count\":2,\"ratio\":0.5}");
+Check.ParseFails<Positive>("{\"count\":1,\"ratio\":0}", "count: must be > 1, got 1", "ratio: must be > 0, got 0");
+Check.ParseFails<Positive>("{\"ratio\":-0}", "ratio: must be > 0");
+Check.WriteFails(new Positive { Count = 1, Ratio = 0 }, "count: must be > 1, got 1", "ratio: must be > 0, got 0");"#,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
