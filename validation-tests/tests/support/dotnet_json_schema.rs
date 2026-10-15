@@ -2515,6 +2515,53 @@ services:
 // ---------------------------------------------------------------------------
 
 #[test]
+fn csharp_json_override_moves_member_derived_names_only() {
+    let case = JsonCase::new("member-derived-names");
+    case.write(
+        "probe.yaml",
+        r#"type: object
+properties:
+  retryCount: { type: integer, default: 3, x-cs-name: Attempts }
+  kind: { type: string, const: widget, x-cs-name: Category }
+  choice: { oneOf: [{ type: string }, { type: integer }], x-cs-name: Pick }
+  address:
+    type: object
+    x-cs-name: Location
+    properties: { street: { type: string } }
+"#,
+    );
+    let output = case.generate(&["probe.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            // Names derived from the member follow the override...
+            "public long AttemptsOrDefault => Attempts ?? 3L;",
+            "public sealed class CategoryValue",
+            "public CategoryValue? Category { get; init; }",
+            "public interface PickUnion",
+            // ...while a hoisted shape keeps its position-derived name (P15).
+            "public ProbeAddress? Location { get; init; }",
+            "public sealed record ProbeAddress\n",
+        ],
+    );
+    assert_lacks(
+        models,
+        &[
+            "RetryCountOrDefault",
+            "KindValue",
+            "ChoiceUnion",
+            "ProbeLocation",
+        ],
+    );
+    case.run(
+        r#"var parsed = Check.RoundTrip<Probe.Probe>("{\"retryCount\":5,\"kind\":\"widget\",\"choice\":1,\"address\":{\"street\":\"s\"}}");
+Check.Equal(5L, parsed.AttemptsOrDefault, "renamed default accessor");
+Check.Equal(Probe.Probe.CategoryValue.Widget, parsed.Category, "renamed const");"#,
+    );
+}
+
+#[test]
 fn csharp_json_names_value_constants_from_the_value() {
     let case = JsonCase::new("value-constants");
     case.write(
@@ -2610,6 +2657,244 @@ properties:
     assert_has(
         &collide.generate_err(&["collide.yaml"]),
         &["both map to `Same`"],
+    );
+}
+
+/// Every identifier the C# emitter owns is reserved where it lives, and a
+/// schema that would reuse one is a P15 load reject naming `x-cs-name` —
+/// never a silent rename and never a compile error.
+#[test]
+fn csharp_json_rejects_names_the_emitter_reserves() {
+    let cases: &[(&str, &str)] = &[
+        // Runtime types, in every module scope, used or not.
+        (
+            "type: object\nproperties:\n  x: { $ref: \"#/$defs/Violation\" }\n$defs:\n  Violation: { type: object, properties: { a: { type: string } } }\n",
+            "generated runtime identifier `Violation`",
+        ),
+        (
+            "type: object\nproperties:\n  x: { $ref: \"#/$defs/SpecJson\" }\n$defs:\n  SpecJson: { type: object, properties: { a: { type: string } } }\n",
+            "generated runtime identifier `SpecJson`",
+        ),
+        (
+            "type: object\nproperties:\n  x: { $ref: \"#/$defs/ValueEquality\" }\n$defs:\n  ValueEquality: { type: object, properties: { a: { type: string } } }\n",
+            "generated runtime identifier `ValueEquality`",
+        ),
+        (
+            "type: object\nproperties:\n  x: { $ref: \"#/$defs/TemporalSupport\" }\n$defs:\n  TemporalSupport: { type: object, properties: { a: { type: string } } }\n",
+            "generated runtime identifier `TemporalSupport`",
+        ),
+        (
+            "type: object\nproperties:\n  x: { $ref: \"#/$defs/Base64Support\" }\n$defs:\n  Base64Support: { type: object, properties: { a: { type: string } } }\n",
+            "generated runtime identifier `Base64Support`",
+        ),
+        // Members a record or its converter already declares.
+        (
+            "type: object\nproperties:\n  converter: { type: string }\n",
+            "generated record member `Converter`",
+        ),
+        (
+            "type: object\nproperties:\n  equals: { type: string }\n",
+            "generated record member `Equals`",
+        ),
+        (
+            "type: object\nproperties:\n  getHashCode: { type: string }\n",
+            "generated record member `GetHashCode`",
+        ),
+        (
+            "type: object\nproperties:\n  toString: { type: string }\n",
+            "generated record member `ToString`",
+        ),
+        (
+            "type: object\nproperties:\n  equalityContract: { type: string }\n",
+            "generated record member `EqualityContract`",
+        ),
+        (
+            "type: object\nproperties:\n  deconstruct: { type: string }\n",
+            "generated record member `Deconstruct`",
+        ),
+        (
+            "type: object\nproperties:\n  additionalProperties: { type: string }\n",
+            "additional-properties catch-all",
+        ),
+        // A member named after its enclosing type (CS0542).
+        (
+            "type: object\nproperties:\n  model: { type: string }\n",
+            "`Model`",
+        ),
+        // Names the service file imports.
+        (
+            "nexusrpc: \"1.0.0\"\nservices:\n  Svc:\n    operations:\n      run: { input: { $ref: \"#/$defs/Task\" } }\n$defs:\n  Task: { type: object, properties: { a: { type: string } } }\n",
+            "generated service-file import `Task`",
+        ),
+        // An override that cannot be a C# identifier.
+        (
+            "type: object\nproperties:\n  a: { type: string, x-cs-name: 1st }\n",
+            "x-cs-name",
+        ),
+        (
+            "type: object\nproperties:\n  a: { type: string, x-cs-name: \"\" }\n",
+            "x-cs-name",
+        ),
+    ];
+    // Members of every converter, which would capture a same-module type
+    // name inside a converter body (CS0119/CS0120).
+    for member in [
+        "CanConvert",
+        "GetType",
+        "HandleNull",
+        "MemberwiseClone",
+        "Parse",
+        "Read",
+        "ReadAsPropertyName",
+        "ReferenceEquals",
+        "Type",
+        "Validate",
+        "Write",
+        "WriteAsPropertyName",
+        "WriteValue",
+    ] {
+        let case = JsonCase::new("reserved-converter-member");
+        case.write(
+            "model.yaml",
+            &format!(
+                "type: object\nproperties:\n  x: {{ $ref: \"#/$defs/{member}\" }}\n$defs:\n  {member}: {{ type: object, properties: {{ a: {{ type: string }} }} }}\n"
+            ),
+        );
+        assert_has(
+            &case.generate_err(&["model.yaml"]),
+            &[
+                &format!("generated converter member `{member}`"),
+                "x-cs-name",
+            ],
+        );
+    }
+    // Inherited `object` members, which a record member or a closed-value
+    // constant would hide (CS0108).
+    for (property, member) in [
+        ("getType", "GetType"),
+        ("memberwiseClone", "MemberwiseClone"),
+        ("referenceEquals", "ReferenceEquals"),
+    ] {
+        let case = JsonCase::new("reserved-object-member");
+        case.write(
+            "model.yaml",
+            &format!("type: object\nproperties:\n  {property}: {{ type: string }}\n"),
+        );
+        assert_has(
+            &case.generate_err(&["model.yaml"]),
+            &[
+                &format!("inherited `object` member `{member}`"),
+                "x-cs-name",
+            ],
+        );
+        let constant = JsonCase::new("reserved-object-member-constant");
+        constant.write(
+            "model.yaml",
+            &format!(
+                "type: object\nproperties:\n  mode: {{ type: string, enum: [{property}, other] }}\n"
+            ),
+        );
+        assert_has(
+            &constant.generate_err(&["model.yaml"]),
+            &[
+                &format!("inherited `object` member `{member}`"),
+                "x-cs-enum-names",
+            ],
+        );
+    }
+    for (schema, expected) in cases {
+        let case = JsonCase::new("reserved-name");
+        let file = if schema.starts_with("nexusrpc") {
+            "model.nexusrpc.yaml"
+        } else {
+            "model.yaml"
+        };
+        case.write(file, schema);
+        let error = case.generate_err(&[file]);
+        assert_has(&error, &[expected, "x-cs-name"]);
+    }
+
+    // The override is the fix-it.
+    let fixed = JsonCase::new("reserved-name-fixed");
+    fixed.write(
+        "model.yaml",
+        "type: object\nproperties:\n  converter: { type: string, x-cs-name: ConverterName }\n  model: { type: string, x-cs-name: ModelName }\n  getType: { type: string, x-cs-name: KindName }\n  mode: { type: string, enum: [referenceEquals, other], x-cs-enum-names: { referenceEquals: SameRef } }\n  type: { type: string }\n  read: { type: string }\n  x: { $ref: \"#/$defs/Type\" }\n$defs:\n  Type: { type: object, x-cs-name: TypeInfo, properties: { a: { type: string } } }\n",
+    );
+    fixed.generate(&["model.yaml"]);
+    // Members spelled like converter members are fine: they are always
+    // reached through an instance.
+    fixed.run(
+        r#"var parsed = Check.RoundTrip<Model>("{\"converter\":\"c\",\"model\":\"m\",\"getType\":\"g\",\"mode\":\"referenceEquals\",\"type\":\"t\",\"read\":\"r\",\"x\":{\"a\":\"b\"}}");
+Check.Equal("c", parsed.ConverterName, "renamed member");
+Check.Equal("g", parsed.KindName, "renamed object-member name");
+Check.Equal(Model.ModeValue.SameRef, parsed.Mode, "renamed object-member constant");
+Check.Equal("t", parsed.Type, "a member named Type");
+Check.Equal("b", parsed.X!.A, "a renamed type");"#,
+    );
+}
+
+/// Generated code spells every framework type `global::`-qualified, so a
+/// schema may name its types after the BCL types the converters use.
+#[test]
+fn csharp_json_framework_type_names_do_not_shadow() {
+    let names = [
+        "String",
+        "Object",
+        "Exception",
+        "Math",
+        "Guid",
+        "Uri",
+        "Console",
+        "Nullable",
+        "Encoding",
+        "List",
+        "Dictionary",
+        "HashSet",
+        "IReadOnlyList",
+        "IReadOnlyDictionary",
+        "Enumerable",
+        "JsonElement",
+        "JsonDocument",
+        "JsonValueKind",
+        "JsonSerializer",
+        "Utf8JsonWriter",
+        "Utf8JsonReader",
+        "JsonConverter",
+        "Regex",
+        "RegexOptions",
+        "DateTimeOffset",
+        "DateOnly",
+        "TimeSpan",
+        "Convert",
+        "CultureInfo",
+        "StringComparer",
+        "IEquatable",
+        "GeneratedCode",
+        "Obsolete",
+        "PayloadValidationError",
+    ];
+    let mut schema = String::from(
+        "type: object\nrequired: [stamp]\nproperties:\n  stamp: { type: string, format: date-time }\n  day: { type: string, format: date }\n  span: { type: string, format: duration }\n  blob: { type: string, contentEncoding: base64 }\n  word: { type: string, pattern: \"^[a-z]+$\", minLength: 1 }\n  tags: { type: array, uniqueItems: true, items: { type: number } }\n",
+    );
+    for name in names {
+        schema.push_str(&format!("  my{name}: {{ $ref: \"#/$defs/{name}\" }}\n"));
+    }
+    schema.push_str("$defs:\n");
+    for name in names {
+        schema.push_str(&format!(
+            "  {name}:\n    type: object\n    properties:\n      value: {{ type: string, format: email }}\n      when: {{ type: string, format: date-time }}\n"
+        ));
+    }
+    let case = JsonCase::new("framework-names");
+    case.write("holder.yaml", &schema);
+    case.generate(&["holder.yaml"]);
+    case.run(
+        r#"var parsed = Check.RoundTrip<Holder>(
+    "{\"stamp\":\"2024-01-01T00:00:00Z\",\"day\":\"2024-01-01\",\"span\":\"PT1S\",\"blob\":\"AQI=\",\"word\":\"ab\",\"tags\":[1,2],\"myString\":{\"value\":\"a@example.com\"},\"myRegex\":{\"when\":\"2024-01-01T00:00:00Z\"}}");
+Check.Equal("a@example.com", parsed.MyString!.Value, "a model named String");
+Check.ParseFails<Holder>("{\"stamp\":\"x\",\"myJsonElement\":{\"value\":\"nope\"}}",
+    "stamp: must be a valid date-time",
+    "myJsonElement.value: must be a valid email");"#,
     );
 }
 

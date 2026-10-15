@@ -665,7 +665,17 @@ The generated runtime type names `Violation`, `SpecJson`, `ValueEquality`,
 in every model's member scope (a member of one of those names would shadow the
 type the model body names). `TemporalSupport` and `Base64Support` stay reserved
 even when a run does not emit them, so adding a temporal `format` or a
-`contentEncoding` cannot introduce a collision.
+`contentEncoding` cannot introduce a collision. The members every generated
+converter declares or inherits (`Parse`, `Validate`, `WriteValue`, `Read`,
+`Write`, `Type`, `HandleNull`, `CanConvert`, `ReadAsPropertyName`,
+`WriteAsPropertyName`, `GetType`, `MemberwiseClone`, `ReferenceEquals`) are
+reserved *type* names in every C# module scope too: a converter names the
+same-module types it handles by simple name, and one of these would bind to the
+member instead. A member may still be named after most of them, but not after
+the non-overridden members every type inherits from `object` (`GetType`,
+`MemberwiseClone`, `ReferenceEquals`): a record member or closed-value constant
+of one of those names would hide it (CS0108), so they are reserved in every
+model member scope and closed-value constant scope.
 
 1. **Targets `net10.0` and C# 14.** `net10.0` is the oldest .NET release in
    support. Generated code may use any API and language feature it provides.
