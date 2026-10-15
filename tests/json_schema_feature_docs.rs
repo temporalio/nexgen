@@ -40,7 +40,6 @@ const PENDING: &[&str] = &[
     "deprecated.md",
     "description.md",
     "nullability.md",
-    "oneOf.md",
     "services.md",
     "title.md",
 ];
