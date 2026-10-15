@@ -1069,6 +1069,42 @@ Check.ParseFails<Closed>(
     );
 }
 
+#[test]
+fn csharp_json_materialized_values_compare_on_the_wire() {
+    let case = JsonCase::new("wire-comparison");
+    case.write(
+        "wire.yaml",
+        r#"type: object
+required: [blob]
+properties:
+  blob: { type: string, contentEncoding: base64, minLength: 4, maxLength: 8 }
+  blobConst: { type: string, contentEncoding: base64, const: "aGk=" }
+  times: { type: array, uniqueItems: true, items: { type: string, format: date-time } }
+  blobs: { type: array, uniqueItems: true, items: { type: string, contentEncoding: base64 } }
+"#,
+    );
+    case.generate(&["wire.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Wire>("{\"blob\":\"aGkhIQ==\",\"blobConst\":\"aGk=\"}");
+// Length bounds count the base64 text, not the decoded bytes.
+Check.WriteFails(new Wire { Blob = new byte[] { 1, 2, 3, 4, 5, 6, 7 } }, "blob: must have length <= 8");
+Check.WriteFails(new Wire { Blob = new byte[] { 1, 2, 3 }, BlobConst = new byte[] { 1 } }, "blobConst: must equal \"aGk=\"");
+// One instant at two offsets is two wire values, so the elements are unique,
+// although DateTimeOffset.Equals calls them equal.
+var instant = new System.DateTimeOffset(2024, 1, 1, 0, 0, 0, System.TimeSpan.Zero);
+var shifted = instant.ToOffset(System.TimeSpan.FromHours(1));
+Check.True(instant.Equals(shifted), "DateTimeOffset equality is by instant");
+Check.RoundTrip<Wire>("{\"blob\":\"AAAA\",\"times\":[\"2024-01-01T00:00:00Z\",\"2024-01-01T01:00:00+01:00\"]}");
+Check.Write(new Wire { Blob = new byte[] { 0, 0, 0 }, Times = new[] { instant, shifted } });
+Check.WriteFails(new Wire { Blob = new byte[] { 0, 0, 0 }, Times = new[] { instant, instant } }, "times: duplicate items");
+// Byte arrays compare by content, not by reference.
+Check.WriteFails(
+    new Wire { Blob = new byte[] { 0, 0, 0 }, Blobs = new[] { new byte[] { 1 }, new byte[] { 1 } } },
+    "blobs: duplicate items");
+Check.ParseFails<Wire>("{\"blob\":\"AAAA\",\"blobs\":[\"AQ==\",\"AQ==\"]}", "blobs: duplicate items");"#,
+    );
+}
+
 /// .NET's `$` (like Python's) also matches before a final newline, so every
 /// generated anchor must be `\z`, in authored patterns and in the temporal
 /// grammars alike — and a mismatch must be a violation, not an exception.
