@@ -34,6 +34,11 @@ pub(crate) enum Error {
         status: ExitStatus,
     },
 
+    #[error(
+        "Markdown formatting check failed. Run `cargo fmt-markdown` to rewrap the files listed above, then commit the result."
+    )]
+    MarkdownUnformatted,
+
     #[error("unknown {language} example `{example_id}")]
     UnknownExampleId {
         language: Language,

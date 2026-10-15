@@ -1,7 +1,7 @@
 # Contributing
 
-Run `cargo validate` before pushing; it validates Rust and all five language
-sample projects. Follow the generated sample guidance in [AGENTS.md](AGENTS.md).
+Run `cargo validate` before pushing; it validates Rust, Markdown formatting, and all five language
+sample projects. Run `cargo fmt-markdown` to rewrap Markdown you have edited. Follow the generated sample guidance in [AGENTS.md](AGENTS.md).
 
 ## Running tests
 

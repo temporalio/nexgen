@@ -9,12 +9,16 @@
   ```
 
 - Focused checks are appropriate while iterating, but do not push without the
-  full command passing. It covers Rust formatting and tests plus the checked-in
-  Python, TypeScript, Go, Java, and .NET sample projects.
+  full command passing. It covers Rust formatting and tests, Markdown
+  formatting, plus the checked-in Python, TypeScript, Go, Java, and .NET sample projects.
 
   ```sh
   cargo validate python
   ```
+
+- Human-authored Markdown is wrapped at 80 columns. After editing Markdown,
+  rewrap it with `cargo fmt-markdown` (configured in `.rumdl.toml`) rather than
+  wrapping by hand.
 
 - When running Rust tests directly, pass the feature flag to test the "advanced" features:
 

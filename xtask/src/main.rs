@@ -6,6 +6,7 @@ use nexgen::language::Language;
 
 mod build_examples;
 mod error;
+mod markdown;
 mod validate;
 use build_examples::{BuildExamplesRequest, ExampleFormat, build_examples};
 use validate::{ValidateRequest, validate};
@@ -20,6 +21,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     BuildExamples(ExampleArgs),
+    /// Rewrap human-authored Markdown files in place.
+    FmtMarkdown,
     Validate(ValidateArgs),
 }
 
@@ -64,6 +67,7 @@ enum ExampleFormatArg {
 #[derive(Clone, Copy, ValueEnum)]
 enum ValidationLanguage {
     Rust,
+    Markdown,
     Python,
     Typescript,
     Go,
@@ -93,6 +97,7 @@ fn main() -> ExitCode {
             languages: args.langs.into_iter().map(Language::from).collect(),
             example_ids: args.example_ids,
         }),
+        Command::FmtMarkdown => markdown::fmt_markdown(),
         Command::Validate(args) => validate(&ValidateRequest {
             language: args.language.map(Into::into),
             verbose: args.verbose,
@@ -121,6 +126,7 @@ impl From<ValidationLanguage> for validate::ValidationLanguage {
     fn from(value: ValidationLanguage) -> Self {
         match value {
             ValidationLanguage::Rust => Self::Rust,
+            ValidationLanguage::Markdown => Self::Markdown,
             ValidationLanguage::Python => Self::Python,
             ValidationLanguage::Typescript => Self::Typescript,
             ValidationLanguage::Go => Self::Go,
