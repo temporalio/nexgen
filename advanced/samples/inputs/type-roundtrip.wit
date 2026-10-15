@@ -4,7 +4,7 @@ world system {
   export type-roundtrip-service;
 }
 
-/// @nexus.endpoint "temporal-system" go="__temporal_system"
+/// @nexus.endpoint "temporal-system"
 interface type-roundtrip-service {
   use nexus:temporal-types/model@1.0.0.{
     duration,

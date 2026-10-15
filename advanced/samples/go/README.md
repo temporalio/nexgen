@@ -1,8 +1,9 @@
 # Go WIT samples
 
 WIT-generated packages live in directories such as `typeroundtrip/` and
-`workflowservice/`. The hand-written converter package lives separately in
-[`support/`](support/), outside those regenerated directories.
+`workflowservice/`. Hand-written converters live in [`support/`](support/) for
+ordinary Nexus samples and [`systemsupport/`](systemsupport/) for system Nexus
+samples, outside the regenerated directories.
 
 ## Using the support package
 
@@ -11,7 +12,13 @@ passed to `--output`**. Pass the package's **full import path** (from its Go
 module and package directory), not a `.go` filename, as `--support-package`.
 Generated code imports it as `support`; its converters must be exported and
 accept/return the types used by generated calls such as
-`support.DurationToProto(ctx, value)`. Implement both conversion directions.
+`support.DurationToProto(value)`. Implement both conversion directions.
+Ordinary protobuf-backed models use the public transfer converter API; their
+conversion callbacks receive no data converter. Converter-dependent sample
+support, such as failure conversion, uses a fixed default encoding policy.
+With `--system-nexus`, generated callbacks receive the SDK's system Nexus
+configuration and pass its data converter to support functions, such as
+`support.DurationToProto(cfg.DataConverter, value)`.
 An explicit `go-from`/`go-to` name in WIT is used exactly as spelled, so it
 also must be exported. Do not import the generated package from support or
 you will create an import cycle.
@@ -28,7 +35,7 @@ cargo run --features advanced -- go advanced/samples/inputs/type-roundtrip.wit \
   --native-api --output advanced/samples/go/typeroundtrip
 ```
 
-The sample support source imports
+The system Nexus sample support source imports
 `go.temporal.io/sdk/internal` because it lives under the SDK module tree; a
 project in another module cannot copy that import unchanged. Adapt those
 conversions using APIs available to your module. For `@nexus.source`, write

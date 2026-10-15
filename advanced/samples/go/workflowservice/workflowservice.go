@@ -9,7 +9,7 @@ import (
 	enums "go.temporal.io/api/enums/v1"
 	sdk "go.temporal.io/api/sdk/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
-	support "go.temporal.io/sdk/advanced/samples/go/support"
+	support "go.temporal.io/sdk/advanced/samples/go/systemsupport"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"

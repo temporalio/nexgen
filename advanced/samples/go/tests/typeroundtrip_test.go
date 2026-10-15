@@ -210,18 +210,23 @@ func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly
 	s.Equal(int32(5), handlerInput.GetRetryPolicy().GetMaximumAttempts())
 }
 
-func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsRequiresSystemNexusConfig() {
+func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsUsesPublicTransferConverter() {
 	dc := converter.GetDefaultDataConverter()
-	_, err := dc.ToPayload(tr.ActivityOptions{RetryPolicy: temporal.RetryPolicy{MaximumAttempts: 5}})
-	s.ErrorContains(err, "without a system Nexus config")
-
-	payload, err := dc.ToPayload(&activitypb.ActivityOptions{})
+	want := tr.ActivityOptions{RetryPolicy: temporal.RetryPolicy{MaximumAttempts: 5}}
+	payload, err := dc.ToPayload(want)
 	s.Require().NoError(err)
+	s.NotContains(payload.GetMetadata(), "__temporal_system_payload")
 	var result tr.ActivityOptions
-	s.ErrorContains(dc.FromPayload(payload, &result), "without a system Nexus config")
+	s.Require().NoError(dc.FromPayload(payload, &result))
+	s.Equal(want, result)
+
+	payload, err = dc.ToPayload(&activitypb.ActivityOptions{})
+	s.Require().NoError(err)
+	s.Require().NoError(dc.FromPayload(payload, &result))
+	s.Equal(tr.ActivityOptions{}, result)
 }
 
-func (s *TypeRoundtripIntegrationSuite) TestOrdinaryEndpointsRejectSystemModels() {
+func (s *TypeRoundtripIntegrationSuite) TestOrdinaryEndpointsAcceptModels() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		for _, endpoint := range []string{"temporal-system", "ordinary-endpoint"} {
 			client := workflow.NewNexusClient(endpoint, typeRoundtripServiceName)
@@ -229,14 +234,13 @@ func (s *TypeRoundtripIntegrationSuite) TestOrdinaryEndpointsRejectSystemModels(
 				tr.ActivityOptions{RetryPolicy: temporal.RetryPolicy{MaximumAttempts: 5}},
 				workflow.NexusOperationOptions{},
 			).Get(ctx, nil)
-			if err == nil {
-				return fmt.Errorf("endpoint %q accepted a system-only model", endpoint)
+			if err != nil {
+				return err
 			}
-			s.ErrorContains(err, "without a system Nexus config", endpoint)
 		}
 		return nil
 	})
 
 	s.Require().NoError(s.env.GetWorkflowError())
-	s.Empty(s.calls)
+	s.Len(s.calls, 2)
 }

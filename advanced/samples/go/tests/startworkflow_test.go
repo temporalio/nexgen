@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -143,7 +142,7 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 	s.Equal("resource-cancel", resourceCancel.GetReason())
 }
 
-func (s *StartWorkflowIntegrationSuite) TestOrdinaryEndpointsRejectNativeRequest() {
+func (s *StartWorkflowIntegrationSuite) TestOrdinaryEndpointsAcceptNativeRequest() {
 	var request any
 	s.env.SetWorkerOptions(worker.Options{Interceptors: []interceptor.WorkerInterceptor{
 		&replaceNexusInputInterceptor{replace: func(input any) any {
@@ -161,15 +160,14 @@ func (s *StartWorkflowIntegrationSuite) TestOrdinaryEndpointsRejectNativeRequest
 		for _, endpoint := range []string{"temporal-system", "ordinary-endpoint"} {
 			client := workflow.NewNexusClient(endpoint, startWorkflowServiceName)
 			err := client.ExecuteOperation(ctx, "StartWorkflow", request, workflow.NexusOperationOptions{}).Get(ctx, nil)
-			if err == nil {
-				return fmt.Errorf("endpoint %q accepted a system-only native request", endpoint)
+			if err != nil {
+				return err
 			}
-			s.ErrorContains(err, "without a system Nexus config", endpoint)
 		}
 		return nil
 	})
 
 	s.Require().NoError(s.env.GetWorkflowError())
-	s.Require().Len(s.calls, 1)
+	s.Require().Len(s.calls, 3)
 	s.Equal("StartWorkflow", s.calls[0].Operation)
 }

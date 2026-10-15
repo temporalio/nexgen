@@ -550,11 +550,12 @@ impl GoPackageContext {
         Ok(Self {
             package_name,
             import_path,
-            has_serialization_context: api_plan
-                .services
-                .iter()
-                .flat_map(|service| &service.operations)
-                .any(|operation| operation.serialization_context.value().is_some()),
+            has_serialization_context: crate::nexgen_config::current().system_nexus
+                && api_plan
+                    .services
+                    .iter()
+                    .flat_map(|service| &service.operations)
+                    .any(|operation| operation.serialization_context.value().is_some()),
             support_package: options.support_package.clone(),
         })
     }
@@ -636,7 +637,12 @@ impl GoPackageContext {
     }
 
     pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
-        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
+        if !crate::nexgen_config::current().system_nexus {
+            self.qualified_expr(
+                "go.temporal.io/sdk/converter",
+                "converter.NewTransferTypeConverter",
+            )
+        } else if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
             "NewSystemNexusTransferTypeConverter".to_string()
         } else {
             "commonconverter.NewSystemNexusTransferTypeConverter".to_string()
@@ -1220,10 +1226,7 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
-        let has_system_operations = services.iter().any(|service| {
-            service.endpoint.as_deref() == Some("__temporal_system")
-                && !service.operations.is_empty()
-        });
+        let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
         let has_eager_conversion = services.iter().flat_map(|s| &s.operations).any(|op| {
             op.wire_binding
                 .as_ref()
@@ -1261,12 +1264,14 @@ impl<'a> ApiPlanner<'a> {
             self.imports.insert("runtime".to_string());
             self.imports.insert("strings".to_string());
         }
-        // Transfer-type callbacks use the converter selected by the SDK.
+        // System transfer callbacks use the converter selected by the SDK;
+        // ordinary callbacks are context-free.
         if self.external_models.renders_transfer_type_converters() {
             if !self.package.is_self_import("go.temporal.io/sdk/converter")
-                && !self
-                    .package
-                    .is_self_import("go.temporal.io/sdk/internal/common/converter")
+                && (!crate::nexgen_config::current().system_nexus
+                    || !self
+                        .package
+                        .is_self_import("go.temporal.io/sdk/internal/common/converter"))
             {
                 self.imports
                     .insert("go.temporal.io/sdk/converter".to_string());
@@ -1295,7 +1300,9 @@ impl<'a> ApiPlanner<'a> {
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
         let mut external_imports = self.external_models.imports();
-        let registry = if self.package.has_serialization_context {
+        let registry = if crate::nexgen_config::current().system_nexus
+            && self.package.has_serialization_context
+        {
             render_operation_registry(&self.package, &services, &self.imports, &external_imports)?
         } else {
             GoOperationRegistry::default()
@@ -1511,7 +1518,11 @@ impl<'a> ApiPlanner<'a> {
                 .collect()
         });
 
-        let serialization_context_expr = operation.serialization_context.value();
+        let serialization_context_expr = if crate::nexgen_config::current().system_nexus {
+            operation.serialization_context.value()
+        } else {
+            None
+        };
         if let Some(helper) = serialization_context_expr {
             validate_go_serialization_context_helper(helper, &operation.name)?;
         }
@@ -1982,10 +1993,6 @@ fn render_operation_registry(
     model_imports: &BTreeSet<String>,
     external_imports: &[(String, String)],
 ) -> Result<GoOperationRegistry> {
-    let services: Vec<_> = services
-        .iter()
-        .filter(|service| service.is_system_endpoint())
-        .collect();
     let has_helpers = services
         .iter()
         .flat_map(|service| &service.operations)
@@ -2146,15 +2153,6 @@ pub(in crate::generator) struct RenderedService<'a> {
     pub(in crate::generator) operations: Vec<RenderedOperation<'a>>,
     /// Resources belonging to this service.
     pub(in crate::generator) resources: Vec<PlannedResource>,
-}
-
-impl RenderedService<'_> {
-    pub(in crate::generator) fn is_system_endpoint(&self) -> bool {
-        matches!(
-            self.endpoint.as_deref(),
-            Some("__temporal_system" | "temporal-system")
-        )
-    }
 }
 
 /// A resolved Nexus operation with enough information to render the operation
@@ -4607,7 +4605,7 @@ pub(in crate::generator) fn new_nexus_client_expr(
     service_name: &str,
     package: &GoPackageContext,
 ) -> String {
-    if endpoint == "__temporal_system" {
+    if crate::nexgen_config::current().system_nexus {
         return format!(
             "internal.NewSystemNexusClient({})",
             go_string_literal(service_name)
@@ -5814,6 +5812,7 @@ mod tests {
         native_type: &str,
         annotated: bool,
         owned_request: bool,
+        system_nexus: bool,
     ) -> Result<BTreeMap<PathBuf, String>> {
         let temp = tempfile::tempdir().unwrap();
         let input = temp.path().join("context.wit");
@@ -5882,7 +5881,7 @@ mod tests {
         generate_to_file(&GenerateRequest {
             config: crate::nexgen_config::NexgenConfig {
                 mode: crate::generator::GenerationMode::NativeApi,
-                ..Default::default()
+                system_nexus,
             },
             language: crate::language::Language::Go,
             input_paths: vec![input],
@@ -5906,25 +5905,52 @@ mod tests {
     }
 
     #[test]
-    fn client_selection_uses_runtime_endpoint_without_requiring_context_helper() {
+    fn system_nexus_configuration_controls_clients_and_converters() {
         for endpoint in ["__temporal_system", "temporal-system", "sample-service"] {
             for annotated in [false, true] {
-                let files =
-                    generate_context_operation(endpoint, "temporal.RetryPolicy", annotated, true)
-                        .unwrap();
-                let source = &files[&PathBuf::from("sampleservice.go")];
-                if endpoint == "__temporal_system" {
-                    assert!(
-                        source.contains("internal.NewSystemNexusClient("),
-                        "{source}"
-                    );
-                    assert!(!source.contains("workflow.NewNexusClient("), "{source}");
-                } else {
-                    assert!(
-                        source.contains(&format!("workflow.NewNexusClient(\"{endpoint}\",")),
-                        "{source}"
-                    );
-                    assert!(!source.contains("NewSystemNexusClient"), "{source}");
+                for system_nexus in [false, true] {
+                    let files = generate_context_operation(
+                        endpoint,
+                        "temporal.RetryPolicy",
+                        annotated,
+                        true,
+                        system_nexus,
+                    )
+                    .unwrap();
+                    let source = &files[&PathBuf::from("sampleservice.go")];
+                    if system_nexus {
+                        assert!(
+                            source.contains("internal.NewSystemNexusClient("),
+                            "{source}"
+                        );
+                        assert!(!source.contains("workflow.NewNexusClient("), "{source}");
+                        assert!(
+                            source.contains("commonconverter.NewSystemNexusTransferTypeConverter("),
+                            "{source}"
+                        );
+                        assert!(
+                            source.contains("cfg *commonconverter.SystemNexusConfig"),
+                            "{source}"
+                        );
+                        assert_eq!(
+                            source.contains("// --- Registry ---"),
+                            annotated,
+                            "{source}"
+                        );
+                    } else {
+                        assert!(
+                            source.contains(&format!("workflow.NewNexusClient(\"{endpoint}\",")),
+                            "{source}"
+                        );
+                        assert!(!source.contains("NewSystemNexusClient"), "{source}");
+                        assert!(
+                            source.contains("converter.NewTransferTypeConverter("),
+                            "{source}"
+                        );
+                        assert!(!source.contains("go.temporal.io/sdk/internal"), "{source}");
+                        assert!(!source.contains("SystemNexusConfig"), "{source}");
+                        assert!(!source.contains("// --- Registry ---"), "{source}");
+                    }
                 }
             }
         }
@@ -5934,8 +5960,8 @@ mod tests {
     fn serialization_context_rejects_external_operation_inputs() {
         for endpoint in ["__temporal_system", "temporal-system"] {
             for native_type in ["temporal.RetryPolicy", "*temporal.RetryPolicy"] {
-                let error =
-                    generate_context_operation(endpoint, native_type, true, false).unwrap_err();
+                let error = generate_context_operation(endpoint, native_type, true, false, true)
+                    .unwrap_err();
                 let Error::UnsupportedGoProtoConversion { context, reason } = error else {
                     panic!("unexpected error: {error}");
                 };
@@ -5954,12 +5980,17 @@ mod tests {
             ("temporal-system", false),
             ("__temporal_system", false),
         ] {
-            let files =
-                generate_context_operation(endpoint, "temporal.RetryPolicy", annotated, false)
-                    .unwrap();
+            let files = generate_context_operation(
+                endpoint,
+                "temporal.RetryPolicy",
+                annotated,
+                false,
+                false,
+            )
+            .unwrap();
             let source = &files[&PathBuf::from("sampleservice.go")];
             assert!(
-                source.contains("requestProto, err := support.RetryPolicyToProto(dc, &request)"),
+                source.contains("requestProto, err := support.RetryPolicyToProto(&request)"),
                 "{source}"
             );
             assert!(
@@ -5967,7 +5998,7 @@ mod tests {
                 "{source}"
             );
             assert!(
-                source.contains("support.RetryPolicyFromProto(dc, &result)"),
+                source.contains("support.RetryPolicyFromProto(&result)"),
                 "{source}"
             );
         }
@@ -5976,7 +6007,7 @@ mod tests {
     #[test]
     fn system_policy_supports_generated_request_with_nested_external_type() {
         let files =
-            generate_context_operation("temporal-system", "temporal.RetryPolicy", true, true)
+            generate_context_operation("temporal-system", "temporal.RetryPolicy", true, true, true)
                 .unwrap();
         let source = &files[&PathBuf::from("sampleservice.go")];
         assert!(
@@ -6013,6 +6044,10 @@ mod tests {
 
     #[test]
     fn system_nexus_factory_avoids_self_import_namespace() {
+        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
         let package = super::GoPackageContext {
             package_name: "converter".to_string(),
             import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),

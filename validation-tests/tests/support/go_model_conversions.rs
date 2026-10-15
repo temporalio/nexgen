@@ -124,7 +124,7 @@ world api {
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
             mode: nexgen::generator::GenerationMode::NativeApi,
-            ..Default::default()
+            system_nexus: true,
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path],
@@ -373,11 +373,11 @@ world api {
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
             mode: nexgen::generator::GenerationMode::NativeApi,
-            ..Default::default()
+            system_nexus: true,
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![input_path, root.join("advanced/samples/inputs/deps")],
-        support_package: Some("go.temporal.io/sdk/advanced/samples/go/support".into()),
+        support_package: Some("go.temporal.io/sdk/advanced/samples/go/systemsupport".into()),
         descriptor_paths: vec![descriptor_path(&root)],
         output_path: output_path.clone(),
         format: true,
@@ -392,10 +392,10 @@ world api {
         )
         .unwrap();
     }
-    fs::create_dir(temp_dir.join("support")).unwrap();
+    fs::create_dir(temp_dir.join("systemsupport")).unwrap();
     fs::copy(
-        root.join("advanced/samples/go/support/temporal_model_converters.go"),
-        temp_dir.join("support/temporal_model_converters.go"),
+        root.join("advanced/samples/go/systemsupport/temporal_model_converters.go"),
+        temp_dir.join("systemsupport/temporal_model_converters.go"),
     )
     .unwrap();
     fs::write(

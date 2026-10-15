@@ -4,7 +4,7 @@ world system {
   export start-workflow-service;
 }
 
-/// @nexus.endpoint "temporal-system" go="__temporal_system"
+/// @nexus.endpoint "temporal-system"
 interface start-workflow-service {
   use nexus:temporal-types/model@1.0.0.{duration, placeholder, task-queue, workflow-type};
 

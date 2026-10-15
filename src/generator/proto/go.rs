@@ -215,9 +215,10 @@ impl ModelBackend {
     }
 
     pub(in crate::generator) fn set_model_wire(&self, key: String, wire: RenderedModelWire) {
-        if !self
-            .package
-            .is_self_import("go.temporal.io/sdk/internal/common/converter")
+        if crate::nexgen_config::current().system_nexus
+            && !self
+                .package
+                .is_self_import("go.temporal.io/sdk/internal/common/converter")
         {
             self.imports.borrow_mut().register(&GoProtoRef {
                 import_path: "go.temporal.io/sdk/internal/common/converter".to_string(),
@@ -484,9 +485,14 @@ fn go_message_conversion(
     backend: &ModelBackend,
     config: Option<&str>,
 ) -> GoConversionResult<GoValueConversion> {
-    let dc = config
-        .map(|config| format!("{config}.DataConverter"))
-        .unwrap_or_else(|| "dc".to_string());
+    let converter_arg = if crate::nexgen_config::current().system_nexus {
+        let dc = config
+            .map(|config| format!("{config}.DataConverter"))
+            .unwrap_or_else(|| "dc".to_string());
+        format!("{dc}, ")
+    } else {
+        String::new()
+    };
     if let Some(replacement) = &message.replacement {
         if let Some(type_name) = go_replacement_type_name(replacement, &backend.package) {
             let from = backend.support_converter(go_from_proto_converter(
@@ -496,12 +502,12 @@ fn go_message_conversion(
             let to = backend
                 .support_converter(go_to_proto_converter(&message.info.full_name, replacement));
             let native_is_nilable_value = crate::generator::go::go_type_is_nilable(&type_name);
-            let from_dc = dc.clone();
+            let from_arg = converter_arg.clone();
             return Ok(GoValueConversion {
                 kind: GoConversionKind::OverrideConverter,
-                from_proto: Box::new(move |expr, _| format!("{from}({from_dc}, {expr})")),
+                from_proto: Box::new(move |expr, _| format!("{from}({from_arg}{expr})")),
                 decoded_model_type: None,
-                to_proto: Box::new(move |expr| format!("{to}({dc}, {expr})")),
+                to_proto: Box::new(move |expr| format!("{to}({converter_arg}{expr})")),
                 fallible: true,
                 to_proto_takes_pointer: !native_is_nilable_value,
                 from_proto_returns_pointer: !native_is_nilable_value,
@@ -512,12 +518,12 @@ fn go_message_conversion(
     if message.authored_type.is_some() {
         let from = backend.support_converter(go_default_from_proto_name(&message.info.full_name));
         let to = backend.support_converter(go_default_to_proto_name(&message.info.full_name));
-        let from_dc = dc.clone();
+        let from_arg = converter_arg.clone();
         return Ok(GoValueConversion {
             kind: GoConversionKind::OverrideConverter,
-            from_proto: Box::new(move |expr, _| format!("{from}({from_dc}, {expr})")),
+            from_proto: Box::new(move |expr, _| format!("{from}({from_arg}{expr})")),
             decoded_model_type: None,
-            to_proto: Box::new(move |expr| format!("{to}({dc}, {expr})")),
+            to_proto: Box::new(move |expr| format!("{to}({converter_arg}{expr})")),
             fallible: true,
             to_proto_takes_pointer: true,
             from_proto_returns_pointer: true,
@@ -535,20 +541,25 @@ fn go_message_conversion(
         let base = go_unexported_name(&message.model_name);
         let from_proto = format!("{base}FromProto");
         let to_proto = format!("{base}ToProto");
-        let config = config.map(str::to_string).unwrap_or_else(|| {
-            format!(
-                "&{}{{DataConverter: dc}}",
-                backend.package.system_nexus_config_type()
-            )
-        });
-        let from_config = config.clone();
+        let config_arg = if crate::nexgen_config::current().system_nexus {
+            let config = config.map(str::to_string).unwrap_or_else(|| {
+                format!(
+                    "&{}{{DataConverter: dc}}",
+                    backend.package.system_nexus_config_type()
+                )
+            });
+            format!("{config}, ")
+        } else {
+            String::new()
+        };
+        let from_config = config_arg.clone();
         return Ok(GoValueConversion {
             kind: GoConversionKind::ModelConverter,
             from_proto: Box::new(move |expr, out| {
-                format!("{from_proto}({from_config}, {expr}, {out})")
+                format!("{from_proto}({from_config}{expr}, {out})")
             }),
             decoded_model_type: Some(message.model_name.clone()),
-            to_proto: Box::new(move |expr| format!("{to_proto}({config}, {expr})")),
+            to_proto: Box::new(move |expr| format!("{to_proto}({config_arg}{expr})")),
             fallible: true,
             to_proto_takes_pointer: true,
             from_proto_returns_pointer: false,
@@ -780,12 +791,13 @@ struct RenderedResourceFieldInitializer {
 
 impl OperationBinding {
     pub(in crate::generator) fn requires_data_converter(&self) -> bool {
-        self.input_to_proto.is_some()
-            || self.output_from_proto.is_some()
-            || self
-                .resource_return
-                .as_ref()
-                .is_some_and(|resource| resource.requires_data_converter)
+        crate::nexgen_config::current().system_nexus
+            && (self.input_to_proto.is_some()
+                || self.output_from_proto.is_some()
+                || self
+                    .resource_return
+                    .as_ref()
+                    .is_some_and(|resource| resource.requires_data_converter))
     }
 
     pub(in crate::generator) fn requires_fmt(&self) -> bool {
@@ -862,7 +874,7 @@ impl ModelBackend {
         services: &mut [RenderedService<'_>],
     ) -> Result<()> {
         for (service, planned_service) in services.iter_mut().zip(api_plan.services.iter()) {
-            let is_system_endpoint = service.is_system_endpoint();
+            let system_nexus = crate::nexgen_config::current().system_nexus;
             for (rendered_op, planned_op) in service
                 .operations
                 .iter_mut()
@@ -891,7 +903,7 @@ impl ModelBackend {
                     self.mark_transfer_model_checked(api_plan, &input, &planned_op.name, "input")?;
                     None
                 } else {
-                    if is_system_endpoint && rendered_op.serialization_context_expr.is_some() {
+                    if system_nexus && rendered_op.serialization_context_expr.is_some() {
                         return Err(Error::UnsupportedGoProtoConversion {
                             context: format!(
                                 "operation `{}` input `{}`",
@@ -2271,9 +2283,13 @@ fn render_model_converters(
     output.push('\n');
     output.push_str("func ");
     output.push_str(&base);
-    output.push_str("ToProto(cfg *");
-    output.push_str(&package.system_nexus_config_type());
-    output.push_str(", m *");
+    output.push_str("ToProto(");
+    if crate::nexgen_config::current().system_nexus {
+        output.push_str("cfg *");
+        output.push_str(&package.system_nexus_config_type());
+        output.push_str(", ");
+    }
+    output.push_str("m *");
     output.push_str(&model.name);
     output.push_str(") (");
     output.push_str(&wire.proto_type);
@@ -2294,9 +2310,13 @@ fn render_model_converters(
     output.push('\n');
     output.push_str("func ");
     output.push_str(&base);
-    output.push_str("FromProto(cfg *");
-    output.push_str(&package.system_nexus_config_type());
-    output.push_str(", proto ");
+    output.push_str("FromProto(");
+    if crate::nexgen_config::current().system_nexus {
+        output.push_str("cfg *");
+        output.push_str(&package.system_nexus_config_type());
+        output.push_str(", ");
+    }
+    output.push_str("proto ");
     output.push_str(&wire.proto_type);
     output.push_str(", out *");
     output.push_str(&model.name);

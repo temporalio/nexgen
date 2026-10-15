@@ -442,17 +442,22 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
     let output_path = example_output_path(repo_root, language, example_id);
     let language_root = advanced_language_root(repo_root, language);
     reset_example_output_directory(&language_root, &output_path)?;
+    let system_nexus = config
+        .examples
+        .get(example_id)
+        .is_some_and(|example| example.system_nexus);
     let generate_request = GenerateRequest {
         config: NexgenConfig {
             mode: GenerationMode::NativeApi,
-            system_nexus: config
-                .examples
-                .get(example_id)
-                .is_some_and(|example| example.system_nexus),
+            system_nexus,
         },
         language,
         input_paths,
-        support_package: sample_support_package(repo_root, language, &output_path),
+        support_package: if language == Language::Go && system_nexus {
+            Some("go.temporal.io/sdk/advanced/samples/go/systemsupport".into())
+        } else {
+            sample_support_package(repo_root, language, &output_path)
+        },
         descriptor_paths: vec![repo_root.join("advanced/samples/descriptors/temporal_api.bin")],
         output_path: output_path.clone(),
         format: false,

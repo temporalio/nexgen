@@ -9,8 +9,6 @@ import (
 	command "go.temporal.io/api/command/v1"
 	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/converter"
-	"go.temporal.io/sdk/internal"
-	commonconverter "go.temporal.io/sdk/internal/common/converter"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -18,7 +16,7 @@ import (
 // --- Operations (internal) ---
 
 func activityOptionsOperation(ctx workflow.Context, request ActivityOptions) workflow.Future {
-	c := internal.NewSystemNexusClient("TypeRoundtripService")
+	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
 	fut := c.ExecuteOperation(ctx, "ActivityOptionsOperation", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
@@ -33,7 +31,7 @@ func activityOptionsOperation(ctx workflow.Context, request ActivityOptions) wor
 }
 
 func failureOperation(ctx workflow.Context, request FailureContainer) workflow.Future {
-	c := internal.NewSystemNexusClient("TypeRoundtripService")
+	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
 	fut := c.ExecuteOperation(ctx, "FailureOperation", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
@@ -76,31 +74,31 @@ func (m ActivityOptions) GetPriority() *temporal.Priority {
 	return m.Priority
 }
 
-func activityOptionsToProto(cfg *commonconverter.SystemNexusConfig, m *ActivityOptions) (*activity.ActivityOptions, error) {
+func activityOptionsToProto(m *ActivityOptions) (*activity.ActivityOptions, error) {
 	message := &activity.ActivityOptions{}
 	{
-		converted, err := support.TaskQueueToProto(cfg.DataConverter, m.TaskQueue)
+		converted, err := support.TaskQueueToProto(m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
 		message.TaskQueue = converted
 	}
 	{
-		converted, err := support.RetryPolicyToProto(cfg.DataConverter, &m.RetryPolicy)
+		converted, err := support.RetryPolicyToProto(&m.RetryPolicy)
 		if err != nil {
 			return nil, err
 		}
 		message.RetryPolicy = converted
 	}
 	{
-		converted, err := support.DurationToProto(cfg.DataConverter, m.ScheduleToCloseTimeout)
+		converted, err := support.DurationToProto(m.ScheduleToCloseTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := support.PriorityToProto(cfg.DataConverter, m.Priority)
+		converted, err := support.PriorityToProto(m.Priority)
 		if err != nil {
 			return nil, err
 		}
@@ -109,17 +107,17 @@ func activityOptionsToProto(cfg *commonconverter.SystemNexusConfig, m *ActivityO
 	return message, nil
 }
 
-func activityOptionsFromProto(cfg *commonconverter.SystemNexusConfig, proto *activity.ActivityOptions, out *ActivityOptions) error {
+func activityOptionsFromProto(proto *activity.ActivityOptions, out *ActivityOptions) error {
 	*out = ActivityOptions{}
 	{
-		converted, err := support.TaskQueueFromProto(cfg.DataConverter, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(proto.GetTaskQueue())
 		if err != nil {
 			return err
 		}
 		out.TaskQueue = converted
 	}
 	{
-		converted, err := support.RetryPolicyFromProto(cfg.DataConverter, proto.GetRetryPolicy())
+		converted, err := support.RetryPolicyFromProto(proto.GetRetryPolicy())
 		if err != nil {
 			return err
 		}
@@ -128,14 +126,14 @@ func activityOptionsFromProto(cfg *commonconverter.SystemNexusConfig, proto *act
 		}
 	}
 	{
-		converted, err := support.DurationFromProto(cfg.DataConverter, proto.GetScheduleToCloseTimeout())
+		converted, err := support.DurationFromProto(proto.GetScheduleToCloseTimeout())
 		if err != nil {
 			return err
 		}
 		out.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := support.PriorityFromProto(cfg.DataConverter, proto.GetPriority())
+		converted, err := support.PriorityFromProto(proto.GetPriority())
 		if err != nil {
 			return err
 		}
@@ -145,7 +143,7 @@ func activityOptionsFromProto(cfg *commonconverter.SystemNexusConfig, proto *act
 }
 
 func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewSystemNexusTransferTypeConverter(
+	return converter.NewTransferTypeConverter(
 		activityOptionsToProto,
 		activityOptionsFromProto,
 	)
@@ -160,10 +158,10 @@ func (m FailureContainer) GetFailure() error {
 	return m.Failure
 }
 
-func failureContainerToProto(cfg *commonconverter.SystemNexusConfig, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
+func failureContainerToProto(m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
 	message := &command.FailWorkflowExecutionCommandAttributes{}
 	{
-		converted, err := support.FailureToProto(cfg.DataConverter, m.Failure)
+		converted, err := support.FailureToProto(m.Failure)
 		if err != nil {
 			return nil, err
 		}
@@ -172,10 +170,10 @@ func failureContainerToProto(cfg *commonconverter.SystemNexusConfig, m *FailureC
 	return message, nil
 }
 
-func failureContainerFromProto(cfg *commonconverter.SystemNexusConfig, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
+func failureContainerFromProto(proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
 	*out = FailureContainer{}
 	{
-		converted, err := support.FailureFromProto(cfg.DataConverter, proto.GetFailure())
+		converted, err := support.FailureFromProto(proto.GetFailure())
 		if err != nil {
 			return err
 		}
@@ -185,7 +183,7 @@ func failureContainerFromProto(cfg *commonconverter.SystemNexusConfig, proto *co
 }
 
 func (FailureContainer) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewSystemNexusTransferTypeConverter(
+	return converter.NewTransferTypeConverter(
 		failureContainerToProto,
 		failureContainerFromProto,
 	)

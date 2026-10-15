@@ -51,12 +51,21 @@ fn generate_to_string_with_inputs(
     input_paths: &[PathBuf],
     descriptor_paths: &[PathBuf],
 ) -> Result<String, Box<dyn std::error::Error>> {
+    generate_to_string_with_system_nexus(language, input_paths, descriptor_paths, false)
+}
+
+fn generate_to_string_with_system_nexus(
+    language: nexgen::language::Language,
+    input_paths: &[PathBuf],
+    descriptor_paths: &[PathBuf],
+    system_nexus: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
     let temp_dir = unique_output_path("go-rendered");
     let output_path = temp_dir.join("output");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
             mode: nexgen::generator::GenerationMode::NativeApi,
-            ..Default::default()
+            system_nexus,
         },
         language,
         input_paths: input_paths.to_vec(),
@@ -829,10 +838,11 @@ fn go_rejects_collisions_between_generated_wrapper_type_parameters() {
 #[test]
 fn go_temporal_function_constraints_use_workflow_context_prefix() {
     let root = project_root();
-    let rendered = generate_to_string_with_inputs(
+    let rendered = generate_to_string_with_system_nexus(
         nexgen::language::Language::Go,
         &example_input_paths(&root, "workflow-service"),
         &[descriptor_path(&root)],
+        true,
     )
     .unwrap();
 
@@ -876,10 +886,11 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
 #[test]
 fn go_system_nexus_operations_import_internal_without_support_fragments() {
     let root = project_root();
-    let rendered = generate_to_string_with_inputs(
+    let rendered = generate_to_string_with_system_nexus(
         nexgen::language::Language::Go,
         &example_input_paths(&root, "multi-operation-service"),
         &[],
+        true,
     )
     .unwrap();
 
@@ -1082,10 +1093,11 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("ScheduleToCloseTimeout *time.Duration"));
     assert!(rendered.contains("Priority *temporal.Priority"));
 
-    // Generated model gets a context-aware encoding function that accepts a
+    // Generated model gets an encoding function that accepts a
     // pointer and returns the proto message and conversion errors.
-    assert!(rendered
-        .contains("func activityOptionsToProto(cfg *commonconverter.SystemNexusConfig, m *ActivityOptions) (*activity.ActivityOptions, error) {"));
+    assert!(rendered.contains(
+        "func activityOptionsToProto(m *ActivityOptions) (*activity.ActivityOptions, error) {"
+    ));
     assert!(rendered.contains("message := &activity.ActivityOptions{}"));
     assert!(rendered.contains(
         "type ActivityOptions struct {\n\t// TaskQueue - Optional.\n\tTaskQueue *string"
@@ -1096,46 +1108,42 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("\t// Priority - Optional.\n\tPriority *temporal.Priority"));
     // Optional override fields pass the pointer straight to the nil-safe
     // converter; the required field passes its address.
-    assert!(rendered.contains(
-        "converted, err := support.RetryPolicyToProto(cfg.DataConverter, &m.RetryPolicy)"
-    ));
+    assert!(rendered.contains("converted, err := support.RetryPolicyToProto(&m.RetryPolicy)"));
+    assert!(rendered.contains("converted, err := support.TaskQueueToProto(m.TaskQueue)"));
+    assert!(rendered.contains("converted, err := support.PriorityToProto(m.Priority)"));
     assert!(
-        rendered
-            .contains("converted, err := support.TaskQueueToProto(cfg.DataConverter, m.TaskQueue)")
+        rendered.contains("converted, err := support.DurationToProto(m.ScheduleToCloseTimeout)")
     );
-    assert!(
-        rendered
-            .contains("converted, err := support.PriorityToProto(cfg.DataConverter, m.Priority)")
-    );
-    assert!(rendered.contains(
-        "converted, err := support.DurationToProto(cfg.DataConverter, m.ScheduleToCloseTimeout)"
-    ));
     assert!(rendered.contains("return message, nil"));
 
-    // Generated model gets a converter-aware FromProto output callback. Optional
+    // Generated model gets a FromProto output callback. Optional
     // override fields assign the converter's pointer result directly; the
     // required field is dereferenced with a nil guard.
     assert!(rendered.contains(
-        "func activityOptionsFromProto(cfg *commonconverter.SystemNexusConfig, proto *activity.ActivityOptions, out *ActivityOptions) error {"
+        "func activityOptionsFromProto(proto *activity.ActivityOptions, out *ActivityOptions) error {"
     ));
-    assert!(rendered.contains(
-        "converted, err := support.TaskQueueFromProto(cfg.DataConverter, proto.GetTaskQueue())"
-    ));
-    assert!(rendered.contains(
-        "converted, err := support.RetryPolicyFromProto(cfg.DataConverter, proto.GetRetryPolicy())"
-    ));
+    assert!(
+        rendered.contains("converted, err := support.TaskQueueFromProto(proto.GetTaskQueue())")
+    );
+    assert!(
+        rendered.contains("converted, err := support.RetryPolicyFromProto(proto.GetRetryPolicy())")
+    );
     assert!(rendered.contains("out.RetryPolicy = *converted"));
     // The model constructs a transfer-type converter, so the SDK
     // runs model<->proto conversion inside the payload converter.
-    assert!(rendered.contains("return commonconverter.NewSystemNexusTransferTypeConverter("));
+    assert!(rendered.contains("return converter.NewTransferTypeConverter("));
     assert!(rendered.contains(
-        "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewSystemNexusTransferTypeConverter"
+        "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn converter.NewTransferTypeConverter"
     ));
     assert!(rendered.contains(
-        "commonconverter.NewSystemNexusTransferTypeConverter(\n\t\tactivityOptionsToProto,\n\t\tactivityOptionsFromProto,\n"
+        "converter.NewTransferTypeConverter(\n\t\tactivityOptionsToProto,\n\t\tactivityOptionsFromProto,\n"
     ));
     assert!(!rendered.contains("func(cfg *"), "{rendered}");
     assert!(rendered.contains("\t*out = ActivityOptions{}\n"));
+    assert!(
+        !rendered.contains("go.temporal.io/sdk/internal"),
+        "{rendered}"
+    );
     assert!(!rendered.contains("\tvalue := ActivityOptions{}"));
     // Operation functions therefore hand the model straight to the SDK and
     // decode the response back into a model.
@@ -1154,10 +1162,11 @@ fn go_type_roundtrip_generates_proto_conversions() {
 #[test]
 fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     let root = project_root();
-    let rendered = generate_to_string_with_inputs(
+    let rendered = generate_to_string_with_system_nexus(
         nexgen::language::Language::Go,
         &example_input_paths(&root, "workflow-service"),
         &[descriptor_path(&root)],
+        true,
     )
     .unwrap();
 
@@ -1255,10 +1264,11 @@ interface sample-service {{
 "#
         ),
     )?;
-    let result = generate_to_string_with_inputs(
+    let result = generate_to_string_with_system_nexus(
         nexgen::language::Language::Go,
         &[wit_path],
         &[descriptor_path(&project_root())],
+        true,
     );
     fs::remove_dir_all(temp_dir)?;
     result
@@ -1418,10 +1428,11 @@ fn go_serialization_context_rejects_non_proto_operation_requests() {
 fn go_serialization_context_deferred_models_use_sdk_context() {
     let root = project_root();
     // Deferred transfer callbacks use the data converter supplied by the SDK.
-    let rendered = generate_to_string_with_inputs(
+    let rendered = generate_to_string_with_system_nexus(
         nexgen::language::Language::Go,
         &example_input_paths(&root, "workflow-service"),
         &[descriptor_path(&root)],
+        true,
     )
     .unwrap();
     assert!(!rendered.contains("### serialization_context.go"));
@@ -1453,6 +1464,7 @@ fn try_render_go_serialization_context_fixture(
         operations,
         support,
         "temporal-system",
+        true,
     )
 }
 
@@ -1461,6 +1473,7 @@ fn try_render_go_serialization_context_fixture_at_endpoint(
     operations: &str,
     _support: &str,
     endpoint: &str,
+    system_nexus: bool,
 ) -> Result<BTreeMap<PathBuf, String>, Box<dyn std::error::Error>> {
     let temp_dir = unique_output_path("go-serialization-context-conversions");
     fs::create_dir_all(&temp_dir).unwrap();
@@ -1483,7 +1496,7 @@ interface sample-service {{
     let result = generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
             mode: nexgen::generator::GenerationMode::NativeApi,
-            ..Default::default()
+            system_nexus,
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![wit_path],
@@ -1619,7 +1632,7 @@ fn go_serialization_context_registry_uses_wire_names_and_typed_adapter() {
 fn render_go_registry_services(
     second_endpoint: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    // Sharing wire keys across endpoints must only conflict when both are system endpoints.
+    // System mode applies to all services in the generation job.
     let temp_dir = unique_output_path("go-context-duplicate-wire-key");
     fs::create_dir_all(&temp_dir).unwrap();
     let wit_path = temp_dir.join("services.wit");
@@ -1654,10 +1667,11 @@ interface second-service {
         .replace("SECOND_ENDPOINT", second_endpoint),
     )
     .unwrap();
-    let result = generate_to_string_with_inputs(
+    let result = generate_to_string_with_system_nexus(
         nexgen::language::Language::Go,
         &[wit_path],
         &[descriptor_path(&project_root())],
+        true,
     );
     fs::remove_dir_all(temp_dir).unwrap();
     result
@@ -1679,34 +1693,12 @@ fn go_serialization_context_registry_rejects_duplicate_wire_keys() {
 }
 
 #[test]
-fn go_serialization_context_mixed_endpoints_register_only_system_operations() {
-    let rendered = render_go_registry_services("ordinary-endpoint").unwrap();
-    assert!(!rendered.contains("### registry.go"));
-    let registry = rendered
-        .split("// --- Registry ---")
-        .nth(1)
-        .unwrap()
-        .split("\n### ")
-        .next()
-        .unwrap();
-    assert_registry_entry(
-        registry,
-        "SameWireService",
-        "SameWireOperation",
-        Some("requestContext"),
-    );
-    assert!(!registry.contains("OrdinaryOnly"));
-    assert!(!registry.contains("otherContext"));
-    assert_eq!(
-        registry
-            .matches("UpdateNexusOperationRegistry(NexusOperationRegistry)")
-            .count(),
-        1
-    );
-    assert!(rendered.contains("c.ExecuteOperation(ctx, \"OrdinaryOnly\", request,"));
-    assert!(
-        rendered.contains("workflow.NewNexusClient(\"ordinary-endpoint\", \"SameWireService\")")
-    );
+fn go_serialization_context_registry_checks_all_services_in_system_mode() {
+    let error = render_go_registry_services("ordinary-endpoint")
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("SameWireService"), "{error}");
+    assert!(error.contains("SameWireOperation"), "{error}");
 }
 
 const GO_CONTEXT_OWNED_REQUEST: &str = r#"
@@ -1760,6 +1752,7 @@ fn go_serialization_context_rejects_external_request() {
                         &format!("request {native_type}"),
                     ),
                     endpoint,
+                    true,
                 )
                 .unwrap_err()
                 .to_string();
@@ -1786,13 +1779,13 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
         roundtrip: func(request: retry-policy) -> retry-policy;"#,
         GO_CONTEXT_OVERRIDE_SUPPORT,
         "sample-service",
+        false,
     )
     .unwrap();
     let operation = &files[Path::new("sampleservice.go")];
-    let main = go_registry_main(&files);
-    let registry = go_registry_section(main);
+    let main = operation;
     let conversion = operation
-        .find("requestProto, err := support.RetryPolicyToProto(dc, &request)")
+        .find("requestProto, err := support.RetryPolicyToProto(&request)")
         .unwrap();
     let error = operation[conversion..]
         .find("resultSettable.SetError(err)")
@@ -1804,20 +1797,13 @@ fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper
     assert!(conversion < error && error < execute, "{operation}");
     assert!(operation.contains("workflow.NewNexusClient(\"sample-service\", \"SampleService\")"));
     assert_eq!(operation.matches("support.RetryPolicyToProto(").count(), 1);
-    assert!(operation.contains("value, err := support.RetryPolicyFromProto(dc, &result)"));
+    assert!(operation.contains("value, err := support.RetryPolicyFromProto(&result)"));
     assert!(!operation.contains("requestContext("));
     assert_eq!(main.matches("\"go.temporal.io/sdk/temporal\"").count(), 1);
-    let compact = registry.split_whitespace().collect::<String>();
-    assert!(
-        compact.contains("varNexusOperationRegistry=map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry{}")
-    );
-    assert!(!registry.contains("func init()"));
-    assert!(!registry.contains("UpdateNexusOperationRegistry"));
-    assert!(!registry.contains("nexgenOperationInfo"));
-    assert!(!registry.contains("requestContext"));
+    assert!(!main.contains("// --- Registry ---"));
     assert!(!main.contains("\"reflect\""));
     assert!(!main.contains("\"go.temporal.io/sdk/converter\""));
-    assert!(main.contains("dc := internal.GetDataConverterFromWorkflowContext(ctx)"));
+    assert!(!main.contains("go.temporal.io/sdk/internal"));
     assert_no_generated_context_plumbing(&files);
 }
 
@@ -2013,10 +1999,11 @@ interface second-service {{
             ),
         )
         .unwrap();
-        let result = generate_to_string_with_inputs(
+        let result = generate_to_string_with_system_nexus(
             nexgen::language::Language::Go,
             &[wit_path],
             &[descriptor_path(&project_root())],
+            true,
         );
         fs::remove_dir_all(temp_dir).unwrap();
         let rendered = result.unwrap();
