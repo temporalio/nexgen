@@ -36,6 +36,97 @@ interface type-roundtrip-service {
     failure: option<failure>,
   }
 
+  // The records below exercise required and optional nested models, lists, and maps.
+
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution" typescript-import="@temporalio/proto"
+  record workflow-execution {
+    workflow-id: string,
+    run-id: string,
+  }
+
+  /// @nexus.proto "temporal.api.workflow.v1.WorkflowExecutionInfo" typescript-import="@temporalio/proto"
+  record workflow-execution-info {
+    execution: workflow-execution,
+    parent-execution: option<workflow-execution>,
+    /// @nexus.omit
+    %type: placeholder,
+    /// @nexus.omit
+    start-time: placeholder,
+    /// @nexus.omit
+    close-time: placeholder,
+    /// @nexus.omit
+    status: placeholder,
+    /// @nexus.omit
+    history-length: placeholder,
+    /// @nexus.omit
+    parent-namespace-id: placeholder,
+    /// @nexus.omit
+    execution-time: placeholder,
+    /// @nexus.omit
+    memo: placeholder,
+    /// @nexus.omit
+    search-attributes: placeholder,
+    /// @nexus.omit
+    auto-reset-points: placeholder,
+    /// @nexus.omit
+    task-queue: placeholder,
+    /// @nexus.omit
+    state-transition-count: placeholder,
+    /// @nexus.omit
+    history-size-bytes: placeholder,
+    /// @nexus.omit
+    most-recent-worker-version-stamp: placeholder,
+    /// @nexus.omit
+    execution-duration: placeholder,
+    /// @nexus.omit
+    root-execution: placeholder,
+    /// @nexus.omit
+    assigned-build-id: placeholder,
+    /// @nexus.omit
+    inherited-build-id: placeholder,
+    /// @nexus.omit
+    first-run-id: placeholder,
+    /// @nexus.omit
+    versioning-info: placeholder,
+    /// @nexus.omit
+    worker-deployment-name: placeholder,
+    /// @nexus.omit
+    priority: placeholder,
+    /// @nexus.omit
+    external-payload-size-bytes: placeholder,
+    /// @nexus.omit
+    external-payload-count: placeholder,
+  }
+
+  /// @nexus.proto "temporal.api.taskqueue.v1.TaskQueuePartitionMetadata" typescript-import="@temporalio/proto"
+  record task-queue-partition {
+    key: string,
+    owner-host-name: string,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse" typescript-import="@temporalio/proto"
+  record task-queue-partitions {
+    workflow-task-queue-partitions: option<list<task-queue-partition>>,
+    /// @nexus.omit
+    activity-task-queue-partitions: placeholder,
+  }
+
+  /// @nexus.proto "temporal.api.namespace.v1.BadBinaryInfo" typescript-import="@temporalio/proto"
+  record bad-binary {
+    reason: string,
+    operator: string,
+    /// @nexus.omit
+    create-time: placeholder,
+  }
+
+  /// @nexus.proto "temporal.api.namespace.v1.BadBinaries" typescript-import="@temporalio/proto"
+  record bad-binaries {
+    binaries: option<map<string, bad-binary>>,
+  }
+
   activity-options-operation: func(request: activity-options) -> activity-options;
   failure-operation: func(request: failure-container) -> failure-container;
+  workflow-execution-info-operation: func(request: workflow-execution-info) -> workflow-execution-info;
+  task-queue-partitions-operation: func(request: task-queue-partitions) -> task-queue-partitions;
+  bad-binaries-operation: func(request: bad-binaries) -> bad-binaries;
 }

@@ -123,9 +123,36 @@ pub(crate) fn relative_descriptor_name(full_name: &str, package: &str) -> String
 }
 
 fn field_has_presence(field: &FieldDescriptorProto, field_type: Option<Type>) -> bool {
-    matches!(field_type, Some(Type::Message))
-        || field.proto3_optional.unwrap_or(false)
-        || field.oneof_index.is_some()
+    field_label(field) != Some(Label::Repeated)
+        && (matches!(field_type, Some(Type::Message))
+            || field.proto3_optional.unwrap_or(false)
+            || field.oneof_index.is_some())
+}
+
+#[cfg(test)]
+mod presence_tests {
+    use super::*;
+
+    #[test]
+    fn repeated_fields_have_no_presence_even_for_message_elements() {
+        for (label, kind, expected) in [
+            (Label::Optional, Type::Message, true),
+            (Label::Repeated, Type::Message, false),
+            (Label::Repeated, Type::Int32, false),
+            (Label::Optional, Type::Int32, false),
+        ] {
+            let field = FieldDescriptorProto {
+                label: Some(label as i32),
+                r#type: Some(kind as i32),
+                ..Default::default()
+            };
+            assert_eq!(
+                field_has_presence(&field, Some(kind)),
+                expected,
+                "{label:?} {kind:?}"
+            );
+        }
+    }
 }
 
 fn field_label(field: &FieldDescriptorProto) -> Option<Label> {

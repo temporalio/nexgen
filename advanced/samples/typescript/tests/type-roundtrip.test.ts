@@ -117,6 +117,15 @@ describe("type-roundtrip generated output", () => {
           calls.push(["FailureOperation", input]);
           return input;
         },
+        async workflowExecutionInfoOperation(_ctx, input) {
+          return input;
+        },
+        async taskQueuePartitionsOperation(_ctx, input) {
+          return input;
+        },
+        async badBinariesOperation(_ctx, input) {
+          return input;
+        },
       });
 
       const result = await executeWorkflowWithNexus<{
