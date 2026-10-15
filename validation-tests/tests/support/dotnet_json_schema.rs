@@ -849,6 +849,39 @@ Check.WriteFails(new Tagged { Tags = new[] { "a", "b", "c" } }, "tags: must have
     );
 }
 
+#[test]
+fn csharp_json_min_contains_counts_matches() {
+    let case = JsonCase::new("min-contains");
+    case.write(
+        "votes.yaml",
+        r#"type: object
+properties:
+  ballots: { type: array, items: { type: string }, contains: { const: yes }, minContains: 2 }
+  optional: { type: array, items: { type: string }, contains: { const: yes }, minContains: 0, maxContains: 1 }
+"#,
+    );
+    case.generate(&["votes.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Votes>("{\"ballots\":[\"yes\",\"no\",\"yes\"]}");
+Check.ParseFails<Votes>("{\"ballots\":[\"yes\",\"no\"]}", "ballots: too few matching items: at least 2, got 1");
+Check.WriteFails(new Votes { Ballots = new[] { "yes" } }, "ballots: too few matching items: at least 2, got 1");
+// `minContains: 0` lets a list with no match through.
+Check.RoundTrip<Votes>("{\"optional\":[]}");
+Check.RoundTrip<Votes>("{\"optional\":[\"no\"]}");"#,
+    );
+
+    // Alone, `minContains: 0` would make `contains` assert nothing.
+    let vacuous = JsonCase::new("min-contains-vacuous");
+    vacuous.write(
+        "votes.yaml",
+        "type: object\nproperties:\n  ballots: { type: array, items: { type: string }, contains: { const: yes }, minContains: 0 }\n",
+    );
+    assert_has(
+        &vacuous.generate_err(&["votes.yaml"]),
+        &["`minContains: 0` without a `maxContains`"],
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
