@@ -241,6 +241,28 @@ fn csharp_cli_generates_json_schema_without_a_support_package() {
 // Annotations and keywords outside the subset
 // ---------------------------------------------------------------------------
 
+/// A `title` is the first line of the `<summary>`, ahead of the description,
+/// and never names the type.
+#[test]
+fn csharp_json_title_leads_the_summary() {
+    let case = JsonCase::new("title");
+    case.write(
+        "account.yaml",
+        "title: Registered user\ndescription: Someone who signed up.\ntype: object\nproperties:\n  id: { type: string, title: Identifier }\n",
+    );
+    let output = case.generate(&["account.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "    /// <summary>\n    /// Registered user\n    /// <para/>\n    /// Someone who signed up.\n    /// </summary>\n",
+            "    public sealed record Account\n",
+            "        /// <summary>\n        /// Identifier\n        /// </summary>\n        public string? Id { get; init; }",
+        ],
+    );
+    assert_lacks(models, &["RegisteredUser"]);
+}
+
 /// A keyword the shared loader refuses (P6 / P7.1) fails a C# generation
 /// before anything is emitted, so C# never approximates it.
 #[test]
