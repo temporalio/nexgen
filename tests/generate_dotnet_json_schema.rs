@@ -203,6 +203,10 @@ fn csharp_json_rejects_unsupported_keywords() {
             "type: object\nproperties:\n  doc: { type: string, contentSchema: { type: object } }\n",
             "`contentSchema` is not supported",
         ),
+        (
+            "type: object\nproperties:\n  pair: { type: array, prefixItems: [{ type: string }, { type: integer }] }\n",
+            "tuple arrays (`prefixItems`) are not supported",
+        ),
     ];
     for (schema, expected) in cases {
         let case = JsonCase::new("unsupported-keyword");
