@@ -37,7 +37,6 @@ fn names_language(cell: &str, language: &str) -> bool {
 /// documents C# there, and an entry that already does fails the test, so the
 /// list only shrinks.
 const PENDING: &[&str] = &[
-    "contains.md",
     "dependentRequired.md",
     "deprecated.md",
     "description.md",
