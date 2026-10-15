@@ -787,6 +787,11 @@ pub(super) fn property_name_checks(
     out.push_str(&format!(
         "{indent}foreach (var propertyName in {keys})\n{indent}{{\n"
     ));
+    // Every predicate records its own reason; the key's prefix is applied to
+    // all of them at once below, so no check can forget it.
+    out.push_str(&format!(
+        "{inner}var nameViolationStart = violations.Count;\n"
+    ));
     if constraints.has_length() {
         out.push_str(&format!(
             "{inner}var nameLength = {};\n",
@@ -803,8 +808,8 @@ pub(super) fn property_name_checks(
                     &count_comparison("nameLength", op, bound),
                     &key_path,
                     &format!(
-                        "\"invalid property name \\\"\" + propertyName + {} + nameLength",
-                        cs_string(&format!("\": {reason} {bound}, got "))
+                        "{} + nameLength",
+                        cs_string(&format!("{reason} {bound}, got "))
                     ),
                 );
             }
@@ -827,6 +832,9 @@ pub(super) fn property_name_checks(
         &CsType::String,
         &inner,
     );
+    out.push_str(&format!(
+        "{inner}for (var nameViolation = nameViolationStart; nameViolation < violations.Count; nameViolation++)\n{inner}{{\n{inner}    violations[nameViolation] = violations[nameViolation] with {{ Reason = \"invalid property name \\\"\" + propertyName + \"\\\": \" + violations[nameViolation].Reason }};\n{inner}}}\n"
+    ));
     out.push_str(&format!("{indent}}}\n"));
 }
 

@@ -1029,6 +1029,40 @@ Check.ParseFails<NestedPath>(
 }
 
 #[test]
+fn csharp_json_property_names_matcher_is_complete() {
+    let case = JsonCase::new("property-names");
+    case.write(
+        "names.yaml",
+        r#"type: object
+additionalProperties: { type: integer }
+propertyNames:
+  type: string
+  minLength: 6
+  maxLength: 32
+  pattern: "@example\\.com$"
+  format: email
+  enum: [a@example.com, b@example.com]
+"#,
+    );
+    case.generate(&["names.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Names>("{\"a@example.com\":1}");
+Check.ParseFails<Names>("{\"c@example.com\":1}", "[\"c@example.com\"]: invalid property name \"c@example.com\": must be one of");
+// Every failing predicate is reported, each under the key's prefix.
+Check.ParseFails<Names>(
+    "{\"a@example.org\":1}",
+    "[\"a@example.org\"]: invalid property name \"a@example.org\": must match pattern",
+    "[\"a@example.org\"]: invalid property name \"a@example.org\": must be one of");
+Check.WriteFails(
+    new Names { AdditionalProperties = new System.Collections.Generic.Dictionary<string, long> { ["x"] = 1 } },
+    "x: invalid property name \"x\": must have length >= 6",
+    "x: invalid property name \"x\": must match pattern",
+    "x: invalid property name \"x\": must be a valid email",
+    "x: invalid property name \"x\": must be one of");"#,
+    );
+}
+
+#[test]
 fn csharp_json_duplicate_keys_keep_the_last_occurrence() {
     let case = JsonCase::new("duplicate-keys");
     case.write(
