@@ -963,3 +963,28 @@ Check.ParseFails<Locals>("{\"violations\":\"v\",\"value\":\"x\",\"members\":\"m\
 Check.WriteFails(new Locals { Violations = "v", Hash = "h" }, "violations: must have length >= 2", "hash: must have length >= 2");"#,
     );
 }
+
+#[test]
+fn csharp_json_optional_materialized_consts_round_trip() {
+    let case = JsonCase::new("optional-consts");
+    case.write(
+        "pin.yaml",
+        r#"type: object
+properties:
+  plain: { type: string, const: "x" }
+  num: { type: integer, const: 3 }
+  tag: { type: string, contentEncoding: base64, const: "aGk=" }
+  span: { type: string, format: duration, const: "PT1H30M" }
+"#,
+    );
+    case.generate(&["pin.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Pin>("{}");
+Check.RoundTrip<Pin>("{\"plain\":\"x\",\"num\":3,\"tag\":\"aGk=\",\"span\":\"PT1H30M\"}");
+// The closed set compares the wire spelling, as in every target: `PT90M`
+// denotes the same duration but is not the constant's text.
+Check.ParseFails<Pin>("{\"span\":\"PT90M\"}", "span: must equal \"PT1H30M\"");
+Check.ParseFails<Pin>("{\"plain\":\"y\",\"span\":\"PT1H\"}", "plain: must equal \"x\"", "span: must equal \"PT1H30M\"");
+Check.WriteFails(new Pin { Span = System.TimeSpan.FromHours(1) }, "span: must equal \"PT1H30M\"");"#,
+    );
+}
