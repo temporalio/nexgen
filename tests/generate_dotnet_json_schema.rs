@@ -225,6 +225,10 @@ fn csharp_json_rejects_unsupported_keywords() {
             "type: object\nproperties:\n  tags: { type: array, items: { type: string }, unevaluatedItems: false }\n",
             "`unevaluatedItems` is not supported",
         ),
+        (
+            "type: object\npatternProperties:\n  \"^x-\": { type: string }\n",
+            "`patternProperties` is not supported",
+        ),
     ];
     for (schema, expected) in cases {
         let case = JsonCase::new("unsupported-keyword");
