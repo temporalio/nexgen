@@ -123,6 +123,20 @@ fn csharp_json_examples_render_expected_language_features() {
 }
 
 #[test]
+fn csharp_json_property_names_without_a_key_predicate_are_refused() {
+    for property_names in ["{ type: string }", "{ type: string, format: date-time }"] {
+        let case = JsonCase::new("property-names-refused");
+        case.write(
+            "keys.yaml",
+            &format!(
+                "type: object\nadditionalProperties: {{ type: string }}\npropertyNames: {property_names}\n"
+            ),
+        );
+        assert_has(&case.generate_err(&["keys.yaml"]), &["propertyNames"]);
+    }
+}
+
+#[test]
 fn csharp_json_bare_ref_alias_cycle_is_rejected() {
     let case = JsonCase::new("alias-cycle");
     case.write(

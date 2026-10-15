@@ -517,10 +517,15 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 foreach (var propertyName in members.Keys)
                 {
+                    var nameViolationStart = violations.Count;
                     var nameLength = SpecJson.CodePoints(propertyName);
                     if (nameLength > 8)
                     {
-                        violations.Add(new Violation(Violation.Member(path, propertyName), "invalid property name \"" + propertyName + "\": must have length <= 8, got " + nameLength));
+                        violations.Add(new Violation(Violation.Member(path, propertyName), "must have length <= 8, got " + nameLength));
+                    }
+                    for (var nameViolation = nameViolationStart; nameViolation < violations.Count; nameViolation++)
+                    {
+                        violations[nameViolation] = violations[nameViolation] with { Reason = "invalid property name \"" + propertyName + "\": " + violations[nameViolation].Reason };
                     }
                 }
                 if (violations.Count > start)
@@ -547,10 +552,15 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 foreach (var propertyName in value.AdditionalProperties.Keys)
                 {
+                    var nameViolationStart = violations.Count;
                     var nameLength = SpecJson.CodePoints(propertyName);
                     if (nameLength > 8)
                     {
-                        violations.Add(new Violation(Violation.Member(path, propertyName), "invalid property name \"" + propertyName + "\": must have length <= 8, got " + nameLength));
+                        violations.Add(new Violation(Violation.Member(path, propertyName), "must have length <= 8, got " + nameLength));
+                    }
+                    for (var nameViolation = nameViolationStart; nameViolation < violations.Count; nameViolation++)
+                    {
+                        violations[nameViolation] = violations[nameViolation] with { Reason = "invalid property name \"" + propertyName + "\": " + violations[nameViolation].Reason };
                     }
                 }
                 foreach (var entry in value.AdditionalProperties)

@@ -63,7 +63,7 @@ Loader behavior:
 ## Type mapping
 
 None of its own. The host object's type comes from [[additionalProperties]] —
-all four languages wrap the map in a named catch-all member
+all five languages wrap the map in a named catch-all member
 (`AdditionalProperties map[string]T` / `Map<String,T> additionalProperties` /
 `additionalProperties: Record<string,T>` /
 `additional_properties: dict[str, V]`). `propertyNames` only adds a key
@@ -83,6 +83,7 @@ restated here.
 | TypeScript | the same predicate over the wire object's own keys; a failure → push a `Violation` at the key's path with ``reason: `invalid property name "${k}": ${why}` ``, throw one `PayloadValidationError` application failure.                                                                                                                                          |
 | Python     | both directions of the `_<Model>TransferTypeConverter` (**PRINCIPLES Python §3**) loop the map's keys and apply the same key check; a failure appends a `Violation` at the key's path with ``reason=f'invalid property name "{key}": {why}'`` per bad key into the single `PayloadValidationError` application failure.                                         |
 | Java       | in the per-POJO collecting deserializer (PRINCIPLES Java §5), iterate the parsed tree's keys, apply the same key check, and push a `Violation` at the key's path with `"invalid property name \"" + key + "\": " + why` per bad key into the single `PayloadValidationError` application failure.                                                               |
+| C#         | `Converter.Parse` iterates the distinct wire keys and records a `Violation` at the key's path with `"invalid property name \"" + key + "\": " + why` per bad key; `Validate` checks the keys it will write.                                                                                                                                                     |
 
 Every row states the same predicate and the same
 `invalid property name "<key>": ` prefix on both paths; per **P12.2** that
