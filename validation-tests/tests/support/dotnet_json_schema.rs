@@ -728,6 +728,28 @@ Check.WriteFails(new Multiples { ByFive = 7 }, "byFive: must be a multiple of 5"
 }
 
 #[test]
+fn csharp_json_negative_zero_keeps_its_sign_and_matches_zero() {
+    let case = JsonCase::new("negative-zero");
+    case.write(
+        "zero.yaml",
+        r#"type: object
+properties:
+  ratio: { type: number }
+  zeroConst: { type: number, const: 0 }
+  ratios: { type: array, uniqueItems: true, items: { type: number } }
+"#,
+    );
+    case.generate(&["zero.yaml"]);
+    case.run(
+        r#"var parsed = Check.RoundTrip<Zero>("{\"ratio\":-0}");
+Check.True(double.IsNegative(parsed.Ratio!.Value), "-0 keeps its sign");
+Check.RoundTrip<Zero>("{\"zeroConst\":-0}", "{\"zeroConst\":0}");
+Check.ParseFails<Zero>("{\"ratios\":[0,-0]}", "ratios: duplicate items");
+Check.WriteFails(new Zero { Ratios = new[] { 0.0, -0.0 } }, "ratios: duplicate items");"#,
+    );
+}
+
+#[test]
 fn csharp_json_large_portable_counts_compile() {
     let case = JsonCase::new("large-counts");
     case.write(
