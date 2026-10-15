@@ -11,18 +11,18 @@ stable references, do not renumber them.
 ### Foundational mandates
 
 1. **Polyglot wire compatibility is mandatory.** One schema generates models in
-   every supported language (Go, TypeScript, Python, Java), and a JSON payload
-   accepted by one language's deserializer must be accepted — and validated
-   *identically* — by every other's. Validation semantics are part of the wire
-   contract, not a per-language implementation detail: a value one language
-   rejects (`1.5` for an `integer`, a `minLength` underflow, a missing required
-   key) must be rejected by all, and a value one accepts must round-trip through
-   any other with the same JSON value. JSON identity does not include
-   insignificant whitespace, object-member order, or a number's lexical
+   every supported language (C#, Go, TypeScript, Python, Java), and a JSON
+   payload accepted by one language's deserializer must be accepted — and
+   validated *identically* — by every other's. Validation semantics are part of
+   the wire contract, not a per-language implementation detail: a value one
+   language rejects (`1.5` for an `integer`, a `minLength` underflow, a missing
+   required key) must be rejected by all, and a value one accepts must
+   round-trip through any other with the same JSON value. JSON identity does not
+   include insignificant whitespace, object-member order, or a number's lexical
    spelling: `5`, `5.0`, and `5e0` are the same mathematical number, and
    positive/negative zero compare equal. This is enforced from both ends — the
    strict subset (P6) refuses at load time any feature that cannot carry
-   identical semantics across all four targets rather than approximate it, and
+   identical semantics across all five targets rather than approximate it, and
    the shared validator (P12) is specified once as language-agnostic constraint
    predicates whose per-language reimplementations must agree value-for-value.
    This takes precedence: where cross-language wire agreement conflicts with
@@ -49,11 +49,11 @@ stable references, do not renumber them.
    others', **fix the outlier**: an incidental target limitation does not by
    itself license narrowing every target's accepted set. That prohibition does
    not reach (c) — a domain explicitly declared once and enforced identically in
-   all four targets is a P6 subset decision rather than a per-target loss. This
+   all five targets is a P6 subset decision rather than a per-target loss. This
    licenses the binary64 `number` domain and ±(2^53−1) integer range ([[type]])
    and the materialized `time` / `date-time` offset domain `-14:00..+14:00`
    ([[format]]). All three preserve one accepted-and-rejected value set across
-   all four languages (validation semantics are never excepted), and each loss
+   all five languages (validation semantics are never excepted), and each loss
    or domain boundary is bounded and documented at its own keyword. Everything
    else an accepted schema expresses round-trips unchanged by JSON value.
    Members the schema does **not** declare fall outside this clause: their
@@ -73,7 +73,7 @@ stable references, do not renumber them.
 
 3. **Works with the default Temporal payload converter setup.** A contrib
    library is admissible only where a target genuinely cannot express the wire
-   contract without one — a bar none of the four targets meets, so this holds
+   contract without one — a bar none of the five targets meets, so this holds
    literally in all of them: every language's output runs on the stock converter
    (`DataConverter.default`) with **no** contrib dependency and no user wiring.
    Python reaches it through the SDK's own transfer-type hook (Python §3), which
@@ -182,7 +182,7 @@ stable references, do not renumber them.
         indistinguishable from a nested `a` → `b`, and a key spelled `[0]` is
         indistinguishable from an array index. Bracket-quoting every
         non-identifier key removes both ambiguities, and it is why a nested path
-        beginning with `[` can only be an index. All four runtimes route
+        beginning with `[` can only be an index. All five runtimes route
         declared and map keys through the same segment encoder before joining
         nested or indexed paths.
     3. **The failure must survive the boundaries the caller observes it
