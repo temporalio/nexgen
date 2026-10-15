@@ -12,6 +12,9 @@ using Temporalio.Workflows;
 namespace Nexgen.JsonSchema.Showcase
 {
 
+    /// <summary>
+    /// Fetch the showcase payload. Also exercises the service-level `x-&lt;lang&gt;-name` override: the emitted service code identifier is renamed to the derived name plus a per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`, C# interface `IShowcaseServiceCs`) while the wire service name / `@Service` / `ServiceName` string stays `example.showcase.v1.ShowcaseService`.
+    /// </summary>
     [GeneratedCode("nexgen", null)]
     [NexusService("example.showcase.v1.ShowcaseService")]
     internal interface IShowcaseServiceCs

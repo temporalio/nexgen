@@ -2441,6 +2441,48 @@ services:
     service.build();
 }
 
+#[test]
+fn csharp_json_service_module_without_own_types_does_not_reemit_refs() {
+    let case = JsonCase::new("service-only-module");
+    case.write(
+        "a/page.json",
+        r#"{"type":"object","additionalProperties":false,"required":["title"],"properties":{"title":{"type":"string"}}}"#,
+    )
+    .write(
+        "b/note.json",
+        r#"{"type":"object","additionalProperties":false,"required":["body"],"properties":{"body":{"type":"string"}}}"#,
+    )
+    .write(
+        "svc.nexusrpc.yaml",
+        r#"nexusrpc: "1.0.0"
+services:
+  Svc:
+    fqn: example.v1.Svc
+    operations:
+      one:
+        input: { $ref: a/page.json }
+        output: { $ref: b/note.json }
+"#,
+    );
+    let output = case.generate_native(&["."]);
+    let all = output.all();
+    assert_eq!(
+        all.matches("public sealed record Page\n").count(),
+        1,
+        "{all}"
+    );
+    assert_eq!(
+        all.matches("public sealed record Note\n").count(),
+        1,
+        "{all}"
+    );
+    assert_has(
+        output.file("svc/Services.cs"),
+        &["global::Probe.B.Note.Note One(global::Probe.A.Page.Page request);"],
+    );
+    case.build();
+}
+
 // ---------------------------------------------------------------------------
 // Names
 // ---------------------------------------------------------------------------
@@ -2542,6 +2584,81 @@ properties:
         &collide.generate_err(&["collide.yaml"]),
         &["both map to `Same`"],
     );
+}
+
+// ---------------------------------------------------------------------------
+// Services and documentation
+// ---------------------------------------------------------------------------
+
+const DEPRECATED_SERVICE_SCHEMA: &str = r##"nexusrpc: "1.0.0"
+services:
+  Legacy:
+    fqn: example.legacy.v1.Legacy
+    deprecated: true
+    description: Legacy API.
+    x-cs-name: LegacyCs
+    operations:
+      ping:
+        deprecated: true
+        description: Ping the service.
+        x-cs-name: PingCs
+      submit:
+        input: { $ref: "#/$defs/Input" }
+      fetch:
+        output: { $ref: "#/$defs/Input" }
+      archive:
+        input: { $ref: "#/$defs/OldJob" }
+        output: { $ref: "#/$defs/OldJob" }
+$defs:
+  Input:
+    type: object
+    additionalProperties: false
+    properties: { id: { type: string } }
+  OldJob:
+    type: object
+    deprecated: true
+    properties: { oldId: { type: string, deprecated: true } }
+"##;
+
+#[test]
+fn csharp_json_services_render_docs_deprecation_and_one_sided_io() {
+    for native in [false, true] {
+        let case = JsonCase::new("services");
+        case.write("legacy.nexusrpc.yaml", DEPRECATED_SERVICE_SCHEMA);
+        let output = if native {
+            case.generate_native(&["legacy.nexusrpc.yaml"])
+        } else {
+            case.generate(&["legacy.nexusrpc.yaml"])
+        };
+        let services = output.file("Services.cs");
+        assert_has(
+            services,
+            &[
+                // The service is documented and deprecated; overrides rename
+                // the C# identifiers and keep the wire names.
+                "    /// <summary>\n    /// Legacy API.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    [global::System.Obsolete]\n    [NexusService(\"example.legacy.v1.Legacy\")]\n    internal interface ILegacyCs\n",
+                "        /// Ping the service.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        [global::System.Obsolete]\n        [NexusOperation(\"Ping\")]\n        void PingCs();\n",
+                // An absent input is a no-arg method; an absent output is `void`.
+                "void Submit(Input request);",
+                "Input Fetch();",
+                "OldJob Archive(OldJob request);",
+                // The file's own references to deprecated types stay quiet.
+                "#pragma warning disable CS0612, CS0618",
+            ],
+        );
+        if native {
+            assert_has(
+                services,
+                &[
+                    "[global::System.Obsolete]\n    public class LegacyCsClient",
+                    "[global::System.Obsolete]\n        public async Task PingCsAsync()",
+                    "public async Task<Input> FetchAsync()",
+                ],
+            );
+        }
+        // Builds with warnings as errors: no CS0612/CS0618 from generated code.
+        case.build();
+    }
 }
 
 // ---------------------------------------------------------------------------

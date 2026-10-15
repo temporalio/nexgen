@@ -14,6 +14,9 @@ using Nexgen.JsonSchema.Kb.Tree.Category;
 namespace Nexgen.JsonSchema.Kb.Kb
 {
 
+    /// <summary>
+    /// Fetch and update pages, blocks, and the category tree.
+    /// </summary>
     [GeneratedCode("nexgen", null)]
     [NexusService("example.kb.v1.KnowledgeBaseService")]
     internal interface IKnowledgeBaseService

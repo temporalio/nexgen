@@ -147,6 +147,43 @@ fn csharp_json_bare_ref_alias_cycle_is_rejected() {
 }
 
 #[test]
+fn csharp_json_rejects_service_clashing_with_its_io_type() {
+    let case = JsonCase::new("service-clash");
+    case.write(
+        "sub/api.nexusrpc.yaml",
+        r##"nexusrpc: "1.0.0"
+services:
+  Thing:
+    operations:
+      doIt: { input: { $ref: "#/$defs/Thing" } }
+$defs:
+  Thing: { type: object, properties: { id: { type: string } } }
+"##,
+    );
+    case.write(
+        "root.nexusrpc.yaml",
+        "nexusrpc: \"1.0.0\"\n$defs:\n  Root: { type: object, properties: { a: { type: string } } }\n",
+    );
+    assert_has(
+        &case.generate_err(&["."]),
+        &["collision", "Thing", "x-cs-name"],
+    );
+}
+
+#[test]
+fn csharp_json_rejects_empty_service_descriptions() {
+    let case = JsonCase::new("empty-description");
+    case.write(
+        "empty.nexusrpc.yaml",
+        "nexusrpc: \"1.0.0\"\nservices:\n  Empty:\n    fqn: example.v1.Empty\n    description: \"\"\n    operations:\n      ping: {}\n",
+    );
+    assert_has(
+        &case.generate_err(&["empty.nexusrpc.yaml"]),
+        &["`description` must not be empty or whitespace-only"],
+    );
+}
+
+#[test]
 fn csharp_cli_generates_json_schema_without_a_support_package() {
     let root = project_root();
     let temp = unique_output_path("dotnet-json-cli");
