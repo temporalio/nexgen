@@ -467,6 +467,72 @@ Check.WriteFails(new Numbers { Count = -(1L << 53) }, "count: exceeds ±(2^53-1)
 // Objects
 // ---------------------------------------------------------------------------
 
+#[test]
+fn csharp_json_duplicate_keys_keep_the_last_occurrence() {
+    let case = JsonCase::new("duplicate-keys");
+    case.write(
+        "dup.yaml",
+        "type: object\nproperties:\n  a: { type: string }\n",
+    );
+    case.generate(&["dup.yaml"]);
+    case.run(r#"Check.RoundTrip<Dup>("{\"a\":\"x\",\"a\":\"y\"}", "{\"a\":\"y\"}");"#);
+}
+
+#[test]
+fn csharp_json_wire_keys_need_not_be_identifiers() {
+    let case = JsonCase::new("wire-keys");
+    case.write(
+        "wire_keys.yaml",
+        r#"type: object
+required: [content-type]
+properties:
+  content-type: { type: string }
+  class: { type: string }
+  event: { type: integer }
+  "@type": { type: string }
+  a.b: { type: string, minLength: 2 }
+"#,
+    );
+    let output = case.generate(&["wire_keys.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "public required string ContentType { get; init; }",
+            "public string? Class { get; init; }",
+            "public long? Event { get; init; }",
+            "public string? Type { get; init; }",
+            "public string? AB { get; init; }",
+        ],
+    );
+    case.run(
+        r#"Check.RoundTrip<WireKeys>("{\"content-type\":\"t\",\"class\":\"c\",\"event\":1,\"@type\":\"x\",\"a.b\":\"ab\"}");
+// A key that is not identifier-like is bracket-quoted in the path (P11.2).
+Check.ParseFails<WireKeys>("{\"content-type\":\"t\",\"a.b\":\"a\"}", "[\"a.b\"]: must have length >= 2");
+Check.ParseFails<WireKeys>("{}", "[\"content-type\"]: required");"#,
+    );
+}
+
+/// The naming policy on a caller's `JsonSerializerOptions` cannot rename wire
+/// keys: each converter writes every member name itself.
+#[test]
+fn csharp_json_converters_own_the_wire_keys() {
+    let case = JsonCase::new("naming-policy");
+    case.write(
+        "policy.yaml",
+        "type: object\nproperties:\n  firstName: { type: string }\n  zip_code: { type: string }\n",
+    );
+    case.generate(&["policy.yaml"]);
+    case.run(
+        r#"var value = new Policy { FirstName = "a", ZipCode = "b" };
+foreach (var policy in new[] { System.Text.Json.JsonNamingPolicy.SnakeCaseLower, System.Text.Json.JsonNamingPolicy.KebabCaseUpper })
+{
+    var options = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = policy };
+    Check.Equal("{\"firstName\":\"a\",\"zip_code\":\"b\"}", System.Text.Json.JsonSerializer.Serialize(value, options), "naming policy");
+    Check.Equal(value, System.Text.Json.JsonSerializer.Deserialize<Policy>("{\"firstName\":\"a\",\"zip_code\":\"b\"}", options), "naming policy read");
+}"#,
+    );
+}
+
 /// Every violation lands in one non-retryable `PayloadValidationError`
 /// application failure (P11), in both directions.
 #[test]
@@ -509,5 +575,100 @@ catch (Temporalio.Exceptions.ApplicationFailureException failure)
 }
 Check.WriteFails(new Shape { A = "x", B = 2 }, "a: must have length >= 2", "b: must be <= 1");
 Check.Equal("{\"a\":\"ab\",\"b\":1}", Check.Canonical(Check.Write(new Shape { A = "ab", B = 1 })), "valid value writes");"#,
+    );
+}
+
+// ---------------------------------------------------------------------------
+// .NET string and equality semantics
+// ---------------------------------------------------------------------------
+
+/// A record's compiler-generated equality compares arrays, lists and
+/// `JsonElement`s by reference; the generated `Equals`/`GetHashCode` compare
+/// them by content, so a value equals its own round trip.
+#[test]
+fn csharp_json_record_equality_is_structural() {
+    let case = JsonCase::new("record-equality");
+    case.write(
+        "equality.yaml",
+        r#"type: object
+properties:
+  blob: { type: string, contentEncoding: base64 }
+  tags: { type: array, items: { type: string } }
+  grid: { type: array, items: { type: array, items: { type: integer } } }
+  union: { oneOf: [{ type: array, items: { type: string } }, { type: integer }] }
+"#,
+    );
+    case.generate(&["equality.yaml"]);
+    case.run(
+        r#"const string wire = "{\"blob\":\"AQI=\",\"tags\":[\"a\"],\"grid\":[[1]],\"union\":[\"x\"],\"extra\":{\"n\":[1,2]}}";
+var left = Check.Parse<Equality>(wire);
+var right = Check.Parse<Equality>(wire);
+Check.True(!ReferenceEquals(left.Blob, right.Blob), "distinct arrays");
+Check.Equal(left, right, "equal by content");
+Check.Equal(left.GetHashCode(), right.GetHashCode(), "hash by content");
+Check.Equal(left, Check.Parse<Equality>(Check.Write(left)), "a value equals its round trip");
+Check.True(left != right with { Blob = new byte[] { 1, 3 } }, "different bytes");
+Check.True(left != Check.Parse<Equality>("{\"blob\":\"AQI=\",\"tags\":[\"a\"],\"grid\":[[1]],\"union\":[\"x\"],\"extra\":{\"n\":[1,3]}}"), "different extras");"#,
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Edge cases
+// ---------------------------------------------------------------------------
+
+/// Member names that spell the locals and parameters a converter binds.
+#[test]
+fn csharp_json_property_names_never_shadow_converter_locals() {
+    let names = [
+        "reader",
+        "writer",
+        "options",
+        "typeToConvert",
+        "path",
+        "violations",
+        "value",
+        "node",
+        "members",
+        "member",
+        "element",
+        "entry",
+        "key",
+        "item0",
+        "index0",
+        "items0",
+        "wireKeys",
+        "propertyName",
+        "nameLength",
+        "hash",
+        "other",
+        "result",
+        "model0",
+        "length0",
+        "present0",
+        "candidate",
+        "matchCount0",
+        "seen0",
+        "keyed0",
+        "parsed",
+    ];
+    let mut schema = String::from(
+        "type: object\nadditionalProperties: true\nrequired: [violations]\nproperties:\n",
+    );
+    for name in names {
+        schema.push_str(&format!("  {name}: {{ type: string, minLength: 2 }}\n"));
+    }
+    schema.push_str("  list: { type: array, uniqueItems: true, items: { type: string }, contains: { minLength: 3 } }\n");
+    let case = JsonCase::new("converter-locals");
+    case.write("locals.yaml", &schema);
+    case.generate(&["locals.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Locals>("{\"reader\":\"rr\",\"writer\":\"ww\",\"path\":\"pp\",\"violations\":\"vv\",\"value\":\"xx\",\"list\":[\"abc\"],\"extra\":1}");
+Check.ParseFails<Locals>("{\"violations\":\"v\",\"value\":\"x\",\"members\":\"m\",\"list\":[\"a\",\"a\"]}",
+    "violations: must have length >= 2",
+    "value: must have length >= 2",
+    "members: must have length >= 2",
+    "list: duplicate items",
+    "list: no element matches the required schema");
+Check.WriteFails(new Locals { Violations = "v", Hash = "h" }, "violations: must have length >= 2", "hash: must have length >= 2");"#,
     );
 }
