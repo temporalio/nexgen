@@ -230,6 +230,16 @@ impl ModelBackend {
         }
     }
 
+    /// Whether any model in the run is `deprecated`. A file that names models
+    /// it does not declare (the service file) then has to suppress the
+    /// obsolete warnings its own references raise, as the model files do.
+    pub(in crate::generator) fn has_deprecated_models(&self) -> bool {
+        self.tree
+            .models
+            .values()
+            .any(|model| model.schema.get("deprecated") == Some(&serde_json::Value::Bool(true)))
+    }
+
     fn type_name(&self, json_type: &PlannedJsonType) -> String {
         let context = self.tree.context(&self.namespace);
         match self.tree.registry.get(&json_type.full_name) {

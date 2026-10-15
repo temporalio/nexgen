@@ -29,6 +29,7 @@ const GENERATED_HEADER: &str = concat!(
     ". DO NOT EDIT!"
 );
 const GENERATED_CODE_ATTRIBUTE: &str = "[GeneratedCode(\"nexgen\", null)]";
+const OBSOLETE_ATTRIBUTE: &str = "[global::System.Obsolete]";
 const EXPERIMENTAL_WARNING: &str =
     "WARNING: This API is experimental and may change in the future.";
 
@@ -170,10 +171,29 @@ impl<'a> ApiPlanner<'a> {
         }
         imports.extend(module_imports.iter().map(String::as_str));
         let mut output = generated_file_prelude(namespace, &imports);
+        let has_deprecations = self.api_plan.services.iter().any(|service| {
+            service.deprecated
+                || service
+                    .operations
+                    .iter()
+                    .any(|operation| operation.deprecated)
+        }) || self.external_models.has_deprecated_models();
+        if has_deprecations {
+            output.push_str("#pragma warning disable CS0612, CS0618\n\n");
+        }
         for service in &self.api_plan.services {
-            render_xml_summary(&mut output, "", None, service.experimental);
+            render_xml_summary(
+                &mut output,
+                "",
+                dotnet_doc(&service.doc),
+                service.experimental,
+            );
             output.push_str(GENERATED_CODE_ATTRIBUTE);
             output.push('\n');
+            if service.deprecated {
+                output.push_str(OBSOLETE_ATTRIBUTE);
+                output.push('\n');
+            }
             output.push_str("[NexusService(");
             output.push_str(&csharp_string_literal(&service.wire_name));
             output.push_str(")]\n");
@@ -249,6 +269,11 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    ");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
+        if operation.deprecated {
+            output.push_str("    ");
+            output.push_str(OBSOLETE_ATTRIBUTE);
+            output.push('\n');
+        }
         output.push_str("    [NexusOperation(");
         output.push_str(&csharp_string_literal(&operation.wire_name));
         output.push_str(")]\n");
@@ -416,6 +441,10 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("</c> service's operations from a workflow.\n/// </summary>\n");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
+        if service.deprecated {
+            output.push_str(OBSOLETE_ATTRIBUTE);
+            output.push('\n');
+        }
         output.push_str("public class ");
         output.push_str(&service_class_name);
         output.push_str("\n{\n");
@@ -846,6 +875,11 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    ");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
+        if operation.deprecated {
+            output.push_str("    ");
+            output.push_str(OBSOLETE_ATTRIBUTE);
+            output.push('\n');
+        }
         output.push_str("    ");
         output.push_str(self.operation_request_method_access(operation, request_kind));
         output.push(' ');
@@ -1033,6 +1067,11 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    ");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
+        if operation.deprecated {
+            output.push_str("    ");
+            output.push_str(OBSOLETE_ATTRIBUTE);
+            output.push('\n');
+        }
         output.push_str("    ");
         let access = self.operation_request_method_access(operation, request_kind);
         if endpoint_parameter && access == "private" {
@@ -1984,6 +2023,10 @@ impl DotNetExternalModels {
         };
         this.prepare(api_plan)?;
         Ok(this)
+    }
+
+    fn has_deprecated_models(&self) -> bool {
+        self.json.has_deprecated_models()
     }
 
     fn render_model_wire_methods(
