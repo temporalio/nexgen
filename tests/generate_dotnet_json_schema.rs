@@ -207,6 +207,10 @@ fn csharp_json_rejects_unsupported_keywords() {
             "type: object\nproperties:\n  pair: { type: array, prefixItems: [{ type: string }, { type: integer }] }\n",
             "tuple arrays (`prefixItems`) are not supported",
         ),
+        (
+            "type: object\nproperties:\n  tags: { type: array, items: { type: string }, unevaluatedItems: false }\n",
+            "`unevaluatedItems` is not supported",
+        ),
     ];
     for (schema, expected) in cases {
         let case = JsonCase::new("unsupported-keyword");
