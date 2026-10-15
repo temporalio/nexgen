@@ -40,7 +40,6 @@ const PENDING: &[&str] = &[
     "dependentRequired.md",
     "deprecated.md",
     "description.md",
-    "maxContains.md",
     "maxProperties.md",
     "minProperties.md",
     "nullability.md",
