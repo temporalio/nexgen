@@ -83,6 +83,7 @@ each language uses its bare length primitive.
 | TypeScript | After the `Array.isArray` guard ([[items]]), deserialize checks `raw.length > max` after parsing the elements; serialize checks the typed array. A failure pushes ``Violation{path, reason: `must have at most ${max} items, got ${raw.length}`}``.                                |
 | Python     | After the `isinstance(raw, list)` guard ([[items]]), the transfer converter checks `len(raw) > max` after parsing the elements; serialize checks the typed list. Both aggregate into the generated `PayloadValidationError` application failure.                                   |
 | Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5) checks `node.size() > max` after parsing the elements; serialize checks the typed `List<T>`. Both push a structured violation into the single `PayloadValidationError` application failure. Not bean-validation `@Size`. |
+| C#         | `Converter.Parse` checks `GetArrayLength() > max` over the wire array; `Validate` checks the in-memory list's `Count`. Both record a structured violation in the single `PayloadValidationError` application failure.                                                              |
 
 **Informative `reason` strings.** The `Violation` `reason` names the
 **concrete bound and the offending count** — `must have at most 3 items, got 4`
