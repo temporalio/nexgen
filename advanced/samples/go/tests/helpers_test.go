@@ -6,8 +6,6 @@ import (
 	"go.temporal.io/sdk/converter"
 )
 
-// The testsuite uses one converter for server protobufs and nested user values,
-// including nil signal arguments.
 func systemNexusTestDataConverter() converter.DataConverter {
 	return converter.NewCompositeDataConverter(
 		converter.NewNilPayloadConverter(),

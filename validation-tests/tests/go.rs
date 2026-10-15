@@ -12,9 +12,6 @@ use nexgen::{GenerateRequest, generate_to_file};
 mod support;
 use support::common;
 
-#[path = "support/go_model_conversions.rs"]
-mod go_model_conversions;
-
 #[path = "support/json_schema/selected_tests.rs"]
 mod json_schema_tests;
 

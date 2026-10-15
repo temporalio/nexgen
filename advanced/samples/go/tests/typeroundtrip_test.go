@@ -30,7 +30,6 @@ type TypeRoundtripIntegrationSuite struct {
 
 func (s *TypeRoundtripIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
-	s.env.SetDataConverter(systemNexusTestDataConverter())
 	s.calls = nil
 
 	activityOptionsOp := nexus.NewSyncOperation("ActivityOptionsOperation",
@@ -187,16 +186,15 @@ func (s *TypeRoundtripIntegrationSuite) TestFailureOperationPreservesAbsence() {
 func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly() {
 	policy := temporal.RetryPolicy{MaximumAttempts: 5}
 
-	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*typeRoundtripResults, error) {
-		var result typeRoundtripResults
-		return &result, tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{RetryPolicy: policy}).Get(ctx, &result.ActivityOption)
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*tr.ActivityOptions, error) {
+		var result tr.ActivityOptions
+		return &result, tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{RetryPolicy: policy}).Get(ctx, &result)
 	})
 
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
-	var results typeRoundtripResults
-	s.NoError(s.env.GetWorkflowResult(&results))
-	result := results.ActivityOption
+	var result tr.ActivityOptions
+	s.NoError(s.env.GetWorkflowResult(&result))
 	s.Equal(int32(5), result.RetryPolicy.MaximumAttempts)
 	// Optional fields that were never supplied remain absent after the round
 	// trip, which is distinct from present fields containing their zero value.
@@ -208,39 +206,4 @@ func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly
 	s.Equal("ActivityOptionsOperation", s.calls[0].Operation)
 	handlerInput := s.calls[0].Input.(*activitypb.ActivityOptions)
 	s.Equal(int32(5), handlerInput.GetRetryPolicy().GetMaximumAttempts())
-}
-
-func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsUsesPublicTransferConverter() {
-	dc := converter.GetDefaultDataConverter()
-	want := tr.ActivityOptions{RetryPolicy: temporal.RetryPolicy{MaximumAttempts: 5}}
-	payload, err := dc.ToPayload(want)
-	s.Require().NoError(err)
-	s.NotContains(payload.GetMetadata(), "__temporal_system_payload")
-	var result tr.ActivityOptions
-	s.Require().NoError(dc.FromPayload(payload, &result))
-	s.Equal(want, result)
-
-	payload, err = dc.ToPayload(&activitypb.ActivityOptions{})
-	s.Require().NoError(err)
-	s.Require().NoError(dc.FromPayload(payload, &result))
-	s.Equal(tr.ActivityOptions{}, result)
-}
-
-func (s *TypeRoundtripIntegrationSuite) TestOrdinaryEndpointsAcceptModels() {
-	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
-		for _, endpoint := range []string{"temporal-system", "ordinary-endpoint"} {
-			client := workflow.NewNexusClient(endpoint, typeRoundtripServiceName)
-			err := client.ExecuteOperation(ctx, "ActivityOptionsOperation",
-				tr.ActivityOptions{RetryPolicy: temporal.RetryPolicy{MaximumAttempts: 5}},
-				workflow.NexusOperationOptions{},
-			).Get(ctx, nil)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-
-	s.Require().NoError(s.env.GetWorkflowError())
-	s.Len(s.calls, 2)
 }

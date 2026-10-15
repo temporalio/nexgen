@@ -31,11 +31,9 @@ func doNothingWorkflow(ctx workflow.Context, input string) error {
 	return nil
 }
 
-// recordedEncode captures one value handed to the data converter along with the
-// serialization context that was active at the time.
 type recordedEncode struct {
-	Context converter.SerializationContext
-	Value   any
+	sc    converter.SerializationContext
+	value any
 }
 
 // recordingDataConverter records every value it is asked to encode. It also
@@ -510,13 +508,13 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 	}
 	innerEncodes := map[converter.SerializationContext]int{}
 	for _, encoded := range recorder.snapshot() {
-		switch value := encoded.Value.(type) {
+		switch value := encoded.value.(type) {
 		case string:
 			if value == "raw-input" {
-				innerEncodes[encoded.Context]++
+				innerEncodes[encoded.sc]++
 			}
 		case *workflowservicepb.SignalWithStartWorkflowExecutionRequest:
-			s.Fail("user converter received an operation envelope", "context: %v", encoded.Context)
+			s.Fail("user converter received an operation envelope", "context: %v", encoded.sc)
 		}
 	}
 	s.Equal(map[converter.SerializationContext]int{target: 2}, innerEncodes)
@@ -560,7 +558,7 @@ func (s *WorkflowServiceIntegrationSuite) TestOrdinaryEndpointsIgnoreRegisteredT
 		}
 		found := false
 		for _, encoded := range recorder.snapshot() {
-			if encoded.Value == endpoint+"-input" && encoded.Context == want {
+			if encoded.value == endpoint+"-input" && encoded.sc == want {
 				found = true
 			}
 		}
@@ -657,7 +655,7 @@ func (s *WorkflowServiceIntegrationSuite) checkSerializationContextsWithTarget(o
 	}
 	stringAt := func(want string) int {
 		return indexOf(func(entry recordedEncode) bool {
-			value, ok := entry.Value.(string)
+			value, ok := entry.value.(string)
 			return ok && value == want
 		})
 	}
@@ -667,25 +665,25 @@ func (s *WorkflowServiceIntegrationSuite) checkSerializationContextsWithTarget(o
 	s.Require().NotEqual(-1, workflowArg, "workflow argument was not encoded by the SDK's data converter")
 	s.Require().NotEqual(-1, signalArg, "signal argument was not encoded by the SDK's data converter")
 	for _, entry := range recorded {
-		_, envelope := entry.Value.(*workflowservicepb.SignalWithStartWorkflowExecutionRequest)
+		_, envelope := entry.value.(*workflowservicepb.SignalWithStartWorkflowExecutionRequest)
 		s.False(envelope, "user converter must not receive the outer request")
 	}
 	s.checkRawEnvelopes(recorder, 1)
 
-	s.Equal(targetContext, recorded[workflowArg].Context)
-	s.Equal(targetContext, recorded[signalArg].Context)
+	s.Equal(targetContext, recorded[workflowArg].sc)
+	s.Equal(targetContext, recorded[signalArg].sc)
 	// Memo uses the user converter with the current SDK memo flag enabled;
 	// this sample's metadata helper also uses the workflow-context converter.
 	for _, value := range []string{"target-memo", "target-summary", "target-details"} {
 		i := stringAt(value)
 		s.Require().NotEqual(-1, i, "%s was not encoded by the user converter", value)
-		s.Equal(targetContext, recorded[i].Context, value)
+		s.Equal(targetContext, recorded[i].sc, value)
 	}
 	caller := stringAt("caller-after")
 	s.Require().NotEqual(-1, caller)
 	s.Equal(converter.WorkflowSerializationContext{
 		Namespace: "default-test-namespace", WorkflowID: "default-test-workflow-id",
-	}, recorded[caller].Context, "operation must not change the caller's converter")
+	}, recorded[caller].sc, "operation must not change the caller's converter")
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestConcurrentOperationsKeepTargetContextsIsolated() {
@@ -748,10 +746,10 @@ func (s *WorkflowServiceIntegrationSuite) TestConcurrentOperationsKeepTargetCont
 	}
 	seen := make(map[string]int)
 	for _, entry := range recorder.snapshot() {
-		switch value := entry.Value.(type) {
+		switch value := entry.value.(type) {
 		case string:
 			if expected, ok := want[value]; ok {
-				s.Equal(expected, entry.Context, value)
+				s.Equal(expected, entry.sc, value)
 				seen[value]++
 			}
 		case *workflowservicepb.SignalWithStartWorkflowExecutionRequest:

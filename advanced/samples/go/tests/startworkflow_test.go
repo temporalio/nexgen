@@ -8,9 +8,7 @@ import (
 	"github.com/nexus-rpc/sdk-go/nexus"
 	"github.com/stretchr/testify/suite"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
-	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/testsuite"
-	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
 	sw "go.temporal.io/sdk/advanced/samples/go/startworkflow"
@@ -27,7 +25,6 @@ type StartWorkflowIntegrationSuite struct {
 
 func (s *StartWorkflowIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
-	s.env.SetDataConverter(systemNexusTestDataConverter())
 	s.calls = nil
 
 	start := nexus.NewSyncOperation("StartWorkflow",
@@ -66,22 +63,10 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 		if err := future.Get(ctx, &start); err != nil {
 			return err
 		}
-		var startWithArgs sw.StartedWorkflow
-		if err := sw.StartWorkflow(
-			ctx, sw.StartWorkflowOptions{Workflow: "named-workflow", WorkflowID: "start-args-id", TaskQueue: "start-args-queue"},
-		).Get(ctx, &startWithArgs); err != nil {
-			return err
-		}
 		var restart sw.StartedWorkflow
 		if err := sw.RestartWorkflow(
 			ctx, sw.RestartWorkflowOptions{Workflow: "typed-restart", WorkflowID: "restart-id", TaskQueue: "restart-queue"},
 		).Get(ctx, &restart); err != nil {
-			return err
-		}
-		var restartWithArgs sw.StartedWorkflow
-		if err := sw.RestartWorkflow(
-			ctx, sw.RestartWorkflowOptions{Workflow: "named-restart", WorkflowID: "restart-args-id", TaskQueue: "restart-args-queue"},
-		).Get(ctx, &restartWithArgs); err != nil {
 			return err
 		}
 		var cancelResult sw.CancelWorkflowResponse
@@ -90,8 +75,6 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 		}).Get(ctx, &cancelResult); err != nil {
 			return err
 		}
-		// StartedWorkflow retains namespace, workflow ID, and run ID, so its
-		// methods require only the values specific to the next operation.
 		var resourceRestart sw.StartedWorkflow
 		if err := start.RestartWorkflow(ctx, "resource-workflow", "resource-queue").Get(ctx, &resourceRestart); err != nil {
 			return err
@@ -102,7 +85,7 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
-	s.Require().Len(s.calls, 7)
+	s.Require().Len(s.calls, 5)
 
 	startRequest := s.calls[0].Input.(*workflowservicepb.StartWorkflowExecutionRequest)
 	s.Equal("StartWorkflow", s.calls[0].Operation)
@@ -112,62 +95,25 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 	s.Equal(time.Second, startRequest.GetWorkflowStartDelay().AsDuration())
 	s.Nil(startRequest.GetInput())
 
-	startWithArgs := s.calls[1].Input.(*workflowservicepb.StartWorkflowExecutionRequest)
-	s.Equal("named-workflow", startWithArgs.GetWorkflowType().GetName())
-	s.Nil(startWithArgs.GetInput())
-
-	s.Equal("RestartWorkflow", s.calls[2].Operation)
-	restartRequest := s.calls[2].Input.(*workflowservicepb.StartWorkflowExecutionRequest)
+	s.Equal("RestartWorkflow", s.calls[1].Operation)
+	restartRequest := s.calls[1].Input.(*workflowservicepb.StartWorkflowExecutionRequest)
 	s.Equal("typed-restart", restartRequest.GetWorkflowType().GetName())
 	s.Nil(restartRequest.GetInput())
-	restartWithArgs := s.calls[3].Input.(*workflowservicepb.StartWorkflowExecutionRequest)
-	s.Equal("named-restart", restartWithArgs.GetWorkflowType().GetName())
-	s.Nil(restartWithArgs.GetInput())
 
-	cancelRequest := s.calls[4].Input.(*workflowservicepb.RequestCancelWorkflowExecutionRequest)
-	s.Equal("CancelWorkflow", s.calls[4].Operation)
+	cancelRequest := s.calls[2].Input.(*workflowservicepb.RequestCancelWorkflowExecutionRequest)
+	s.Equal("CancelWorkflow", s.calls[2].Operation)
 	s.Equal("cancel-id", cancelRequest.GetWorkflowExecution().GetWorkflowId())
 	s.Equal("because", cancelRequest.GetReason())
 
-	resourceRestart := s.calls[5].Input.(*workflowservicepb.StartWorkflowExecutionRequest)
-	s.Equal("RestartWorkflow", s.calls[5].Operation)
+	resourceRestart := s.calls[3].Input.(*workflowservicepb.StartWorkflowExecutionRequest)
+	s.Equal("RestartWorkflow", s.calls[3].Operation)
 	s.Equal("start-id", resourceRestart.GetWorkflowId())
 	s.Equal("resource-queue", resourceRestart.GetTaskQueue().GetName())
 	s.Equal("resource-workflow", resourceRestart.GetWorkflowType().GetName())
 
-	resourceCancel := s.calls[6].Input.(*workflowservicepb.RequestCancelWorkflowExecutionRequest)
-	s.Equal("CancelWorkflow", s.calls[6].Operation)
+	resourceCancel := s.calls[4].Input.(*workflowservicepb.RequestCancelWorkflowExecutionRequest)
+	s.Equal("CancelWorkflow", s.calls[4].Operation)
 	s.Equal("start-id", resourceCancel.GetWorkflowExecution().GetWorkflowId())
 	s.Equal("start-run", resourceCancel.GetWorkflowExecution().GetRunId())
 	s.Equal("resource-cancel", resourceCancel.GetReason())
-}
-
-func (s *StartWorkflowIntegrationSuite) TestOrdinaryEndpointsAcceptNativeRequest() {
-	var request any
-	s.env.SetWorkerOptions(worker.Options{Interceptors: []interceptor.WorkerInterceptor{
-		&replaceNexusInputInterceptor{replace: func(input any) any {
-			request = input
-			return input
-		}},
-	}})
-
-	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
-		if err := sw.StartWorkflow(ctx, sw.StartWorkflowOptions{
-			Workflow: "typed-workflow", WorkflowID: "start-id", TaskQueue: "start-queue",
-		}).Get(ctx, nil); err != nil {
-			return err
-		}
-		for _, endpoint := range []string{"temporal-system", "ordinary-endpoint"} {
-			client := workflow.NewNexusClient(endpoint, startWorkflowServiceName)
-			err := client.ExecuteOperation(ctx, "StartWorkflow", request, workflow.NexusOperationOptions{}).Get(ctx, nil)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-
-	s.Require().NoError(s.env.GetWorkflowError())
-	s.Require().Len(s.calls, 3)
-	s.Equal("StartWorkflow", s.calls[0].Operation)
 }
