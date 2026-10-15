@@ -22,7 +22,9 @@ use nexgen::language::Language;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
-use csharp_json_case::{Output, assert_has, assert_lacks, read_cs_files, unique_output_path};
+use csharp_json_case::{
+    JsonCase, Output, assert_has, assert_lacks, read_cs_files, unique_output_path,
+};
 
 fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -118,6 +120,16 @@ fn csharp_json_examples_render_expected_language_features() {
         assert!(!temporal.has_file("Services.cs"));
         fs::remove_dir_all(dir).unwrap();
     }
+}
+
+#[test]
+fn csharp_json_bare_ref_alias_cycle_is_rejected() {
+    let case = JsonCase::new("alias-cycle");
+    case.write(
+        "cycle.yaml",
+        "title: Cycle\n$ref: \"#/$defs/A\"\n$defs:\n  A: { $ref: \"#/$defs/Z\" }\n  Z: { $ref: \"#/$defs/A\" }\n",
+    );
+    assert_has(&case.generate_err(&["cycle.yaml"]), &["cycle"]);
 }
 
 #[test]
