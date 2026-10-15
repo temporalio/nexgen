@@ -1173,6 +1173,35 @@ Check.WriteFails(new Locals { Violations = "v", Hash = "h" }, "violations: must 
 }
 
 #[test]
+fn csharp_json_numeric_edges() {
+    let case = JsonCase::new("numeric-edges");
+    case.write(
+        "edges.yaml",
+        r#"type: object
+properties:
+  bounded: { type: number, exclusiveMaximum: 10, multipleOf: 5 }
+  edge: { type: number, exclusiveMaximum: -1, multipleOf: 2e1 }
+  integral: { type: array, items: { type: number }, contains: { type: integer } }
+  matrix: { type: array, items: { type: array, uniqueItems: true, items: { type: integer } } }
+"#,
+    );
+    case.generate(&["edges.yaml"]);
+    case.run(
+        r#"Check.ParseFails<Edges>("{\"bounded\":10}", "bounded: must be < 10");
+Check.RoundTrip<Edges>("{\"bounded\":-15}");
+Check.ParseFails<Edges>("{\"edge\":-0.9}", "edge: must be < -1", "edge: must be a multiple of 20");
+Check.RoundTrip<Edges>("{\"edge\":-20}");
+// The integer matcher sees the decimal text: 1e300 is integral but past the
+// cap, 2^53+1 is past the cap, 2^53-1 matches.
+Check.ParseFails<Edges>("{\"integral\":[1e300]}", "integral: no element matches the required schema");
+Check.ParseFails<Edges>("{\"integral\":[9007199254740993]}", "integral: no element matches the required schema");
+Check.RoundTrip<Edges>("{\"integral\":[9007199254740991]}");
+Check.ParseFails<Edges>("{\"matrix\":[[1],[2,2]]}", "matrix[1]: duplicate items: element at index 1 equals index 0");
+Check.WriteFails(new Edges { Matrix = new[] { new long[] { 3, 3 } } }, "matrix[0]: duplicate items");"#,
+    );
+}
+
+#[test]
 fn csharp_json_optional_materialized_consts_round_trip() {
     let case = JsonCase::new("optional-consts");
     case.write(
