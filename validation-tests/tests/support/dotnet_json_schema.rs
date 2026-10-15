@@ -563,6 +563,57 @@ Check.WriteFails(new Numbers { Count = -(1L << 53) }, "count: exceeds ±(2^53-1)
 // ---------------------------------------------------------------------------
 
 #[test]
+fn csharp_json_typed_additional_properties_are_native_and_collision_safe() {
+    let case = JsonCase::new("typed-extras");
+    case.write(
+        "mixed.yaml",
+        r##"type: object
+minProperties: 2
+maxProperties: 3
+required: [id]
+properties:
+  id: { type: string }
+additionalProperties: { $ref: "#/$defs/Extra" }
+$defs:
+  Extra:
+    type: object
+    additionalProperties: false
+    required: [score]
+    properties: { score: { type: integer, minimum: 1 } }
+  Dates:
+    type: object
+    additionalProperties: { type: array, items: { type: string, format: date } }
+"##,
+    );
+    let output = case.generate(&["mixed.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "IReadOnlyDictionary<string, Extra> AdditionalProperties",
+            "IReadOnlyDictionary<string, global::System.Collections.Generic.IReadOnlyList<global::System.DateOnly>> AdditionalProperties",
+        ],
+    );
+    case.run(
+        r#"var parsed = Check.RoundTrip<Mixed>("{\"id\":\"x\",\"bonus\":{\"score\":2}}");
+Check.Equal(2L, parsed.AdditionalProperties["bonus"].Score, "typed extra");
+Check.ParseFails<Mixed>("{\"id\":\"x\",\"bonus\":{\"score\":0}}", "bonus.score: must be >= 1");
+Check.ParseFails<Mixed>("{\"id\":\"x\"}", "must have at least 2 properties");
+Check.ParseFails<Mixed>(
+    "{\"id\":\"x\",\"a\":{\"score\":1},\"b\":{\"score\":1},\"c\":{\"score\":1}}",
+    "must have at most 3 properties");
+// A catch-all key that names a declared member would emit it twice.
+Check.WriteFails(
+    new Mixed { Id = "x", AdditionalProperties = new System.Collections.Generic.Dictionary<string, Extra> { ["id"] = new Extra { Score = 1 } } },
+    "id: declared property key collision",
+    "must have at least 2 properties");
+Check.WriteFails(new Mixed { Id = "x" }, "must have at least 2 properties");
+var dates = Check.RoundTrip<Dates>("{\"due\":[\"2024-02-29\"]}");
+Check.Equal(new System.DateOnly(2024, 2, 29), dates.AdditionalProperties["due"][0], "date extra");"#,
+    );
+}
+
+#[test]
 fn csharp_json_duplicate_keys_keep_the_last_occurrence() {
     let case = JsonCase::new("duplicate-keys");
     case.write(

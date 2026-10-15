@@ -913,7 +913,7 @@ namespace Nexgen.JsonSchema.Chat
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "roomId" or "displayName" or "topic" or "members" or "labels" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
