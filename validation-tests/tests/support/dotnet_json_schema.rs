@@ -502,6 +502,59 @@ fn csharp_json_required_members_are_enforced_at_compile_time() {
     assert_has(&error, &["CS9035", "RequiredNullable"]);
 }
 
+#[test]
+fn csharp_json_nullable_elements_keep_constraints_at_every_depth() {
+    let case = JsonCase::new("nullable-elements");
+    case.write(
+        "bag.yaml",
+        r#"type: object
+properties:
+  slots:
+    type: array
+    uniqueItems: true
+    items: { oneOf: [{ type: string, minLength: 2 }, { type: "null" }] }
+  counts:
+    type: array
+    contains: { type: integer, minimum: 5 }
+    items: { oneOf: [{ type: integer }, { type: "null" }] }
+  grid:
+    type: array
+    items: { type: array, items: { oneOf: [{ type: string, minLength: 2 }, { type: "null" }] } }
+  lookup:
+    type: object
+    additionalProperties:
+      type: array
+      items: { oneOf: [{ type: string, minLength: 2 }, { type: "null" }] }
+"#,
+    );
+    let output = case.generate(&["bag.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "IReadOnlyList<string?>? Slots { get; init; }",
+            "IReadOnlyList<long?>? Counts { get; init; }",
+            "IReadOnlyList<global::System.Collections.Generic.IReadOnlyList<string?>>? Grid { get; init; }",
+        ],
+    );
+    case.run(
+        r#"Check.RoundTrip<Bag>(
+    "{\"slots\":[\"ab\",null],\"counts\":[null,7],\"grid\":[[null,\"ab\"]],\"lookup\":{\"k\":[null,\"ab\"]}}");
+// Two nulls are duplicates; a null never satisfies a matcher.
+Check.ParseFails<Bag>("{\"slots\":[null,null]}", "slots: duplicate items");
+Check.ParseFails<Bag>("{\"counts\":[null]}", "counts: no element matches the required schema");
+Check.ParseFails<Bag>("{\"counts\":[null,1]}", "counts: no element matches the required schema");
+Check.ParseFails<Bag>("{\"slots\":[\"a\",null]}", "slots[0]: must have length >= 2");
+Check.ParseFails<Bag>("{\"grid\":[[null,\"a\"]]}", "grid[0][1]: must have length >= 2");
+Check.ParseFails<Bag>("{\"lookup\":{\"k\":[\"a\"]}}", "lookup.k[0]: must have length >= 2");
+Check.WriteFails(new Bag { Slots = new string?[] { null, null } }, "slots: duplicate items");
+Check.WriteFails(new Bag { Counts = new long?[] { null } }, "counts: no element matches the required schema");
+Check.WriteFails(new Bag { Grid = new[] { new string?[] { "a" } } }, "grid[0][0]: must have length >= 2");
+Check.WriteFails(
+    new Bag { Lookup = new BagLookup { AdditionalProperties = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IReadOnlyList<string?>> { ["k"] = new string?[] { "a" } } } },
+    "lookup.k[0]: must have length >= 2");"#,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Numbers
 // ---------------------------------------------------------------------------
