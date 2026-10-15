@@ -70,7 +70,6 @@ const PENDING: &[&str] = &[
     "required.md",
     "services.md",
     "title.md",
-    "type.md",
     "uniqueItems.md",
 ];
 
