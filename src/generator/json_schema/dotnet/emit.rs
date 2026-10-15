@@ -782,8 +782,23 @@ fn render_object_validate(
             "{indent}if (value.AdditionalProperties is null)\n{indent}{{\n{indent}    violations.Add(new Violation(Violation.Join(path, \"AdditionalProperties\"), \"required\"));\n{indent}}}\n{indent}else\n{indent}{{\n"
         ));
         let inner = format!("{indent}    ");
+        // The catch-all can only hold members the declared set does not name,
+        // whether or not the declared member is set: writing one would emit a
+        // member the declared type must parse (or emit it twice).
+        let declared = fields
+            .iter()
+            .map(|field| cs_string(&field.json_name))
+            .collect::<Vec<_>>();
+        let collides = if declared.is_empty() {
+            "!wireKeys.Add(entry.Key)".to_string()
+        } else {
+            format!(
+                "entry.Key is {} || !wireKeys.Add(entry.Key)",
+                declared.join(" or ")
+            )
+        };
         out.push_str(&format!(
-            "{inner}foreach (var entry in value.AdditionalProperties)\n{inner}{{\n{inner}    if (!wireKeys.Add(entry.Key))\n{inner}    {{\n{inner}        violations.Add(new Violation(Violation.Member(path, entry.Key), \"declared property key collision\"));\n{inner}    }}\n"
+            "{inner}foreach (var entry in value.AdditionalProperties)\n{inner}{{\n{inner}    if ({collides})\n{inner}    {{\n{inner}        violations.Add(new Violation(Violation.Member(path, entry.Key), \"declared property key collision\"));\n{inner}    }}\n"
         ));
         if let Some(additional) = typed_additional {
             render_map_entry_validate(

@@ -229,7 +229,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "street" or "city" or "zip" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -1195,7 +1195,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "kind" or "radius" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -1445,7 +1445,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "email" or "shippingStreet" or "shippingZip" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -2395,7 +2395,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "kind" or "href" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -9186,7 +9186,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "by" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -9407,7 +9407,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "code" or "hint" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -9731,7 +9731,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "amount" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -9950,7 +9950,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "city" or "geo" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -10164,7 +10164,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "lat" or "lon" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -10494,7 +10494,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "cell" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -11063,7 +11063,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "kind" or "side" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -11330,7 +11330,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "kind" or "body" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -11804,7 +11804,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "id" or "kind" or "name" or "size" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
@@ -12025,7 +12025,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     foreach (var entry in value.AdditionalProperties)
                     {
-                        if (!wireKeys.Add(entry.Key))
+                        if (entry.Key is "id" or "kind" || !wireKeys.Add(entry.Key))
                         {
                             violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
                         }
