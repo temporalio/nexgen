@@ -13,7 +13,6 @@ type request struct {
 	ID string
 }
 
-// GetID returns the ID field.
 func (m request) GetID() string {
 	return m.ID
 }
@@ -39,7 +38,6 @@ type Response struct {
 	Value string
 }
 
-// GetValue returns the Value field.
 func (m Response) GetValue() string {
 	return m.Value
 }

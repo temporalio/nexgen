@@ -21,38 +21,33 @@ type startWorkflowRequest struct {
 	WorkflowID         string
 	TaskQueue          string
 	WorkflowStartDelay *time.Duration
-	namespace          string
+	Namespace          string
 }
 
-// GetWorkflow returns the Workflow field.
 func (m startWorkflowRequest) GetWorkflow() string {
 	return m.Workflow
 }
 
-// GetWorkflowID returns the WorkflowID field.
 func (m startWorkflowRequest) GetWorkflowID() string {
 	return m.WorkflowID
 }
 
-// GetTaskQueue returns the TaskQueue field.
 func (m startWorkflowRequest) GetTaskQueue() string {
 	return m.TaskQueue
 }
 
-// GetWorkflowStartDelay returns the WorkflowStartDelay field.
 func (m startWorkflowRequest) GetWorkflowStartDelay() *time.Duration {
 	return m.WorkflowStartDelay
 }
 
-// GetNamespace returns the namespace field.
 func (m startWorkflowRequest) GetNamespace() string {
-	return m.namespace
+	return m.Namespace
 }
 
-func startWorkflowRequestToProto(dc converter.DataConverter, m *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
+func startWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfig, m *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
 	message := &workflowservice.StartWorkflowExecutionRequest{}
 	{
-		converted, err := support.WorkflowTypeToProto(dc, &m.Workflow)
+		converted, err := support.WorkflowTypeToProto(cfg.DataConverter, &m.Workflow)
 		if err != nil {
 			return nil, err
 		}
@@ -60,27 +55,27 @@ func startWorkflowRequestToProto(dc converter.DataConverter, m *startWorkflowReq
 	}
 	message.WorkflowId = m.WorkflowID
 	{
-		converted, err := support.TaskQueueToProto(dc, &m.TaskQueue)
+		converted, err := support.TaskQueueToProto(cfg.DataConverter, &m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
 		message.TaskQueue = converted
 	}
 	{
-		converted, err := support.DurationToProto(dc, m.WorkflowStartDelay)
+		converted, err := support.DurationToProto(cfg.DataConverter, m.WorkflowStartDelay)
 		if err != nil {
 			return nil, err
 		}
 		message.WorkflowStartDelay = converted
 	}
-	message.Namespace = m.namespace
+	message.Namespace = m.Namespace
 	return message, nil
 }
 
-func startWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowservice.StartWorkflowExecutionRequest, out *startWorkflowRequest) error {
+func startWorkflowRequestFromProto(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.StartWorkflowExecutionRequest, out *startWorkflowRequest) error {
 	*out = startWorkflowRequest{}
 	{
-		converted, err := support.WorkflowTypeFromProto(dc, proto.GetWorkflowType())
+		converted, err := support.WorkflowTypeFromProto(cfg.DataConverter, proto.GetWorkflowType())
 		if err != nil {
 			return err
 		}
@@ -90,7 +85,7 @@ func startWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowse
 	}
 	out.WorkflowID = proto.GetWorkflowId()
 	{
-		converted, err := support.TaskQueueFromProto(dc, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(cfg.DataConverter, proto.GetTaskQueue())
 		if err != nil {
 			return err
 		}
@@ -99,52 +94,45 @@ func startWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowse
 		}
 	}
 	{
-		converted, err := support.DurationFromProto(dc, proto.GetWorkflowStartDelay())
+		converted, err := support.DurationFromProto(cfg.DataConverter, proto.GetWorkflowStartDelay())
 		if err != nil {
 			return err
 		}
 		out.WorkflowStartDelay = converted
 	}
-	out.namespace = proto.GetNamespace()
+	out.Namespace = proto.GetNamespace()
 	return nil
 }
 
 func (startWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return commonconverter.NewSystemNexusTransferTypeConverter(
-		func(cfg *commonconverter.SystemNexusConfig, m *startWorkflowRequest) (*workflowservice.StartWorkflowExecutionRequest, error) {
-			return startWorkflowRequestToProto(cfg.DataConverter, m)
-		},
-		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.StartWorkflowExecutionRequest, out *startWorkflowRequest) error {
-			return startWorkflowRequestFromProto(cfg.DataConverter, proto, out)
-		},
+		startWorkflowRequestToProto,
+		startWorkflowRequestFromProto,
 	)
 }
 
 type cancelWorkflowRequest struct {
 	WorkflowExecution WorkflowExecution
 	Reason            *string
-	namespace         string
+	Namespace         string
 }
 
-// GetWorkflowExecution returns the WorkflowExecution field.
 func (m cancelWorkflowRequest) GetWorkflowExecution() WorkflowExecution {
 	return m.WorkflowExecution
 }
 
-// GetReason returns the Reason field.
 func (m cancelWorkflowRequest) GetReason() *string {
 	return m.Reason
 }
 
-// GetNamespace returns the namespace field.
 func (m cancelWorkflowRequest) GetNamespace() string {
-	return m.namespace
+	return m.Namespace
 }
 
-func cancelWorkflowRequestToProto(dc converter.DataConverter, m *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
+func cancelWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfig, m *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
 	message := &workflowservice.RequestCancelWorkflowExecutionRequest{}
 	{
-		converted, err := workflowExecutionToProto(dc, &m.WorkflowExecution)
+		converted, err := workflowExecutionToProto(cfg, &m.WorkflowExecution)
 		if err != nil {
 			return nil, err
 		}
@@ -153,31 +141,27 @@ func cancelWorkflowRequestToProto(dc converter.DataConverter, m *cancelWorkflowR
 	if m.Reason != nil {
 		message.Reason = (*m.Reason)
 	}
-	message.Namespace = m.namespace
+	message.Namespace = m.Namespace
 	return message, nil
 }
 
-func cancelWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowservice.RequestCancelWorkflowExecutionRequest, out *cancelWorkflowRequest) error {
+func cancelWorkflowRequestFromProto(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.RequestCancelWorkflowExecutionRequest, out *cancelWorkflowRequest) error {
 	*out = cancelWorkflowRequest{}
-	if err := workflowExecutionFromProto(dc, proto.GetWorkflowExecution(), &out.WorkflowExecution); err != nil {
+	if err := workflowExecutionFromProto(cfg, proto.GetWorkflowExecution(), &out.WorkflowExecution); err != nil {
 		return err
 	}
 	{
 		converted := proto.GetReason()
 		out.Reason = &converted
 	}
-	out.namespace = proto.GetNamespace()
+	out.Namespace = proto.GetNamespace()
 	return nil
 }
 
 func (cancelWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return commonconverter.NewSystemNexusTransferTypeConverter(
-		func(cfg *commonconverter.SystemNexusConfig, m *cancelWorkflowRequest) (*workflowservice.RequestCancelWorkflowExecutionRequest, error) {
-			return cancelWorkflowRequestToProto(cfg.DataConverter, m)
-		},
-		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.RequestCancelWorkflowExecutionRequest, out *cancelWorkflowRequest) error {
-			return cancelWorkflowRequestFromProto(cfg.DataConverter, proto, out)
-		},
+		cancelWorkflowRequestToProto,
+		cancelWorkflowRequestFromProto,
 	)
 }
 
@@ -185,12 +169,11 @@ type startWorkflowResult struct {
 	RunID *string
 }
 
-// GetRunID returns the RunID field.
 func (m startWorkflowResult) GetRunID() *string {
 	return m.RunID
 }
 
-func startWorkflowResultToProto(dc converter.DataConverter, m *startWorkflowResult) (*workflowservice.StartWorkflowExecutionResponse, error) {
+func startWorkflowResultToProto(cfg *commonconverter.SystemNexusConfig, m *startWorkflowResult) (*workflowservice.StartWorkflowExecutionResponse, error) {
 	message := &workflowservice.StartWorkflowExecutionResponse{}
 	if m.RunID != nil {
 		message.RunId = (*m.RunID)
@@ -198,7 +181,7 @@ func startWorkflowResultToProto(dc converter.DataConverter, m *startWorkflowResu
 	return message, nil
 }
 
-func startWorkflowResultFromProto(dc converter.DataConverter, proto *workflowservice.StartWorkflowExecutionResponse, out *startWorkflowResult) error {
+func startWorkflowResultFromProto(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.StartWorkflowExecutionResponse, out *startWorkflowResult) error {
 	*out = startWorkflowResult{}
 	{
 		converted := proto.GetRunId()
@@ -249,7 +232,7 @@ func (u *StartedWorkflow) GetResult(ctx workflow.Context) workflow.Future {
 // --- Operations (internal) ---
 
 func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
-	request.namespace = support.WorkflowNamespace(ctx)
+	request.Namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "StartWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -259,14 +242,14 @@ func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.
 			resultSettable.SetError(err)
 			return
 		}
-		value := NewStartedWorkflow(request.namespace, request.WorkflowID, result.GetRunId())
+		value := NewStartedWorkflow(request.Namespace, request.WorkflowID, result.GetRunId())
 		resultSettable.Set(value, nil)
 	})
 	return result
 }
 
 func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
-	request.namespace = support.WorkflowNamespace(ctx)
+	request.Namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "RestartWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -276,14 +259,14 @@ func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflo
 			resultSettable.SetError(err)
 			return
 		}
-		value := NewStartedWorkflow(request.namespace, request.WorkflowID, result.GetRunId())
+		value := NewStartedWorkflow(request.Namespace, request.WorkflowID, result.GetRunId())
 		resultSettable.Set(value, nil)
 	})
 	return result
 }
 
 func cancelWorkflow(ctx workflow.Context, request cancelWorkflowRequest) workflow.Future {
-	request.namespace = support.WorkflowNamespace(ctx)
+	request.Namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "CancelWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -307,17 +290,15 @@ type WorkflowExecution struct {
 	RunID *string
 }
 
-// GetWorkflowID returns the WorkflowID field.
 func (m WorkflowExecution) GetWorkflowID() string {
 	return m.WorkflowID
 }
 
-// GetRunID returns the RunID field.
 func (m WorkflowExecution) GetRunID() *string {
 	return m.RunID
 }
 
-func workflowExecutionToProto(dc converter.DataConverter, m *WorkflowExecution) (*common.WorkflowExecution, error) {
+func workflowExecutionToProto(cfg *commonconverter.SystemNexusConfig, m *WorkflowExecution) (*common.WorkflowExecution, error) {
 	message := &common.WorkflowExecution{}
 	message.WorkflowId = m.WorkflowID
 	if m.RunID != nil {
@@ -326,7 +307,7 @@ func workflowExecutionToProto(dc converter.DataConverter, m *WorkflowExecution) 
 	return message, nil
 }
 
-func workflowExecutionFromProto(dc converter.DataConverter, proto *common.WorkflowExecution, out *WorkflowExecution) error {
+func workflowExecutionFromProto(cfg *commonconverter.SystemNexusConfig, proto *common.WorkflowExecution, out *WorkflowExecution) error {
 	*out = WorkflowExecution{}
 	out.WorkflowID = proto.GetWorkflowId()
 	{
@@ -339,24 +320,20 @@ func workflowExecutionFromProto(dc converter.DataConverter, proto *common.Workfl
 type CancelWorkflowResponse struct {
 }
 
-func cancelWorkflowResponseToProto(dc converter.DataConverter, m *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
+func cancelWorkflowResponseToProto(cfg *commonconverter.SystemNexusConfig, m *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
 	message := &workflowservice.RequestCancelWorkflowExecutionResponse{}
 	return message, nil
 }
 
-func cancelWorkflowResponseFromProto(dc converter.DataConverter, proto *workflowservice.RequestCancelWorkflowExecutionResponse, out *CancelWorkflowResponse) error {
+func cancelWorkflowResponseFromProto(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.RequestCancelWorkflowExecutionResponse, out *CancelWorkflowResponse) error {
 	*out = CancelWorkflowResponse{}
 	return nil
 }
 
 func (CancelWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return commonconverter.NewSystemNexusTransferTypeConverter(
-		func(cfg *commonconverter.SystemNexusConfig, m *CancelWorkflowResponse) (*workflowservice.RequestCancelWorkflowExecutionResponse, error) {
-			return cancelWorkflowResponseToProto(cfg.DataConverter, m)
-		},
-		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.RequestCancelWorkflowExecutionResponse, out *CancelWorkflowResponse) error {
-			return cancelWorkflowResponseFromProto(cfg.DataConverter, proto, out)
-		},
+		cancelWorkflowResponseToProto,
+		cancelWorkflowResponseFromProto,
 	)
 }
 

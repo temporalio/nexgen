@@ -453,7 +453,7 @@ func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryUsesWireKeyAndNat
 	s.Require().Equal(reflect.Struct, request.Kind(), "callback must receive a native request value")
 	s.Equal(reflect.TypeOf(ws.SignalWithStartWorkflowOptions{}).PkgPath(), request.Type().PkgPath())
 	for name, want := range map[string]string{
-		"namespace": "default-test-namespace", "ID": "target-workflow-id",
+		"Namespace": "default-test-namespace", "ID": "target-workflow-id",
 		"TaskQueue": "my-task-queue", "Workflow": "ExampleWorkflow", "Signal": "wake-up",
 	} {
 		field := request.FieldByName(name)
@@ -483,7 +483,7 @@ func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredN
 	endpoints := []string{"__temporal_system", "temporal-system", "ordinary-endpoint"}
 	s.env.SetWorkerOptions(worker.Options{Interceptors: []interceptor.WorkerInterceptor{
 		&replaceNexusInputInterceptor{replace: func(input any) any {
-			// Preserve the unexported sourced fields while replacing the exported ID.
+			// Preserve the sourced fields while replacing the exported ID.
 			value := reflect.ValueOf(input)
 			replacement := reflect.New(value.Type()).Elem()
 			replacement.Set(value)

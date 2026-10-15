@@ -608,16 +608,16 @@ interface namespace-service {
     // operation function where `workflow.Context` is in scope.
     assert!(
         rendered
-            .contains("type namespaceInfo struct {\n\tName *string\n\tdata map[string]string\n}")
+            .contains("type namespaceInfo struct {\n\tName *string\n\tData map[string]string\n}")
     );
-    assert!(rendered.contains("\trequest.data = support.NamespaceData(ctx)\n"));
+    assert!(rendered.contains("\trequest.Data = support.NamespaceData(ctx)\n"));
     // The sourced map is then converted like any other model field, and it now
     // round-trips back out of the proto as well.
-    assert!(rendered.contains("if len(m.data) > 0 {"));
-    assert!(rendered.contains("message.Data = make(map[string]string, len(m.data))"));
-    assert!(rendered.contains("for k, v := range m.data {"));
+    assert!(rendered.contains("if len(m.Data) > 0 {"));
+    assert!(rendered.contains("message.Data = make(map[string]string, len(m.Data))"));
+    assert!(rendered.contains("for k, v := range m.Data {"));
     assert!(rendered.contains("message.Data[k] = v"));
-    assert!(rendered.contains("out.data = make(map[string]string, len(proto.GetData()))"));
+    assert!(rendered.contains("out.Data = make(map[string]string, len(proto.GetData()))"));
     assert!(rendered.contains("support \"example.com/nexgen/support\""));
 
     // With no other converter to register the package, a sourced field alone
@@ -1861,7 +1861,7 @@ fn go_type_roundtrip_generates_proto_conversions() {
     // Generated model gets a context-aware encoding function that accepts a
     // pointer and returns the proto message and conversion errors.
     assert!(rendered
-        .contains("func activityOptionsToProto(dc converter.DataConverter, m *ActivityOptions) (*activity.ActivityOptions, error) {"));
+        .contains("func activityOptionsToProto(cfg *commonconverter.SystemNexusConfig, m *ActivityOptions) (*activity.ActivityOptions, error) {"));
     assert!(rendered.contains("message := &activity.ActivityOptions{}"));
     assert!(rendered.contains(
         "type ActivityOptions struct {\n\t// TaskQueue - Optional.\n\tTaskQueue *string"
@@ -1872,28 +1872,34 @@ fn go_type_roundtrip_generates_proto_conversions() {
     assert!(rendered.contains("\t// Priority - Optional.\n\tPriority *temporal.Priority"));
     // Optional override fields pass the pointer straight to the nil-safe
     // converter; the required field passes its address.
-    assert!(rendered.contains("converted, err := support.RetryPolicyToProto(dc, &m.RetryPolicy)"));
-    assert!(rendered.contains("converted, err := support.TaskQueueToProto(dc, m.TaskQueue)"));
-    assert!(rendered.contains("converted, err := support.PriorityToProto(dc, m.Priority)"));
+    assert!(rendered.contains(
+        "converted, err := support.RetryPolicyToProto(cfg.DataConverter, &m.RetryPolicy)"
+    ));
     assert!(
         rendered
-            .contains("converted, err := support.DurationToProto(dc, m.ScheduleToCloseTimeout)")
+            .contains("converted, err := support.TaskQueueToProto(cfg.DataConverter, m.TaskQueue)")
     );
+    assert!(
+        rendered
+            .contains("converted, err := support.PriorityToProto(cfg.DataConverter, m.Priority)")
+    );
+    assert!(rendered.contains(
+        "converted, err := support.DurationToProto(cfg.DataConverter, m.ScheduleToCloseTimeout)"
+    ));
     assert!(rendered.contains("return message, nil"));
 
     // Generated model gets a converter-aware FromProto output callback. Optional
     // override fields assign the converter's pointer result directly; the
     // required field is dereferenced with a nil guard.
     assert!(rendered.contains(
-        "func activityOptionsFromProto(dc converter.DataConverter, proto *activity.ActivityOptions, out *ActivityOptions) error {"
+        "func activityOptionsFromProto(cfg *commonconverter.SystemNexusConfig, proto *activity.ActivityOptions, out *ActivityOptions) error {"
     ));
-    assert!(
-        rendered.contains("converted, err := support.TaskQueueFromProto(dc, proto.GetTaskQueue())")
-    );
-    assert!(
-        rendered
-            .contains("converted, err := support.RetryPolicyFromProto(dc, proto.GetRetryPolicy())")
-    );
+    assert!(rendered.contains(
+        "converted, err := support.TaskQueueFromProto(cfg.DataConverter, proto.GetTaskQueue())"
+    ));
+    assert!(rendered.contains(
+        "converted, err := support.RetryPolicyFromProto(cfg.DataConverter, proto.GetRetryPolicy())"
+    ));
     assert!(rendered.contains("out.RetryPolicy = *converted"));
     // The model constructs a transfer-type converter, so the SDK
     // runs model<->proto conversion inside the payload converter.
@@ -1902,11 +1908,9 @@ fn go_type_roundtrip_generates_proto_conversions() {
         "func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewSystemNexusTransferTypeConverter"
     ));
     assert!(rendered.contains(
-        "func(cfg *commonconverter.SystemNexusConfig, m *ActivityOptions) (*activity.ActivityOptions, error) {\n\t\t\treturn activityOptionsToProto(cfg.DataConverter, m)"
+        "commonconverter.NewSystemNexusTransferTypeConverter(\n\t\tactivityOptionsToProto,\n\t\tactivityOptionsFromProto,\n"
     ));
-    assert!(rendered.contains(
-        "func(cfg *commonconverter.SystemNexusConfig, proto *activity.ActivityOptions, out *ActivityOptions) error {\n\t\t\treturn activityOptionsFromProto(cfg.DataConverter, proto, out)"
-    ));
+    assert!(!rendered.contains("func(cfg *"), "{rendered}");
     assert!(rendered.contains("\t*out = ActivityOptions{}\n"));
     assert!(!rendered.contains("\tvalue := ActivityOptions{}"));
     // Operation functions therefore hand the model straight to the SDK and
@@ -1933,12 +1937,11 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     )
     .unwrap();
 
-    // Sourced fields become unexported model fields so they survive payload
-    // conversion without widening the public API.
-    assert!(rendered.contains("\tnamespace string\n"));
-    assert!(rendered.contains("\tmessage.Namespace = m.namespace\n"));
-    assert!(rendered.contains("\tout.namespace = proto.GetNamespace()\n"));
-    assert!(rendered.contains("\trequest.namespace = support.WorkflowNamespace(ctx)\n"));
+    // Sourced fields remain available to serialization-context helpers.
+    assert!(rendered.contains("\tNamespace string\n"));
+    assert!(rendered.contains("\tmessage.Namespace = m.Namespace\n"));
+    assert!(rendered.contains("\tout.Namespace = proto.GetNamespace()\n"));
+    assert!(rendered.contains("\trequest.Namespace = support.WorkflowNamespace(ctx)\n"));
 
     // Construction happens in the method; the SDK owns caching by model type.
     assert!(rendered.contains("return commonconverter.NewSystemNexusTransferTypeConverter("));
@@ -1947,23 +1950,19 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
         "func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {\n\treturn commonconverter.NewSystemNexusTransferTypeConverter"
     ));
 
-    // Exactly two callbacks adapt the explicit SDK config to reusable helpers.
     assert!(rendered.contains(
-        "func(cfg *commonconverter.SystemNexusConfig, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {\n\t\t\treturn signalWithStartWorkflowRequestToProto(cfg.DataConverter, m)"
+        "commonconverter.NewSystemNexusTransferTypeConverter(\n\t\tsignalWithStartWorkflowRequestToProto,\n\t\tsignalWithStartWorkflowRequestFromProto,\n"
+    ));
+    assert!(!rendered.contains("func(cfg *"), "{rendered}");
+    assert!(rendered.contains(
+        "func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfig,"
     ));
     assert!(rendered.contains(
-        "func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {\n\t\t\treturn signalWithStartWorkflowRequestFromProto(cfg.DataConverter, proto, out)"
+        "func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusConfig,"
     ));
-    assert!(
-        rendered.contains("func signalWithStartWorkflowRequestToProto(dc converter.DataConverter,")
-    );
-    assert!(
-        rendered
-            .contains("func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter,")
-    );
     assert!(!rendered.contains("GetDataConverterFromWorkflowContext"));
     assert!(!rendered.contains("SDKFlagMemoUserDCEncode"));
-    assert!(rendered.contains("support.MemoToProto(dc, m.Memo)"));
+    assert!(rendered.contains("support.MemoToProto(cfg.DataConverter, m.Memo)"));
 
     // Operation responses decode into the model, not the proto.
     assert!(rendered.contains(
@@ -2193,6 +2192,7 @@ import (
 
 	"go.temporal.io/sdk/advanced/samples/go/wire"
 	"go.temporal.io/sdk/converter"
+	commonconverter "go.temporal.io/sdk/internal/common/converter"
 )
 
 type childView interface {
@@ -2210,7 +2210,7 @@ var _ childView = Child{}
 var _ parentView = Parent{}
 
 func TestNestedConversionRoundTrip(t *testing.T) {
-	dc := converter.GetDefaultDataConverter()
+	cfg := &commonconverter.SystemNexusConfig{DataConverter: converter.GetDefaultDataConverter()}
 	for _, tt := range []struct {
 		name  string
 		model Parent
@@ -2254,7 +2254,7 @@ func TestNestedConversionRoundTrip(t *testing.T) {
 					t.Fatalf("%s getter = %#v, want %#v", getter.name, getter.got, getter.want)
 				}
 			}
-			encoded, err := parentToProto(dc, &tt.model)
+			encoded, err := parentToProto(cfg, &tt.model)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2267,7 +2267,7 @@ func TestNestedConversionRoundTrip(t *testing.T) {
 				Children: []Child{{Name: "stale"}},
 				Entries:  map[string]Child{"stale": {Name: "stale"}},
 			}
-			if err := parentFromProto(dc, encoded, &decoded); err != nil {
+			if err := parentFromProto(cfg, encoded, &decoded); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(decoded, tt.model) {
@@ -2289,38 +2289,39 @@ func TestNestedConversionRoundTrip(t *testing.T) {
 
     assert!(
         rendered.contains(
-            "func childToProto(dc converter.DataConverter, m *Child) (*wire.Child, error) {"
+            "func childToProto(cfg *commonconverter.SystemNexusConfig, m *Child) (*wire.Child, error) {"
         ),
         "{rendered}"
     );
     assert!(rendered.contains(
-        "func childFromProto(dc converter.DataConverter, proto *wire.Child, out *Child) error {"
+        "func childFromProto(cfg *commonconverter.SystemNexusConfig, proto *wire.Child, out *Child) error {"
     ));
-    assert!(rendered.contains("converted, err := childToProto(dc, &m.Required)"));
-    assert!(
-        rendered
-            .contains("if m.Optional != nil {\n\t\tconverted, err := childToProto(dc, m.Optional)")
-    );
-    assert!(rendered.contains(
-        "for _, item := range m.Children {\n\t\tconverted, err := childToProto(dc, &item)"
-    ));
+    assert!(rendered.contains("converted, err := childToProto(cfg, &m.Required)"));
     assert!(
         rendered.contains(
-            "for k, v := range m.Entries {\n\t\t\tconverted, err := childToProto(dc, &v)"
+            "if m.Optional != nil {\n\t\tconverted, err := childToProto(cfg, m.Optional)"
         )
     );
     assert!(rendered.contains(
-        "if proto.GetOptional() != nil {\n\t\tout.Optional = new(Child)\n\t\tif err := childFromProto(dc, proto.GetOptional(), out.Optional); err != nil {"
+        "for _, item := range m.Children {\n\t\tconverted, err := childToProto(cfg, &item)"
+    ));
+    assert!(
+        rendered.contains(
+            "for k, v := range m.Entries {\n\t\t\tconverted, err := childToProto(cfg, &v)"
+        )
+    );
+    assert!(rendered.contains(
+        "if proto.GetOptional() != nil {\n\t\tout.Optional = new(Child)\n\t\tif err := childFromProto(cfg, proto.GetOptional(), out.Optional); err != nil {"
     ));
     assert!(rendered.contains("out.Optional = new(Child)"));
     assert!(rendered.contains(
-        "if err := childFromProto(dc, proto.GetRequired(), &out.Required); err != nil {"
+        "if err := childFromProto(cfg, proto.GetRequired(), &out.Required); err != nil {"
     ));
     assert!(rendered.contains(
-        "for _, item := range proto.GetChildren() {\n\t\tvar converted Child\n\t\tif err := childFromProto(dc, item, &converted); err != nil {"
+        "for _, item := range proto.GetChildren() {\n\t\tvar converted Child\n\t\tif err := childFromProto(cfg, item, &converted); err != nil {"
     ));
     assert!(rendered.contains(
-        "for k, v := range proto.GetEntries() {\n\t\t\tvar converted Child\n\t\t\tif err := childFromProto(dc, v, &converted); err != nil {"
+        "for k, v := range proto.GetEntries() {\n\t\t\tvar converted Child\n\t\t\tif err := childFromProto(cfg, v, &converted); err != nil {"
     ));
     assert!(rendered.contains("\t*out = Parent{}\n"));
     assert!(rendered.contains("out.Children = append(out.Children, converted)"));
@@ -2388,6 +2389,7 @@ import (
 	common "go.temporal.io/api/common/v1"
 	sdk "go.temporal.io/api/sdk/v1"
 	"go.temporal.io/sdk/converter"
+	commonconverter "go.temporal.io/sdk/internal/common/converter"
 )
 
 func TestUserMetadataConversion(t *testing.T) {
@@ -2395,8 +2397,9 @@ func TestUserMetadataConversion(t *testing.T) {
 		converter.GetDefaultDataConverter(),
 		converter.NewZlibCodec(converter.ZlibCodecOptions{AlwaysEncode: true}),
 	)
+	cfg := &commonconverter.SystemNexusConfig{DataConverter: dc}
 	want := UserMetadata{StaticSummary: "summary", StaticDetails: "details"}
-	message, err := userMetadataToProto(dc, &want)
+	message, err := userMetadataToProto(cfg, &want)
 	if err != nil {
 		t.Fatalf("encode user metadata: %v", err)
 	}
@@ -2409,13 +2412,13 @@ func TestUserMetadataConversion(t *testing.T) {
 		}
 	}
 	var out UserMetadata
-	if err := userMetadataFromProto(dc, message, &out); err != nil {
+	if err := userMetadataFromProto(cfg, message, &out); err != nil {
 		t.Fatalf("decode user metadata with supplied converter: %v", err)
 	}
 	if out != want {
 		t.Fatalf("roundtrip = %#v, want %#v", out, want)
 	}
-	if err := userMetadataFromProto(dc, &sdk.UserMetadata{}, &out); err != nil {
+	if err := userMetadataFromProto(cfg, &sdk.UserMetadata{}, &out); err != nil {
 		t.Fatalf("decode empty user metadata: %v", err)
 	}
 	if out != (UserMetadata{}) {
@@ -2426,7 +2429,7 @@ func TestUserMetadataConversion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode wrong-type payload: %v", err)
 	}
-	if err := userMetadataFromProto(dc, &sdk.UserMetadata{Summary: wrongType}, &out); err == nil ||
+	if err := userMetadataFromProto(cfg, &sdk.UserMetadata{Summary: wrongType}, &out); err == nil ||
 		!strings.Contains(err.Error(), "StaticSummary has unexpected type") {
 		t.Fatalf("decode non-string summary error = %v, want field-specific type error", err)
 	}
@@ -2434,7 +2437,7 @@ func TestUserMetadataConversion(t *testing.T) {
 		Metadata: map[string][]byte{converter.MetadataEncoding: []byte("binary/zlib")},
 		Data:     []byte("not zlib"),
 	}
-	if err := userMetadataFromProto(dc, &sdk.UserMetadata{Details: invalid}, &out); err == nil {
+	if err := userMetadataFromProto(cfg, &sdk.UserMetadata{Details: invalid}, &out); err == nil {
 		t.Fatal("decode invalid compressed details succeeded, want converter error")
 	}
 }
@@ -2523,7 +2526,7 @@ fn go_serialization_context_is_only_emitted_for_a_selected_helper() {
         assert!(!rendered.contains("nexgenWithOperationSerializationContext"));
         assert!(!rendered.contains("SerializationContext() converter.SerializationContext"));
         assert!(!rendered.contains("nexgenPayloadContext"));
-        assert!(rendered.contains("cancelRequestToProto(dc converter.DataConverter,"));
+        assert!(rendered.contains("cancelRequestToProto(cfg *commonconverter.SystemNexusConfig,"));
     }
 }
 
@@ -2621,16 +2624,16 @@ fn go_serialization_context_wrapper_assigns_sources_before_sdk() {
     )
     .unwrap();
     let sourced = rendered
-        .find("request.namespace = support.WorkflowNamespace(ctx)")
+        .find("request.Namespace = support.WorkflowNamespace(ctx)")
         .unwrap();
     let execute = rendered
         .find("c.ExecuteOperation(ctx, \"Cancel\", request,")
         .unwrap();
     assert!(sourced < execute);
     assert!(!rendered.contains("nexgenWithOperationSerializationContext"));
-    assert!(rendered.contains("\tnamespace string\n"));
-    assert!(rendered.contains("cancelRequestToProto(dc converter.DataConverter,"));
-    assert!(rendered.contains("cancelRequestFromProto(dc converter.DataConverter,"));
+    assert!(rendered.contains("\tNamespace string\n"));
+    assert!(rendered.contains("cancelRequestToProto(cfg *commonconverter.SystemNexusConfig,"));
+    assert!(rendered.contains("cancelRequestFromProto(cfg *commonconverter.SystemNexusConfig,"));
     assert!(!rendered.contains("SerializationContext()"));
     assert!(!rendered.contains("SerializationContextProvider"));
     assert!(!rendered.contains("GetNexusOperationInnerDataConverter"));
@@ -2677,7 +2680,7 @@ fn go_serialization_context_deferred_models_use_sdk_context() {
     assert!(!rendered.contains("nexgenPayloadContext"));
     assert!(!rendered.contains("### support.go"));
     assert!(rendered.contains("support.SignalWithStartWorkflowSerializationContext(request.("));
-    assert!(rendered.contains("support.RetryPolicyToProto(dc,"));
+    assert!(rendered.contains("support.RetryPolicyToProto(cfg.DataConverter,"));
     assert!(!rendered.contains("func nexgenPayloadContext("));
 }
 
@@ -3086,7 +3089,7 @@ fn go_serialization_context_preserves_owned_input_and_uses_dc_for_eager_output()
         compact.contains("value, err := support.RetryPolicyFromProto(dc, &result)"),
         "{operation}"
     );
-    assert!(operation.contains("contextRequestToProto(dc converter.DataConverter,"));
+    assert!(operation.contains("contextRequestToProto(cfg *commonconverter.SystemNexusConfig,"));
     let execute = operation
         .find("c.ExecuteOperation(ctx, \"Roundtrip\", request,")
         .unwrap();
@@ -3456,7 +3459,7 @@ fn go_proto_resource_return_converts_request_and_constructs_resource() {
     )
     .unwrap();
 
-    assert!(rendered.contains("\trequest.namespace = support.WorkflowNamespace(ctx)\n"));
+    assert!(rendered.contains("\trequest.Namespace = support.WorkflowNamespace(ctx)\n"));
     assert!(rendered.contains(
         "fut := c.ExecuteOperation(ctx, \"StartWorkflow\", request, workflow.NexusOperationOptions{})"
     ));
@@ -3465,7 +3468,7 @@ fn go_proto_resource_return_converts_request_and_constructs_resource() {
     assert!(rendered.contains("\tvar result workflowservice.StartWorkflowExecutionResponse\n"));
     // Sourced constructor arguments are read off the model instead of the proto.
     assert!(rendered.contains(
-        "value := NewStartedWorkflow(request.namespace, request.WorkflowID, result.GetRunId())"
+        "value := NewStartedWorkflow(request.Namespace, request.WorkflowID, result.GetRunId())"
     ));
     assert!(rendered.contains(
         "type StartedWorkflow struct {\n\t// Namespace - Required.\n\tNamespace string\n\t// WorkflowID - Required.\n\tWorkflowID string\n\t// RunID - Optional.\n\tRunID *string\n}"
@@ -3556,7 +3559,7 @@ interface workflow-service {
     assert!(!rendered.contains("support.support.WorkflowNamespace(ctx)"));
     assert!(!rendered.contains("workflow.GetInfo(ctx).Namespace"));
 
-    assert!(rendered.contains("value := NewSignalResult(request.namespace, result.GetStarted())"));
+    assert!(rendered.contains("value := NewSignalResult(request.Namespace, result.GetStarted())"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 

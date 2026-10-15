@@ -15,22 +15,18 @@ type genericRequest[ContextT any] struct {
 	Nested   Inner[ContextT]
 }
 
-// GetContext returns the Context field.
 func (m genericRequest[ContextT]) GetContext() ContextT {
 	return m.Context
 }
 
-// GetContexts returns the Contexts field.
 func (m genericRequest[ContextT]) GetContexts() []ContextT {
 	return m.Contexts
 }
 
-// GetByName returns the ByName field.
 func (m genericRequest[ContextT]) GetByName() map[string]ContextT {
 	return m.ByName
 }
 
-// GetNested returns the Nested field.
 func (m genericRequest[ContextT]) GetNested() Inner[ContextT] {
 	return m.Nested
 }
@@ -66,7 +62,6 @@ type Inner[ContextT any] struct {
 	Value ContextT
 }
 
-// GetValue returns the Value field.
 func (m Inner[ContextT]) GetValue() ContextT {
 	return m.Value
 }
@@ -80,17 +75,14 @@ type GenericResponse[ContextT any, OutputT any, MetadataT any] struct {
 	Metadata *MetadataT
 }
 
-// GetContext returns the Context field.
 func (m GenericResponse[ContextT, OutputT, MetadataT]) GetContext() ContextT {
 	return m.Context
 }
 
-// GetCompletion returns the Completion field.
 func (m GenericResponse[ContextT, OutputT, MetadataT]) GetCompletion() OperationCompletionResult[OutputT] {
 	return m.Completion
 }
 
-// GetMetadata returns the Metadata field.
 func (m GenericResponse[ContextT, OutputT, MetadataT]) GetMetadata() *MetadataT {
 	return m.Metadata
 }
@@ -100,7 +92,6 @@ type OperationCompletionSuccess[OutputT any] struct {
 	Output OutputT
 }
 
-// GetOutput returns the Output field.
 func (m OperationCompletionSuccess[OutputT]) GetOutput() OutputT {
 	return m.Output
 }
@@ -110,7 +101,6 @@ type OperationCompletionFailure struct {
 	Message string
 }
 
-// GetMessage returns the Message field.
 func (m OperationCompletionFailure) GetMessage() string {
 	return m.Message
 }

@@ -13,12 +13,10 @@ type getUserRequest struct {
 	ConsistencyToken *string
 }
 
-// GetUserID returns the UserID field.
 func (m getUserRequest) GetUserID() string {
 	return m.UserID
 }
 
-// GetConsistencyToken returns the ConsistencyToken field.
 func (m getUserRequest) GetConsistencyToken() *string {
 	return m.ConsistencyToken
 }
@@ -28,12 +26,10 @@ type updateEmailRequest struct {
 	Email  string
 }
 
-// GetUserID returns the UserID field.
 func (m updateEmailRequest) GetUserID() string {
 	return m.UserID
 }
 
-// GetEmail returns the Email field.
 func (m updateEmailRequest) GetEmail() string {
 	return m.Email
 }
@@ -43,12 +39,10 @@ type renameRequest struct {
 	DisplayName string
 }
 
-// GetUserID returns the UserID field.
 func (m renameRequest) GetUserID() string {
 	return m.UserID
 }
 
-// GetDisplayName returns the DisplayName field.
 func (m renameRequest) GetDisplayName() string {
 	return m.DisplayName
 }
@@ -58,12 +52,10 @@ type setProfileRequest struct {
 	Profile UserProfile
 }
 
-// GetUserID returns the UserID field.
 func (m setProfileRequest) GetUserID() string {
 	return m.UserID
 }
 
-// GetProfile returns the Profile field.
 func (m setProfileRequest) GetProfile() UserProfile {
 	return m.Profile
 }
@@ -73,12 +65,10 @@ type recordSyncRequest struct {
 	Report SyncReport
 }
 
-// GetUserID returns the UserID field.
 func (m recordSyncRequest) GetUserID() string {
 	return m.UserID
 }
 
-// GetReport returns the Report field.
 func (m recordSyncRequest) GetReport() SyncReport {
 	return m.Report
 }
@@ -88,12 +78,10 @@ type deactivateRequest struct {
 	Reason *string
 }
 
-// GetUserID returns the UserID field.
 func (m deactivateRequest) GetUserID() string {
 	return m.UserID
 }
 
-// GetReason returns the Reason field.
 func (m deactivateRequest) GetReason() *string {
 	return m.Reason
 }
@@ -230,32 +218,26 @@ type UserProfile struct {
 	Address *PostalAddress
 }
 
-// GetTags returns the Tags field.
 func (m UserProfile) GetTags() []string {
 	return m.Tags
 }
 
-// GetMetadata returns the Metadata field.
 func (m UserProfile) GetMetadata() map[string]string {
 	return m.Metadata
 }
 
-// GetCapabilities returns the Capabilities field.
 func (m UserProfile) GetCapabilities() UserCapability {
 	return m.Capabilities
 }
 
-// GetSyncState returns the SyncState field.
 func (m UserProfile) GetSyncState() Result[string, string] {
 	return m.SyncState
 }
 
-// GetNotificationTarget returns the NotificationTarget field.
 func (m UserProfile) GetNotificationTarget() NotificationTarget {
 	return m.NotificationTarget
 }
 
-// GetAddress returns the Address field.
 func (m UserProfile) GetAddress() *PostalAddress {
 	return m.Address
 }
@@ -267,12 +249,10 @@ type Result[T, E any] struct {
 	Error E
 }
 
-// GetResult returns the Result field.
 func (m Result[T, E]) GetResult() T {
 	return m.Result
 }
 
-// GetError returns the Error field.
 func (m Result[T, E]) GetError() E {
 	return m.Error
 }
@@ -288,22 +268,18 @@ type PostalAddress struct {
 	Coordinates *Tuple2[float64, float64]
 }
 
-// GetStreet returns the Street field.
 func (m PostalAddress) GetStreet() string {
 	return m.Street
 }
 
-// GetCity returns the City field.
 func (m PostalAddress) GetCity() string {
 	return m.City
 }
 
-// GetCountry returns the Country field.
 func (m PostalAddress) GetCountry() string {
 	return m.Country
 }
 
-// GetCoordinates returns the Coordinates field.
 func (m PostalAddress) GetCoordinates() *Tuple2[float64, float64] {
 	return m.Coordinates
 }
@@ -315,12 +291,10 @@ type Tuple2[T1, T2 any] struct {
 	Second T2
 }
 
-// GetFirst returns the First field.
 func (m Tuple2[T1, T2]) GetFirst() T1 {
 	return m.First
 }
 
-// GetSecond returns the Second field.
 func (m Tuple2[T1, T2]) GetSecond() T2 {
 	return m.Second
 }
@@ -334,17 +308,14 @@ type SyncReport struct {
 	RegionStatus map[string]Result[string, string]
 }
 
-// GetRoute returns the Route field.
 func (m SyncReport) GetRoute() []Tuple2[float64, float64] {
 	return m.Route
 }
 
-// GetAttempts returns the Attempts field.
 func (m SyncReport) GetAttempts() []Result[string, string] {
 	return m.Attempts
 }
 
-// GetRegionStatus returns the RegionStatus field.
 func (m SyncReport) GetRegionStatus() map[string]Result[string, string] {
 	return m.RegionStatus
 }

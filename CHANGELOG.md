@@ -29,22 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `notification-service`, `proto-oneof`, and `proto-generic` (previously
   `proto-generic-python`) examples are now generated for .NET.
 
-### Changed
-
-- Go proto-backed operation models now use SDK transfer-type converters instead
-  of eager conversion at the operation call site. Conversion errors surface on
-  the returned future. Generated converters use
-  `converter.NewContextualTransferTypeConverter`. The Go samples pin the
-  squash-merged experimental SDK API from temporalio/sdk-go#2703.
-
-### Deprecated
-
-### Breaking Changes
-
-- Go models with generated transfer-type converters require workflow context and
-  cannot be used as top-level workflow return values or activity arguments.
-- Go generation rejects `@nexus.omit` fields used as resource constructor
-  arguments.
 ### Breaking Changes
 
 - Materialized JSON Schema `time` and `date-time` offsets are now limited to

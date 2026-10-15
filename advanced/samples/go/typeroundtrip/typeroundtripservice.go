@@ -60,51 +60,47 @@ type ActivityOptions struct {
 	Priority *temporal.Priority
 }
 
-// GetTaskQueue returns the TaskQueue field.
 func (m ActivityOptions) GetTaskQueue() *string {
 	return m.TaskQueue
 }
 
-// GetRetryPolicy returns the RetryPolicy field.
 func (m ActivityOptions) GetRetryPolicy() temporal.RetryPolicy {
 	return m.RetryPolicy
 }
 
-// GetScheduleToCloseTimeout returns the ScheduleToCloseTimeout field.
 func (m ActivityOptions) GetScheduleToCloseTimeout() *time.Duration {
 	return m.ScheduleToCloseTimeout
 }
 
-// GetPriority returns the Priority field.
 func (m ActivityOptions) GetPriority() *temporal.Priority {
 	return m.Priority
 }
 
-func activityOptionsToProto(dc converter.DataConverter, m *ActivityOptions) (*activity.ActivityOptions, error) {
+func activityOptionsToProto(cfg *commonconverter.SystemNexusConfig, m *ActivityOptions) (*activity.ActivityOptions, error) {
 	message := &activity.ActivityOptions{}
 	{
-		converted, err := support.TaskQueueToProto(dc, m.TaskQueue)
+		converted, err := support.TaskQueueToProto(cfg.DataConverter, m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
 		message.TaskQueue = converted
 	}
 	{
-		converted, err := support.RetryPolicyToProto(dc, &m.RetryPolicy)
+		converted, err := support.RetryPolicyToProto(cfg.DataConverter, &m.RetryPolicy)
 		if err != nil {
 			return nil, err
 		}
 		message.RetryPolicy = converted
 	}
 	{
-		converted, err := support.DurationToProto(dc, m.ScheduleToCloseTimeout)
+		converted, err := support.DurationToProto(cfg.DataConverter, m.ScheduleToCloseTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := support.PriorityToProto(dc, m.Priority)
+		converted, err := support.PriorityToProto(cfg.DataConverter, m.Priority)
 		if err != nil {
 			return nil, err
 		}
@@ -113,17 +109,17 @@ func activityOptionsToProto(dc converter.DataConverter, m *ActivityOptions) (*ac
 	return message, nil
 }
 
-func activityOptionsFromProto(dc converter.DataConverter, proto *activity.ActivityOptions, out *ActivityOptions) error {
+func activityOptionsFromProto(cfg *commonconverter.SystemNexusConfig, proto *activity.ActivityOptions, out *ActivityOptions) error {
 	*out = ActivityOptions{}
 	{
-		converted, err := support.TaskQueueFromProto(dc, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(cfg.DataConverter, proto.GetTaskQueue())
 		if err != nil {
 			return err
 		}
 		out.TaskQueue = converted
 	}
 	{
-		converted, err := support.RetryPolicyFromProto(dc, proto.GetRetryPolicy())
+		converted, err := support.RetryPolicyFromProto(cfg.DataConverter, proto.GetRetryPolicy())
 		if err != nil {
 			return err
 		}
@@ -132,14 +128,14 @@ func activityOptionsFromProto(dc converter.DataConverter, proto *activity.Activi
 		}
 	}
 	{
-		converted, err := support.DurationFromProto(dc, proto.GetScheduleToCloseTimeout())
+		converted, err := support.DurationFromProto(cfg.DataConverter, proto.GetScheduleToCloseTimeout())
 		if err != nil {
 			return err
 		}
 		out.ScheduleToCloseTimeout = converted
 	}
 	{
-		converted, err := support.PriorityFromProto(dc, proto.GetPriority())
+		converted, err := support.PriorityFromProto(cfg.DataConverter, proto.GetPriority())
 		if err != nil {
 			return err
 		}
@@ -150,12 +146,8 @@ func activityOptionsFromProto(dc converter.DataConverter, proto *activity.Activi
 
 func (ActivityOptions) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return commonconverter.NewSystemNexusTransferTypeConverter(
-		func(cfg *commonconverter.SystemNexusConfig, m *ActivityOptions) (*activity.ActivityOptions, error) {
-			return activityOptionsToProto(cfg.DataConverter, m)
-		},
-		func(cfg *commonconverter.SystemNexusConfig, proto *activity.ActivityOptions, out *ActivityOptions) error {
-			return activityOptionsFromProto(cfg.DataConverter, proto, out)
-		},
+		activityOptionsToProto,
+		activityOptionsFromProto,
 	)
 }
 
@@ -164,15 +156,14 @@ type FailureContainer struct {
 	Failure error
 }
 
-// GetFailure returns the Failure field.
 func (m FailureContainer) GetFailure() error {
 	return m.Failure
 }
 
-func failureContainerToProto(dc converter.DataConverter, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
+func failureContainerToProto(cfg *commonconverter.SystemNexusConfig, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
 	message := &command.FailWorkflowExecutionCommandAttributes{}
 	{
-		converted, err := support.FailureToProto(dc, m.Failure)
+		converted, err := support.FailureToProto(cfg.DataConverter, m.Failure)
 		if err != nil {
 			return nil, err
 		}
@@ -181,10 +172,10 @@ func failureContainerToProto(dc converter.DataConverter, m *FailureContainer) (*
 	return message, nil
 }
 
-func failureContainerFromProto(dc converter.DataConverter, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
+func failureContainerFromProto(cfg *commonconverter.SystemNexusConfig, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
 	*out = FailureContainer{}
 	{
-		converted, err := support.FailureFromProto(dc, proto.GetFailure())
+		converted, err := support.FailureFromProto(cfg.DataConverter, proto.GetFailure())
 		if err != nil {
 			return err
 		}
@@ -195,12 +186,8 @@ func failureContainerFromProto(dc converter.DataConverter, proto *command.FailWo
 
 func (FailureContainer) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return commonconverter.NewSystemNexusTransferTypeConverter(
-		func(cfg *commonconverter.SystemNexusConfig, m *FailureContainer) (*command.FailWorkflowExecutionCommandAttributes, error) {
-			return failureContainerToProto(cfg.DataConverter, m)
-		},
-		func(cfg *commonconverter.SystemNexusConfig, proto *command.FailWorkflowExecutionCommandAttributes, out *FailureContainer) error {
-			return failureContainerFromProto(cfg.DataConverter, proto, out)
-		},
+		failureContainerToProto,
+		failureContainerFromProto,
 	)
 }
 

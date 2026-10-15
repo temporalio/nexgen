@@ -637,13 +637,6 @@ impl GoPackageContext {
         }
     }
 
-    pub(in crate::generator) fn data_converter_type(&self) -> String {
-        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            return "DataConverter".to_string();
-        }
-        self.qualified_expr("go.temporal.io/sdk/converter", "converter.DataConverter")
-    }
-
     pub(in crate::generator) fn system_nexus_config_type(&self) -> String {
         if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
             "SystemNexusConfig".to_string()
@@ -1296,16 +1289,6 @@ impl<'a> ApiPlanner<'a> {
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
         let mut external_imports = self.external_models.imports();
-        if self.external_models.renders_transfer_type_converters()
-            && !self
-                .package
-                .is_self_import("go.temporal.io/sdk/internal/common/converter")
-        {
-            external_imports.push((
-                "go.temporal.io/sdk/internal/common/converter".to_string(),
-                "commonconverter".to_string(),
-            ));
-        }
         let registry = if self.package.has_serialization_context {
             render_operation_registry(&self.package, &services, &self.imports, &external_imports)?
         } else {
@@ -1860,11 +1843,7 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn build_field(&mut self, field: &PlannedField, sourced: bool) -> Result<RenderedField> {
-        let field_name = if sourced {
-            go_unexported_name(&go_field_name(&field.authored_name))
-        } else {
-            go_field_name(&field.authored_name)
-        };
+        let field_name = go_field_name(&field.authored_name);
 
         let annotated_go_type = field
             .flattened_annotation_override
@@ -2334,9 +2313,8 @@ pub(in crate::generator) struct RenderedField {
     /// Whether the field is required in the WIT definition. Rendered as a
     /// leading `// Required.` godoc comment on the generated Go struct field.
     pub(in crate::generator) required: bool,
-    /// Whether this field carries a `@nexus.source` value. Sourced fields are
-    /// rendered as unexported struct fields, populated by generated code at
-    /// the operation call site, and never documented.
+    /// Whether this field is populated from `@nexus.source` at the operation
+    /// call site rather than documented as a caller-supplied field.
     pub(in crate::generator) sourced: bool,
 }
 
@@ -4036,21 +4014,7 @@ fn render_model(
 }
 
 fn model_getter_name(field: &RenderedField) -> String {
-    let name = if field.sourced {
-        field
-            .name
-            .strip_suffix('_')
-            .filter(|name| is_go_keyword(name))
-            .unwrap_or(&field.name)
-    } else {
-        &field.name
-    };
-    let mut chars = name.chars();
-    let exported = match chars.next() {
-        Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
-        None => String::new(),
-    };
-    format!("Get{exported}")
+    format!("Get{}", field.name)
 }
 
 // Go fields and methods share a namespace. Validate final native names here,
@@ -4060,7 +4024,11 @@ fn validate_model_getter_names(model: &RenderedModel) -> Result<()> {
     for field in &model.fields {
         occupied.insert(field.name.clone(), format!("field `{}`", field.name));
     }
-    for field in &model.fields {
+    for field in model
+        .fields
+        .iter()
+        .filter(|field| is_go_exported_decl(&field.name))
+    {
         let getter = model_getter_name(field);
         if let Some(previous) =
             occupied.insert(getter.clone(), format!("getter for field `{}`", field.name))
@@ -4091,11 +4059,15 @@ fn render_model_getters(output: &mut String, model: &RenderedModel) {
             .join(", ");
         format!("{ident}[{names}]")
     };
-    for field in &model.fields {
+    for field in model
+        .fields
+        .iter()
+        .filter(|field| is_go_exported_decl(&field.name))
+    {
         let getter = model_getter_name(field);
         output.push_str(&format!(
-            "\n// {getter} returns the {} field.\nfunc (m {receiver}) {getter}() {} {{\n\treturn m.{}\n}}\n",
-            field.name, field.go_type, field.name
+            "\nfunc (m {receiver}) {getter}() {} {{\n\treturn m.{}\n}}\n",
+            field.go_type, field.name
         ));
     }
 }
@@ -5705,8 +5677,8 @@ mod tests {
             ("GetValues", "Values", "[]string"),
             ("GetLookup", "Lookup", "map[string]int32"),
             ("GetElapsed", "Elapsed", "time.Duration"),
-            ("GetNamespace", "namespace", "string"),
-            ("GetType", "type_", "string"),
+            ("GetNamespace", "Namespace", "string"),
+            ("GetType", "Type", "string"),
         ] {
             assert!(
                 source.contains(&format!(
@@ -5717,6 +5689,7 @@ mod tests {
         }
         assert!(!source.contains("func (m *Request) Get"), "{source}");
         assert!(!source.contains("if m == nil"), "{source}");
+        assert!(!source.contains("// Get"), "{source}");
         for receiver in ["ReadOptions", "Status", "RequestAlias"] {
             assert!(
                 !source.contains(&format!("func (m {receiver}) Get")),
@@ -5783,7 +5756,7 @@ mod tests {
     }
 
     #[test]
-    fn record_getters_reject_duplicate_methods_for_private_and_public_fields() {
+    fn record_getters_skip_private_fields() {
         let model = super::RenderedModel {
             name: "Request".to_string(),
             fields: ["ID", "iD"]
@@ -5797,13 +5770,12 @@ mod tests {
                 })
                 .collect(),
         };
-        let error = super::validate_model_getter_names(&model).unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("conflicts with getter for field `ID`"),
-            "{error}"
-        );
+        super::validate_model_getter_names(&model).unwrap();
+        let mut source = String::new();
+        super::render_model_getters(&mut source, &model);
+        assert_eq!(source.matches("func (m Request) GetID() string").count(), 1);
+        assert!(!source.contains("return m.iD"), "{source}");
+        assert!(!source.contains("// Get"), "{source}");
     }
 
     fn generate_context_operation(
@@ -5988,16 +5960,18 @@ mod tests {
             "{source}"
         );
         assert!(
-            source.contains("func(cfg *commonconverter.SystemNexusConfig, m *"),
-            "{source}"
-        );
-        assert!(source.contains("ToProto(cfg.DataConverter, m)"), "{source}");
-        assert!(
-            source.contains("FromProto(cfg.DataConverter, proto, out)"),
+            source.contains("func requestToProto(cfg *commonconverter.SystemNexusConfig, m *"),
             "{source}"
         );
         assert!(
-            source.contains("support.RetryPolicyToProto(dc, m.RetryPolicy)"),
+            source.contains(
+                "commonconverter.NewSystemNexusTransferTypeConverter(\n\t\trequestToProto,\n\t\trequestFromProto,\n"
+            ),
+            "{source}"
+        );
+        assert!(!source.contains("func(cfg *"), "{source}");
+        assert!(
+            source.contains("support.RetryPolicyToProto(cfg.DataConverter, m.RetryPolicy)"),
             "{source}"
         );
         assert!(
@@ -6018,7 +5992,6 @@ mod tests {
             package.new_transfer_type_converter(),
             "NewSystemNexusTransferTypeConverter"
         );
-        assert_eq!(package.data_converter_type(), "DataConverter");
         assert_eq!(package.system_nexus_config_type(), "SystemNexusConfig");
         assert_eq!(
             package.transfer_type_converter_type(),

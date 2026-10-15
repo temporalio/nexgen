@@ -41,125 +41,104 @@ type signalWithStartWorkflowRequest struct {
 	StartDelay               *time.Duration
 	UserMetadata             *UserMetadata
 	Headers                  map[string]any
-	namespace                string
+	Namespace                string
 }
 
-// GetWorkflow returns the Workflow field.
 func (m signalWithStartWorkflowRequest) GetWorkflow() string {
 	return m.Workflow
 }
 
-// GetArgs returns the Args field.
 func (m signalWithStartWorkflowRequest) GetArgs() []any {
 	return m.Args
 }
 
-// GetID returns the ID field.
 func (m signalWithStartWorkflowRequest) GetID() string {
 	return m.ID
 }
 
-// GetTaskQueue returns the TaskQueue field.
 func (m signalWithStartWorkflowRequest) GetTaskQueue() string {
 	return m.TaskQueue
 }
 
-// GetSignal returns the Signal field.
 func (m signalWithStartWorkflowRequest) GetSignal() string {
 	return m.Signal
 }
 
-// GetSignalArgs returns the SignalArgs field.
 func (m signalWithStartWorkflowRequest) GetSignalArgs() []any {
 	return m.SignalArgs
 }
 
-// GetWorkflowExecutionTimeout returns the WorkflowExecutionTimeout field.
 func (m signalWithStartWorkflowRequest) GetWorkflowExecutionTimeout() *time.Duration {
 	return m.WorkflowExecutionTimeout
 }
 
-// GetWorkflowRunTimeout returns the WorkflowRunTimeout field.
 func (m signalWithStartWorkflowRequest) GetWorkflowRunTimeout() *time.Duration {
 	return m.WorkflowRunTimeout
 }
 
-// GetWorkflowTaskTimeout returns the WorkflowTaskTimeout field.
 func (m signalWithStartWorkflowRequest) GetWorkflowTaskTimeout() *time.Duration {
 	return m.WorkflowTaskTimeout
 }
 
-// GetWorkflowIDReusePolicy returns the WorkflowIDReusePolicy field.
 func (m signalWithStartWorkflowRequest) GetWorkflowIDReusePolicy() *enums.WorkflowIdReusePolicy {
 	return m.WorkflowIDReusePolicy
 }
 
-// GetWorkflowIDConflictPolicy returns the WorkflowIDConflictPolicy field.
 func (m signalWithStartWorkflowRequest) GetWorkflowIDConflictPolicy() *enums.WorkflowIdConflictPolicy {
 	return m.WorkflowIDConflictPolicy
 }
 
-// GetRetryPolicy returns the RetryPolicy field.
 func (m signalWithStartWorkflowRequest) GetRetryPolicy() *temporal.RetryPolicy {
 	return m.RetryPolicy
 }
 
-// GetCronSchedule returns the CronSchedule field.
 func (m signalWithStartWorkflowRequest) GetCronSchedule() *string {
 	return m.CronSchedule
 }
 
-// GetMemo returns the Memo field.
 func (m signalWithStartWorkflowRequest) GetMemo() map[string]any {
 	return m.Memo
 }
 
-// GetTypedSearchAttributes returns the TypedSearchAttributes field.
 func (m signalWithStartWorkflowRequest) GetTypedSearchAttributes() temporal.SearchAttributes {
 	return m.TypedSearchAttributes
 }
 
-// GetPriority returns the Priority field.
 func (m signalWithStartWorkflowRequest) GetPriority() *temporal.Priority {
 	return m.Priority
 }
 
-// GetVersioningOverride returns the VersioningOverride field.
 func (m signalWithStartWorkflowRequest) GetVersioningOverride() client.VersioningOverride {
 	return m.VersioningOverride
 }
 
-// GetStartDelay returns the StartDelay field.
 func (m signalWithStartWorkflowRequest) GetStartDelay() *time.Duration {
 	return m.StartDelay
 }
 
-// GetUserMetadata returns the UserMetadata field.
 func (m signalWithStartWorkflowRequest) GetUserMetadata() *UserMetadata {
 	return m.UserMetadata
 }
 
-// GetHeaders returns the Headers field.
 func (m signalWithStartWorkflowRequest) GetHeaders() map[string]any {
 	return m.Headers
 }
 
-// GetNamespace returns the namespace field.
 func (m signalWithStartWorkflowRequest) GetNamespace() string {
-	return m.namespace
+	return m.Namespace
 }
 
-func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
+func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfig, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
 	message := &workflowservice.SignalWithStartWorkflowExecutionRequest{}
 	{
-		converted, err := support.WorkflowTypeToProto(dc, &m.Workflow)
+		converted, err := support.WorkflowTypeToProto(cfg.DataConverter, &m.Workflow)
 		if err != nil {
 			return nil, err
 		}
 		message.WorkflowType = converted
 	}
 	{
-		converted, err := support.PayloadsToProto(dc, m.Args)
+		converted, err := support.PayloadsToProto(cfg.DataConverter, m.Args)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +146,7 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 	}
 	message.WorkflowId = m.ID
 	{
-		converted, err := support.TaskQueueToProto(dc, &m.TaskQueue)
+		converted, err := support.TaskQueueToProto(cfg.DataConverter, &m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
@@ -175,28 +154,28 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 	}
 	message.SignalName = m.Signal
 	{
-		converted, err := support.PayloadsToProto(dc, m.SignalArgs)
+		converted, err := support.PayloadsToProto(cfg.DataConverter, m.SignalArgs)
 		if err != nil {
 			return nil, err
 		}
 		message.SignalInput = converted
 	}
 	{
-		converted, err := support.DurationToProto(dc, m.WorkflowExecutionTimeout)
+		converted, err := support.DurationToProto(cfg.DataConverter, m.WorkflowExecutionTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.WorkflowExecutionTimeout = converted
 	}
 	{
-		converted, err := support.DurationToProto(dc, m.WorkflowRunTimeout)
+		converted, err := support.DurationToProto(cfg.DataConverter, m.WorkflowRunTimeout)
 		if err != nil {
 			return nil, err
 		}
 		message.WorkflowRunTimeout = converted
 	}
 	{
-		converted, err := support.DurationToProto(dc, m.WorkflowTaskTimeout)
+		converted, err := support.DurationToProto(cfg.DataConverter, m.WorkflowTaskTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +190,7 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 		message.WorkflowIdConflictPolicy = enums.WorkflowIdConflictPolicy((*m.WorkflowIDConflictPolicy))
 	}
 	{
-		converted, err := support.RetryPolicyToProto(dc, m.RetryPolicy)
+		converted, err := support.RetryPolicyToProto(cfg.DataConverter, m.RetryPolicy)
 		if err != nil {
 			return nil, err
 		}
@@ -221,62 +200,62 @@ func signalWithStartWorkflowRequestToProto(dc converter.DataConverter, m *signal
 		message.CronSchedule = (*m.CronSchedule)
 	}
 	{
-		converted, err := support.MemoToProto(dc, m.Memo)
+		converted, err := support.MemoToProto(cfg.DataConverter, m.Memo)
 		if err != nil {
 			return nil, err
 		}
 		message.Memo = converted
 	}
 	{
-		converted, err := support.SearchAttributesToProto(dc, &m.TypedSearchAttributes)
+		converted, err := support.SearchAttributesToProto(cfg.DataConverter, &m.TypedSearchAttributes)
 		if err != nil {
 			return nil, err
 		}
 		message.SearchAttributes = converted
 	}
 	{
-		converted, err := support.PriorityToProto(dc, m.Priority)
+		converted, err := support.PriorityToProto(cfg.DataConverter, m.Priority)
 		if err != nil {
 			return nil, err
 		}
 		message.Priority = converted
 	}
 	{
-		converted, err := support.VersioningOverrideToProto(dc, &m.VersioningOverride)
+		converted, err := support.VersioningOverrideToProto(cfg.DataConverter, &m.VersioningOverride)
 		if err != nil {
 			return nil, err
 		}
 		message.VersioningOverride = converted
 	}
 	{
-		converted, err := support.DurationToProto(dc, m.StartDelay)
+		converted, err := support.DurationToProto(cfg.DataConverter, m.StartDelay)
 		if err != nil {
 			return nil, err
 		}
 		message.WorkflowStartDelay = converted
 	}
 	if m.UserMetadata != nil {
-		converted, err := userMetadataToProto(dc, m.UserMetadata)
+		converted, err := userMetadataToProto(cfg, m.UserMetadata)
 		if err != nil {
 			return nil, err
 		}
 		message.UserMetadata = converted
 	}
 	{
-		converted, err := support.HeaderToProto(dc, m.Headers)
+		converted, err := support.HeaderToProto(cfg.DataConverter, m.Headers)
 		if err != nil {
 			return nil, err
 		}
 		message.Header = converted
 	}
-	message.Namespace = m.namespace
+	message.Namespace = m.Namespace
 	return message, nil
 }
 
-func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
+func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
 	*out = signalWithStartWorkflowRequest{}
 	{
-		converted, err := support.WorkflowTypeFromProto(dc, proto.GetWorkflowType())
+		converted, err := support.WorkflowTypeFromProto(cfg.DataConverter, proto.GetWorkflowType())
 		if err != nil {
 			return err
 		}
@@ -285,7 +264,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		}
 	}
 	{
-		converted, err := support.PayloadsFromProto(dc, proto.GetInput())
+		converted, err := support.PayloadsFromProto(cfg.DataConverter, proto.GetInput())
 		if err != nil {
 			return err
 		}
@@ -293,7 +272,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 	}
 	out.ID = proto.GetWorkflowId()
 	{
-		converted, err := support.TaskQueueFromProto(dc, proto.GetTaskQueue())
+		converted, err := support.TaskQueueFromProto(cfg.DataConverter, proto.GetTaskQueue())
 		if err != nil {
 			return err
 		}
@@ -303,28 +282,28 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 	}
 	out.Signal = proto.GetSignalName()
 	{
-		converted, err := support.PayloadsFromProto(dc, proto.GetSignalInput())
+		converted, err := support.PayloadsFromProto(cfg.DataConverter, proto.GetSignalInput())
 		if err != nil {
 			return err
 		}
 		out.SignalArgs = converted
 	}
 	{
-		converted, err := support.DurationFromProto(dc, proto.GetWorkflowExecutionTimeout())
+		converted, err := support.DurationFromProto(cfg.DataConverter, proto.GetWorkflowExecutionTimeout())
 		if err != nil {
 			return err
 		}
 		out.WorkflowExecutionTimeout = converted
 	}
 	{
-		converted, err := support.DurationFromProto(dc, proto.GetWorkflowRunTimeout())
+		converted, err := support.DurationFromProto(cfg.DataConverter, proto.GetWorkflowRunTimeout())
 		if err != nil {
 			return err
 		}
 		out.WorkflowRunTimeout = converted
 	}
 	{
-		converted, err := support.DurationFromProto(dc, proto.GetWorkflowTaskTimeout())
+		converted, err := support.DurationFromProto(cfg.DataConverter, proto.GetWorkflowTaskTimeout())
 		if err != nil {
 			return err
 		}
@@ -339,7 +318,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		out.WorkflowIDConflictPolicy = &converted
 	}
 	{
-		converted, err := support.RetryPolicyFromProto(dc, proto.GetRetryPolicy())
+		converted, err := support.RetryPolicyFromProto(cfg.DataConverter, proto.GetRetryPolicy())
 		if err != nil {
 			return err
 		}
@@ -350,14 +329,14 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		out.CronSchedule = &converted
 	}
 	{
-		converted, err := support.MemoFromProto(dc, proto.GetMemo())
+		converted, err := support.MemoFromProto(cfg.DataConverter, proto.GetMemo())
 		if err != nil {
 			return err
 		}
 		out.Memo = converted
 	}
 	{
-		converted, err := support.SearchAttributesFromProto(dc, proto.GetSearchAttributes())
+		converted, err := support.SearchAttributesFromProto(cfg.DataConverter, proto.GetSearchAttributes())
 		if err != nil {
 			return err
 		}
@@ -366,14 +345,14 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		}
 	}
 	{
-		converted, err := support.PriorityFromProto(dc, proto.GetPriority())
+		converted, err := support.PriorityFromProto(cfg.DataConverter, proto.GetPriority())
 		if err != nil {
 			return err
 		}
 		out.Priority = converted
 	}
 	{
-		converted, err := support.VersioningOverrideFromProto(dc, proto.GetVersioningOverride())
+		converted, err := support.VersioningOverrideFromProto(cfg.DataConverter, proto.GetVersioningOverride())
 		if err != nil {
 			return err
 		}
@@ -382,7 +361,7 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 		}
 	}
 	{
-		converted, err := support.DurationFromProto(dc, proto.GetWorkflowStartDelay())
+		converted, err := support.DurationFromProto(cfg.DataConverter, proto.GetWorkflowStartDelay())
 		if err != nil {
 			return err
 		}
@@ -390,36 +369,32 @@ func signalWithStartWorkflowRequestFromProto(dc converter.DataConverter, proto *
 	}
 	if proto.GetUserMetadata() != nil {
 		out.UserMetadata = new(UserMetadata)
-		if err := userMetadataFromProto(dc, proto.GetUserMetadata(), out.UserMetadata); err != nil {
+		if err := userMetadataFromProto(cfg, proto.GetUserMetadata(), out.UserMetadata); err != nil {
 			return err
 		}
 	}
 	{
-		converted, err := support.HeaderFromProto(dc, proto.GetHeader())
+		converted, err := support.HeaderFromProto(cfg.DataConverter, proto.GetHeader())
 		if err != nil {
 			return err
 		}
 		out.Headers = converted
 	}
-	out.namespace = proto.GetNamespace()
+	out.Namespace = proto.GetNamespace()
 	return nil
 }
 
 func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return commonconverter.NewSystemNexusTransferTypeConverter(
-		func(cfg *commonconverter.SystemNexusConfig, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
-			return signalWithStartWorkflowRequestToProto(cfg.DataConverter, m)
-		},
-		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
-			return signalWithStartWorkflowRequestFromProto(cfg.DataConverter, proto, out)
-		},
+		signalWithStartWorkflowRequestToProto,
+		signalWithStartWorkflowRequestFromProto,
 	)
 }
 
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
-	request.namespace = support.WorkflowNamespace(ctx)
+	request.Namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -450,27 +425,25 @@ type UserMetadata struct {
 	StaticDetails string
 }
 
-// GetStaticSummary returns the StaticSummary field.
 func (m UserMetadata) GetStaticSummary() string {
 	return m.StaticSummary
 }
 
-// GetStaticDetails returns the StaticDetails field.
 func (m UserMetadata) GetStaticDetails() string {
 	return m.StaticDetails
 }
 
-func userMetadataToProto(dc converter.DataConverter, m *UserMetadata) (*sdk.UserMetadata, error) {
+func userMetadataToProto(cfg *commonconverter.SystemNexusConfig, m *UserMetadata) (*sdk.UserMetadata, error) {
 	message := &sdk.UserMetadata{}
 	{
-		converted, err := support.PayloadToProto(dc, m.StaticSummary)
+		converted, err := support.PayloadToProto(cfg.DataConverter, m.StaticSummary)
 		if err != nil {
 			return nil, err
 		}
 		message.Summary = converted
 	}
 	{
-		converted, err := support.PayloadToProto(dc, m.StaticDetails)
+		converted, err := support.PayloadToProto(cfg.DataConverter, m.StaticDetails)
 		if err != nil {
 			return nil, err
 		}
@@ -479,10 +452,10 @@ func userMetadataToProto(dc converter.DataConverter, m *UserMetadata) (*sdk.User
 	return message, nil
 }
 
-func userMetadataFromProto(dc converter.DataConverter, proto *sdk.UserMetadata, out *UserMetadata) error {
+func userMetadataFromProto(cfg *commonconverter.SystemNexusConfig, proto *sdk.UserMetadata, out *UserMetadata) error {
 	*out = UserMetadata{}
 	if proto.GetSummary() != nil {
-		converted, err := support.PayloadFromProto(dc, proto.GetSummary())
+		converted, err := support.PayloadFromProto(cfg.DataConverter, proto.GetSummary())
 		if err != nil {
 			return err
 		}
@@ -493,7 +466,7 @@ func userMetadataFromProto(dc converter.DataConverter, proto *sdk.UserMetadata, 
 		out.StaticSummary = typed
 	}
 	if proto.GetDetails() != nil {
-		converted, err := support.PayloadFromProto(dc, proto.GetDetails())
+		converted, err := support.PayloadFromProto(cfg.DataConverter, proto.GetDetails())
 		if err != nil {
 			return err
 		}
@@ -517,17 +490,15 @@ type SignalWithStartWorkflowResponse struct {
 	Started *bool
 }
 
-// GetRunID returns the RunID field.
 func (m SignalWithStartWorkflowResponse) GetRunID() *string {
 	return m.RunID
 }
 
-// GetStarted returns the Started field.
 func (m SignalWithStartWorkflowResponse) GetStarted() *bool {
 	return m.Started
 }
 
-func signalWithStartWorkflowResponseToProto(dc converter.DataConverter, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
+func signalWithStartWorkflowResponseToProto(cfg *commonconverter.SystemNexusConfig, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
 	message := &workflowservice.SignalWithStartWorkflowExecutionResponse{}
 	if m.RunID != nil {
 		message.RunId = (*m.RunID)
@@ -538,7 +509,7 @@ func signalWithStartWorkflowResponseToProto(dc converter.DataConverter, m *Signa
 	return message, nil
 }
 
-func signalWithStartWorkflowResponseFromProto(dc converter.DataConverter, proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
+func signalWithStartWorkflowResponseFromProto(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
 	*out = SignalWithStartWorkflowResponse{}
 	{
 		converted := proto.GetRunId()
@@ -553,12 +524,8 @@ func signalWithStartWorkflowResponseFromProto(dc converter.DataConverter, proto 
 
 func (SignalWithStartWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
 	return commonconverter.NewSystemNexusTransferTypeConverter(
-		func(cfg *commonconverter.SystemNexusConfig, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
-			return signalWithStartWorkflowResponseToProto(cfg.DataConverter, m)
-		},
-		func(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
-			return signalWithStartWorkflowResponseFromProto(cfg.DataConverter, proto, out)
-		},
+		signalWithStartWorkflowResponseToProto,
+		signalWithStartWorkflowResponseFromProto,
 	)
 }
 
