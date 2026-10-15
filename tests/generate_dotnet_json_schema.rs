@@ -233,6 +233,10 @@ fn csharp_json_rejects_unsupported_keywords() {
             "type: object\nproperties:\n  card: { type: string }\ndependentSchemas:\n  card: { required: [billing] }\n",
             "`dependentSchemas` is not supported",
         ),
+        (
+            "type: object\nproperties:\n  a: { type: string }\nunevaluatedProperties: false\n",
+            "`unevaluatedProperties` is not supported",
+        ),
     ];
     for (schema, expected) in cases {
         let case = JsonCase::new("unsupported-keyword");
