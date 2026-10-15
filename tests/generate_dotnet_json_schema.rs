@@ -194,10 +194,16 @@ fn csharp_cli_generates_json_schema_without_a_support_package() {
 /// before anything is emitted, so C# never approximates it.
 #[test]
 fn csharp_json_rejects_unsupported_keywords() {
-    let cases: &[(&str, &str)] = &[(
-        "type: object\nproperties:\n  doc: { type: string, contentMediaType: application/json }\n",
-        "`contentMediaType` is not supported",
-    )];
+    let cases: &[(&str, &str)] = &[
+        (
+            "type: object\nproperties:\n  doc: { type: string, contentMediaType: application/json }\n",
+            "`contentMediaType` is not supported",
+        ),
+        (
+            "type: object\nproperties:\n  doc: { type: string, contentSchema: { type: object } }\n",
+            "`contentSchema` is not supported",
+        ),
+    ];
     for (schema, expected) in cases {
         let case = JsonCase::new("unsupported-keyword");
         case.write("model.yaml", schema);
