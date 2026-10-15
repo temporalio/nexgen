@@ -8957,6 +8957,13 @@ pub(crate) fn build_name_manifest(
                 format!("generated runtime identifier `{ident}`"),
             )?;
         }
+        for ident in converter_member_idents(language) {
+            top.insert(
+                language,
+                (*ident).to_string(),
+                format!("generated converter member `{ident}`"),
+            )?;
+        }
         // A service's bindings live in the module scope of the file that declares
         // it — which is the root module only in single-input mode. Keying the
         // insert on an empty module key meant that in multi-input mode services
@@ -9030,6 +9037,13 @@ pub(crate) fn build_name_manifest(
                     language,
                     (*ident).to_string(),
                     format!("generated runtime identifier `{ident}`"),
+                )?;
+            }
+            for ident in converter_member_idents(language) {
+                module.insert(
+                    language,
+                    (*ident).to_string(),
+                    format!("generated converter member `{ident}`"),
                 )?;
             }
             for service in services
@@ -9242,6 +9256,17 @@ fn boilerplate_idents(language: Language) -> &'static [&'static str] {
         ],
         Language::Dotnet => dotnet::RUNTIME_TYPES,
         Language::Ruby => &[],
+    }
+}
+
+/// Members of a target's generated per-model converter that the converter's
+/// own body would resolve before a same-module type of that name. See
+/// [`dotnet::CONVERTER_MEMBERS`]; the other targets name types in positions a
+/// converter member cannot capture.
+fn converter_member_idents(language: Language) -> &'static [&'static str] {
+    match language {
+        Language::Dotnet => dotnet::CONVERTER_MEMBERS,
+        _ => &[],
     }
 }
 
@@ -9759,6 +9784,14 @@ fn collect_csharp_nested_scope(
                     remedy,
                 )?;
             }
+            for ident in dotnet::OBJECT_MEMBERS {
+                constants.insert_with_remedy(
+                    language,
+                    (*ident).to_string(),
+                    format!("inherited `object` member `{ident}`"),
+                    remedy,
+                )?;
+            }
         }
         let has_scalar_default = property.extra.get("default").is_some_and(|default| {
             !(default.is_null() || default.is_object() || default.is_array())
@@ -9791,6 +9824,18 @@ fn collect_csharp_nested_scope(
             language,
             ident.to_string(),
             format!("generated record member `{ident}`"),
+        )?;
+    }
+    // A record may itself be named after an inherited member (it hides
+    // nothing); the scope holds the type's own name only for CS0542.
+    for ident in dotnet::OBJECT_MEMBERS
+        .iter()
+        .filter(|ident| **ident != type_ident)
+    {
+        scope.insert(
+            language,
+            (*ident).to_string(),
+            format!("inherited `object` member `{ident}`"),
         )?;
     }
     for ident in dotnet::RUNTIME_TYPES {

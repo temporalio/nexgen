@@ -47,6 +47,36 @@ pub(crate) const RUNTIME_TYPES: &[&str] = &[
     "Base64Support",
 ];
 
+/// The members every generated `JsonConverter<T>` declares or inherits. A
+/// converter names the same-module types it parses, validates and writes by
+/// simple name, so a type spelled like one of these would bind to the member
+/// instead (CS0119/CS0120). They are reserved type names in every C# module
+/// scope (P15). A *member* may still use most of them, being always accessed
+/// through an instance; [`OBJECT_MEMBERS`] are the exceptions.
+pub(crate) const CONVERTER_MEMBERS: &[&str] = &[
+    "CanConvert",
+    "GetType",
+    "HandleNull",
+    "MemberwiseClone",
+    "Parse",
+    "Read",
+    "ReadAsPropertyName",
+    "ReferenceEquals",
+    "Type",
+    "Validate",
+    "Write",
+    "WriteAsPropertyName",
+    "WriteValue",
+];
+
+/// The non-overridden members every C# type inherits from `object`. A generated
+/// record or closed-value class member spelled like one would hide it (CS0108,
+/// an error under the generated project's warnings-as-errors), so they are
+/// reserved in every model's member scope and every closed-value constant scope
+/// (P15). The overridden `Equals`, `GetHashCode` and `ToString` are reserved as
+/// generated members instead.
+pub(crate) const OBJECT_MEMBERS: &[&str] = &["GetType", "MemberwiseClone", "ReferenceEquals"];
+
 /// A C# string literal, escaping everything a regular literal cannot hold.
 pub(in crate::generator) fn cs_string(value: &str) -> String {
     let mut output = String::with_capacity(value.len() + 2);
