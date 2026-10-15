@@ -2214,6 +2214,115 @@ Check.True(left != Check.Parse<Equality>("{\"blob\":\"AQI=\",\"tags\":[\"a\"],\"
 // Modules, namespaces and references
 // ---------------------------------------------------------------------------
 
+/// A two-file closure: a service whose operation output and a model member
+/// both reference a model declared, and renamed, in another file.
+fn write_cross_module_closure(case: &JsonCase) {
+    case.write(
+        "kb.nexusrpc.yaml",
+        r##"nexusrpc: "1.0.0"
+services:
+  Pages:
+    fqn: example.pages.v1.Pages
+    operations:
+      get:
+        input: { $ref: "#/$defs/GetInput" }
+        output: { $ref: "content/page.json" }
+      find:
+        input: { $ref: "#/$defs/GetInput" }
+        output: { $ref: "#/$defs/FindOutput" }
+$defs:
+  GetInput:
+    type: object
+    additionalProperties: false
+    properties: { id: { type: string } }
+  FindOutput:
+    type: object
+    additionalProperties: false
+    properties:
+      page: { $ref: "content/page.json" }
+      leaf: { $ref: "deep/nested/leaf.yaml" }
+"##,
+    );
+    case.write(
+        "content/page.json",
+        r#"{"type":"object","x-cs-name":"RenamedPage","additionalProperties":false,"properties":{"title":{"type":"string","minLength":2}}}"#,
+    );
+    case.write(
+        "deep/nested/leaf.yaml",
+        "type: object\nproperties:\n  n: { type: integer, minimum: 0 }\n",
+    );
+}
+
+#[test]
+fn csharp_json_namespaces_follow_module_paths() {
+    let case = JsonCase::new("namespaces");
+    write_cross_module_closure(&case);
+    let output = case.generate_native(&["."]);
+    // One namespace per module below the root; the runtime types once, at the root.
+    assert_has(output.file("kb/Models.cs"), &["namespace Probe.Kb\n"]);
+    assert_has(output.file("kb/Services.cs"), &["namespace Probe.Kb\n"]);
+    assert_has(
+        output.file("content/page/Models.cs"),
+        &["namespace Probe.Content.Page\n"],
+    );
+    assert_has(
+        output.file("deep/nested/leaf/Models.cs"),
+        &["namespace Probe.Deep.Nested.Leaf\n"],
+    );
+    for runtime in ["Violation.cs", "SpecJson.cs", "ValueEquality.cs"] {
+        assert_has(output.file(runtime), &["namespace Probe\n"]);
+        assert_eq!(
+            output
+                .0
+                .keys()
+                .filter(|path| path.ends_with(runtime))
+                .count(),
+            1,
+            "{runtime} is emitted once"
+        );
+    }
+    // A cross-module reference is `global::`-qualified, so neither a module's
+    // own type names nor a namespace that shares a type's name can capture it.
+    assert_has(
+        output.file("kb/Models.cs"),
+        &[
+            "public global::Probe.Content.Page.RenamedPage? Page { get; init; }",
+            "public global::Probe.Deep.Nested.Leaf.Leaf? Leaf { get; init; }",
+        ],
+    );
+    case.run_with_usings(
+        &["Probe.Kb"],
+        r#"var parsed = Check.RoundTrip<FindOutput>("{\"page\":{\"title\":\"ok\"},\"leaf\":{\"n\":1}}");
+Check.Equal("ok", parsed.Page!.Title, "cross-module member");
+Check.ParseFails<FindOutput>("{\"page\":{\"title\":\"x\"},\"leaf\":{\"n\":-1}}",
+    "page.title: must have length >= 2",
+    "leaf.n: must be >= 0");
+// The runtime types are shared by every module.
+Check.True(typeof(Probe.Violation).Namespace == "Probe", "one runtime namespace");"#,
+    );
+}
+
+#[test]
+fn csharp_json_cross_module_cs_name_override_moves_every_reference() {
+    let case = JsonCase::new("cross-module-override");
+    write_cross_module_closure(&case);
+    let output = case.generate_native(&["."]);
+    assert_has(
+        output.file("content/page/Models.cs"),
+        &["public sealed record RenamedPage\n"],
+    );
+    assert_has(
+        output.file("kb/Services.cs"),
+        &[
+            "global::Probe.Content.Page.RenamedPage Get(GetInput request);",
+            "public async Task<global::Probe.Content.Page.RenamedPage> GetAsync(GetInput request)",
+        ],
+    );
+    let all = output.all();
+    assert_lacks(&all, &["record Page", ".Page.Page", " Page Get("]);
+    case.build();
+}
+
 #[test]
 fn csharp_json_bare_ref_aliases_collapse_to_the_target_type() {
     let case = JsonCase::new("bare-ref-alias");
@@ -2276,6 +2385,60 @@ $defs:
         r#"Check.RoundTrip<Chain>("{\"item\":{\"value\":\"a\"},\"longItem\":{\"value\":\"b\"}}");
 Check.ParseFails<Chain>("{\"item\":{},\"longItem\":{\"value\":\"b\"}}", "item.value: required");"#,
     );
+}
+
+/// Each module is its own namespace, so the same type name may appear in two
+/// modules — but a service file names its operation I/O types through
+/// `using` directives, where two `Page`s are ambiguous, so that one scope is a
+/// P15 reject with the `x-cs-name` fix-it.
+#[test]
+fn csharp_json_same_type_name_in_two_modules() {
+    let page = r#"{"type":"object","additionalProperties":false,"required":["title"],"properties":{"title":{"type":"string"}}}"#;
+    let models = JsonCase::new("same-name-models");
+    models.write("a/page.json", page).write("b/page.json", page).write(
+        "root.yaml",
+        "type: object\nproperties:\n  first: { $ref: a/page.json }\n  second: { $ref: b/page.json }\n",
+    );
+    let output = models.generate(&["."]);
+    assert_has(
+        output.file("root/Models.cs"),
+        &[
+            "public global::Probe.A.Page.Page? First { get; init; }",
+            "public global::Probe.B.Page.Page? Second { get; init; }",
+        ],
+    );
+    models.run_with_usings(
+        &["Probe.Root"],
+        r#"Check.RoundTrip<Root>("{\"first\":{\"title\":\"a\"},\"second\":{\"title\":\"b\"}}");"#,
+    );
+
+    let service = JsonCase::new("same-name-service");
+    let root = r#"nexusrpc: "1.0.0"
+services:
+  Svc:
+    fqn: example.v1.Svc
+    operations:
+      one: { input: { $ref: a/page.json } }
+      two: { input: { $ref: b/page.json } }
+"#;
+    service
+        .write("a/page.json", page)
+        .write("b/page.json", page)
+        .write("root.nexusrpc.yaml", root);
+    assert_has(
+        &service.generate_err(&["."]),
+        &["collision", "a/page#Page", "b/page#Page", "x-cs-name"],
+    );
+    service.write(
+        "b/page.json",
+        r#"{"type":"object","x-cs-name":"BPage","additionalProperties":false,"required":["title"],"properties":{"title":{"type":"string"}}}"#,
+    );
+    let output = service.generate_native(&["."]);
+    assert_has(
+        output.file("b/page/Models.cs"),
+        &["public sealed record BPage\n"],
+    );
+    service.build();
 }
 
 // ---------------------------------------------------------------------------
