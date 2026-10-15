@@ -785,6 +785,56 @@ $defs:
 }
 
 #[test]
+fn csharp_json_contains_matchers_are_complete_and_typed() {
+    let case = JsonCase::new("contains");
+    case.write(
+        "matchers.yaml",
+        r#"type: object
+properties:
+  integral: { type: array, items: { type: number }, contains: { type: integer, minimum: 2, multipleOf: 2 } }
+  emails:
+    type: array
+    items: { type: string }
+    contains: { type: string, minLength: 6, pattern: "@example\\.com$", format: email }
+  names: { type: array, items: { type: string }, contains: { minLength: 2 } }
+  nums: { type: array, items: { type: integer }, contains: { minimum: 5 } }
+  ordered: { type: array, items: { type: number }, contains: { enum: [2, 1.5] } }
+  reversed: { type: array, items: { type: number }, contains: { enum: [1.5, 2] } }
+  bounded:
+    type: array
+    items: { type: string }
+    contains: { const: ok }
+    minContains: 1
+    maxContains: 1
+"#,
+    );
+    let output = case.generate(&["matchers.yaml"]);
+    // A member's matcher regexes compile once, into static fields.
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "private static readonly global::System.Text.RegularExpressions.Regex EmailsContainsPattern = new(",
+            "private static readonly global::System.Text.RegularExpressions.Regex EmailsContainsFormat = new(",
+        ],
+    );
+    case.run(
+        r#"Check.RoundTrip<Matchers>("{\"integral\":[1,4],\"emails\":[\"x\",\"a@example.com\"],\"names\":[\"a\",\"bc\"],\"nums\":[1,9]}");
+Check.ParseFails<Matchers>("{\"integral\":[2.5,3]}", "integral: no element matches the required schema");
+Check.ParseFails<Matchers>("{\"emails\":[\"a@example.org\"]}", "emails: no element matches the required schema");
+Check.ParseFails<Matchers>("{\"names\":[\"a\"]}", "names: no element matches the required schema");
+// A mistyped element is its own violation and never matches.
+Check.ParseFails<Matchers>("{\"names\":[5]}", "names[0]: ", "names: no element matches the required schema");
+Check.ParseFails<Matchers>("{\"nums\":[\"9\"]}", "nums[0]: ", "nums: no element matches the required schema");
+// The matcher kind follows the element type, not the order of its literals.
+Check.RoundTrip<Matchers>("{\"ordered\":[1.5],\"reversed\":[1.5]}");
+Check.ParseFails<Matchers>("{\"bounded\":[\"ok\",\"ok\"]}", "bounded: ");
+Check.ParseFails<Matchers>("{\"bounded\":[]}", "bounded: ");
+Check.WriteFails(new Matchers { Nums = new long[] { 1 } }, "nums: no element matches the required schema");
+Check.WriteFails(new Matchers { Bounded = new[] { "ok", "ok" } }, "bounded: ");"#,
+    );
+}
+
+#[test]
 fn csharp_json_max_items_bounds_the_element_count() {
     let case = JsonCase::new("max-items");
     case.write(
