@@ -417,6 +417,13 @@ fn render_output_files(files: BTreeMap<PathBuf, String>) -> String {
 }
 
 fn generate_typescript_to_string(input_paths: &[PathBuf], descriptor_paths: &[PathBuf]) -> String {
+    render_output_files(generate_typescript_files(input_paths, descriptor_paths))
+}
+
+fn generate_typescript_files(
+    input_paths: &[PathBuf],
+    descriptor_paths: &[PathBuf],
+) -> BTreeMap<PathBuf, String> {
     let temp_dir = unique_output_path("typescript-rendered");
     let output_path = temp_dir.join("output");
     generate_to_file(&GenerateRequest {
@@ -434,95 +441,27 @@ fn generate_typescript_to_string(input_paths: &[PathBuf], descriptor_paths: &[Pa
         ts_date_time_types: Default::default(),
     })
     .unwrap();
-    let rendered = if output_path.is_file() {
-        fs::read_to_string(&output_path).unwrap()
-    } else {
-        render_output_files(read_typescript_output_files(&output_path))
-    };
+    let files = read_typescript_output_files(&output_path);
     fs::remove_dir_all(temp_dir).unwrap();
-    rendered
+    files
 }
 
 #[test]
-fn typescript_notification_models_convert_generic_oneofs_without_service() {
+fn typescript_proto_model_only_examples_emit_only_model_files() {
     let root = project_root();
-    let rendered = generate_typescript_to_string(
-        &example_input_paths(&root, "notification-service"),
-        &[descriptor_path(&root)],
-    );
-    assert!(rendered.contains("export interface OnCompleteRequest<OutputT, SourceContextT>"));
-    assert!(rendered.contains("export type OnCompleteRequestResult<OutputT>"));
-    assert!(rendered.contains(
-        "support.payloadToValue<OutputT>(requiredField(proto.success, \"OnCompleteRequest\", \"success\"))"
-    ));
-    assert!(rendered.contains("support.payloadToValue<SourceContextT>("));
-    assert!(rendered.contains(
-        "return { result: \"success\" as const, success: support.valueToPayload(result.value) };"
-    ));
-    assert!(rendered.contains(
-        "return { result: \"failure\" as const, failure: support.failureToProto(result.value) };"
-    ));
-    assert!(rendered.contains("switch (proto.result)"));
-    assert!(!rendered.contains("selectOneof"));
-    assert!(rendered.contains("missing required field OnCompleteRequest.result"));
-    assert!(
-        rendered.contains("return onCompleteRequestFromProto<OutputT, SourceContextT>(value)!;")
-    );
-    assert!(rendered.contains(
-        "export type { OnCompleteRequest, OnCompleteRequestResult, OnCompleteResponse } from './models';"
-    ));
-    assert!(
-        rendered.contains("export { onCompleteRequestTransferTypeConverter } from './models';")
-    );
-    assert!(!rendered.contains("### services.ts"));
-    assert!(!rendered.contains("### operations/"));
-    assert!(!rendered.contains("NotificationServiceClient"));
-}
-
-#[test]
-fn typescript_proto_generic_models_convert_nested_payloads() {
-    let root = project_root();
-    let rendered = generate_typescript_to_string(
-        &example_input_paths(&root, "proto-generic"),
-        &[descriptor_path(&root)],
-    );
-    assert!(rendered.contains("export interface PayloadBackedEnvelope<OutputT, ContextT>"));
-    assert!(rendered.contains("provider: PayloadBackedOutput<OutputT>;"));
-    assert!(rendered.contains("scaler: PayloadBackedContext<ContextT>;"));
-    assert!(rendered.contains("support.payloadToValue<OutputT>("));
-    assert!(rendered.contains("support.payloadToValue<ContextT>("));
-    assert!(rendered.contains("return payloadBackedEnvelopeFromProto<OutputT, ContextT>(value)!;"));
-    assert!(
-        rendered.contains("export { payloadBackedEnvelopeTransferTypeConverter } from './models';")
-    );
-    assert!(!rendered.contains("### services.ts"));
-}
-
-#[test]
-fn typescript_proto_oneof_models_convert_required_and_optional_groups() {
-    let root = project_root();
-    let rendered = generate_typescript_to_string(
-        &example_input_paths(&root, "proto-oneof"),
-        &[descriptor_path(&root)],
-    );
-    assert!(rendered.contains("export type OutcomeValue<OutputT>"));
-    assert!(rendered.contains(
-        "support.singleValueFromPayloads<OutputT>(requiredField(proto.success, \"Outcome\", \"success\"))"
-    ));
-    assert!(rendered.contains(
-        "return { value: \"success\" as const, success: support.payloadsToProto([result.value]) };"
-    ));
-    assert!(rendered.contains("missing required field Outcome.value"));
-    assert!(rendered.contains("switch (proto.value)"));
-    assert!(rendered.contains("switch (proto.activity)"));
-    assert!(!rendered.contains("selectOneof"));
-    assert!(!rendered.contains("hasOwn"));
-    assert!(!rendered.contains("Number("));
-    assert!(rendered.contains("if (result == null) return {};"));
-    assert!(
-        rendered.contains("export { pauseActivityRequestTransferTypeConverter } from './models';")
-    );
-    assert!(!rendered.contains("### services.ts"));
+    // Types, exports, and conversion behavior are exercised by the TypeScript
+    // sample tests. Here the contract is the output layout, not source spelling.
+    for example in ["notification-service", "proto-generic", "proto-oneof"] {
+        let files = generate_typescript_files(
+            &example_input_paths(&root, example),
+            &[descriptor_path(&root)],
+        );
+        assert_eq!(
+            files.into_keys().collect::<Vec<_>>(),
+            vec![PathBuf::from("index.ts"), PathBuf::from("models.ts")],
+            "model-only example {example} must not emit service or operation modules",
+        );
+    }
 }
 
 fn unique_output_path(label: &str) -> PathBuf {
