@@ -39,7 +39,6 @@ fn names_language(cell: &str, language: &str) -> bool {
 const PENDING: &[&str] = &[
     "contains.md",
     "contentEncoding.md",
-    "default.md",
     "dependentRequired.md",
     "deprecated.md",
     "description.md",

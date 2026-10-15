@@ -765,6 +765,53 @@ Check.Equal("{\"a\":\"ab\",\"b\":1}", Check.Canonical(Check.Write(new Shape { A 
 }
 
 // ---------------------------------------------------------------------------
+// Materialized formats
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csharp_json_materialized_closed_values_and_defaults_stay_native() {
+    let case = JsonCase::new("materialized-closed");
+    case.write(
+        "closed.yaml",
+        r#"type: object
+additionalProperties: false
+required: [epoch, token]
+properties:
+  epoch: { type: string, format: date, const: "2024-01-01" }
+  token: { type: string, contentEncoding: base64, enum: ["YQ==", "Yg=="] }
+  fallbackDay: { type: string, format: date, default: "2024-02-03" }
+  fallbackBytes: { type: string, contentEncoding: base64, default: "Yw==" }
+  fallbackSpan:
+    oneOf: [{ type: string, format: duration }, { type: "null" }]
+    default: PT1M
+"#,
+    );
+    let output = case.generate(&["closed.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "public global::System.DateOnly FallbackDayOrDefault =>",
+            "public byte[] FallbackBytesOrDefault =>",
+            "public global::System.TimeSpan FallbackSpanOrDefault =>",
+        ],
+    );
+    case.run(
+        r#"var parsed = Check.RoundTrip<Closed>("{\"epoch\":\"2024-01-01\",\"token\":\"YQ==\"}");
+Check.Equal(new System.DateOnly(2024, 1, 1), parsed.Epoch, "date const");
+Check.True(parsed.Token is [(byte)'a'], "bytes enum");
+Check.Equal(new System.DateOnly(2024, 2, 3), parsed.FallbackDayOrDefault, "date default");
+Check.True(parsed.FallbackBytesOrDefault is [(byte)'c'], "bytes default");
+Check.Equal(System.TimeSpan.FromMinutes(1), parsed.FallbackSpanOrDefault, "nullable default");
+Check.ParseFails<Closed>("{\"epoch\":\"2024-01-02\",\"token\":\"Yw==\"}", "epoch: must equal \"2024-01-01\"", "token: must be one of");
+// A const on a materialized type compares canonical wire forms.
+Check.ParseFails<Closed>(
+    "{\"epoch\":\"2024-1-01\",\"token\":\"YQ==\"}",
+    "epoch: must equal \"2024-01-01\"",
+    "epoch: must be a valid date");"#,
+    );
+}
+
+// ---------------------------------------------------------------------------
 // .NET string and equality semantics
 // ---------------------------------------------------------------------------
 
