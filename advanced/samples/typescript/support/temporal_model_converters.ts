@@ -172,6 +172,14 @@ export function payloadsFromProto(proto: temporal.api.common.v1.IPayloads): unkn
   return common.arrayFromPayloads(configuredPayloadConverter(), proto.payloads) ?? [];
 }
 
+/** Decode a generic value carried by a protobuf Payloads message. */
+export function singleValueFromPayloads<T>(proto: temporal.api.common.v1.IPayloads): T {
+  if ((proto.payloads?.length ?? 0) > 1) {
+    throw new Error("expected at most one payload for a generic value");
+  }
+  return payloadsFromProto(proto)[0] as T;
+}
+
 /** Convert one application value to a protobuf payload. */
 export function valueToPayload(value: unknown): common.Payload {
   return configuredPayloadConverter().toPayload(value);

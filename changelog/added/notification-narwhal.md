@@ -1,0 +1,1 @@
+TypeScript generation now supports the notification-service, proto-generic, and proto-oneof WIT examples, including nested generic protobuf payload carriers, required and optional oneofs, and model-only exports with generic transfer converters.

@@ -443,6 +443,88 @@ fn generate_typescript_to_string(input_paths: &[PathBuf], descriptor_paths: &[Pa
     rendered
 }
 
+#[test]
+fn typescript_notification_models_convert_generic_oneofs_without_service() {
+    let root = project_root();
+    let rendered = generate_typescript_to_string(
+        &example_input_paths(&root, "notification-service"),
+        &[descriptor_path(&root)],
+    );
+    assert!(rendered.contains("export interface OnCompleteRequest<OutputT, SourceContextT>"));
+    assert!(rendered.contains("export type OnCompleteRequestResult<OutputT>"));
+    assert!(rendered.contains(
+        "support.payloadToValue<OutputT>(requiredField(proto.success, \"OnCompleteRequest\", \"success\"))"
+    ));
+    assert!(rendered.contains("support.payloadToValue<SourceContextT>("));
+    assert!(rendered.contains(
+        "return { result: \"success\" as const, success: support.valueToPayload(result.value) };"
+    ));
+    assert!(rendered.contains(
+        "return { result: \"failure\" as const, failure: support.failureToProto(result.value) };"
+    ));
+    assert!(rendered.contains("switch (proto.result)"));
+    assert!(!rendered.contains("selectOneof"));
+    assert!(rendered.contains("missing required field OnCompleteRequest.result"));
+    assert!(
+        rendered.contains("return onCompleteRequestFromProto<OutputT, SourceContextT>(value)!;")
+    );
+    assert!(rendered.contains(
+        "export type { OnCompleteRequest, OnCompleteRequestResult, OnCompleteResponse } from './models';"
+    ));
+    assert!(
+        rendered.contains("export { onCompleteRequestTransferTypeConverter } from './models';")
+    );
+    assert!(!rendered.contains("### services.ts"));
+    assert!(!rendered.contains("### operations/"));
+    assert!(!rendered.contains("NotificationServiceClient"));
+}
+
+#[test]
+fn typescript_proto_generic_models_convert_nested_payloads() {
+    let root = project_root();
+    let rendered = generate_typescript_to_string(
+        &example_input_paths(&root, "proto-generic"),
+        &[descriptor_path(&root)],
+    );
+    assert!(rendered.contains("export interface PayloadBackedEnvelope<OutputT, ContextT>"));
+    assert!(rendered.contains("provider: PayloadBackedOutput<OutputT>;"));
+    assert!(rendered.contains("scaler: PayloadBackedContext<ContextT>;"));
+    assert!(rendered.contains("support.payloadToValue<OutputT>("));
+    assert!(rendered.contains("support.payloadToValue<ContextT>("));
+    assert!(rendered.contains("return payloadBackedEnvelopeFromProto<OutputT, ContextT>(value)!;"));
+    assert!(
+        rendered.contains("export { payloadBackedEnvelopeTransferTypeConverter } from './models';")
+    );
+    assert!(!rendered.contains("### services.ts"));
+}
+
+#[test]
+fn typescript_proto_oneof_models_convert_required_and_optional_groups() {
+    let root = project_root();
+    let rendered = generate_typescript_to_string(
+        &example_input_paths(&root, "proto-oneof"),
+        &[descriptor_path(&root)],
+    );
+    assert!(rendered.contains("export type OutcomeValue<OutputT>"));
+    assert!(rendered.contains(
+        "support.singleValueFromPayloads<OutputT>(requiredField(proto.success, \"Outcome\", \"success\"))"
+    ));
+    assert!(rendered.contains(
+        "return { value: \"success\" as const, success: support.payloadsToProto([result.value]) };"
+    ));
+    assert!(rendered.contains("missing required field Outcome.value"));
+    assert!(rendered.contains("switch (proto.value)"));
+    assert!(rendered.contains("switch (proto.activity)"));
+    assert!(!rendered.contains("selectOneof"));
+    assert!(!rendered.contains("hasOwn"));
+    assert!(!rendered.contains("Number("));
+    assert!(rendered.contains("if (result == null) return {};"));
+    assert!(
+        rendered.contains("export { pauseActivityRequestTransferTypeConverter } from './models';")
+    );
+    assert!(!rendered.contains("### services.ts"));
+}
+
 fn unique_output_path(label: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

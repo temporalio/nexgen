@@ -1,11 +1,12 @@
 import { fileURLToPath } from "node:url";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import * as workflow from "@temporalio/workflow";
 import * as nexus from "nexus-rpc";
 
 import { signalWithStartWorkflow } from "../wit/workflow-service/index.ts";
 import type { SignalWithStartWorkflowRequest } from "../wit/workflow-service/index.ts";
 import { workflowService } from "../wit/workflow-service/services.ts";
+import { signalWithStartWorkflowRequestTransferTypeConverter as requestConverter } from "../wit/workflow-service/models.ts";
 import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts";
 
 const workflowsPath = fileURLToPath(
@@ -101,6 +102,17 @@ if (false) {
     staticDetails: "Workflow details",
     namespace: "default",
   };
+
+  const wire = requestConverter.toTransferType(request);
+  const decoded = requestConverter.fromTransferType<
+    typeof exampleWorkflow,
+    typeof wakeUpSignal
+  >(wire);
+  expectTypeOf(decoded).toEqualTypeOf<
+    SignalWithStartWorkflowRequest<typeof exampleWorkflow, typeof wakeUpSignal>
+  >();
+  expectTypeOf(decoded.workflow).toEqualTypeOf<string | typeof exampleWorkflow>();
+  expectTypeOf(decoded.signal).toEqualTypeOf<string | typeof wakeUpSignal>();
 
   // @ts-expect-error flattened user metadata fields should be strings
   request.staticSummary = 7;

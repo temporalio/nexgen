@@ -113,33 +113,36 @@ fn generate(language: Language, path: &Path) -> nexgen::error::Result<String> {
 }
 
 #[test]
-fn unsupported_backend_rejects_reachable_oneof_conversion() {
+fn typescript_converts_reachable_oneof() {
     let temp = tempfile::tempdir().unwrap();
     let path = write_fixture(temp.path(), true, false, true);
-    let error = generate(Language::TypeScript, &path).unwrap_err();
+    let output = generate(Language::TypeScript, &path).unwrap();
+    assert!(output.contains(
+        "case \"id\": return { tag: \"id\", value: requiredField(proto.id, \"PauseActivityRequest\", \"id\") };"
+    ));
     assert!(
-        error
-            .to_string()
-            .contains("typescript protobuf conversion does not yet support oneof group"),
-        "{error}"
+        output
+            .contains("case \"type\": return { activity: \"type\" as const, type: result.value };")
     );
+    assert!(output.contains("if (result == null) return {};"));
+    assert!(output.contains("switch (proto.activity)"));
+    assert!(output.contains("case undefined: return undefined;"));
+    assert!(output.contains("invalid oneof discriminator for PauseActivityRequest.activity"));
+    assert!(!output.contains("selectOneof"));
+    assert!(!output.contains("hasOwn"));
 }
 
 #[test]
-fn unsupported_backend_rejects_operation_free_exported_oneof() {
+fn typescript_converts_operation_free_exported_oneof() {
     let temp = tempfile::tempdir().unwrap();
     let path = write_fixture(temp.path(), false, false, true);
-    let error = generate(Language::TypeScript, &path).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("typescript protobuf conversion does not yet support oneof group"),
-        "{error}"
-    );
+    let output = generate(Language::TypeScript, &path).unwrap();
+    assert!(output.contains("switch (result.tag)"));
+    assert!(output.contains("pauseActivityRequestTransferTypeConverter"));
 }
 
 #[test]
-fn unsupported_backend_allows_omitted_or_unreachable_oneofs() {
+fn typescript_allows_omitted_or_unreachable_oneofs() {
     let temp = tempfile::tempdir().unwrap();
     let omitted = write_fixture(temp.path(), true, true, true);
     generate(Language::TypeScript, &omitted).unwrap();
@@ -149,16 +152,17 @@ fn unsupported_backend_allows_omitted_or_unreachable_oneofs() {
 }
 
 #[test]
-fn unsupported_backend_rejects_reachable_generic_proto_carrier() {
+fn typescript_converts_reachable_generic_proto_carrier() {
     let temp = tempfile::tempdir().unwrap();
     let path = write_generic_carrier_fixture(temp.path());
-    let error = generate(Language::TypeScript, &path).unwrap_err();
+    let output = generate(Language::TypeScript, &path).unwrap();
     assert!(
-        error
-            .to_string()
-            .contains("typescript protobuf conversion does not yet support generic carrier"),
-        "{error}"
+        output.contains("support.singleValueFromPayloads<InputT>"),
+        "{output}"
     );
+    assert!(output.contains("support.payloadsToProto(["));
+    assert!(output.contains("fromTransferType<"));
+    assert!(output.contains("return genericRequestFromProto<InputT>(value)!;"));
 }
 
 #[test]

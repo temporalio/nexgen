@@ -483,14 +483,38 @@ function signalWithStartWorkflowRequestToProto<
 }
 
 export const signalWithStartWorkflowRequestTransferTypeConverter = {
-  fromTransferType(
+  fromTransferType<
+    WorkflowFn extends (...args: any[]) => Promise<any> = (
+      ...args: any[]
+    ) => Promise<any>,
+    SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
+    SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
+      infer Args extends any[],
+      any
+    >
+      ? Args
+      : never,
+  >(
     value: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest,
-  ): SignalWithStartWorkflowRequest {
-    return signalWithStartWorkflowRequestFromProto(value)!;
+  ): SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs> {
+    return signalWithStartWorkflowRequestFromProto<WorkflowFn, SignalValue, SignalArgs>(
+      value,
+    )!;
   },
 
-  toTransferType(
-    value: SignalWithStartWorkflowRequest,
+  toTransferType<
+    WorkflowFn extends (...args: any[]) => Promise<any> = (
+      ...args: any[]
+    ) => Promise<any>,
+    SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
+    SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
+      infer Args extends any[],
+      any
+    >
+      ? Args
+      : never,
+  >(
+    value: SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs>,
   ): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest {
     return signalWithStartWorkflowRequestToProto(value) ?? {};
   },

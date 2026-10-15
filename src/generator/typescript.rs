@@ -845,6 +845,57 @@ impl<'a> ApiPlanner<'a> {
         let generated_field_name = typescript_generated_field_name(&field.name);
         let wire_field_name = typescript_generated_field_name(field_name);
         let wire_field_expr = format!("{WIRE_VALUE_EXPR}.{wire_field_name}");
+        if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
+            &field.data.wire_binding
+        {
+            let PlannedType::Variant(variant_type) = field.field_type.validation_type() else {
+                unreachable!("oneof binding requires a variant");
+            };
+            let variant = self
+                .api_plan
+                .variant(&variant_type.full_name)
+                .unwrap()
+                .clone();
+            let resolved = self.resolve_planned_value_type(&field.field_type);
+            let mut requirements = resolved.requirements;
+            let mut cases = Vec::new();
+            for (case, member) in variant.cases.iter().zip(members) {
+                let payload = case
+                    .payload
+                    .as_ref()
+                    .expect("proto oneof cases have payloads");
+                let value = self.resolve_proto_field_type(payload, &member.wire_type);
+                requirements.merge(&value.requirements);
+                cases.push(typescript_proto::OneofCase {
+                    tag: case.name.clone(),
+                    wire_name: typescript_generated_field_name(&member.wire_name),
+                    conversion: value.wire_conversion,
+                });
+            }
+            let (from_wire_expr, to_wire_expr) = typescript_proto::oneof_expressions(
+                &record.name,
+                &generated_field_name,
+                &typescript_generated_field_name(wire_name),
+                &resolved.annotation,
+                field.required,
+                &cases,
+            );
+            return RenderedField {
+                name: generated_field_name,
+                wire_name: wire_field_name,
+                annotation: resolved.annotation,
+                doc: field
+                    .doc
+                    .as_ref()
+                    .and_then(|doc| doc.value())
+                    .map(str::to_string),
+                optional: !field.required,
+                from_wire_expr,
+                to_wire_expr,
+                flattened_fields: Vec::new(),
+                requirements,
+            };
+        }
         self.build_field_with_wire_expr(
             record,
             field_name,
@@ -896,6 +947,48 @@ impl<'a> ApiPlanner<'a> {
             PlannedType::Map(_, _) => unreachable!("handled above"),
             value => (self.resolve_planned_value_type(value), false),
         };
+        if let Some(PlannedWireFieldBinding::Value { wire_type, .. }) = &field.data.wire_binding
+            && let Some(conversion) = typescript_proto::generic_carrier_conversion(
+                &field.field_type,
+                wire_type,
+                &resolved_type.annotation,
+            )
+        {
+            // Required presence applies to the envelope. A generic application
+            // value can itself be null or undefined.
+            let value_expr = format!("model.{generated_field_name}");
+            let from_wire_expr = if field.required {
+                conversion.from_wire_expr(&required_field_expr(
+                    wire_field_expr,
+                    &record.name,
+                    generated_field_name,
+                ))
+            } else {
+                format!(
+                    "{wire_field_expr} == null ? undefined : {}",
+                    conversion.from_wire_expr(wire_field_expr)
+                )
+            };
+            let to_wire_expr = if field.required {
+                conversion.to_wire_expr(&value_expr)
+            } else {
+                format!(
+                    "{value_expr} == null ? undefined : {}",
+                    conversion.to_wire_expr(&value_expr)
+                )
+            };
+            return RenderedField {
+                name: generated_field_name.to_string(),
+                wire_name: wire_field_name.to_string(),
+                annotation: Self::typescript_field_annotation(field, resolved_type.annotation),
+                doc,
+                optional: !field.required,
+                from_wire_expr,
+                to_wire_expr,
+                flattened_fields: Vec::new(),
+                requirements: resolved_type.requirements,
+            };
+        }
         let owner_name = record.name.clone();
 
         if !repeated
@@ -1130,6 +1223,21 @@ impl<'a> ApiPlanner<'a> {
             flattened_fields: Vec::new(),
             requirements: resolved_type.requirements,
         }
+    }
+
+    fn resolve_proto_field_type(
+        &mut self,
+        api_type: &PlannedType,
+        wire_type: &PlannedType,
+    ) -> ResolvedFieldType {
+        let mut resolved = self.resolve_planned_value_type(api_type);
+        if let Some(conversion) =
+            typescript_proto::generic_carrier_conversion(api_type, wire_type, &resolved.annotation)
+        {
+            resolved.kind = ResolvedFieldKind::Message;
+            resolved.wire_conversion = Some(conversion);
+        }
+        resolved
     }
 
     fn build_flattened_message_field(
@@ -3177,14 +3285,27 @@ fn render_module_files(
     // barrel re-exporting a file with no exports, which TypeScript rejects
     // outright (TS2306, "is not a module").
     let has_models_module = !is_blank_generated_module(&models_source);
+    let mut index_model_names = model_fragments.type_exported_names.clone();
+    index_model_names.extend(enums.iter().map(|item| item.name.clone()));
+    index_model_names.extend(flags.iter().map(|item| item.name.clone()));
+    index_model_names.extend(variants.iter().map(|item| item.name.clone()));
+    index_model_names.extend(models.iter().map(|item| item.name.clone()));
+    let mut index_exports = rendered_support.root_exports.clone();
+    if services.is_empty() {
+        for model in models
+            .iter()
+            .filter(|model| model.wire_function_names.is_some())
+        {
+            index_exports.push(format!(
+                "export {{ {}TransferTypeConverter }} from './models';",
+                model.name.to_lower_camel_case()
+            ));
+        }
+    }
     files.insert(
         "index.ts",
         if mode == GenerationMode::NativeApi {
-            render_index_module(
-                services,
-                &model_fragments.type_exported_names,
-                &rendered_support.root_exports,
-            )
+            render_index_module(services, &index_model_names, &index_exports)
         } else {
             render_definitions_only_index_module(
                 services,
