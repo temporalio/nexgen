@@ -44,7 +44,7 @@ Loader behavior:
 - **Over an `integer` position the bound MUST be integer-valued.** `maximum:5.0`
   is accepted (≡ `5`, honoring the `1.0`-as-integer rule from [[type]]);
   `maximum:5.5` is **rejected** with a fix-it ("use an integer bound, or make
-  the position `number`"). An integer bound lets all four languages compare
+  the position `number`"). An integer bound lets all five languages compare
   against one integer value with no float/round ambiguity. **The rule is keyed
   on the kind of the value being bounded, not on the node the bound is written
   on.** Where the two differ — a [[contains]] matcher declaring `type: number`
@@ -96,6 +96,7 @@ in both directions (a pure predicate over the decoded value — the
 | TypeScript | ``if (v > max) push(Violation{path, reason: `must be <= ${max}, got ${v}`})``, throw one `PayloadValidationError` application failure. `number` covers both `integer` and `number` fields; `max` is an emitted numeric constant.                                                                                                                                                                                                                                                                               |
 | Python     | An explicit comparison in the transfer type converter (PRINCIPLES Python §3): `if v > max: violations.append(Violation(path=…, reason=f"must be <= {max}, got {v}"))`, aggregated into the single generated `PayloadValidationError` application failure. On an `integer` field it runs **after** `_parse_spec_integer` has normalized the wire value (`5.0`→`5`, see [[type]]), so the comparison is against a Python `int`. `max` is an inlined numeric literal.                                             |
 | Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the field node via the [[type]] `SpecNumbers` helper, then checks `v > max` (integer field: `long` vs `long`; number field: `double` vs `double`), pushing a `Violation{path, "must be <= " + max + ", got " + v}` into the single `PayloadValidationError` application failure. **Not** bean-validation `@Max` — the check is hand-written in the collecting deserializer like every other constraint.                                        |
+| C#         | `Converter.Parse` reads the value via `SpecJson.SpecLong`/`SpecDouble`, then checks `v > max` (`long`/`double`), recording `Violation{path, "must be <= " + max + ", got " + v}` into the single `PayloadValidationError` application failure; `Validate` repeats the check before writing.                                                                                                                                                                                                                    |
 
 **Informative `reason` strings.** The `Violation` `reason` is *not* a bare
 keyword tag (`"maximum"`); it states the
@@ -103,7 +104,7 @@ keyword tag (`"maximum"`); it states the
 aggregated error tells the caller exactly which limit was crossed and by what.
 The bound is an emitted compile-time constant; the actual value is interpolated
 at runtime. This matches [[type]]'s descriptive style (`expected integer`,
-`exceeds cap`). All four targets hand-build the string from the emitted bound
+`exceeds cap`). All five targets hand-build the string from the emitted bound
 and the runtime value. The rest of the numeric family ([[minimum]],
 [[exclusiveMaximum]], [[exclusiveMinimum]], [[multipleOf]]) follows the same
 convention with its own operator/word.

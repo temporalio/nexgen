@@ -50,7 +50,6 @@ const PENDING: &[&str] = &[
     "maxItems.md",
     "maxLength.md",
     "maxProperties.md",
-    "maximum.md",
     "minContains.md",
     "minItems.md",
     "minLength.md",
