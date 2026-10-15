@@ -204,7 +204,7 @@ referencing file does not restate.
 
 **Collision.** For Go, TypeScript and Python all type names occupy
 **one package-wide namespace** — Go flattens to a single package, and the
-TypeScript and Python barrels re-aggregate every module into one. Java and .NET
+TypeScript and Python barrels re-aggregate every module into one. Java and C#
 resolve per module instead, so there the namespace is the module
 ([[generated-file-layout]]). A collision → **load reject, no mangling**; the
 escape hatch is `x-<lang>-name` (**P15**, scope widened from per-object to
@@ -279,6 +279,7 @@ files is the cross-file SCC that hoists to `_recursive.py` (Python only — see
 | -------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Go**         | pointer `*T` (even when required + non-nullable) | a bare recursive `T` is an infinitely-sized struct (compile error); `[]T`/`map[string]T` already carry indirection                                                                                               |
 | **Java**       | bare reference                                   | object fields are references already; recursion is free                                                                                                                                                          |
+| **C#**         | bare reference                                   | record members are references already; recursion is free                                                                                                                                                         |
 | **TypeScript** | bare reference                                   | interfaces reference themselves/each other freely                                                                                                                                                                |
 | **Python**     | bare reference                                   | `from __future__ import annotations` makes every annotation a string that is never evaluated, so a dataclass references itself and its cycle peers freely; the emitted order is topological only for readability |
 
@@ -328,6 +329,7 @@ language supports an alias declaration it is emitted as one:
 | **TypeScript** | `export type A = Main`                                                                                           |
 | **Python**     | `A = Main` (module-level alias)                                                                                  |
 | **Java**       | **no alias** — every reference to the bare-ref schema resolves directly to the target `Main`; no synthesized `A` |
+| **C#**         | **no alias** — every reference to the bare-ref schema resolves directly to the target `Main`; no synthesized `A` |
 
 The Java asymmetry is cosmetic and *safe by construction*: since `A` is nothing
 but another name for `Main`, collapsing all references to `Main` yields one

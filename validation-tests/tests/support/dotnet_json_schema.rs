@@ -24,7 +24,7 @@ use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
 use crate::support::common;
-use crate::support::csharp_json_case::{JsonCase, assert_has};
+use crate::support::csharp_json_case::{JsonCase, assert_has, assert_lacks};
 
 fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -614,6 +614,46 @@ Check.Equal(new System.DateOnly(2024, 2, 29), dates.AdditionalProperties["due"][
 }
 
 #[test]
+fn csharp_json_repaths_nested_violations_on_serialize() {
+    let case = JsonCase::new("nested-paths");
+    case.write(
+        "nested_path.yaml",
+        r##"type: object
+required: [address]
+properties:
+  address: { $ref: "#/$defs/Addr" }
+  addresses: { type: array, items: { $ref: "#/$defs/Addr" } }
+  byName: { type: object, additionalProperties: { $ref: "#/$defs/Addr" } }
+  label: { type: string, minLength: 4 }
+$defs:
+  Addr:
+    type: object
+    properties: { zip: { type: string, minLength: 5 } }
+"##,
+    );
+    case.generate(&["nested_path.yaml"]);
+    case.run(
+        r#"Check.WriteFails(
+    new NestedPath
+    {
+        Address = new Addr { Zip = "1" },
+        Addresses = new[] { new Addr { Zip = "12345" }, new Addr { Zip = "2" } },
+        ByName = new NestedPathByName { AdditionalProperties = new System.Collections.Generic.Dictionary<string, Addr> { ["home"] = new Addr { Zip = "3" } } },
+        Label = "abc",
+    },
+    "address.zip: must have length >= 5",
+    "addresses[1].zip: must have length >= 5",
+    "byName.home.zip: must have length >= 5",
+    "label: must have length >= 4");
+Check.WriteFails(new NestedPath { Address = null! }, "address: required");
+Check.ParseFails<NestedPath>(
+    "{\"address\":{\"zip\":\"1\"},\"addresses\":[{\"zip\":2}]}",
+    "address.zip: must have length >= 5",
+    "addresses[0].zip: ");"#,
+    );
+}
+
+#[test]
 fn csharp_json_duplicate_keys_keep_the_last_occurrence() {
     let case = JsonCase::new("duplicate-keys");
     case.write(
@@ -759,8 +799,113 @@ Check.True(left != Check.Parse<Equality>("{\"blob\":\"AQI=\",\"tags\":[\"a\"],\"
 }
 
 // ---------------------------------------------------------------------------
+// Modules, namespaces and references
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csharp_json_bare_ref_aliases_collapse_to_the_target_type() {
+    let case = JsonCase::new("bare-ref-alias");
+    common::write_bare_ref_alias_closure(&case.root);
+    let output = case.generate_native(&["."]);
+    let all = output.all();
+    // Neither the file-root alias nor the `$ref: "#"` definition is a type.
+    assert_lacks(
+        &all,
+        &["record Alternate", "record Mirror", "interface Alternate"],
+    );
+    assert_has(
+        output.file("service/Services.cs"),
+        &["global::Probe.Target.Main.Main Echo(global::Probe.Target.Main.Main request);"],
+    );
+    assert_has(
+        output.file("service/Models.cs"),
+        &["public required global::Probe.Target.Main.Main Item { get; init; }"],
+    );
+    case.run_with_usings(
+        &["Probe.Service"],
+        r#"Check.RoundTrip<Holder>("{\"item\":{\"value\":\"ok\"}}");
+Check.ParseFails<Holder>("{\"item\":{}}", "item.value: required");"#,
+    );
+}
+
+#[test]
+fn csharp_json_same_module_alias_chain_resolves_to_the_target() {
+    let case = JsonCase::new("alias-chain");
+    case.write(
+        "chain.yaml",
+        r##"type: object
+additionalProperties: false
+required: [item, longItem]
+properties:
+  item: { $ref: "#/$defs/A" }
+  longItem: { $ref: "#/$defs/LongA" }
+$defs:
+  A: { $ref: "#/$defs/Z" }
+  Z: { $ref: "#/$defs/Target" }
+  LongA: { $ref: "#/$defs/LongM" }
+  LongM: { $ref: "#/$defs/LongZ" }
+  LongZ: { $ref: "#/$defs/Target" }
+  Target:
+    type: object
+    additionalProperties: false
+    required: [value]
+    properties: { value: { type: string } }
+"##,
+    );
+    let output = case.generate(&["chain.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "public required Target Item { get; init; }",
+            "public required Target LongItem { get; init; }",
+        ],
+    );
+    case.run(
+        r#"Check.RoundTrip<Chain>("{\"item\":{\"value\":\"a\"},\"longItem\":{\"value\":\"b\"}}");
+Check.ParseFails<Chain>("{\"item\":{},\"longItem\":{\"value\":\"b\"}}", "item.value: required");"#,
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------
+
+/// A recursive type whose cycle crosses files, through `$defs` keys that need
+/// JSON Pointer escaping.
+#[test]
+fn csharp_json_cross_file_cycles_resolve() {
+    let case = JsonCase::new("cross-file-cycle");
+    case.write(
+        "a.yaml",
+        r##"$defs:
+  "a~1b":
+    type: object
+    properties:
+      label: { type: string, minLength: 1 }
+      link: { $ref: "b.yaml#/$defs/Bee" }
+"##,
+    )
+    .write(
+        "b.yaml",
+        r##"$defs:
+  Bee:
+    type: object
+    properties:
+      back: { $ref: "a.yaml#/$defs/a~01b" }
+      children: { type: array, items: { $ref: "#/$defs/Bee" } }
+"##,
+    );
+    let output = case.generate(&["."]);
+    assert_has(output.file("a/Models.cs"), &["public sealed record A1b\n"]);
+    case.run_with_usings(
+        &["Probe.A", "Probe.B"],
+        r#"var parsed = Check.RoundTrip<A1b>("{\"label\":\"x\",\"link\":{\"back\":{\"label\":\"y\"},\"children\":[{\"children\":[]}]}}");
+Check.Equal("y", parsed.Link!.Back!.Label, "cycle");
+Check.ParseFails<A1b>("{\"link\":{\"back\":{\"label\":\"\"},\"children\":[{\"back\":{\"label\":\"\"}}]}}",
+    "link.back.label: must have length >= 1",
+    "link.children[0].back.label: must have length >= 1");"#,
+    );
+}
 
 /// Member names that spell the locals and parameters a converter binds.
 #[test]
