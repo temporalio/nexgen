@@ -275,6 +275,7 @@ fn csharp_json_inert_annotations_change_nothing() {
     let plain = generate("type: object\nproperties:\n  a: { type: string, description: Shown. }\n");
     for annotated in [
         "type: object\n$comment: \"TODO: tighten\"\nproperties:\n  a: { type: string, description: Shown., $comment: internal }\n",
+        "type: object\nproperties:\n  a: { type: string, description: Shown., examples: [x, { $ref: missing.yaml }] }\n",
     ] {
         assert_eq!(generate(annotated), plain, "{annotated}");
     }
