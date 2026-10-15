@@ -558,6 +558,21 @@ Check.WriteFails(new Numbers { Count = -(1L << 53) }, "count: exceeds ±(2^53-1)
     );
 }
 
+#[test]
+fn csharp_json_minimum_is_inclusive_in_both_directions() {
+    let case = JsonCase::new("minimum");
+    case.write(
+        "floor.yaml",
+        "type: object\nproperties:\n  count: { type: integer, minimum: 1 }\n  ratio: { type: number, minimum: 0.5 }\n",
+    );
+    case.generate(&["floor.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Floor>("{\"count\":1,\"ratio\":0.5}");
+Check.ParseFails<Floor>("{\"count\":0,\"ratio\":0.25}", "count: must be >= 1, got 0", "ratio: must be >= 0.5, got 0.25");
+Check.WriteFails(new Floor { Count = 0, Ratio = 0.25 }, "count: must be >= 1, got 0", "ratio: must be >= 0.5, got 0.25");"#,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
