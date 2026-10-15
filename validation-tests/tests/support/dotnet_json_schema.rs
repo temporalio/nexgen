@@ -849,6 +849,33 @@ Check.ParseFails<AssertionOnly>("{\"contacts\":[\"nope\"]}", "contacts[0]: must 
     );
 }
 
+#[test]
+fn csharp_json_union_alias_keeps_its_title_and_deprecation() {
+    let case = JsonCase::new("union-alias-docs");
+    case.write(
+        "doc.yaml",
+        r##"type: object
+properties:
+  u: { $ref: "#/$defs/U" }
+$defs:
+  U:
+    title: UNION TITLE
+    description: UNION BODY
+    deprecated: true
+    oneOf: [{ type: string }, { type: integer }]
+"##,
+    );
+    let output = case.generate(&["doc.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "    /// <summary>\n    /// UNION TITLE\n    /// <para/>\n    /// UNION BODY\n    /// </summary>\n    [global::System.Obsolete]\n",
+            "    public interface U\n",
+        ],
+    );
+    case.build();
+}
+
 // ---------------------------------------------------------------------------
 // Presence, nullability and defaults
 // ---------------------------------------------------------------------------
