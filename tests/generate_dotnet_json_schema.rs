@@ -263,6 +263,23 @@ fn csharp_json_title_leads_the_summary() {
     assert_lacks(models, &["RegisteredUser"]);
 }
 
+/// An annotation the loader accepts and drops leaves the C# output exactly as
+/// the schema generates without it, so none can leak into a doc comment.
+#[test]
+fn csharp_json_inert_annotations_change_nothing() {
+    let generate = |schema: &str| {
+        let case = JsonCase::new("inert-annotation");
+        case.write("model.yaml", schema);
+        case.generate(&["model.yaml"]).all()
+    };
+    let plain = generate("type: object\nproperties:\n  a: { type: string, description: Shown. }\n");
+    for annotated in [
+        "type: object\n$comment: \"TODO: tighten\"\nproperties:\n  a: { type: string, description: Shown., $comment: internal }\n",
+    ] {
+        assert_eq!(generate(annotated), plain, "{annotated}");
+    }
+}
+
 /// A keyword the shared loader refuses (P6 / P7.1) fails a C# generation
 /// before anything is emitted, so C# never approximates it.
 #[test]
