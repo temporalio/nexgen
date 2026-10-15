@@ -44,14 +44,15 @@ The definitions-mode JSON-Schema samples (plain data models) live under
 
 The notification-service example uses the SDK namespace
 `temporal.api.notificationservice.v1`. Until the TypeScript SDK exports these
-models, [`support/notification-service-proto.d.ts`](support/notification-service-proto.d.ts)
+models,
+[`support/notification-service-proto.d.ts`](support/notification-service-proto.d.ts)
 supplies sample-only interface declarations matching the checked-in descriptor.
 Remove this file and update the SDK dependency **before landing this change**.
 The generator has no fallback types or notification-specific logic.
 
 The notification tests exercise conversion of plain wire objects, including
-generic payloads, failure details, and oneof validation. They do not yet exercise
-notification protobuf binary encoding or SDK message constructors.
+generic payloads, failure details, and oneof validation. They do not yet
+exercise notification protobuf binary encoding or SDK message constructors.
 
 The `proto-generic` and `proto-oneof` samples use the SDK's existing protobuf
 models without a shim. Their tests include binary encode/decode round-trips,
@@ -60,19 +61,19 @@ presence (including an explicitly selected empty string).
 
 ## Using a support module
 
-In your own project, keep hand-written helpers **outside the directory passed
-to `--output`** and export the functions generated code calls. Supply either
-an installed package specifier or a module specifier **relative to that output
-directory**, not relative to the shell's working directory or a nested
-generated file. Nexgen adjusts relative paths for nested
-`operations/*.ts` and imports the module as `support`.
+In your own project, keep hand-written helpers
+**outside the directory passed to `--output`** and export the functions
+generated code calls. Supply either an installed package specifier or a module
+specifier **relative to that output directory**, not relative to the shell's
+working directory or a nested generated file. Nexgen adjusts relative paths for
+nested `operations/*.ts` and imports the module as `support`.
 
 For example, this repository exports `retryPolicyToProto` and
 `durationFromProto` from
 [`support/temporal_model_converters.ts`](support/temporal_model_converters.ts),
 outside the generated `wit/<example>/` directories. The module is
-`../../support/temporal_model_converters` relative to its
-`wit/type-roundtrip` output directory:
+`../../support/temporal_model_converters` relative to its `wit/type-roundtrip`
+output directory:
 
 ```sh
 cargo run --features advanced -- typescript advanced/samples/inputs/type-roundtrip.wit \
@@ -84,6 +85,6 @@ cargo run --features advanced -- typescript advanced/samples/inputs/type-roundtr
 
 Include both your authored module and generated output in your TypeScript
 project so the import resolves. The sample's [`tsconfig.json`](tsconfig.json)
-does so; from this directory, run `npm run typecheck` and `npm run test`.
-For derived helper names and sourced expression imports, see
+does so; from this directory, run `npm run typecheck` and `npm run test`. For
+derived helper names and sourced expression imports, see
 [the WIT guide](../../../GUIDE.md#typescript).

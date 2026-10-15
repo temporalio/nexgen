@@ -1,0 +1,32 @@
+# Markdown formatting for human-authored docs. Run `cargo fmt-markdown` to
+# rewrap; `cargo validate markdown` checks formatting in CI.
+
+[global]
+# Only enforce line wrapping and table alignment; other markdownlint-style
+# rules are out of scope.
+enable = ["MD013", "MD060"]
+line-length = 80
+cache = false
+exclude = [
+    # Assembled from changelog fragments by the release tooling.
+    "CHANGELOG.md",
+    # Each nonempty line in a fragment is a separate changelog item, so
+    # fragments must not be wrapped.
+    "changelog/*/*.md",
+]
+
+[MD013]
+reflow = true
+# Rejoin and rewrap whole paragraphs so edited text can simply be reformatted.
+reflow-mode = "normalize"
+code-blocks = false
+# Long inline code spans cannot be wrapped; do not flag lines they push past
+# the limit.
+code-spans = false
+headings = false
+# Tables are aligned by MD060 instead of wrapped.
+tables = false
+
+[MD060]
+enabled = true
+style = "aligned"

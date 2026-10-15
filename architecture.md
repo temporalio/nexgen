@@ -1,7 +1,7 @@
 # Compiler architecture
 
-`nexgen` turns WIT or JSON Schema input into language-specific source files.
-The long-term design keeps one structural API-spec graph throughout the compiler:
+`nexgen` turns WIT or JSON Schema input into language-specific source files. The
+long-term design keeps one structural API-spec graph throughout the compiler:
 `ApiSpec<F>`. A type family `F` changes the metadata attached to otherwise
 equivalent services, operations, fields, and type references as passes enrich
 the graph.
@@ -97,7 +97,8 @@ flowchart LR
   constraints.
 - `LanguageSelectionPass` selects the target-language values from authored
   language maps.
-- `SelectedValidationPass` validates the selected generic surface after selection.
+- `SelectedValidationPass` validates the selected generic surface after
+  selection.
 - `ResourceResolutionPass` resolves resource-method and resource-return facts
   from the API spec and descriptors.
 - `OperationBindingPass` attaches resolved resource facts to their owning

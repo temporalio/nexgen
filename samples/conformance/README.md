@@ -1,11 +1,11 @@
 # JSON Schema conformance manifest
 
-`json-schema.json` is the language-neutral statement of P1: *a value one target
-accepts round-trips through any other unchanged.* It is **executed**, not just
-described — `tests/json_schema_conformance_manifest.rs` generates every case
-into Go, Java, Python and TypeScript, pushes every declared wire value through
-the generated code of all four, and requires the verdicts to agree with the
-manifest and with each other.
+`json-schema.json` is the language-neutral statement of P1:
+*a value one target accepts round-trips through any other unchanged.* It is
+**executed**, not just described — `tests/json_schema_conformance_manifest.rs`
+generates every case into Go, Java, Python and TypeScript, pushes every declared
+wire value through the generated code of all four, and requires the verdicts to
+agree with the manifest and with each other.
 
 ## Layout
 
@@ -21,19 +21,19 @@ convention is only total for those names.
 
 ## A case
 
-| field | meaning |
-|---|---|
-| `id` | stable, lowercase kebab-case |
-| `intent` | what the case pins, in prose |
-| `schemas` | ordered repository-relative schema paths; multiple entries exercise cross-file `$ref` generation |
-| `model` | the generated model every wire value is driven through |
-| `expected_load` | `accepted`, or `rejected` with the `diagnostic` substring and load-phase `covers` claims |
-| `accepted_wire_values` | `fixture` or `wire_json`, optional native `mutations`, optional `expected_wire`, and round-trip/serialize `covers` claims |
-| `parse_failures` | `wire_json` + `expected_paths` + parse-phase `covers` claims |
-| `serialize_failures` | `from_wire`/`from_fixture` + native `mutations` + `expected_paths` + serialize-phase `covers` claims |
-| `permitted_presence_nullability_collapse` | the **closed** list of members allowed to change presence on the way out |
-| `expected_divergence` | the findings a case still reproduces (see below) |
-| `consumers` | optional; a hand-written per-language test that also covers the case |
+| field                                     | meaning                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                      | stable, lowercase kebab-case                                                                                              |
+| `intent`                                  | what the case pins, in prose                                                                                              |
+| `schemas`                                 | ordered repository-relative schema paths; multiple entries exercise cross-file `$ref` generation                          |
+| `model`                                   | the generated model every wire value is driven through                                                                    |
+| `expected_load`                           | `accepted`, or `rejected` with the `diagnostic` substring and load-phase `covers` claims                                  |
+| `accepted_wire_values`                    | `fixture` or `wire_json`, optional native `mutations`, optional `expected_wire`, and round-trip/serialize `covers` claims |
+| `parse_failures`                          | `wire_json` + `expected_paths` + parse-phase `covers` claims                                                              |
+| `serialize_failures`                      | `from_wire`/`from_fixture` + native `mutations` + `expected_paths` + serialize-phase `covers` claims                      |
+| `permitted_presence_nullability_collapse` | the **closed** list of members allowed to change presence on the way out                                                  |
+| `expected_divergence`                     | the findings a case still reproduces (see below)                                                                          |
+| `consumers`                               | optional; a hand-written per-language test that also covers the case                                                      |
 
 Failures compare **paths**, never reason text: P11 leaves the wording
 target-idiomatic. A **load** verdict may legitimately differ per target — P15
@@ -41,12 +41,13 @@ scopes identifier validity to the emitted language, so a member named `validate`
 is rejected for Go and accepted for the other three
 (`features/properties.md:132-144`). What may never differ is the accepted and
 rejected **wire** value set. `tests/json_schema_probe_matrix.rs` declares the
-former with a `ScopedLoad` row rather than treating it as a finding. Round-trip comparison is member-by-member — presence (absent /
-explicit null / present) is exact, and numbers compare by mathematical value with
-`-0` kept distinct from `0`.
+former with a `ScopedLoad` row rather than treating it as a finding. Round-trip
+comparison is member-by-member — presence (absent / explicit null / present) is
+exact, and numbers compare by mathematical value with `-0` kept distinct from
+`0`.
 
-Rejected manifest cases are generated for every base target and must produce
-the declared diagnostic in all four. The probe matrix remains the owner of
+Rejected manifest cases are generated for every base target and must produce the
+declared diagnostic in all four. The probe matrix remains the owner of
 legitimate language-specific identifier rejections.
 
 ### Coverage declarations
@@ -122,20 +123,20 @@ Use a `new:<slug>` finding id for a divergence this driver measured first.
 workspace by `tests/toolchain/mod.rs`; nothing is generated into the committed
 samples, which are golden snapshots.
 
-| runner | how it reaches the model |
-|---|---|
-| `runner.go` | a generated `registry.go` maps a case to a `reflect.Type` (Go cannot look a type up by name), then reflection |
-| `Runner.java` | `Class.forName` + Jackson, configured like Temporal's default converter |
-| `runner.py` | `importlib` + the registered `TransferTypeConverter` |
+| runner           | how it reaches the model                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runner.go`      | a generated `registry.go` maps a case to a `reflect.Type` (Go cannot look a type up by name), then reflection                                                             |
+| `Runner.java`    | `Class.forName` + Jackson, configured like Temporal's default converter                                                                                                   |
+| `runner.py`      | `importlib` + the registered `TransferTypeConverter`                                                                                                                      |
 | `runner.test.ts` | a generated `registry.ts` of lazy `import()`s plus Temporal SDK `TypeInfo` conversion, run under vitest (whose transform resolves the generator's extension-less imports) |
 
 `smoke.py` and `smoke.test.ts` are the import-only variants used by
 `tests/json_schema_probe_matrix.rs`.
 
 `tests/json_schema_corpus_runtime.rs` runs the pure matcher data. Pattern
-coverage executes all 102 gate-accepted rows in the four base runtimes and
-keeps the 38 rejected rows anchored to the shared loader gate. Format coverage
-adds `typescript-date` and `typescript-temporal` to the four defaults, for six
+coverage executes all 102 gate-accepted rows in the four base runtimes and keeps
+the 38 rejected rows anchored to the shared loader gate. Format coverage adds
+`typescript-date` and `typescript-temporal` to the four defaults, for six
 profiles total. Clock rows declare a common wire and explicit legacy-`Date`
 overrides; Python's sub-microsecond `09#8` loss remains a live reported
 divergence. Duration and URI-reference each have accept/reject and round-trip

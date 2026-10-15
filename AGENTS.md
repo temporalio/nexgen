@@ -9,14 +9,20 @@
   ```
 
 - Focused checks are appropriate while iterating, but do not push without the
-  full command passing. It covers Rust formatting and tests plus the checked-in
-  Python, TypeScript, Go, Java, and .NET sample projects.
+  full command passing. It covers Rust formatting and tests, Markdown
+  formatting, plus the checked-in Python, TypeScript, Go, Java, and .NET sample
+  projects.
 
   ```sh
   cargo validate python
   ```
 
-- When running Rust tests directly, pass the feature flag to test the "advanced" features:
+- Human-authored Markdown is wrapped at 80 columns. After editing Markdown,
+  rewrap it with `cargo fmt-markdown` (configured in `.rumdl.toml`) rather than
+  wrapping by hand.
+
+- When running Rust tests directly, pass the feature flag to test the "advanced"
+  features:
 
   ```sh
   cargo test --all-features
@@ -28,11 +34,11 @@ When asked to create a stack of pull requests, use the
 [`gh-stack`](https://github.com/github/gh-stack) GitHub CLI extension rather
 than creating and linking the PRs manually.
 
-- If `gh stack` is unavailable, install it with `gh extension install
-github/gh-stack`.
-- Initialize the stack from its trunk branch, normally with `gh stack init
---base main <bottom-branch>`, then add each successive layer from the current
-  top branch with `gh stack add <branch>`.
+- If `gh stack` is unavailable, install it with
+  `gh extension install github/gh-stack`.
+- Initialize the stack from its trunk branch, normally with
+  `gh stack init --base main <bottom-branch>`, then add each successive layer
+  from the current top branch with `gh stack add <branch>`.
 - Commit each layer independently. Use `gh stack push` to publish every branch
   and `gh stack submit` to create the PRs with the correct parent branches.
 - Use `gh stack view` to inspect the stack. When the trunk or lower layers
@@ -44,9 +50,10 @@ github/gh-stack`.
 - Never edit generated sample output directly. Change the authored input,
   generator, or shared model as appropriate, then regenerate the affected
   outputs with the generator.
-- JSON Schema sample outputs: `cargo build-examples --format json-schema [--lang <language>]`.
-- Advanced WIT sample outputs: `cargo build-examples --format wit [--lang <language>]
-[<example>]`.
+- JSON Schema sample outputs:
+  `cargo build-examples --format json-schema [--lang <language>]`.
+- Advanced WIT sample outputs:
+  `cargo build-examples --format wit [--lang <language>] [<example>]`.
 - Review regenerated diffs to ensure they are the intended consequence of the
   source change.
 
@@ -67,17 +74,18 @@ github/gh-stack`.
 - Keep JSON and JSON Schema concerns within the relevant JSON Schema parser,
   planning, generator, and `src/json_schema/` components. Do not introduce JSON
   knowledge into generic or unrelated modules.
-- Put target-language policy and rendering decisions in that language's files
-  or modules (for example `src/generator/python.rs` and
+- Put target-language policy and rendering decisions in that language's files or
+  modules (for example `src/generator/python.rs` and
   `src/generator/json_schema/python.rs`). Shared code may represent language
   neutral concepts, but must not encode one target's conventions.
 
 ### Planning
 
-When planning a change, map each change onto one or more existing architectural component
-such as parsing or specific passes. If the change requires adding a pass then explicitly
-identify it as a new addition to the architecture. Each change should have a
-justification for why it belongs where it is planned in the architecture.
+When planning a change, map each change onto one or more existing architectural
+component such as parsing or specific passes. If the change requires adding a
+pass then explicitly identify it as a new addition to the architecture. Each
+change should have a justification for why it belongs where it is planned in the
+architecture.
 
 ## Documentation and public changes
 
@@ -93,7 +101,8 @@ justification for why it belongs where it is planned in the architecture.
 - Choose a fun, whimsical lowercase kebab-case filename, such as
   `moonwalking-marshmallow.md`. Keep entries concise, ideally a sentence or two.
   Each nonempty line becomes one bullet; omit the leading `-`. Multiple items
-  from one PR can share a fragment, but unrelated PRs should have separate files.
+  from one PR can share a fragment, but unrelated PRs should have separate
+  files.
 - `CHANGELOG.md` contains completed releases only. See `changelog/README.md`.
 
 ## Compatibility

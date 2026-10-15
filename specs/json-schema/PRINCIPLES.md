@@ -1,66 +1,351 @@
 # Core Design Principles
 
 Cross-cutting concerns only. Feature-specific reasoning — type tables,
-per-language mechanisms, loader rejects, property-testing matrices —
-lives in `features/<keyword>.md`. This file is the shared base the
-specs build on and link back to by label (`Pn`, `Pn.m`,
-`PRINCIPLES <lang> §n`); those labels are stable references, do not
-renumber them.
+per-language mechanisms, loader rejects, property-testing matrices — lives in
+`features/<keyword>.md`. This file is the shared base the specs build on and
+link back to by label (`Pn`, `Pn.m`, `PRINCIPLES <lang> §n`); those labels are
+stable references, do not renumber them.
 
 ## Cross-cutting
 
 ### Foundational mandates
 
-1. **Polyglot wire compatibility is mandatory.** One schema generates models in every supported language (Go, TypeScript, Python, Java), and a JSON payload accepted by one language's deserializer must be accepted — and validated *identically* — by every other's. Validation semantics are part of the wire contract, not a per-language implementation detail: a value one language rejects (`1.5` for an `integer`, a `minLength` underflow, a missing required key) must be rejected by all, and a value one accepts must round-trip through any other with the same JSON value. JSON identity does not include insignificant whitespace, object-member order, or a number's lexical spelling: `5`, `5.0`, and `5e0` are the same mathematical number, and positive/negative zero compare equal. This is enforced from both ends — the strict subset (P6) refuses at load time any feature that cannot carry identical semantics across all four targets rather than approximate it, and the shared validator (P12) is specified once as language-agnostic constraint predicates whose per-language reimplementations must agree value-for-value. This takes precedence: where cross-language wire agreement conflicts with per-language ergonomics (P2), the wire wins — save **three bounded exceptions to value-level round-trip fidelity**. The first two are cases where an idiomatic in-memory model provably cannot carry a wire distinction without an unidiomatic wrapper; the third is a **declared portable domain restriction** owned by [[type]] or [[format]] — the accepted value set itself is narrowed, identically in every target, rather than a value being accepted and then degraded. The three are: (a) the Go/Java/Python **optional+nullable collapse**, where an explicit `null` reads back as absent (see [[nullability]]); (b) **native-type materialization** of a temporal [[format]], where precision may be lost *only* at the target type's genuine capacity limit — never an artificial common-denominator floor; and (c) an explicitly declared uniform domain such as binary64 [[type]] `number` or the materialized temporal offset range. The recovery path for temporal loss is the per-field `string` opt-out, which is **specified but not implemented** (see [[format]]), so exception (b) is **provisional**: the loss it licenses is currently unrecoverable, and the exception narrows to genuinely-unavoidable only once the opt-out ships. That is an argument for shipping the opt-out, never for widening the exception — in particular, a target that *can* represent a value must not be made to drop it. **Within (b)**, when one target's native type is less capable than the others', **fix the outlier**: an incidental target limitation does not by itself license narrowing every target's accepted set. That prohibition does not reach (c) — a domain explicitly declared once and enforced identically in all four targets is a P6 subset decision rather than a per-target loss. This licenses the binary64 `number` domain and ±(2^53−1) integer range ([[type]]) and the materialized `time` / `date-time` offset domain `-14:00..+14:00` ([[format]]). All three preserve one accepted-and-rejected value set across all four languages (validation semantics are never excepted), and each loss or domain boundary is bounded and documented at its own keyword. Everything else an accepted schema expresses round-trips unchanged by JSON value. Members the schema does **not** declare fall outside this clause: their fidelity is P13.2's, under its verbatim-preservation rule and the one bounded exception stated at [[additionalProperties]].
-2. **Prefer ergonomics over performance — including idiomatic, hand-written-feeling output.** Pay for normalization and conversion rather than give a subpar per-language experience, and shape output to read like code a human wrote for that language: generated code lands in users' repositories and is read, reviewed, grepped, and debugged like any other source, so alien-looking codegen (the protoc / openapi-generator house style) is a real adoption and maintenance tax. This is the quality tiebreaker between otherwise-acceptable designs, and it is **always subordinate to polyglot consistency (P1)**.
+1. **Polyglot wire compatibility is mandatory.** One schema generates models in
+   every supported language (Go, TypeScript, Python, Java), and a JSON payload
+   accepted by one language's deserializer must be accepted — and validated
+   *identically* — by every other's. Validation semantics are part of the wire
+   contract, not a per-language implementation detail: a value one language
+   rejects (`1.5` for an `integer`, a `minLength` underflow, a missing required
+   key) must be rejected by all, and a value one accepts must round-trip through
+   any other with the same JSON value. JSON identity does not include
+   insignificant whitespace, object-member order, or a number's lexical
+   spelling: `5`, `5.0`, and `5e0` are the same mathematical number, and
+   positive/negative zero compare equal. This is enforced from both ends — the
+   strict subset (P6) refuses at load time any feature that cannot carry
+   identical semantics across all four targets rather than approximate it, and
+   the shared validator (P12) is specified once as language-agnostic constraint
+   predicates whose per-language reimplementations must agree value-for-value.
+   This takes precedence: where cross-language wire agreement conflicts with
+   per-language ergonomics (P2), the wire wins — save
+   **three bounded exceptions to value-level round-trip fidelity**. The first
+   two are cases where an idiomatic in-memory model provably cannot carry a wire
+   distinction without an unidiomatic wrapper; the third is a
+   **declared portable domain restriction** owned by [[type]] or [[format]] —
+   the accepted value set itself is narrowed, identically in every target,
+   rather than a value being accepted and then degraded. The three are: (a) the
+   Go/Java/Python **optional+nullable collapse**, where an explicit `null` reads
+   back as absent (see [[nullability]]); (b) **native-type materialization** of
+   a temporal [[format]], where precision may be lost *only* at the target
+   type's genuine capacity limit — never an artificial common-denominator floor;
+   and (c) an explicitly declared uniform domain such as binary64 [[type]]
+   `number` or the materialized temporal offset range. The recovery path for
+   temporal loss is the per-field `string` opt-out, which is
+   **specified but not implemented** (see [[format]]), so exception (b) is
+   **provisional**: the loss it licenses is currently unrecoverable, and the
+   exception narrows to genuinely-unavoidable only once the opt-out ships. That
+   is an argument for shipping the opt-out, never for widening the exception —
+   in particular, a target that *can* represent a value must not be made to drop
+   it. **Within (b)**, when one target's native type is less capable than the
+   others', **fix the outlier**: an incidental target limitation does not by
+   itself license narrowing every target's accepted set. That prohibition does
+   not reach (c) — a domain explicitly declared once and enforced identically in
+   all four targets is a P6 subset decision rather than a per-target loss. This
+   licenses the binary64 `number` domain and ±(2^53−1) integer range ([[type]])
+   and the materialized `time` / `date-time` offset domain `-14:00..+14:00`
+   ([[format]]). All three preserve one accepted-and-rejected value set across
+   all four languages (validation semantics are never excepted), and each loss
+   or domain boundary is bounded and documented at its own keyword. Everything
+   else an accepted schema expresses round-trips unchanged by JSON value.
+   Members the schema does **not** declare fall outside this clause: their
+   fidelity is P13.2's, under its verbatim-preservation rule and the one bounded
+   exception stated at [[additionalProperties]].
+2. **Prefer ergonomics over performance — including idiomatic,
+   hand-written-feeling output.** Pay for normalization and conversion rather
+   than give a subpar per-language experience, and shape output to read like
+   code a human wrote for that language: generated code lands in users'
+   repositories and is read, reviewed, grepped, and debugged like any other
+   source, so alien-looking codegen (the protoc / openapi-generator house style)
+   is a real adoption and maintenance tax. This is the quality tiebreaker
+   between otherwise-acceptable designs, and it is
+   **always subordinate to polyglot consistency (P1)**.
 
 ### Operating constraints
 
-3. **Works with the default Temporal payload converter setup.** A contrib library is admissible only where a target genuinely cannot express the wire contract without one — a bar none of the four targets meets, so this holds literally in all of them: every language's output runs on the stock converter (`DataConverter.default`) with **no** contrib dependency and no user wiring. Python reaches it through the SDK's own transfer-type hook (Python §3), which the default converter consults for every payload.
-4. **Minimal external runtime dependencies on generated code.** Runtime dependencies are limited to the `nexus-rpc` and Temporal SDKs and their transitive closure. Generated Java names Jackson directly, and generated Python names `typing_extensions`; both are already in the corresponding Temporal SDK dependency closure. Dependencies outside that closure are prohibited.
+3. **Works with the default Temporal payload converter setup.** A contrib
+   library is admissible only where a target genuinely cannot express the wire
+   contract without one — a bar none of the four targets meets, so this holds
+   literally in all of them: every language's output runs on the stock converter
+   (`DataConverter.default`) with **no** contrib dependency and no user wiring.
+   Python reaches it through the SDK's own transfer-type hook (Python §3), which
+   the default converter consults for every payload.
+4. **Minimal external runtime dependencies on generated code.** Runtime
+   dependencies are limited to the `nexus-rpc` and Temporal SDKs and their
+   transitive closure. Generated Java names Jackson directly, and generated
+   Python names `typing_extensions`; both are already in the corresponding
+   Temporal SDK dependency closure. Dependencies outside that closure are
+   prohibited.
 
 ### Input contract
 
-5. **Use 2020-12 as the base spec version.** The strict subset is based on the latest draft.
-6. **Strict JSON schema subset.** The generator rejects features that cannot be coherently represented in all supported languages (e.g., `anyOf`, `not`, `if`/`then`/`else`) — the loader-time arm of polyglot wire compatibility (P1). A feature is admitted when it *can* be represented coherently, even if that means a load-time rewrite rather than a retained construct: `allOf` is accepted as a **merge/flatten** into a single schema (see [[allOf]]), and `oneOf` as a closed sum type with a decidable selector (see [[oneOf]]).
-7. **Strict schema validation.** The *schema itself* is held to a strict shape — not just the runtime values it describes (that is P10).
-    1. **Reject ambiguity loudly at generator time.** Better to error than to guess; an unsupported feature that is *ambiguous or would produce silently-wrong output* gets an explicit error, never silent passthrough. The one exception is a purely **inert annotation** — one that cannot affect the emitted type, any identifier, or the wire — which may be accepted-and-ignored instead (see [[examples]]).
-    2. **A reject names the cause and a remedy that works.** Rejecting loudly is only half of it: the diagnostic must name the authored input that caused the reject, and at least one remedy that, applied at a site the author controls, makes the input load. Three shapes fail that and are defects rather than diagnostics: a remedy the author has **already applied**, or that leaves the reject standing once applied; a remedy the author **cannot** apply, such as renaming something outside the working copy; and naming only an input that **did not change** when the cause is elsewhere. This binds every reject the generator raises, at whichever stage it is raised — load, planning or emission — because the stage is an implementation detail and the author's position is the same either way. In particular a conflict detected only when two generated files land on one path is bound by this clause exactly as a load-time collision is, even though it is not an identifier collision and P15 does not reach it. Where two inputs collide, both are named. **Status: open** in more than one family; the per-scope cases are at P15 and [[generated-file-layout]].
+5. **Use 2020-12 as the base spec version.** The strict subset is based on the
+   latest draft.
+6. **Strict JSON schema subset.** The generator rejects features that cannot be
+   coherently represented in all supported languages (e.g., `anyOf`, `not`,
+   `if`/`then`/`else`) — the loader-time arm of polyglot wire compatibility
+   (P1). A feature is admitted when it *can* be represented coherently, even if
+   that means a load-time rewrite rather than a retained construct: `allOf` is
+   accepted as a **merge/flatten** into a single schema (see [[allOf]]), and
+   `oneOf` as a closed sum type with a decidable selector (see [[oneOf]]).
+7. **Strict schema validation.** The *schema itself* is held to a strict shape —
+   not just the runtime values it describes (that is P10).
+    1. **Reject ambiguity loudly at generator time.** Better to error than to
+       guess; an unsupported feature that is
+       *ambiguous or would produce silently-wrong output* gets an explicit
+       error, never silent passthrough. The one exception is a purely
+       **inert annotation** — one that cannot affect the emitted type, any
+       identifier, or the wire — which may be accepted-and-ignored instead (see
+       [[examples]]).
+    2. **A reject names the cause and a remedy that works.** Rejecting loudly is
+       only half of it: the diagnostic must name the authored input that caused
+       the reject, and at least one remedy that, applied at a site the author
+       controls, makes the input load. Three shapes fail that and are defects
+       rather than diagnostics: a remedy the author has **already applied**, or
+       that leaves the reject standing once applied; a remedy the author
+       **cannot** apply, such as renaming something outside the working copy;
+       and naming only an input that **did not change** when the cause is
+       elsewhere. This binds every reject the generator raises, at whichever
+       stage it is raised — load, planning or emission — because the stage is an
+       implementation detail and the author's position is the same either way.
+       In particular a conflict detected only when two generated files land on
+       one path is bound by this clause exactly as a load-time collision is,
+       even though it is not an identifier collision and P15 does not reach it.
+       Where two inputs collide, both are named. **Status: open** in more than
+       one family; the per-scope cases are at P15 and [[generated-file-layout]].
 
 ### Cross-language type modeling
 
-8. **Distinguish optional from nullable.** Two orthogonal axes: "key may be absent" (optional, owned by [[required]]) vs "value may be `null`" (nullable, owned by [[nullability]]). Because they are orthogonal, **all four combinations are legal** — including *required + nullable* ("must be present, value may be `null`"), which we deliberately do not reject. Per-language encodings and the optional+nullable in-memory collapse live in [[nullability]].
-9. **Distinguish absent from zero value.** An optional field's "absent" state must be representable distinctly from a present zero/empty/default value — "not provided" is never aliased to `0`/`""`/`false`. This is the mandate that forces a dedicated presence channel in each language rather than the bare value type. Per-language mechanisms live in [[nullability]].
+8. **Distinguish optional from nullable.** Two orthogonal axes: "key may be
+   absent" (optional, owned by [[required]]) vs "value may be `null`" (nullable,
+   owned by [[nullability]]). Because they are orthogonal,
+   **all four combinations are legal** — including *required + nullable* ("must
+   be present, value may be `null`"), which we deliberately do not reject.
+   Per-language encodings and the optional+nullable in-memory collapse live in
+   [[nullability]].
+9. **Distinguish absent from zero value.** An optional field's "absent" state
+   must be representable distinctly from a present zero/empty/default value —
+   "not provided" is never aliased to `0`/`""`/`false`. This is the mandate that
+   forces a dedicated presence channel in each language rather than the bare
+   value type. Per-language mechanisms live in [[nullability]].
 
 ### Validation & error behavior
 
-10. **Validation is enforced, not advisory.** Constraints (`minLength`, `pattern`, `minimum`, …), `const`, and discriminator strings are checked at the (de)serializer boundary in **both** directions (P12) — schemas are not just documentation. Violations aggregate per P11.
-11. **Aggregate validation errors as a Temporal payload-validation failure.** Surface every violation in one shot as a non-retryable Temporal application failure whose message is `Payload validation failed`, whose type is `PayloadValidationError`, and whose first detail is the language's list of `Violation { path, reason }`. The SDK class is named `ApplicationFailure` in TypeScript and Java and `ApplicationError` in Python and Go. The `reason` *text* is not held byte-identical across targets; the cross-language contract is the accepted-and-rejected value set (P1) plus this structure. Temporal's Nexus integration recognizes the reserved failure type and reports the payload rejection; generated service bindings do not wrap it in a separate `HandlerError`.
-    1. **The aggregate is direction-symmetric.** The violation *set* a value produces on serialize is the set its wire form produces on parse (P12) — a set, not a sequence: nothing in P11 constrains the order of the `Violation` list. A direction that stops early does not satisfy this. Java serializes each nested child into a `TokenBuffer`, merges any child `PayloadValidationError`, keeps validating siblings, and copies buffered tokens to the real generator only after the complete aggregate is empty; no bytes escape before validation succeeds.
-    2. **`Violation.path` has a defined grammar, and it is escaped.** `path` locates the offending value inside the payload and is compared target-to-target — the conformance driver's cross-target signature is the sorted path list — so it is part of the contract, not a diagnostic nicety. The grammar:
+10. **Validation is enforced, not advisory.** Constraints (`minLength`,
+    `pattern`, `minimum`, …), `const`, and discriminator strings are checked at
+    the (de)serializer boundary in **both** directions (P12) — schemas are not
+    just documentation. Violations aggregate per P11.
+11. **Aggregate validation errors as a Temporal payload-validation failure.**
+    Surface every violation in one shot as a non-retryable Temporal application
+    failure whose message is `Payload validation failed`, whose type is
+    `PayloadValidationError`, and whose first detail is the language's list of
+    `Violation { path, reason }`. The SDK class is named `ApplicationFailure` in
+    TypeScript and Java and `ApplicationError` in Python and Go. The `reason`
+    *text* is not held byte-identical across targets; the cross-language
+    contract is the accepted-and-rejected value set (P1) plus this structure.
+    Temporal's Nexus integration recognizes the reserved failure type and
+    reports the payload rejection; generated service bindings do not wrap it in
+    a separate `HandlerError`.
+    1. **The aggregate is direction-symmetric.** The violation *set* a value
+       produces on serialize is the set its wire form produces on parse (P12) —
+       a set, not a sequence: nothing in P11 constrains the order of the
+       `Violation` list. A direction that stops early does not satisfy this.
+       Java serializes each nested child into a `TokenBuffer`, merges any child
+       `PayloadValidationError`, keeps validating siblings, and copies buffered
+       tokens to the real generator only after the complete aggregate is empty;
+       no bytes escape before validation succeeds.
+    2. **`Violation.path` has a defined grammar, and it is escaped.** `path`
+       locates the offending value inside the payload and is compared
+       target-to-target — the conformance driver's cross-target signature is the
+       sorted path list — so it is part of the contract, not a diagnostic
+       nicety. The grammar:
         * The root is the empty string.
-        * A **declared member or map key** `k` appends `.k` when `k` matches `^[A-Za-z_][A-Za-z0-9_]*$`, and `["k"]` otherwise, with `\` written `\\` and `"` written `\"`. At the root the leading `.` is omitted.
-        * An **array element** at index `i` appends `[i]`, with no separator before the `[`.
-        * Nesting concatenates: a parent prepends its own path to each nested violation's, inserting a separator only where the rules above call for one.
+        * A **declared member or map key** `k` appends `.k` when `k` matches
+          `^[A-Za-z_][A-Za-z0-9_]*$`, and `["k"]` otherwise, with `\` written
+          `\\` and `"` written `\"`. At the root the leading `.` is omitted.
+        * An **array element** at index `i` appends `[i]`, with no separator
+          before the `[`.
+        * Nesting concatenates: a parent prepends its own path to each nested
+          violation's, inserting a separator only where the rules above call for
+          one.
 
-        The escaping is what makes the grammar decidable, because a typed map's keys are arbitrary wire strings: unescaped, `{"a.b": …}` is indistinguishable from a nested `a` → `b`, and a key spelled `[0]` is indistinguishable from an array index. Bracket-quoting every non-identifier key removes both ambiguities, and it is why a nested path beginning with `[` can only be an index. All four runtimes route declared and map keys through the same segment encoder before joining nested or indexed paths.
-    3. **The failure must survive the boundaries the caller observes it across.** The structure above is guaranteed at the **throw site** in generated code, and it has to reach the caller through the stock `DataConverter` that **P3** mandates and across the Nexus boundary. Two properties are load-bearing: that `errors.As`/`instanceof` recovers the failure as the SDK's application-failure type with `type == "PayloadValidationError"`, and that it reports **non-retryable** — a payload that fails validation can never validate, so a retry is always wrong. Python and Java meet it; their stock converters preserve the failure and its details. **Go does not, and the cause is upstream:** the Go SDK's JSON payload converter `%w`-wraps its own sentinel and stringifies the real error, severing the chain. A direct converter round-trip yields a `*fmt.wrapError` on which `errors.As` fails outright, and through Temporal's in-memory Nexus test environment the failure is recovered but reports `Type() == "wrapError"` and **`NonRetryable() == false`**, so a permanently-invalid payload is retried. TypeScript is unmeasured; no claim is made for it. **Status: open** — generated Go cannot deliver this clause today, so generated code must not depend on a caller recovering `Violation` details after a converter hop, and a test that constructs the failure locally or bypasses the payload converter is not evidence for this clause and must say so where it bypasses.
-12. **Serialize-side validation; one shared validator, mirror-image adapters.** Validation runs in *both* directions (P10 is literal). Every (de)serializer decomposes into three layers, and crucially **no intermediate representation is round-tripped** to achieve sharing:
-    1. **Parse adapter (deserialize-only).** Wire → decoded value. Owns the checks that only exist on the wire: spec-number parsing (`1.0` accepted, `1.5` rejected), explicit-`null` rejection, wire-absence → required-presence, type-token classification, unknown-key preservation. These can't live in the shared layer because the decoded value no longer carries the wire information they inspect.
-    2. **Shared `Validate(model)` over the decoded model.** Every constraint predicate — the integer cap, numeric ranges, string `minLength`/`pattern`, `const`/`enum` checks, property counts, nested recursion. Pure functions over decoded values, *identical in both directions* — the single source of truth (P1). **"Shared" is a requirement on the predicate, not on the call graph.** What must hold is that both directions apply the *same* comparison to the *same* kind of operand, with the same reason text shape; whether a target reaches it through one exported `Validate(model)` called by both adapters, or by emitting the identical check inline on each path, is a per-target emission choice. Both forms occur: Go's `Validate` is called by every `MarshalJSON` but by `UnmarshalJSON` only for one narrow shape, Go and Java do share a `oneOf` branch wrapper's validator across both directions, and no target shares an ordinary field constraint. All of that is conformant, and where a per-keyword spec writes "a predicate in the shared `Validate`, which `UnmarshalJSON` calls", it is naming the predicate and its operand rather than requiring that call graph. Because inline emission leaves the emitted code with no structural guarantee of the equality, the **generator** owes one: the predicate multiset it emits into a model's two directions is the same multiset, checkable per model, and not something to infer from the two directions agreeing on the shapes the conformance corpus happens to cover. What is **not** conformant is the two operands drifting apart: a predicate that counts wire keys on one side and in-memory fields on the other, or that measures the incoming string on parse and the canonical one on serialize, violates this clause even though both sides "call the same helper".
-    3. **Encode adapter (serialize-only).** Decoded value → wire. Owns omit-vs-emit-`null` (per-field, from the optional/nullable/required declaration — see [[nullability]]) and `default` omission (see [[default]]). `const` adds nothing here — it is a pure assertion in the shared `Validate`.
-    Serialize applies the shared constraint layer **before emitting a byte** — through an exported `Validate` where the target has one — and fails with the same aggregated primitive as deserialize (P11). In-memory construction is unchecked in every target — Go/TS/Java carry only what static typing can express, and a Python dataclass validates nothing on `__init__` — so serialize-side validation has real teeth.
+        The escaping is what makes the grammar decidable, because a typed map's
+        keys are arbitrary wire strings: unescaped, `{"a.b": …}` is
+        indistinguishable from a nested `a` → `b`, and a key spelled `[0]` is
+        indistinguishable from an array index. Bracket-quoting every
+        non-identifier key removes both ambiguities, and it is why a nested path
+        beginning with `[` can only be an index. All four runtimes route
+        declared and map keys through the same segment encoder before joining
+        nested or indexed paths.
+    3. **The failure must survive the boundaries the caller observes it
+       across.** The structure above is guaranteed at the **throw site** in
+       generated code, and it has to reach the caller through the stock
+       `DataConverter` that **P3** mandates and across the Nexus boundary. Two
+       properties are load-bearing: that `errors.As`/`instanceof` recovers the
+       failure as the SDK's application-failure type with
+       `type == "PayloadValidationError"`, and that it reports **non-retryable**
+       — a payload that fails validation can never validate, so a retry is
+       always wrong. Python and Java meet it; their stock converters preserve
+       the failure and its details. **Go does not, and the cause is upstream:**
+       the Go SDK's JSON payload converter `%w`-wraps its own sentinel and
+       stringifies the real error, severing the chain. A direct converter
+       round-trip yields a `*fmt.wrapError` on which `errors.As` fails outright,
+       and through Temporal's in-memory Nexus test environment the failure is
+       recovered but reports `Type() == "wrapError"` and
+       **`NonRetryable() == false`**, so a permanently-invalid payload is
+       retried. TypeScript is unmeasured; no claim is made for it.
+       **Status: open** — generated Go cannot deliver this clause today, so
+       generated code must not depend on a caller recovering `Violation` details
+       after a converter hop, and a test that constructs the failure locally or
+       bypasses the payload converter is not evidence for this clause and must
+       say so where it bypasses.
+12. **Serialize-side validation; one shared validator, mirror-image adapters.**
+    Validation runs in *both* directions (P10 is literal). Every (de)serializer
+    decomposes into three layers, and crucially
+    **no intermediate representation is round-tripped** to achieve sharing:
+    1. **Parse adapter (deserialize-only).** Wire → decoded value. Owns the
+       checks that only exist on the wire: spec-number parsing (`1.0` accepted,
+       `1.5` rejected), explicit-`null` rejection, wire-absence →
+       required-presence, type-token classification, unknown-key preservation.
+       These can't live in the shared layer because the decoded value no longer
+       carries the wire information they inspect.
+    2. **Shared `Validate(model)` over the decoded model.** Every constraint
+       predicate — the integer cap, numeric ranges, string
+       `minLength`/`pattern`, `const`/`enum` checks, property counts, nested
+       recursion. Pure functions over decoded values,
+       *identical in both directions* — the single source of truth (P1).
+       **"Shared" is a requirement on the predicate, not on the call graph.**
+       What must hold is that both directions apply the *same* comparison to the
+       *same* kind of operand, with the same reason text shape; whether a target
+       reaches it through one exported `Validate(model)` called by both
+       adapters, or by emitting the identical check inline on each path, is a
+       per-target emission choice. Both forms occur: Go's `Validate` is called
+       by every `MarshalJSON` but by `UnmarshalJSON` only for one narrow shape,
+       Go and Java do share a `oneOf` branch wrapper's validator across both
+       directions, and no target shares an ordinary field constraint. All of
+       that is conformant, and where a per-keyword spec writes "a predicate in
+       the shared `Validate`, which `UnmarshalJSON` calls", it is naming the
+       predicate and its operand rather than requiring that call graph. Because
+       inline emission leaves the emitted code with no structural guarantee of
+       the equality, the **generator** owes one: the predicate multiset it emits
+       into a model's two directions is the same multiset, checkable per model,
+       and not something to infer from the two directions agreeing on the shapes
+       the conformance corpus happens to cover. What is **not** conformant is
+       the two operands drifting apart: a predicate that counts wire keys on one
+       side and in-memory fields on the other, or that measures the incoming
+       string on parse and the canonical one on serialize, violates this clause
+       even though both sides "call the same helper".
+    3. **Encode adapter (serialize-only).** Decoded value → wire. Owns
+       omit-vs-emit-`null` (per-field, from the optional/nullable/required
+       declaration — see [[nullability]]) and `default` omission (see
+       [[default]]). `const` adds nothing here — it is a pure assertion in the
+       shared `Validate`. Serialize applies the shared constraint layer
+       **before emitting a byte** — through an exported `Validate` where the
+       target has one — and fails with the same aggregated primitive as
+       deserialize (P11). In-memory construction is unchecked in every target —
+       Go/TS/Java carry only what static typing can express, and a Python
+       dataclass validates nothing on `__init__` — so serialize-side validation
+       has real teeth.
 
 ### Forward compatibility
 
-13. **Forward compatibility for unknown *fields*; closed *value sets*.** Preserve unknown object members (additional properties) as faithfully as the language allows, so a payload from a newer schema round-trips through an older model without losing data. Known-value sets are the deliberate exception: `const` and `enum` are **closed** and **reject** an unrecognized value rather than preserve it.
-    1. **Closed value sets; unknown values rejected.** A `const`/`enum` field admits only its known value(s), for every scalar kind; any other value is a hard validation failure. The emitted type expresses that closedness in each language's idiom — a closed literal (TS `"v"` / `1.5`; Python `Literal["v"]`, with `float` the exception since `Literal` forbids it), a Go defined type + typed value constant, a Java value class (the known constant obtainable only through the class). Value constants are named from the value via the [[properties]] identifier pipeline. Bumping a `const` value or changing an `enum`'s members is a **breaking change** to the contract and surfaces as one (a compile break at stale call sites / a regenerated value set), which is the correct, loud outcome. See [[const]], [[enum]].
-    2. **The wire is forward-compatible for unknown *fields*.** An additive schema change that adds an optional field or extra object members must break neither the generated code nor the wire round-trip: (a) *Code:* it must not change an existing field's type signature or a type's kind, nor rename an identifier already emitted, so already-compiled consumers keep compiling — a catch-all map stays the same kind when `properties` is later added, and the name of a synthesized constant or accessor does not move because an unrelated model was declared (P15). (b) *Wire:* a payload from a newer schema must deserialize under an older model and round-trip back out **without dropping the object keys it didn't recognize** — preserved verbatim. A changed `const`/`enum` **value**, by contrast, is a breaking change: the older model rejects the unrecognized value rather than preserving it (P13.1). See [[additionalProperties]].
+13. **Forward compatibility for unknown *fields*; closed *value sets*.**
+    Preserve unknown object members (additional properties) as faithfully as the
+    language allows, so a payload from a newer schema round-trips through an
+    older model without losing data. Known-value sets are the deliberate
+    exception: `const` and `enum` are **closed** and **reject** an unrecognized
+    value rather than preserve it.
+    1. **Closed value sets; unknown values rejected.** A `const`/`enum` field
+       admits only its known value(s), for every scalar kind; any other value is
+       a hard validation failure. The emitted type expresses that closedness in
+       each language's idiom — a closed literal (TS `"v"` / `1.5`; Python
+       `Literal["v"]`, with `float` the exception since `Literal` forbids it), a
+       Go defined type + typed value constant, a Java value class (the known
+       constant obtainable only through the class). Value constants are named
+       from the value via the [[properties]] identifier pipeline. Bumping a
+       `const` value or changing an `enum`'s members is a **breaking change** to
+       the contract and surfaces as one (a compile break at stale call sites / a
+       regenerated value set), which is the correct, loud outcome. See
+       [[const]], [[enum]].
+    2. **The wire is forward-compatible for unknown *fields*.** An additive
+       schema change that adds an optional field or extra object members must
+       break neither the generated code nor the wire round-trip: (a) *Code:* it
+       must not change an existing field's type signature or a type's kind, nor
+       rename an identifier already emitted, so already-compiled consumers keep
+       compiling — a catch-all map stays the same kind when `properties` is
+       later added, and the name of a synthesized constant or accessor does not
+       move because an unrelated model was declared (P15). (b) *Wire:* a payload
+       from a newer schema must deserialize under an older model and round-trip
+       back out **without dropping the object keys it didn't recognize** —
+       preserved verbatim. A changed `const`/`enum` **value**, by contrast, is a
+       breaking change: the older model rejects the unrecognized value rather
+       than preserving it (P13.1). See [[additionalProperties]].
 
 ### Output organization
 
-14. **One module per input file; merge recursion.** Each input schema file maps to one generated module. Python, TypeScript, and Java mirror the input directory tree (Python subpackages, TS `index.ts` barrels, Java packages); **Go is the exception** — it collapses every input into a single flat package, because a Go package cannot participate in an import cycle and a cross-directory mutual reference would otherwise be an illegal cyclic import (with no cross-package hoist available). Cross-file reference *cycles* hoist only the cycle's strongly-connected types into one shared module (Python `_recursive.py`; Go resolves them within its flat package; TS/Java handle cycles natively). See [[ref]], [[generated-file-layout]].
-15. **One identifier namespace per scope; synthesized-name collisions reject at load time — never silently mangled.** Beyond the declared properties and types, the generator *synthesizes* identifiers (type aliases, value constants, accessors). These do not live in a private namespace — each enters the same per-scope identifier set as the declared names and as each other. The generator runs **one collision pass** over that union (after case-mapping) and rejects any coincidence at load with a fix-it diagnostic. We **never auto-mangle**: an auto-suffixed name would be unstable under schema evolution (a P13 break) and is exactly the silently-incorrect output the mission rejects (P7/P7.1). The escape hatch is the per-language `x-<lang>-name` override (resolved in the [[properties]] case-mapping policy), and which name it moves follows from where the synthesized name came from: **a name synthesized from a member moves with that member; a name synthesized from a position stays with the position.** So the override on the *declaring* property moves the member identifier and everything derived from it — the Go `<Field>OrDefault()` accessor and TS `DEFAULT_<FIELD>` constant ([[default]]), the closed-value type ([[const]]) — while a shape named after the position it was written in (an inline object hoisted to `<Model><Property>`, see [[properties]]) keeps that name, and is renamed instead by authoring the shape in `$defs` and `$ref`ing it. A value constant is synthesized from the *value*, so where a target synthesizes one it carries its own `x-<lang>-const-name` ([[const]]; which targets those are is below). Every escape hatch has to reach the name it is offered for: an override that moved the member but not a name derived from it would leave the collision unresolvable, which is the fix-it lying about the remedy. A **scope** is whatever unit the target actually resolves names in, which is a property of the emitted layout rather than of the schema, and is not the same everywhere. For **Go, TypeScript and Python** it is the **whole run**, so two input files may not each declare a `Page`: Go flattens every module into one package ([[generated-file-layout]]), making the second declaration a redeclaration; TypeScript and Python do emit a namespace per module, but each also emits a root barrel that lifts every module's top-level names into one namespace — `index.ts` re-exporting each module with `export *`, and `__init__.py` re-exporting them by name — so the second declaration collides there. TypeScript rejects the barrel outright, while Python *would* silently bind whichever import runs last and drop the other model off the package surface — precisely the silent incorrectness P7 forbids, and the reason Python's scope is the whole run rather than per module: the collision is rejected at load, before either barrel is emitted. For **Java and .NET** the scope is the **module** the declaring file emits into: each module lands in its own sub-package/namespace and neither target emits an aggregating barrel, so two input files may each declare a `Page` and stay unambiguous. A service is checked in the module that declares it, alongside that module's types. Which identifiers are synthesized, and the per-language scopes they share, live in [[const]], [[default]], [[properties]].
+14. **One module per input file; merge recursion.** Each input schema file maps
+    to one generated module. Python, TypeScript, and Java mirror the input
+    directory tree (Python subpackages, TS `index.ts` barrels, Java packages);
+    **Go is the exception** — it collapses every input into a single flat
+    package, because a Go package cannot participate in an import cycle and a
+    cross-directory mutual reference would otherwise be an illegal cyclic import
+    (with no cross-package hoist available). Cross-file reference *cycles* hoist
+    only the cycle's strongly-connected types into one shared module (Python
+    `_recursive.py`; Go resolves them within its flat package; TS/Java handle
+    cycles natively). See [[ref]], [[generated-file-layout]].
+15. **One identifier namespace per scope; synthesized-name collisions reject at
+    load time — never silently mangled.** Beyond the declared properties and
+    types, the generator *synthesizes* identifiers (type aliases, value
+    constants, accessors). These do not live in a private namespace — each
+    enters the same per-scope identifier set as the declared names and as each
+    other. The generator runs **one collision pass** over that union (after
+    case-mapping) and rejects any coincidence at load with a fix-it diagnostic.
+    We **never auto-mangle**: an auto-suffixed name would be unstable under
+    schema evolution (a P13 break) and is exactly the silently-incorrect output
+    the mission rejects (P7/P7.1). The escape hatch is the per-language
+    `x-<lang>-name` override (resolved in the [[properties]] case-mapping
+    policy), and which name it moves follows from where the synthesized name
+    came from: **a name synthesized from a member moves with that member; a name
+    synthesized from a position stays with the position.** So the override on
+    the *declaring* property moves the member identifier and everything derived
+    from it — the Go `<Field>OrDefault()` accessor and TS `DEFAULT_<FIELD>`
+    constant ([[default]]), the closed-value type ([[const]]) — while a shape
+    named after the position it was written in (an inline object hoisted to
+    `<Model><Property>`, see [[properties]]) keeps that name, and is renamed
+    instead by authoring the shape in `$defs` and `$ref`ing it. A value constant
+    is synthesized from the *value*, so where a target synthesizes one it
+    carries its own `x-<lang>-const-name` ([[const]]; which targets those are is
+    below). Every escape hatch has to reach the name it is offered for: an
+    override that moved the member but not a name derived from it would leave
+    the collision unresolvable, which is the fix-it lying about the remedy. A
+    **scope** is whatever unit the target actually resolves names in, which is a
+    property of the emitted layout rather than of the schema, and is not the
+    same everywhere. For **Go, TypeScript and Python** it is the **whole run**,
+    so two input files may not each declare a `Page`: Go flattens every module
+    into one package ([[generated-file-layout]]), making the second declaration
+    a redeclaration; TypeScript and Python do emit a namespace per module, but
+    each also emits a root barrel that lifts every module's top-level names into
+    one namespace — `index.ts` re-exporting each module with `export *`, and
+    `__init__.py` re-exporting them by name — so the second declaration collides
+    there. TypeScript rejects the barrel outright, while Python *would* silently
+    bind whichever import runs last and drop the other model off the package
+    surface — precisely the silent incorrectness P7 forbids, and the reason
+    Python's scope is the whole run rather than per module: the collision is
+    rejected at load, before either barrel is emitted. For **Java and .NET** the
+    scope is the **module** the declaring file emits into: each module lands in
+    its own sub-package/namespace and neither target emits an aggregating
+    barrel, so two input files may each declare a `Page` and stay unambiguous. A
+    service is checked in the module that declares it, alongside that module's
+    types. Which identifiers are synthesized, and the per-language scopes they
+    share, live in [[const]], [[default]], [[properties]].
 
 **A scope's namespace is everything written into it or read from it by bare
 name** — the declared types and members, every identifier the generator
@@ -115,9 +400,9 @@ would be. Six consequences, each normative:
 
 Target-specific P15 details: Java also synthesizes `get<Field>OrDefault()` for a
 default-bearing member. Go and Java value constants are value-derived and use
-`x-go-const-name` / `x-java-const-name` (and their enum-name maps);
-TypeScript's private `<FIELD>_CONST` is member-derived and moves with
-`x-ts-name`, while Python synthesizes no such binding.
+`x-go-const-name` / `x-java-const-name` (and their enum-name maps); TypeScript's
+private `<FIELD>_CONST` is member-derived and moves with `x-ts-name`, while
+Python synthesizes no such binding.
 
 ### Surface
 
@@ -125,10 +410,53 @@ TypeScript's private `<FIELD>_CONST` is member-derived and moves with
 
 ## TypeScript
 
-1. **Hand-emitted validators, no runtime schema library (P4).** The generated runtime uses plain built-ins and generated helpers — no `zod`/`ajv`/`lossless-json` dependency. The ±(2^53−1) integer cap (see [[type]]) is what makes this possible.
-2. **Models emit `interface`s, not classes.** Models stay structural types — plain objects with no methods or runtime footprint (tree-shakeable, hand-written-feeling, P2). Conversion and validation live *off* the model, in a companion `<type>TransferTypeConverter` (§4).
-3. **Aggregate via one Temporal `ApplicationFailure` (P11).** Collect every `Violation { path, reason }`, then pass the list to `createPayloadValidationError` from `@temporalio/common`, which returns the non-retryable `ApplicationFailure` with message `Payload validation failed`, type `PayloadValidationError`, and the `Violation[]` as its first detail. Generated TypeScript requires Temporal SDK 1.23.0 or newer for this factory. Nested aggregation casts `failure.details[0]` back to `Violation[]`; locally-created failures retain that array, so the cast is cheap and performs no serialization.
-4. **A companion `TransferTypeConverter` instance converts model ⇄ transfer value and validates; it does not stringify (P12).** Each model gets one exported converter — `export const userTransferTypeConverter = new class implements TransferTypeConverter<User> { fromTransferType(raw: unknown): User; toTransferType(value: User): unknown }()` — implementing `nexus-rpc`'s `TransferTypeConverter<T>` contract, where `toTransferType` is the encode adapter (model → plain JSON value) and `fromTransferType` the parse adapter (untrusted JSON value → model). It is an **instance**, not a class: the operation's type info holds the converter, so the Temporal SDK applies it automatically at the payload boundary and application code never needs to invoke it for top-level Nexus inputs or outputs (see [[services]]). Both directions run the same hand-emitted validators (collecting `Violation`s into one `PayloadValidationError` application failure), so validation lives *inside* the conversion — that is what makes them the single source of truth. The transfer value is plain `unknown` (raw JSON), never a `string`: the byte-level `JSON.stringify`/`JSON.parse` is the Temporal converter's boundary, which hands the converter the parsed (or about-to-be-stringified) value. Working in transfer values (not strings) is also what makes conversions **composable** — a parent's `toTransferType` calls its children's on nested values and embeds the results, and `fromTransferType` likewise; a `string` could not nest. The per-field omit-vs-`null` decision follows the [[nullability]] serialize table. Because the contract name is imported into every model module, `TransferTypeConverter` joins the module's reserved generated identifiers — a `$defs` type of that name is a §15 load reject, not a shadowed import. The derived `<type>TransferTypeConverter` identifiers join that same namespace, which is **run-wide** rather than per-module because the root barrel re-exports every module's top-level names into one namespace: lower-camel-casing folds type names that would otherwise stay apart, so two models whose converters coincide reject at load rather than emitting the same `export const` twice.
+1. **Hand-emitted validators, no runtime schema library (P4).** The generated
+   runtime uses plain built-ins and generated helpers — no
+   `zod`/`ajv`/`lossless-json` dependency. The ±(2^53−1) integer cap (see
+   [[type]]) is what makes this possible.
+2. **Models emit `interface`s, not classes.** Models stay structural types —
+   plain objects with no methods or runtime footprint (tree-shakeable,
+   hand-written-feeling, P2). Conversion and validation live *off* the model, in
+   a companion `<type>TransferTypeConverter` (§4).
+3. **Aggregate via one Temporal `ApplicationFailure` (P11).** Collect every
+   `Violation { path, reason }`, then pass the list to
+   `createPayloadValidationError` from `@temporalio/common`, which returns the
+   non-retryable `ApplicationFailure` with message `Payload validation failed`,
+   type `PayloadValidationError`, and the `Violation[]` as its first detail.
+   Generated TypeScript requires Temporal SDK 1.23.0 or newer for this factory.
+   Nested aggregation casts `failure.details[0]` back to `Violation[]`;
+   locally-created failures retain that array, so the cast is cheap and performs
+   no serialization.
+4. **A companion `TransferTypeConverter` instance converts model ⇄ transfer
+   value and validates; it does not stringify (P12).** Each model gets one
+   exported converter —
+   `export const userTransferTypeConverter = new class implements TransferTypeConverter<User> { fromTransferType(raw: unknown): User; toTransferType(value: User): unknown }()`
+   — implementing `nexus-rpc`'s `TransferTypeConverter<T>` contract, where
+   `toTransferType` is the encode adapter (model → plain JSON value) and
+   `fromTransferType` the parse adapter (untrusted JSON value → model). It is an
+   **instance**, not a class: the operation's type info holds the converter, so
+   the Temporal SDK applies it automatically at the payload boundary and
+   application code never needs to invoke it for top-level Nexus inputs or
+   outputs (see [[services]]). Both directions run the same hand-emitted
+   validators (collecting `Violation`s into one `PayloadValidationError`
+   application failure), so validation lives *inside* the conversion — that is
+   what makes them the single source of truth. The transfer value is plain
+   `unknown` (raw JSON), never a `string`: the byte-level
+   `JSON.stringify`/`JSON.parse` is the Temporal converter's boundary, which
+   hands the converter the parsed (or about-to-be-stringified) value. Working in
+   transfer values (not strings) is also what makes conversions **composable** —
+   a parent's `toTransferType` calls its children's on nested values and embeds
+   the results, and `fromTransferType` likewise; a `string` could not nest. The
+   per-field omit-vs-`null` decision follows the [[nullability]] serialize
+   table. Because the contract name is imported into every model module,
+   `TransferTypeConverter` joins the module's reserved generated identifiers — a
+   `$defs` type of that name is a §15 load reject, not a shadowed import. The
+   derived `<type>TransferTypeConverter` identifiers join that same namespace,
+   which is **run-wide** rather than per-module because the root barrel
+   re-exports every module's top-level names into one namespace:
+   lower-camel-casing folds type names that would otherwise stay apart, so two
+   models whose converters coincide reject at load rather than emitting the same
+   `export const` twice.
 
 ## Python
 
@@ -137,26 +465,190 @@ private `_<field>` slot in the same class namespace as declared members. A
 collision rejects at load time, and `x-py-name` moves the public property and
 its backing slot together. Python emits no module-level `DEFAULT_*` identifier.
 
-1. **Models emit `@dataclasses.dataclass`es, not a validating model base (P2/P4).** Every model is a slotted, keyword-only dataclass with **no validation on construction**. Required non-nullable property annotations are bare `T`; optional or nullable property annotations use `T | None`. A model with a schema-defaulted property uses `init=False` plus a generated keyword-only `__init__`: the public constructor keyword initializes a private `_<field>: T | None` presence slot, while a mutable same-name property returns either that raw value or the scalar schema default. Its setter accepts `T`, and its deleter restores the unset state. The private slot is excluded from `repr` but remains a dataclass comparison field, preserving raw presence/value equality. Open-model constructors initialize an omitted `additional_properties` to a fresh dictionary. Other models use `@dataclasses.dataclass(slots=True, kw_only=True)` directly. Field annotations remain plain Python types (`int`, `str`, `datetime.datetime`, `datetime.timedelta`, `bytes`, `typing.Literal[...]`, `list[T]`, `dict[str, V]`), never annotated validator aliases, so the class reads like hand-written Python (P2) and the runtime dependency set stays at the SDKs alone (P4). Conversion and validation live *off* the model, in a companion transfer-type converter (§3), which gives serialize-side validation real teeth (P12).
-2. **Aggregate via one Temporal `ApplicationError` (P11).** Collect every `Violation { path, reason }` — a frozen, slotted dataclass exported by the package root — then pass that list to `temporalio.converter.create_payload_validation_error`, which returns the non-retryable `ApplicationError` with message `Payload validation failed`, type `PayloadValidationError`, and the list as its first detail. Generated Python requires Temporal SDK 1.32.0 or newer for this factory. A nested failure is re-pathed by `_collect`, which casts `error.details[0]` back to `list[Violation]`; locally-created errors retain that list, so the cast is type-checker-only and performs no serialization.
-3. **A companion `_<Model>TransferTypeConverter` converts model ⇄ intermediate and validates; the *default* Temporal converter finds it through the SDK's transfer-type hook (P12/P3).** Each model gets a private converter class — `class _UserTransferTypeConverter(temporalio.converter.TransferTypeConverter["User", typing.Any])` with `from_transfer_type(value: typing.Any, type_hint: type[User]) -> User` as the parse adapter (untrusted JSON value → model) and `to_transfer_type(value: User) -> typing.Any` as the encode adapter (model → plain JSON value) — attached to the class by `@_transfer_type_convertible(_UserTransferTypeConverter)`, the runtime module's one-line shim over `temporalio.converter.transfer_type_convertible` that erases the converter's value-type parameter (binding it on the decorated class is circular for a static type checker: the class's type depends on the decorator, whose value type depends on the class). Both directions run the same emitted checks, collecting `Violation`s into one `PayloadValidationError` application failure (§2), so validation lives *inside* the conversion — that is what makes them the single source of truth in both directions. The intermediate is a plain `dict`/`list`/scalar, never a `str`: the byte-level JSON encode/decode is the Temporal payload converter's boundary, which hands the transfer-type converter the parsed (or about-to-be-encoded) value. Working in intermediate values (not strings) is also what makes conversions **composable** — a parent's `to_transfer_type` calls its children's on nested values and embeds the results, `from_transfer_type` likewise; a `str` could not nest. That composition is load-bearing rather than stylistic: the SDK hooks only the **top-level** value, so a nested model is always converted by its parent's body. Registration is the whole of the wiring — the stock `DataConverter.default` consults the hook, so generated models need no contrib package and no user setup (P3). A `typing.TypeAlias` cannot be decorated, so a named or inline `oneOf` union is served by module-private free functions (`_<name>_from_transfer_type` / `_<name>_to_transfer_type`) instead of a converter class; unions can only appear nested, so nothing is lost. The per-field omit-vs-`null` decision follows the [[nullability]] serialize table. See [[nullability]], [[const]], [[default]].
+1. **Models emit `@dataclasses.dataclass`es, not a validating model base
+   (P2/P4).** Every model is a slotted, keyword-only dataclass with
+   **no validation on construction**. Required non-nullable property annotations
+   are bare `T`; optional or nullable property annotations use `T | None`. A
+   model with a schema-defaulted property uses `init=False` plus a generated
+   keyword-only `__init__`: the public constructor keyword initializes a private
+   `_<field>: T | None` presence slot, while a mutable same-name property
+   returns either that raw value or the scalar schema default. Its setter
+   accepts `T`, and its deleter restores the unset state. The private slot is
+   excluded from `repr` but remains a dataclass comparison field, preserving raw
+   presence/value equality. Open-model constructors initialize an omitted
+   `additional_properties` to a fresh dictionary. Other models use
+   `@dataclasses.dataclass(slots=True, kw_only=True)` directly. Field
+   annotations remain plain Python types (`int`, `str`, `datetime.datetime`,
+   `datetime.timedelta`, `bytes`, `typing.Literal[...]`, `list[T]`,
+   `dict[str, V]`), never annotated validator aliases, so the class reads like
+   hand-written Python (P2) and the runtime dependency set stays at the SDKs
+   alone (P4). Conversion and validation live *off* the model, in a companion
+   transfer-type converter (§3), which gives serialize-side validation real
+   teeth (P12).
+2. **Aggregate via one Temporal `ApplicationError` (P11).** Collect every
+   `Violation { path, reason }` — a frozen, slotted dataclass exported by the
+   package root — then pass that list to
+   `temporalio.converter.create_payload_validation_error`, which returns the
+   non-retryable `ApplicationError` with message `Payload validation failed`,
+   type `PayloadValidationError`, and the list as its first detail. Generated
+   Python requires Temporal SDK 1.32.0 or newer for this factory. A nested
+   failure is re-pathed by `_collect`, which casts `error.details[0]` back to
+   `list[Violation]`; locally-created errors retain that list, so the cast is
+   type-checker-only and performs no serialization.
+3. **A companion `_<Model>TransferTypeConverter` converts model ⇄ intermediate
+   and validates; the *default* Temporal converter finds it through the SDK's
+   transfer-type hook (P12/P3).** Each model gets a private converter class —
+   `class _UserTransferTypeConverter(temporalio.converter.TransferTypeConverter["User", typing.Any])`
+   with `from_transfer_type(value: typing.Any, type_hint: type[User]) -> User`
+   as the parse adapter (untrusted JSON value → model) and
+   `to_transfer_type(value: User) -> typing.Any` as the encode adapter (model →
+   plain JSON value) — attached to the class by
+   `@_transfer_type_convertible(_UserTransferTypeConverter)`, the runtime
+   module's one-line shim over `temporalio.converter.transfer_type_convertible`
+   that erases the converter's value-type parameter (binding it on the decorated
+   class is circular for a static type checker: the class's type depends on the
+   decorator, whose value type depends on the class). Both directions run the
+   same emitted checks, collecting `Violation`s into one
+   `PayloadValidationError` application failure (§2), so validation lives
+   *inside* the conversion — that is what makes them the single source of truth
+   in both directions. The intermediate is a plain `dict`/`list`/scalar, never a
+   `str`: the byte-level JSON encode/decode is the Temporal payload converter's
+   boundary, which hands the transfer-type converter the parsed (or
+   about-to-be-encoded) value. Working in intermediate values (not strings) is
+   also what makes conversions **composable** — a parent's `to_transfer_type`
+   calls its children's on nested values and embeds the results,
+   `from_transfer_type` likewise; a `str` could not nest. That composition is
+   load-bearing rather than stylistic: the SDK hooks only the **top-level**
+   value, so a nested model is always converted by its parent's body.
+   Registration is the whole of the wiring — the stock `DataConverter.default`
+   consults the hook, so generated models need no contrib package and no user
+   setup (P3). A `typing.TypeAlias` cannot be decorated, so a named or inline
+   `oneOf` union is served by module-private free functions
+   (`_<name>_from_transfer_type` / `_<name>_to_transfer_type`) instead of a
+   converter class; unions can only appear nested, so nothing is lost. The
+   per-field omit-vs-`null` decision follows the [[nullability]] serialize
+   table. See [[nullability]], [[const]], [[default]].
 
 ## Java
 
-The generated runtime class names `Violation`, `SpecNumbers`,
-`TemporalSupport`, and `Base64Support` are reserved in every Java module scope.
-`TemporalSupport` and `Base64Support` remain reserved even when that run does
-not materialize the corresponding runtime class, so later use of a temporal
-format or content encoding cannot introduce a new name collision.
+The generated runtime class names `Violation`, `SpecNumbers`, `TemporalSupport`,
+and `Base64Support` are reserved in every Java module scope. `TemporalSupport`
+and `Base64Support` remain reserved even when that run does not materialize the
+corresponding runtime class, so later use of a temporal format or content
+encoding cannot introduce a new name collision.
 
-1. **Java 8 baseline; POJOs, not records.** Targets Java 8 to match the Temporal Java SDK's own minimum — emitted code must never impose a stricter floor than the SDK it plugs into (P3/P4). Records require Java 16+, which would exclude the large Java 8/11 install base, so models are emitted as **POJOs** (private final fields, constructor, getters, `equals`/`hashCode`/`toString`). The boilerplate stays hidden behind a hand-written-feeling API (P2).
-2. **Jackson typed binding into POJOs.** Jackson handles structural (de)serialization. No reflection-based schema library beyond Jackson itself (P4).
-3. **Primitive for required, boxed for optional; JSpecify for reference nullness.** Required scalar fields use primitives (`long`/`double`/`boolean`); optional ones box (`Long`/`Double`/`Boolean`) so absence is `null`. Reference types (`String`, `List<T>`, object types) carry a non-null validator instead. Emitted packages are `@NullMarked` (JSpecify; non-null by default) and optional reference fields are `@Nullable`, restoring for reference types the same in-memory absence signal `long`-vs-`Long` gives scalars (P2). The annotation tracks **in-memory post-construction nullness** (required vs optional), **not** the wire-level nullable distinction — that stays a validator concern (§4, [[nullability]]). Generated Java source imports these annotations, so `org.jspecify:jspecify:1.0.0` is a required compile-time dependency, configured as `compileOnly` in Gradle or `provided` in Maven. JSpecify annotations have runtime retention but enforce nothing at runtime; `@Nullable` targets type uses, while `@NullMarked` targets declarations including packages and types. Consumers that reflect over these annotations must provide JSpecify themselves. Chosen over the abandoned JSR-305; it is the cross-tool consensus (Google, JetBrains, Spring, Kotlin, NullAway, Checker Framework).
-4. **Spec-strict per-primitive parse as a node helper, invoked from the collecting deserializer (§5), not a per-field `@JsonDeserialize`.** Each spec-sensitive primitive ships a strict-parse helper over a `JsonNode`: `SpecNumbers.specLong` accepts integral spellings such as `1.0`/`1e2`, rejects `1.5`, and enforces the integer cap, while `SpecNumbers.specDouble` accepts only finite binary64 numbers (see [[type]]). On a bad value each helper **pushes a `Violation` and returns `null` rather than throwing**. Custom logic is mandatory because Jackson's defaults can silently truncate integers or map overflowing decimals to infinity. It is *not* a per-field `@JsonDeserialize` because per-field binders are fail-fast — the first field's `MismatchedInputException` aborts the whole bind and defeats P11 aggregation. The explicit-`null` decision (reject for optional-non-nullable/required, accept for nullable) is a per-field branch in the collecting deserializer over the node's `isNull()` — the same three-way Go makes in `UnmarshalJSON` (see [[nullability]]). Parallels the `parseSpecInteger` helper (see [[type]]).
-5. **Error aggregation primitive — one class-level collecting (de)serializer per POJO.** Each POJO carries class-level `@JsonDeserialize(using = <Pojo>.Deserializer.class)` and the mirror `@JsonSerialize` (§6), emitted as **`public static final` nested classes** (`User.Deserializer`/`User.Serializer`) — so the names never collide *across* models and sit visibly with the type they serve (P2). Both names are still reserved in the model's own nested scope, so a `const`/`enum` member recasing onto `Serializer`/`Deserializer` is a P15 load reject. The deserializer is the Jackson analog of Go's raw-object `UnmarshalJSON`: a **two-stage lenient-then-validate** bind. Stage 1 reads the whole object into a `JsonNode` tree with `SpecNumbers.readExactTree(parser)`, preserving exact decimal tokens while avoiding Jackson's fail-fast `MismatchedInputException` on field #1. Stage 2 walks every declared field through the shared spec-strict + constraint helpers (§4), pushes one `Violation { path, reason }` per problem, and throws one non-retryable Temporal `ApplicationFailure` with type `PayloadValidationError` and the `List<Violation>` as its first detail (P11). Each generated throw site calls `ApplicationFailure.newNonRetryableFailure` directly and carries a TODO to use `PayloadValidationException.newPayloadValidationException` once it is available in a supported SDK release. Nested aggregation casts the locally-retained first detail back to `List<Violation>`; the cast is cheap and performs no serialization. The tree stage also gives closed structs their extra-key check and open structs natural unknown-key tolerance (P13). A mapper-level `DeserializationProblemHandler` is still insufficient because it intercepts only Jackson-recoverable binding events and misses spec-number, required-presence, and other explicit checks.
-6. **Serialize: validate-then-write (P12).** The nested `Serializer` (§5) runs the shared constraint predicates **first**, collecting into the same `PayloadValidationError` application failure, and throws before writing a byte; it then emits fields honoring per-field `@JsonInclude` semantics in code, per the [[nullability]] serialize table (including the Go-tier conservative omit for optional+nullable). A **required** member whose Java type is a reference (`String`, `List<T>`, an object type) is where §3's non-null validator has teeth: a `null` is a violation on that member and the field is written unconditionally — never the optional treatment of guarding the check on `!= null` and omitting the key, which turns an invalid in-memory value into a payload that violates its own schema and blames the receiver. Generated serializers apply that required-reference guard before recursive or element validation and aggregate it with every sibling violation.
+1. **Java 8 baseline; POJOs, not records.** Targets Java 8 to match the Temporal
+   Java SDK's own minimum — emitted code must never impose a stricter floor than
+   the SDK it plugs into (P3/P4). Records require Java 16+, which would exclude
+   the large Java 8/11 install base, so models are emitted as **POJOs** (private
+   final fields, constructor, getters, `equals`/`hashCode`/`toString`). The
+   boilerplate stays hidden behind a hand-written-feeling API (P2).
+2. **Jackson typed binding into POJOs.** Jackson handles structural
+   (de)serialization. No reflection-based schema library beyond Jackson itself
+   (P4).
+3. **Primitive for required, boxed for optional; JSpecify for reference
+   nullness.** Required scalar fields use primitives
+   (`long`/`double`/`boolean`); optional ones box (`Long`/`Double`/`Boolean`) so
+   absence is `null`. Reference types (`String`, `List<T>`, object types) carry
+   a non-null validator instead. Emitted packages are `@NullMarked` (JSpecify;
+   non-null by default) and optional reference fields are `@Nullable`, restoring
+   for reference types the same in-memory absence signal `long`-vs-`Long` gives
+   scalars (P2). The annotation tracks **in-memory post-construction nullness**
+   (required vs optional), **not** the wire-level nullable distinction — that
+   stays a validator concern (§4, [[nullability]]). Generated Java source
+   imports these annotations, so `org.jspecify:jspecify:1.0.0` is a required
+   compile-time dependency, configured as `compileOnly` in Gradle or `provided`
+   in Maven. JSpecify annotations have runtime retention but enforce nothing at
+   runtime; `@Nullable` targets type uses, while `@NullMarked` targets
+   declarations including packages and types. Consumers that reflect over these
+   annotations must provide JSpecify themselves. Chosen over the abandoned
+   JSR-305; it is the cross-tool consensus (Google, JetBrains, Spring, Kotlin,
+   NullAway, Checker Framework).
+4. **Spec-strict per-primitive parse as a node helper, invoked from the
+   collecting deserializer (§5), not a per-field `@JsonDeserialize`.** Each
+   spec-sensitive primitive ships a strict-parse helper over a `JsonNode`:
+   `SpecNumbers.specLong` accepts integral spellings such as `1.0`/`1e2`,
+   rejects `1.5`, and enforces the integer cap, while `SpecNumbers.specDouble`
+   accepts only finite binary64 numbers (see [[type]]). On a bad value each
+   helper **pushes a `Violation` and returns `null` rather than throwing**.
+   Custom logic is mandatory because Jackson's defaults can silently truncate
+   integers or map overflowing decimals to infinity. It is *not* a per-field
+   `@JsonDeserialize` because per-field binders are fail-fast — the first
+   field's `MismatchedInputException` aborts the whole bind and defeats P11
+   aggregation. The explicit-`null` decision (reject for
+   optional-non-nullable/required, accept for nullable) is a per-field branch in
+   the collecting deserializer over the node's `isNull()` — the same three-way
+   Go makes in `UnmarshalJSON` (see [[nullability]]). Parallels the
+   `parseSpecInteger` helper (see [[type]]).
+5. **Error aggregation primitive — one class-level collecting (de)serializer per
+   POJO.** Each POJO carries class-level
+   `@JsonDeserialize(using = <Pojo>.Deserializer.class)` and the mirror
+   `@JsonSerialize` (§6), emitted as **`public static final` nested classes**
+   (`User.Deserializer`/`User.Serializer`) — so the names never collide *across*
+   models and sit visibly with the type they serve (P2). Both names are still
+   reserved in the model's own nested scope, so a `const`/`enum` member recasing
+   onto `Serializer`/`Deserializer` is a P15 load reject. The deserializer is
+   the Jackson analog of Go's raw-object `UnmarshalJSON`: a
+   **two-stage lenient-then-validate** bind. Stage 1 reads the whole object into
+   a `JsonNode` tree with `SpecNumbers.readExactTree(parser)`, preserving exact
+   decimal tokens while avoiding Jackson's fail-fast `MismatchedInputException`
+   on field #1. Stage 2 walks every declared field through the shared
+   spec-strict + constraint helpers (§4), pushes one
+   `Violation { path, reason }` per problem, and throws one non-retryable
+   Temporal `ApplicationFailure` with type `PayloadValidationError` and the
+   `List<Violation>` as its first detail (P11). Each generated throw site calls
+   `ApplicationFailure.newNonRetryableFailure` directly and carries a TODO to
+   use `PayloadValidationException.newPayloadValidationException` once it is
+   available in a supported SDK release. Nested aggregation casts the
+   locally-retained first detail back to `List<Violation>`; the cast is cheap
+   and performs no serialization. The tree stage also gives closed structs their
+   extra-key check and open structs natural unknown-key tolerance (P13). A
+   mapper-level `DeserializationProblemHandler` is still insufficient because it
+   intercepts only Jackson-recoverable binding events and misses spec-number,
+   required-presence, and other explicit checks.
+6. **Serialize: validate-then-write (P12).** The nested `Serializer` (§5) runs
+   the shared constraint predicates **first**, collecting into the same
+   `PayloadValidationError` application failure, and throws before writing a
+   byte; it then emits fields honoring per-field `@JsonInclude` semantics in
+   code, per the [[nullability]] serialize table (including the Go-tier
+   conservative omit for optional+nullable). A **required** member whose Java
+   type is a reference (`String`, `List<T>`, an object type) is where §3's
+   non-null validator has teeth: a `null` is a violation on that member and the
+   field is written unconditionally — never the optional treatment of guarding
+   the check on `!= null` and omitting the key, which turns an invalid in-memory
+   value into a payload that violates its own schema and blames the receiver.
+   Generated serializers apply that required-reference guard before recursive or
+   element validation and aggregate it with every sibling violation.
 
 ## Go
 
-1. **Every exported declaration carries a name-led doc comment (P2, `golint`/godoc convention).** Every exported type, struct field, function, method, var, and const the generator emits — schema-derived or generator-owned runtime alike — gets a `//` doc comment whose opening line leads with the identifier itself, never a bare, unattributed sentence; this is stricter than TypeScript/Python/Java, which have no equivalent per-declaration mandate. For a schema-derived type or field, [[title]]/[[description]] supply the text (see [[description]]'s Doc-comment assembly for the name-led rule in both the title-present and title-absent cases); when neither is authored, the generator falls back to a short, honest, name-led line synthesized from information already at hand — the `$defs`/property name, the JSON member name, a union's admissible members — rather than leaving the declaration undocumented. For the fixed runtime the generator owns outright (`Violation`, `Validate`/`UnmarshalJSON`/`MarshalJSON`, the closed-value/`oneOf` synthesized types and their constants, service/operation client bindings), the doc text is one hand-authored, name-led sentence per declaration kind, reused verbatim everywhere that kind is emitted. Unexported identifiers (including the payload-validation compatibility helper) are unaffected — godoc does not require them, and the terser, hand-written-feeling output stays terse.
-2. **Aggregate via one Temporal `ApplicationError` (P11).** Validation returns a non-retryable application error with message `Payload validation failed`, type `PayloadValidationError`, and `[]Violation` as its first detail. The generated `newPayloadValidationError` compatibility helper calls `temporal.NewNonRetryableApplicationError` until `temporal.NewPayloadValidationError` is available in the supported SDK release. Nested aggregation uses `ApplicationError.Details(&violations)` to cast the locally-retained first detail back to `[]Violation`; this is a cheap reflection assignment and performs no serialization.
+1. **Every exported declaration carries a name-led doc comment (P2,
+   `golint`/godoc convention).** Every exported type, struct field, function,
+   method, var, and const the generator emits — schema-derived or
+   generator-owned runtime alike — gets a `//` doc comment whose opening line
+   leads with the identifier itself, never a bare, unattributed sentence; this
+   is stricter than TypeScript/Python/Java, which have no equivalent
+   per-declaration mandate. For a schema-derived type or field,
+   [[title]]/[[description]] supply the text (see [[description]]'s Doc-comment
+   assembly for the name-led rule in both the title-present and title-absent
+   cases); when neither is authored, the generator falls back to a short,
+   honest, name-led line synthesized from information already at hand — the
+   `$defs`/property name, the JSON member name, a union's admissible members —
+   rather than leaving the declaration undocumented. For the fixed runtime the
+   generator owns outright (`Violation`,
+   `Validate`/`UnmarshalJSON`/`MarshalJSON`, the closed-value/`oneOf`
+   synthesized types and their constants, service/operation client bindings),
+   the doc text is one hand-authored, name-led sentence per declaration kind,
+   reused verbatim everywhere that kind is emitted. Unexported identifiers
+   (including the payload-validation compatibility helper) are unaffected —
+   godoc does not require them, and the terser, hand-written-feeling output
+   stays terse.
+2. **Aggregate via one Temporal `ApplicationError` (P11).** Validation returns a
+   non-retryable application error with message `Payload validation failed`,
+   type `PayloadValidationError`, and `[]Violation` as its first detail. The
+   generated `newPayloadValidationError` compatibility helper calls
+   `temporal.NewNonRetryableApplicationError` until
+   `temporal.NewPayloadValidationError` is available in the supported SDK
+   release. Nested aggregation uses `ApplicationError.Details(&violations)` to
+   cast the locally-retained first detail back to `[]Violation`; this is a cheap
+   reflection assignment and performs no serialization.
