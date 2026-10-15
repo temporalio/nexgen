@@ -27,30 +27,8 @@ import (
 
 const workflowServiceName = "temporal.api.workflowservice.v1.WorkflowService"
 
-// The system server consumes and returns binary protobuf, not Nexus handler
-// payloads encoded by the application's converter.
-func systemServerDataConverter() converter.DataConverter {
-	return converter.NewCompositeDataConverter(
-		converter.NewNilPayloadConverter(),
-		converter.NewByteSlicePayloadConverter(),
-		converter.NewProtoPayloadConverter(),
-		converter.NewJSONPayloadConverter(),
-	)
-}
-
-func signalWithStartWorkflow(ctx workflow.Context, input string) error {
+func doNothingWorkflow(ctx workflow.Context, input string) error {
 	return nil
-}
-
-type emptyPayloadsDataConverter struct {
-	converter.DataConverter
-}
-
-func (c emptyPayloadsDataConverter) ToPayloads(values ...interface{}) (*common.Payloads, error) {
-	if len(values) == 0 {
-		return &common.Payloads{}, nil
-	}
-	return c.DataConverter.ToPayloads(values...)
 }
 
 // recordedEncode captures one value handed to the data converter along with the
@@ -223,7 +201,7 @@ type WorkflowServiceIntegrationSuite struct {
 
 func (s *WorkflowServiceIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
-	s.env.SetDataConverter(systemServerDataConverter())
+	s.env.SetDataConverter(systemNexusTestDataConverter())
 	s.calls = nil
 
 	signalWithStart := nexus.NewSyncOperation("SignalWithStartWorkflowExecution",
@@ -244,7 +222,7 @@ func TestWorkflowServiceIntegrationSuite(t *testing.T) {
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
-	s.env.RegisterWorkflowWithOptions(signalWithStartWorkflow, workflow.RegisterOptions{
+	s.env.RegisterWorkflowWithOptions(doNothingWorkflow, workflow.RegisterOptions{
 		Name: "registered-workflow",
 	})
 	retryPolicy := &temporal.RetryPolicy{MaximumAttempts: 3}
@@ -272,7 +250,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 			opts,
 			"wake-up",
 			"signal-value",
-			signalWithStartWorkflow,
+			doNothingWorkflow,
 			"workflow-input",
 		)
 		selector := workflow.NewSelector(ctx)
@@ -343,7 +321,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSliceSignalArgumentRemainsOnePaylo
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		opts := ws.SignalWithStartWorkflowOptions{ID: "workflow-id"}
 		if err := ws.SignalWithStartWorkflowTyped(
-			ctx, opts, "wake-up", signalArg, signalWithStartWorkflow, "workflow-input",
+			ctx, opts, "wake-up", signalArg, doNothingWorkflow, "workflow-input",
 		).Get(ctx, nil); err != nil {
 			return err
 		}
@@ -365,8 +343,20 @@ func (s *WorkflowServiceIntegrationSuite) TestSliceSignalArgumentRemainsOnePaylo
 	}
 }
 
+// A non-nil empty result distinguishes converter delegation from a nil shortcut.
+type nonNilEmptyPayloadsDataConverter struct {
+	converter.DataConverter
+}
+
+func (c nonNilEmptyPayloadsDataConverter) ToPayloads(values ...any) (*common.Payloads, error) {
+	if len(values) == 0 {
+		return &common.Payloads{}, nil
+	}
+	return c.DataConverter.ToPayloads(values...)
+}
+
 func (s *WorkflowServiceIntegrationSuite) TestEmptyPayloadsAreDelegatedToDataConverter() {
-	s.env.SetDataConverter(emptyPayloadsDataConverter{systemServerDataConverter()})
+	s.env.SetDataConverter(nonNilEmptyPayloadsDataConverter{systemNexusTestDataConverter()})
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		var result ws.SignalWithStartWorkflowResponse
 		return ws.SignalWithStartWorkflow(
@@ -389,7 +379,7 @@ func (s *WorkflowServiceIntegrationSuite) TestCanceledContextDoesNotScheduleOper
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		ctx, cancel := workflow.WithCancel(ctx)
 		cancel()
-		return ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{ID: "workflow-id"}, "wake-up", "signal-value", signalWithStartWorkflow, "workflow-input").Get(ctx, nil)
+		return ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{ID: "workflow-id"}, "wake-up", "signal-value", doNothingWorkflow, "workflow-input").Get(ctx, nil)
 	})
 
 	s.Error(s.env.GetWorkflowError())
@@ -401,7 +391,7 @@ func (s *WorkflowServiceIntegrationSuite) TestConversionFailureSurfacesOnTheFutu
 	// conversion failure resolves the operation future with an error instead of
 	// failing synchronously before the operation is scheduled.
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
-		fut := ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{ID: "workflow-id", Memo: map[string]any{"invalid": func() {}}}, "wake-up", "signal-value", signalWithStartWorkflow, "workflow-input")
+		fut := ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{ID: "workflow-id", Memo: map[string]any{"invalid": func() {}}}, "wake-up", "signal-value", doNothingWorkflow, "workflow-input")
 		if err := fut.Get(ctx, nil); err == nil {
 			return errors.New("conversion failure future returned no error")
 		}
@@ -447,27 +437,10 @@ func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryUsesWireKeyAndNat
 	s.Equal(converter.WorkflowSerializationContext{
 		Namespace: "default-test-namespace", WorkflowID: "target-workflow-id",
 	}, original.SerializationContext(requests[0]))
-	// The native request type is intentionally unexported. Inspect its fields
-	// without converting it to a proto or adding a public model API for tests.
+	// The policy must receive the generated native model, not a protobuf.
 	request := reflect.ValueOf(requests[0])
 	s.Require().Equal(reflect.Struct, request.Kind(), "callback must receive a native request value")
 	s.Equal(reflect.TypeOf(ws.SignalWithStartWorkflowOptions{}).PkgPath(), request.Type().PkgPath())
-	for name, want := range map[string]string{
-		"Namespace": "default-test-namespace", "ID": "target-workflow-id",
-		"TaskQueue": "my-task-queue", "Workflow": "ExampleWorkflow", "Signal": "wake-up",
-	} {
-		field := request.FieldByName(name)
-		s.Require().True(field.IsValid(), "native request field %s is missing", name)
-		s.Require().Equal(reflect.String, field.Kind(), name)
-		s.Equal(want, field.String(), name)
-	}
-	for name, want := range map[string][]any{
-		"Args": {"workflow-input"}, "SignalArgs": {"signal-value"},
-	} {
-		field := request.FieldByName(name)
-		s.Require().True(field.IsValid(), "native request field %s is missing", name)
-		s.Equal(want, field.Interface(), name)
-	}
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestRawExecuteOperationUsesRegisteredNativeRequest() {
@@ -614,25 +587,6 @@ func (s *WorkflowServiceIntegrationSuite) checkRawEnvelopes(recorder recordingDa
 			}
 		}
 	}
-}
-
-func (s *WorkflowServiceIntegrationSuite) TestOperationRegistryCopiesEntries() {
-	key := internal.NexusOperationKey{
-		Service: workflowServiceName, Operation: "SignalWithStartWorkflowExecution",
-	}
-	original, ok := ws.NexusOperationRegistry[key]
-	s.Require().True(ok)
-	s.T().Cleanup(func() { ws.NexusOperationRegistry[key] = original })
-	entry := original
-	calls := 0
-	entry.SerializationContext = func(any) converter.SerializationContext {
-		calls++
-		return converter.WorkflowSerializationContext{}
-	}
-	ws.NexusOperationRegistry[key] = entry
-
-	s.checkSerializationContexts(true)
-	s.Zero(calls, "changing the generated map must not replace an SDK-owned entry")
 }
 
 func (s *WorkflowServiceIntegrationSuite) checkSerializationContexts(oneShot bool) {

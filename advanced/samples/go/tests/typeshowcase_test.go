@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/nexus-rpc/sdk-go/nexus"
@@ -84,46 +83,6 @@ func sampleProfile() typeshowcase.UserProfile {
 			Coordinates: &typeshowcase.Tuple2[float64, float64]{First: 45.5152, Second: -122.6784},
 		},
 	}
-}
-
-func field(value any, name string) any {
-	reflected := reflect.ValueOf(value)
-	for reflected.IsValid() && (reflected.Kind() == reflect.Interface || reflected.Kind() == reflect.Pointer) {
-		if reflected.IsNil() {
-			return nil
-		}
-		reflected = reflected.Elem()
-	}
-	if !reflected.IsValid() || reflected.Kind() != reflect.Struct {
-		if reflected.IsValid() && reflected.Kind() == reflect.Map && reflected.Type().Key().Kind() == reflect.String {
-			mapValue := reflected.MapIndex(reflect.ValueOf(name))
-			if mapValue.IsValid() {
-				return mapValue.Interface()
-			}
-		}
-		return nil
-	}
-	field := reflected.FieldByName(name)
-	if !field.IsValid() || !field.CanInterface() {
-		return nil
-	}
-	return field.Interface()
-}
-
-func mapValue(value any) map[string]any {
-	if values, ok := value.(map[string]any); ok {
-		return values
-	}
-	reflected := reflect.ValueOf(value)
-	if !reflected.IsValid() || reflected.Kind() != reflect.Map || reflected.Type().Key().Kind() != reflect.String {
-		return nil
-	}
-	values := make(map[string]any, reflected.Len())
-	iter := reflected.MapRange()
-	for iter.Next() {
-		values[iter.Key().String()] = iter.Value().Interface()
-	}
-	return values
 }
 
 func TestTypeShowcaseIntegrationSuite(t *testing.T) {

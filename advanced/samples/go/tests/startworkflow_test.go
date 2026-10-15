@@ -28,7 +28,7 @@ type StartWorkflowIntegrationSuite struct {
 
 func (s *StartWorkflowIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
-	s.env.SetDataConverter(systemServerDataConverter())
+	s.env.SetDataConverter(systemNexusTestDataConverter())
 	s.calls = nil
 
 	start := nexus.NewSyncOperation("StartWorkflow",

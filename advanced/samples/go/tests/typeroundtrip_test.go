@@ -30,7 +30,7 @@ type TypeRoundtripIntegrationSuite struct {
 
 func (s *TypeRoundtripIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
-	s.env.SetDataConverter(systemServerDataConverter())
+	s.env.SetDataConverter(systemNexusTestDataConverter())
 	s.calls = nil
 
 	activityOptionsOp := nexus.NewSyncOperation("ActivityOptionsOperation",
