@@ -896,6 +896,54 @@ Check.ParseFails<Closed>(
     );
 }
 
+/// .NET's `$` (like Python's) also matches before a final newline, so every
+/// generated anchor must be `\z`, in authored patterns and in the temporal
+/// grammars alike — and a mismatch must be a violation, not an exception.
+#[test]
+fn csharp_json_trailing_newline_is_rejected_everywhere() {
+    let case = JsonCase::new("trailing-newline");
+    case.write(
+        "newline.yaml",
+        r#"type: object
+properties:
+  word: { type: string, pattern: "^[a-z]+$" }
+  stamp: { type: string, format: date-time }
+  day: { type: string, format: date }
+  clock: { type: string, format: time }
+  span: { type: string, format: duration }
+  mail: { type: string, format: email }
+  host: { type: string, format: hostname }
+  id: { type: string, format: uuid }
+"#,
+    );
+    let output = case.generate(&["newline.yaml"]);
+    for (path, file) in &output.0 {
+        for line in file
+            .lines()
+            .filter(|line| line.contains("new global::System.Text.RegularExpressions.Regex("))
+        {
+            assert!(
+                line.contains("\\\\z\""),
+                "{}: an anchor that is not `\\z`:\n{line}",
+                path.display()
+            );
+        }
+    }
+    case.run(
+        r#"foreach (var (member, valid) in new[]
+{
+    ("word", "abc"), ("stamp", "2024-01-01T00:00:00Z"), ("day", "2024-01-01"), ("clock", "12:00:00Z"),
+    ("span", "PT1H"), ("mail", "a@example.com"), ("host", "example.com"), ("id", "123e4567-e89b-12d3-a456-426614174000"),
+})
+{
+    Check.RoundTrip<Newline>("{\"" + member + "\":\"" + valid + "\"}");
+    Check.ParseFails<Newline>("{\"" + member + "\":\"" + valid + "\\n\"}", member + ": ");
+}
+Check.WriteFails(new Newline { Word = "abc\n" }, "word: must match pattern");
+Check.WriteFails(new Newline { Clock = "12:00:00Z\n" }, "clock: ");"#,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // .NET string and equality semantics
 // ---------------------------------------------------------------------------
@@ -956,6 +1004,32 @@ Check.ParseFails<Lengths>("{\"long\":\"😀\"}", "long: must have length >= 2, g
 Check.RoundTrip<Lengths>("{\"tags\":[\"😀\"]}");
 Check.RoundTrip<Lengths>("{\"keyed\":{\"😀\":1}}");
 Check.WriteFails(new Lengths { Long = "😀" }, "long: must have length >= 2, got 1");"#,
+    );
+}
+
+/// .NET regexes match UTF-16 code units; the portable contract matches code
+/// points, so negated classes and astral members must consume a whole
+/// surrogate pair.
+#[test]
+fn csharp_json_patterns_match_code_points() {
+    let case = JsonCase::new("astral-patterns");
+    case.write(
+        "patterns.yaml",
+        r#"type: object
+properties:
+  one: { type: string, pattern: "^.$" }
+  notA: { type: string, pattern: "^[^a]$" }
+  emoji: { type: string, pattern: "^[😀-😂]+$" }
+  repeat: { type: string, pattern: "^😀{2}$" }
+"#,
+    );
+    case.generate(&["patterns.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Patterns>("{\"one\":\"😀\",\"notA\":\"😀\",\"emoji\":\"😀😁😂\",\"repeat\":\"😀😀\"}");
+Check.ParseFails<Patterns>("{\"one\":\"😀😀\"}", "one: must match pattern");
+Check.ParseFails<Patterns>("{\"notA\":\"a\"}", "notA: must match pattern");
+Check.ParseFails<Patterns>("{\"emoji\":\"😃\"}", "emoji: must match pattern");
+Check.ParseFails<Patterns>("{\"repeat\":\"😀\"}", "repeat: must match pattern");"#,
     );
 }
 
