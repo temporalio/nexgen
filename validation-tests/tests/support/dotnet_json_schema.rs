@@ -762,6 +762,21 @@ $defs:
     case.build();
 }
 
+#[test]
+fn csharp_json_max_items_bounds_the_element_count() {
+    let case = JsonCase::new("max-items");
+    case.write(
+        "tagged.yaml",
+        "type: object\nproperties:\n  tags: { type: array, items: { type: string }, maxItems: 2 }\n",
+    );
+    case.generate(&["tagged.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Tagged>("{\"tags\":[\"a\",\"b\"]}");
+Check.ParseFails<Tagged>("{\"tags\":[\"a\",\"b\",\"c\"]}", "tags: must have at most 2 items, got 3");
+Check.WriteFails(new Tagged { Tags = new[] { "a", "b", "c" } }, "tags: must have at most 2 items, got 3");"#,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
