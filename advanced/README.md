@@ -455,4 +455,7 @@ npm run test
 npm run typecheck
 ```
 
-`cargo test` validates the checked-in example outputs as-is. Use `cargo build-examples` when you want to refresh them.
+`cargo test --all-features` runs Rust-only checks without language toolchains.
+Use `cargo validate <language>` to check generated sample freshness and run
+that language's compilation and runtime tests, or `cargo validate` for all
+languages. Use `cargo build-examples` when you want to refresh the samples.

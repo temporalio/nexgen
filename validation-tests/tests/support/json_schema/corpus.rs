@@ -20,7 +20,7 @@
 //!   accepted row is round-tripped against its declared common canonical wire,
 //!   with explicit overrides only for legacy TypeScript `Date` capacity loss.
 
-mod toolchain;
+use super::toolchain;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -30,8 +30,7 @@ use nexgen::generator::TsDateTimeTypes;
 use serde_json::{Value, json};
 
 use toolchain::{
-    PlanCase, Probe, ProbeKind, TARGETS, Target, TargetVerdicts, Verdict, Workspace,
-    repository_root,
+    PlanCase, Probe, ProbeKind, Target, TargetVerdicts, Verdict, Workspace, repository_root,
 };
 
 fn corpus(name: &str) -> Value {
@@ -119,6 +118,7 @@ fn write_schema(workspace: &Workspace, model: &str, members: &[Member]) -> PathB
 /// rather than failing the whole corpus.
 fn generate_corpus(
     workspace: &Workspace,
+    targets: &[Target],
     model: &str,
     dir: &str,
     mut members: Vec<Member>,
@@ -127,7 +127,7 @@ fn generate_corpus(
     loop {
         let schema = write_schema(workspace, model, &members);
         let mut failure = None;
-        for target in TARGETS {
+        for &target in targets {
             if let Err(error) = workspace.generate(target, &schema, dir) {
                 failure = Some(error);
                 break;
@@ -154,13 +154,14 @@ fn generate_corpus(
 
 fn run_corpus(
     workspace: &Workspace,
+    targets: &[Target],
     case_id: &str,
     model: &str,
     dir: &str,
     members: Vec<Member>,
     corpus_rows: Vec<Row>,
 ) -> Vec<String> {
-    let (kept, dropped) = generate_corpus(workspace, model, dir, members);
+    let (kept, dropped) = generate_corpus(workspace, targets, model, dir, members);
     let live: BTreeSet<String> = kept.iter().map(|member| member.name.clone()).collect();
     let corpus_rows: Vec<Row> = corpus_rows
         .into_iter()
@@ -195,7 +196,7 @@ fn run_corpus(
         .into_iter()
         .map(|note| format!("member dropped at load — {note}"))
         .collect();
-    for target in TARGETS {
+    for &target in targets {
         match toolchain::run_target(workspace, target, &plan) {
             Ok(result) => {
                 verdicts.insert(target, result);
@@ -381,8 +382,13 @@ fn run_typescript_profile(
     findings
 }
 
-#[test]
-fn pattern_corpus_matches_identically_in_every_runtime() {
+pub fn run(target: Option<Target>) {
+    pattern_corpus_matches_identically_in_every_runtime(target);
+    format_corpora_hold_in_every_runtime(target);
+}
+
+pub fn pattern_corpus_matches_identically_in_every_runtime(target: Option<Target>) {
+    let targets = toolchain::selected_targets(target);
     let document = corpus("pattern_conformance");
     let mut members = Vec::new();
     let mut index_of: BTreeMap<String, String> = BTreeMap::new();
@@ -431,13 +437,14 @@ fn pattern_corpus_matches_identically_in_every_runtime() {
     let workspace = Workspace::new("pattern-corpus");
     let findings = run_corpus(
         &workspace,
+        &targets,
         "pattern-conformance",
         "PatternCorpus",
         "pattern_corpus",
         members,
         corpus_rows,
     );
-    let (unexpected, open, structural) = triage(findings, &[]);
+    let (unexpected, open, structural) = triage(findings, &[], &targets);
     report_open(&open, &structural);
     assert!(
         unexpected.is_empty(),
@@ -447,8 +454,8 @@ fn pattern_corpus_matches_identically_in_every_runtime() {
     );
 }
 
-#[test]
-fn format_corpora_hold_in_every_runtime() {
+pub fn format_corpora_hold_in_every_runtime(target: Option<Target>) {
+    let targets = toolchain::selected_targets(target);
     // One member per asserted format, plus the three materializing clock
     // formats, so every corpus row lands on the generated check for its rule.
     let members = vec![
@@ -580,34 +587,34 @@ fn format_corpora_hold_in_every_runtime() {
         });
     }
 
-    let date_findings = run_typescript_profile(
-        "typescript-date",
-        TsDateTimeTypes::Date,
-        "FormatCorpus",
-        "format_corpus",
-        &members,
-        &corpus_rows,
-    );
-    let temporal_findings = run_typescript_profile(
-        "typescript-temporal",
-        TsDateTimeTypes::Temporal,
-        "FormatCorpus",
-        "format_corpus",
-        &members,
-        &corpus_rows,
-    );
+    let mut profile_findings = Vec::new();
+    if targets.contains(&Target::TypeScript) {
+        for (profile, repr) in [
+            ("typescript-date", TsDateTimeTypes::Date),
+            ("typescript-temporal", TsDateTimeTypes::Temporal),
+        ] {
+            profile_findings.extend(run_typescript_profile(
+                profile,
+                repr,
+                "FormatCorpus",
+                "format_corpus",
+                &members,
+                &corpus_rows,
+            ));
+        }
+    }
     let workspace = Workspace::new("format-corpus");
     let mut findings = run_corpus(
         &workspace,
+        &targets,
         "format-conformance",
         "FormatCorpus",
         "format_corpus",
         members,
         corpus_rows,
     );
-    findings.extend(date_findings);
-    findings.extend(temporal_findings);
-    let (unexpected, open, structural) = triage(findings, OPEN_FORMAT_ROWS);
+    findings.extend(profile_findings);
+    let (unexpected, open, structural) = triage(findings, OPEN_FORMAT_ROWS, &targets);
     report_open(&open, &structural);
     assert!(
         unexpected.is_empty(),
@@ -623,6 +630,8 @@ fn format_corpora_hold_in_every_runtime() {
 /// must match at least one observed finding, so it cannot outlive the defect.
 struct OpenRow {
     matches: &'static str,
+    /// Targets whose execution can prove this entry stale.
+    targets: &'static [Target],
     finding: &'static str,
     status: RowStatus,
     note: &'static str,
@@ -643,6 +652,7 @@ enum RowStatus {
 static OPEN_FORMAT_ROWS: &[OpenRow] = &[
     OpenRow {
         matches: "format_materialize_clock/dt-frac-9 (",
+        targets: &[Target::Python],
         finding: "09#8",
         status: RowStatus::Open,
         note: "Python truncates nanoseconds to microseconds, so it re-emits a different wire \
@@ -651,6 +661,7 @@ static OPEN_FORMAT_ROWS: &[OpenRow] = &[
     },
     OpenRow {
         matches: "format_materialize_clock/dt-frac-9-offset (",
+        targets: &[Target::Python],
         finding: "09#8",
         status: RowStatus::Open,
         note: "As above, with an offset.",
@@ -659,7 +670,11 @@ static OPEN_FORMAT_ROWS: &[OpenRow] = &[
 
 /// Split findings into "must fail the build", "known open" and "documented
 /// target limitation".
-fn triage(findings: Vec<String>, open_rows: &[OpenRow]) -> (Vec<String>, Vec<String>, Vec<String>) {
+fn triage(
+    findings: Vec<String>,
+    open_rows: &[OpenRow],
+    targets: &[Target],
+) -> (Vec<String>, Vec<String>, Vec<String>) {
     let mut unexpected = Vec::new();
     let mut open = Vec::new();
     let mut structural = Vec::new();
@@ -676,6 +691,9 @@ fn triage(findings: Vec<String>, open_rows: &[OpenRow]) -> (Vec<String>, Vec<Str
         }
     }
     for row in open_rows {
+        if !row.targets.iter().all(|target| targets.contains(target)) {
+            continue;
+        }
         let seen = open
             .iter()
             .chain(structural.iter())

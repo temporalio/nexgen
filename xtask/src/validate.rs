@@ -16,6 +16,9 @@ pub enum ValidationLanguage {
     Go,
     Java,
     Dotnet,
+    // Full validation additionally checks agreement between all JSON Schema
+    // backends, after every language's dependencies have been provisioned.
+    CrossLanguage,
 }
 
 pub struct ValidateRequest {
@@ -34,19 +37,7 @@ pub fn validate(request: &ValidateRequest) -> Result<()> {
         path: log_dir.clone(),
         source,
     })?;
-    let languages = match request.language {
-        Some(language) => vec![language],
-        None => vec![
-            ValidationLanguage::Rust,
-            ValidationLanguage::Python,
-            ValidationLanguage::Typescript,
-            ValidationLanguage::Go,
-            ValidationLanguage::Java,
-            ValidationLanguage::Dotnet,
-        ],
-    };
-
-    for language in languages {
+    for language in validation_languages(request.language) {
         let mut log = ValidationLog::new(&log_dir, language, request.verbose)?;
         println!(
             "==> Validating {} (log: {})",
@@ -61,7 +52,17 @@ pub fn validate(request: &ValidateRequest) -> Result<()> {
             ValidationLanguage::Go => validate_go(&repo_root, &mut log),
             ValidationLanguage::Java => validate_java(&repo_root, &mut log),
             ValidationLanguage::Dotnet => validate_dotnet(&repo_root, &mut log),
+            ValidationLanguage::CrossLanguage => validate_conformance(&repo_root, &mut log),
         };
+        let result = result.and_then(|()| {
+            if !matches!(
+                language,
+                ValidationLanguage::Rust | ValidationLanguage::CrossLanguage
+            ) {
+                validate_generated_code(&repo_root, language, &mut log)?;
+            }
+            Ok(())
+        });
         match result {
             Ok(()) => println!("    passed in {:.1?}", started.elapsed()),
             Err(error) => {
@@ -78,6 +79,21 @@ pub fn validate(request: &ValidateRequest) -> Result<()> {
     Ok(())
 }
 
+fn validation_languages(language: Option<ValidationLanguage>) -> Vec<ValidationLanguage> {
+    match language {
+        Some(language) => vec![language],
+        None => vec![
+            ValidationLanguage::Rust,
+            ValidationLanguage::Python,
+            ValidationLanguage::Typescript,
+            ValidationLanguage::Go,
+            ValidationLanguage::Java,
+            ValidationLanguage::Dotnet,
+            ValidationLanguage::CrossLanguage,
+        ],
+    }
+}
+
 impl ValidationLanguage {
     fn name(self) -> &'static str {
         match self {
@@ -87,6 +103,7 @@ impl ValidationLanguage {
             Self::Go => "Go",
             Self::Java => "Java",
             Self::Dotnet => ".NET",
+            Self::CrossLanguage => "cross-language JSON Schema conformance",
         }
     }
 
@@ -98,6 +115,7 @@ impl ValidationLanguage {
             Self::Python => "python",
             Self::Go => "go",
             Self::Java => "java",
+            Self::CrossLanguage => "conformance",
         }
     }
 }
@@ -192,10 +210,39 @@ fn sample_roots(repo_root: &Path, language: &str) -> [PathBuf; 2] {
 }
 
 fn validate_rust(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
-    run(log, repo_root, "cargo", &["fmt", "--check"])?;
-    // The `advanced` feature exposes the WIT/proto CLI surface exercised by the
-    // integration tests, so validation must include it.
-    run(log, repo_root, "cargo", &["test", "--features", "advanced"])
+    run(log, repo_root, "cargo", &["fmt", "--all", "--check"])?;
+    // Default members are nexgen and xtask. The toolchain integration-test
+    // package is selected only by non-Rust validation stages.
+    run(log, repo_root, "cargo", &["test", "--all-features"])
+}
+
+fn validate_generated_code(
+    repo_root: &Path,
+    language: ValidationLanguage,
+    log: &mut ValidationLog,
+) -> Result<()> {
+    run(log, repo_root, "cargo", &integration_test_args(language))
+}
+
+fn validate_conformance(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
+    // Other backends resolve dependencies on demand. TypeScript links the
+    // sample project's installed dependencies into its scratch workspaces.
+    let typescript = repo_root.join("samples/typescript");
+    if !typescript.join("node_modules").is_dir() {
+        run(log, &typescript, "npm", &["ci"])?;
+    }
+    validate_generated_code(repo_root, ValidationLanguage::CrossLanguage, log)
+}
+
+fn integration_test_args(language: ValidationLanguage) -> [&'static str; 6] {
+    [
+        "test",
+        "--package",
+        "nexgen-validation-tests",
+        "--all-features",
+        "--test",
+        language.log_name(),
+    ]
 }
 
 fn validate_python(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
@@ -365,4 +412,70 @@ fn format_command(program: &str, args: &[&str]) -> String {
         .chain(args.iter().copied())
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ValidationLanguage, integration_test_args, validation_languages};
+
+    #[test]
+    fn each_toolchain_stage_selects_one_integration_target() {
+        for (language, target) in [
+            (ValidationLanguage::Python, "python"),
+            (ValidationLanguage::Typescript, "typescript"),
+            (ValidationLanguage::Go, "go"),
+            (ValidationLanguage::Java, "java"),
+            (ValidationLanguage::Dotnet, "dotnet"),
+            (ValidationLanguage::CrossLanguage, "conformance"),
+        ] {
+            assert_eq!(
+                integration_test_args(language),
+                [
+                    "test",
+                    "--package",
+                    "nexgen-validation-tests",
+                    "--all-features",
+                    "--test",
+                    target,
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn full_validation_ends_with_one_cross_language_stage() {
+        let languages: Vec<_> = validation_languages(None)
+            .into_iter()
+            .map(|language| language.log_name())
+            .collect();
+        assert_eq!(
+            languages,
+            [
+                "rust",
+                "python",
+                "typescript",
+                "go",
+                "java",
+                "dotnet",
+                "conformance"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_selected_stage_runs_on_its_own() {
+        for language in [
+            ValidationLanguage::Rust,
+            ValidationLanguage::Python,
+            ValidationLanguage::Typescript,
+            ValidationLanguage::Go,
+            ValidationLanguage::Java,
+            ValidationLanguage::Dotnet,
+            ValidationLanguage::CrossLanguage,
+        ] {
+            let stages = validation_languages(Some(language));
+            assert_eq!(stages.len(), 1);
+            assert_eq!(stages[0].log_name(), language.log_name());
+        }
+    }
 }

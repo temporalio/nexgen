@@ -39,7 +39,7 @@ struct ValidateArgs {
     /// Print each validation command's output in addition to writing it to its log.
     #[arg(short, long)]
     verbose: bool,
-    /// Directory for per-language validation logs. Defaults to `target/validate-logs`.
+    /// Directory for per-stage validation logs. Defaults to `target/validate-logs`.
     #[arg(long, value_name = "DIR")]
     log_dir: Option<PathBuf>,
     #[arg(value_enum, value_name = "LANGUAGE")]
@@ -69,6 +69,8 @@ enum ValidationLanguage {
     Go,
     Java,
     Dotnet,
+    /// Compare generated JSON Schema behavior across Go, Java, Python, and TypeScript.
+    Conformance,
 }
 
 impl From<ExampleLanguage> for Language {
@@ -124,6 +126,7 @@ impl From<ValidationLanguage> for validate::ValidationLanguage {
             ValidationLanguage::Go => Self::Go,
             ValidationLanguage::Java => Self::Java,
             ValidationLanguage::Dotnet => Self::Dotnet,
+            ValidationLanguage::Conformance => Self::CrossLanguage,
         }
     }
 }

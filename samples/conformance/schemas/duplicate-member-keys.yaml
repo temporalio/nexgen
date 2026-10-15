@@ -1,0 +1,12 @@
+# A JSON object may repeat a key (RFC 8259 leaves the meaning to the reader).
+# Every target's decoder keeps the last occurrence, for a declared member and
+# for an extra the open model preserves, so the generated parsers do too.
+$schema: https://json-schema.org/draft/2020-12/schema
+title: DuplicateMemberKeys
+description: Repeated object keys resolve to their last occurrence.
+type: object
+required: [value]
+properties:
+  value:
+    description: A declared member.
+    type: integer

@@ -30,7 +30,9 @@ cargo build-examples --format json-schema            # all languages
 cargo build-examples --format json-schema --lang go  # a single language
 ```
 
-The generated definitions are checked in and snapshot-tested by `cargo test`.
+The generated definitions are checked in. `cargo validate <language>` checks
+their freshness and runs that language's sample and generated-code tests.
+`cargo test --all-features` runs Rust-only checks without language toolchains.
 Each example's output directory is deleted before it is regenerated, so nothing
 hand-written belongs in one — the tests live in the sibling `tests/` directory.
 (The `nexgen` CLI itself never deletes: it writes into an existing `--output`

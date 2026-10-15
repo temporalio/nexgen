@@ -28,13 +28,13 @@
 //! The row must match, and must keep matching: a probe that starts passing fails
 //! the test so the marker cannot outlive the bug.
 
-mod toolchain;
+use super::toolchain;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use toolchain::{TARGETS, Target, Workspace, brief, command, repository_root, run};
+use toolchain::{Target, Workspace, brief, command, repository_root, run as run_command};
 
 /// A target that legitimately refuses to *load* a schema the others accept.
 ///
@@ -565,8 +565,8 @@ fn attribute<'a>(line: &str, ids: &'a [&'a str]) -> Option<&'a str> {
         .find(|id| line.contains(&format!("/{id}/")) || line.starts_with(&format!("{id}/")))
 }
 
-#[test]
-fn generated_output_compiles_for_every_probe_schema() {
+pub fn run(target: Option<Target>) {
+    let targets = toolchain::selected_targets(target);
     let workspace = Workspace::new("probe-matrix");
     let mut failures = Failures::default();
     let mut compiled: BTreeSet<(String, Target)> = BTreeSet::new();
@@ -577,19 +577,18 @@ fn generated_output_compiles_for_every_probe_schema() {
     for probe in PROBES {
         let schema = write_schema(&workspace, probe);
         let mut load_errors: BTreeMap<Target, String> = BTreeMap::new();
-        for target in TARGETS {
+        for &target in &targets {
             if let Err(error) = workspace.generate(target, &schema, probe.id) {
                 load_errors.insert(target, error);
             }
         }
-        if load_errors.len() == TARGETS.len() {
-            let expected = probe.load_rejected.unwrap_or_else(|| {
-                panic!(
-                    "{}: the loader rejected a shape the matrix expects it to accept:\n{}",
-                    probe.id,
-                    load_errors.values().next().expect("a diagnostic")
-                )
-            });
+        if let Some(expected) = probe.load_rejected {
+            assert_eq!(
+                load_errors.len(),
+                targets.len(),
+                "{}: the loader now accepts it for at least one selected target, so its expected rejection is stale",
+                probe.id
+            );
             for (target, error) in &load_errors {
                 assert!(
                     error.contains(expected),
@@ -599,11 +598,6 @@ fn generated_output_compiles_for_every_probe_schema() {
             }
             continue;
         }
-        assert!(
-            probe.load_rejected.is_none(),
-            "{}: the loader now accepts it for at least one target, so its expected rejection is stale",
-            probe.id
-        );
         // A load verdict that differs per target is only a defect when it is
         // undeclared. P15 scopes identifier validity to the emitted target, so a
         // target listed in `scoped_load` is *supposed* to refuse; anything else
@@ -634,6 +628,9 @@ fn generated_output_compiles_for_every_probe_schema() {
         // A declared scoped load that no longer happens is stale: the target
         // started accepting the schema, and the declaration has to go.
         for scoped in probe.scoped_load {
+            if !targets.contains(&scoped.target) {
+                continue;
+            }
             assert!(
                 load_errors.contains_key(&scoped.target),
                 "{} / {}: now loads, so its scoped_load declaration is stale — delete it",
@@ -642,7 +639,7 @@ fn generated_output_compiles_for_every_probe_schema() {
             );
         }
         generated.push(probe);
-        for target in TARGETS {
+        for &target in &targets {
             if !load_errors.contains_key(&target) {
                 per_target.entry(target).or_default().push(probe);
             }
@@ -652,36 +649,22 @@ fn generated_output_compiles_for_every_probe_schema() {
     let for_target = |target: Target| per_target.get(&target).unwrap_or(&empty).clone();
     let ids: Vec<&str> = generated.iter().map(|probe| probe.id).collect();
 
-    check_go(
-        &workspace,
-        &for_target(Target::Go),
-        &mut failures,
-        &mut compiled,
-    );
-    check_java(
-        &workspace,
-        &for_target(Target::Java),
-        &mut failures,
-        &mut compiled,
-    );
-    check_python(
-        &workspace,
-        &for_target(Target::Python),
-        &mut failures,
-        &mut compiled,
-    );
-    check_typescript(
-        &workspace,
-        &for_target(Target::TypeScript),
-        &ids,
-        &mut failures,
-        &mut compiled,
-    );
+    for &target in &targets {
+        let probes = for_target(target);
+        match target {
+            Target::Go => check_go(&workspace, &probes, &mut failures, &mut compiled),
+            Target::Java => check_java(&workspace, &probes, &mut failures, &mut compiled),
+            Target::Python => check_python(&workspace, &probes, &mut failures, &mut compiled),
+            Target::TypeScript => {
+                check_typescript(&workspace, &probes, &ids, &mut failures, &mut compiled);
+            }
+        }
+    }
 
     let mut report = Vec::new();
     let mut open = Vec::new();
     for probe in &generated {
-        for target in TARGETS {
+        for &target in &targets {
             let key = (probe.id.to_string(), target);
             let observed = failures.0.get(&key);
             let expected = probe.broken.iter().find(|entry| entry.target == target);
@@ -749,10 +732,12 @@ fn check_go(
         compiled.insert((probe.id.to_string(), Target::Go));
         // `go vet` type-checks before it analyses, so it subsumes `go build` and
         // additionally reports the shadowing and printf defects a build ignores.
-        let vet = run(command("go")
-            .current_dir(&root)
-            .arg("vet")
-            .arg(format!("./{}", probe.id)));
+        let vet = run_command(
+            command("go")
+                .current_dir(&root)
+                .arg("vet")
+                .arg(format!("./{}", probe.id)),
+        );
         if !vet.ok {
             failures.record(probe.id, Target::Go, "go vet", &vet.detail);
         }
@@ -801,7 +786,7 @@ fn check_python(
     fs::create_dir_all(&root).expect("create python probe root");
     fs::write(
         &runner,
-        include_str!("../samples/conformance/runners/smoke.py"),
+        include_str!("../../../../samples/conformance/runners/smoke.py"),
     )
     .expect("write python smoke runner");
 
@@ -830,7 +815,7 @@ fn check_python(
         // interpreter is a missing check, not a generator defect, so it must not
         // masquerade as one.
         let (program, leading) = argv.split_first().expect("interpreter argv");
-        if run(command(program).args(leading).args(["-c", "pass"])).ok {
+        if run_command(command(program).args(leading).args(["-c", "pass"])).ok {
             interpreters.push((format!("py_compile ({version})"), argv));
         } else {
             eprintln!("skipping the Python {version} sweep: uv cannot provide that interpreter");
@@ -842,11 +827,13 @@ fn check_python(
         let files = python_files(&root.join(probe.id));
         for (stage, argv) in &interpreters {
             let (program, leading) = argv.split_first().expect("interpreter argv");
-            let compile = run(command(program)
-                .current_dir(&root)
-                .args(leading)
-                .args(["-m", "py_compile"])
-                .args(&files));
+            let compile = run_command(
+                command(program)
+                    .current_dir(&root)
+                    .args(leading)
+                    .args(["-m", "py_compile"])
+                    .args(&files),
+            );
             if !compile.ok {
                 failures.record(probe.id, Target::Python, stage, &compile.detail);
             }
@@ -854,13 +841,15 @@ fn check_python(
     }
 
     let result_path = root.join("smoke.json");
-    let execution = run(toolchain::python_runtime_command()
-        .expect("provision the Python probe runtime")
-        .current_dir(&root)
-        .arg(&runner)
-        .arg(&result_path)
-        .arg(&root)
-        .args(probes.iter().map(|probe| probe.id)));
+    let execution = run_command(
+        toolchain::python_runtime_command()
+            .expect("provision the Python probe runtime")
+            .current_dir(&root)
+            .arg(&runner)
+            .arg(&result_path)
+            .arg(&root)
+            .args(probes.iter().map(|probe| probe.id)),
+    );
     if !execution.ok {
         panic!(
             "the Python import smoke runner failed:\n{}",
@@ -919,9 +908,11 @@ fn check_typescript(
     }
 
     let tsc = samples.join("node_modules/.bin/tsc");
-    let check = run(command(&tsc.to_string_lossy())
-        .current_dir(&root)
-        .args(["--noEmit", "--pretty", "false"]));
+    let check = run_command(
+        command(&tsc.to_string_lossy())
+            .current_dir(&root)
+            .args(["--noEmit", "--pretty", "false"]),
+    );
     if !check.ok {
         let mut unattributed = Vec::new();
         for line in check
@@ -959,15 +950,17 @@ fn check_typescript(
     .expect("write registry");
     fs::write(
         root.join("smoke.test.ts"),
-        include_str!("../samples/conformance/runners/smoke.test.ts"),
+        include_str!("../../../../samples/conformance/runners/smoke.test.ts"),
     )
     .expect("write smoke test");
     let result_path = root.join("smoke.json");
     let vitest = samples.join("node_modules/.bin/vitest");
-    let execution = run(command(&vitest.to_string_lossy())
-        .current_dir(&root)
-        .env("NEXGEN_CONFORMANCE_RESULT", &result_path)
-        .args(["run", "--root", ".", "smoke.test.ts"]));
+    let execution = run_command(
+        command(&vitest.to_string_lossy())
+            .current_dir(&root)
+            .env("NEXGEN_CONFORMANCE_RESULT", &result_path)
+            .args(["run", "--root", ".", "smoke.test.ts"]),
+    );
     if !execution.ok {
         panic!(
             "the TypeScript import smoke runner failed:\n{}",

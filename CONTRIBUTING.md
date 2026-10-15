@@ -3,6 +3,43 @@
 Run `cargo validate` before pushing; it validates Rust and all five language
 sample projects. Follow the generated sample guidance in [AGENTS.md](AGENTS.md).
 
+## Running tests
+
+`cargo test --all-features` runs the Rust-only suite, including parsing,
+planning, CLI behavior, and generated-source assertions for every language.
+It does not require Python, Node, Go, Java, or .NET tooling.
+
+Use `cargo validate <language>` to validate one language: `rust`, `python`,
+`typescript`, `go`, `java`, or `dotnet`. Each non-Rust stage checks generated
+sample freshness, runs the sample projects' native checks, and exercises
+generated-code regressions using the applicable compilers, formatters, and runtimes.
+Go, Java, Python, and TypeScript validation also check JSON Schema conformance
+cases, format and pattern corpora, and generated-output compilation probes.
+
+Toolchain tests are integration-test targets in the `nexgen-validation-tests`
+package under `validation-tests/`. For focused debugging after dependencies are
+installed, use Cargo's test selection:
+
+```sh
+cargo test -p nexgen-validation-tests --test python
+cargo test -p nexgen-validation-tests --test python union_serializer -- --nocapture
+```
+
+The workspace's default members are `nexgen` and `xtask`.
+`cargo test --workspace` explicitly includes the toolchain tests and requires
+all language toolchains.
+
+Use `cargo validate conformance` to compare JSON Schema behavior across Go,
+Java, Python, and TypeScript. It requires all four toolchains and checks
+acceptance, validation errors, and serialized values against expected results
+and across backends. It also checks that declared divergences remain necessary.
+These checks use unformatted generator output so formatters cannot hide syntax
+defects. `cargo validate` runs all language stages followed by this cross-language
+check.
+
+Validation writes per-stage logs to `target/validate-logs/`. Use `--verbose`
+to also see command output in the terminal.
+
 Public-facing changes need a [changelog fragment](changelog/README.md).
 
 ## Preparing a release

@@ -8,7 +8,7 @@ use crate::generator::python::{
     PythonFieldDefaultKind, PythonGeneratedName, PythonImports, RenderedField, RenderedModel,
     RenderedModelFragments, RenderedRecordWireBlock, RenderedVariant, ResolvedFieldKind,
     ResolvedFieldType, RootPackageImports, WireValueConversion, python_authored_type_annotation,
-    python_string_literal,
+    python_string_literal, render_python_docstring,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
@@ -146,6 +146,7 @@ fn render_oneof_variant_body(variant: &RenderedVariant) -> String {
             body.push_str("])");
         }
         body.push_str(":\n");
+        render_python_docstring(&mut body, "    ", case.doc.as_deref(), &[], None, false);
         if let Some(payload_annotation) = &case.payload_annotation {
             body.push_str("    value: ");
             body.push_str(payload_annotation);
@@ -160,6 +161,14 @@ fn render_oneof_variant_body(variant: &RenderedVariant) -> String {
     body.push_str(" = ");
     if variant.cases.is_empty() {
         body.push_str("typing.Never\n");
+        render_python_docstring(
+            &mut body,
+            "",
+            variant.doc.as_deref(),
+            &[],
+            None,
+            variant.experimental,
+        );
         return body;
     }
     if variant.cases.len() > 1 {
@@ -176,6 +185,14 @@ fn render_oneof_variant_body(variant: &RenderedVariant) -> String {
         body.push_str("\n)");
     }
     body.push('\n');
+    render_python_docstring(
+        &mut body,
+        "",
+        variant.doc.as_deref(),
+        &[],
+        None,
+        variant.experimental,
+    );
     body
 }
 

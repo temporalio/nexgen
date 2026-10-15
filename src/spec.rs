@@ -867,6 +867,8 @@ pub struct FlagSpec {
 pub struct VariantSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub full_name: String,
+    pub doc: F::Text,
+    pub experimental: bool,
     pub cases: Vec<VariantCaseSpec<F>>,
     pub source: Option<ExternalVariantSourceSpec<F>>,
 }
@@ -875,6 +877,7 @@ pub struct VariantSpec<F: TypeFamily = AuthoredFamily> {
 pub struct VariantCaseSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub wire_name: String,
+    pub doc: F::Text,
     pub payload: Option<TypeSpec<F>>,
 }
 
@@ -1104,6 +1107,8 @@ impl<F: TypeFamily> VariantSpec<F> {
         VariantSpec {
             name: self.name,
             full_name: self.full_name,
+            doc: map.map_text(self.doc),
+            experimental: self.experimental,
             cases: self
                 .cases
                 .into_iter()
@@ -1123,6 +1128,7 @@ impl<F: TypeFamily> VariantCaseSpec<F> {
         VariantCaseSpec {
             name: self.name,
             wire_name: self.wire_name,
+            doc: map.map_text(self.doc),
             payload: self.payload.map(|payload| payload.map_names_with(map)),
         }
     }
