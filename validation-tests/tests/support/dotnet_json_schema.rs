@@ -377,6 +377,101 @@ fn csharp_json_examples_build_in_both_modes() {
 }
 
 // ---------------------------------------------------------------------------
+// Presence, nullability and defaults
+// ---------------------------------------------------------------------------
+
+const PRESENCE_SCHEMA: &str = r#"type: object
+required: [requiredPlain, requiredNullable]
+properties:
+  requiredPlain: { type: string }
+  requiredNullable: { oneOf: [{ type: integer }, { type: "null" }] }
+  optionalPlain: { type: boolean }
+  optionalNullable: { oneOf: [{ type: string }, { type: "null" }] }
+  nullableItems: { type: array, items: { oneOf: [{ type: string }, { type: "null" }] } }
+  greeting: { type: string, default: hello, deprecated: true, x-cs-name: Salutation }
+  retries: { type: integer, default: 3 }
+  fallback:
+    oneOf: [{ type: string }, { type: "null" }]
+    default: fallback
+"#;
+
+#[test]
+fn csharp_json_presence_nullability_and_defaults() {
+    let case = JsonCase::new("presence");
+    case.write("model.yaml", PRESENCE_SCHEMA);
+    let output = case.generate(&["model.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            // Required members are `required`, so leaving one out at a
+            // construction site is a compile error (P2).
+            "public required string RequiredPlain { get; init; }",
+            "public required long? RequiredNullable { get; init; }",
+            // Optional value types are `Nullable<T>`: absence is never zero (P9).
+            "public bool? OptionalPlain { get; init; }",
+            "public string? OptionalNullable { get; init; }",
+            "IReadOnlyList<string?>? NullableItems { get; init; }",
+            // A default is read through `OrDefault`; the member keeps presence.
+            "[global::System.Obsolete]\n        public string? Salutation { get; init; }",
+            "public string SalutationOrDefault => Salutation ?? \"hello\";",
+            "public long RetriesOrDefault => Retries ?? 3L;",
+        ],
+    );
+    case.run(
+        r#"var minimal = Check.RoundTrip<Model>("{\"requiredPlain\":\"a\",\"requiredNullable\":null}");
+Check.Equal<long?>(null, minimal.RequiredNullable, "required nullable");
+// Defaults apply on read, never on the wire.
+Check.Equal<long?>(null, minimal.Retries, "unset default");
+Check.Equal(3L, minimal.RetriesOrDefault, "default");
+#pragma warning disable CS0612
+Check.Equal("hello", minimal.SalutationOrDefault, "renamed default");
+Check.RoundTrip<Model>("{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"greeting\":\"hi\",\"retries\":3}");
+#pragma warning restore CS0612
+// Optional+nullable collapses an explicit null to absence in memory.
+Check.RoundTrip<Model>(
+    "{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"optionalNullable\":null}",
+    "{\"requiredPlain\":\"a\",\"requiredNullable\":1}");
+Check.RoundTrip<Model>("{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"nullableItems\":[\"x\",null]}");
+Check.RoundTrip<Model>(
+    "{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"fallback\":null}",
+    "{\"requiredPlain\":\"a\",\"requiredNullable\":1}");
+Check.ParseFails<Model>("{\"requiredNullable\":1}", "requiredPlain: required");
+Check.ParseFails<Model>("{\"requiredPlain\":\"a\"}", "requiredNullable: required");
+Check.ParseFails<Model>("{\"requiredPlain\":null,\"requiredNullable\":1}", "requiredPlain: explicit null not allowed");
+Check.ParseFails<Model>(
+    "{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"optionalPlain\":null}",
+    "optionalPlain: explicit null not allowed");
+Check.ParseFails<Model>(
+    "{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"retries\":null}",
+    "retries: explicit null not allowed");
+// Nullable reference annotations are compile-time only, so a required
+// reference forced to null is caught before writing.
+Check.WriteFails(new Model { RequiredPlain = null!, RequiredNullable = null }, "requiredPlain: required");
+// Records compare by value, collections included.
+Check.Equal(
+    Check.Parse<Model>("{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"nullableItems\":[\"x\"]}"),
+    Check.Parse<Model>("{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"nullableItems\":[\"x\"]}"),
+    "structural equality");"#,
+    );
+}
+
+#[test]
+fn csharp_json_required_members_are_enforced_at_compile_time() {
+    let case = JsonCase::new("required-compile");
+    case.write("model.yaml", PRESENCE_SCHEMA);
+    case.generate(&["model.yaml"]);
+    fs::write(
+        case.root.join("Program.cs"),
+        "using Probe;\n\npublic static class Program\n{\n    public static void Main()\n    {\n        _ = new Model { RequiredPlain = \"a\" };\n    }\n}\n",
+    )
+    .unwrap();
+    fs::write(case.root.join("Harness.cs"), HARNESS).unwrap();
+    let error = case.build_err();
+    // CS9035: required member must be set in the object initializer.
+    assert_has(&error, &["CS9035", "RequiredNullable"]);
+}
+
+// ---------------------------------------------------------------------------
 // Numbers
 // ---------------------------------------------------------------------------
 
