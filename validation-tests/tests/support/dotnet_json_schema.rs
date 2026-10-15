@@ -867,6 +867,109 @@ Check.ParseFails<Chain>("{\"item\":{},\"longItem\":{\"value\":\"b\"}}", "item.va
 }
 
 // ---------------------------------------------------------------------------
+// Names
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csharp_json_names_value_constants_from_the_value() {
+    let case = JsonCase::new("value-constants");
+    case.write(
+        "naming.yaml",
+        r#"type: object
+properties:
+  kind: { type: string, const: showcase }
+  enabled: { type: boolean, const: true }
+  tier: { type: integer, enum: [1, -2] }
+  scale: { type: number, enum: [1.5, -2.25] }
+  status: { type: string, enum: [active, "multi-word_ish"] }
+"#,
+    );
+    let output = case.generate(&["naming.yaml"]);
+    assert_has(
+        output.file("Models.cs"),
+        &[
+            "public static readonly KindValue Showcase = new(\"showcase\");",
+            "public static readonly EnabledValue True = new(true);",
+            "public static readonly TierValue V1 = new(1L);",
+            "public static readonly TierValue VNeg2 = new(-2L);",
+            "public static readonly ScaleValue V1_5 = new(1.5);",
+            "public static readonly ScaleValue VNeg2_25 = new(-2.25);",
+            "public static readonly StatusValue Active = new(\"active\");",
+            "public static readonly StatusValue MultiWordIsh = new(\"multi-word_ish\");",
+        ],
+    );
+    case.run(
+        r#"var parsed = Check.RoundTrip<Naming>("{\"kind\":\"showcase\",\"enabled\":true,\"tier\":-2,\"scale\":1.5,\"status\":\"multi-word_ish\"}");
+Check.Equal(Naming.TierValue.VNeg2, parsed.Tier, "integer constant");
+Check.True(ReferenceEquals(Naming.StatusValue.MultiWordIsh, parsed.Status), "parsed values are the constants");
+Check.ParseFails<Naming>("{\"tier\":3,\"enabled\":false}", "tier: must be one of", "enabled: must equal true");"#,
+    );
+
+    // A numeric constant's name does not depend on how the literal is spelled.
+    for spelling in ["1", "1.0", "1e0"] {
+        let case = JsonCase::new("value-constant-spelling");
+        case.write(
+            "spelling.yaml",
+            &format!(
+                "type: object\nproperties:\n  score: {{ type: integer, const: {spelling} }}\n"
+            ),
+        );
+        assert_has(
+            case.generate(&["spelling.yaml"]).file("Models.cs"),
+            &["public static readonly ScoreValue V1 = new(1L);"],
+        );
+    }
+}
+
+#[test]
+fn csharp_json_enum_name_overrides_reach_non_string_members() {
+    let case = JsonCase::new("enum-names");
+    case.write(
+        "enum_names.yaml",
+        r#"type: object
+properties:
+  tier: { type: integer, enum: [1, 2], x-cs-enum-names: { "1": Bronze, "2": Silver } }
+  toggle: { type: boolean, enum: [true, false], x-cs-enum-names: { "true": On, "false": Off } }
+  scale: { type: number, enum: [1.5, 2.5], x-cs-enum-names: { "1.5": Half, "2.5": TwoHalf } }
+  mode: { type: string, enum: [fast, slow], x-cs-enum-names: { fast: Quick } }
+  edition: { type: integer, const: 7, x-cs-const-name: Lucky }
+"#,
+    );
+    let output = case.generate(&["enum_names.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "public static readonly TierValue Bronze = new(1L);",
+            "public static readonly TierValue Silver = new(2L);",
+            "public static readonly ToggleValue On = new(true);",
+            "public static readonly ToggleValue Off = new(false);",
+            "public static readonly ScaleValue Half = new(1.5);",
+            "public static readonly ScaleValue TwoHalf = new(2.5);",
+            "public static readonly ModeValue Quick = new(\"fast\");",
+            // An entry the map does not name keeps its derived name.
+            "public static readonly ModeValue Slow = new(\"slow\");",
+            "public static readonly EditionValue Lucky = new(7L);",
+        ],
+    );
+    assert_lacks(
+        models,
+        &["TierValue V1 ", "ToggleValue True ", "ScaleValue V1_5 "],
+    );
+    case.build();
+
+    let collide = JsonCase::new("enum-names-collide");
+    collide.write(
+        "collide.yaml",
+        "type: object\nproperties:\n  tier: { type: integer, enum: [1, 2], x-cs-enum-names: { \"1\": Same, \"2\": Same } }\n",
+    );
+    assert_has(
+        &collide.generate_err(&["collide.yaml"]),
+        &["both map to `Same`"],
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------
 
