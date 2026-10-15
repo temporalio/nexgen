@@ -326,6 +326,10 @@ fn csharp_json_rejects_unsupported_keywords() {
             "type: object\nproperties:\n  kind: { type: string }\nif: { properties: { kind: { const: a } } }\nthen: { required: [kind] }\n",
             "conditional schemas (`if`/`then`/`else`) are not supported",
         ),
+        (
+            "type: object\nproperties:\n  id: { type: string, readOnly: true }\n",
+            "`readOnly`/`writeOnly` is not supported",
+        ),
     ];
     for (schema, expected) in cases {
         let case = JsonCase::new("unsupported-keyword");
