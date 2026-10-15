@@ -1,0 +1,2 @@
+Generated protobuf-backed Go models used as eligible top-level Nexus inputs or outputs implement `TransferTypeConverter`, deferring model conversion to the SDK. Ordinary Nexus models use the public transfer converter API; system Nexus models receive the SDK-selected data converter with the operation's serialization context applied.
+Generated Go request models expose `@nexus.source` fields as exported fields populated at the operation call site before SDK conversion, making them available to serialization-context helpers.
