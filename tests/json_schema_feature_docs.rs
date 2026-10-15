@@ -50,7 +50,6 @@ const PENDING: &[&str] = &[
     "propertyNames.md",
     "services.md",
     "title.md",
-    "uniqueItems.md",
 ];
 
 #[test]
