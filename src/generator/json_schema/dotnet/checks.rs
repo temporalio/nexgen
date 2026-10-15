@@ -205,7 +205,7 @@ pub(super) fn string_checks(
             push_violation(
                 out,
                 indent,
-                &format!("{length} < {min}"),
+                &count_comparison(&length, "<", min),
                 path,
                 &format!(
                     "{} + {length}",
@@ -217,7 +217,7 @@ pub(super) fn string_checks(
             push_violation(
                 out,
                 indent,
-                &format!("{length} > {max}"),
+                &count_comparison(&length, ">", max),
                 path,
                 &format!(
                     "{} + {length}",
@@ -397,10 +397,10 @@ fn matcher_condition(
         ));
     }
     if let Some(min) = matcher.min_length {
-        parts.push(format!("{} >= {min}", code_points(element)));
+        parts.push(count_comparison(&code_points(element), ">=", min));
     }
     if let Some(max) = matcher.max_length {
-        parts.push(format!("{} <= {max}", code_points(element)));
+        parts.push(count_comparison(&code_points(element), "<=", max));
     }
     let string = StringConstraints::from_schema(matcher);
     let site = match position {
@@ -537,7 +537,7 @@ fn count_checks(
         push_violation(
             out,
             indent,
-            &format!("{count} < {min}"),
+            &count_comparison(count, "<", min),
             path,
             &format!(
                 "{} + {count}",
@@ -549,7 +549,7 @@ fn count_checks(
         push_violation(
             out,
             indent,
-            &format!("{count} > {max}"),
+            &count_comparison(count, ">", max),
             path,
             &format!(
                 "{} + {count}",
@@ -581,7 +581,7 @@ fn contains_verdict(
         push_violation(
             out,
             indent,
-            &format!("{match_count} < {effective_min}"),
+            &count_comparison(match_count, "<", effective_min),
             path,
             &reason,
         );
@@ -590,13 +590,25 @@ fn contains_verdict(
         push_violation(
             out,
             indent,
-            &format!("{match_count} > {max}"),
+            &count_comparison(match_count, ">", max),
             path,
             &format!(
                 "{} + {match_count}",
                 cs_string(&format!("too many matching items: at most {max}, got "))
             ),
         );
+    }
+}
+
+/// An `int` count compared against a portable count bound. A bound past
+/// `int.MaxValue` widens the count to `long`: C# flags comparing an `int` with
+/// an out-of-range constant as useless (CS0652, an error under warnings as
+/// errors), although the verdict it reaches is the right one.
+fn count_comparison(count: &str, operator: &str, bound: u64) -> String {
+    if bound > i32::MAX as u64 {
+        format!("(long){count} {operator} {bound}L")
+    } else {
+        format!("{count} {operator} {bound}")
     }
 }
 
@@ -735,7 +747,7 @@ pub(super) fn property_count_checks(
         push_violation(
             out,
             indent,
-            &format!("{count} < {min}"),
+            &count_comparison(count, "<", min),
             path,
             &format!(
                 "{} + {count}",
@@ -747,7 +759,7 @@ pub(super) fn property_count_checks(
         push_violation(
             out,
             indent,
-            &format!("{count} > {max}"),
+            &count_comparison(count, ">", max),
             path,
             &format!(
                 "{} + {count}",
@@ -788,7 +800,7 @@ pub(super) fn property_name_checks(
                 push_violation(
                     out,
                     &inner,
-                    &format!("nameLength {op} {bound}"),
+                    &count_comparison("nameLength", op, bound),
                     &key_path,
                     &format!(
                         "\"invalid property name \\\"\" + propertyName + {} + nameLength",
