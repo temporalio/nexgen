@@ -75,11 +75,11 @@ language; each member becomes a field. The member's bare type comes from
 [[type]]; optional/nullable wrapping from [[required]] + [[nullability]];
 open/closed catch-all from [[additionalProperties]].
 
-| Aspect            | Go                  | TypeScript                  | Python                                                                         | Java                                                    |
-| ----------------- | ------------------- | --------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| Aggregate         | `struct`            | `interface` (**not class**) | `@dataclasses.dataclass(slots=True, kw_only=True)` (**not a validating base**) | POJO `class` (Java 8; **not records**)                  |
-| Member            | struct field        | interface member            | dataclass field; default-bearing property over private storage                 | private field + getter                                  |
-| JSON-name binding | `json:"<name>"` tag | exact key (index access)    | the wire key, read and written by the converter                                | exact key in the collecting deserializer and serializer |
+| Aspect            | Go                  | TypeScript                  | Python                                                                         | Java                                                    | C#                                                    |
+| ----------------- | ------------------- | --------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------- |
+| Aggregate         | `struct`            | `interface` (**not class**) | `@dataclasses.dataclass(slots=True, kw_only=True)` (**not a validating base**) | POJO `class` (Java 8; **not records**)                  | `sealed record` (**not** attribute-bound)             |
+| Member            | struct field        | interface member            | dataclass field; default-bearing property over private storage                 | private field + getter                                  | `required` or optional `{ get; init; }` property      |
+| JSON-name binding | `json:"<name>"` tag | exact key (index access)    | the wire key, read and written by the converter                                | exact key in the collecting deserializer and serializer | exact key in the converter's `Parse` and `WriteValue` |
 
 Field naming: JSON member names are mapped to each language's idiomatic
 identifier and the **original JSON name is always pinned** — by a Go struct tag
@@ -99,7 +99,7 @@ escape hatch are specified in
 
 ## Identifier case-mapping
 
-One shared algorithm drives every emitter so the four languages agree on
+One shared algorithm drives every emitter so the five languages agree on
 segmentation and recasing. A language-agnostic **segmentation** core produces a
 canonical word list; thin per-language layers **recase** it; then each emitted
 target **validates** the result. The original JSON name is always pinned on the
@@ -121,7 +121,7 @@ A JSON member name is split into a canonical, lowercased word list:
   `[http, server]`, `[oauth2]`.
 
 **Acronyms are folded as ordinary words** (no initialism set). This is the
-single decision that makes "one algorithm for all four emitters" literally true;
+single decision that makes "one algorithm for all five emitters" literally true;
 its limitation is documented below.
 
 ### Stage 2 — Recasing (per language)
@@ -133,6 +133,7 @@ From the canonical word list:
 | Go         | exported `PascalCase`                             | `UserId`               |
 | TypeScript | `camelCase`                                       | `userId`               |
 | Java       | field `camelCase` + `get` + `PascalCase` accessor | `userId` / `getUserId` |
+| C#         | property `PascalCase`                             | `UserId`               |
 | Python     | `snake_case`                                      | `user_id`              |
 
 ### Stage 3 — Validity (per emitted target)
@@ -331,6 +332,7 @@ presence/absence is [[required]], extras are
 | TypeScript | Hand-emitted per-member checks over the parsed object; push `Violation { path, reason }` into the list, throw one `PayloadValidationError` application failure.                                                                                                                                                                                            |
 | Python     | hand-emitted per-member checks over the raw `dict` in the model's `_<Model>TransferTypeConverter` (**PRINCIPLES Python §3**); each appends a `Violation { path, reason }` (`path` = the JSON member name) to the list raised as one `PayloadValidationError` application failure. The TypeScript strategy, expressed through the SDK's transfer-type hook. |
 | Java       | per-POJO collecting `@JsonDeserialize` (PRINCIPLES Java §5): a two-stage bind that reads the object into a `JsonNode` tree, then dispatches each present member through its spec-strict/constraint helper (see [[type]]), collecting `Violation{path,reason}` into one `PayloadValidationError` application failure. The Go parallel.                      |
+| C#         | the model's nested `Converter : JsonConverter<T>` (PRINCIPLES C# §4): `Read` binds the whole object with `JsonElement.ParseValue`, then `Parse` dispatches each present member through its spec-strict/constraint path (see [[type]]), collecting `Violation{path,reason}` into one `PayloadValidationError` application failure.                          |
 
 A member subschema validates recursively — nested objects become nested
 aggregates, arrays use [[items]], etc.
