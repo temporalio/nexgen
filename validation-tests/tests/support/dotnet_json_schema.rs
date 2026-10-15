@@ -882,6 +882,23 @@ Check.RoundTrip<Votes>("{\"optional\":[\"no\"]}");"#,
     );
 }
 
+#[test]
+fn csharp_json_max_contains_counts_matches() {
+    let case = JsonCase::new("max-contains");
+    case.write(
+        "votes.yaml",
+        "type: object\nproperties:\n  ballots: { type: array, items: { type: string }, contains: { const: yes }, maxContains: 1 }\n",
+    );
+    case.generate(&["votes.yaml"]);
+    case.run(
+        r#"Check.RoundTrip<Votes>("{\"ballots\":[\"yes\",\"no\"]}");
+Check.ParseFails<Votes>("{\"ballots\":[\"yes\",\"yes\"]}", "ballots: too many matching items: at most 1, got 2");
+// The implied `minContains: 1` still requires a match.
+Check.ParseFails<Votes>("{\"ballots\":[\"no\"]}", "ballots: no element matches the required schema");
+Check.WriteFails(new Votes { Ballots = new[] { "yes", "yes" } }, "ballots: too many matching items: at most 1, got 2");"#,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Objects
 // ---------------------------------------------------------------------------
