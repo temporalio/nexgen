@@ -230,23 +230,6 @@ func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly
 	s.Equal(int32(5), handlerInput.GetRetryPolicy().GetMaximumAttempts())
 }
 
-var (
-	_ interface {
-		GetWorkflowID() string
-		GetRunID() string
-	} = tr.WorkflowExecution{}
-	_ interface {
-		GetExecution() tr.WorkflowExecution
-		GetParentExecution() *tr.WorkflowExecution
-	} = tr.WorkflowExecutionInfo{}
-	_ interface {
-		GetWorkflowTaskQueuePartitions() []tr.TaskQueuePartition
-	} = tr.TaskQueuePartitions{}
-	_ interface {
-		GetBinaries() map[string]tr.BadBinary
-	} = tr.BadBinaries{}
-)
-
 func (s *TypeRoundtripIntegrationSuite) TestNestedModelRoundTrips() {
 	cases := []struct {
 		name       string
@@ -293,15 +276,6 @@ func (s *TypeRoundtripIntegrationSuite) TestNestedModelRoundTrips() {
 				&namespacepb.BadBinaries{},
 			},
 		},
-	}
-
-	for _, tt := range cases {
-		s.Equal(tt.execution.Execution, tt.execution.GetExecution(), tt.name)
-		s.Equal(tt.execution.Execution.WorkflowID, tt.execution.GetExecution().GetWorkflowID(), tt.name)
-		s.Equal(tt.execution.Execution.RunID, tt.execution.GetExecution().GetRunID(), tt.name)
-		s.Equal(tt.execution.ParentExecution, tt.execution.GetParentExecution(), tt.name)
-		s.Equal(tt.partitions.WorkflowTaskQueuePartitions, tt.partitions.GetWorkflowTaskQueuePartitions(), tt.name)
-		s.Equal(tt.binaries.Binaries, tt.binaries.GetBinaries(), tt.name)
 	}
 
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {

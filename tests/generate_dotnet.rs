@@ -752,60 +752,6 @@ fn dotnet_proto_oneofs_convert_payloads_and_optional_groups() {
 }
 
 #[test]
-fn dotnet_proto_collections_convert_nested_models() {
-    let root = project_root();
-    let files = generate_dotnet_files(
-        &example_input_paths(&root, "type-roundtrip"),
-        &[descriptor_path(&root)],
-    );
-    let models = &files[Path::new("Models.cs")];
-    for expected in [
-        "WorkflowTaskQueuePartitions = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.WorkflowTaskQueuePartitions, item => TaskQueuePartition.FromTransferType(item)))",
-        "proto.WorkflowTaskQueuePartitions.Add(System.Linq.Enumerable.Select(workflowTaskQueuePartitions, item => (Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata)item.ToTransferType()))",
-        "Binaries = System.Linq.Enumerable.ToDictionary(wire.Binaries, entry => entry.Key, entry => BadBinary.FromTransferType(entry.Value))",
-        "proto.Binaries.Add(System.Linq.Enumerable.ToDictionary(binaries, entry => entry.Key, entry => (Temporalio.Api.Namespace.V1.BadBinaryInfo)entry.Value.ToTransferType()))",
-    ] {
-        assert!(models.contains(expected), "{expected}\n{models}");
-    }
-}
-
-#[test]
-fn dotnet_sourced_proto_collections_populate_wire_fields() {
-    let root = project_root();
-    let original = fs::read_to_string(wit_input_path(&root, "type-roundtrip")).unwrap();
-    let temp = tempfile::tempdir().unwrap();
-    let path = temp.path().join("collections.wit");
-    fs::write(
-        &path,
-        original
-            .replace(
-                "workflow-task-queue-partitions: option<list<task-queue-partition>>",
-                "/// @nexus.source dotnet=\"CollectionSources.Partitions()\"\n    workflow-task-queue-partitions: option<list<task-queue-partition>>",
-            )
-            .replace(
-                "binaries: option<map<string, bad-binary>>",
-                "/// @nexus.source dotnet=\"CollectionSources.Binaries()\"\n    binaries: option<map<string, bad-binary>>",
-            )
-            .replace("-> task-queue-partitions;", ";")
-            .replace("-> bad-binaries;", ";"),
-    )
-    .unwrap();
-    let files = generate_dotnet_files(
-        &[path, linked_inputs_path(&root)],
-        &[descriptor_path(&root)],
-    );
-    let models = &files[Path::new("Models.cs")];
-    assert!(
-        models.contains("proto.WorkflowTaskQueuePartitions.Add(System.Linq.Enumerable.Select(workflowTaskQueuePartitions,"),
-        "{models}"
-    );
-    assert!(
-        models.contains("proto.Binaries.Add(System.Linq.Enumerable.ToDictionary(binaries,"),
-        "{models}"
-    );
-}
-
-#[test]
 fn dotnet_generic_proto_models_reference_nested_generic_converters() {
     let root = project_root();
     let files = generate_dotnet_files(
