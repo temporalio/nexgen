@@ -59,6 +59,36 @@ them must provide JSpecify themselves. They do **not** encode the wire-level
 nullable distinction — every optional reference field is `@Nullable` regardless
 of whether it is optional-non-nullable or optional+nullable.
 
+### C#
+
+`Nullable<T>` for optional value types, a `T?` nullable reference annotation for
+optional reference types, and the `required` modifier for required members
+(PRINCIPLES C# §2):
+
+```csharp
+public sealed record User
+{
+    public required long Id { get; init; }        // required: integer
+    public long? Nickname { get; init; }          // optional: integer — null if absent
+    public required string Name { get; init; }    // required: string (Validate rejects null)
+    public string? Email { get; init; }           // optional: string
+}
+```
+
+| `type` token | required                                           | optional            |
+| ------------ | -------------------------------------------------- | ------------------- |
+| `"integer"`  | `required long`                                    | `long?`             |
+| `"number"`   | `required double`                                  | `double?`           |
+| `"boolean"`  | `required bool`                                    | `bool?`             |
+| `"string"`   | `required string` *(non-null validator)*           | `string?`           |
+| `"object"`   | `required T` *(non-null validator)*                | `T?`                |
+| `"array"`    | `required IReadOnlyList<T>` *(non-null validator)* | `IReadOnlyList<T>?` |
+
+Nullable reference annotations are compile-time only, so `Validate` still
+rejects a required reference left `null` before writing. As in Java, the
+annotations track in-memory nullness, not the wire's nullable distinction:
+optional and optional+nullable members share one `null` state.
+
 ### Go
 
 Pointer to primitive for optional fields; bare type for required.
@@ -266,27 +296,27 @@ default).
 
 **Optional + nullable** (absent OK, `null` OK, T OK):
 
-| `type` token | Java                | Go                           | TypeScript            | Python                      |
-| ------------ | ------------------- | ---------------------------- | --------------------- | --------------------------- |
-| `"integer"`  | `@Nullable Long`    | `*int64`                     | `x?: number \| null`  | `x: int \| None = None`     |
-| `"number"`   | `@Nullable Double`  | `*float64`                   | `x?: number \| null`  | `x: float \| None = None`   |
-| `"boolean"`  | `@Nullable Boolean` | `*bool`                      | `x?: boolean \| null` | `x: bool \| None = None`    |
-| `"string"`   | `@Nullable String`  | `*string`                    | `x?: string \| null`  | `x: str \| None = None`     |
-| `"object"`   | `@Nullable T`       | `*T`                         | `x?: T \| null`       | `x: T \| None = None`       |
-| `"array"`    | `@Nullable List<T>` | `[]T` (nil = absent or null) | `x?: T[] \| null`     | `x: list[T] \| None = None` |
+| `type` token | Java                | Go                           | TypeScript            | Python                      | C#                  |
+| ------------ | ------------------- | ---------------------------- | --------------------- | --------------------------- | ------------------- |
+| `"integer"`  | `@Nullable Long`    | `*int64`                     | `x?: number \| null`  | `x: int \| None = None`     | `long?`             |
+| `"number"`   | `@Nullable Double`  | `*float64`                   | `x?: number \| null`  | `x: float \| None = None`   | `double?`           |
+| `"boolean"`  | `@Nullable Boolean` | `*bool`                      | `x?: boolean \| null` | `x: bool \| None = None`    | `bool?`             |
+| `"string"`   | `@Nullable String`  | `*string`                    | `x?: string \| null`  | `x: str \| None = None`     | `string?`           |
+| `"object"`   | `@Nullable T`       | `*T`                         | `x?: T \| null`       | `x: T \| None = None`       | `T?`                |
+| `"array"`    | `@Nullable List<T>` | `[]T` (nil = absent or null) | `x?: T[] \| null`     | `x: list[T] \| None = None` | `IReadOnlyList<T>?` |
 
 **Required + nullable** (`null` OK, T OK, absent rejected) — same type, presence
 enforced by the validator; TS drops the `?`, Python drops the `= None` default
 (a dataclass field with no default must be supplied at construction):
 
-| `type` token | Java                | Go                 | TypeScript           | Python               |
-| ------------ | ------------------- | ------------------ | -------------------- | -------------------- |
-| `"integer"`  | `@Nullable Long`    | `*int64`           | `x: number \| null`  | `x: int \| None`     |
-| `"number"`   | `@Nullable Double`  | `*float64`         | `x: number \| null`  | `x: float \| None`   |
-| `"boolean"`  | `@Nullable Boolean` | `*bool`            | `x: boolean \| null` | `x: bool \| None`    |
-| `"string"`   | `@Nullable String`  | `*string`          | `x: string \| null`  | `x: str \| None`     |
-| `"object"`   | `@Nullable T`       | `*T`               | `x: T \| null`       | `x: T \| None`       |
-| `"array"`    | `@Nullable List<T>` | `[]T` (nil = null) | `x: T[] \| null`     | `x: list[T] \| None` |
+| `type` token | Java                | Go                 | TypeScript           | Python               | C#                           |
+| ------------ | ------------------- | ------------------ | -------------------- | -------------------- | ---------------------------- |
+| `"integer"`  | `@Nullable Long`    | `*int64`           | `x: number \| null`  | `x: int \| None`     | `required long?`             |
+| `"number"`   | `@Nullable Double`  | `*float64`         | `x: number \| null`  | `x: float \| None`   | `required double?`           |
+| `"boolean"`  | `@Nullable Boolean` | `*bool`            | `x: boolean \| null` | `x: bool \| None`    | `required bool?`             |
+| `"string"`   | `@Nullable String`  | `*string`          | `x: string \| null`  | `x: str \| None`     | `required string?`           |
+| `"object"`   | `@Nullable T`       | `*T`               | `x: T \| null`       | `x: T \| None`       | `required T?`                |
+| `"array"`    | `@Nullable List<T>` | `[]T` (nil = null) | `x: T[] \| null`     | `x: list[T] \| None` | `required IReadOnlyList<T>?` |
 
 (Java is `@Nullable` across every nullable column — the annotation tracks
 in-memory nullness, not the wire distinction; see the optionality section above
@@ -297,38 +327,39 @@ type can't express.)
 
 ### Round-trip behavior
 
-- **Required + nullable round-trips losslessly in all four languages.** Presence
+- **Required + nullable round-trips losslessly in all five languages.** Presence
   is guaranteed, so an in-memory `null`/`nil`/`None` unambiguously means "the
   wire sent `null`"; the serializer always emits the key (never omits it), and
   `null` ⟷ `null`. There is no absent state to confuse it with.
 - **Optional + nullable round-trips faithfully in TypeScript; collapses in Go,
-  Java and Python.** TS keeps `undefined` (absent) vs `null` distinct in memory,
-  so its serializer re-emits a wire `null` as `null` and omits a wire-absent
-  key. Go (`*T` `nil`), Java (`null`) and Python (`None`) genuinely cannot
-  distinguish the two in memory, so they emit a single canonical form — the key
-  is **omitted** (the conservative choice; emitting `null` would fabricate a
-  value the client may never have sent). A client that sent explicit `null` on
-  an optional+nullable field reads it back as absent **in Go/Java/Python**.
+  Java, Python and C#.** TS keeps `undefined` (absent) vs `null` distinct in
+  memory, so its serializer re-emits a wire `null` as `null` and omits a
+  wire-absent key. Go (`*T` `nil`), Java (`null`), Python (`None`) and C#
+  (`null`) genuinely cannot distinguish the two in memory, so they emit a single
+  canonical form — the key is **omitted** (the conservative choice; emitting
+  `null` would fabricate a value the client may never have sent). A client that
+  sent explicit `null` on an optional+nullable field reads it back as absent
+  **in Go/Java/Python/C#**.
 
-**Collapse note (Go / Java / Python):** the in-memory representations of
-"absent" and "JSON null" are the same (`nil`, `null`, `None`), and — unlike TS's
-`undefined` — there is no side channel recording which the wire carried, so
-post-validation user code can't recover it. This matches **P8**'s framing —
-optional and nullable are distinct *schema* concerns; runtime collapse is
-acceptable when the language can't represent the difference. Making any of the
-three faithful would require a presence-tracking channel — a `Null[T]` wrapper
-or shadow bit in Go/Java, an `UNSET` sentinel widening every optional field to
-`T | None | UnsetType` or a hidden per-instance presence set in Python; each is
-rejected as ergonomic overhead (P2) that the conservative omit avoids, and the
-sentinel additionally forces every consumer to test against a generated marker
-instead of plain `None`.
+**Collapse note (Go / Java / Python / C#):** the in-memory representations of
+"absent" and "JSON null" are the same (`nil`, `null`, `None`, `null`), and —
+unlike TS's `undefined` — there is no side channel recording which the wire
+carried, so post-validation user code can't recover it. This matches **P8**'s
+framing — optional and nullable are distinct *schema* concerns; runtime collapse
+is acceptable when the language can't represent the difference. Making any of
+the four faithful would require a presence-tracking channel — a `Null[T]`
+wrapper or shadow bit in Go/Java/C#, an `UNSET` sentinel widening every optional
+field to `T | None | UnsetType` or a hidden per-instance presence set in Python;
+each is rejected as ergonomic overhead (P2) that the conservative omit avoids,
+and the sentinel additionally forces every consumer to test against a generated
+marker instead of plain `None`.
 
-TypeScript enforces *and* preserves the distinction; Go, Java and Python enforce
-it at the boundary but collapse it in memory.
+TypeScript enforces *and* preserves the distinction; Go, Java, Python and C#
+enforce it at the boundary but collapse it in memory.
 
 **What the collapse is licensed for, and where that runs out.** P1 excepts the
-collapse from *value-level round-trip fidelity*, and only for Go, Java and
-Python — TypeScript is not in the exception because it does not collapse. P1
+collapse from *value-level round-trip fidelity*, and only for Go, Java, Python
+and C# — TypeScript is not in the exception because it does not collapse. P1
 excepts nothing from **validation semantics**. The strict subset therefore
 rejects presence-sensitive combinations that cannot survive the collapse: a
 positive [[minProperties]] floor beside any optional nullable declared member,
@@ -352,17 +383,16 @@ Wire form → required generator output:
 
 ## Validator implications
 
-Four schema states × four languages → sixteen cells. The two axes are
-orthogonal: **presence** (required = reject absent; optional = accept absent)
-and **null acceptance** (non-nullable = reject `null`; nullable = accept
-`null`).
+Four schema states × five languages → twenty cells. The two axes are orthogonal:
+**presence** (required = reject absent; optional = accept absent) and
+**null acceptance** (non-nullable = reject `null`; nullable = accept `null`).
 
-| State                                                                       | Java                                                                                      | Go                                                                           | TS                                                                         | Python                                                                                                                   |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Required, non-nullable** — must be present, must be T                     | type is `long`/`String`/etc.; collecting deserializer rejects an absent or null tree node | type is `int64`/`string`/etc.; raw-map lookup distinguishes absent from null | type is `x: T`; emit `raw.x === undefined \|\| raw.x === null` reject      | type is `x: T` with no default; converter rejects an absent key **and** a `null` token with `required`                   |
-| **Optional, non-nullable** — absent OK, T OK, explicit `null` rejected      | collecting deserializer's three-way tree-node branch (see strategy below)                 | raw-map `*json.RawMessage` lookup plus `isNull`                              | `raw.x === null` rejected; `=== undefined` OK                              | type is `x: T \| None = None`; converter branch over the raw dict rejects a key present with `None` (see strategy below) |
-| **Optional + nullable** — absent OK, `null` OK, T OK                        | type is `@Nullable Long`/`String`/etc.; no extra check beyond type binding                | type is `*int64`/`*string`/etc.; no extra check beyond type binding          | type is `x?: T \| null`; both `undefined` and `null` accepted              | type is `x: T \| None = None`; both absent and `null` accepted, no extra check                                           |
-| **Required + nullable** — must be present, `null` OK, T OK, absent rejected | collecting deserializer accepts a null node and rejects an absent one                     | raw-map lookup rejects absence and accepts a null token                      | type is `x: T \| null`; emit `raw.x === undefined` reject; `null` accepted | type is `x: T \| None` with **no** default; converter rejects an absent key, accepts the `null` token as `None`          |
+| State                                                                       | Java                                                                                      | Go                                                                           | TS                                                                         | Python                                                                                                                   | C#                                                                                                                             |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Required, non-nullable** — must be present, must be T                     | type is `long`/`String`/etc.; collecting deserializer rejects an absent or null tree node | type is `int64`/`string`/etc.; raw-map lookup distinguishes absent from null | type is `x: T`; emit `raw.x === undefined \|\| raw.x === null` reject      | type is `x: T` with no default; converter rejects an absent key **and** a `null` token with `required`                   | type is `long`/`string`/etc. with `required`; `Converter.Parse` rejects an absent or null member                               |
+| **Optional, non-nullable** — absent OK, T OK, explicit `null` rejected      | collecting deserializer's three-way tree-node branch (see strategy below)                 | raw-map `*json.RawMessage` lookup plus `isNull`                              | `raw.x === null` rejected; `=== undefined` OK                              | type is `x: T \| None = None`; converter branch over the raw dict rejects a key present with `None` (see strategy below) | `Converter.Parse`'s three-way branch over the member lookup and `ValueKind == Null`                                            |
+| **Optional + nullable** — absent OK, `null` OK, T OK                        | type is `@Nullable Long`/`String`/etc.; no extra check beyond type binding                | type is `*int64`/`*string`/etc.; no extra check beyond type binding          | type is `x?: T \| null`; both `undefined` and `null` accepted              | type is `x: T \| None = None`; both absent and `null` accepted, no extra check                                           | type is `long?`/`string?`/etc.; absent and `null` collapse to `null`, re-emitted absent                                        |
+| **Required + nullable** — must be present, `null` OK, T OK, absent rejected | collecting deserializer accepts a null node and rejects an absent one                     | raw-map lookup rejects absence and accepts a null token                      | type is `x: T \| null`; emit `raw.x === undefined` reject; `null` accepted | type is `x: T \| None` with **no** default; converter rejects an absent key, accepts the `null` token as `None`          | `required long?`/`string?`/etc.; `Converter.Parse` accepts a null member and rejects an absent one; `WriteValue` writes `null` |
 
 ## Serialize-side behavior
 
@@ -377,7 +407,7 @@ would fabricate an invalid `null` for optional-non-nullable.
 | required | nullable     | empty-value serialize action                                                                                                                                                                                                                                                                                          |
 | -------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | optional | non-nullable | **omit** the key (emitting `null` is invalid; `Validate` also rejects an explicit in-memory `null` where the language can hold one)                                                                                                                                                                                   |
-| optional | nullable     | **omit** (conservative) in Go/Java/Python; **faithful** in TS — omit if `undefined`, emit `null` if explicitly `null`. Presence-sensitive combinations that would observe the collapse reject at load — see the Collapse note                                                                                         |
+| optional | nullable     | **omit** (conservative) in Go/Java/Python/C#; **faithful** in TS — omit if `undefined`, emit `null` if explicitly `null`. Presence-sensitive combinations that would observe the collapse reject at load — see the Collapse note                                                                                      |
 | required | non-nullable | cannot be empty — always emit the value. Where the language can hold an empty reference (Java `null`, Python `None`, TS `undefined`/`null`) `Validate` **rejects** it rather than omitting the key; a Go `nil` slice on a required array is written as `[]`, since Go has no non-nil empty-slice type (see [[items]]) |
 | required | nullable     | **emit `key: null`** — omitting violates `required`                                                                                                                                                                                                                                                                   |
 
@@ -432,6 +462,19 @@ There is **no** `…StrictDeserializer` / `getNullValue` override and no per-fie
 `@JsonDeserialize`: the null/absence decision lives in the collecting
 deserializer's branch, so the old two-subclass split collapses into the same
 three-way Go uses in `UnmarshalJSON`.
+
+### C#
+
+The model's `Converter.Parse` decides the three-way per field over the wire
+members (PRINCIPLES C# §4), mirroring Go and Java:
+
+1. member absent (`!members.TryGetValue(name, out var node)`) → key absent
+   (required → record `Violation`; optional → leave the property `null`)
+2. `node.ValueKind == JsonValueKind.Null` → explicit `null`
+   (optional-non-nullable → record `Violation`; nullable → accept as `null`)
+3. otherwise → the type-specific strict parse (e.g.
+   `SpecJson.SpecLong(node, path, violations)`), which records its own
+   `Violation` on a spec violation
 
 ### Go
 

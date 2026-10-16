@@ -3,15 +3,15 @@
 `json-schema.json` is the language-neutral statement of P1:
 *a value one target accepts round-trips through any other unchanged.* It is
 **executed**, not just described — `tests/json_schema_conformance_manifest.rs`
-generates every case into Go, Java, Python and TypeScript, pushes every declared
-wire value through the generated code of all four, and requires the verdicts to
-agree with the manifest and with each other.
+generates every case into C#, Go, Java, Python and TypeScript, pushes every
+declared wire value through the generated code of all five, and requires the
+verdicts to agree with the manifest and with each other.
 
 ## Layout
 
     json-schema.json   the manifest
     schemas/           schemas written for conformance, including cross-file inputs
-    runners/           the four generic runners the Rust driver drives
+    runners/           the five generic runners the Rust driver drives
 
 The generator derives a root model's name from the schema **file stem**, so
 `schemas/numeric-bounds.yaml` produces `NumericBounds` in every target. Keep
@@ -38,7 +38,7 @@ convention is only total for those names.
 Failures compare **paths**, never reason text: P11 leaves the wording
 target-idiomatic. A **load** verdict may legitimately differ per target — P15
 scopes identifier validity to the emitted language, so a member named `validate`
-is rejected for Go and accepted for the other three
+is rejected for Go and accepted for the other four
 (`features/properties.md:132-144`). What may never differ is the accepted and
 rejected **wire** value set. `tests/json_schema_probe_matrix.rs` declares the
 former with a `ScopedLoad` row rather than treating it as a finding. Round-trip
@@ -47,7 +47,7 @@ exact, and numbers compare by mathematical value with `-0` kept distinct from
 `0`.
 
 Rejected manifest cases are generated for every base target and must produce the
-declared diagnostic in all four. The probe matrix remains the owner of
+declared diagnostic in all five. The probe matrix remains the owner of
 legitimate language-specific identifier rejections.
 
 ### Coverage declarations
@@ -67,7 +67,7 @@ compile/import coverage rather than receiving artificial runtime claims.
 
 A serialize-side rejection needs a native value the parser would never produce,
 so a case declares one by parsing `from_wire` and then mutating the model. The
-mutation vocabulary is deliberately tiny and implemented identically by all four
+mutation vocabulary is deliberately tiny and implemented identically by all five
 runners:
 
     {"path": "count",         "set_integer": "9007199254740992"}
@@ -125,6 +125,7 @@ samples, which are golden snapshots.
 
 | runner           | how it reaches the model                                                                                                                                                  |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Runner.cs`      | the plan's `csharp_model` names the type; Temporal's default payload converter binds its `[JsonConverter]`, and mutations write through reflection                        |
 | `runner.go`      | a generated `registry.go` maps a case to a `reflect.Type` (Go cannot look a type up by name), then reflection                                                             |
 | `Runner.java`    | `Class.forName` + Jackson, configured like Temporal's default converter                                                                                                   |
 | `runner.py`      | `importlib` + the registered `TransferTypeConverter`                                                                                                                      |
@@ -134,15 +135,15 @@ samples, which are golden snapshots.
 `tests/json_schema_probe_matrix.rs`.
 
 `tests/json_schema_corpus_runtime.rs` runs the pure matcher data. Pattern
-coverage executes all 102 gate-accepted rows in the four base runtimes and keeps
+coverage executes all 102 gate-accepted rows in the five base runtimes and keeps
 the 38 rejected rows anchored to the shared loader gate. Format coverage adds
-`typescript-date` and `typescript-temporal` to the four defaults, for six
+`typescript-date` and `typescript-temporal` to the five defaults, for seven
 profiles total. Clock rows declare a common wire and explicit legacy-`Date`
-overrides; Python's sub-microsecond `09#8` loss remains a live reported
-divergence. Duration and URI-reference each have accept/reject and round-trip
-corpora.
+overrides; Python's sub-microsecond and C#'s sub-100 ns `09#8` losses remain
+live reported divergences. Duration and URI-reference each have accept/reject
+and round-trip corpora.
 
-.NET is not part of this P1 runtime matrix; its validation contract remains a
-separate generator project.
+A single language stage (for example `cargo validate dotnet`) runs the runtime
+tests against that target alone; `cargo validate conformance` runs every target.
 
-Adding a case needs no runner change. Adding a *mutation kind* needs all four.
+Adding a case needs no runner change. Adding a *mutation kind* needs all five.

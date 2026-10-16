@@ -23,8 +23,8 @@ import org.jspecify.annotations.Nullable;
  * and its inline member shape `ShowcaseLedgerValue`, so both the map and its members
  * are ordinary named models. Also exercises the member-name override on a hoisted
  * property — `x-&lt;lang&gt;-name` keeps naming the *member* (Go `LedgerGo`, TS
- * `ledgerTs`, Python `ledger_py`, Java `ledgerJava`) while the type keeps its
- * position-derived name.
+ * `ledgerTs`, Python `ledger_py`, Java `ledgerJava`, C# `LedgerCs`) while the type
+ * keeps its position-derived name.
  */
 @JsonSerialize(using = ShowcaseLedger.Serializer.class)
 @JsonDeserialize(using = ShowcaseLedger.Deserializer.class)

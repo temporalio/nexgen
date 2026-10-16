@@ -15,7 +15,7 @@ namespace Nexgen.FunctionExecution
 
     [GeneratedCode("nexgen", null)]
     [NexusService("FunctionExecution")]
-    internal interface IFunctionExecution
+    public interface IFunctionExecution
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("ExecuteFunction")]

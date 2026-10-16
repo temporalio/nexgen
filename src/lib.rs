@@ -43,6 +43,9 @@ pub struct GenerateRequest {
     /// TypeScript-only: the in-memory representation for materialized temporal
     /// `format` fields. `Default` is `TsDateTimeTypes::String`.
     pub ts_date_time_types: generator::TsDateTimeTypes,
+    /// C#-only: the root namespace for generated types. Each input module's
+    /// types live in a namespace below it. Ignored for other languages.
+    pub dotnet_namespace: Option<String>,
 }
 
 pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
@@ -90,6 +93,11 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
         },
         ts_date_time_types: request.ts_date_time_types,
         support_package: request.support_package.clone(),
+        dotnet_namespace: if request.language == Language::Dotnet {
+            request.dotnet_namespace.clone()
+        } else {
+            None
+        },
     };
     let generated = compile_tree_to_files(request.language, tree, &descriptors, options)?;
     print_warnings(&generated);
@@ -367,6 +375,7 @@ mod tests {
             format: false,
             java_package_name: java_package_name.map(str::to_string),
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         }
     }
 

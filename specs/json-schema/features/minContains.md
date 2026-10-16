@@ -108,6 +108,7 @@ in both directions (**P12**).
 | TypeScript | The transfer converters tally the raw array inbound and the typed array outbound after the `Array.isArray` guard.                                                      |
 | Python     | `_check_contains` receives the raw list inbound and the typed list outbound, appending the same bound/count violation.                                                 |
 | Java       | The collecting deserializer tallies the original Jackson array node; serialize tallies the typed `List<T>`. Not bean-validation.                                       |
+| C#         | `Converter.Parse` tallies the original `JsonElement` array; `Validate` tallies the in-memory `IReadOnlyList<T>`.                                                       |
 
 Reason strings name the concrete bound and offending match count
 (`too few matching items: at least 2, got 1`), per the [[maxContains]]

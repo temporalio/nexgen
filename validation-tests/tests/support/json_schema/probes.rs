@@ -445,11 +445,11 @@ properties:
         scoped_load: &[ScopedLoad {
             target: Target::Java,
             diagnostic: "identifier collision in java output",
-            rationale: "Java is the only target that nests its converter inside the model and \
-                        binds `violation` as a loop variable in the same method body as the \
-                        member slots, so `violation` needs an `x-java-name` override there and \
-                        nowhere else. Go, Python and TypeScript synthesize no such name and \
-                        compile the schema unchanged.",
+            rationale: "Java nests its converter inside the model and binds `violation` \
+                        as a loop variable in the same method body as the member slots, \
+                        so `violation` needs an `x-java-name` override there. C#, Go, \
+                        Python and TypeScript bind no such name and compile the schema \
+                        unchanged.",
         }],
         broken: &[],
     },
@@ -652,6 +652,7 @@ pub fn run(target: Option<Target>) {
     for &target in &targets {
         let probes = for_target(target);
         match target {
+            Target::CSharp => check_csharp(&workspace, &probes, &mut failures, &mut compiled),
             Target::Go => check_go(&workspace, &probes, &mut failures, &mut compiled),
             Target::Java => check_java(&workspace, &probes, &mut failures, &mut compiled),
             Target::Python => check_python(&workspace, &probes, &mut failures, &mut compiled),
@@ -716,6 +717,31 @@ pub fn run(target: Option<Target>) {
         "the probe matrix found generated code no toolchain accepts:\n\n{}",
         report.join("\n\n")
     );
+}
+
+/// Compiles every C# probe in one project with warnings as errors, so a
+/// nullable-reference or obsolete-member warning in generated code fails the
+/// probe as surely as a compile error.
+fn check_csharp(
+    workspace: &Workspace,
+    probes: &[&MatrixProbe],
+    failures: &mut Failures,
+    compiled: &mut BTreeSet<(String, Target)>,
+) {
+    if probes.is_empty() {
+        return;
+    }
+    let root = workspace.target_root(Target::CSharp);
+    let broken = match toolchain::csharp_build(&root, true, false) {
+        Ok(broken) => broken,
+        Err(error) => panic!("could not build the C# probes: {error}"),
+    };
+    for probe in probes {
+        compiled.insert((probe.id.to_string(), Target::CSharp));
+        if let Some(error) = broken.get(probe.id) {
+            failures.record(probe.id, Target::CSharp, "dotnet build", error);
+        }
+    }
 }
 
 fn check_go(

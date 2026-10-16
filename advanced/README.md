@@ -18,8 +18,8 @@ The generator picks its input format from the file extension, so the same
 (`.json`/`.yaml`/`.yml`) inputs.
 
 > [!IMPORTANT]
-> The `dotnet` target, the `--descriptors`, `--format`, and `--native-api`
-> flags, and the `add-rpc` and `debug-wit-dir` subcommands — is gated behind the
+> The `--descriptors`, `--format`, and `--native-api` flags, and the `add-rpc`,
+> `add-message`, and `debug-wit-dir` subcommands, are gated behind the
 > `advanced` Cargo feature, which is off by default. Build or run with
 > `--features advanced` (as every command below does), or produce a binary that
 > includes it with `cargo build --release --features advanced`. The

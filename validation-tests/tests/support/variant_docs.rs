@@ -79,6 +79,7 @@ pub fn generate(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     output

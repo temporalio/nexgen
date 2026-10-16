@@ -132,6 +132,7 @@ $defs:
         config: Default::default(),
         java_package_name: Some("example.shadow".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -227,6 +228,7 @@ fn java_json_bare_ref_root_alias_collapses_to_the_target_class() {
         config: Default::default(),
         java_package_name: Some("example.aliases".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -345,6 +347,7 @@ properties:
         format: false,
         java_package_name: Some("fracsec".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -440,6 +443,7 @@ properties:
         format: false,
         java_package_name: Some("invalid".to_string()),
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap_err()
     .to_string();
