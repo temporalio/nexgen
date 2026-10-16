@@ -775,8 +775,10 @@ reserved in every model member scope and closed-value constant scope.
     canonicalized `string` (no BCL type holds both offset-bearing and
     offset-less times of day); `contentEncoding` is `byte[]`. `DateTimeOffset`
     resolves 100 ns, so a longer fraction is truncated to seven digits (P1
-    exception (b)). It holds UTC offsets only within ±14:00, which is exactly
-    the shared [[format]] domain.
+    exception (b); the open `09#8` divergence, shared with Python's microsecond
+    `datetime` and reported on every run of
+    `tests/json_schema_corpus_runtime.rs`). It holds UTC offsets only within
+    ±14:00, which is exactly the shared [[format]] domain.
 12. **Name overrides are `x-cs-name`, `x-cs-const-name`, and
     `x-cs-enum-names`.** Types, members, and constants are PascalCase, so a
     derived name is never a C# keyword; an override must itself be a legal,
