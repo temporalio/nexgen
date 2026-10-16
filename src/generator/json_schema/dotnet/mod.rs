@@ -37,8 +37,14 @@ pub(crate) use types::{
 pub(in crate::generator) const GENERATED_CODE_ATTRIBUTE: &str =
     "[global::System.CodeDom.Compiler.GeneratedCode(\"nexgen\", null)]";
 
-/// The runtime support types every module refers to by bare name. They are
-/// reserved identifiers in every C# module scope (P15).
+/// The namespace alias generated model code qualifies the runtime support types
+/// with (`NexgenRuntime::Violation`). An alias qualifier resolves only against
+/// `using` aliases, so no member, nested type, or local can capture it, and a
+/// schema member may take any runtime type's name.
+pub(crate) const RUNTIME_ALIAS: &str = "NexgenRuntime";
+
+/// The runtime support types. They are reserved identifiers in every C# module
+/// scope (P15): the runtime namespace declares them alongside a module's types.
 pub(crate) const RUNTIME_TYPES: &[&str] = &[
     "Violation",
     "SpecJson",
@@ -172,19 +178,6 @@ impl JsonModelTree {
         })
     }
 
-    /// The runtime support types this run emits.
-    fn runtime_types(&self) -> Vec<&'static str> {
-        RUNTIME_TYPES
-            .iter()
-            .copied()
-            .filter(|name| match *name {
-                "TemporalSupport" => self.uses_temporal,
-                "Base64Support" => self.uses_content_encoding,
-                _ => true,
-            })
-            .collect()
-    }
-
     pub(in crate::generator) fn is_empty(&self) -> bool {
         self.models.is_empty()
     }
@@ -240,8 +233,8 @@ pub(in crate::generator) struct ModelBackend {
 #[derive(Debug, Default)]
 pub(in crate::generator) struct RenderedModelFragments {
     pub(in crate::generator) body: String,
-    /// `using` aliases binding the runtime support types by bare name, when the
-    /// module lives outside the runtime namespace.
+    /// `using` aliases the model bodies need: the [`RUNTIME_ALIAS`] namespace
+    /// alias.
     pub(in crate::generator) aliases: Vec<String>,
 }
 
@@ -377,15 +370,10 @@ impl ExternalModelBackend<PlannedJsonType> for ModelBackend {
             }
             self.render_model(&mut body, model)?;
         }
-        let aliases = if self.namespace == self.tree.runtime_namespace {
-            Vec::new()
-        } else {
-            self.tree
-                .runtime_types()
-                .iter()
-                .map(|name| format!("{name} = global::{}.{name}", self.tree.runtime_namespace))
-                .collect()
-        };
+        let aliases = vec![format!(
+            "{RUNTIME_ALIAS} = global::{}",
+            self.tree.runtime_namespace
+        )];
         Ok(RenderedModelFragments { body, aliases })
     }
 

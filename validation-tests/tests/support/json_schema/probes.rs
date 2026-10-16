@@ -442,23 +442,15 @@ properties:
   violation: { type: string }
 ",
         load_rejected: None,
-        scoped_load: &[
-            ScopedLoad {
-                target: Target::Java,
-                diagnostic: "identifier collision in java output",
-                rationale: "Java nests its converter inside the model and binds `violation` \
-                            as a loop variable in the same method body as the member slots, \
-                            so `violation` needs an `x-java-name` override there.",
-            },
-            ScopedLoad {
-                target: Target::CSharp,
-                diagnostic: "identifier collision in dotnet output",
-                rationale: "C# PascalCases `violation` onto the runtime `Violation` type the \
-                            model's converter names by bare identifier, so it needs an \
-                            `x-cs-name` override there. Go, Python and TypeScript synthesize \
-                            no such name and compile the schema unchanged.",
-            },
-        ],
+        scoped_load: &[ScopedLoad {
+            target: Target::Java,
+            diagnostic: "identifier collision in java output",
+            rationale: "Java nests its converter inside the model and binds `violation` \
+                        as a loop variable in the same method body as the member slots, \
+                        so `violation` needs an `x-java-name` override there. C#, Go, \
+                        Python and TypeScript bind no such name and compile the schema \
+                        unchanged.",
+        }],
         broken: &[],
     },
     MatrixProbe {
