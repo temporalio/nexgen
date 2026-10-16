@@ -139,9 +139,9 @@ coverage executes all 102 gate-accepted rows in the five base runtimes and keeps
 the 38 rejected rows anchored to the shared loader gate. Format coverage adds
 `typescript-date` and `typescript-temporal` to the five defaults, for seven
 profiles total. Clock rows declare a common wire and explicit legacy-`Date`
-overrides; Python's sub-microsecond `09#8` loss remains a live reported
-divergence. Duration and URI-reference each have accept/reject and round-trip
-corpora.
+overrides; Python's sub-microsecond and C#'s sub-100 ns `09#8` losses remain
+live reported divergences. Duration and URI-reference each have accept/reject
+and round-trip corpora.
 
 A single language stage (for example `cargo validate dotnet`) runs the runtime
 tests against that target alone; `cargo validate conformance` runs every target.
