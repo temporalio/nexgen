@@ -2,17 +2,7 @@ package tests
 
 import (
 	"reflect"
-
-	"go.temporal.io/sdk/converter"
 )
-
-func systemNexusTestDataConverter() converter.DataConverter {
-	return converter.NewCompositeDataConverter(
-		converter.NewNilPayloadConverter(),
-		converter.NewProtoPayloadConverter(),
-		converter.NewJSONPayloadConverter(),
-	)
-}
 
 type nexusCall struct {
 	Operation string
