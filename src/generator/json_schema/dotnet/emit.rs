@@ -203,7 +203,7 @@ fn render_object_body(
             out.push_str("    [global::System.Obsolete]\n");
         }
         out.push_str(&format!(
-            "    public {ty} {} => {} ?? {expr};\n\n",
+            "    public {ty} {} => this.{} ?? {expr};\n\n",
             default_accessor_name(&field.name),
             field.name
         ));
@@ -305,7 +305,7 @@ fn render_equality(out: &mut String, name: &str, members: &[String]) {
             &members
                 .iter()
                 .map(|member| {
-                    format!("NexgenRuntime::ValueEquality.Equal({member}, other.{member})")
+                    format!("NexgenRuntime::ValueEquality.Equal(this.{member}, other.{member})")
                 })
                 .collect::<Vec<_>>()
                 .join("\n            && "),
@@ -315,7 +315,7 @@ fn render_equality(out: &mut String, name: &str, members: &[String]) {
     out.push_str("    /// <inheritdoc/>\n    public override int GetHashCode()\n    {\n        var hash = new global::System.HashCode();\n");
     for member in members {
         out.push_str(&format!(
-            "        hash.Add(NexgenRuntime::ValueEquality.Hash({member}));\n"
+            "        hash.Add(NexgenRuntime::ValueEquality.Hash(this.{member}));\n"
         ));
     }
     out.push_str("        return hash.ToHashCode();\n    }\n\n");
@@ -1246,15 +1246,15 @@ fn render_closed_value_class(
         ));
     }
     out.push_str(&format!(
-        "\n        private {name}({value_type} value)\n        {{\n            Value = value;\n        }}\n\n        /// <summary>\n        /// The wire value.\n        /// </summary>\n        public {value_type} Value {{ get; }}\n\n"
+        "\n        private {name}({value_type} value)\n        {{\n            this.Value = value;\n        }}\n\n        /// <summary>\n        /// The wire value.\n        /// </summary>\n        public {value_type} Value {{ get; }}\n\n"
     ));
     let equals = if value_type == "string" {
-        "string.Equals(Value, other.Value, global::System.StringComparison.Ordinal)"
+        "string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal)"
     } else {
-        "Value == other.Value"
+        "this.Value == other.Value"
     };
     out.push_str(&format!(
-        "        /// <inheritdoc/>\n        public bool Equals({name}? other) => other is not null && {equals};\n\n        /// <inheritdoc/>\n        public override bool Equals(object? obj) => Equals(obj as {name});\n\n        /// <inheritdoc/>\n        public override int GetHashCode() => Value.GetHashCode();\n\n        /// <inheritdoc/>\n        public override string ToString() => Value.ToString()!;\n    }}\n"
+        "        /// <inheritdoc/>\n        public bool Equals({name}? other) => other is not null && {equals};\n\n        /// <inheritdoc/>\n        public override bool Equals(object? obj) => Equals(obj as {name});\n\n        /// <inheritdoc/>\n        public override int GetHashCode() => this.Value.GetHashCode();\n\n        /// <inheritdoc/>\n        public override string ToString() => this.Value.ToString()!;\n    }}\n"
     ));
 }
 
@@ -1394,7 +1394,7 @@ fn render_union_wrapper(out: &mut String, union: &CsUnion, variant: &UnionVarian
         out.push('\n');
     }
     out.push_str(&format!(
-        "{inner}/// <summary>\n{inner}/// Wraps a member value.\n{inner}/// </summary>\n{inner}public {class}({value_type} value)\n{inner}{{\n{inner}    Value = value;\n{inner}}}\n\n{inner}/// <summary>\n{inner}/// The member value.\n{inner}/// </summary>\n{inner}public {value_type} Value {{ get; }}\n\n"
+        "{inner}/// <summary>\n{inner}/// Wraps a member value.\n{inner}/// </summary>\n{inner}public {class}({value_type} value)\n{inner}{{\n{inner}    this.Value = value;\n{inner}}}\n\n{inner}/// <summary>\n{inner}/// The member value.\n{inner}/// </summary>\n{inner}public {value_type} Value {{ get; }}\n\n"
     ));
     if let Some(checks) = wrapper_checks(variant, &format!("{inner}    ")) {
         out.push_str(&format!(
@@ -1402,7 +1402,7 @@ fn render_union_wrapper(out: &mut String, union: &CsUnion, variant: &UnionVarian
         ));
     }
     out.push_str(&format!(
-        "{inner}/// <inheritdoc/>\n{inner}public override bool Equals(object? obj) => obj is {class} other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);\n\n{inner}/// <inheritdoc/>\n{inner}public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);\n\n{inner}/// <inheritdoc/>\n{inner}public override string ToString() => \"{class}[\" + Value + \"]\";\n{indent}}}\n"
+        "{inner}/// <inheritdoc/>\n{inner}public override bool Equals(object? obj) => obj is {class} other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);\n\n{inner}/// <inheritdoc/>\n{inner}public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);\n\n{inner}/// <inheritdoc/>\n{inner}public override string ToString() => \"{class}[\" + this.Value + \"]\";\n{indent}}}\n"
     ));
 }
 

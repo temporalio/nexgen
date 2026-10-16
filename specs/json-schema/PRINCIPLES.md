@@ -796,6 +796,15 @@ reserved in every model member scope and closed-value constant scope.
     non-reserved identifier. A name that cannot be a C# identifier at all
     (empty, or starting with a digit) is a P15 load reject with the override as
     its fix-it, as is a member that shares its enclosing type's name (CS0542).
+    An override may be lowercase and may spell any parameter or local the
+    generated code binds (`value`, `path`, `violations`, `other`, `hash`, …);
+    none is reserved, unlike Java's deserializer locals. Converter locals carry
+    a member-derived prefix or never meet a member by bare name, a converter
+    reaches members through an instance (`value.Member`), and generated record
+    and closed-value methods qualify their own members with `this.` (the Java
+    `equals` pattern), so a parameter such as `Equals(T? other)` cannot capture
+    a member named `other`. A test harvests every such identifier from the
+    generated showcase and overrides a member to each.
 13. **One namespace per module (P14).** Each input file's module is one
     namespace: the root module's is `--namespace` (or, for a single input, one
     derived from its service, else `Nexgen.Generated`) and every other module's

@@ -52,20 +52,20 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Street, other.Street)
-                && NexgenRuntime::ValueEquality.Equal(City, other.City)
-                && NexgenRuntime::ValueEquality.Equal(Zip, other.Zip)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Street, other.Street)
+                && NexgenRuntime::ValueEquality.Equal(this.City, other.City)
+                && NexgenRuntime::ValueEquality.Equal(this.Zip, other.Zip)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Street));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(City));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Zip));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Street));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.City));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Zip));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -289,14 +289,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -431,14 +431,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -619,14 +619,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -768,14 +768,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1005,7 +1005,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private KindValue(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -1014,16 +1014,16 @@ namespace Nexgen.JsonSchema.Showcase
             public string Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(KindValue? other) => other is not null && string.Equals(Value, other.Value, global::System.StringComparison.Ordinal);
+            public bool Equals(KindValue? other) => other is not null && string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal);
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as KindValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -1052,18 +1052,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
-                && NexgenRuntime::ValueEquality.Equal(Radius, other.Radius)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(this.Radius, other.Radius)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Radius));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Radius));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1272,20 +1272,20 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Email, other.Email)
-                && NexgenRuntime::ValueEquality.Equal(ShippingStreet, other.ShippingStreet)
-                && NexgenRuntime::ValueEquality.Equal(ShippingZip, other.ShippingZip)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Email, other.Email)
+                && NexgenRuntime::ValueEquality.Equal(this.ShippingStreet, other.ShippingStreet)
+                && NexgenRuntime::ValueEquality.Equal(this.ShippingZip, other.ShippingZip)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Email));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(ShippingStreet));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(ShippingZip));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Email));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ShippingStreet));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ShippingZip));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1530,14 +1530,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1669,14 +1669,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1805,14 +1805,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Values, other.Values);
+            return NexgenRuntime::ValueEquality.Equal(this.Values, other.Values);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Values));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Values));
             return hash.ToHashCode();
         }
 
@@ -2036,14 +2036,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2185,7 +2185,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private KindValue(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -2194,16 +2194,16 @@ namespace Nexgen.JsonSchema.Showcase
             public string Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(KindValue? other) => other is not null && string.Equals(Value, other.Value, global::System.StringComparison.Ordinal);
+            public bool Equals(KindValue? other) => other is not null && string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal);
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as KindValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -2232,18 +2232,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
-                && NexgenRuntime::ValueEquality.Equal(Href, other.Href)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(this.Href, other.Href)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Href));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Href));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2460,14 +2460,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2594,14 +2594,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2846,14 +2846,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -3009,16 +3009,16 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Theme, other.Theme)
-                && NexgenRuntime::ValueEquality.Equal(FontSize, other.FontSize);
+            return NexgenRuntime::ValueEquality.Equal(this.Theme, other.Theme)
+                && NexgenRuntime::ValueEquality.Equal(this.FontSize, other.FontSize);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Theme));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(FontSize));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Theme));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.FontSize));
             return hash.ToHashCode();
         }
 
@@ -3274,7 +3274,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private KindValue(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -3283,16 +3283,16 @@ namespace Nexgen.JsonSchema.Showcase
             public string Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(KindValue? other) => other is not null && string.Equals(Value, other.Value, global::System.StringComparison.Ordinal);
+            public bool Equals(KindValue? other) => other is not null && string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal);
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as KindValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -3306,7 +3306,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private RevisionValue(long value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -3315,16 +3315,16 @@ namespace Nexgen.JsonSchema.Showcase
             public long Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(RevisionValue? other) => other is not null && Value == other.Value;
+            public bool Equals(RevisionValue? other) => other is not null && this.Value == other.Value;
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as RevisionValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -3338,7 +3338,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private EnabledValue(bool value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -3347,16 +3347,16 @@ namespace Nexgen.JsonSchema.Showcase
             public bool Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(EnabledValue? other) => other is not null && Value == other.Value;
+            public bool Equals(EnabledValue? other) => other is not null && this.Value == other.Value;
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as EnabledValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -3374,7 +3374,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private StatusValue(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -3383,16 +3383,16 @@ namespace Nexgen.JsonSchema.Showcase
             public string Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(StatusValue? other) => other is not null && string.Equals(Value, other.Value, global::System.StringComparison.Ordinal);
+            public bool Equals(StatusValue? other) => other is not null && string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal);
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as StatusValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -3410,7 +3410,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private TierValue(long value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -3419,16 +3419,16 @@ namespace Nexgen.JsonSchema.Showcase
             public long Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(TierValue? other) => other is not null && Value == other.Value;
+            public bool Equals(TierValue? other) => other is not null && this.Value == other.Value;
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as TierValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -3444,7 +3444,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private ScaleValue(double value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -3453,16 +3453,16 @@ namespace Nexgen.JsonSchema.Showcase
             public double Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(ScaleValue? other) => other is not null && Value == other.Value;
+            public bool Equals(ScaleValue? other) => other is not null && this.Value == other.Value;
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as ScaleValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -3483,7 +3483,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public IdOrNameUnionString(string value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -3501,13 +3501,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is IdOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is IdOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "IdOrNameUnionString[" + Value + "]";
+                public override string ToString() => "IdOrNameUnionString[" + this.Value + "]";
             }
 
             /// <summary>
@@ -3521,7 +3521,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public IdOrNameUnionInteger(long value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -3542,13 +3542,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is IdOrNameUnionInteger other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is IdOrNameUnionInteger other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "IdOrNameUnionInteger[" + Value + "]";
+                public override string ToString() => "IdOrNameUnionInteger[" + this.Value + "]";
             }
 
             /// <summary>
@@ -3666,7 +3666,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public ModeUnionString(string value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -3683,13 +3683,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ModeUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is ModeUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "ModeUnionString[" + Value + "]";
+                public override string ToString() => "ModeUnionString[" + this.Value + "]";
             }
 
             /// <summary>
@@ -3703,7 +3703,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public ModeUnionInteger(long value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -3724,13 +3724,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ModeUnionInteger other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is ModeUnionInteger other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "ModeUnionInteger[" + Value + "]";
+                public override string ToString() => "ModeUnionInteger[" + this.Value + "]";
             }
 
             /// <summary>
@@ -3848,7 +3848,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public PayloadUnionObject(global::System.Collections.Generic.IReadOnlyDictionary<string, global::System.Text.Json.JsonElement> value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -3857,13 +3857,13 @@ namespace Nexgen.JsonSchema.Showcase
                 public global::System.Collections.Generic.IReadOnlyDictionary<string, global::System.Text.Json.JsonElement> Value { get; }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is PayloadUnionObject other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is PayloadUnionObject other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "PayloadUnionObject[" + Value + "]";
+                public override string ToString() => "PayloadUnionObject[" + this.Value + "]";
             }
 
             /// <summary>
@@ -3877,7 +3877,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public PayloadUnionString(string value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -3886,13 +3886,13 @@ namespace Nexgen.JsonSchema.Showcase
                 public string Value { get; }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is PayloadUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is PayloadUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "PayloadUnionString[" + Value + "]";
+                public override string ToString() => "PayloadUnionString[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4006,7 +4006,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public DetailUnionString(string value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -4015,13 +4015,13 @@ namespace Nexgen.JsonSchema.Showcase
                 public string Value { get; }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is DetailUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is DetailUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "DetailUnionString[" + Value + "]";
+                public override string ToString() => "DetailUnionString[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4130,7 +4130,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public ShapeOrNameUnionString(string value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -4148,13 +4148,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ShapeOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is ShapeOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "ShapeOrNameUnionString[" + Value + "]";
+                public override string ToString() => "ShapeOrNameUnionString[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4285,7 +4285,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public MeasurementsUnionArray(global::System.Collections.Generic.IReadOnlyList<double> value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -4323,13 +4323,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MeasurementsUnionArray other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is MeasurementsUnionArray other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "MeasurementsUnionArray[" + Value + "]";
+                public override string ToString() => "MeasurementsUnionArray[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4345,7 +4345,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public MeasurementsUnionString(string value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -4362,13 +4362,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MeasurementsUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is MeasurementsUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "MeasurementsUnionString[" + Value + "]";
+                public override string ToString() => "MeasurementsUnionString[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4523,7 +4523,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public MetricOrLabelUnionNumber(double value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -4540,13 +4540,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MetricOrLabelUnionNumber other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is MetricOrLabelUnionNumber other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "MetricOrLabelUnionNumber[" + Value + "]";
+                public override string ToString() => "MetricOrLabelUnionNumber[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4560,7 +4560,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public MetricOrLabelUnionString(string value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -4578,13 +4578,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MetricOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is MetricOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "MetricOrLabelUnionString[" + Value + "]";
+                public override string ToString() => "MetricOrLabelUnionString[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4702,7 +4702,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public AddressListOrLabelUnionArray(global::System.Collections.Generic.IReadOnlyList<Address> value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -4730,13 +4730,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionArray other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionArray other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "AddressListOrLabelUnionArray[" + Value + "]";
+                public override string ToString() => "AddressListOrLabelUnionArray[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4750,7 +4750,7 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public AddressListOrLabelUnionString(string value)
                 {
-                    Value = value;
+                    this.Value = value;
                 }
 
                 /// <summary>
@@ -4768,13 +4768,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
                 /// <inheritdoc/>
-                public override string ToString() => "AddressListOrLabelUnionString[" + Value + "]";
+                public override string ToString() => "AddressListOrLabelUnionString[" + this.Value + "]";
             }
 
             /// <summary>
@@ -4916,7 +4916,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private NullableModeValue(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -4925,16 +4925,16 @@ namespace Nexgen.JsonSchema.Showcase
             public string Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(NullableModeValue? other) => other is not null && string.Equals(Value, other.Value, global::System.StringComparison.Ordinal);
+            public bool Equals(NullableModeValue? other) => other is not null && string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal);
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as NullableModeValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -5359,17 +5359,17 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// <see cref="Retries"/>, or its schema default when absent.
         /// </summary>
-        public long RetriesOrDefault => Retries ?? 3L;
+        public long RetriesOrDefault => this.Retries ?? 3L;
 
         /// <summary>
         /// <see cref="Greeting"/>, or its schema default when absent.
         /// </summary>
-        public string GreetingOrDefault => Greeting ?? "hello";
+        public string GreetingOrDefault => this.Greeting ?? "hello";
 
         /// <summary>
         /// <see cref="Debug"/>, or its schema default when absent.
         /// </summary>
-        public bool DebugOrDefault => Debug ?? false;
+        public bool DebugOrDefault => this.Debug ?? false;
 
         /// <inheritdoc/>
         public bool Equals(Showcase? other)
@@ -5382,176 +5382,176 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
-                && NexgenRuntime::ValueEquality.Equal(Revision, other.Revision)
-                && NexgenRuntime::ValueEquality.Equal(Enabled, other.Enabled)
-                && NexgenRuntime::ValueEquality.Equal(Status, other.Status)
-                && NexgenRuntime::ValueEquality.Equal(Tier, other.Tier)
-                && NexgenRuntime::ValueEquality.Equal(Scale, other.Scale)
-                && NexgenRuntime::ValueEquality.Equal(Name, other.Name)
-                && NexgenRuntime::ValueEquality.Equal(Count, other.Count)
-                && NexgenRuntime::ValueEquality.Equal(Active, other.Active)
-                && NexgenRuntime::ValueEquality.Equal(Nickname, other.Nickname)
-                && NexgenRuntime::ValueEquality.Equal(Code, other.Code)
-                && NexgenRuntime::ValueEquality.Equal(Sku, other.Sku)
-                && NexgenRuntime::ValueEquality.Equal(Phrase, other.Phrase)
-                && NexgenRuntime::ValueEquality.Equal(RequestId, other.RequestId)
-                && NexgenRuntime::ValueEquality.Equal(ContactEmail, other.ContactEmail)
-                && NexgenRuntime::ValueEquality.Equal(Host, other.Host)
-                && NexgenRuntime::ValueEquality.Equal(Homepage, other.Homepage)
-                && NexgenRuntime::ValueEquality.Equal(Gateway, other.Gateway)
-                && NexgenRuntime::ValueEquality.Equal(Blob, other.Blob)
-                && NexgenRuntime::ValueEquality.Equal(UrlBlob, other.UrlBlob)
-                && NexgenRuntime::ValueEquality.Equal(Retries, other.Retries)
-                && NexgenRuntime::ValueEquality.Equal(Verbose, other.Verbose)
-                && NexgenRuntime::ValueEquality.Equal(Greeting, other.Greeting)
-                && NexgenRuntime::ValueEquality.Equal(Debug, other.Debug)
-                && NexgenRuntime::ValueEquality.Equal(LegacyIdCs, other.LegacyIdCs)
-                && NexgenRuntime::ValueEquality.Equal(MiddleName, other.MiddleName)
-                && NexgenRuntime::ValueEquality.Equal(Category, other.Category)
-                && NexgenRuntime::ValueEquality.Equal(Priority, other.Priority)
-                && NexgenRuntime::ValueEquality.Equal(Level, other.Level)
-                && NexgenRuntime::ValueEquality.Equal(Ratio, other.Ratio)
-                && NexgenRuntime::ValueEquality.Equal(Score, other.Score)
-                && NexgenRuntime::ValueEquality.Equal(Step, other.Step)
-                && NexgenRuntime::ValueEquality.Equal(Tags, other.Tags)
-                && NexgenRuntime::ValueEquality.Equal(Aliases, other.Aliases)
-                && NexgenRuntime::ValueEquality.Equal(Roles, other.Roles)
-                && NexgenRuntime::ValueEquality.Equal(IdOrName, other.IdOrName)
-                && NexgenRuntime::ValueEquality.Equal(Mode, other.Mode)
-                && NexgenRuntime::ValueEquality.Equal(Payload, other.Payload)
-                && NexgenRuntime::ValueEquality.Equal(Detail, other.Detail)
-                && NexgenRuntime::ValueEquality.Equal(ShapeOrName, other.ShapeOrName)
-                && NexgenRuntime::ValueEquality.Equal(Measurements, other.Measurements)
-                && NexgenRuntime::ValueEquality.Equal(Shapes, other.Shapes)
-                && NexgenRuntime::ValueEquality.Equal(Segments, other.Segments)
-                && NexgenRuntime::ValueEquality.Equal(Slots, other.Slots)
-                && NexgenRuntime::ValueEquality.Equal(Grid, other.Grid)
-                && NexgenRuntime::ValueEquality.Equal(NumberGrid, other.NumberGrid)
-                && NexgenRuntime::ValueEquality.Equal(Links, other.Links)
-                && NexgenRuntime::ValueEquality.Equal(Addresses, other.Addresses)
-                && NexgenRuntime::ValueEquality.Equal(AddressBook, other.AddressBook)
-                && NexgenRuntime::ValueEquality.Equal(Dates, other.Dates)
-                && NexgenRuntime::ValueEquality.Equal(DateIndex, other.DateIndex)
-                && NexgenRuntime::ValueEquality.Equal(Blobs, other.Blobs)
-                && NexgenRuntime::ValueEquality.Equal(BlobIndex, other.BlobIndex)
-                && NexgenRuntime::ValueEquality.Equal(Metrics, other.Metrics)
-                && NexgenRuntime::ValueEquality.Equal(MetricOrLabel, other.MetricOrLabel)
-                && NexgenRuntime::ValueEquality.Equal(AddressListOrLabel, other.AddressListOrLabel)
-                && NexgenRuntime::ValueEquality.Equal(Location, other.Location)
-                && NexgenRuntime::ValueEquality.Equal(Audit, other.Audit)
-                && NexgenRuntime::ValueEquality.Equal(Rows, other.Rows)
-                && NexgenRuntime::ValueEquality.Equal(LedgerCs, other.LedgerCs)
-                && NexgenRuntime::ValueEquality.Equal(Metadata, other.Metadata)
-                && NexgenRuntime::ValueEquality.Equal(Quotas, other.Quotas)
-                && NexgenRuntime::ValueEquality.Equal(Tokens, other.Tokens)
-                && NexgenRuntime::ValueEquality.Equal(Nicknames, other.Nicknames)
-                && NexgenRuntime::ValueEquality.Equal(Choices, other.Choices)
-                && NexgenRuntime::ValueEquality.Equal(Extras, other.Extras)
-                && NexgenRuntime::ValueEquality.Equal(Shape, other.Shape)
-                && NexgenRuntime::ValueEquality.Equal(Note, other.Note)
-                && NexgenRuntime::ValueEquality.Equal(Address, other.Address)
-                && NexgenRuntime::ValueEquality.Equal(Labels, other.Labels)
-                && NexgenRuntime::ValueEquality.Equal(Settings, other.Settings)
-                && NexgenRuntime::ValueEquality.Equal(Attributes, other.Attributes)
-                && NexgenRuntime::ValueEquality.Equal(Contact, other.Contact)
-                && NexgenRuntime::ValueEquality.Equal(NullableCount, other.NullableCount)
-                && NexgenRuntime::ValueEquality.Equal(NullableRatio, other.NullableRatio)
-                && NexgenRuntime::ValueEquality.Equal(NullableFlag, other.NullableFlag)
-                && NexgenRuntime::ValueEquality.Equal(NullableTags, other.NullableTags)
-                && NexgenRuntime::ValueEquality.Equal(NullableMode, other.NullableMode)
-                && NexgenRuntime::ValueEquality.Equal(IntegralMeasurements, other.IntegralMeasurements)
-                && NexgenRuntime::ValueEquality.Equal(ByFive, other.ByFive)
-                && NexgenRuntime::ValueEquality.Equal(Wildcard, other.Wildcard)
-                && NexgenRuntime::ValueEquality.Equal(Quoted, other.Quoted);
+            return NexgenRuntime::ValueEquality.Equal(this.Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(this.Revision, other.Revision)
+                && NexgenRuntime::ValueEquality.Equal(this.Enabled, other.Enabled)
+                && NexgenRuntime::ValueEquality.Equal(this.Status, other.Status)
+                && NexgenRuntime::ValueEquality.Equal(this.Tier, other.Tier)
+                && NexgenRuntime::ValueEquality.Equal(this.Scale, other.Scale)
+                && NexgenRuntime::ValueEquality.Equal(this.Name, other.Name)
+                && NexgenRuntime::ValueEquality.Equal(this.Count, other.Count)
+                && NexgenRuntime::ValueEquality.Equal(this.Active, other.Active)
+                && NexgenRuntime::ValueEquality.Equal(this.Nickname, other.Nickname)
+                && NexgenRuntime::ValueEquality.Equal(this.Code, other.Code)
+                && NexgenRuntime::ValueEquality.Equal(this.Sku, other.Sku)
+                && NexgenRuntime::ValueEquality.Equal(this.Phrase, other.Phrase)
+                && NexgenRuntime::ValueEquality.Equal(this.RequestId, other.RequestId)
+                && NexgenRuntime::ValueEquality.Equal(this.ContactEmail, other.ContactEmail)
+                && NexgenRuntime::ValueEquality.Equal(this.Host, other.Host)
+                && NexgenRuntime::ValueEquality.Equal(this.Homepage, other.Homepage)
+                && NexgenRuntime::ValueEquality.Equal(this.Gateway, other.Gateway)
+                && NexgenRuntime::ValueEquality.Equal(this.Blob, other.Blob)
+                && NexgenRuntime::ValueEquality.Equal(this.UrlBlob, other.UrlBlob)
+                && NexgenRuntime::ValueEquality.Equal(this.Retries, other.Retries)
+                && NexgenRuntime::ValueEquality.Equal(this.Verbose, other.Verbose)
+                && NexgenRuntime::ValueEquality.Equal(this.Greeting, other.Greeting)
+                && NexgenRuntime::ValueEquality.Equal(this.Debug, other.Debug)
+                && NexgenRuntime::ValueEquality.Equal(this.LegacyIdCs, other.LegacyIdCs)
+                && NexgenRuntime::ValueEquality.Equal(this.MiddleName, other.MiddleName)
+                && NexgenRuntime::ValueEquality.Equal(this.Category, other.Category)
+                && NexgenRuntime::ValueEquality.Equal(this.Priority, other.Priority)
+                && NexgenRuntime::ValueEquality.Equal(this.Level, other.Level)
+                && NexgenRuntime::ValueEquality.Equal(this.Ratio, other.Ratio)
+                && NexgenRuntime::ValueEquality.Equal(this.Score, other.Score)
+                && NexgenRuntime::ValueEquality.Equal(this.Step, other.Step)
+                && NexgenRuntime::ValueEquality.Equal(this.Tags, other.Tags)
+                && NexgenRuntime::ValueEquality.Equal(this.Aliases, other.Aliases)
+                && NexgenRuntime::ValueEquality.Equal(this.Roles, other.Roles)
+                && NexgenRuntime::ValueEquality.Equal(this.IdOrName, other.IdOrName)
+                && NexgenRuntime::ValueEquality.Equal(this.Mode, other.Mode)
+                && NexgenRuntime::ValueEquality.Equal(this.Payload, other.Payload)
+                && NexgenRuntime::ValueEquality.Equal(this.Detail, other.Detail)
+                && NexgenRuntime::ValueEquality.Equal(this.ShapeOrName, other.ShapeOrName)
+                && NexgenRuntime::ValueEquality.Equal(this.Measurements, other.Measurements)
+                && NexgenRuntime::ValueEquality.Equal(this.Shapes, other.Shapes)
+                && NexgenRuntime::ValueEquality.Equal(this.Segments, other.Segments)
+                && NexgenRuntime::ValueEquality.Equal(this.Slots, other.Slots)
+                && NexgenRuntime::ValueEquality.Equal(this.Grid, other.Grid)
+                && NexgenRuntime::ValueEquality.Equal(this.NumberGrid, other.NumberGrid)
+                && NexgenRuntime::ValueEquality.Equal(this.Links, other.Links)
+                && NexgenRuntime::ValueEquality.Equal(this.Addresses, other.Addresses)
+                && NexgenRuntime::ValueEquality.Equal(this.AddressBook, other.AddressBook)
+                && NexgenRuntime::ValueEquality.Equal(this.Dates, other.Dates)
+                && NexgenRuntime::ValueEquality.Equal(this.DateIndex, other.DateIndex)
+                && NexgenRuntime::ValueEquality.Equal(this.Blobs, other.Blobs)
+                && NexgenRuntime::ValueEquality.Equal(this.BlobIndex, other.BlobIndex)
+                && NexgenRuntime::ValueEquality.Equal(this.Metrics, other.Metrics)
+                && NexgenRuntime::ValueEquality.Equal(this.MetricOrLabel, other.MetricOrLabel)
+                && NexgenRuntime::ValueEquality.Equal(this.AddressListOrLabel, other.AddressListOrLabel)
+                && NexgenRuntime::ValueEquality.Equal(this.Location, other.Location)
+                && NexgenRuntime::ValueEquality.Equal(this.Audit, other.Audit)
+                && NexgenRuntime::ValueEquality.Equal(this.Rows, other.Rows)
+                && NexgenRuntime::ValueEquality.Equal(this.LedgerCs, other.LedgerCs)
+                && NexgenRuntime::ValueEquality.Equal(this.Metadata, other.Metadata)
+                && NexgenRuntime::ValueEquality.Equal(this.Quotas, other.Quotas)
+                && NexgenRuntime::ValueEquality.Equal(this.Tokens, other.Tokens)
+                && NexgenRuntime::ValueEquality.Equal(this.Nicknames, other.Nicknames)
+                && NexgenRuntime::ValueEquality.Equal(this.Choices, other.Choices)
+                && NexgenRuntime::ValueEquality.Equal(this.Extras, other.Extras)
+                && NexgenRuntime::ValueEquality.Equal(this.Shape, other.Shape)
+                && NexgenRuntime::ValueEquality.Equal(this.Note, other.Note)
+                && NexgenRuntime::ValueEquality.Equal(this.Address, other.Address)
+                && NexgenRuntime::ValueEquality.Equal(this.Labels, other.Labels)
+                && NexgenRuntime::ValueEquality.Equal(this.Settings, other.Settings)
+                && NexgenRuntime::ValueEquality.Equal(this.Attributes, other.Attributes)
+                && NexgenRuntime::ValueEquality.Equal(this.Contact, other.Contact)
+                && NexgenRuntime::ValueEquality.Equal(this.NullableCount, other.NullableCount)
+                && NexgenRuntime::ValueEquality.Equal(this.NullableRatio, other.NullableRatio)
+                && NexgenRuntime::ValueEquality.Equal(this.NullableFlag, other.NullableFlag)
+                && NexgenRuntime::ValueEquality.Equal(this.NullableTags, other.NullableTags)
+                && NexgenRuntime::ValueEquality.Equal(this.NullableMode, other.NullableMode)
+                && NexgenRuntime::ValueEquality.Equal(this.IntegralMeasurements, other.IntegralMeasurements)
+                && NexgenRuntime::ValueEquality.Equal(this.ByFive, other.ByFive)
+                && NexgenRuntime::ValueEquality.Equal(this.Wildcard, other.Wildcard)
+                && NexgenRuntime::ValueEquality.Equal(this.Quoted, other.Quoted);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Revision));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Enabled));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Status));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Tier));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Scale));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Name));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Count));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Active));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Nickname));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Code));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Sku));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Phrase));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(RequestId));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(ContactEmail));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Host));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Homepage));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Gateway));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Blob));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(UrlBlob));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Retries));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Verbose));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Greeting));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Debug));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(LegacyIdCs));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(MiddleName));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Category));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Priority));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Level));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Ratio));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Score));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Step));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Tags));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Aliases));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Roles));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(IdOrName));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Mode));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Payload));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Detail));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(ShapeOrName));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Measurements));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Shapes));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Segments));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Slots));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Grid));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(NumberGrid));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Links));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Addresses));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AddressBook));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Dates));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(DateIndex));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Blobs));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(BlobIndex));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Metrics));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(MetricOrLabel));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AddressListOrLabel));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Location));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Audit));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Rows));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(LedgerCs));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Metadata));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Quotas));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Tokens));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Nicknames));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Choices));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Extras));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Shape));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Note));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Address));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Labels));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Settings));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Attributes));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Contact));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableCount));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableRatio));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableFlag));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableTags));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableMode));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(IntegralMeasurements));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(ByFive));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Wildcard));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Quoted));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Revision));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Enabled));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Status));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Tier));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Scale));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Name));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Count));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Active));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Nickname));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Code));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Sku));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Phrase));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.RequestId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ContactEmail));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Host));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Homepage));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Gateway));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Blob));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.UrlBlob));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Retries));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Verbose));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Greeting));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Debug));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.LegacyIdCs));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.MiddleName));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Category));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Priority));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Level));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Ratio));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Score));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Step));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Tags));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Aliases));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Roles));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.IdOrName));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Mode));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Payload));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Detail));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ShapeOrName));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Measurements));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Shapes));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Segments));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Slots));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Grid));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.NumberGrid));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Links));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Addresses));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AddressBook));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Dates));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.DateIndex));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Blobs));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.BlobIndex));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Metrics));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.MetricOrLabel));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AddressListOrLabel));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Location));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Audit));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Rows));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.LedgerCs));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Metadata));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Quotas));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Tokens));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Nicknames));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Choices));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Extras));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Shape));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Note));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Address));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Labels));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Settings));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Attributes));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Contact));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.NullableCount));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.NullableRatio));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.NullableFlag));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.NullableTags));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.NullableMode));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.IntegralMeasurements));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ByFive));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Wildcard));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Quoted));
             return hash.ToHashCode();
         }
 
@@ -9062,16 +9062,16 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(By, other.By)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.By, other.By)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(By));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.By));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9256,18 +9256,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Code, other.Code)
-                && NexgenRuntime::ValueEquality.Equal(Hint, other.Hint)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Code, other.Code)
+                && NexgenRuntime::ValueEquality.Equal(this.Hint, other.Hint)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Code));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Hint));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Code));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Hint));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9472,14 +9472,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9619,16 +9619,16 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Amount, other.Amount)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Amount, other.Amount)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Amount));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Amount));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9798,18 +9798,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(City, other.City)
-                && NexgenRuntime::ValueEquality.Equal(Geo, other.Geo)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.City, other.City)
+                && NexgenRuntime::ValueEquality.Equal(this.Geo, other.Geo)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(City));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Geo));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.City));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Geo));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -10025,18 +10025,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Lat, other.Lat)
-                && NexgenRuntime::ValueEquality.Equal(Lon, other.Lon)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Lat, other.Lat)
+                && NexgenRuntime::ValueEquality.Equal(this.Lon, other.Lon)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Lat));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Lon));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Lat));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Lon));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -10229,14 +10229,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -10370,16 +10370,16 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Cell, other.Cell)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Cell, other.Cell)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Cell));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Cell));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -10549,7 +10549,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// </summary>
             public ShowcaseSegmentsItemString(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -10567,13 +10567,13 @@ namespace Nexgen.JsonSchema.Showcase
             }
 
             /// <inheritdoc/>
-            public override bool Equals(object? obj) => obj is ShowcaseSegmentsItemString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+            public override bool Equals(object? obj) => obj is ShowcaseSegmentsItemString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
             /// <inheritdoc/>
-            public override string ToString() => "ShowcaseSegmentsItemString[" + Value + "]";
+            public override string ToString() => "ShowcaseSegmentsItemString[" + this.Value + "]";
         }
 
         /// <summary>
@@ -10587,7 +10587,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// </summary>
             public ShowcaseSegmentsItemInteger(long value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -10608,13 +10608,13 @@ namespace Nexgen.JsonSchema.Showcase
             }
 
             /// <inheritdoc/>
-            public override bool Equals(object? obj) => obj is ShowcaseSegmentsItemInteger other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
+            public override bool Equals(object? obj) => obj is ShowcaseSegmentsItemInteger other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
 
             /// <inheritdoc/>
-            public override string ToString() => "ShowcaseSegmentsItemInteger[" + Value + "]";
+            public override string ToString() => "ShowcaseSegmentsItemInteger[" + this.Value + "]";
         }
 
         /// <summary>
@@ -10737,14 +10737,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Id, other.Id);
+            return NexgenRuntime::ValueEquality.Equal(this.Id, other.Id);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Id));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Id));
             return hash.ToHashCode();
         }
 
@@ -10873,7 +10873,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private KindValue(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -10882,16 +10882,16 @@ namespace Nexgen.JsonSchema.Showcase
             public string Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(KindValue? other) => other is not null && string.Equals(Value, other.Value, global::System.StringComparison.Ordinal);
+            public bool Equals(KindValue? other) => other is not null && string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal);
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as KindValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -10920,18 +10920,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
-                && NexgenRuntime::ValueEquality.Equal(Side, other.Side)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(this.Side, other.Side)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Side));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Side));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -11120,7 +11120,7 @@ namespace Nexgen.JsonSchema.Showcase
 
             private KindValue(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -11129,16 +11129,16 @@ namespace Nexgen.JsonSchema.Showcase
             public string Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(KindValue? other) => other is not null && string.Equals(Value, other.Value, global::System.StringComparison.Ordinal);
+            public bool Equals(KindValue? other) => other is not null && string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal);
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as KindValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -11167,18 +11167,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
-                && NexgenRuntime::ValueEquality.Equal(Body, other.Body)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(this.Body, other.Body)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Body));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Body));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -11395,14 +11395,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -11589,22 +11589,22 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Id, other.Id)
-                && NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
-                && NexgenRuntime::ValueEquality.Equal(Name, other.Name)
-                && NexgenRuntime::ValueEquality.Equal(Size, other.Size)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Id, other.Id)
+                && NexgenRuntime::ValueEquality.Equal(this.Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(this.Name, other.Name)
+                && NexgenRuntime::ValueEquality.Equal(this.Size, other.Size)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Id));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Name));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Size));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Id));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Name));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Size));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -11889,18 +11889,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Id, other.Id)
-                && NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.Id, other.Id)
+                && NexgenRuntime::ValueEquality.Equal(this.Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Id));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Id));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 

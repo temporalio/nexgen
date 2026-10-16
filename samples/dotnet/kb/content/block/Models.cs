@@ -58,22 +58,22 @@ namespace Nexgen.JsonSchema.Kb.Content.Block
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(BlockId, other.BlockId)
-                && NexgenRuntime::ValueEquality.Equal(Order, other.Order)
-                && NexgenRuntime::ValueEquality.Equal(Text, other.Text)
-                && NexgenRuntime::ValueEquality.Equal(Style, other.Style)
-                && NexgenRuntime::ValueEquality.Equal(Page, other.Page);
+            return NexgenRuntime::ValueEquality.Equal(this.BlockId, other.BlockId)
+                && NexgenRuntime::ValueEquality.Equal(this.Order, other.Order)
+                && NexgenRuntime::ValueEquality.Equal(this.Text, other.Text)
+                && NexgenRuntime::ValueEquality.Equal(this.Style, other.Style)
+                && NexgenRuntime::ValueEquality.Equal(this.Page, other.Page);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(BlockId));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Order));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Text));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Style));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Page));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.BlockId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Order));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Text));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Style));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Page));
             return hash.ToHashCode();
         }
 
@@ -325,16 +325,16 @@ namespace Nexgen.JsonSchema.Kb.Content.Block
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Bold, other.Bold)
-                && NexgenRuntime::ValueEquality.Equal(Indent, other.Indent);
+            return NexgenRuntime::ValueEquality.Equal(this.Bold, other.Bold)
+                && NexgenRuntime::ValueEquality.Equal(this.Indent, other.Indent);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Bold));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Indent));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Bold));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Indent));
             return hash.ToHashCode();
         }
 
