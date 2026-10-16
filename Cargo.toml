@@ -31,7 +31,6 @@ path = "src/main.rs"
 # - The WIT/proto-oriented generate flags (`--support-file`,
 #   `--descriptors`, `--format`, `--native-api`)
 # - The maintenance subcommands (`add-rpc`, `add-message`, `debug-wit-dir`)
-# - The (WIP) `dotnet` generation target for JSON Schema
 #
 # See advanced/README.md. Off by default so the published binary
 # only offers the documented JSON Schema workflow.

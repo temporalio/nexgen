@@ -18,8 +18,8 @@ The generator picks its input format from the file extension, so the same
 (`.json`/`.yaml`/`.yml`) inputs.
 
 > [!IMPORTANT]
-> The `dotnet` target, the `--descriptors`, `--format`, and `--native-api`
-> flags, and the `add-rpc` and `debug-wit-dir` subcommands — is gated behind the
+> The `--descriptors`, `--format`, and `--native-api` flags, and the `add-rpc`,
+> `add-message`, and `debug-wit-dir` subcommands, are gated behind the
 > `advanced` Cargo feature, which is off by default. Build or run with
 > `--features advanced` (as every command below does), or produce a binary that
 > includes it with `cargo build --release --features advanced`. The
@@ -178,18 +178,6 @@ cargo run --features advanced -- dotnet \
   advanced/samples/inputs/user-service.wit \
   --support-package Nexgen.Support \
   --output /tmp/user-service-dotnet
-```
-
-The `dotnet` target also accepts JSON Schema inputs (work in progress). The
-output targets `net10.0` and `Temporalio` 1.19.0; `--namespace` sets the root
-namespace, and `x-cs-name`, `x-cs-const-name`, and `x-cs-enum-names` override
-emitted identifiers. JSON Schema inputs need no `--support-package`:
-
-```bash
-cargo run --features advanced -- dotnet \
-  samples/schemas/showcase.nexusrpc.yaml \
-  --namespace Example.Showcase \
-  --output /tmp/showcase-dotnet
 ```
 
 Inputs are positional; pass more than one path (a file or a directory) to link
