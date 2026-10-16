@@ -15,7 +15,7 @@ namespace Nexgen.StreamService
 
     [GeneratedCode("nexgen", null)]
     [NexusService("streamsample.v1.StreamService")]
-    internal interface IStreamService
+    public interface IStreamService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("CreateStream")]

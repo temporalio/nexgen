@@ -194,19 +194,23 @@ stable references, do not renumber them.
        `type == "PayloadValidationError"`, and that it reports **non-retryable**
        — a payload that fails validation can never validate, so a retry is
        always wrong. Python and Java meet it; their stock converters preserve
-       the failure and its details. **Go does not, and the cause is upstream:**
-       the Go SDK's JSON payload converter `%w`-wraps its own sentinel and
-       stringifies the real error, severing the chain. A direct converter
-       round-trip yields a `*fmt.wrapError` on which `errors.As` fails outright,
-       and through Temporal's in-memory Nexus test environment the failure is
-       recovered but reports `Type() == "wrapError"` and
-       **`NonRetryable() == false`**, so a permanently-invalid payload is
-       retried. TypeScript is unmeasured; no claim is made for it.
-       **Status: open** — generated Go cannot deliver this clause today, so
-       generated code must not depend on a caller recovering `Violation` details
-       after a converter hop, and a test that constructs the failure locally or
-       bypasses the payload converter is not evidence for this clause and must
-       say so where it bypasses.
+       the failure and its details. C# meets it too, measured with Temporalio
+       1.19.0 both on a direct converter round trip and over a real Nexus
+       endpoint, where the caller recovers the failure, non-retryable and with
+       decodable violations, as the cause of the worker's non-retryable
+       `BAD_REQUEST` handler error (C# §5).
+       **Go does not, and the cause is upstream:** the Go SDK's JSON payload
+       converter `%w`-wraps its own sentinel and stringifies the real error,
+       severing the chain. A direct converter round-trip yields a
+       `*fmt.wrapError` on which `errors.As` fails outright, and through
+       Temporal's in-memory Nexus test environment the failure is recovered but
+       reports `Type() == "wrapError"` and **`NonRetryable() == false`**, so a
+       permanently-invalid payload is retried. TypeScript is unmeasured; no
+       claim is made for it. **Status: open** — generated Go cannot deliver this
+       clause today, so generated code must not depend on a caller recovering
+       `Violation` details after a converter hop, and a test that constructs the
+       failure locally or bypasses the payload converter is not evidence for
+       this clause and must say so where it bypasses.
 12. **Serialize-side validation; one shared validator, mirror-image adapters.**
     Validation runs in *both* directions (P10 is literal). Every (de)serializer
     decomposes into three layers, and crucially
@@ -737,8 +741,15 @@ reserved in every model member scope and closed-value constant scope.
    detail. Generated C# requires Temporal SDK 1.19.0 or newer for this factory.
    Through `DataConverter.Default` the failure reaches the caller unwrapped, as
    type `PayloadValidationError` and non-retryable (measured with Temporalio
-   1.19.0 on a direct converter round trip; the Nexus boundary is not yet
-   measured, so P11.3 is open for C#).
+   1.19.0 on a direct converter round trip). Across the Nexus boundary, an input
+   the generated converter rejects never reaches the operation: the Temporal
+   worker reports it as a non-retryable `BAD_REQUEST` handler error ("Invalid
+   operation input") whose cause the calling workflow recovers as the original
+   non-retryable `PayloadValidationError`, its violations decodable from the
+   first detail. That meets P11.3, and
+   `samples/dotnet/tests/JsonSchemaKbNexusChecks.cs` pins it over a local dev
+   server. The bare NexusRpc dispatcher below the worker propagates the
+   converter's failure unclassified; the classification is the worker's.
 6. **Spec-strict primitive parse over the raw number token (P1; Java §4).**
    `JsonElement.GetRawText()` is the exact wire spelling (`1.0e2`,
    `12345678901234567890.5`, and `-0` survive verbatim). `SpecJson.SpecLong`
@@ -797,3 +808,13 @@ reserved in every model member scope and closed-value constant scope.
     spells framework types `global::`-qualified so no schema type name can
     shadow them. The generator emits formatted C# directly; no external
     formatter runs.
+14. **Services are `public` NexusRpc interfaces.** Each service is a
+    `[NexusService(fqn)]` `public interface I<Name>` with one
+    `[NexusOperation(wire)]` method per operation (see [[services]]). It is
+    public, like Java's service interface, so a handler
+    (`[NexusServiceHandler(typeof(I<Name>))]`) or a caller
+    (`Workflow.CreateNexusWorkflowClient<I<Name>>`) in another assembly can name
+    it. Definitions mode emits the contract only, with no handler or client
+    scaffolding; the sample suite implements and calls it end to end over a real
+    Nexus endpoint (§5), with both synchronous operations and an asynchronous,
+    workflow-backed one.

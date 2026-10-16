@@ -16,7 +16,7 @@ namespace Nexgen.TypeShowcase
     /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     [NexusService("TypeShowcase")]
-    internal interface ITypeShowcase
+    public interface ITypeShowcase
     {
         /// <summary>
         /// Get a user.

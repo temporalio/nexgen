@@ -15,7 +15,7 @@ namespace Nexgen.GenericModelService
 
     [GeneratedCode("nexgen", null)]
     [NexusService("GenericModelService")]
-    internal interface IGenericModelService
+    public interface IGenericModelService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("Complete")]

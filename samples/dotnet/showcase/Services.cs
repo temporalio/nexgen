@@ -16,7 +16,7 @@ namespace Nexgen.JsonSchema.Showcase
     /// </summary>
     [GeneratedCode("nexgen", null)]
     [NexusService("example.showcase.v1.ShowcaseService")]
-    internal interface IShowcaseServiceCs
+    public interface IShowcaseServiceCs
     {
         /// <summary>
         /// Fetch a showcase by id. Also exercises the operation-level `x-&lt;lang&gt;-name` override: the emitted operation code identifier is renamed to the derived name plus a per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python `get_showcase_py`, Java `getShowcaseJava`, C# `GetShowcaseCs`) while the wire operation name stays `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from the operation key, not the override).
