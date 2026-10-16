@@ -295,8 +295,9 @@ accepted and rejected **wire** value set.
 Two further module-level load rejects belong to this namespace:
 
 - a module segment that is not a valid identifier, or that is a
-  **reserved word in any of the four targets** (`class.json`, `2fa.json`) —
-  target-independent for the same reason;
+  **reserved word in any of the four targets that emit module names verbatim**
+  (`class.json`, `2fa.json`; C# PascalCases them into namespace segments, and no
+  C# keyword is PascalCase) — target-independent for the same reason;
 - an input file whose module path conflicts with a **directory** of the same
   path (`foo.yaml` beside `foo/bar.yaml`), which is why a per-input directory
   never has children — and therefore why `models` / `services` can only ever
