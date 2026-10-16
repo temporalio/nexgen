@@ -206,7 +206,7 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Contains(violations, violation => violation.Path == "roomId");
         }
 
-        private static T Decode<T>(string suite, string name) =>
+        internal static T Decode<T>(string suite, string name) =>
             (T)Decode(typeof(T), File.ReadAllBytes(Path.Combine(FixtureDirectory(suite), name)));
 
         private static object Decode(Type type, byte[] json) =>

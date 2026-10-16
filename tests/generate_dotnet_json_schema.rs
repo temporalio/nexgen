@@ -95,7 +95,7 @@ fn csharp_json_examples_render_expected_language_features() {
             services,
             &[
                 "[NexusService(\"example.showcase.v1.ShowcaseService\")]",
-                "internal interface IShowcaseServiceCs",
+                "public interface IShowcaseServiceCs",
                 "[NexusOperation(\"GetShowcase\")]",
                 "GetShowcaseCs(",
             ],

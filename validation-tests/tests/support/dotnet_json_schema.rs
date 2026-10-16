@@ -2971,7 +2971,7 @@ fn csharp_json_services_render_docs_deprecation_and_one_sided_io() {
             &[
                 // The service is documented and deprecated; overrides rename
                 // the C# identifiers and keep the wire names.
-                "    /// <summary>\n    /// Legacy API.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    [global::System.Obsolete]\n    [NexusService(\"example.legacy.v1.Legacy\")]\n    internal interface ILegacyCs\n",
+                "    /// <summary>\n    /// Legacy API.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    [global::System.Obsolete]\n    [NexusService(\"example.legacy.v1.Legacy\")]\n    public interface ILegacyCs\n",
                 "        /// Ping the service.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        [global::System.Obsolete]\n        [NexusOperation(\"Ping\")]\n        void PingCs();\n",
                 // An absent input is a no-arg method; an absent output is `void`.
                 "void Submit(Input request);",

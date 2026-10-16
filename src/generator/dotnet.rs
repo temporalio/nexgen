@@ -197,7 +197,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("[NexusService(");
             output.push_str(&csharp_string_literal(&service.wire_name));
             output.push_str(")]\n");
-            output.push_str("internal interface I");
+            output.push_str("public interface I");
             output.push_str(&csharp_service_ident(service));
             output.push_str("\n{\n");
             for operation in &service.operations {

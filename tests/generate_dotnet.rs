@@ -325,7 +325,7 @@ fn dotnet_renders_nexus_service_interface_and_resources() {
     let rendered = render_output_files(files);
 
     assert!(rendered.contains("[NexusService(\"TypeShowcase\")]"));
-    assert!(rendered.contains("internal interface ITypeShowcase"));
+    assert!(rendered.contains("public interface ITypeShowcase"));
     assert!(rendered.contains("[NexusOperation(\"SetProfile\")]"));
     assert!(rendered.contains("User SetProfile(SetProfileRequest request);"));
     assert!(!rendered.contains("public sealed class NexgenNexusOperation"));
@@ -388,7 +388,7 @@ fn dotnet_renders_proto_backed_temporal_types() {
     let operations = files.get(&PathBuf::from("Operations.cs")).unwrap().clone();
     let rendered = render_output_files(files);
 
-    assert!(rendered.contains("internal interface IWorkflowService"));
+    assert!(rendered.contains("public interface IWorkflowService"));
     assert!(rendered.contains("namespace Nexgen.WorkflowService\n{"));
     assert!(!rendered.contains("namespace Nexgen.Support\n{"));
     assert!(!rendered.contains("namespace Temporalio.Workflows;"));
@@ -465,7 +465,7 @@ fn dotnet_renders_proto_backed_temporal_types() {
     );
     assert!(rendered.contains("Expression<Func<TWorkflow, Task<TResult>>> workflow"));
     assert!(rendered.contains("using System.CodeDom.Compiler;"));
-    assert!(rendered.contains("[GeneratedCode(\"nexgen\", null)]\n    [NexusService(\"temporal.api.workflowservice.v1.WorkflowService\")]\n    internal interface IWorkflowService"));
+    assert!(rendered.contains("[GeneratedCode(\"nexgen\", null)]\n    [NexusService(\"temporal.api.workflowservice.v1.WorkflowService\")]\n    public interface IWorkflowService"));
     assert!(rendered.contains(
         "[GeneratedCode(\"nexgen\", null)]\n    public record SignalWithStartWorkflowRequest"
     ));

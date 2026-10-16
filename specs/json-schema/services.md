@@ -189,7 +189,7 @@ that wrapper *can* gain fields; the bare scalar cannot.
 ### Scope: a typed contract, not a handler
 
 The generated binding is deliberately a **typed contract** — operation
-references (Go/TS/Python) or a service interface (Java) — and nothing more.
+references (Go/TS/Python) or a service interface (Java, C#) — and nothing more.
 Handler-shape and runtime concerns the SDKs carry —
 **sync vs async handlers, headers, links** — live at *implementation* time, are
 expressed by the SDKs there, and are **intentionally out of scope** here: a
@@ -211,15 +211,15 @@ algorithm). `description` → the language's native doc comment. `description` i
 optional at both levels ([[input-files]]); when absent, Go still emits a
 name-led fallback comment on the service binding, client, constructor, and each
 operation entry/method (every exported Go declaration must carry one —
-PRINCIPLES.md, Go §1). The other three languages simply emit no comment, as
-elsewhere ([[description]]). `deprecated: true` is also annotation-only and
-lowers to each target's native service/operation marker and documentation tag;
-it never changes the wire name, signature, validation, or dispatch behavior. A
-non-boolean value rejects.
+PRINCIPLES.md, Go §1). The other languages simply emit no comment, as elsewhere
+([[description]]). `deprecated: true` is also annotation-only and lowers to each
+target's native service/operation marker and documentation tag; it never changes
+the wire name, signature, validation, or dispatch behavior. A non-boolean value
+rejects.
 
 | Aspect              | Go                                                                                            | TypeScript                                                                    | Python                                                     | Java                                               | C#                                                       |
 | ------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------- |
-| Service binding     | pkg-level `var <Name> = struct{…}{…}`                                                         | `export const <name> = nexus.service(fqn, {…})`                               | `@service(name=fqn)` class                                 | `@Service(name=fqn)` interface                     | `[NexusService(fqn)]` interface `I<Name>`                |
+| Service binding     | pkg-level `var <Name> = struct{…}{…}`                                                         | `export const <name> = nexus.service(fqn, {…})`                               | `@service(name=fqn)` class                                 | `@Service(name=fqn)` interface                     | `[NexusService(fqn)]` `public interface I<Name>`         |
 | Operation entry     | field `nexus.OperationReference[In, Out]` set via `nexus.NewOperationReference[In,Out](wire)` | `nexus.operation<In, Out>({ name: wire, inputType, outputType })`             | attr `Operation[In, Out] = Operation(name=wire)`           | method `Out m(In input)` + `@Operation(name=wire)` | `[NexusOperation(wire)]` method `Out <Name>(In request)` |
 | Operation type info | —                                                                                             | `inputType`/`outputType` carry the I/O type's transfer type converter (below) | —                                                          | —                                                  | —                                                        |
 | Service wire name   | `ServiceName` struct field                                                                    | first arg to `nexus.service`                                                  | `service(name=…)`                                          | `@Service(name=…)`                                 | `[NexusService(…)]`                                      |
@@ -251,6 +251,15 @@ non-boolean value rejects.
   unqualified method name); a method takes **zero or one** convertible param
   (zero ⇒ absent input) and returns `void` (absent output) or a convertible
   type, no `throws`.
+- **C#** (`NexusRpc` 0.4.0, a dependency of `Temporalio` 1.19.0):
+  `[NexusService(name)]` on an **interface** and `[NexusOperation(name)]` on
+  each method; a method takes zero or one parameter (zero ⇒ absent input) and
+  returns `void` (absent output) or the output type. The interface is
+  **`public`**, like Java's, so a handler or caller in another assembly can name
+  it: a handler is a `[NexusServiceHandler(typeof(I<Name>))]` class whose
+  `[NexusOperationHandler]` methods return `IOperationHandler<In, Out>`, and a
+  workflow calls it through
+  `Workflow.CreateNexusWorkflowClient<I<Name>>(new(endpoint))`.
 
 ### The Go `--native-api` client
 
@@ -387,7 +396,7 @@ using NexusRpc;
 /// A service for sending chat messages.
 /// </summary>
 [NexusService("example.v1.ChatService")]
-internal interface IChatService
+public interface IChatService
 {
     /// <summary>
     /// Poll for new messages.
@@ -629,6 +638,20 @@ rather than duplicate it:
   (de)serializer; an invalid one aggregates a `Violation` with a path into that
   type (P11) — the operation binding adds nothing.
 - Void I/O carries no payload to validate in any language.
+- Every target's sample suite drives the generated `kb` service end to end over
+  a Temporal Nexus endpoint (Go through the SDK's in-memory test environment,
+  the others through a local dev server): a handler implementing the generated
+  binding and a caller workflow invoking every operation through the SDK's Nexus
+  client (`samples/<lang>/tests/*kb*nexus*`; C#'s is
+  `samples/dotnet/tests/JsonSchemaKbNexusChecks.cs`, which also implements
+  `GetCategoryTree` as an asynchronous, workflow-backed operation whose workflow
+  loads the tree through an activity — the binding is unchanged, since sync or
+  async is the handler's choice). The Go, Python and C# suites also send an
+  input the generated converter rejects and pin that the handler side reports it
+  as a non-retryable `BAD_REQUEST` before the operation runs. Java's suite
+  carries that expectation as a disabled test (its note records the Java SDK
+  1.35 reporting `INTERNAL` instead); the TypeScript suite does not cover it
+  yet.
 
 ## Interactions
 
