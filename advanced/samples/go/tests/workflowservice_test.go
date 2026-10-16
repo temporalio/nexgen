@@ -182,9 +182,9 @@ func (s *WorkflowServiceIntegrationSuite) TestConversionFailureSurfacesOnTheFutu
 	s.runWorkflow(func(ctx workflow.Context) (string, error) {
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{
-				ID: s.targetID("invalid"),
+				ID:        s.targetID("invalid"),
 				TaskQueue: s.taskQueue,
-				Memo: map[string]any{"invalid": func() {}},
+				Memo:      map[string]any{"invalid": func() {}},
 			},
 			"wake-up", "signal-value", singleArgWorkflow, "workflow-input",
 		).Get(ctx, nil)
@@ -292,9 +292,9 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	s.runWorkflow(func(ctx workflow.Context) (string, error) {
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{
-				ID: s.targetID("target"),
+				ID:        s.targetID("target"),
 				TaskQueue: s.taskQueue,
-				Memo:         map[string]any{
+				Memo: map[string]any{
 					"memo-key": "target-memo",
 				},
 				UserMetadata: ws.UserMetadata{

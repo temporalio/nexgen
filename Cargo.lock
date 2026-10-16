@@ -302,8 +302,6 @@ version = "0.0.0"
 dependencies = [
  "heck",
  "nexgen",
- "prost",
- "prost-types",
  "serde",
  "serde_json",
  "tempfile",

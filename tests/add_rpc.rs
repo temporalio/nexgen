@@ -45,19 +45,14 @@ fn write_temp_wit(name: &str, contents: &str) -> PathBuf {
     fs::create_dir_all(&temp_dir).unwrap();
     let path = temp_dir.join("input.wit");
     fs::write(&path, contents).unwrap();
-    for support in [
-        "dotnet/WorkflowServiceSupport.cs",
-        "go/WorkflowServiceSupport.go",
-    ] {
-        if contents.contains(support) {
-            let destination = temp_dir.join(support);
-            fs::create_dir_all(destination.parent().unwrap()).unwrap();
-            fs::copy(
-                project_root().join("advanced/samples/inputs").join(support),
-                destination,
-            )
-            .unwrap();
-        }
+    if contents.contains("dotnet/WorkflowServiceSupport.cs") {
+        let dotnet_dir = temp_dir.join("dotnet");
+        fs::create_dir_all(&dotnet_dir).unwrap();
+        fs::copy(
+            project_root().join("advanced/samples/inputs/dotnet/WorkflowServiceSupport.cs"),
+            dotnet_dir.join("WorkflowServiceSupport.cs"),
+        )
+        .unwrap();
     }
     path
 }
