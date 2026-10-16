@@ -16,7 +16,7 @@ namespace Temporalio.Workflows
     /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     [NexusService("temporal.api.workflowservice.v1.WorkflowService")]
-    internal interface IWorkflowService
+    public interface IWorkflowService
     {
         /// <summary>
         /// Signal a workflow, starting it first if needed.
