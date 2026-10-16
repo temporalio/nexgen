@@ -456,7 +456,7 @@ Fixtures outside the corpus (validator integration, not pure matching):
 The cross-engine divergences enumerated in the gate rules are handled: the
 compile gate + `regex-syntax` AST checks **reject** the non-portable constructs
 and **normalize** `\s`/`\S` (→ explicit ASCII class), `.` (→ `[^\n]`) and `$` (→
-per-target end-anchor), which is what makes the four runtimes agree
+per-target end-anchor), which is what makes the five runtimes agree
 value-for-value on every corpus pair. Beyond those rules, the open edges are
 **lone-surrogate wire strings** and any divergence that appears only past the
 corpus's length ceiling — short runtime examples alone cannot prove a repeated

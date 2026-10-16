@@ -23,7 +23,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[cfg(feature = "advanced")]
     #[command(about = "Generate C# / .NET bindings")]
     Dotnet(DotnetGenerateArgs),
     #[command(about = "Generate Go bindings")]
@@ -79,7 +78,6 @@ struct SupportPackageGenerateArgs {
     support_package: Option<String>,
 }
 
-#[cfg(feature = "advanced")]
 #[derive(Args)]
 struct DotnetGenerateArgs {
     #[command(flatten)]
@@ -174,7 +172,6 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        #[cfg(feature = "advanced")]
         Commands::Dotnet(args) => {
             let mut request = generate_request(
                 Language::Dotnet,
@@ -338,7 +335,7 @@ mod tests {
 
     #[test]
     fn support_package_option_is_available_but_not_a_json_schema_requirement() {
-        for language in ["go", "python", "typescript"] {
+        for language in ["dotnet", "go", "python", "typescript"] {
             assert!(
                 Cli::try_parse_from(["nexgen", language, "input.json", "--output", "out"]).is_ok()
             );
@@ -355,8 +352,18 @@ mod tests {
                 .is_ok()
             );
         }
-        #[cfg(feature = "advanced")]
-        assert!(Cli::try_parse_from(["nexgen", "dotnet", "input.wit", "--output", "out"]).is_ok());
+        assert!(
+            Cli::try_parse_from([
+                "nexgen",
+                "dotnet",
+                "input.json",
+                "--output",
+                "out",
+                "--namespace",
+                "Example.Chat",
+            ])
+            .is_ok()
+        );
         assert!(matches!(
             Cli::try_parse_from([
                 "nexgen",

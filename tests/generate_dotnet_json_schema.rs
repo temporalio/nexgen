@@ -5,9 +5,6 @@
 //! payload converter live with the other toolchain tests in
 //! `validation-tests/tests/support/dotnet_json_schema.rs`.
 
-// The `dotnet` generate target lives behind the `advanced` feature.
-#![cfg(feature = "advanced")]
-
 mod common;
 
 #[path = "../validation-tests/tests/support/csharp_json_case.rs"]
