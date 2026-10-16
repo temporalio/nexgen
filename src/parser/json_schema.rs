@@ -9838,13 +9838,6 @@ fn collect_csharp_nested_scope(
             format!("inherited `object` member `{ident}`"),
         )?;
     }
-    for ident in dotnet::RUNTIME_TYPES {
-        scope.insert(
-            language,
-            (*ident).to_string(),
-            format!("generated runtime identifier `{ident}`"),
-        )?;
-    }
     Ok(())
 }
 
@@ -16352,7 +16345,6 @@ $defs:
             ("statusValue: { type: string }", "StatusValue"),
             ("converter: { type: string }", "Converter"),
             ("equalityContract: { type: string }", "EqualityContract"),
-            ("violation: { type: string }", "Violation"),
         ] {
             let input = format!(
                 r##"

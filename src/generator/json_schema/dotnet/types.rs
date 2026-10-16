@@ -26,7 +26,8 @@ pub(super) const READ_ONLY_DICTIONARY: &str =
     "global::System.Collections.Generic.IReadOnlyDictionary";
 pub(super) const JSON_ELEMENT: &str = "global::System.Text.Json.JsonElement";
 pub(super) const JSON_VALUE_KIND: &str = "global::System.Text.Json.JsonValueKind";
-pub(super) const VIOLATIONS: &str = "global::System.Collections.Generic.List<Violation>";
+pub(super) const VIOLATIONS: &str =
+    "global::System.Collections.Generic.List<NexgenRuntime::Violation>";
 
 /// Resolution context for one input module. Every model reference resolves
 /// through `registry` (planned full name → namespace and type name) so a type
