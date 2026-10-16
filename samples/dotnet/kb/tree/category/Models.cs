@@ -47,18 +47,18 @@ namespace Nexgen.JsonSchema.Kb.Tree.Category
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Id, other.Id)
-                && NexgenRuntime::ValueEquality.Equal(Name, other.Name)
-                && NexgenRuntime::ValueEquality.Equal(Children, other.Children);
+            return NexgenRuntime::ValueEquality.Equal(this.Id, other.Id)
+                && NexgenRuntime::ValueEquality.Equal(this.Name, other.Name)
+                && NexgenRuntime::ValueEquality.Equal(this.Children, other.Children);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Id));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Name));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Children));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Id));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Name));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Children));
             return hash.ToHashCode();
         }
 
@@ -291,14 +291,14 @@ namespace Nexgen.JsonSchema.Kb.Tree.Category
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Swatches, other.Swatches);
+            return NexgenRuntime::ValueEquality.Equal(this.Swatches, other.Swatches);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Swatches));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Swatches));
             return hash.ToHashCode();
         }
 

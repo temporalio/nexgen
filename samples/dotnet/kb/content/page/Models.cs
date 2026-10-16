@@ -53,20 +53,20 @@ namespace Nexgen.JsonSchema.Kb.Content.Page
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(PageId, other.PageId)
-                && NexgenRuntime::ValueEquality.Equal(Title, other.Title)
-                && NexgenRuntime::ValueEquality.Equal(Meta, other.Meta)
-                && NexgenRuntime::ValueEquality.Equal(Blocks, other.Blocks);
+            return NexgenRuntime::ValueEquality.Equal(this.PageId, other.PageId)
+                && NexgenRuntime::ValueEquality.Equal(this.Title, other.Title)
+                && NexgenRuntime::ValueEquality.Equal(this.Meta, other.Meta)
+                && NexgenRuntime::ValueEquality.Equal(this.Blocks, other.Blocks);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(PageId));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Title));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Meta));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Blocks));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.PageId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Title));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Meta));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Blocks));
             return hash.ToHashCode();
         }
 
@@ -336,16 +336,16 @@ namespace Nexgen.JsonSchema.Kb.Content.Page
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Author, other.Author)
-                && NexgenRuntime::ValueEquality.Equal(WordCount, other.WordCount);
+            return NexgenRuntime::ValueEquality.Equal(this.Author, other.Author)
+                && NexgenRuntime::ValueEquality.Equal(this.WordCount, other.WordCount);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Author));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(WordCount));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Author));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.WordCount));
             return hash.ToHashCode();
         }
 

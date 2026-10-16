@@ -40,14 +40,14 @@ namespace Nexgen.JsonSchema.Kb.Kb
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(RootId, other.RootId);
+            return NexgenRuntime::ValueEquality.Equal(this.RootId, other.RootId);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(RootId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.RootId));
             return hash.ToHashCode();
         }
 
@@ -181,14 +181,14 @@ namespace Nexgen.JsonSchema.Kb.Kb
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(PageId, other.PageId);
+            return NexgenRuntime::ValueEquality.Equal(this.PageId, other.PageId);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(PageId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.PageId));
             return hash.ToHashCode();
         }
 
@@ -327,16 +327,16 @@ namespace Nexgen.JsonSchema.Kb.Kb
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(BlockId, other.BlockId)
-                && NexgenRuntime::ValueEquality.Equal(Revision, other.Revision);
+            return NexgenRuntime::ValueEquality.Equal(this.BlockId, other.BlockId)
+                && NexgenRuntime::ValueEquality.Equal(this.Revision, other.Revision);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(BlockId));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Revision));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.BlockId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Revision));
             return hash.ToHashCode();
         }
 

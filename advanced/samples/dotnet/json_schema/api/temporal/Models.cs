@@ -84,32 +84,32 @@ namespace Nexgen.JsonSchema.Temporal
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(CreatedAt, other.CreatedAt)
-                && NexgenRuntime::ValueEquality.Equal(Birthday, other.Birthday)
-                && NexgenRuntime::ValueEquality.Equal(Alarm, other.Alarm)
-                && NexgenRuntime::ValueEquality.Equal(Timeout, other.Timeout)
-                && NexgenRuntime::ValueEquality.Equal(UpdatedAt, other.UpdatedAt)
-                && NexgenRuntime::ValueEquality.Equal(ExpiresOn, other.ExpiresOn)
-                && NexgenRuntime::ValueEquality.Equal(Reminder, other.Reminder)
-                && NexgenRuntime::ValueEquality.Equal(RetryDelay, other.RetryDelay)
-                && NexgenRuntime::ValueEquality.Equal(DeletedAt, other.DeletedAt)
-                && NexgenRuntime::ValueEquality.Equal(ArchivedOn, other.ArchivedOn);
+            return NexgenRuntime::ValueEquality.Equal(this.CreatedAt, other.CreatedAt)
+                && NexgenRuntime::ValueEquality.Equal(this.Birthday, other.Birthday)
+                && NexgenRuntime::ValueEquality.Equal(this.Alarm, other.Alarm)
+                && NexgenRuntime::ValueEquality.Equal(this.Timeout, other.Timeout)
+                && NexgenRuntime::ValueEquality.Equal(this.UpdatedAt, other.UpdatedAt)
+                && NexgenRuntime::ValueEquality.Equal(this.ExpiresOn, other.ExpiresOn)
+                && NexgenRuntime::ValueEquality.Equal(this.Reminder, other.Reminder)
+                && NexgenRuntime::ValueEquality.Equal(this.RetryDelay, other.RetryDelay)
+                && NexgenRuntime::ValueEquality.Equal(this.DeletedAt, other.DeletedAt)
+                && NexgenRuntime::ValueEquality.Equal(this.ArchivedOn, other.ArchivedOn);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(CreatedAt));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Birthday));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Alarm));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Timeout));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(UpdatedAt));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(ExpiresOn));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Reminder));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(RetryDelay));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(DeletedAt));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(ArchivedOn));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.CreatedAt));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Birthday));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Alarm));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Timeout));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.UpdatedAt));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ExpiresOn));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Reminder));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.RetryDelay));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.DeletedAt));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ArchivedOn));
             return hash.ToHashCode();
         }
 
