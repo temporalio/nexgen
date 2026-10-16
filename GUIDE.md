@@ -83,10 +83,10 @@ const user = await getUser({ userId: "abc" });
 An exported interface with no operations or resources acts as a model-only
 module. Its declared types remain public, but the generator does not emit an
 empty service definition or client. The interface still names the generated
-output where a target would otherwise use the service: its
-`@nexus.namespace` directive selects the .NET namespace or Go import path, and
-.NET otherwise uses `Nexgen.<InterfaceName>`, such as
-`Nexgen.NotificationService` for `interface notification-service`.
+output where a target would otherwise use the service: its `@nexus.namespace`
+directive selects the .NET namespace or Go import path, and .NET otherwise uses
+`Nexgen.<InterfaceName>`, such as `Nexgen.NotificationService` for
+`interface notification-service`.
 
 ---
 
@@ -94,37 +94,37 @@ output where a target would otherwise use the service: its
 
 For **WIT** generation in Go, Python, TypeScript, and .NET, pass one
 `--support-package` value on the language subcommand, even if that particular
-input does not use support helpers. It identifies code **you maintain in your
-project**; nexgen neither reads it nor copies it into the output. Java does not
-consume user support, and JSON Schema generation does not require this option
-(its generated JSON runtime helpers are unrelated).
+input does not use support helpers. It identifies code
+**you maintain in your project**; nexgen neither reads it nor copies it into the
+output. Java does not consume user support, and JSON Schema generation does not
+require this option (its generated JSON runtime helpers are unrelated).
 
 The package must be importable when the generated code is compiled or run.
 Nexgen does not verify that it exists or that its exports have the required
-signatures: use the language's compiler or type checker to check the integration.
-The WIT directives name some helpers explicitly (for example `python-from` on
-`@nexus.type` and `typescript-converter` on `@nexus.function`); for other
-protobuf conversions nexgen derives names from the proto message. Check the
-calls in generated code for the exact exports and signatures your support
-package needs. Keep authored support code outside directories that you replace
-when regenerating output.
+signatures: use the language's compiler or type checker to check the
+integration. The WIT directives name some helpers explicitly (for example
+`python-from` on `@nexus.type` and `typescript-converter` on `@nexus.function`);
+for other protobuf conversions nexgen derives names from the proto message.
+Check the calls in generated code for the exact exports and signatures your
+support package needs. Keep authored support code outside directories that you
+replace when regenerating output.
 
-Each `@nexus.source` value is a call to a helper in the support package.
-Write the helper path and its arguments, without the package prefix. Nexgen
-imports support and adds the prefix to the helper call. It does not add or
-change the arguments. For example, write `workflow_namespace()` in Python,
+Each `@nexus.source` value is a call to a helper in the support package. Write
+the helper path and its arguments, without the package prefix. Nexgen imports
+support and adds the prefix to the helper call. It does not add or change the
+arguments. For example, write `workflow_namespace()` in Python,
 `workflowNamespace()` in TypeScript, `WorkflowNamespace(ctx)` in Go, or
 `TemporalWorkflowContext.WorkflowNamespace()` in .NET. Generated code calls
 `_support.workflow_namespace()`, `support.workflowNamespace()`,
 `support.WorkflowNamespace(ctx)`, or
-`Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()` for those
-examples. `@nexus.output-transform` remains a separate authored expression.
+`Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()` for those examples.
+`@nexus.output-transform` remains a separate authored expression.
 
 ### Go
 
 Create a **separate Go package in a separate directory** from the generated
-package, in a module that the generated code can import. Pass its full Go
-import path, not the package name or a `.go` file path. For the sample
+package, in a module that the generated code can import. Pass its full Go import
+path, not the package name or a `.go` file path. For the sample
 [`go.mod`](advanced/samples/go/go.mod) and
 [`support/`](advanced/samples/go/support/), that value is
 `go.temporal.io/sdk/advanced/samples/go/support`; generated code imports it as
@@ -141,25 +141,25 @@ cargo run --features advanced -- go advanced/samples/inputs/type-roundtrip.wit \
 Export converter functions from the support package. For
 `google.protobuf.Duration`, nexgen derives `support.DurationToProto(ctx, value)`
 and `support.DurationFromProto(ctx, value)` when WIT does not specify names.
-When WIT sets `go-to` or `go-from` on `@nexus.type`, nexgen uses each given
-name exactly. Each converter must be exported. Its parameters and
-`(value, error)` results must match the generated call. See
+When WIT sets `go-to` or `go-from` on `@nexus.type`, nexgen uses each given name
+exactly. Each converter must be exported. Its parameters and `(value, error)`
+results must match the generated call. See
 [the sample converters](advanced/samples/go/support/temporal_model_converters.go).
 Do not import the generated package from support. That import creates a cycle.
-The sample converters import `go.temporal.io/sdk/internal`. Only packages
-under the SDK module tree can import it. If your module is elsewhere, use
-dependencies that your module can access. Do not copy the sample file without
-changing that import.
+The sample converters import `go.temporal.io/sdk/internal`. Only packages under
+the SDK module tree can import it. If your module is elsewhere, use dependencies
+that your module can access. Do not copy the sample file without changing that
+import.
 
-For `@nexus.source`, the sample writes `WorkflowNamespace(ctx)`. Generated
-code calls `support.WorkflowNamespace(ctx)`. The support package implements it with
-`workflow.GetInfo(ctx).Namespace`. The generated Go package imports support
-for the sourced field. Verify with `go test ./...` from the module root.
+For `@nexus.source`, the sample writes `WorkflowNamespace(ctx)`. Generated code
+calls `support.WorkflowNamespace(ctx)`. The support package implements it with
+`workflow.GetInfo(ctx).Namespace`. The generated Go package imports support for
+the sourced field. Verify with `go test ./...` from the module root.
 
 ### Python
 
-Place an importable Python package in your project and pass its module name,
-not a filename. The sample's
+Place an importable Python package in your project and pass its module name, not
+a filename. The sample's
 [`temporal_support/`](advanced/samples/python/temporal_support/) is importable
 as `temporal_support` from the sample project root. Its `__init__.py` exposes
 the converter functions needed by generated code; merely putting them in a
@@ -182,23 +182,23 @@ path). The sample tests set `pythonpath = ["."]` in
 directory, `uv run python -c 'import temporal_support'` checks resolution.
 Default converter names use proto-message snake case, such as
 `duration_from_proto` / `duration_to_proto`; user-authored names in WIT must
-also be exported. Keep support independent of generated models to avoid
-circular imports.
+also be exported. Keep support independent of generated models to avoid circular
+imports.
 
-For `@nexus.source`, the sample writes `workflow_namespace()`. Generated
-code calls `_support.workflow_namespace()`.
-Check the generated project with `ruff check`, a Python type checker, and
-your tests.
+For `@nexus.source`, the sample writes `workflow_namespace()`. Generated code
+calls `_support.workflow_namespace()`. Check the generated project with
+`ruff check`, a Python type checker, and your tests.
 
 ### TypeScript
 
 Export helpers from a TypeScript module and pass either an installed package
-specifier (for example `@my-org/nexgen-support`) or a path **relative to the
-output directory**, not the directory in which you run the CLI. For the
-sample output root `advanced/samples/typescript/wit/type-roundtrip`, the sample
-module is `../../support/temporal_model_converters`; generated `models.ts`
-imports it as `support`. Nexgen adjusts that relative specifier for nested
-files such as `operations/<operation>.ts`.
+specifier (for example `@my-org/nexgen-support`) or a path
+**relative to the output directory**, not the directory in which you run the
+CLI. For the sample output root
+`advanced/samples/typescript/wit/type-roundtrip`, the sample module is
+`../../support/temporal_model_converters`; generated `models.ts` imports it as
+`support`. Nexgen adjusts that relative specifier for nested files such as
+`operations/<operation>.ts`.
 
 ```sh
 cargo run --features advanced -- typescript advanced/samples/inputs/type-roundtrip.wit \
@@ -213,23 +213,25 @@ Export the exact WIT-named or derived converter functions, for example
 conversions can also call `valueToPayload`, `payloadToValue`,
 `payloadsFromProto`, `payloadsToProto`, and `functionInputTypes`. See
 [`support/temporal_model_converters.ts`](advanced/samples/typescript/support/temporal_model_converters.ts)
-for their contracts. For `@nexus.source`, write `workflowNamespace()`.
-Generated code calls `support.workflowNamespace()`.
-Include both the support module and generated output in your project.
-Run the project's TypeScript type checker (the sample uses `npm run typecheck`).
+for their contracts. For `@nexus.source`, write `workflowNamespace()`. Generated
+code calls `support.workflowNamespace()`. Include both the support module and
+generated output in your project. Run the project's TypeScript type checker (the
+sample uses `npm run typecheck`).
 
 ### .NET
 
 Pass the C# **namespace**, not a source path or assembly name:
-`--support-package Nexgen.Support` for the sample. Put hand-written `.cs`
-files such as [`TemporalSupport.cs`](advanced/samples/dotnet/TemporalSupport/TemporalSupport.cs)
-and [`WorkflowServiceSupport.cs`](advanced/samples/dotnet/TemporalSupport/WorkflowServiceSupport.cs)
+`--support-package Nexgen.Support` for the sample. Put hand-written `.cs` files
+such as
+[`TemporalSupport.cs`](advanced/samples/dotnet/TemporalSupport/TemporalSupport.cs)
+and
+[`WorkflowServiceSupport.cs`](advanced/samples/dotnet/TemporalSupport/WorkflowServiceSupport.cs)
 outside regenerated output and compile them into the **same project/assembly**
-as the generated files. This is why the sample's `internal` helpers work;
-simply referencing a separate support DLL would not give the generated code
-access to those members. The support namespace need not equal the generated
-models' namespace. If your `.csproj` disables default compile items or
-excludes directories, explicitly include the authored sources (see
+as the generated files. This is why the sample's `internal` helpers work; simply
+referencing a separate support DLL would not give the generated code access to
+those members. The support namespace need not equal the generated models'
+namespace. If your `.csproj` disables default compile items or excludes
+directories, explicitly include the authored sources (see
 [`Nexgen.DotNetMultiOperationService.csproj`](advanced/samples/dotnet/Nexgen.DotNetMultiOperationService.csproj)).
 
 ```sh
@@ -243,11 +245,10 @@ cargo run --features advanced -- dotnet advanced/samples/inputs/type-roundtrip.w
 Generated calls qualify helper names with `Nexgen.Support`; where extension
 methods such as `ToProto()` need it, generated modules also use the support
 namespace. Provide `ProtoExtensions.FromPayload`, `FromPayloads`, `ToPayload`,
-and `ToPayloads` for the generic payload carriers, along with any converters
-and serialization-context helpers named in your WIT. For `@nexus.source`,
-write `TemporalWorkflowContext.WorkflowNamespace()`. Generated code adds the
-support namespace to the call. Verify that the project compiles with
-`dotnet build`.
+and `ToPayloads` for the generic payload carriers, along with any converters and
+serialization-context helpers named in your WIT. For `@nexus.source`, write
+`TemporalWorkflowContext.WorkflowNamespace()`. Generated code adds the support
+namespace to the call. Verify that the project compiles with `dotnet build`.
 
 ---
 
@@ -354,9 +355,8 @@ export enum UserCapability {
 ### Variants
 
 Python represents WIT variants as tagged tuples. A variant backed by a protobuf
-`oneof` uses case dataclasses, as described under
-[`@nexus.proto`](#nexusproto). TypeScript represents variants as tagged object
-unions.
+`oneof` uses case dataclasses, as described under [`@nexus.proto`](#nexusproto).
+TypeScript represents variants as tagged object unions.
 
 ```wit
 variant notification-target {
@@ -563,9 +563,9 @@ For each resource method, the generator builds a **name environment** from:
 - The resource's **constructor field names** (e.g., `user-id`, `email`)
 - The method's **parameter names** (e.g., `email`)
 
-It then tries every operation in the service as a candidate. For each
-candidate operation, it checks whether every **required** field in the
-operation's input record can be satisfied by a name in the environment.
+It then tries every operation in the service as a candidate. For each candidate
+operation, it checks whether every **required** field in the operation's input
+record can be satisfied by a name in the environment.
 
 **Example walkthrough:**
 
@@ -603,8 +603,8 @@ request = UpdateEmailRequest(user_id=self.user_id, email=email)
 **Nested struct matching:**
 
 When an operation's input contains a field whose type is itself a record, the
-generator recursively tries to match the nested record's fields against the
-same environment.
+generator recursively tries to match the nested record's fields against the same
+environment.
 
 ```wit
 resource started-workflow {
@@ -652,9 +652,9 @@ request = CancelWorkflowRequest(
 
 **Return type filtering:**
 
-After field matching, the generator also filters candidates by return type.
-If the method returns `own<user>`, only operations that also return
-`own<user>` (or the equivalent proto type) are considered.
+After field matching, the generator also filters candidates by return type. If
+the method returns `own<user>`, only operations that also return `own<user>` (or
+the equivalent proto type) are considered.
 
 **Disambiguation by name:**
 
@@ -703,9 +703,9 @@ raises `InvalidResource`.
 
 #### Same field name in constructor and method parameter
 
-When a resource constructor field and a method parameter have the same name,
-the **method parameter takes precedence**. This is the expected pattern for
-"update" operations:
+When a resource constructor field and a method parameter have the same name, the
+**method parameter takes precedence**. This is the expected pattern for "update"
+operations:
 
 ```wit
 resource user {
@@ -721,8 +721,8 @@ argument), not the old one (from `self`). The `user-id` field still comes from
 
 #### No matching operation found
 
-If no operation's input fields can be satisfied by the method's environment,
-the method becomes a **stub** that raises an error at runtime:
+If no operation's input fields can be satisfied by the method's environment, the
+method becomes a **stub** that raises an error at runtime:
 
 ```python
 async def get_result(self) -> ...:
@@ -740,17 +740,16 @@ A warning is emitted during generation.
 #### Multiple operations match ambiguously
 
 If two or more operations satisfy a method's field requirements and return type,
-and disambiguation by name fails, the generator raises
-`InvalidResourceMethod` with a list of the ambiguous matches. To fix this,
-rename either the method or one of the operations so the preferred name
-match succeeds, or adjust the operation's input record so fewer candidates
-match.
+and disambiguation by name fails, the generator raises `InvalidResourceMethod`
+with a list of the ambiguous matches. To fix this, rename either the method or
+one of the operations so the preferred name match succeeds, or adjust the
+operation's input record so fewer candidates match.
 
 #### Required field in operation input has no match
 
 If an operation's input record has a required field whose name does not appear
-in the resource constructor or method parameters, that operation will silently be
-skipped as a candidate. So watch out for typos!
+in the resource constructor or method parameters, that operation will silently
+be skipped as a candidate. So watch out for typos!
 
 #### Resource field cannot be bound from input or output
 
@@ -776,10 +775,10 @@ name, the generator raises an error.
 
 ## Proto-Backed Models
 
-When a WIT record is annotated with `@nexus.proto`, the generator produces
-code that converts between the public model and its protobuf transfer type.
-Generated callers continue to accept and return the public model; conversion is
-performed by the target SDK or generated operation helpers.
+When a WIT record is annotated with `@nexus.proto`, the generator produces code
+that converts between the public model and its protobuf transfer type. Generated
+callers continue to accept and return the public model; conversion is performed
+by the target SDK or generated operation helpers.
 
 ### Transfer-Type Conversion
 
@@ -910,9 +909,9 @@ record start-workflow-request {
 }
 ```
 
-The convenience API does not require a `namespace` argument. For example,
-the generated Python model uses the helper as a default factory. Conversion
-then reads the model field:
+The convenience API does not require a `namespace` argument. For example, the
+generated Python model uses the helper as a default factory. Conversion then
+reads the model field:
 
 ```python
 namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
@@ -920,9 +919,9 @@ namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
 message.namespace = value.namespace
 ```
 
-Nexgen prefixes the helper call, but it does not add arguments. The
-configured package supplies the helper. The `@nexus.output-transform`
-directive is different: its value remains a raw expression.
+Nexgen prefixes the helper call, but it does not add arguments. The configured
+package supplies the helper. The `@nexus.output-transform` directive is
+different: its value remains a raw expression.
 
 ### Omitted Fields
 
@@ -967,9 +966,9 @@ record user-metadata {
 }
 ```
 
-When a parent record has `user-metadata: option<user-metadata>`, the
-convenience wrapper exposes `static_summary` and `static_details` as top-level
-parameters instead of requiring a nested `UserMetadata(...)` object:
+When a parent record has `user-metadata: option<user-metadata>`, the convenience
+wrapper exposes `static_summary` and `static_details` as top-level parameters
+instead of requiring a nested `UserMetadata(...)` object:
 
 ```python
 async def signal_with_start_workflow(
@@ -984,19 +983,19 @@ async def signal_with_start_workflow(
 ```
 
 In the snippet above, notice that the entire `user-metadata` field is `None` if
-all its constituent fields are `None`. This is the behavior in Python and Typescript,
-but not in Go; in Go we implement flattening with value embedding, so `user-metadata`
-is never nil.
+all its constituent fields are `None`. This is the behavior in Python and
+Typescript, but not in Go; in Go we implement flattening with value embedding,
+so `user-metadata` is never nil.
 
 ### Output Transforms
 
 An operation annotated with `@nexus.output-transform` transforms the raw
 operation result into a different type before returning it. Its language
-expressions are emitted verbatim, not interpreted as names of support
-functions to call. Unlike `@nexus.source`, this directive can call an SDK
-function directly. Moving that call into a Go support package could require
-the support package to import generated request or result types. That import
-would create a package cycle.
+expressions are emitted verbatim, not interpreted as names of support functions
+to call. Unlike `@nexus.source`, this directive can call an SDK function
+directly. Moving that call into a Go support package could require the support
+package to import generated request or result types. That import would create a
+package cycle.
 
 ```wit
 /// @nexus.output-transform
@@ -1013,15 +1012,14 @@ signal-with-start-workflow: func(
 ) -> signal-with-start-workflow-response;
 ```
 
-The generated wrapper returns the transformed type. The transform expression
-has access to `request` (the input) and `result` (the raw response). Go
-transform expressions must evaluate to `(T, error)`, where `T` is the
-`go-type` value:
+The generated wrapper returns the transformed type. The transform expression has
+access to `request` (the input) and `result` (the raw response). Go transform
+expressions must evaluate to `(T, error)`, where `T` is the `go-type` value:
 
 For TypeScript, `typescript-type-import` adds a type-only import for the type
 named by `typescript-type`; `typescript-import` adds the value import used by
-the transform expression. They are separate because a transform can need a
-type from one module and a runtime value from another.
+the transform expression. They are separate because a transform can need a type
+from one module and a runtime value from another.
 
 ```python
 result = await handle
@@ -1078,7 +1076,8 @@ Then define a type alias that points to the function you defined:
 type my-exe = placeholder;
 ```
 
-Now any field of type `my-exe` is treated as a function reference with the specified signature.
+Now any field of type `my-exe` is treated as a function reference with the
+specified signature.
 
 ```wit
 record execute-function-request {
@@ -1098,8 +1097,8 @@ class ExecuteFunctionRequest:
 
 ### `alternate-type`
 
-`alternate-type` allows the caller to pass other types as the
-function argument, besides callables.
+`alternate-type` allows the caller to pass other types as the function argument,
+besides callables.
 
 ```wit
 function-call: func(name: string, enabled: bool) -> string;
@@ -1122,8 +1121,8 @@ class ExecuteNamedFunctionRequest:
 
 ### `@nexus.function-args`
 
-`@nexus.function-args varargs=true` changes the last parameter into
-a variable argument list.
+`@nexus.function-args varargs=true` changes the last parameter into a variable
+argument list.
 
 ```wit
 /// @nexus.function-args varargs=true
@@ -1133,8 +1132,8 @@ varargs-function-call: func(args: list<string>) -> string;
 type varargs-function = placeholder;
 ```
 
-When the signature has multiple parameters, use `param` to
-specify which one is variadic:
+When the signature has multiple parameters, use `param` to specify which one is
+variadic:
 
 ```wit
 /// @nexus.function-args
@@ -1151,9 +1150,9 @@ parameter. Python keeps the prefix in the callable annotation where needed.
 
 ### `args-field`
 
-For proto-backed APIs, the WIT record often
-has a wire field like `input` or `signal-input` that stores a payload list.
-`args-field` maps the ergonomic Python arguments back to that field.
+For proto-backed APIs, the WIT record often has a wire field like `input` or
+`signal-input` that stores a payload list. `args-field` maps the ergonomic
+Python arguments back to that field.
 
 ```wit
 type payloads = list<string>;
@@ -1220,8 +1219,8 @@ Without a typed callable, generated Python has no result type to infer.
 
 ### `primary`
 
-When an operation has multiple `@nexus.function` parameters, use `primary=true` to
-indicate which function is "primary".
+When an operation has multiple `@nexus.function` parameters, use `primary=true`
+to indicate which function is "primary".
 
 ```wit
 type payloads = list<string>;
@@ -1292,9 +1291,8 @@ is still a typed function reference, but its arguments stay in `signal_args`.
 ### `converter`, `python-converter`, and `typescript-converter`
 
 Converters tell proto-backed generation how to turn the callable reference into
-the wire value. Signals are the common example: callers
-can pass a string signal name or a Python signal method, while the proto field
-is just `signal_name`.
+the wire value. Signals are the common example: callers can pass a string signal
+name or a Python signal method, while the proto field is just `signal_name`.
 
 ```wit
 /// @nexus.function
@@ -1332,8 +1330,8 @@ language, or use language-prefixed keys such as `python-converter` and
 
 Most authored APIs should use the type-alias `signature` form because it keeps
 arguments and result types in WIT. A direct record-field annotation is available
-for the narrower case where the field itself describes a callable and the
-result type is already language-specific.
+for the narrower case where the field itself describes a callable and the result
+type is already language-specific.
 
 ```wit
 type function-args = list<string>;
@@ -1363,27 +1361,27 @@ alias.
 
 ### Option Summary
 
-| Option                         | Motivation                                                                     | Generated effect                                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `signature`                    | Keep callable shape in a WIT function instead of a placeholder alias.          | Derives callable argument and result annotations. Required for type-alias `@nexus.function`.                |
-| `alternate-type`               | Accept raw names as well as typed callables.                                   | Generates union annotations and overloads such as `str \| Callable[...]`.                                   |
-| `args-field`                   | Map ergonomic function args to a wire field such as `input` or `signal-input`. | Stores normalized args in that request/proto field. Defaults to the signature's args name for type aliases. |
-| `result-type-parameter`        | Preserve the callable's result type in returned handles.                       | Emits a type variable such as `WorkflowResult` and uses it in callable overload returns.                    |
-| `primary`                      | Identify the main callable when a request has multiple function references.    | Enables positional primary args and result type propagation. Defaults to `false`.                           |
-| `converter`                    | Reuse the same conversion helper name in all languages.                        | Calls the helper when converting the function field to proto.                                               |
-| `<language>-converter`         | Use language-specific conversion helper names.                                 | Python uses `python-converter`; TypeScript uses `typescript-converter`.                                     |
-| `result` / `<language>-result` | Direct field-level form when there is no type alias `signature`.               | Supplies the callable result annotation directly. Prefer `signature` for authored aliases.                  |
-| `go-value-type` / `go-args-type` | Override the Go reference and argument representation together.              | A string reference passes through as its name; the argument override is one payload, even for slice types. |
-| `go-name-extractor`            | Resolve callable names with a support helper.                                  | Calls the helper with `(ctx, value)` instead of runtime function-name extraction.                          |
+| Option                           | Motivation                                                                     | Generated effect                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `signature`                      | Keep callable shape in a WIT function instead of a placeholder alias.          | Derives callable argument and result annotations. Required for type-alias `@nexus.function`.                |
+| `alternate-type`                 | Accept raw names as well as typed callables.                                   | Generates union annotations and overloads such as `str \| Callable[...]`.                                   |
+| `args-field`                     | Map ergonomic function args to a wire field such as `input` or `signal-input`. | Stores normalized args in that request/proto field. Defaults to the signature's args name for type aliases. |
+| `result-type-parameter`          | Preserve the callable's result type in returned handles.                       | Emits a type variable such as `WorkflowResult` and uses it in callable overload returns.                    |
+| `primary`                        | Identify the main callable when a request has multiple function references.    | Enables positional primary args and result type propagation. Defaults to `false`.                           |
+| `converter`                      | Reuse the same conversion helper name in all languages.                        | Calls the helper when converting the function field to proto.                                               |
+| `<language>-converter`           | Use language-specific conversion helper names.                                 | Python uses `python-converter`; TypeScript uses `typescript-converter`.                                     |
+| `result` / `<language>-result`   | Direct field-level form when there is no type alias `signature`.               | Supplies the callable result annotation directly. Prefer `signature` for authored aliases.                  |
+| `go-value-type` / `go-args-type` | Override the Go reference and argument representation together.                | A string reference passes through as its name; the argument override is one payload, even for slice types.  |
+| `go-name-extractor`              | Resolve callable names with a support helper.                                  | Calls the helper with `(ctx, value)` instead of runtime function-name extraction.                           |
 
-Go argument overrides require a variadic signature with one list-backed
-argument field. For example, `go-value-type="string" go-args-type="any"`
-exposes a name and one opaque payload, packed into the wire argument list.
-Without an override, Go groups each reference with its signature-derived
-arguments, preserves the other groups' authored order, and places primary
-variadic arguments last. Only a final argument list uses `...T`; other lists
-use `[]T`. An explicit primary descriptor replaces signature-derived typing,
-so no additional `Typed` wrapper is emitted.
+Go argument overrides require a variadic signature with one list-backed argument
+field. For example, `go-value-type="string" go-args-type="any"` exposes a name
+and one opaque payload, packed into the wire argument list. Without an override,
+Go groups each reference with its signature-derived arguments, preserves the
+other groups' authored order, and places primary variadic arguments last. Only a
+final argument list uses `...T`; other lists use `[]T`. An explicit primary
+descriptor replaces signature-derived typing, so no additional `Typed` wrapper
+is emitted.
 
 `@nexus.function-args` options:
 
@@ -1403,8 +1401,8 @@ indented key-value pairs.
 
 ### @nexus.endpoint
 
-**Placement:** Interface doc comment
-**Syntax:** `@nexus.endpoint "<endpoint-name>"`
+**Placement:** Interface doc comment **Syntax:**
+`@nexus.endpoint "<endpoint-name>"`
 
 Names the Nexus endpoint for the service. This is the value used when
 registering or connecting to the endpoint at runtime.
@@ -1421,8 +1419,8 @@ converted to PascalCase: `user-service` becomes `UserService`.
 
 ### @nexus.proto
 
-**Placement:** Type alias, record, variant, enum, or flags
-**Syntax:** `@nexus.proto "<fully.qualified.proto.MessageName>"`
+**Placement:** Type alias, record, variant, enum, or flags **Syntax:**
+`@nexus.proto "<fully.qualified.proto.MessageName>"`
 
 For variants, use `@nexus.proto "<fully.qualified.proto.MessageName>.<oneof>"`.
 
@@ -1441,12 +1439,12 @@ native declaration.
 record activity-options { ... }
 ```
 
-Protobuf `oneof` groups are authored as a single record field whose name
-matches the oneof and whose type is a WIT variant. The variant's directive
-identifies that same message and oneof. Each variant case must match a protobuf
-member name (with kebab-case WIT naming) and carry the corresponding member
-value. Use `option<variant>` when the protobuf oneof may be unset, or a
-required `variant` when an unset value should be rejected during conversion.
+Protobuf `oneof` groups are authored as a single record field whose name matches
+the oneof and whose type is a WIT variant. The variant's directive identifies
+that same message and oneof. Each variant case must match a protobuf member name
+(with kebab-case WIT naming) and carry the corresponding member value. Use
+`option<variant>` when the protobuf oneof may be unset, or a required `variant`
+when an unset value should be rejected during conversion.
 
 ```wit
 /// @nexus.proto "example.v1.Response.result"
@@ -1463,8 +1461,8 @@ record response {
 
 Python represents a protobuf oneof-backed variant as a union of slotted case
 dataclasses. Each case contains its payload in a `value` field. For example, the
-variant above generates `OutcomeSuccess(value)` and `OutcomeFailure(value)`.
-The containing record's protobuf conversion constructs and matches those case
+variant above generates `OutcomeSuccess(value)` and `OutcomeFailure(value)`. The
+containing record's protobuf conversion constructs and matches those case
 classes.
 
 .NET uses the variant's nested case records, such as `Outcome.Success(Value)`.
@@ -1482,8 +1480,7 @@ Unreachable declarations and omitted oneofs remain valid.
 
 ### @nexus.type-parameter
 
-**Placement:** Type alias
-**Syntax:** `@nexus.type-parameter` (no arguments)
+**Placement:** Type alias **Syntax:** `@nexus.type-parameter` (no arguments)
 
 Declares an opaque model type parameter. Records and variants infer their
 ordered generic parameters from public fields and case payloads, including
@@ -1506,10 +1503,9 @@ This generates `Request[ContextT]`-style models in Python, TypeScript, and Go.
 `Request<TContext>`. A trailing `T` in the alias name moves to the front, and
 .NET adds a `T` prefix to an alias name with no trailing `T`. .NET rejects two
 parameters of one declaration that map to the same C# name. In a model with
-workflow-function fields, the names `TWorkflow` and `TResult` are also
-reserved. A language-specific field-level `@nexus.type` override replaces that
-field occurrence and therefore removes it from generic inference for that
-target.
+workflow-function fields, the names `TWorkflow` and `TResult` are also reserved.
+A language-specific field-level `@nexus.type` override replaces that field
+occurrence and therefore removes it from generic inference for that target.
 
 Type parameters are not currently supported in proto-backed records except in
 Python and .NET when a field or oneof member maps to Temporal's protobuf
@@ -1543,8 +1539,8 @@ occur.
 
 ### @nexus.proto-field
 
-**Placement:** Record field (within a `@nexus.proto` record)
-**Syntax:** `@nexus.proto-field "<proto_field_name>"`
+**Placement:** Record field (within a `@nexus.proto` record) **Syntax:**
+`@nexus.proto-field "<proto_field_name>"`
 
 Maps a WIT field name to a differently-named proto field. Without this, the WIT
 name converted to `snake_case` is assumed to match.
@@ -1562,8 +1558,8 @@ Here the WIT field `workflow` maps to proto field `workflow_type`.
 
 ### @nexus.name
 
-**Placement:** Record field
-**Syntax:** `@nexus.name go="<name>" python="<name>" typescript="<name>" dotnet="<name>"`
+**Placement:** Record field **Syntax:**
+`@nexus.name go="<name>" python="<name>" typescript="<name>" dotnet="<name>"`
 
 Overrides the generated field name for individual target languages. Languages
 without an override continue to use the WIT field name.
@@ -1582,8 +1578,8 @@ This emits `WorkflowExecutionTimeout` in Go while retaining the normal
 
 ### @nexus.type
 
-**Placement:** Type alias or record field
-**Syntax:** `@nexus.type python="<type>" typescript="<type>" go="<type>"`
+**Placement:** Type alias or record field **Syntax:**
+`@nexus.type python="<type>" typescript="<type>" go="<type>"`
 
 Substitutes the WIT type with a language-native type in generated code. Each
 language key is optional; omit a language to skip override for that target.
@@ -1600,8 +1596,8 @@ entirely replaced by language-specific overrides.
 
 ### @nexus.omit
 
-**Placement:** Record field (within a `@nexus.proto` record)
-**Syntax:** `@nexus.omit` (no arguments)
+**Placement:** Record field (within a `@nexus.proto` record) **Syntax:**
+`@nexus.omit` (no arguments)
 
 Excludes a proto field from the generated API. Use this for infrastructure
 fields (identity, request-id, headers) that are not relevant to API consumers.
@@ -1619,14 +1615,14 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 
 ### @nexus.source
 
-**Placement:** Record field (within a `@nexus.proto` record)
-**Syntax:** `@nexus.source python="<helper-call>" typescript="<helper-call>" go="<helper-call>" dotnet="<helper-call>"`
+**Placement:** Record field (within a `@nexus.proto` record) **Syntax:**
+`@nexus.source python="<helper-call>" typescript="<helper-call>" go="<helper-call>" dotnet="<helper-call>"`
 
 Provides a field value through a helper in the package specified by
-`--support-package`. The field is not an argument in operation convenience
-APIs. Write a helper call with its arguments, but without the package prefix.
-Nexgen adds the prefix and imports support when it generates the sourced field.
-Other expressions, including property access after a call, are not valid here.
+`--support-package`. The field is not an argument in operation convenience APIs.
+Write a helper call with its arguments, but without the package prefix. Nexgen
+adds the prefix and imports support when it generates the sourced field. Other
+expressions, including property access after a call, are not valid here.
 
 ```wit
 /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
@@ -1668,8 +1664,8 @@ Cannot be combined with `@nexus.source`.
 
 ### @nexus.experimental
 
-**Placement:** Interface, record, variant, or operation (function)
-**Syntax:** `@nexus.experimental`
+**Placement:** Interface, record, variant, or operation (function) **Syntax:**
+`@nexus.experimental`
 
 Adds an experimental API warning to the generated declaration's documentation.
 The directive takes no arguments. Mark declarations individually; marking an
@@ -1689,10 +1685,12 @@ variant outcome {
 
 ### @nexus.doc
 
-**Placement:** Record, record field, variant, variant case, or operation (function)
-**Syntax:** `@nexus.doc "<text>" [returns="<text>"]`
-Per-language overrides: `python="<text>"` `typescript="<text>"` `go="<text>"` `dotnet="<text>"` `java="<text>"`
-Return docs: `python-returns="<text>"` `typescript-returns="<text>"` `go-returns="<text>"` `dotnet-returns="<text>"` `java-returns="<text>"`
+**Placement:** Record, record field, variant, variant case, or operation
+(function) **Syntax:** `@nexus.doc "<text>" [returns="<text>"]` Per-language
+overrides: `python="<text>"` `typescript="<text>"` `go="<text>"`
+`dotnet="<text>"` `java="<text>"` Return docs: `python-returns="<text>"`
+`typescript-returns="<text>"` `go-returns="<text>"` `dotnet-returns="<text>"`
+`java-returns="<text>"`
 
 Adds documentation to generated code. The default text applies to all languages;
 per-language keys override for specific targets. The `returns` key generates
@@ -1728,8 +1726,8 @@ variant notification-target {
 
 ### @nexus.operation
 
-**Placement:** Operation (function)
-**Syntax:** `@nexus.operation name="<WireOperationName>"`
+**Placement:** Operation (function) **Syntax:**
+`@nexus.operation name="<WireOperationName>"`
 
 Overrides the Nexus wire operation name. Without this, the WIT function name
 converted to UpperCamelCase is used (e.g., `signal-with-start-workflow` becomes
@@ -1744,8 +1742,8 @@ signal-with-start-workflow: func(...) -> ...;
 
 ### @nexus.serialization-context
 
-**Placement:** Operation (function)
-**Syntax:** `@nexus.serialization-context python="<support-helper>"`
+**Placement:** Operation (function) **Syntax:**
+`@nexus.serialization-context python="<support-helper>"`
 
 Supplies a support helper that returns the serialization context to use when
 encoding operation inputs. Use this when the generated operation request
@@ -1795,8 +1793,7 @@ The referenced helper must be available from the package specified by
 
 ### @nexus.output-transform
 
-**Placement:** Operation (function)
-**Syntax:**
+**Placement:** Operation (function) **Syntax:**
 
 ```
 @nexus.output-transform
@@ -1823,16 +1820,16 @@ expressions must return `(T, error)`.
 ///   go="handles.FromSignalWithStart(request, &result)"
 ```
 
-Both the type and expression must be provided together for each language.
-The TypeScript import fields are optional, but required when the generated
-return type or transform expression refers to an otherwise-unavailable module.
+Both the type and expression must be provided together for each language. The
+TypeScript import fields are optional, but required when the generated return
+type or transform expression refers to an otherwise-unavailable module.
 
 ---
 
 ### @nexus.flatten-in-api
 
-**Placement:** Record type (with `@nexus.proto`)
-**Syntax:** `@nexus.flatten-in-api` (no arguments)
+**Placement:** Record type (with `@nexus.proto`) **Syntax:**
+`@nexus.flatten-in-api` (no arguments)
 
 Flattens the record's fields into the parent record's generated API surface
 instead of creating a nested model.
@@ -1867,8 +1864,8 @@ an embedded zero-value record, generated Go cannot distinguish "omitted" from
 
 ### @nexus.flattened-type
 
-**Placement:** Field within a `@nexus.flatten-in-api` record
-**Syntax:** `@nexus.flattened-type python="<type>" typescript="<type>"`
+**Placement:** Field within a `@nexus.flatten-in-api` record **Syntax:**
+`@nexus.flattened-type python="<type>" typescript="<type>"`
 
 Overrides the type of a field when it is flattened into the parent API. Useful
 when the non-flattened type (e.g., `Payload`) should be simplified (e.g., to
@@ -1886,8 +1883,7 @@ static-summary: option<payload>,
 
 ### @nexus.function
 
-**Placement:** Type alias or record field
-**Syntax:**
+**Placement:** Type alias or record field **Syntax:**
 
 ```
 @nexus.function
@@ -1908,8 +1904,7 @@ generated Python samples.
 
 ### @nexus.function-args
 
-**Placement:** Function used as a `@nexus.function signature`
-**Syntax:**
+**Placement:** Function used as a `@nexus.function signature` **Syntax:**
 
 ```
 @nexus.function-args
@@ -1932,12 +1927,12 @@ workflow-call: async func(callable-prefix: callable-prefix, args: payloads) -> w
 
 ### @nexus.add-rpc-compatible-with
 
-**Placement:** Type alias (in a linked/dependency WIT package)
-**Syntax:** `@nexus.add-rpc-compatible-with "<type-name>"`
+**Placement:** Type alias (in a linked/dependency WIT package) **Syntax:**
+`@nexus.add-rpc-compatible-with "<type-name>"`
 
 Declares that a type is assignment-compatible with another type for the
-`add-rpc` and `add-message` scaffolding commands. This allows the scaffolder to substitute
-compatible types when generating WIT from proto RPCs.
+`add-rpc` and `add-message` scaffolding commands. This allows the scaffolder to
+substitute compatible types when generating WIT from proto RPCs.
 
 ```wit
 /// @nexus.add-rpc-compatible-with "workflow-type"
@@ -1958,6 +1953,6 @@ checked for missing or extra cases and incompatible payloads.
 Explicit `@nexus.omit` fields and compatible substitutions remain intentional
 boundaries. Opaque proto type mappings are preserved rather than expanded into
 records, and type parameters backed by the supported Payload/Payloads carriers
-are preserved. Linked records are validated but not edited; missing fields
-there must be fixed in the dependency package. Reconciliation completes before
-the output is written, and rerunning it on complete WIT leaves the model unchanged.
+are preserved. Linked records are validated but not edited; missing fields there
+must be fixed in the dependency package. Reconciliation completes before the
+output is written, and rerunning it on complete WIT leaves the model unchanged.

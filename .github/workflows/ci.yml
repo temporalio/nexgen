@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@6255b92812bf51d292e488b61469267a391267f6 # stable
+        uses: dtolnay/rust-toolchain@3fc1e40d4c4ce3007de028907c886bc3996ce2ea # 1.96.0
         with:
           components: rustfmt
 
@@ -31,6 +31,21 @@ jobs:
 
       - name: Verify Cargo.lock is up to date
         run: cargo metadata --locked --format-version 1 > /dev/null
+
+      # `cargo validate markdown` installs the rumdl version pinned in
+      # xtask/src/markdown.rs into target/tools on first use.
+      - name: Cache Markdown tooling
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/tools
+          key: markdown-tools-${{ runner.os }}-${{ hashFiles('xtask/src/markdown.rs') }}
+
+      - name: Validate Markdown
+        run: |
+          if ! cargo validate markdown; then
+            echo "::error::Markdown formatting check failed. Run \`cargo fmt-markdown\` locally and commit the result."
+            exit 1
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0

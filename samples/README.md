@@ -12,14 +12,15 @@ For the more advanced WIT-based generation and the JSON Schema *native-api*
 
 - [`schemas/`](schemas/): the authored JSON Schema / `*.nexusrpc.yaml` inputs
   (`chat`, `kb`, `showcase`, `temporal`).
-- [`wire/json_schema/`](wire/json_schema/): canonical wire fixtures shared by the
-  per-language round-trip tests.
+- [`wire/json_schema/`](wire/json_schema/): canonical wire fixtures shared by
+  the per-language round-trip tests.
 - Per-language projects with the generated definitions and their tests:
   - [`dotnet/`](dotnet/) — see [`dotnet/README.md`](dotnet/README.md)
   - [`go/`](go/) — see [`go/README.md`](go/README.md)
   - [`java/`](java/) — see [`java/README.md`](java/README.md)
   - [`python/`](python/) — see [`python/README.md`](python/README.md)
-  - [`typescript/`](typescript/) — see [`typescript/README.md`](typescript/README.md)
+  - [`typescript/`](typescript/) — see
+    [`typescript/README.md`](typescript/README.md)
 
 ## Regenerating
 

@@ -7,6 +7,7 @@ use std::time::Instant;
 use nexgen::error::Error as NexgenError;
 
 use crate::error::{Error, Result};
+use crate::markdown;
 
 #[derive(Clone, Copy)]
 pub enum ValidationLanguage {
@@ -16,6 +17,8 @@ pub enum ValidationLanguage {
     Go,
     Java,
     Dotnet,
+    // Confirms hand-authored Markdown formats have been auto formatted.
+    Markdown,
     // Full validation additionally checks agreement between all JSON Schema
     // backends, after every language's dependencies have been provisioned.
     CrossLanguage,
@@ -52,12 +55,15 @@ pub fn validate(request: &ValidateRequest) -> Result<()> {
             ValidationLanguage::Go => validate_go(&repo_root, &mut log),
             ValidationLanguage::Java => validate_java(&repo_root, &mut log),
             ValidationLanguage::Dotnet => validate_dotnet(&repo_root, &mut log),
+            ValidationLanguage::Markdown => validate_markdown(&repo_root, &mut log),
             ValidationLanguage::CrossLanguage => validate_conformance(&repo_root, &mut log),
         };
         let result = result.and_then(|()| {
             if !matches!(
                 language,
-                ValidationLanguage::Rust | ValidationLanguage::CrossLanguage
+                ValidationLanguage::Rust
+                    | ValidationLanguage::Markdown
+                    | ValidationLanguage::CrossLanguage
             ) {
                 validate_generated_code(&repo_root, language, &mut log)?;
             }
@@ -89,6 +95,7 @@ fn validation_languages(language: Option<ValidationLanguage>) -> Vec<ValidationL
             ValidationLanguage::Go,
             ValidationLanguage::Java,
             ValidationLanguage::Dotnet,
+            ValidationLanguage::Markdown,
             ValidationLanguage::CrossLanguage,
         ],
     }
@@ -98,6 +105,7 @@ impl ValidationLanguage {
     fn name(self) -> &'static str {
         match self {
             Self::Rust => "Rust",
+            Self::Markdown => "Markdown",
             Self::Python => "Python",
             Self::Typescript => "TypeScript",
             Self::Go => "Go",
@@ -112,6 +120,7 @@ impl ValidationLanguage {
             Self::Typescript => "typescript",
             Self::Dotnet => "dotnet",
             Self::Rust => "rust",
+            Self::Markdown => "markdown",
             Self::Python => "python",
             Self::Go => "go",
             Self::Java => "java",
@@ -243,6 +252,19 @@ fn integration_test_args(language: ValidationLanguage) -> [&'static str; 6] {
         "--test",
         language.log_name(),
     ]
+}
+
+fn validate_markdown(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
+    let rumdl = markdown::rumdl_path(repo_root)?;
+    let rumdl = rumdl.to_string_lossy();
+    match run(log, repo_root, &rumdl, &["check", "."]) {
+        // rumdl exits with 1 when files need formatting; other failures are
+        // tool or configuration errors and are reported as-is.
+        Err(Error::CommandFailed { status, .. }) if status.code() == Some(1) => {
+            Err(Error::MarkdownUnformatted)
+        }
+        result => result,
+    }
 }
 
 fn validate_python(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
@@ -457,6 +479,7 @@ mod tests {
                 "go",
                 "java",
                 "dotnet",
+                "markdown",
                 "conformance"
             ]
         );
@@ -471,6 +494,7 @@ mod tests {
             ValidationLanguage::Go,
             ValidationLanguage::Java,
             ValidationLanguage::Dotnet,
+            ValidationLanguage::Markdown,
             ValidationLanguage::CrossLanguage,
         ] {
             let stages = validation_languages(Some(language));

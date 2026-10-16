@@ -1,3 +1,4 @@
 [alias]
 build-examples = "run --quiet -p xtask -- build-examples"
+fmt-markdown = "run --quiet -p xtask -- fmt-markdown"
 validate = "run --quiet -p xtask -- validate"

@@ -18,8 +18,7 @@ For the beginner-friendly JSON Schema definitions samples, see
 
 To use hand-written support code with WIT generation, start with the
 [support-package guide](../../GUIDE.md#integrating-a-support-package) and the
-sample-project instructions for
-[Go](go/README.md), [Python](python/README.md),
+sample-project instructions for [Go](go/README.md), [Python](python/README.md),
 [TypeScript](typescript/README.md), and [.NET](dotnet/README.md).
 
 ## WIT examples
@@ -30,72 +29,102 @@ sample-project instructions for
 - .NET: [`dotnet/wit/function-execution/`](dotnet/wit/function-execution/)
 - Go: [`go/functionexecution/`](go/functionexecution/)
 - Python: [`python/wit/function_execution/`](python/wit/function_execution/)
-- TypeScript: [`typescript/wit/function-execution/`](typescript/wit/function-execution/)
+- TypeScript:
+  [`typescript/wit/function-execution/`](typescript/wit/function-execution/)
 
 ### `user-service`
 
 - WIT: [`inputs/user-service.wit`](inputs/user-service.wit)
 - .NET: [`dotnet/wit/user-service/`](dotnet/wit/user-service/)
-- Go: [`go/userservice/`](go/userservice/), [`go/tests/userservice_test.go`](go/tests/userservice_test.go)
-- Python: [`python/wit/user_service/`](python/wit/user_service/), [`python/tests/test_user_service.py`](python/tests/test_user_service.py)
-- TypeScript: [`typescript/wit/user-service/`](typescript/wit/user-service/), [`typescript/tests/user-service.test.ts`](typescript/tests/user-service.test.ts)
+- Go: [`go/userservice/`](go/userservice/),
+  [`go/tests/userservice_test.go`](go/tests/userservice_test.go)
+- Python: [`python/wit/user_service/`](python/wit/user_service/),
+  [`python/tests/test_user_service.py`](python/tests/test_user_service.py)
+- TypeScript: [`typescript/wit/user-service/`](typescript/wit/user-service/),
+  [`typescript/tests/user-service.test.ts`](typescript/tests/user-service.test.ts)
 
 ### `type-showcase`
 
 - WIT: [`inputs/type-showcase.wit`](inputs/type-showcase.wit)
 - .NET: [`dotnet/wit/type-showcase/`](dotnet/wit/type-showcase/)
-- Go: [`go/typeshowcase/`](go/typeshowcase/), [`go/tests/typeshowcase_test.go`](go/tests/typeshowcase_test.go)
-- Python: [`python/wit/type_showcase/`](python/wit/type_showcase/), [`python/tests/test_type_showcase.py`](python/tests/test_type_showcase.py)
-- TypeScript: [`typescript/wit/type-showcase/`](typescript/wit/type-showcase/), [`typescript/tests/type-showcase.test.ts`](typescript/tests/type-showcase.test.ts)
+- Go: [`go/typeshowcase/`](go/typeshowcase/),
+  [`go/tests/typeshowcase_test.go`](go/tests/typeshowcase_test.go)
+- Python: [`python/wit/type_showcase/`](python/wit/type_showcase/),
+  [`python/tests/test_type_showcase.py`](python/tests/test_type_showcase.py)
+- TypeScript: [`typescript/wit/type-showcase/`](typescript/wit/type-showcase/),
+  [`typescript/tests/type-showcase.test.ts`](typescript/tests/type-showcase.test.ts)
 
 ### `start-workflow`
 
 - WIT: [`inputs/start-workflow.wit`](inputs/start-workflow.wit)
 - .NET: [`dotnet/wit/start-workflow/`](dotnet/wit/start-workflow/)
 - Go: [`go/startworkflow/`](go/startworkflow/)
-- Python: [`python/wit/start_workflow/`](python/wit/start_workflow/), [`python/tests/test_start_workflow.py`](python/tests/test_start_workflow.py)
-- TypeScript: [`typescript/wit/start-workflow/`](typescript/wit/start-workflow/), [`typescript/tests/start-workflow.test.ts`](typescript/tests/start-workflow.test.ts)
+- Python: [`python/wit/start_workflow/`](python/wit/start_workflow/),
+  [`python/tests/test_start_workflow.py`](python/tests/test_start_workflow.py)
+- TypeScript:
+  [`typescript/wit/start-workflow/`](typescript/wit/start-workflow/),
+  [`typescript/tests/start-workflow.test.ts`](typescript/tests/start-workflow.test.ts)
 
 ### `workflow-service`
 
 - WIT: [`inputs/workflow-service.wit`](inputs/workflow-service.wit)
 - .NET: [`dotnet/wit/workflow-service/`](dotnet/wit/workflow-service/)
 - Go: [`go/workflowservice/`](go/workflowservice/)
-- Python: [`python/wit/workflow_service/`](python/wit/workflow_service/), [`python/tests/test_workflow_service.py`](python/tests/test_workflow_service.py)
-- TypeScript: [`typescript/wit/workflow-service/`](typescript/wit/workflow-service/), [`typescript/tests/workflow-service.test.ts`](typescript/tests/workflow-service.test.ts)
+- Python: [`python/wit/workflow_service/`](python/wit/workflow_service/),
+  [`python/tests/test_workflow_service.py`](python/tests/test_workflow_service.py)
+- TypeScript:
+  [`typescript/wit/workflow-service/`](typescript/wit/workflow-service/),
+  [`typescript/tests/workflow-service.test.ts`](typescript/tests/workflow-service.test.ts)
 
 ### `type-roundtrip`
 
 - WIT: [`inputs/type-roundtrip.wit`](inputs/type-roundtrip.wit)
 - .NET: [`dotnet/wit/type-roundtrip/`](dotnet/wit/type-roundtrip/)
-- Go: [`go/typeroundtrip/`](go/typeroundtrip/), [`go/tests/typeroundtrip_test.go`](go/tests/typeroundtrip_test.go)
-- Python: [`python/wit/type_roundtrip/`](python/wit/type_roundtrip/), [`python/tests/test_type_roundtrip.py`](python/tests/test_type_roundtrip.py)
-- TypeScript: [`typescript/wit/type-roundtrip/`](typescript/wit/type-roundtrip/), [`typescript/tests/type-roundtrip.test.ts`](typescript/tests/type-roundtrip.test.ts)
+- Go: [`go/typeroundtrip/`](go/typeroundtrip/),
+  [`go/tests/typeroundtrip_test.go`](go/tests/typeroundtrip_test.go)
+- Python: [`python/wit/type_roundtrip/`](python/wit/type_roundtrip/),
+  [`python/tests/test_type_roundtrip.py`](python/tests/test_type_roundtrip.py)
+- TypeScript:
+  [`typescript/wit/type-roundtrip/`](typescript/wit/type-roundtrip/),
+  [`typescript/tests/type-roundtrip.test.ts`](typescript/tests/type-roundtrip.test.ts)
 
 ### `notification-service`
 
 - WIT: [`inputs/notification-service.wit`](inputs/notification-service.wit)
-- .NET: [`dotnet/wit/notification-service/`](dotnet/wit/notification-service/), [`dotnet/tests/NotificationServiceChecks.cs`](dotnet/tests/NotificationServiceChecks.cs)
-- Python: [`python/wit/notification_service/`](python/wit/notification_service/), [`python/tests/test_notification_service.py`](python/tests/test_notification_service.py)
+- .NET: [`dotnet/wit/notification-service/`](dotnet/wit/notification-service/),
+  [`dotnet/tests/NotificationServiceChecks.cs`](dotnet/tests/NotificationServiceChecks.cs)
+- Python:
+  [`python/wit/notification_service/`](python/wit/notification_service/),
+  [`python/tests/test_notification_service.py`](python/tests/test_notification_service.py)
 
 ### `proto-oneof`
 
 - WIT: [`inputs/proto-oneof.wit`](inputs/proto-oneof.wit)
-- .NET: [`dotnet/wit/proto-oneof/`](dotnet/wit/proto-oneof/), [`dotnet/tests/ProtoOneofChecks.cs`](dotnet/tests/ProtoOneofChecks.cs)
-- Python: [`python/wit/proto_oneof/`](python/wit/proto_oneof/), [`python/tests/test_proto_oneof.py`](python/tests/test_proto_oneof.py)
+- .NET: [`dotnet/wit/proto-oneof/`](dotnet/wit/proto-oneof/),
+  [`dotnet/tests/ProtoOneofChecks.cs`](dotnet/tests/ProtoOneofChecks.cs)
+- Python: [`python/wit/proto_oneof/`](python/wit/proto_oneof/),
+  [`python/tests/test_proto_oneof.py`](python/tests/test_proto_oneof.py)
 
 ### `proto-generic`
 
 - WIT: [`inputs/proto-generic.wit`](inputs/proto-generic.wit)
-- .NET: [`dotnet/wit/proto-generic/`](dotnet/wit/proto-generic/), [`dotnet/tests/ProtoGenericChecks.cs`](dotnet/tests/ProtoGenericChecks.cs)
-- Python: [`python/wit/proto_generic/`](python/wit/proto_generic/), [`python/tests/test_proto_generic.py`](python/tests/test_proto_generic.py)
+- .NET: [`dotnet/wit/proto-generic/`](dotnet/wit/proto-generic/),
+  [`dotnet/tests/ProtoGenericChecks.cs`](dotnet/tests/ProtoGenericChecks.cs)
+- Python: [`python/wit/proto_generic/`](python/wit/proto_generic/),
+  [`python/tests/test_proto_generic.py`](python/tests/test_proto_generic.py)
 
 ## Supporting files
 
-- [`inputs/deps/`](inputs/deps/): reusable Temporal semantic/common type WIT inputs linked into proto-backed example generation.
-- [`descriptors/temporal_api.bin`](descriptors/temporal_api.bin): Temporal API descriptor set used by proto-backed examples.
-- [`wire/proto/`](wire/proto/): proto wire fixtures used by the proto-compatibility tests.
-- Per-language notes: [`dotnet/README.md`](dotnet/README.md), [`go/README.md`](go/README.md), [`java/`](java/) (no user support package), [`python/README.md`](python/README.md), [`typescript/README.md`](typescript/README.md).
+- [`inputs/deps/`](inputs/deps/): reusable Temporal semantic/common type WIT
+  inputs linked into proto-backed example generation.
+- [`descriptors/temporal_api.bin`](descriptors/temporal_api.bin): Temporal API
+  descriptor set used by proto-backed examples.
+- [`wire/proto/`](wire/proto/): proto wire fixtures used by the
+  proto-compatibility tests.
+- Per-language notes: [`dotnet/README.md`](dotnet/README.md),
+  [`go/README.md`](go/README.md), [`java/`](java/) (no user support package),
+  [`python/README.md`](python/README.md),
+  [`typescript/README.md`](typescript/README.md).
 
 ## Regenerating
 
@@ -108,7 +137,7 @@ cargo build-examples --format json-schema    # JSON Schema outputs (definitions 
 ```
 
 Each example's output directory is deleted before it is regenerated, so a file
-whose definition was renamed or removed never lingers — and nothing
-hand-written belongs in one. The per-language tests live in the sibling
-`tests/` directories. (The `nexgen` CLI itself never deletes: it writes into an
-existing `--output` directory and leaves everything already there alone.)
+whose definition was renamed or removed never lingers — and nothing hand-written
+belongs in one. The per-language tests live in the sibling `tests/` directories.
+(The `nexgen` CLI itself never deletes: it writes into an existing `--output`
+directory and leaves everything already there alone.)
