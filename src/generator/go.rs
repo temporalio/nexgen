@@ -320,7 +320,7 @@ fn record_message_key(record: &RecordSpec<PlannedFamily>) -> &str {
         .unwrap_or(record.full_name.as_str())
 }
 
-fn record_for_message<'a>(
+pub(in crate::generator) fn record_for_message<'a>(
     api_plan: &'a PlannedSpec,
     message: &PlannedMessageType,
 ) -> Option<&'a RecordSpec<PlannedFamily>> {
@@ -512,6 +512,7 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
 pub(in crate::generator) struct GoPackageContext {
     package_name: String,
     import_path: Option<String>,
+    pub(in crate::generator) has_serialization_context: bool,
     support_package: Option<String>,
 }
 
@@ -549,6 +550,12 @@ impl GoPackageContext {
         Ok(Self {
             package_name,
             import_path,
+            has_serialization_context: crate::nexgen_config::current().system_nexus
+                && api_plan
+                    .services
+                    .iter()
+                    .flat_map(|service| &service.operations)
+                    .any(|operation| operation.serialization_context.value().is_some()),
             support_package: options.support_package.clone(),
         })
     }
@@ -569,7 +576,7 @@ impl GoPackageContext {
         Ok(package_name)
     }
 
-    fn is_self_import(&self, import_path: &str) -> bool {
+    pub(in crate::generator) fn is_self_import(&self, import_path: &str) -> bool {
         self.import_path
             .as_deref()
             .is_some_and(|self_import| self_import == import_path)
@@ -616,6 +623,51 @@ impl GoPackageContext {
         self.qualified_expr(
             "go.temporal.io/sdk/workflow",
             "workflow.NexusOperationOptions{}",
+        )
+    }
+
+    pub(in crate::generator) fn transfer_type_converter_type(&self) -> String {
+        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
+            return "TransferTypeConverter".to_string();
+        }
+        self.qualified_expr(
+            "go.temporal.io/sdk/converter",
+            "converter.TransferTypeConverter",
+        )
+    }
+
+    pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
+        if !crate::nexgen_config::current().system_nexus {
+            self.qualified_expr(
+                "go.temporal.io/sdk/converter",
+                "converter.NewTransferTypeConverter",
+            )
+        } else if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
+            "NewSystemNexusTransferTypeConverter".to_string()
+        } else {
+            "commonconverter.NewSystemNexusTransferTypeConverter".to_string()
+        }
+    }
+
+    pub(in crate::generator) fn system_nexus_config_type(&self) -> String {
+        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
+            "SystemNexusConfig".to_string()
+        } else {
+            "commonconverter.SystemNexusConfig".to_string()
+        }
+    }
+
+    pub(in crate::generator) fn workflow_data_converter(&self) -> String {
+        self.qualified_expr(
+            "go.temporal.io/sdk/internal",
+            "internal.GetDataConverterFromWorkflowContext",
+        )
+    }
+
+    pub(in crate::generator) fn serialization_context_type(&self) -> String {
+        self.qualified_expr(
+            "go.temporal.io/sdk/converter",
+            "converter.SerializationContext",
         )
     }
 
@@ -818,6 +870,12 @@ struct GoModelFragments {
     body: String,
 }
 
+#[derive(Debug, Default)]
+struct GoOperationRegistry {
+    imports: Vec<(String, String)>,
+    body: String,
+}
+
 enum GoExternalModels {
     Json(json::ModelBackend),
     Proto(proto::ModelBackend),
@@ -972,9 +1030,18 @@ impl GoExternalModels {
         }
     }
 
-    fn render_model_wire_methods(&self, output: &mut String, key: &str, model: &RenderedModel) {
+    fn render_model_converters(&self, output: &mut String, key: &str, model: &RenderedModel) {
         if let Self::Proto(backend) = self {
-            backend.render_model_wire_methods(output, key, model);
+            backend.render_model_converters(output, key, model);
+        }
+    }
+
+    /// Whether any model emits a `converter.TransferTypeConverter`, which pulls
+    /// in the `context` and `errors` standard-library imports.
+    fn renders_transfer_type_converters(&self) -> bool {
+        match self {
+            Self::Proto(backend) => backend.renders_transfer_type_converters(),
+            Self::Json(_) => false,
         }
     }
 
@@ -1046,6 +1113,14 @@ impl<'a> ApiPlanner<'a> {
 
     fn generate(mut self, primary_origin: GeneratedFileOrigin) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
+        if self.package.has_serialization_context
+            && self.external_models.renders_operation_references()
+        {
+            return Err(Error::UnsupportedGoProtoConversion {
+                context: "Go serialization context".to_string(),
+                reason: "serialization-context requires proto-backed operation wrappers, not operation references".to_string(),
+            });
+        }
         if !self.external_models.renders_operation_references() {
             for service in &self.api_plan.services {
                 let mut operations = Vec::new();
@@ -1100,6 +1175,14 @@ impl<'a> ApiPlanner<'a> {
         // so the backend renders final Go names directly.
         self.populate_model_wire_conversions()?;
         self.populate_operation_bindings(&mut services)?;
+        for operation in services.iter().flat_map(|service| &service.operations) {
+            if operation.serialization_context_expr.is_some() && operation.wire_binding.is_none() {
+                return Err(Error::UnsupportedGoProtoConversion {
+                    context: format!("operation `{}`", operation.name),
+                    reason: "serialization-context requires a proto-backed operation".to_string(),
+                });
+            }
+        }
 
         for service in &services {
             for operation in &service.operations {
@@ -1143,11 +1226,15 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
-        let has_system_operations = services.iter().any(|service| {
-            service.endpoint.as_deref() == Some("__temporal_system")
-                && !service.operations.is_empty()
+        let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
+        let has_eager_conversion = services.iter().flat_map(|s| &s.operations).any(|op| {
+            op.wire_binding
+                .as_ref()
+                .is_some_and(|binding| binding.requires_data_converter())
         });
-        if has_system_operations && !self.package.is_self_import("go.temporal.io/sdk/internal") {
+        if (has_system_operations || has_eager_conversion)
+            && !self.package.is_self_import("go.temporal.io/sdk/internal")
+        {
             self.imports
                 .insert("go.temporal.io/sdk/internal".to_string());
         }
@@ -1177,6 +1264,19 @@ impl<'a> ApiPlanner<'a> {
             self.imports.insert("runtime".to_string());
             self.imports.insert("strings".to_string());
         }
+        // System transfer callbacks use the converter selected by the SDK;
+        // ordinary callbacks are context-free.
+        if self.external_models.renders_transfer_type_converters() {
+            if !self.package.is_self_import("go.temporal.io/sdk/converter")
+                && (!crate::nexgen_config::current().system_nexus
+                    || !self
+                        .package
+                        .is_self_import("go.temporal.io/sdk/internal/common/converter"))
+            {
+                self.imports
+                    .insert("go.temporal.io/sdk/converter".to_string());
+            }
+        }
         let model_fragments = self.external_models.render_models()?;
         self.imports.extend(model_fragments.imports);
         // The Nexus service definition (operation references) is emitted in
@@ -1200,6 +1300,34 @@ impl<'a> ApiPlanner<'a> {
                 .insert("go.temporal.io/sdk/workflow".to_string());
         }
         let mut external_imports = self.external_models.imports();
+        let registry = if crate::nexgen_config::current().system_nexus
+            && self.package.has_serialization_context
+        {
+            render_operation_registry(&self.package, &services, &self.imports, &external_imports)?
+        } else {
+            GoOperationRegistry::default()
+        };
+        for (path, alias) in &registry.imports {
+            if let Some((_, previous_alias)) = external_imports
+                .iter()
+                .find(|(existing, _)| existing == path)
+            {
+                if previous_alias != alias {
+                    return Err(Error::InvalidWitDirective {
+                        path: PathBuf::from("<go-plan>"),
+                        context: "Go operation registry".to_string(),
+                        directive: "@nexus.serialization-context".to_string(),
+                        reason: format!(
+                            "import `{path}` uses both `{previous_alias}` and `{alias}` in the generated API file"
+                        ),
+                    });
+                }
+            } else if alias == path.rsplit('/').next().unwrap_or(path) {
+                self.imports.insert(path.clone());
+            } else {
+                external_imports.push((path.clone(), alias.clone()));
+            }
+        }
         if services
             .iter()
             .flat_map(|s| &s.operations)
@@ -1222,6 +1350,9 @@ impl<'a> ApiPlanner<'a> {
         {
             external_imports.push((path.clone(), "support".to_string()));
         }
+        for model in self.models.values() {
+            validate_model_getter_names(model)?;
+        }
         let output = render_file(
             &self.package,
             &self.imports,
@@ -1238,6 +1369,7 @@ impl<'a> ApiPlanner<'a> {
             &self.external_models,
             self.api_plan,
             &visibility,
+            &registry.body,
         );
 
         let mut files = GeneratedFileMap::default();
@@ -1386,6 +1518,14 @@ impl<'a> ApiPlanner<'a> {
                 .collect()
         });
 
+        let serialization_context_expr = if crate::nexgen_config::current().system_nexus {
+            operation.serialization_context.value()
+        } else {
+            None
+        };
+        if let Some(helper) = serialization_context_expr {
+            validate_go_serialization_context_helper(helper, &operation.name)?;
+        }
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
@@ -1396,6 +1536,7 @@ impl<'a> ApiPlanner<'a> {
             model_type_parameters,
             output_type,
             raw_output_type,
+            serialization_context_expr,
             output_transform_expr: go_output_transform.map(|(_, expr)| expr),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
@@ -1661,8 +1802,19 @@ impl<'a> ApiPlanner<'a> {
                 let planned_fields = planned_model
                     .model_fields()
                     .map(|(field_name, field)| {
-                        planned_field(planned_model, field_name, field, self.api_plan)
+                        (
+                            planned_field(planned_model, field_name, field, self.api_plan),
+                            false,
+                        )
                     })
+                    .chain(planned_model.sourced_fields().map(
+                        |(field_name, field, _source_expr)| {
+                            (
+                                planned_field(planned_model, field_name, field, self.api_plan),
+                                true,
+                            )
+                        },
+                    ))
                     .collect::<Vec<_>>();
                 (planned_model.name.clone(), parameters, planned_fields)
             })
@@ -1700,7 +1852,7 @@ impl<'a> ApiPlanner<'a> {
 
         let fields = planned_fields
             .iter()
-            .map(|planned_field| self.build_field(planned_field))
+            .map(|(planned_field, sourced)| self.build_field(planned_field, *sourced))
             .collect::<Result<Vec<_>>>()?;
 
         self.models
@@ -1710,7 +1862,7 @@ impl<'a> ApiPlanner<'a> {
         Ok(())
     }
 
-    fn build_field(&mut self, field: &PlannedField) -> Result<RenderedField> {
+    fn build_field(&mut self, field: &PlannedField, sourced: bool) -> Result<RenderedField> {
         let field_name = go_field_name(&field.authored_name);
 
         let annotated_go_type = field
@@ -1755,6 +1907,7 @@ impl<'a> ApiPlanner<'a> {
                 .map(str::to_string),
             go_type,
             required: field.required,
+            sourced,
         })
     }
 
@@ -1808,6 +1961,167 @@ fn go_api_file_name(api_plan: &PlannedSpec) -> PathBuf {
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| "api".to_string());
     PathBuf::from(format!("{stem}.go"))
+}
+
+fn validate_go_serialization_context_helper(helper: &str, operation: &str) -> Result<()> {
+    let parts: Vec<_> = helper.split('.').collect();
+    if parts.len() > 2
+        || parts.iter().any(|part| {
+            part.is_empty()
+                || *part == "_"
+                || is_go_keyword(part)
+                || !part
+                    .as_bytes()
+                    .first()
+                    .is_some_and(|byte| is_go_ident_start(*byte))
+                || !part.bytes().all(is_go_ident_continue)
+        })
+    {
+        return Err(Error::InvalidWitDirective {
+            path: PathBuf::from("<go-plan>"),
+            context: format!("operation `{operation}`"),
+            directive: "@nexus.serialization-context".to_string(),
+            reason: format!("Go support helper `{helper}` must be an identifier or pkg.Func"),
+        });
+    }
+    Ok(())
+}
+
+fn render_operation_registry(
+    package: &GoPackageContext,
+    services: &[RenderedService<'_>],
+    model_imports: &BTreeSet<String>,
+    external_imports: &[(String, String)],
+) -> Result<GoOperationRegistry> {
+    let has_helpers = services
+        .iter()
+        .flat_map(|service| &service.operations)
+        .any(|operation| operation.serialization_context_expr.is_some());
+    let helper_packages: BTreeSet<_> = services
+        .iter()
+        .flat_map(|service| &service.operations)
+        .filter_map(|operation| {
+            operation
+                .serialization_context_expr?
+                .split_once('.')
+                .map(|(name, _)| name)
+        })
+        .collect();
+    let mut candidates = external_imports.to_vec();
+    candidates.extend(model_imports.iter().map(|path| {
+        (
+            path.clone(),
+            path.rsplit('/').next().unwrap_or(path).to_string(),
+        )
+    }));
+    if let Some(path) = &package.support_package {
+        candidates.push((path.clone(), "support".to_string()));
+    }
+    let mut imports = BTreeMap::new();
+    if has_helpers && !package.is_self_import("go.temporal.io/sdk/converter") {
+        imports.insert(
+            "converter".to_string(),
+            "go.temporal.io/sdk/converter".to_string(),
+        );
+    }
+    if !package.is_self_import("go.temporal.io/sdk/internal") {
+        imports.insert(
+            "internal".to_string(),
+            "go.temporal.io/sdk/internal".to_string(),
+        );
+    }
+    for (path, alias) in candidates {
+        let used_by_input_type =
+            services
+                .iter()
+                .flat_map(|service| &service.operations)
+                .any(|operation| {
+                    operation.serialization_context_expr.is_some()
+                        && operation.input_type.contains(&format!("{alias}."))
+                });
+        let used_by_unqualified_helper = alias == "support"
+            && services
+                .iter()
+                .flat_map(|service| &service.operations)
+                .filter_map(|operation| operation.serialization_context_expr)
+                .any(|helper| !helper.contains('.'));
+        if (!helper_packages.contains(alias.as_str())
+            && !used_by_input_type
+            && !used_by_unqualified_helper)
+            || package.is_self_import(&path)
+        {
+            continue;
+        }
+        if let Some(previous) = imports.insert(alias.clone(), path.clone()) {
+            if previous != path {
+                return Err(Error::InvalidWitDirective {
+                    path: PathBuf::from("<go-plan>"),
+                    context: "Go operation registry".to_string(),
+                    directive: "@nexus.serialization-context".to_string(),
+                    reason: format!(
+                        "helper qualifier `{alias}` refers to both `{previous}` and `{path}`"
+                    ),
+                });
+            }
+        }
+    }
+    let mut output = String::from("\n// --- Registry ---\n");
+    let sc = package.serialization_context_type();
+    let key = package.qualified_expr("go.temporal.io/sdk/internal", "internal.NexusOperationKey");
+    let info = package.qualified_expr(
+        "go.temporal.io/sdk/internal",
+        "internal.NexusOperationRegistryEntry",
+    );
+    output.push_str(&format!(
+        "\nvar NexusOperationRegistry = map[{key}]{info}{{\n"
+    ));
+    let mut keys = BTreeSet::new();
+    for service in services {
+        for operation in &service.operations {
+            let Some(helper) = operation.serialization_context_expr else {
+                continue;
+            };
+            let helper = package.function_name_extractor(helper);
+            if !keys.insert((service.wire_name, operation.wire_name)) {
+                return Err(Error::InvalidWitDirective {
+                    path: PathBuf::from("<go-plan>"),
+                    context: "Go operation registry".to_string(),
+                    directive: "@nexus.serialization-context".to_string(),
+                    reason: format!(
+                        "duplicate registry key: service `{}`, operation `{}`",
+                        service.wire_name, operation.wire_name
+                    ),
+                });
+            }
+            let service_name = go_string_literal(service.wire_name);
+            let operation_name = go_string_literal(operation.wire_name);
+            output.push_str(&format!(
+                "\t{{\n\t\tService: {service_name},\n\t\tOperation: {operation_name},\n\t}}: {{\n"
+            ));
+            let input_type = &operation.input_type;
+            output.push_str(&format!(
+                "\t\tSerializationContext: func(request any) {sc} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
+            ));
+            output.push_str("\t},\n");
+        }
+    }
+    output.push_str("}\n");
+    if !keys.is_empty() {
+        let register = package.qualified_expr(
+            "go.temporal.io/sdk/internal",
+            "internal.UpdateNexusOperationRegistry",
+        );
+        output.push_str(&format!(
+            "\nfunc init() {{\n\t{register}(NexusOperationRegistry)\n}}\n"
+        ));
+    }
+    Ok(GoOperationRegistry {
+        imports: imports
+            .into_iter()
+            .map(|(alias, path)| (path, alias))
+            .collect(),
+        body: output,
+    })
 }
 
 /// Derives a valid Go package name from a Nexus endpoint string by stripping
@@ -1873,6 +2187,8 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// The expression is rendered with `request` and raw `result` in scope and
     /// must evaluate to `(output_transform_type, error)`.
     pub(in crate::generator) output_transform_expr: Option<&'a str>,
+    /// Helper selecting the context for user payloads nested in this operation.
+    pub(in crate::generator) serialization_context_expr: Option<&'a str>,
     /// Go return type for an `@nexus.output-transform`, with any embedded
     /// import path stripped from the WIT annotation.
     pub(in crate::generator) output_transform_type: Option<String>,
@@ -2010,6 +2326,9 @@ pub(in crate::generator) struct RenderedField {
     /// Whether the field is required in the WIT definition. Rendered as a
     /// leading `// Required.` godoc comment on the generated Go struct field.
     pub(in crate::generator) required: bool,
+    /// Whether this field is populated from `@nexus.source` at the operation
+    /// call site rather than documented as a caller-supplied field.
+    pub(in crate::generator) sourced: bool,
 }
 
 /// The result of resolving a [`PlannedValueType`] to a Go type expression.
@@ -2045,11 +2364,10 @@ impl GoVisibility {
     }
 
     fn rewrite_go_expr(&self, expr: &str) -> String {
-        if self.type_name_replacements.is_empty() && !expr.contains(".ToProto()") {
+        if self.type_name_replacements.is_empty() {
             return expr.to_string();
         }
 
-        let expr = expr.replace(".ToProto()", ".toProto()");
         let bytes = expr.as_bytes();
         let mut output = String::with_capacity(expr.len());
         let mut index = 0;
@@ -2674,6 +2992,7 @@ fn ensure_generic_tuple(
                 doc: None,
                 go_type: format!("T{}", index + 1),
                 required: true,
+                sourced: false,
             })
             .collect();
         models.insert(
@@ -2702,12 +3021,14 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
                         doc: None,
                         go_type: "T".to_string(),
                         required: false,
+                        sourced: false,
                     },
                     RenderedField {
                         name: "Error".to_string(),
                         doc: None,
                         go_type: "E".to_string(),
                         required: false,
+                        sourced: false,
                     },
                 ],
             },
@@ -3113,6 +3434,7 @@ fn render_file(
     external_models: &GoExternalModels,
     api_plan: &PlannedSpec,
     visibility: &GoVisibility,
+    registry: &str,
 ) -> String {
     let mut output = String::new();
     output.push_str(GENERATED_HEADER);
@@ -3169,6 +3491,7 @@ fn render_file(
         output.push_str(")\n");
     }
 
+    let body_start = output.len();
     if let Some(operation_references) = operation_references {
         if !operation_references.is_empty() {
             output.push('\n');
@@ -3177,6 +3500,7 @@ fn render_file(
         if !external_model_body.is_empty() {
             output.push_str(external_model_body);
         }
+        output.push_str(registry);
         return output;
     }
     if !external_model_body.is_empty()
@@ -3188,6 +3512,7 @@ fn render_file(
     {
         output.push('\n');
         output.push_str(external_model_body);
+        output.push_str(registry);
         return output;
     }
 
@@ -3371,6 +3696,23 @@ fn render_file(
         }
     }
 
+    output.push_str(registry);
+
+    // Imports collected while planning can become unused when the SDK owns
+    // input conversion instead of the generated wrapper.
+    let unused_external_imports: Vec<_> = external_imports
+        .iter()
+        .filter(|(_, alias)| !output[body_start..].contains(&format!("{alias}.")))
+        .collect();
+    for (path, alias) in unused_external_imports {
+        let default_alias = path.rsplit('/').next().unwrap_or(path);
+        let import = if alias == default_alias {
+            format!("\t\"{path}\"\n")
+        } else {
+            format!("\t{alias} \"{path}\"\n")
+        };
+        output = output.replacen(&import, "", 1);
+    }
     output
 }
 
@@ -3678,7 +4020,7 @@ fn render_model(
         output.push_str("}\n");
     } else {
         for field in &model.fields {
-            if public {
+            if public && !field.sourced {
                 render_field_doc_comment(
                     output,
                     "\t",
@@ -3696,7 +4038,67 @@ fn render_model(
         output.push_str("}\n");
     }
 
-    external_models.render_model_wire_methods(output, key, model);
+    render_model_getters(output, model);
+    external_models.render_model_converters(output, key, model);
+}
+
+fn model_getter_name(field: &RenderedField) -> String {
+    format!("Get{}", field.name)
+}
+
+// Go fields and methods share a namespace. Validate final native names here,
+// rather than reserving Go getter names in the language-neutral pipeline.
+fn validate_model_getter_names(model: &RenderedModel) -> Result<()> {
+    let mut occupied = BTreeMap::new();
+    for field in &model.fields {
+        occupied.insert(field.name.clone(), format!("field `{}`", field.name));
+    }
+    for field in model
+        .fields
+        .iter()
+        .filter(|field| is_go_exported_decl(&field.name))
+    {
+        let getter = model_getter_name(field);
+        if let Some(previous) =
+            occupied.insert(getter.clone(), format!("getter for field `{}`", field.name))
+        {
+            return Err(Error::UnsupportedGoType {
+                context: format!("record model `{}`", model.name),
+                reason: format!(
+                    "getter `{getter}` for field `{}` conflicts with {previous}; rename the conflicting field",
+                    field.name
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn render_model_getters(output: &mut String, model: &RenderedModel) {
+    let (ident, parameters) = split_go_type_decl_name(&model.name);
+    let receiver = if parameters.is_empty() {
+        ident.to_string()
+    } else {
+        let names = parameters
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .split(',')
+            .filter_map(|parameter| parameter.split_whitespace().next())
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{ident}[{names}]")
+    };
+    for field in model
+        .fields
+        .iter()
+        .filter(|field| is_go_exported_decl(&field.name))
+    {
+        let getter = model_getter_name(field);
+        output.push_str(&format!(
+            "\nfunc (m {receiver}) {getter}() {} {{\n\treturn m.{}\n}}\n",
+            field.go_type, field.name
+        ));
+    }
 }
 
 /// Renders a WIT resource as a Go struct with its constructor fields.
@@ -4203,7 +4605,7 @@ pub(in crate::generator) fn new_nexus_client_expr(
     service_name: &str,
     package: &GoPackageContext,
 ) -> String {
-    if endpoint == "__temporal_system" {
+    if crate::nexgen_config::current().system_nexus {
         return format!(
             "internal.NewSystemNexusClient({})",
             go_string_literal(service_name)
@@ -5232,6 +5634,452 @@ fn render_forwarding_wrapper(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    use prost::Message;
+    use prost_types::{
+        DescriptorProto, FieldDescriptorProto, FileDescriptorProto, FileDescriptorSet, FileOptions,
+        field_descriptor_proto::{Label, Type},
+    };
+
+    use crate::error::{Error, Result};
+    use crate::{GenerateRequest, generate_to_file};
+
+    fn generate_record_models(declarations: &str) -> Result<String> {
+        let temp = tempfile::tempdir().unwrap();
+        let input = temp.path().join("models.wit");
+        std::fs::write(
+            &input,
+            format!(
+                "package test:models@1.0.0;\nworld model-world {{ export models; }}\ninterface models {{\n{declarations}\n}}"
+            ),
+        )
+        .unwrap();
+        let output = temp.path().join("generated");
+        generate_to_file(&GenerateRequest {
+            config: crate::nexgen_config::NexgenConfig {
+                mode: crate::generator::GenerationMode::NativeApi,
+                ..Default::default()
+            },
+            language: crate::language::Language::Go,
+            input_paths: vec![input],
+            support_package: Some("example.com/nexgen/support".to_string()),
+            descriptor_paths: Vec::new(),
+            output_path: output.clone(),
+            format: false,
+            java_package_name: None,
+            ts_date_time_types: Default::default(),
+        })?;
+        Ok(std::fs::read_dir(output)
+            .unwrap()
+            .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap())
+            .collect::<Vec<_>>()
+            .join("\n"))
+    }
+
+    #[test]
+    fn record_getters_use_value_receivers_and_native_field_types() {
+        let source = generate_record_models(
+            r#"enum status { ready, waiting }
+            type request-alias = request;
+            record request {
+                id: string,
+                status: status,
+                maybe: option<u32>,
+                values: list<string>,
+                /// @nexus.type go="map[string]int32"
+                lookup: list<tuple<string, u32>>,
+                /// @nexus.type go="time.Duration"
+                elapsed: u64,
+                /// @nexus.source go="WorkflowNamespace(ctx)"
+                namespace: string,
+                /// @nexus.source go="RequestType(ctx)"
+                %type: string,
+            }
+            read: func(request: request) -> request;"#,
+        )
+        .unwrap();
+        for (getter, field, go_type) in [
+            ("GetID", "ID", "string"),
+            ("GetMaybe", "Maybe", "*int32"),
+            ("GetValues", "Values", "[]string"),
+            ("GetLookup", "Lookup", "map[string]int32"),
+            ("GetElapsed", "Elapsed", "time.Duration"),
+            ("GetNamespace", "Namespace", "string"),
+            ("GetType", "Type", "string"),
+        ] {
+            assert!(
+                source.contains(&format!(
+                    "func (m Request) {getter}() {go_type} {{\n\treturn m.{field}\n}}"
+                )),
+                "{source}"
+            );
+        }
+        assert!(!source.contains("func (m *Request) Get"), "{source}");
+        assert!(!source.contains("if m == nil"), "{source}");
+        assert!(!source.contains("// Get"), "{source}");
+        for receiver in ["ReadOptions", "Status", "RequestAlias"] {
+            assert!(
+                !source.contains(&format!("func (m {receiver}) Get")),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn record_getters_preserve_generic_receiver_arguments() {
+        let source = generate_record_models(
+            r#"type placeholder = string;
+            /// @nexus.type-parameter
+            type value-t = placeholder;
+            /// @nexus.type-parameter
+            type other-t = placeholder;
+            record pair {
+                value: value-t,
+                other: option<other-t>,
+                history: list<value-t>,
+                tuple-value: tuple<value-t, other-t>,
+                result-value: result<value-t, other-t>,
+            }
+            read: func(request: pair) -> pair;"#,
+        )
+        .unwrap();
+        for (getter, go_type) in [
+            ("GetValue", "ValueT"),
+            ("GetOther", "*OtherT"),
+            ("GetHistory", "[]ValueT"),
+        ] {
+            assert!(
+                source.contains(&format!(
+                    "func (m Pair[ValueT, OtherT]) {getter}() {go_type}"
+                )),
+                "{source}"
+            );
+        }
+        // Tuple and result helpers use grouped constraints in their declarations.
+        assert!(
+            source.contains("func (m tuple2[T1, T2]) GetFirst() T1"),
+            "{source}"
+        );
+        assert!(
+            source.contains("func (m result[T, E]) GetError() E"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn record_getters_reject_field_method_collisions() {
+        let error =
+            generate_record_models(
+                "record request { id: string, get-id: string }\nread: func(request: request) -> request;",
+            )
+            .unwrap_err();
+        let Error::UnsupportedGoType { context, reason } = error else {
+            panic!("unexpected error: {error}");
+        };
+        assert!(context.contains("Request"), "{context}");
+        assert!(reason.contains("getter `GetID` for field `ID`"), "{reason}");
+        assert!(reason.contains("field `GetID`"), "{reason}");
+        assert!(reason.contains("rename"), "{reason}");
+    }
+
+    #[test]
+    fn record_getters_skip_private_fields() {
+        let model = super::RenderedModel {
+            name: "Request".to_string(),
+            fields: ["ID", "iD"]
+                .into_iter()
+                .map(|name| super::RenderedField {
+                    name: name.to_string(),
+                    doc: None,
+                    go_type: "string".to_string(),
+                    required: true,
+                    sourced: name == "iD",
+                })
+                .collect(),
+        };
+        super::validate_model_getter_names(&model).unwrap();
+        let mut source = String::new();
+        super::render_model_getters(&mut source, &model);
+        assert_eq!(source.matches("func (m Request) GetID() string").count(), 1);
+        assert!(!source.contains("return m.iD"), "{source}");
+        assert!(!source.contains("// Get"), "{source}");
+    }
+
+    fn generate_context_operation(
+        endpoint: &str,
+        native_type: &str,
+        annotated: bool,
+        owned_request: bool,
+        system_nexus: bool,
+    ) -> Result<BTreeMap<PathBuf, String>> {
+        let temp = tempfile::tempdir().unwrap();
+        let input = temp.path().join("context.wit");
+        let annotation = if annotated {
+            "/// @nexus.serialization-context go=\"requestContext\""
+        } else {
+            ""
+        };
+        let declaration = if owned_request {
+            r#"/// @nexus.proto "test.Request"
+            record request { retry-policy: option<retry-policy> }"#
+        } else {
+            "type request = retry-policy;"
+        };
+        std::fs::write(
+            &input,
+            format!(
+                r#"package test:context@1.0.0;
+                world system {{ export sample-service; }}
+                /// @nexus.endpoint "{endpoint}"
+                interface sample-service {{
+                    type placeholder = string;
+                    /// @nexus.proto "test.RetryPolicy"
+                    /// @nexus.type go="go.temporal.io/sdk/{native_type}"
+                    type retry-policy = placeholder;
+                    {declaration}
+                    {annotation}
+                    send: func(request: request) -> retry-policy;
+                }}"#
+            ),
+        )
+        .unwrap();
+        let descriptor = temp.path().join("wire.bin");
+        let descriptors = FileDescriptorSet {
+            file: vec![FileDescriptorProto {
+                name: Some("wire.proto".to_string()),
+                package: Some("test".to_string()),
+                syntax: Some("proto3".to_string()),
+                options: Some(FileOptions {
+                    go_package: Some("example.com/wire;wire".to_string()),
+                    ..Default::default()
+                }),
+                message_type: vec![
+                    DescriptorProto {
+                        name: Some("RetryPolicy".to_string()),
+                        ..Default::default()
+                    },
+                    DescriptorProto {
+                        name: Some("Request".to_string()),
+                        field: vec![FieldDescriptorProto {
+                            name: Some("retry_policy".to_string()),
+                            number: Some(1),
+                            label: Some(Label::Optional as i32),
+                            r#type: Some(Type::Message as i32),
+                            type_name: Some(".test.RetryPolicy".to_string()),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            }],
+        };
+        std::fs::write(&descriptor, descriptors.encode_to_vec()).unwrap();
+        let output = temp.path().join("generated");
+        generate_to_file(&GenerateRequest {
+            config: crate::nexgen_config::NexgenConfig {
+                mode: crate::generator::GenerationMode::NativeApi,
+                system_nexus,
+            },
+            language: crate::language::Language::Go,
+            input_paths: vec![input],
+            support_package: Some("example.com/nexgen/support".to_string()),
+            descriptor_paths: vec![descriptor],
+            output_path: output.clone(),
+            format: false,
+            java_package_name: None,
+            ts_date_time_types: Default::default(),
+        })?;
+        Ok(std::fs::read_dir(output)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                (
+                    PathBuf::from(entry.file_name()),
+                    std::fs::read_to_string(entry.path()).unwrap(),
+                )
+            })
+            .collect())
+    }
+
+    #[test]
+    fn system_nexus_configuration_controls_clients_and_converters() {
+        for endpoint in ["__temporal_system", "temporal-system", "sample-service"] {
+            for annotated in [false, true] {
+                for system_nexus in [false, true] {
+                    let files = generate_context_operation(
+                        endpoint,
+                        "temporal.RetryPolicy",
+                        annotated,
+                        true,
+                        system_nexus,
+                    )
+                    .unwrap();
+                    let source = &files[&PathBuf::from("sampleservice.go")];
+                    if system_nexus {
+                        assert!(
+                            source.contains("internal.NewSystemNexusClient("),
+                            "{source}"
+                        );
+                        assert!(!source.contains("workflow.NewNexusClient("), "{source}");
+                        assert!(
+                            source.contains("commonconverter.NewSystemNexusTransferTypeConverter("),
+                            "{source}"
+                        );
+                        assert!(
+                            source.contains("cfg *commonconverter.SystemNexusConfig"),
+                            "{source}"
+                        );
+                        assert_eq!(
+                            source.contains("// --- Registry ---"),
+                            annotated,
+                            "{source}"
+                        );
+                    } else {
+                        assert!(
+                            source.contains(&format!("workflow.NewNexusClient(\"{endpoint}\",")),
+                            "{source}"
+                        );
+                        assert!(!source.contains("NewSystemNexusClient"), "{source}");
+                        assert!(
+                            source.contains("converter.NewTransferTypeConverter("),
+                            "{source}"
+                        );
+                        assert!(!source.contains("go.temporal.io/sdk/internal"), "{source}");
+                        assert!(!source.contains("SystemNexusConfig"), "{source}");
+                        assert!(!source.contains("// --- Registry ---"), "{source}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn serialization_context_rejects_external_operation_inputs() {
+        for endpoint in ["__temporal_system", "temporal-system"] {
+            for native_type in ["temporal.RetryPolicy", "*temporal.RetryPolicy"] {
+                let error = generate_context_operation(endpoint, native_type, true, false, true)
+                    .unwrap_err();
+                let Error::UnsupportedGoProtoConversion { context, reason } = error else {
+                    panic!("unexpected error: {error}");
+                };
+                assert!(context.contains("Send"), "{context}");
+                assert!(context.contains(native_type), "{context}");
+                assert!(reason.contains("TransferTypeConverter"), "{reason}");
+                assert!(reason.contains("locally owned request model"), "{reason}");
+            }
+        }
+    }
+
+    #[test]
+    fn external_inputs_keep_eager_conversion_without_system_policy() {
+        for (endpoint, annotated) in [
+            ("sample-service", true),
+            ("temporal-system", false),
+            ("__temporal_system", false),
+        ] {
+            let files = generate_context_operation(
+                endpoint,
+                "temporal.RetryPolicy",
+                annotated,
+                false,
+                false,
+            )
+            .unwrap();
+            let source = &files[&PathBuf::from("sampleservice.go")];
+            assert!(
+                source.contains("requestProto, err := support.RetryPolicyToProto(&request)"),
+                "{source}"
+            );
+            assert!(
+                source.contains("c.ExecuteOperation(ctx, \"Send\", requestProto,"),
+                "{source}"
+            );
+            assert!(
+                source.contains("support.RetryPolicyFromProto(&result)"),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn system_policy_supports_generated_request_with_nested_external_type() {
+        let files =
+            generate_context_operation("temporal-system", "temporal.RetryPolicy", true, true, true)
+                .unwrap();
+        let source = &files[&PathBuf::from("sampleservice.go")];
+        assert!(
+            source.contains("c.ExecuteOperation(ctx, \"Send\", request,"),
+            "{source}"
+        );
+        assert!(source.contains("TransferTypeConverter()"), "{source}");
+        assert!(
+            source.contains(
+                "func (m request) GetRetryPolicy() *temporal.RetryPolicy {\n\treturn m.RetryPolicy\n}"
+            ),
+            "{source}"
+        );
+        assert!(
+            source.contains("func requestToProto(cfg *commonconverter.SystemNexusConfig, m *"),
+            "{source}"
+        );
+        assert!(
+            source.contains(
+                "commonconverter.NewSystemNexusTransferTypeConverter(\n\t\trequestToProto,\n\t\trequestFromProto,\n"
+            ),
+            "{source}"
+        );
+        assert!(!source.contains("func(cfg *"), "{source}");
+        assert!(
+            source.contains("support.RetryPolicyToProto(cfg.DataConverter, m.RetryPolicy)"),
+            "{source}"
+        );
+        assert!(
+            source.contains("support.RetryPolicyFromProto(dc, &result)"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn system_nexus_factory_avoids_self_import_namespace() {
+        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        let package = super::GoPackageContext {
+            package_name: "converter".to_string(),
+            import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
+            has_serialization_context: false,
+            support_package: None,
+        };
+        assert_eq!(
+            package.new_transfer_type_converter(),
+            "NewSystemNexusTransferTypeConverter"
+        );
+        assert_eq!(package.system_nexus_config_type(), "SystemNexusConfig");
+        assert_eq!(
+            package.transfer_type_converter_type(),
+            "TransferTypeConverter"
+        );
+        let package = super::GoPackageContext {
+            package_name: "workflow".to_string(),
+            import_path: Some("go.temporal.io/sdk/workflow".to_string()),
+            has_serialization_context: false,
+            support_package: None,
+        };
+        assert_eq!(
+            package.new_transfer_type_converter(),
+            "commonconverter.NewSystemNexusTransferTypeConverter"
+        );
+        assert_eq!(package.workflow_context_type(), "Context");
+        assert_eq!(
+            package.system_nexus_config_type(),
+            "commonconverter.SystemNexusConfig"
+        );
+    }
+
     #[test]
     fn parses_package_references_inside_composite_types() {
         for (authored, expected, paths) in [

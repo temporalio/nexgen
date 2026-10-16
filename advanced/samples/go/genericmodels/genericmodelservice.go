@@ -15,6 +15,22 @@ type genericRequest[ContextT any] struct {
 	Nested   Inner[ContextT]
 }
 
+func (m genericRequest[ContextT]) GetContext() ContextT {
+	return m.Context
+}
+
+func (m genericRequest[ContextT]) GetContexts() []ContextT {
+	return m.Contexts
+}
+
+func (m genericRequest[ContextT]) GetByName() map[string]ContextT {
+	return m.ByName
+}
+
+func (m genericRequest[ContextT]) GetNested() Inner[ContextT] {
+	return m.Nested
+}
+
 // --- Operations (internal) ---
 
 func complete[ContextT any](ctx workflow.Context, request genericRequest[ContextT]) workflow.Future {
@@ -46,6 +62,10 @@ type Inner[ContextT any] struct {
 	Value ContextT
 }
 
+func (m Inner[ContextT]) GetValue() ContextT {
+	return m.Value
+}
+
 type GenericResponse[ContextT any, OutputT any, MetadataT any] struct {
 	// Context - Required.
 	Context ContextT
@@ -55,14 +75,34 @@ type GenericResponse[ContextT any, OutputT any, MetadataT any] struct {
 	Metadata *MetadataT
 }
 
+func (m GenericResponse[ContextT, OutputT, MetadataT]) GetContext() ContextT {
+	return m.Context
+}
+
+func (m GenericResponse[ContextT, OutputT, MetadataT]) GetCompletion() OperationCompletionResult[OutputT] {
+	return m.Completion
+}
+
+func (m GenericResponse[ContextT, OutputT, MetadataT]) GetMetadata() *MetadataT {
+	return m.Metadata
+}
+
 type OperationCompletionSuccess[OutputT any] struct {
 	// Output - Required.
 	Output OutputT
 }
 
+func (m OperationCompletionSuccess[OutputT]) GetOutput() OutputT {
+	return m.Output
+}
+
 type OperationCompletionFailure struct {
 	// Message - Required.
 	Message string
+}
+
+func (m OperationCompletionFailure) GetMessage() string {
+	return m.Message
 }
 
 type CompleteOptions[ContextT any] struct {

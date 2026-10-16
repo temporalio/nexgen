@@ -13,9 +13,25 @@ type getUserRequest struct {
 	ConsistencyToken *string
 }
 
+func (m getUserRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m getUserRequest) GetConsistencyToken() *string {
+	return m.ConsistencyToken
+}
+
 type updateEmailRequest struct {
 	UserID string
 	Email  string
+}
+
+func (m updateEmailRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m updateEmailRequest) GetEmail() string {
+	return m.Email
 }
 
 type renameRequest struct {
@@ -23,9 +39,25 @@ type renameRequest struct {
 	DisplayName string
 }
 
+func (m renameRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m renameRequest) GetDisplayName() string {
+	return m.DisplayName
+}
+
 type setProfileRequest struct {
 	UserID  string
 	Profile UserProfile
+}
+
+func (m setProfileRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m setProfileRequest) GetProfile() UserProfile {
+	return m.Profile
 }
 
 type recordSyncRequest struct {
@@ -33,9 +65,25 @@ type recordSyncRequest struct {
 	Report SyncReport
 }
 
+func (m recordSyncRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m recordSyncRequest) GetReport() SyncReport {
+	return m.Report
+}
+
 type deactivateRequest struct {
 	UserID string
 	Reason *string
+}
+
+func (m deactivateRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m deactivateRequest) GetReason() *string {
+	return m.Reason
 }
 
 // --- Resources ---
@@ -170,11 +218,43 @@ type UserProfile struct {
 	Address *PostalAddress
 }
 
+func (m UserProfile) GetTags() []string {
+	return m.Tags
+}
+
+func (m UserProfile) GetMetadata() map[string]string {
+	return m.Metadata
+}
+
+func (m UserProfile) GetCapabilities() UserCapability {
+	return m.Capabilities
+}
+
+func (m UserProfile) GetSyncState() Result[string, string] {
+	return m.SyncState
+}
+
+func (m UserProfile) GetNotificationTarget() NotificationTarget {
+	return m.NotificationTarget
+}
+
+func (m UserProfile) GetAddress() *PostalAddress {
+	return m.Address
+}
+
 type Result[T, E any] struct {
 	// Result - Optional.
 	Result T
 	// Error - Optional.
 	Error E
+}
+
+func (m Result[T, E]) GetResult() T {
+	return m.Result
+}
+
+func (m Result[T, E]) GetError() E {
+	return m.Error
 }
 
 type PostalAddress struct {
@@ -188,11 +268,35 @@ type PostalAddress struct {
 	Coordinates *Tuple2[float64, float64]
 }
 
+func (m PostalAddress) GetStreet() string {
+	return m.Street
+}
+
+func (m PostalAddress) GetCity() string {
+	return m.City
+}
+
+func (m PostalAddress) GetCountry() string {
+	return m.Country
+}
+
+func (m PostalAddress) GetCoordinates() *Tuple2[float64, float64] {
+	return m.Coordinates
+}
+
 type Tuple2[T1, T2 any] struct {
 	// First - Required.
 	First T1
 	// Second - Required.
 	Second T2
+}
+
+func (m Tuple2[T1, T2]) GetFirst() T1 {
+	return m.First
+}
+
+func (m Tuple2[T1, T2]) GetSecond() T2 {
+	return m.Second
 }
 
 type SyncReport struct {
@@ -202,6 +306,18 @@ type SyncReport struct {
 	Attempts []Result[string, string]
 	// RegionStatus - Required.
 	RegionStatus map[string]Result[string, string]
+}
+
+func (m SyncReport) GetRoute() []Tuple2[float64, float64] {
+	return m.Route
+}
+
+func (m SyncReport) GetAttempts() []Result[string, string] {
+	return m.Attempts
+}
+
+func (m SyncReport) GetRegionStatus() map[string]Result[string, string] {
+	return m.RegionStatus
 }
 
 type GetUserOptions struct {
