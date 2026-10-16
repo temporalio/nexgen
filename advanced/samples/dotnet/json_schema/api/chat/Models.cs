@@ -37,14 +37,14 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(RoomId, other.RoomId);
+            return NexgenRuntime::ValueEquality.Equal(this.RoomId, other.RoomId);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(RoomId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.RoomId));
             return hash.ToHashCode();
         }
 
@@ -178,14 +178,14 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -327,7 +327,7 @@ namespace Nexgen.JsonSchema.Chat
 
             private KindValue(string value)
             {
-                Value = value;
+                this.Value = value;
             }
 
             /// <summary>
@@ -336,16 +336,16 @@ namespace Nexgen.JsonSchema.Chat
             public string Value { get; }
 
             /// <inheritdoc/>
-            public bool Equals(KindValue? other) => other is not null && string.Equals(Value, other.Value, global::System.StringComparison.Ordinal);
+            public bool Equals(KindValue? other) => other is not null && string.Equals(this.Value, other.Value, global::System.StringComparison.Ordinal);
 
             /// <inheritdoc/>
             public override bool Equals(object? obj) => Equals(obj as KindValue);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => Value.GetHashCode();
+            public override int GetHashCode() => this.Value.GetHashCode();
 
             /// <inheritdoc/>
-            public override string ToString() => Value.ToString()!;
+            public override string ToString() => this.Value.ToString()!;
         }
 
         /// <summary>
@@ -371,7 +371,7 @@ namespace Nexgen.JsonSchema.Chat
         /// <summary>
         /// <see cref="Priority"/>, or its schema default when absent.
         /// </summary>
-        public long PriorityOrDefault => Priority ?? 0L;
+        public long PriorityOrDefault => this.Priority ?? 0L;
 
         /// <inheritdoc/>
         public bool Equals(Message? other)
@@ -384,20 +384,20 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
-                && NexgenRuntime::ValueEquality.Equal(Body, other.Body)
-                && NexgenRuntime::ValueEquality.Equal(ReplyToId, other.ReplyToId)
-                && NexgenRuntime::ValueEquality.Equal(Priority, other.Priority);
+            return NexgenRuntime::ValueEquality.Equal(this.Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(this.Body, other.Body)
+                && NexgenRuntime::ValueEquality.Equal(this.ReplyToId, other.ReplyToId)
+                && NexgenRuntime::ValueEquality.Equal(this.Priority, other.Priority);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Body));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(ReplyToId));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Priority));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Body));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ReplyToId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Priority));
             return hash.ToHashCode();
         }
 
@@ -649,24 +649,24 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(RoomId, other.RoomId)
-                && NexgenRuntime::ValueEquality.Equal(DisplayName, other.DisplayName)
-                && NexgenRuntime::ValueEquality.Equal(Topic, other.Topic)
-                && NexgenRuntime::ValueEquality.Equal(Members, other.Members)
-                && NexgenRuntime::ValueEquality.Equal(Labels, other.Labels)
-                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(this.RoomId, other.RoomId)
+                && NexgenRuntime::ValueEquality.Equal(this.DisplayName, other.DisplayName)
+                && NexgenRuntime::ValueEquality.Equal(this.Topic, other.Topic)
+                && NexgenRuntime::ValueEquality.Equal(this.Members, other.Members)
+                && NexgenRuntime::ValueEquality.Equal(this.Labels, other.Labels)
+                && NexgenRuntime::ValueEquality.Equal(this.AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(RoomId));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(DisplayName));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Topic));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Members));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Labels));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.RoomId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.DisplayName));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Topic));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Members));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Labels));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1005,16 +1005,16 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(RoomId, other.RoomId)
-                && NexgenRuntime::ValueEquality.Equal(Message, other.Message);
+            return NexgenRuntime::ValueEquality.Equal(this.RoomId, other.RoomId)
+                && NexgenRuntime::ValueEquality.Equal(this.Message, other.Message);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(RoomId));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(Message));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.RoomId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Message));
             return hash.ToHashCode();
         }
 
@@ -1180,14 +1180,14 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(MessageId, other.MessageId);
+            return NexgenRuntime::ValueEquality.Equal(this.MessageId, other.MessageId);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(MessageId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(this.MessageId));
             return hash.ToHashCode();
         }
 

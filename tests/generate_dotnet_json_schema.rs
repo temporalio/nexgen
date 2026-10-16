@@ -65,8 +65,8 @@ fn csharp_json_examples_render_expected_language_features() {
             &[
                 // Scalar defaults keep presence and read through `OrDefault`.
                 "public string? Greeting { get; init; }",
-                "public string GreetingOrDefault => Greeting ?? \"hello\";",
-                "public bool DebugOrDefault => Debug ?? false;",
+                "public string GreetingOrDefault => this.Greeting ?? \"hello\";",
+                "public bool DebugOrDefault => this.Debug ?? false;",
                 // `deprecated` and `title`.
                 "[global::System.Obsolete]",
                 "Retry budget",

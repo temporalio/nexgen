@@ -913,8 +913,8 @@ fn csharp_json_presence_nullability_and_defaults() {
             "IReadOnlyList<string?>? NullableItems { get; init; }",
             // A default is read through `OrDefault`; the member keeps presence.
             "[global::System.Obsolete]\n        public string? Salutation { get; init; }",
-            "public string SalutationOrDefault => Salutation ?? \"hello\";",
-            "public long RetriesOrDefault => Retries ?? 3L;",
+            "public string SalutationOrDefault => this.Salutation ?? \"hello\";",
+            "public long RetriesOrDefault => this.Retries ?? 3L;",
         ],
     );
     case.run(
@@ -1511,7 +1511,7 @@ $defs:
     // An enum default is typed as the closed value class.
     assert_has(
         output.file("Models.cs"),
-        &["public StatusValue StatusOrDefault => Status ?? StatusValue.Active;"],
+        &["public StatusValue StatusOrDefault => this.Status ?? StatusValue.Active;"],
     );
     case.run(
         r#"Check.Equal(Defaulted.StatusValue.Active, Check.Parse<Defaulted>("{}").StatusOrDefault, "enum default");
@@ -2536,7 +2536,7 @@ properties:
         models,
         &[
             // Names derived from the member follow the override...
-            "public long AttemptsOrDefault => Attempts ?? 3L;",
+            "public long AttemptsOrDefault => this.Attempts ?? 3L;",
             "public sealed class CategoryValue",
             "public CategoryValue? Category { get; init; }",
             "public interface PickUnion",
@@ -3144,6 +3144,157 @@ Check.ParseFails<Locals>("{\"violations\":\"v\",\"value\":\"x\",\"members\":\"m\
     "list: no element matches the required schema");
 Check.WriteFails(new Locals { Violations = "v", Hash = "h" }, "violations: must have length >= 2", "hash: must have length >= 2");"#,
     );
+}
+
+/// The lowercase identifiers generated code binds — converter parameters and
+/// locals, record-method parameters and locals — are not reserved: an
+/// `x-cs-name` override may spell any of them. Converter locals carry a
+/// member-derived prefix or are bound before any member is read, members are
+/// reached through an instance (`value.Member`), and record methods qualify
+/// their own members with `this.`, so no override can capture, or be captured
+/// by, a generated name. The names are harvested from the generated showcase
+/// rather than listed, so a new local is covered the day it appears.
+#[test]
+fn csharp_json_overrides_may_spell_any_generated_local() {
+    let schema =
+        fs::read_to_string(project_root().join("samples/schemas/showcase.nexusrpc.yaml")).unwrap();
+
+    // Harvest: every lowercase identifier in the generated models, outside
+    // comments and string literals, that the loader accepts as an override
+    // (which leaves out the C# keywords).
+    let plain = JsonCase::new("generated-locals-harvest");
+    plain.write("showcase.nexusrpc.yaml", &schema);
+    let output = plain.generate(&["showcase.nexusrpc.yaml"]);
+    let probe = JsonCase::new("generated-locals-probe");
+    let names: Vec<String> = lowercase_identifiers(output.file("Models.cs"))
+        .into_iter()
+        .filter(|name| {
+            probe.write(
+                "probe.yaml",
+                &format!("type: object\nproperties:\n  a: {{ type: string, x-cs-name: {name} }}\n"),
+            );
+            probe
+                .try_generate(&["probe.yaml"], GenerationMode::DefinitionsOnly, None)
+                .is_ok()
+        })
+        .collect();
+    for expected in [
+        "reader",
+        "writer",
+        "options",
+        "value",
+        "path",
+        "violations",
+        "node",
+        "other",
+        "obj",
+        "hash",
+        "members",
+        "item0",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "harvest missed `{expected}`: {names:?}"
+        );
+    }
+
+    // One showcase whose extra members are overridden to every harvested name.
+    let mut extra = String::new();
+    for (index, name) in names.iter().enumerate() {
+        extra.push_str(&format!(
+            "      z{index}: {{ type: string, minLength: 2, x-cs-name: {name} }}\n"
+        ));
+    }
+    let anchor = "    additionalProperties: false\n    properties:\n      kind:\n";
+    assert!(schema.contains(anchor), "showcase layout changed");
+    let case = JsonCase::new("generated-locals-overrides");
+    case.write(
+        "showcase.nexusrpc.yaml",
+        &schema.replacen(
+            anchor,
+            &format!("    additionalProperties: false\n    properties:\n{extra}      kind:\n"),
+            1,
+        ),
+    );
+    case.generate(&["showcase.nexusrpc.yaml"]);
+
+    let mut program = String::from(
+        r#"var wire = (System.Text.Json.Nodes.JsonObject)System.Text.Json.Nodes.JsonNode.Parse(
+    """{"kind":"showcase","revision":1,"enabled":true,"status":"active","tier":1,"scale":1.5,"name":"Widget","count":3,"active":true,"category":"tools"}""")!;
+"#,
+    );
+    program.push_str(&format!(
+        "for (var index = 0; index < {}; index++)\n{{\n    wire[\"z\" + index] = \"vv\";\n}}\n",
+        names.len()
+    ));
+    program.push_str(
+        r#"var json = wire.ToJsonString();
+var a = Check.Parse<Showcase>(json);
+var b = Check.Parse<Showcase>(json);
+var failures = new List<string>();
+if (!a.Equals(b)) failures.Add("equal values compare unequal");
+if (a.GetHashCode() != b.GetHashCode()) failures.Add("equal values hash differently");
+if (!System.Text.Json.Nodes.JsonNode.DeepEquals(System.Text.Json.Nodes.JsonNode.Parse(Check.Write(a)), wire)) failures.Add("round trip changed the value");
+string Short(string member) => json.Replace("\"" + member + "\":\"vv\"", "\"" + member + "\":\"v\"");
+"#,
+    );
+    for (index, name) in names.iter().enumerate() {
+        program.push_str(&format!(
+            "if (a.Equals(a with {{ {name} = \"ww\" }})) failures.Add(\"Equals ignores `{name}`\");\n\
+             if (!Check.ViolationsOf(() => Check.Parse<Showcase>(Short(\"z{index}\")), \"{name}\").Exists(v => v.StartsWith(\"z{index}:\"))) failures.Add(\"no violation at z{index} (`{name}`)\");\n"
+        ));
+    }
+    program.push_str("Check.True(failures.Count == 0, string.Join(\"; \", failures));\n");
+    case.run_with_usings(&["Probe", "System.Collections.Generic"], &program);
+}
+
+/// The lowercase identifiers of `source`, skipping comments and string and
+/// character literals, in first-seen order.
+fn lowercase_identifiers(source: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut chars = source.chars().peekable();
+    let mut previous = ' ';
+    while let Some(c) = chars.next() {
+        match c {
+            '/' if chars.peek() == Some(&'/') => {
+                for next in chars.by_ref() {
+                    if next == '\n' {
+                        break;
+                    }
+                }
+                previous = '\n';
+            }
+            '"' | '\'' => {
+                while let Some(next) = chars.next() {
+                    if next == '\\' {
+                        chars.next();
+                    } else if next == c {
+                        break;
+                    }
+                }
+                previous = c;
+            }
+            c if c.is_ascii_alphabetic() || c == '_' => {
+                let mut word = String::from(c);
+                while let Some(&next) = chars.peek() {
+                    if next.is_ascii_alphanumeric() || next == '_' {
+                        word.push(next);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                // Member accesses (`.x`) and alias-qualified names (`x::`)
+                // are not bindings.
+                if c.is_ascii_lowercase() && previous != '.' && !names.contains(&word) {
+                    names.push(word);
+                }
+                previous = 'a';
+            }
+            _ => previous = c,
+        }
+    }
+    names
 }
 
 /// A union's interface is public, so a caller can implement it; writing such a
