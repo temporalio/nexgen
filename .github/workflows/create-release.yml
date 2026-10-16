@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: temporalio/sdk-rust
-          ref: 38f831515fb4be0e4e0bbcfe9504d0ffbbb43a0f
+          ref: 2c1ee2debb851a0183d46764ce1eee73a96b35b3
           path: .changelog-tool
 
       - name: Read crate metadata
