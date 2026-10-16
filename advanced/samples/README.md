@@ -96,6 +96,9 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
 - Python:
   [`python/wit/notification_service/`](python/wit/notification_service/),
   [`python/tests/test_notification_service.py`](python/tests/test_notification_service.py)
+- TypeScript:
+  [`typescript/wit/notification-service/`](typescript/wit/notification-service/),
+  [`typescript/tests/notification-service.test.ts`](typescript/tests/notification-service.test.ts)
 
 ### `proto-oneof`
 
@@ -104,6 +107,8 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
   [`dotnet/tests/ProtoOneofChecks.cs`](dotnet/tests/ProtoOneofChecks.cs)
 - Python: [`python/wit/proto_oneof/`](python/wit/proto_oneof/),
   [`python/tests/test_proto_oneof.py`](python/tests/test_proto_oneof.py)
+- TypeScript: [`typescript/wit/proto-oneof/`](typescript/wit/proto-oneof/),
+  [`typescript/tests/proto-oneof.test.ts`](typescript/tests/proto-oneof.test.ts)
 
 ### `proto-generic`
 
@@ -112,6 +117,8 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
   [`dotnet/tests/ProtoGenericChecks.cs`](dotnet/tests/ProtoGenericChecks.cs)
 - Python: [`python/wit/proto_generic/`](python/wit/proto_generic/),
   [`python/tests/test_proto_generic.py`](python/tests/test_proto_generic.py)
+- TypeScript: [`typescript/wit/proto-generic/`](typescript/wit/proto-generic/),
+  [`typescript/tests/proto-generic.test.ts`](typescript/tests/proto-generic.test.ts)
 
 ## Supporting files
 

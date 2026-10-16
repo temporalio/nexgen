@@ -417,6 +417,13 @@ fn render_output_files(files: BTreeMap<PathBuf, String>) -> String {
 }
 
 fn generate_typescript_to_string(input_paths: &[PathBuf], descriptor_paths: &[PathBuf]) -> String {
+    render_output_files(generate_typescript_files(input_paths, descriptor_paths))
+}
+
+fn generate_typescript_files(
+    input_paths: &[PathBuf],
+    descriptor_paths: &[PathBuf],
+) -> BTreeMap<PathBuf, String> {
     let temp_dir = unique_output_path("typescript-rendered");
     let output_path = temp_dir.join("output");
     generate_to_file(&GenerateRequest {
@@ -434,13 +441,27 @@ fn generate_typescript_to_string(input_paths: &[PathBuf], descriptor_paths: &[Pa
         ts_date_time_types: Default::default(),
     })
     .unwrap();
-    let rendered = if output_path.is_file() {
-        fs::read_to_string(&output_path).unwrap()
-    } else {
-        render_output_files(read_typescript_output_files(&output_path))
-    };
+    let files = read_typescript_output_files(&output_path);
     fs::remove_dir_all(temp_dir).unwrap();
-    rendered
+    files
+}
+
+#[test]
+fn typescript_proto_model_only_examples_emit_only_model_files() {
+    let root = project_root();
+    // Types, exports, and conversion behavior are exercised by the TypeScript
+    // sample tests. Here the contract is the output layout, not source spelling.
+    for example in ["notification-service", "proto-generic", "proto-oneof"] {
+        let files = generate_typescript_files(
+            &example_input_paths(&root, example),
+            &[descriptor_path(&root)],
+        );
+        assert_eq!(
+            files.into_keys().collect::<Vec<_>>(),
+            vec![PathBuf::from("index.ts"), PathBuf::from("models.ts")],
+            "model-only example {example} must not emit service or operation modules",
+        );
+    }
 }
 
 fn unique_output_path(label: &str) -> PathBuf {

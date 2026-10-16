@@ -234,9 +234,15 @@ impl TypeScriptExternalModels {
         output: &mut String,
         model: &RenderedModel,
         planned_record: &RecordSpec<PlannedFamily>,
+        api_plan: &PlannedSpec,
     ) -> bool {
-        self.proto
-            .render_model_wire_functions(output, model, planned_record)
+        self.proto.render_model_wire_functions(
+            output,
+            model,
+            planned_record,
+            api_plan,
+            &|value_type| resolve_typescript_value_type(api_plan, self, value_type),
+        )
     }
 
     fn render_support(&self) -> Result<RenderedTypeScriptSupport> {
@@ -601,36 +607,7 @@ impl<'a> ApiPlanner<'a> {
         }
 
         self.ensure_rendered_model(model_type);
-        let PlannedType::Record(record) = model_type else {
-            panic!("message conversion should be a record");
-        };
-        let full_name = record.full_name.as_str();
-        let rendered_model = self
-            .models
-            .get(full_name)
-            .expect("planned model should be rendered");
-        let planned_model = self
-            .api_plan
-            .record(full_name)
-            .unwrap_or_else(|| panic!("planned model should exist for {full_name}"));
-        let message = if let Some(conversion) = self
-            .external_models
-            .wire_conversion(model_type, Some(planned_model))
-        {
-            conversion
-        } else if matches!(model_type, PlannedType::Record(_)) {
-            WireValueConversion {
-                annotation: rendered_model.name.clone(),
-                from_wire: "{wire}".to_string(),
-                to_wire: "{value}".to_string(),
-                function_name_to_wire: None,
-                wire_function_names: None,
-                uses_rendered_model_annotation: true,
-            }
-        } else {
-            panic!("message conversion should be model-shaped")
-        };
-        message
+        resolve_typescript_message_conversion(self.api_plan, &self.external_models, model_type)
     }
 
     fn ensure_rendered_model(&mut self, model_type: &PlannedType) {
@@ -1203,7 +1180,7 @@ impl<'a> ApiPlanner<'a> {
             doc,
             optional: !field.required,
             from_wire_expr: String::new(),
-            to_wire_expr: Self::flattened_message_to_wire_expr(field.required, &flattened_fields),
+            to_wire_expr: flattened_message_to_wire_expr(field.required, &flattened_fields),
             flattened_fields,
             requirements,
         })
@@ -1220,23 +1197,6 @@ impl<'a> ApiPlanner<'a> {
             return format!("support.valueToPayload({value_expr})");
         }
         field.to_wire_expr.clone()
-    }
-
-    fn flattened_message_to_wire_expr(required: bool, fields: &[RenderedFlattenedField]) -> String {
-        let wire_fields = fields
-            .iter()
-            .map(|field| format!("{}: {}", field.wire_name, field.to_wire_expr))
-            .collect::<Vec<_>>()
-            .join(", ");
-        if required || fields.iter().any(|field| !field.optional) {
-            return format!("{{ {wire_fields} }}");
-        }
-        let all_empty = fields
-            .iter()
-            .map(|field| format!("model.{} == null", field.name))
-            .collect::<Vec<_>>()
-            .join(" && ");
-        format!("{all_empty} ? undefined : {{ {wire_fields} }}")
     }
 
     fn build_sourced_field(
@@ -1336,236 +1296,305 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn resolve_planned_value_type(&mut self, value_type: &PlannedType) -> ResolvedFieldType {
+        self.ensure_rendered_value_type(value_type);
+        resolve_typescript_value_type(self.api_plan, &self.external_models, value_type)
+    }
+
+    /// Register declarations separately from pure type resolution so emission
+    /// can resolve types without depending on rendered declarations or mutating
+    /// the planner.
+    fn ensure_rendered_value_type(&mut self, value_type: &PlannedType) {
         match value_type {
-            PlannedType::TypeParameter(parameter) => ResolvedFieldType {
-                annotation: parameter.name.clone(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements::default(),
-                wire_conversion: None,
-            },
-            PlannedType::Float => ResolvedFieldType {
-                annotation: "number".to_string(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements::default(),
-                wire_conversion: None,
-            },
-            PlannedType::Int(IntSpec::I32) => ResolvedFieldType {
-                annotation: "number".to_string(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements::default(),
-                wire_conversion: None,
-            },
-            PlannedType::Int(IntSpec::I64) => ResolvedFieldType {
-                annotation: "Long".to_string(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements {
-                    long: true,
-                    ..Default::default()
-                },
-                wire_conversion: None,
-            },
-            PlannedType::Bool => ResolvedFieldType {
-                annotation: "boolean".to_string(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements::default(),
-                wire_conversion: None,
-            },
-            PlannedType::String => ResolvedFieldType {
-                annotation: "string".to_string(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements::default(),
-                wire_conversion: None,
-            },
-            PlannedType::Bytes => ResolvedFieldType {
-                annotation: "Uint8Array".to_string(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements::default(),
-                wire_conversion: None,
-            },
             PlannedType::Enum(enum_type) => {
-                if let Some(planned_enum) = self.api_plan.enum_decl(&enum_type.full_name) {
-                    let planned_enum = planned_enum.clone();
-                    self.ensure_rendered_enum(&planned_enum);
-                }
-                ResolvedFieldType {
-                    annotation: enum_type.name.clone(),
-                    kind: ResolvedFieldKind::Enum,
-                    requirements: TypeScriptRequirements::default(),
-                    wire_conversion: None,
-                }
-            }
-            PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => {
-                ResolvedFieldType {
-                    annotation: self
-                        .external_models
-                        .model_type_annotation(value_type)
-                        .expect("external enum annotation should be present"),
-                    kind: ResolvedFieldKind::Enum,
-                    requirements: TypeScriptRequirements::default(),
-                    wire_conversion: self.external_models.wire_conversion(value_type, None),
+                if let Some(enumeration) = self.api_plan.enum_decl(&enum_type.full_name) {
+                    self.ensure_rendered_enum(&enumeration.clone());
                 }
             }
             PlannedType::Flags(flags_type) => {
-                if let Some(planned_flags) = self.api_plan.flags_decl(&flags_type.full_name) {
-                    let planned_flags = planned_flags.clone();
-                    self.ensure_rendered_flags(&planned_flags);
-                }
-                ResolvedFieldType {
-                    annotation: flags_type.name.clone(),
-                    kind: ResolvedFieldKind::Scalar,
-                    requirements: TypeScriptRequirements::default(),
-                    wire_conversion: None,
+                if let Some(flags) = self.api_plan.flags_decl(&flags_type.full_name) {
+                    self.ensure_rendered_flags(&flags.clone());
                 }
             }
             PlannedType::Variant(variant_type) => {
-                if let Some(planned_variant) = self.api_plan.variant(&variant_type.full_name) {
-                    let planned_variant = planned_variant.clone();
-                    self.ensure_rendered_variant(&planned_variant);
-                }
-                ResolvedFieldType {
-                    annotation: generic_type_annotation(
-                        &variant_type.name,
-                        &self
-                            .api_plan
-                            .variant_type_parameters(&variant_type.full_name)
-                            .into_iter()
-                            .map(|usage| usage.parameter.name)
-                            .collect::<Vec<_>>(),
-                    ),
-                    kind: ResolvedFieldKind::Scalar,
-                    requirements: TypeScriptRequirements::default(),
-                    wire_conversion: None,
+                if let Some(variant) = self.api_plan.variant(&variant_type.full_name) {
+                    self.ensure_rendered_variant(&variant.clone());
                 }
             }
-            message_type @ (PlannedType::External(ExternalTypeSpec::Proto(
+            message @ (PlannedType::Record(_)
+            | PlannedType::External(ExternalTypeSpec::Proto(
                 PlannedProtoType::Message(_),
-            ))
-            | PlannedType::Record(_)) => {
-                let conversion = self.resolve_message_value_conversion(message_type);
-                let annotation = if let PlannedType::Record(record) = message_type {
-                    let parameters = self
-                        .api_plan
-                        .record_type_parameters(&record.full_name)
-                        .into_iter()
-                        .map(|usage| RenderedTypeParameter {
-                            name: usage.parameter.name,
-                            constraint: "unknown".to_string(),
-                            default: "unknown".to_string(),
-                            infer_from_operation_request: true,
-                            explicit: true,
-                        })
-                        .collect::<Vec<_>>();
-                    generic_model_annotation(&conversion.annotation, &parameters)
-                } else {
-                    conversion.annotation.clone()
-                };
-                ResolvedFieldType {
-                    annotation,
-                    kind: ResolvedFieldKind::Message,
-                    requirements: TypeScriptRequirements::default(),
-                    wire_conversion: Some(conversion),
-                }
+            ))) => {
+                self.resolve_message_value_conversion(message);
             }
-            PlannedType::External(ExternalTypeSpec::Json(json_type)) => ResolvedFieldType {
-                annotation: json_type.model_name.clone(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements::default(),
-                wire_conversion: None,
-            },
-            PlannedType::Resource(resource) => ResolvedFieldType {
-                annotation: resource.type_name.clone(),
-                kind: ResolvedFieldKind::Scalar,
-                requirements: TypeScriptRequirements::default(),
-                wire_conversion: None,
-            },
-            PlannedType::Option(inner) => {
-                let inner = self.resolve_planned_value_type(inner);
-                ResolvedFieldType {
-                    annotation: format!("{} | undefined", inner.annotation),
-                    kind: inner.kind,
-                    requirements: inner.requirements,
-                    wire_conversion: inner.wire_conversion,
-                }
-            }
-            PlannedType::List(inner) => {
-                let inner = self.resolve_planned_value_type(inner);
-                ResolvedFieldType {
-                    annotation: typescript_array_annotation(&inner.annotation),
-                    kind: ResolvedFieldKind::Scalar,
-                    requirements: inner.requirements,
-                    wire_conversion: None,
-                }
+            PlannedType::Option(inner) | PlannedType::List(inner) => {
+                self.ensure_rendered_value_type(inner);
             }
             PlannedType::Map(key, value) => {
-                let key = self.resolve_planned_value_type(key);
-                let value = self.resolve_planned_value_type(value);
-                let mut requirements = key.requirements;
-                requirements.merge(&value.requirements);
-                ResolvedFieldType {
-                    annotation: format!("Record<{}, {}>", key.annotation, value.annotation),
-                    kind: ResolvedFieldKind::Scalar,
-                    requirements,
-                    wire_conversion: None,
-                }
+                self.ensure_rendered_value_type(key);
+                self.ensure_rendered_value_type(value);
             }
             PlannedType::Tuple(items) => {
-                let item_types = items
-                    .iter()
-                    .map(|item| self.resolve_planned_value_type(item))
-                    .collect::<Vec<_>>();
-                let mut requirements = TypeScriptRequirements::default();
-                for item_type in &item_types {
-                    requirements.merge(&item_type.requirements);
-                }
-                ResolvedFieldType {
-                    annotation: format!(
-                        "[{}]",
-                        item_types
-                            .iter()
-                            .map(|item| item.annotation.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ),
-                    kind: ResolvedFieldKind::Scalar,
-                    requirements,
-                    wire_conversion: None,
+                for item in items {
+                    self.ensure_rendered_value_type(item);
                 }
             }
             PlannedType::Result { ok, err } => {
-                let ok = ok.as_ref().map(|ok| self.resolve_planned_value_type(ok));
-                let err = err.as_ref().map(|err| self.resolve_planned_value_type(err));
-                let mut requirements = TypeScriptRequirements::default();
-                if let Some(ok) = &ok {
-                    requirements.merge(&ok.requirements);
-                }
-                if let Some(err) = &err {
-                    requirements.merge(&err.requirements);
-                }
-                ResolvedFieldType {
-                    annotation: typescript_result_annotation(
-                        ok.as_ref().map(|ok| ok.annotation.clone()),
-                        err.as_ref().map(|err| err.annotation.clone()),
-                    ),
-                    kind: ResolvedFieldKind::Scalar,
-                    requirements,
-                    wire_conversion: None,
+                for value in ok.iter().chain(err.iter()) {
+                    self.ensure_rendered_value_type(value);
                 }
             }
-            PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec {
-                type_name,
-                target: fallback,
-                ..
-            })) => {
-                let mut resolved = self.resolve_planned_value_type(fallback);
-                if let Some(annotation) = type_name.value() {
-                    resolved.annotation = annotation.to_string();
-                    resolved.requirements = TypeScriptRequirements {
-                        long: annotation == "Long",
-                        ..TypeScriptRequirements::default()
-                    };
-                }
-                resolved
+            PlannedType::External(ExternalTypeSpec::Alias(alias)) => {
+                self.ensure_rendered_value_type(&alias.target);
             }
+            _ => {}
+        }
+    }
+}
+
+fn resolve_typescript_message_conversion(
+    api_plan: &PlannedSpec,
+    external_models: &TypeScriptExternalModels,
+    model_type: &PlannedType,
+) -> WireValueConversion {
+    if let Some(conversion) = external_models.wire_conversion(model_type, None) {
+        return conversion;
+    }
+    let PlannedType::Record(record) = model_type else {
+        panic!("message conversion should be a record");
+    };
+    let planned_model = api_plan
+        .record(&record.full_name)
+        .expect("planned record should exist");
+    external_models
+        .wire_conversion(model_type, Some(planned_model))
+        .unwrap_or_else(|| WireValueConversion {
+            annotation: planned_model.name.clone(),
+            from_wire: "{wire}".to_string(),
+            to_wire: "{value}".to_string(),
+            function_name_to_wire: None,
+            wire_function_names: None,
+            uses_rendered_model_annotation: true,
+        })
+}
+
+fn resolve_typescript_value_type(
+    api_plan: &PlannedSpec,
+    external_models: &TypeScriptExternalModels,
+    value_type: &PlannedType,
+) -> ResolvedFieldType {
+    match value_type {
+        PlannedType::TypeParameter(parameter) => ResolvedFieldType {
+            annotation: parameter.name.clone(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::Float => ResolvedFieldType {
+            annotation: "number".to_string(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::Int(IntSpec::I32) => ResolvedFieldType {
+            annotation: "number".to_string(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::Int(IntSpec::I64) => ResolvedFieldType {
+            annotation: "Long".to_string(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements {
+                long: true,
+                ..Default::default()
+            },
+            wire_conversion: None,
+        },
+        PlannedType::Bool => ResolvedFieldType {
+            annotation: "boolean".to_string(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::String => ResolvedFieldType {
+            annotation: "string".to_string(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::Bytes => ResolvedFieldType {
+            annotation: "Uint8Array".to_string(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::Enum(enum_type) => ResolvedFieldType {
+            annotation: enum_type.name.clone(),
+            kind: ResolvedFieldKind::Enum,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => {
+            ResolvedFieldType {
+                annotation: external_models
+                    .model_type_annotation(value_type)
+                    .expect("external enum annotation should be present"),
+                kind: ResolvedFieldKind::Enum,
+                requirements: TypeScriptRequirements::default(),
+                wire_conversion: external_models.wire_conversion(value_type, None),
+            }
+        }
+        PlannedType::Flags(flags_type) => ResolvedFieldType {
+            annotation: flags_type.name.clone(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::Variant(variant_type) => ResolvedFieldType {
+            annotation: generic_type_annotation(
+                &variant_type.name,
+                &api_plan
+                    .variant_type_parameters(&variant_type.full_name)
+                    .into_iter()
+                    .map(|usage| usage.parameter.name)
+                    .collect::<Vec<_>>(),
+            ),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        message_type @ (PlannedType::External(ExternalTypeSpec::Proto(
+            PlannedProtoType::Message(_),
+        ))
+        | PlannedType::Record(_)) => {
+            let conversion =
+                resolve_typescript_message_conversion(api_plan, external_models, message_type);
+            let annotation = if let PlannedType::Record(record) = message_type {
+                let parameters = api_plan
+                    .record_type_parameters(&record.full_name)
+                    .into_iter()
+                    .map(|usage| RenderedTypeParameter {
+                        name: usage.parameter.name,
+                        constraint: "unknown".to_string(),
+                        default: "unknown".to_string(),
+                        infer_from_operation_request: true,
+                        explicit: true,
+                    })
+                    .collect::<Vec<_>>();
+                generic_model_annotation(&conversion.annotation, &parameters)
+            } else {
+                conversion.annotation.clone()
+            };
+            ResolvedFieldType {
+                annotation,
+                kind: ResolvedFieldKind::Message,
+                requirements: TypeScriptRequirements::default(),
+                wire_conversion: Some(conversion),
+            }
+        }
+        PlannedType::External(ExternalTypeSpec::Json(json_type)) => ResolvedFieldType {
+            annotation: json_type.model_name.clone(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::Resource(resource) => ResolvedFieldType {
+            annotation: resource.type_name.clone(),
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
+        PlannedType::Option(inner) => {
+            let inner = resolve_typescript_value_type(api_plan, external_models, inner);
+            ResolvedFieldType {
+                annotation: format!("{} | undefined", inner.annotation),
+                kind: inner.kind,
+                requirements: inner.requirements,
+                wire_conversion: inner.wire_conversion,
+            }
+        }
+        PlannedType::List(inner) => {
+            let inner = resolve_typescript_value_type(api_plan, external_models, inner);
+            ResolvedFieldType {
+                annotation: typescript_array_annotation(&inner.annotation),
+                kind: ResolvedFieldKind::Scalar,
+                requirements: inner.requirements,
+                wire_conversion: None,
+            }
+        }
+        PlannedType::Map(key, value) => {
+            let key = resolve_typescript_value_type(api_plan, external_models, key);
+            let value = resolve_typescript_value_type(api_plan, external_models, value);
+            let mut requirements = key.requirements;
+            requirements.merge(&value.requirements);
+            ResolvedFieldType {
+                annotation: format!("Record<{}, {}>", key.annotation, value.annotation),
+                kind: ResolvedFieldKind::Scalar,
+                requirements,
+                wire_conversion: None,
+            }
+        }
+        PlannedType::Tuple(items) => {
+            let item_types = items
+                .iter()
+                .map(|item| resolve_typescript_value_type(api_plan, external_models, item))
+                .collect::<Vec<_>>();
+            let mut requirements = TypeScriptRequirements::default();
+            for item_type in &item_types {
+                requirements.merge(&item_type.requirements);
+            }
+            ResolvedFieldType {
+                annotation: format!(
+                    "[{}]",
+                    item_types
+                        .iter()
+                        .map(|item| item.annotation.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                kind: ResolvedFieldKind::Scalar,
+                requirements,
+                wire_conversion: None,
+            }
+        }
+        PlannedType::Result { ok, err } => {
+            let ok = ok
+                .as_ref()
+                .map(|ok| resolve_typescript_value_type(api_plan, external_models, ok));
+            let err = err
+                .as_ref()
+                .map(|err| resolve_typescript_value_type(api_plan, external_models, err));
+            let mut requirements = TypeScriptRequirements::default();
+            if let Some(ok) = &ok {
+                requirements.merge(&ok.requirements);
+            }
+            if let Some(err) = &err {
+                requirements.merge(&err.requirements);
+            }
+            ResolvedFieldType {
+                annotation: typescript_result_annotation(
+                    ok.as_ref().map(|ok| ok.annotation.clone()),
+                    err.as_ref().map(|err| err.annotation.clone()),
+                ),
+                kind: ResolvedFieldKind::Scalar,
+                requirements,
+                wire_conversion: None,
+            }
+        }
+        PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec {
+            type_name,
+            target: fallback,
+            ..
+        })) => {
+            let mut resolved = resolve_typescript_value_type(api_plan, external_models, fallback);
+            if let Some(annotation) = type_name.value() {
+                resolved.annotation = annotation.to_string();
+                resolved.requirements = TypeScriptRequirements {
+                    long: annotation == "Long",
+                    ..TypeScriptRequirements::default()
+                };
+            }
+            resolved
         }
     }
 }
@@ -1755,7 +1784,27 @@ fn defaulted_enum_from_wire_expr(
     )
 }
 
-fn flattened_field_from_wire_expr(
+pub(in crate::generator) fn flattened_message_to_wire_expr(
+    required: bool,
+    fields: &[RenderedFlattenedField],
+) -> String {
+    let wire_fields = fields
+        .iter()
+        .map(|field| format!("{}: {}", field.wire_name, field.to_wire_expr))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if required || fields.iter().any(|field| !field.optional) {
+        return format!("{{ {wire_fields} }}");
+    }
+    let all_empty = fields
+        .iter()
+        .map(|field| format!("model.{} == null", field.name))
+        .collect::<Vec<_>>()
+        .join(" && ");
+    format!("{all_empty} ? undefined : {{ {wire_fields} }}")
+}
+
+pub(in crate::generator) fn flattened_field_from_wire_expr(
     containing_wire_expr: &str,
     nested_field_from_wire_expr: &str,
     nested_annotation: &str,
@@ -2940,11 +2989,11 @@ pub(in crate::generator) struct WireFunctionNames {
     pub(in crate::generator) to_wire: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(in crate::generator) struct RenderedField {
     pub(in crate::generator) name: String,
     pub(in crate::generator) wire_name: String,
-    annotation: String,
+    pub(in crate::generator) annotation: String,
     doc: Option<String>,
     optional: bool,
     pub(in crate::generator) from_wire_expr: String,
@@ -2953,15 +3002,15 @@ pub(in crate::generator) struct RenderedField {
     requirements: TypeScriptRequirements,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(in crate::generator) struct RenderedFlattenedField {
     pub(in crate::generator) name: String,
-    wire_name: String,
-    annotation: String,
+    pub(in crate::generator) wire_name: String,
+    pub(in crate::generator) annotation: String,
     doc: Option<String>,
     optional: bool,
     pub(in crate::generator) from_wire_expr: String,
-    to_wire_expr: String,
+    pub(in crate::generator) to_wire_expr: String,
 }
 
 #[derive(Debug, Clone)]
@@ -3177,14 +3226,27 @@ fn render_module_files(
     // barrel re-exporting a file with no exports, which TypeScript rejects
     // outright (TS2306, "is not a module").
     let has_models_module = !is_blank_generated_module(&models_source);
+    let mut index_model_names = model_fragments.type_exported_names.clone();
+    index_model_names.extend(enums.iter().map(|item| item.name.clone()));
+    index_model_names.extend(flags.iter().map(|item| item.name.clone()));
+    index_model_names.extend(variants.iter().map(|item| item.name.clone()));
+    index_model_names.extend(models.iter().map(|item| item.name.clone()));
+    let mut index_exports = rendered_support.root_exports.clone();
+    if services.is_empty() {
+        for model in models
+            .iter()
+            .filter(|model| model.wire_function_names.is_some())
+        {
+            index_exports.push(format!(
+                "export {{ {}TransferTypeConverter }} from './models';",
+                model.name.to_lower_camel_case()
+            ));
+        }
+    }
     files.insert(
         "index.ts",
         if mode == GenerationMode::NativeApi {
-            render_index_module(
-                services,
-                &model_fragments.type_exported_names,
-                &rendered_support.root_exports,
-            )
+            render_index_module(services, &index_model_names, &index_exports)
         } else {
             render_definitions_only_index_module(
                 services,
@@ -5349,7 +5411,7 @@ fn render_model(
     let planned_record = api_plan
         .record(&model.full_name)
         .unwrap_or_else(|| panic!("planned model should exist for {}", model.full_name));
-    external_models.render_model_wire_functions(output, model, planned_record);
+    external_models.render_model_wire_functions(output, model, planned_record, api_plan);
 }
 
 fn render_service_definition(output: &mut String, service: &RenderedService<'_>) {

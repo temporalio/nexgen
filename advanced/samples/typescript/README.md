@@ -40,6 +40,25 @@ cargo build-examples --format wit --lang typescript workflow-service
 The definitions-mode JSON-Schema samples (plain data models) live under
 [`samples/typescript`](../../samples/typescript).
 
+## Temporary notification protobuf declarations
+
+The notification-service example uses the SDK namespace
+`temporal.api.notificationservice.v1`. Until the TypeScript SDK exports these
+models,
+[`support/notification-service-proto.d.ts`](support/notification-service-proto.d.ts)
+supplies sample-only interface declarations matching the checked-in descriptor.
+Remove this file and update the SDK dependency **before landing this change**.
+The generator has no fallback types or notification-specific logic.
+
+The notification tests exercise conversion of plain wire objects, including
+generic payloads, failure details, and oneof validation. They do not yet
+exercise notification protobuf binary encoding or SDK message constructors.
+
+The `proto-generic` and `proto-oneof` samples use the SDK's existing protobuf
+models without a shim. Their tests include binary encode/decode round-trips,
+nested generic payloads, required and optional oneofs, and scalar member
+presence (including an explicitly selected empty string).
+
 ## Using a support module
 
 In your own project, keep hand-written helpers

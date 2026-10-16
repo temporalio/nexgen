@@ -1,19 +1,22 @@
+use std::borrow::Cow;
+
 use heck::ToLowerCamelCase;
 use prost_types::FieldDescriptorProto;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::generator::ExternalModelBackend;
 use crate::generator::typescript::{
-    RenderedExternalModelFragments, RenderedModel, WireFunctionNames, WireValueConversion,
-    generic_model_annotation, render_named_generic_function_start, support_reference,
-    typescript_authored_type_annotation, typescript_generated_field_name, typescript_ident,
+    RenderedExternalModelFragments, RenderedField, RenderedModel, ResolvedFieldType,
+    WireFunctionNames, WireValueConversion, flattened_field_from_wire_expr,
+    flattened_message_to_wire_expr, generic_model_annotation, render_named_generic_function_start,
+    required_field_expr, support_reference, typescript_authored_type_annotation,
+    typescript_generated_field_name, typescript_ident,
 };
-use crate::language::Language;
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding, relative_descriptor_name,
 };
-use crate::spec::{ExternalTypeSpec, RecordFieldVisibility, RecordSpec, TypeReplacementSpec};
+use crate::spec::{ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
 
 #[derive(Debug, Default)]
 pub(in crate::generator) struct ModelBackend;
@@ -22,10 +25,7 @@ impl ExternalModelBackend for ModelBackend {
     type ModelFragments = RenderedExternalModelFragments;
     type WireConversion = WireValueConversion;
 
-    fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
-        for (_, record) in api_plan.records() {
-            validate_record_conversion(record)?;
-        }
+    fn prepare(&mut self, _api_plan: &PlannedSpec) -> Result<()> {
         Ok(())
     }
 
@@ -62,51 +62,278 @@ impl ExternalModelBackend for ModelBackend {
     }
 }
 
-fn validate_record_conversion(record: &RecordSpec<PlannedFamily>) -> Result<()> {
-    let Some(proto) = &record.data.proto else {
-        return Ok(());
+fn oneof_wire_field(
+    api_plan: &PlannedSpec,
+    record: &RecordSpec<PlannedFamily>,
+    field: &RecordFieldSpec<PlannedFamily>,
+    rendered: &RenderedField,
+    resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
+) -> Option<RenderedField> {
+    let PlannedWireFieldBinding::VariantMembers { wire_name, members } =
+        field.data.wire_binding.as_ref()?
+    else {
+        return None;
     };
-    for (field_name, field) in record
-        .fields
-        .iter()
-        .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
-    {
-        match &field.data.wire_binding {
-            Some(PlannedWireFieldBinding::VariantMembers { wire_name, .. }) => {
-                return Err(Error::UnsupportedProtoOneofConversion {
-                    language: Language::TypeScript,
-                    message: proto.full_name.clone(),
-                    oneof: wire_name.clone(),
-                });
-            }
-            Some(PlannedWireFieldBinding::Value { wire_type, .. })
-                if matches!(
-                    field.field_type.validation_type(),
-                    PlannedType::TypeParameter(_)
-                ) && is_proto_generic_carrier(wire_type) =>
-            {
-                return Err(Error::UnsupportedProtoGenericCarrierConversion {
-                    language: Language::TypeScript,
-                    message: proto.full_name.clone(),
-                    field: field_name.clone(),
-                });
-            }
-            _ => {}
-        }
+    let PlannedType::Variant(variant_type) = field.field_type.validation_type() else {
+        unreachable!("oneof binding requires a variant");
+    };
+    let variant = api_plan
+        .variant(&variant_type.full_name)
+        .expect("planned oneof variant should exist");
+    let mut cases = Vec::new();
+    for (case, member) in variant.cases.iter().zip(members) {
+        let payload = case
+            .payload
+            .as_ref()
+            .expect("proto oneof cases have payloads");
+        let value = resolve_type(payload);
+        let conversion = generic_carrier_conversion(payload, &member.wire_type, &value.annotation)
+            .or_else(|| value.wire_conversion.clone());
+        cases.push(OneofCase {
+            tag: case.name.clone(),
+            wire_name: typescript_generated_field_name(&member.wire_name),
+            conversion,
+        });
     }
-    Ok(())
+    let (from_wire_expr, to_wire_expr) = oneof_expressions(
+        &record.name,
+        &rendered.name,
+        &typescript_generated_field_name(wire_name),
+        &rendered.annotation,
+        field.required,
+        &cases,
+    );
+    let mut wire_field = rendered.clone();
+    wire_field.from_wire_expr = from_wire_expr;
+    wire_field.to_wire_expr = to_wire_expr;
+    Some(wire_field)
 }
 
-fn is_proto_generic_carrier(kind: &PlannedType) -> bool {
+fn generic_carrier_expressions(
+    record: &RecordSpec<PlannedFamily>,
+    field: &RecordFieldSpec<PlannedFamily>,
+    generated_field_name: &str,
+    wire_field_expr: &str,
+) -> Option<(String, String)> {
+    let PlannedWireFieldBinding::Value { wire_type, .. } = field.data.wire_binding.as_ref()? else {
+        return None;
+    };
+    let PlannedType::TypeParameter(parameter) = field.field_type.validation_type() else {
+        return None;
+    };
+    let conversion = generic_carrier_conversion(&field.field_type, wire_type, &parameter.name)?;
+    // Required presence applies to the envelope. A generic application value
+    // can itself be null or undefined.
+    let value_expr = format!("model.{generated_field_name}");
+    let from_wire_expr = if field.required {
+        conversion.from_wire_expr(&required_field_expr(
+            wire_field_expr,
+            &record.name,
+            generated_field_name,
+        ))
+    } else {
+        format!(
+            "{wire_field_expr} == null ? undefined : {}",
+            conversion.from_wire_expr(wire_field_expr)
+        )
+    };
+    let to_wire_expr = if field.required {
+        conversion.to_wire_expr(&value_expr)
+    } else {
+        format!(
+            "{value_expr} == null ? undefined : {}",
+            conversion.to_wire_expr(&value_expr)
+        )
+    };
+    Some((from_wire_expr, to_wire_expr))
+}
+
+/// Wire-only field expressions are prepared at emission. Public model fields
+/// retain their ordinary TypeScript metadata; unchanged fields are borrowed.
+fn model_wire_fields<'a>(
+    model: &'a RenderedModel,
+    record: &RecordSpec<PlannedFamily>,
+    api_plan: &PlannedSpec,
+    resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
+) -> Vec<Cow<'a, RenderedField>> {
+    model
+        .fields
+        .iter()
+        .map(|rendered| {
+            let (_, field) = record
+                .model_fields()
+                .find(|(_, field)| typescript_generated_field_name(&field.name) == rendered.name)
+                .expect("rendered model field should have a planned field");
+            if let Some(wire_field) =
+                oneof_wire_field(api_plan, record, field, rendered, resolve_type)
+            {
+                return Cow::Owned(wire_field);
+            }
+            let wire_expr = format!("{{wire}}.{}", rendered.wire_name);
+            if let Some((from_wire, to_wire)) =
+                generic_carrier_expressions(record, field, &rendered.name, &wire_expr)
+            {
+                let mut wire_field = rendered.clone();
+                wire_field.from_wire_expr = from_wire;
+                wire_field.to_wire_expr = to_wire;
+                return Cow::Owned(wire_field);
+            }
+            // Flattened fields still belong to their nested protobuf record.
+            let mut wire_field = Cow::Borrowed(rendered);
+            if !rendered.flattened_fields.is_empty()
+                && let PlannedType::Record(nested) = &field.field_type
+            {
+                let nested = api_plan
+                    .record(&nested.full_name)
+                    .expect("flattened record should exist");
+                for (index, flattened) in rendered.flattened_fields.iter().enumerate() {
+                    let (_, nested_field) = nested
+                        .public_fields()
+                        .find(|(_, field)| {
+                            typescript_generated_field_name(&field.name) == flattened.name
+                        })
+                        .expect("flattened field should have a planned field");
+                    let nested_wire_expr = format!("{wire_expr}.{}", flattened.wire_name);
+                    if let Some((from_wire, to_wire)) = generic_carrier_expressions(
+                        nested,
+                        nested_field,
+                        &flattened.name,
+                        &nested_wire_expr,
+                    ) {
+                        let nested_annotation = match nested_field.field_type.validation_type() {
+                            PlannedType::TypeParameter(parameter) => &parameter.name,
+                            _ => unreachable!("generic carrier requires a type parameter"),
+                        };
+                        let target = &mut wire_field.to_mut().flattened_fields[index];
+                        target.from_wire_expr = flattened_field_from_wire_expr(
+                            &wire_expr,
+                            &from_wire,
+                            nested_annotation,
+                            &flattened.annotation,
+                        );
+                        target.to_wire_expr = to_wire;
+                    }
+                }
+                if let Cow::Owned(wire_field) = &mut wire_field {
+                    wire_field.to_wire_expr = flattened_message_to_wire_expr(
+                        field.required,
+                        &wire_field.flattened_fields,
+                    );
+                }
+            }
+            wire_field
+        })
+        .collect()
+}
+
+fn generic_carrier_conversion(
+    api_type: &PlannedType,
+    kind: &PlannedType,
+    annotation: &str,
+) -> Option<WireValueConversion> {
+    if !matches!(api_type.validation_type(), PlannedType::TypeParameter(_)) {
+        return None;
+    }
     let PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message))) =
         kind.validation_type()
     else {
-        return false;
+        return None;
     };
-    matches!(
-        message.proto.full_name.as_str(),
-        "temporal.api.common.v1.Payload" | "temporal.api.common.v1.Payloads"
-    )
+    let (from_wire, to_wire) = match message.proto.full_name.as_str() {
+        "temporal.api.common.v1.Payload" => (
+            format!(
+                "{}<{annotation}>({{wire}})",
+                support_reference("payloadToValue")
+            ),
+            format!("{}({{value}})", support_reference("valueToPayload")),
+        ),
+        "temporal.api.common.v1.Payloads" => (
+            format!(
+                "{}<{annotation}>({{wire}})",
+                support_reference("singleValueFromPayloads")
+            ),
+            format!("{}([{{value}}])", support_reference("payloadsToProto")),
+        ),
+        _ => return None,
+    };
+    Some(WireValueConversion {
+        annotation: annotation.to_string(),
+        from_wire,
+        to_wire,
+        function_name_to_wire: None,
+        wire_function_names: None,
+        uses_rendered_model_annotation: false,
+    })
+}
+
+struct OneofCase {
+    tag: String,
+    wire_name: String,
+    conversion: Option<WireValueConversion>,
+}
+
+/// Read the SDK discriminator directly. Writes include it so plain wire objects
+/// retain the same contract across JSON payload conversion.
+fn oneof_expressions(
+    owner: &str,
+    field: &str,
+    wire_group: &str,
+    annotation: &str,
+    required: bool,
+    cases: &[OneofCase],
+) -> (String, String) {
+    let missing = format!("missing required field {owner}.{field}");
+    let mut read = format!(
+        "((): {annotation}{} => {{\n",
+        if required { "" } else { " | undefined" }
+    );
+    read.push_str(&format!("      switch ({{wire}}.{wire_group}) {{\n"));
+    let mut write = format!("(() => {{\n      const result = model.{field};\n");
+    if !required {
+        write.push_str("      if (result == null) return {};\n");
+    } else {
+        write.push_str(&format!(
+            "      if (result == null) throw new Error(\"{missing}\");\n"
+        ));
+    }
+    write.push_str("      switch (result.tag) {\n");
+    for case in cases {
+        let wire = format!(
+            "requiredField({{wire}}.{}, {owner:?}, {:?})",
+            case.wire_name, case.wire_name
+        );
+        let decoded = case
+            .conversion
+            .as_ref()
+            .map(|c| c.from_wire_expr(&wire))
+            .unwrap_or(wire.clone());
+        let encoded = case
+            .conversion
+            .as_ref()
+            .map(|c| c.to_wire_expr("result.value"))
+            .unwrap_or_else(|| "result.value".into());
+        read.push_str(&format!(
+            "        case {:?}: return {{ tag: {:?}, value: {decoded} }};\n",
+            case.wire_name, case.tag
+        ));
+        write.push_str(&format!(
+            "        case {:?}: return {{ {wire_group}: {:?} as const, {}: {encoded} }};\n",
+            case.tag, case.wire_name, case.wire_name
+        ));
+    }
+    if required {
+        read.push_str(&format!(
+            "        case undefined: throw new Error(\"{missing}\");\n"
+        ));
+    } else {
+        read.push_str("        case undefined: return undefined;\n");
+    }
+    read.push_str(&format!(
+        "        default: throw new Error(\"invalid oneof discriminator for {owner}.{field}\");\n"
+    ));
+    read.push_str("      }\n    })()");
+    write.push_str(&format!("        default: throw new Error(\"invalid oneof tag for {owner}.{field}\");\n      }}\n    }})()"));
+    (read, write)
 }
 
 impl ModelBackend {
@@ -115,13 +342,16 @@ impl ModelBackend {
         output: &mut String,
         model: &RenderedModel,
         planned_record: &RecordSpec<PlannedFamily>,
+        api_plan: &PlannedSpec,
+        resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
     ) -> bool {
         let Some(names) = &model.wire_function_names else {
             return false;
         };
-        render_model_from_proto_function(output, model, planned_record, &names.from_wire);
+        let fields = model_wire_fields(model, planned_record, api_plan, resolve_type);
+        render_model_from_proto_function(output, model, planned_record, &fields, &names.from_wire);
         output.push('\n');
-        render_model_to_proto_function(output, model, planned_record, &names.to_wire);
+        render_model_to_proto_function(output, model, planned_record, &fields, &names.to_wire);
         output.push('\n');
         render_model_transfer_type_converter(output, model, planned_record, names);
         true
@@ -147,19 +377,42 @@ fn render_model_transfer_type_converter(
     let proto_type = message_typescript_interface_ref(proto);
     output.push_str("export const ");
     output.push_str(&converter_name);
-    output.push_str(" = {\n  fromTransferType(value: ");
+    output.push_str(" = {\n");
+    render_converter_method_start(output, "  fromTransferType", model);
+    output.push_str("  value: ");
     output.push_str(&proto_type);
     output.push_str("): ");
-    output.push_str(&model.name);
+    output.push_str(&generic_model_annotation(
+        &model.name,
+        &model.type_parameters,
+    ));
     output.push_str(" {\n    return ");
     output.push_str(&names.from_wire);
-    output.push_str("(value)!;\n  },\n\n  toTransferType(value: ");
-    output.push_str(&model.name);
+    output.push_str(&format!("{}(value)!;\n  }},\n\n", type_arguments(model)));
+    render_converter_method_start(output, "  toTransferType", model);
+    output.push_str("  value: ");
+    output.push_str(&generic_model_annotation(
+        &model.name,
+        &model.type_parameters,
+    ));
     output.push_str("): ");
     output.push_str(&proto_type);
     output.push_str(" {\n    return ");
     output.push_str(&names.to_wire);
     output.push_str("(value) ?? {};\n  },\n};");
+}
+
+fn type_arguments(model: &RenderedModel) -> String {
+    generic_model_annotation("", &model.type_parameters)
+}
+
+fn render_converter_method_start(output: &mut String, name: &str, model: &RenderedModel) {
+    if model.type_parameters.is_empty() {
+        output.push_str(name);
+        output.push_str("(\n");
+    } else {
+        render_named_generic_function_start(output, name, &model.type_parameters, 2);
+    }
 }
 
 pub(crate) fn message_typescript_interface_ref(proto: &PlannedProtoTypeInfo) -> String {
@@ -403,6 +656,7 @@ fn render_model_to_proto_function(
     output: &mut String,
     model: &RenderedModel,
     planned_record: &RecordSpec<PlannedFamily>,
+    fields: &[Cow<'_, RenderedField>],
     function_name: &str,
 ) {
     let wire_annotation = rendered_model_wire_annotation(model, planned_record);
@@ -437,10 +691,21 @@ fn render_model_to_proto_function(
         output.push_str("  return {};\n");
     } else {
         output.push_str("  return {\n");
-        for field in &model.fields {
+        for field in fields {
             output.push_str("    ");
-            output.push_str(&field.wire_name);
-            output.push_str(": ");
+            let oneof = planned_record.fields.values().any(|planned| {
+                typescript_generated_field_name(&planned.name) == field.name
+                    && matches!(
+                        planned.data.wire_binding,
+                        Some(PlannedWireFieldBinding::VariantMembers { .. })
+                    )
+            });
+            if oneof {
+                output.push_str("...");
+            } else {
+                output.push_str(&field.wire_name);
+                output.push_str(": ");
+            }
             output.push_str(&field.to_wire_expr);
             output.push_str(",\n");
         }
@@ -460,6 +725,7 @@ fn render_model_from_proto_function(
     output: &mut String,
     model: &RenderedModel,
     planned_record: &RecordSpec<PlannedFamily>,
+    fields: &[Cow<'_, RenderedField>],
     function_name: &str,
 ) {
     let wire_annotation = rendered_model_wire_annotation(model, planned_record);
@@ -494,7 +760,7 @@ fn render_model_from_proto_function(
         output.push_str("  return {};\n");
     } else {
         output.push_str("  return {\n");
-        for field in &model.fields {
+        for field in fields {
             if field.flattened_fields.is_empty() {
                 output.push_str("    ");
                 output.push_str(&field.name);

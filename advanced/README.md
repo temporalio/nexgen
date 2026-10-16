@@ -70,13 +70,13 @@ replaced without deleting these authored helpers.
   retry policies, activity options, durations, task queues, and priority.
 - [`notification-service`](samples/inputs/notification-service.wit): a
   proto-backed notification completion payload with generic source-context and
-  output values, generated for Python and .NET.
+  output values, generated for Python, .NET, and TypeScript.
 - [`proto-oneof`](samples/inputs/proto-oneof.wit): proto-backed models with
   required and optional protobuf oneofs, including a generic `Payloads`-carried
-  case, generated for Python and .NET.
+  case, generated for Python, .NET, and TypeScript.
 - [`proto-generic`](samples/inputs/proto-generic.wit): generic proto-backed
   models whose type parameters are carried by `Payload` fields through nested
-  records, generated for Python and .NET.
+  records, generated for Python, .NET, and TypeScript.
 
 Rebuild the checked-in example outputs:
 

@@ -113,33 +113,16 @@ fn generate(language: Language, path: &Path) -> nexgen::error::Result<String> {
 }
 
 #[test]
-fn unsupported_backend_rejects_reachable_oneof_conversion() {
+fn typescript_allows_oneofs_in_operation_models() {
     let temp = tempfile::tempdir().unwrap();
     let path = write_fixture(temp.path(), true, false, true);
-    let error = generate(Language::TypeScript, &path).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("typescript protobuf conversion does not yet support oneof group"),
-        "{error}"
-    );
+    // The proto-oneof sample covers model-only conversion at runtime. This
+    // fixture additionally checks that a oneof-bearing operation is accepted.
+    generate(Language::TypeScript, &path).unwrap();
 }
 
 #[test]
-fn unsupported_backend_rejects_operation_free_exported_oneof() {
-    let temp = tempfile::tempdir().unwrap();
-    let path = write_fixture(temp.path(), false, false, true);
-    let error = generate(Language::TypeScript, &path).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("typescript protobuf conversion does not yet support oneof group"),
-        "{error}"
-    );
-}
-
-#[test]
-fn unsupported_backend_allows_omitted_or_unreachable_oneofs() {
+fn typescript_allows_omitted_or_unreachable_oneofs() {
     let temp = tempfile::tempdir().unwrap();
     let omitted = write_fixture(temp.path(), true, true, true);
     generate(Language::TypeScript, &omitted).unwrap();
@@ -149,16 +132,15 @@ fn unsupported_backend_allows_omitted_or_unreachable_oneofs() {
 }
 
 #[test]
-fn unsupported_backend_rejects_reachable_generic_proto_carrier() {
+fn typescript_converts_reachable_generic_proto_carrier() {
     let temp = tempfile::tempdir().unwrap();
     let path = write_generic_carrier_fixture(temp.path());
-    let error = generate(Language::TypeScript, &path).unwrap_err();
+    let output = generate(Language::TypeScript, &path).unwrap();
     assert!(
-        error
-            .to_string()
-            .contains("typescript protobuf conversion does not yet support generic carrier"),
-        "{error}"
+        output.contains("support.singleValueFromPayloads<InputT>"),
+        "{output}"
     );
+    assert!(output.contains("support.payloadsToProto(["));
 }
 
 #[test]
