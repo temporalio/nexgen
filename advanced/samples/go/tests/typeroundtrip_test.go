@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -11,10 +12,16 @@ import (
 	"github.com/stretchr/testify/suite"
 	activitypb "go.temporal.io/api/activity/v1"
 	commandpb "go.temporal.io/api/command/v1"
+	commonpb "go.temporal.io/api/common/v1"
+	namespacepb "go.temporal.io/api/namespace/v1"
+	taskqueuepb "go.temporal.io/api/taskqueue/v1"
+	workflowpb "go.temporal.io/api/workflow/v1"
+	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
+	"google.golang.org/protobuf/proto"
 
 	tr "go.temporal.io/sdk/advanced/samples/go/typeroundtrip"
 )
@@ -58,6 +65,21 @@ func (s *TypeRoundtripIntegrationSuite) SetupTest() {
 	service := nexus.NewService(typeRoundtripServiceName)
 	s.NoError(service.Register(activityOptionsOp))
 	s.NoError(service.Register(failureOp))
+	s.NoError(service.Register(nexus.NewSyncOperation("WorkflowExecutionInfoOperation",
+		func(ctx context.Context, input *workflowpb.WorkflowExecutionInfo, opts nexus.StartOperationOptions) (*workflowpb.WorkflowExecutionInfo, error) {
+			s.calls = append(s.calls, nexusCall{"WorkflowExecutionInfoOperation", input})
+			return input, nil
+		})))
+	s.NoError(service.Register(nexus.NewSyncOperation("TaskQueuePartitionsOperation",
+		func(ctx context.Context, input *workflowservicepb.ListTaskQueuePartitionsResponse, opts nexus.StartOperationOptions) (*workflowservicepb.ListTaskQueuePartitionsResponse, error) {
+			s.calls = append(s.calls, nexusCall{"TaskQueuePartitionsOperation", input})
+			return input, nil
+		})))
+	s.NoError(service.Register(nexus.NewSyncOperation("BadBinariesOperation",
+		func(ctx context.Context, input *namespacepb.BadBinaries, opts nexus.StartOperationOptions) (*namespacepb.BadBinaries, error) {
+			s.calls = append(s.calls, nexusCall{"BadBinariesOperation", input})
+			return input, nil
+		})))
 	s.env.RegisterNexusService(service)
 }
 
@@ -206,4 +228,98 @@ func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly
 	s.Equal("ActivityOptionsOperation", s.calls[0].Operation)
 	handlerInput := s.calls[0].Input.(*activitypb.ActivityOptions)
 	s.Equal(int32(5), handlerInput.GetRetryPolicy().GetMaximumAttempts())
+}
+
+func (s *TypeRoundtripIntegrationSuite) TestNestedModelRoundTrips() {
+	cases := []struct {
+		name       string
+		execution  tr.WorkflowExecutionInfo
+		partitions tr.TaskQueuePartitions
+		binaries   tr.BadBinaries
+		wire       []proto.Message
+	}{
+		{
+			name: "all fields",
+			execution: tr.WorkflowExecutionInfo{
+				Execution:       tr.WorkflowExecution{WorkflowID: "child", RunID: "child-run"},
+				ParentExecution: &tr.WorkflowExecution{WorkflowID: "parent", RunID: "parent-run"},
+			},
+			partitions: tr.TaskQueuePartitions{WorkflowTaskQueuePartitions: []tr.TaskQueuePartition{
+				{Key: "first", OwnerHostName: "first-host"},
+				{Key: "second", OwnerHostName: "second-host"},
+			}},
+			binaries: tr.BadBinaries{Binaries: map[string]tr.BadBinary{
+				"first":  {Reason: "first-reason", Operator: "first-operator"},
+				"second": {Reason: "second-reason", Operator: "second-operator"},
+			}},
+			wire: []proto.Message{
+				&workflowpb.WorkflowExecutionInfo{
+					Execution:       &commonpb.WorkflowExecution{WorkflowId: "child", RunId: "child-run"},
+					ParentExecution: &commonpb.WorkflowExecution{WorkflowId: "parent", RunId: "parent-run"},
+				},
+				&workflowservicepb.ListTaskQueuePartitionsResponse{WorkflowTaskQueuePartitions: []*taskqueuepb.TaskQueuePartitionMetadata{
+					{Key: "first", OwnerHostName: "first-host"},
+					{Key: "second", OwnerHostName: "second-host"},
+				}},
+				&namespacepb.BadBinaries{Binaries: map[string]*namespacepb.BadBinaryInfo{
+					"first":  {Reason: "first-reason", Operator: "first-operator"},
+					"second": {Reason: "second-reason", Operator: "second-operator"},
+				}},
+			},
+		},
+		{
+			name:      "required only",
+			execution: tr.WorkflowExecutionInfo{Execution: tr.WorkflowExecution{WorkflowID: "required", RunID: "required-run"}},
+			wire: []proto.Message{
+				&workflowpb.WorkflowExecutionInfo{Execution: &commonpb.WorkflowExecution{WorkflowId: "required", RunId: "required-run"}},
+				&workflowservicepb.ListTaskQueuePartitionsResponse{},
+				&namespacepb.BadBinaries{},
+			},
+		},
+	}
+
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		for _, tt := range cases {
+			execution := tr.WorkflowExecutionInfo{
+				Execution:       tr.WorkflowExecution{WorkflowID: "stale"},
+				ParentExecution: &tr.WorkflowExecution{WorkflowID: "stale"},
+			}
+			if err := tr.WorkflowExecutionInfoOperation(ctx, tr.WorkflowExecutionInfoOperationOptions{
+				Execution: tt.execution.Execution, ParentExecution: tt.execution.ParentExecution,
+			}).Get(ctx, &execution); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(tt.execution, execution) {
+				return fmt.Errorf("%s execution = %#v, want %#v", tt.name, execution, tt.execution)
+			}
+			partitions := tr.TaskQueuePartitions{WorkflowTaskQueuePartitions: []tr.TaskQueuePartition{{Key: "stale"}}}
+			if err := tr.TaskQueuePartitionsOperation(ctx, tr.TaskQueuePartitionsOperationOptions{
+				WorkflowTaskQueuePartitions: tt.partitions.WorkflowTaskQueuePartitions,
+			}).Get(ctx, &partitions); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(tt.partitions, partitions) {
+				return fmt.Errorf("%s partitions = %#v, want %#v", tt.name, partitions, tt.partitions)
+			}
+			binaries := tr.BadBinaries{Binaries: map[string]tr.BadBinary{"stale": {Reason: "stale"}}}
+			if err := tr.BadBinariesOperation(ctx, tr.BadBinariesOperationOptions{
+				Binaries: tt.binaries.Binaries,
+			}).Get(ctx, &binaries); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(tt.binaries, binaries) {
+				return fmt.Errorf("%s binaries = %#v, want %#v", tt.name, binaries, tt.binaries)
+			}
+		}
+		return nil
+	})
+
+	s.Require().NoError(s.env.GetWorkflowError())
+	s.Require().Len(s.calls, len(cases)*3)
+	for i, tt := range cases {
+		for j, want := range tt.wire {
+			got := s.calls[i*3+j].Input.(proto.Message)
+			s.True(proto.Equal(want, got), "%s operation %d: got %v, want %v", tt.name, j, got, want)
+		}
+	}
 }

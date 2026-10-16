@@ -10,10 +10,18 @@ import temporalio.converter
 from . import services as _services
 from .operations.activity_options_operation import activity_options_operation
 from .operations.failure_operation import failure_operation
+from .operations.workflow_execution_info_operation import (
+    workflow_execution_info_operation,
+)
+from .operations.task_queue_partitions_operation import task_queue_partitions_operation
+from .operations.bad_binaries_operation import bad_binaries_operation
 
 __all__ = [
     "activity_options_operation",
+    "bad_binaries_operation",
     "failure_operation",
+    "task_queue_partitions_operation",
+    "workflow_execution_info_operation",
 ]
 
 
@@ -51,5 +59,23 @@ __nexus_operation_registry__ = {
         "FailureOperation",
     ): _NexusOperationInfo(
         operation=_services.TypeRoundtripService.failure_operation,
+    ),
+    (
+        "TypeRoundtripService",
+        "WorkflowExecutionInfoOperation",
+    ): _NexusOperationInfo(
+        operation=_services.TypeRoundtripService.workflow_execution_info_operation,
+    ),
+    (
+        "TypeRoundtripService",
+        "TaskQueuePartitionsOperation",
+    ): _NexusOperationInfo(
+        operation=_services.TypeRoundtripService.task_queue_partitions_operation,
+    ),
+    (
+        "TypeRoundtripService",
+        "BadBinariesOperation",
+    ): _NexusOperationInfo(
+        operation=_services.TypeRoundtripService.bad_binaries_operation,
     ),
 }
