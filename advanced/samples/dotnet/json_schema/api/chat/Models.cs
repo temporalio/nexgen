@@ -7,6 +7,7 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NexgenRuntime = global::Nexgen.JsonSchema.Chat;
 
 namespace Nexgen.JsonSchema.Chat
 {
@@ -36,14 +37,14 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return ValueEquality.Equal(RoomId, other.RoomId);
+            return NexgenRuntime::ValueEquality.Equal(RoomId, other.RoomId);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(RoomId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(RoomId));
             return hash.ToHashCode();
         }
 
@@ -59,11 +60,11 @@ namespace Nexgen.JsonSchema.Chat
             public override GetRoomInput Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -71,51 +72,51 @@ namespace Nexgen.JsonSchema.Chat
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, GetRoomInput value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static GetRoomInput? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static GetRoomInput? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "roomId")
                     {
                         continue;
                     }
-                    violations.Add(new Violation(Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
                 }
                 string? parsedRoomId = null;
                 if (!members.TryGetValue("roomId", out var nodeRoomId))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "required"));
                 }
                 else if (nodeRoomId.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeRoomId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "roomId"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "expected string"));
                     }
                     else
                     {
@@ -133,11 +134,11 @@ namespace Nexgen.JsonSchema.Chat
                 };
             }
 
-            internal static void Validate(GetRoomInput value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(GetRoomInput value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.RoomId is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "required"));
                 }
             }
 
@@ -177,14 +178,14 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -200,11 +201,11 @@ namespace Nexgen.JsonSchema.Chat
             public override Labels Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -212,41 +213,41 @@ namespace Nexgen.JsonSchema.Chat
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Labels value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Labels? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Labels? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, string>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (member.Value.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(memberPath, "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "expected string"));
                     }
                     else
                     {
@@ -256,7 +257,7 @@ namespace Nexgen.JsonSchema.Chat
                 }
                 if (members.Count > 50)
                 {
-                    violations.Add(new Violation(path, "must have at most 50 properties, got " + members.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 50 properties, got " + members.Count));
                 }
                 if (violations.Count > start)
                 {
@@ -265,16 +266,16 @@ namespace Nexgen.JsonSchema.Chat
                 return new Labels { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(Labels value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Labels value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 if (value.AdditionalProperties.Count > 50)
                 {
-                    violations.Add(new Violation(path, "must have at most 50 properties, got " + value.AdditionalProperties.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 50 properties, got " + value.AdditionalProperties.Count));
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
@@ -283,7 +284,7 @@ namespace Nexgen.JsonSchema.Chat
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Member(path, entry.Key), "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "explicit null not allowed"));
                     }
                 }
             }
@@ -383,20 +384,20 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return ValueEquality.Equal(Kind, other.Kind)
-                && ValueEquality.Equal(Body, other.Body)
-                && ValueEquality.Equal(ReplyToId, other.ReplyToId)
-                && ValueEquality.Equal(Priority, other.Priority);
+            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(Body, other.Body)
+                && NexgenRuntime::ValueEquality.Equal(ReplyToId, other.ReplyToId)
+                && NexgenRuntime::ValueEquality.Equal(Priority, other.Priority);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Kind));
-            hash.Add(ValueEquality.Hash(Body));
-            hash.Add(ValueEquality.Hash(ReplyToId));
-            hash.Add(ValueEquality.Hash(Priority));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Body));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(ReplyToId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Priority));
             return hash.ToHashCode();
         }
 
@@ -412,11 +413,11 @@ namespace Nexgen.JsonSchema.Chat
             public override Message Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -424,51 +425,51 @@ namespace Nexgen.JsonSchema.Chat
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Message value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Message? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Message? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "kind" || member.Key == "body" || member.Key == "replyToId" || member.Key == "priority")
                     {
                         continue;
                     }
-                    violations.Add(new Violation(Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
                 }
                 KindValue? parsedKind = null;
                 if (!members.TryGetValue("kind", out var nodeKind))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 else if (nodeKind.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeKind.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "kind"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "expected string"));
                     }
                     else
                     {
@@ -479,24 +480,24 @@ namespace Nexgen.JsonSchema.Chat
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "kind"), "must equal \"text\", got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "must equal \"text\", got " + closed0));
                         }
                     }
                 }
                 string? parsedBody = null;
                 if (!members.TryGetValue("body", out var nodeBody))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "body"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "required"));
                 }
                 else if (nodeBody.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "body"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeBody.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "body"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "expected string"));
                     }
                     else
                     {
@@ -515,7 +516,7 @@ namespace Nexgen.JsonSchema.Chat
                 {
                     if (nodeReplyToId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "replyToId"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "replyToId"), "expected string"));
                     }
                     else
                     {
@@ -529,11 +530,11 @@ namespace Nexgen.JsonSchema.Chat
                 }
                 else if (nodePriority.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "priority"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "priority"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodePriority, Violation.Join(path, "priority"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodePriority, NexgenRuntime::Violation.Join(path, "priority"), violations) is { } value0)
                     {
                         parsedPriority = value0;
                     }
@@ -551,22 +552,22 @@ namespace Nexgen.JsonSchema.Chat
                 };
             }
 
-            internal static void Validate(Message value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Message value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Kind is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 if (value.Body is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "body"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "required"));
                 }
                 {
                     if (value.Priority is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "priority"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "priority"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                     }
                 }
@@ -648,24 +649,24 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return ValueEquality.Equal(RoomId, other.RoomId)
-                && ValueEquality.Equal(DisplayName, other.DisplayName)
-                && ValueEquality.Equal(Topic, other.Topic)
-                && ValueEquality.Equal(Members, other.Members)
-                && ValueEquality.Equal(Labels, other.Labels)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(RoomId, other.RoomId)
+                && NexgenRuntime::ValueEquality.Equal(DisplayName, other.DisplayName)
+                && NexgenRuntime::ValueEquality.Equal(Topic, other.Topic)
+                && NexgenRuntime::ValueEquality.Equal(Members, other.Members)
+                && NexgenRuntime::ValueEquality.Equal(Labels, other.Labels)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(RoomId));
-            hash.Add(ValueEquality.Hash(DisplayName));
-            hash.Add(ValueEquality.Hash(Topic));
-            hash.Add(ValueEquality.Hash(Members));
-            hash.Add(ValueEquality.Hash(Labels));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(RoomId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(DisplayName));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Topic));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Members));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Labels));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -681,11 +682,11 @@ namespace Nexgen.JsonSchema.Chat
             public override Room Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -693,29 +694,29 @@ namespace Nexgen.JsonSchema.Chat
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Room value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Room? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Room? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -728,17 +729,17 @@ namespace Nexgen.JsonSchema.Chat
                 string? parsedRoomId = null;
                 if (!members.TryGetValue("roomId", out var nodeRoomId))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "required"));
                 }
                 else if (nodeRoomId.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeRoomId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "roomId"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "expected string"));
                     }
                     else
                     {
@@ -749,17 +750,17 @@ namespace Nexgen.JsonSchema.Chat
                 string? parsedDisplayName = null;
                 if (!members.TryGetValue("displayName", out var nodeDisplayName))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "displayName"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "displayName"), "required"));
                 }
                 else if (nodeDisplayName.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "displayName"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "displayName"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeDisplayName.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "displayName"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "displayName"), "expected string"));
                     }
                     else
                     {
@@ -770,7 +771,7 @@ namespace Nexgen.JsonSchema.Chat
                 string? parsedTopic = null;
                 if (!members.TryGetValue("topic", out var nodeTopic))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "topic"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "topic"), "required"));
                 }
                 else if (nodeTopic.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
@@ -779,7 +780,7 @@ namespace Nexgen.JsonSchema.Chat
                 {
                     if (nodeTopic.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "topic"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "topic"), "expected string"));
                     }
                     else
                     {
@@ -793,13 +794,13 @@ namespace Nexgen.JsonSchema.Chat
                 }
                 else if (nodeMembers.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "members"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "members"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeMembers.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "members"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "members"), "expected array"));
                     }
                     else
                     {
@@ -807,15 +808,15 @@ namespace Nexgen.JsonSchema.Chat
                         var index0 = 0;
                         foreach (var item0 in nodeMembers.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "members"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "members"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
@@ -832,11 +833,11 @@ namespace Nexgen.JsonSchema.Chat
                 }
                 else if (nodeLabels.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "labels"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "labels"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Labels.Converter.Parse(nodeLabels, Violation.Join(path, "labels"), violations) is { } model0)
+                    if (Labels.Converter.Parse(nodeLabels, NexgenRuntime::Violation.Join(path, "labels"), violations) is { } model0)
                     {
                         parsedLabels = model0;
                     }
@@ -856,15 +857,15 @@ namespace Nexgen.JsonSchema.Chat
                 };
             }
 
-            internal static void Validate(Room value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Room value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.RoomId is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "required"));
                 }
                 if (value.DisplayName is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "displayName"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "displayName"), "required"));
                 }
                 {
                     if (value.Members is { } member)
@@ -876,7 +877,7 @@ namespace Nexgen.JsonSchema.Chat
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "members"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "members"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -884,7 +885,7 @@ namespace Nexgen.JsonSchema.Chat
                 {
                     if (value.Labels is { } member)
                     {
-                        Labels.Converter.Validate(member, Violation.Join(path, "labels"), violations);
+                        Labels.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "labels"), violations);
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -907,7 +908,7 @@ namespace Nexgen.JsonSchema.Chat
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -915,7 +916,7 @@ namespace Nexgen.JsonSchema.Chat
                     {
                         if (entry.Key is "roomId" or "displayName" or "topic" or "members" or "labels" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -1004,16 +1005,16 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return ValueEquality.Equal(RoomId, other.RoomId)
-                && ValueEquality.Equal(Message, other.Message);
+            return NexgenRuntime::ValueEquality.Equal(RoomId, other.RoomId)
+                && NexgenRuntime::ValueEquality.Equal(Message, other.Message);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(RoomId));
-            hash.Add(ValueEquality.Hash(Message));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(RoomId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Message));
             return hash.ToHashCode();
         }
 
@@ -1029,11 +1030,11 @@ namespace Nexgen.JsonSchema.Chat
             public override SendMessageInput Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -1041,51 +1042,51 @@ namespace Nexgen.JsonSchema.Chat
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, SendMessageInput value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static SendMessageInput? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static SendMessageInput? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "roomId" || member.Key == "message")
                     {
                         continue;
                     }
-                    violations.Add(new Violation(Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
                 }
                 string? parsedRoomId = null;
                 if (!members.TryGetValue("roomId", out var nodeRoomId))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "required"));
                 }
                 else if (nodeRoomId.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeRoomId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "roomId"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "expected string"));
                     }
                     else
                     {
@@ -1096,15 +1097,15 @@ namespace Nexgen.JsonSchema.Chat
                 Message? parsedMessage = null;
                 if (!members.TryGetValue("message", out var nodeMessage))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "message"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "message"), "required"));
                 }
                 else if (nodeMessage.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "message"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "message"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Message.Converter.Parse(nodeMessage, Violation.Join(path, "message"), violations) is { } model0)
+                    if (Message.Converter.Parse(nodeMessage, NexgenRuntime::Violation.Join(path, "message"), violations) is { } model0)
                     {
                         parsedMessage = model0;
                     }
@@ -1120,20 +1121,20 @@ namespace Nexgen.JsonSchema.Chat
                 };
             }
 
-            internal static void Validate(SendMessageInput value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(SendMessageInput value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.RoomId is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roomId"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roomId"), "required"));
                 }
                 {
                     if (value.Message is { } member)
                     {
-                        Message.Converter.Validate(member, Violation.Join(path, "message"), violations);
+                        Message.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "message"), violations);
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "message"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "message"), "required"));
                     }
                 }
             }
@@ -1179,14 +1180,14 @@ namespace Nexgen.JsonSchema.Chat
             {
                 return true;
             }
-            return ValueEquality.Equal(MessageId, other.MessageId);
+            return NexgenRuntime::ValueEquality.Equal(MessageId, other.MessageId);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(MessageId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(MessageId));
             return hash.ToHashCode();
         }
 
@@ -1202,11 +1203,11 @@ namespace Nexgen.JsonSchema.Chat
             public override SendMessageOutput Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -1214,51 +1215,51 @@ namespace Nexgen.JsonSchema.Chat
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, SendMessageOutput value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static SendMessageOutput? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static SendMessageOutput? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "messageId")
                     {
                         continue;
                     }
-                    violations.Add(new Violation(Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
                 }
                 string? parsedMessageId = null;
                 if (!members.TryGetValue("messageId", out var nodeMessageId))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "messageId"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "messageId"), "required"));
                 }
                 else if (nodeMessageId.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "messageId"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "messageId"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeMessageId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "messageId"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "messageId"), "expected string"));
                     }
                     else
                     {
@@ -1276,11 +1277,11 @@ namespace Nexgen.JsonSchema.Chat
                 };
             }
 
-            internal static void Validate(SendMessageOutput value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(SendMessageOutput value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.MessageId is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "messageId"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "messageId"), "required"));
                 }
             }
 

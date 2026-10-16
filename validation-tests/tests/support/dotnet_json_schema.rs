@@ -2898,6 +2898,29 @@ Check.ParseFails<Holder>("{\"stamp\":\"x\",\"myJsonElement\":{\"value\":\"nope\"
     );
 }
 
+/// Generated code spells the runtime support types through the
+/// `NexgenRuntime::` alias qualifier, which no member or type can capture, so
+/// a member may take a runtime type's name and a type may take the alias's.
+#[test]
+fn csharp_json_runtime_type_names_are_free_member_names() {
+    let case = JsonCase::new("runtime-member-names");
+    case.write(
+        "holder.yaml",
+        "type: object\nadditionalProperties: false\nrequired: [violation]\nproperties:\n  violation: { type: string, minLength: 2 }\n  specJson: { type: number }\n  valueEquality: { type: array, uniqueItems: true, items: { type: string } }\n  temporalSupport: { type: string, format: date-time }\n  base64Support: { type: string, contentEncoding: base64 }\n  nexgenRuntime: { $ref: \"#/$defs/NexgenRuntime\" }\n$defs:\n  NexgenRuntime:\n    type: object\n    additionalProperties: { type: integer }\n    properties:\n      violation: { type: integer }\n",
+    );
+    case.generate(&["holder.yaml"]);
+    case.run(
+        r#"var parsed = Check.RoundTrip<Holder>(
+    "{\"violation\":\"vv\",\"specJson\":1.5,\"valueEquality\":[\"a\"],\"temporalSupport\":\"2024-01-01T00:00:00Z\",\"base64Support\":\"AQI=\",\"nexgenRuntime\":{\"violation\":1,\"extra\":2}}");
+Check.Equal("vv", parsed.Violation, "a member named Violation");
+Check.ParseFails<Holder>("{\"violation\":\"v\",\"valueEquality\":[\"a\",\"a\"],\"temporalSupport\":\"x\",\"nexgenRuntime\":{\"extra\":\"y\"}}",
+    "violation: must have length >= 2",
+    "valueEquality: duplicate items",
+    "temporalSupport: must be a valid date-time",
+    "nexgenRuntime.extra: expected integer");"#,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Services and documentation
 // ---------------------------------------------------------------------------

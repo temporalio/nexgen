@@ -32,7 +32,7 @@ const SERIALIZER_OPTIONS: &str = "global::System.Text.Json.JsonSerializerOptions
 
 fn member_path(json_name: &str) -> String {
     format!(
-        "Violation.Join(path, {})",
+        "NexgenRuntime::Violation.Join(path, {})",
         cs_string(&crate::generator::json_schema::violation_member_segment(
             json_name
         ))
@@ -273,11 +273,11 @@ fn render_converter_entry_points(out: &mut String, name: &str, nullable: bool) {
     ));
     if nullable {
         out.push_str(
-            "            if (violations.Count > 0)\n            {\n                throw Violation.Failure(violations);\n            }\n            return value;\n        }\n\n",
+            "            if (violations.Count > 0)\n            {\n                throw NexgenRuntime::Violation.Failure(violations);\n            }\n            return value;\n        }\n\n",
         );
     } else {
         out.push_str(
-            "            if (value is null || violations.Count > 0)\n            {\n                throw Violation.Failure(violations);\n            }\n            return value;\n        }\n\n",
+            "            if (value is null || violations.Count > 0)\n            {\n                throw NexgenRuntime::Violation.Failure(violations);\n            }\n            return value;\n        }\n\n",
         );
     }
     out.push_str(&format!(
@@ -286,10 +286,10 @@ fn render_converter_entry_points(out: &mut String, name: &str, nullable: bool) {
     if nullable {
         out.push_str("            if (value is null)\n            {\n                writer.WriteNullValue();\n                return;\n            }\n");
     } else {
-        out.push_str("            if (value is null)\n            {\n                violations.Add(new Violation(\"\", \"expected object\"));\n                throw Violation.Failure(violations);\n            }\n");
+        out.push_str("            if (value is null)\n            {\n                violations.Add(new NexgenRuntime::Violation(\"\", \"expected object\"));\n                throw NexgenRuntime::Violation.Failure(violations);\n            }\n");
     }
     out.push_str(
-        "            Validate(value, \"\", violations);\n            if (violations.Count > 0)\n            {\n                throw Violation.Failure(violations);\n            }\n            WriteValue(writer, value);\n        }\n\n",
+        "            Validate(value, \"\", violations);\n            if (violations.Count > 0)\n            {\n                throw NexgenRuntime::Violation.Failure(violations);\n            }\n            WriteValue(writer, value);\n        }\n\n",
     );
 }
 
@@ -304,7 +304,9 @@ fn render_equality(out: &mut String, name: &str, members: &[String]) {
         out.push_str(
             &members
                 .iter()
-                .map(|member| format!("ValueEquality.Equal({member}, other.{member})"))
+                .map(|member| {
+                    format!("NexgenRuntime::ValueEquality.Equal({member}, other.{member})")
+                })
                 .collect::<Vec<_>>()
                 .join("\n            && "),
         );
@@ -313,7 +315,7 @@ fn render_equality(out: &mut String, name: &str, members: &[String]) {
     out.push_str("    /// <inheritdoc/>\n    public override int GetHashCode()\n    {\n        var hash = new global::System.HashCode();\n");
     for member in members {
         out.push_str(&format!(
-            "        hash.Add(ValueEquality.Hash({member}));\n"
+            "        hash.Add(NexgenRuntime::ValueEquality.Hash({member}));\n"
         ));
     }
     out.push_str("        return hash.ToHashCode();\n    }\n\n");
@@ -332,10 +334,10 @@ fn render_object_parse(
         "        internal static {name}? Parse({JSON_ELEMENT} node, string path, {VIOLATIONS} violations)\n        {{\n"
     ));
     out.push_str(&format!(
-        "{indent}if (node.ValueKind != {JSON_VALUE_KIND}.Object)\n{indent}{{\n{indent}    violations.Add(new Violation(path, \"expected object\"));\n{indent}    return null;\n{indent}}}\n"
+        "{indent}if (node.ValueKind != {JSON_VALUE_KIND}.Object)\n{indent}{{\n{indent}    violations.Add(new NexgenRuntime::Violation(path, \"expected object\"));\n{indent}    return null;\n{indent}}}\n"
     ));
     out.push_str(&format!(
-        "{indent}var start = violations.Count;\n{indent}var members = SpecJson.Members(node);\n"
+        "{indent}var start = violations.Count;\n{indent}var members = NexgenRuntime::SpecJson.Members(node);\n"
     ));
     if open {
         out.push_str(&format!(
@@ -365,11 +367,11 @@ fn render_object_parse(
     let inner = format!("{indent}    ");
     if !open {
         out.push_str(&format!(
-            "{inner}violations.Add(new Violation(Violation.Member(path, member.Key), \"unknown field\"));\n"
+            "{inner}violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), \"unknown field\"));\n"
         ));
     } else if let Some(additional) = typed_additional {
         out.push_str(&format!(
-            "{inner}var memberPath = Violation.Member(path, member.Key);\n"
+            "{inner}var memberPath = NexgenRuntime::Violation.Member(path, member.Key);\n"
         ));
         out.push_str(&format!(
             "{inner}if (member.Value.ValueKind == {JSON_VALUE_KIND}.Null)\n{inner}{{\n"
@@ -380,7 +382,7 @@ fn render_object_parse(
             ));
         } else {
             out.push_str(&format!(
-                "{inner}    violations.Add(new Violation(memberPath, \"explicit null not allowed\"));\n{inner}    continue;\n"
+                "{inner}    violations.Add(new NexgenRuntime::Violation(memberPath, \"explicit null not allowed\"));\n{inner}    continue;\n"
             ));
         }
         out.push_str(&format!("{inner}}}\n"));
@@ -460,7 +462,7 @@ fn render_field_parse(out: &mut String, field: &FieldPlan, indent: &str) {
     ));
     if field.required {
         out.push_str(&format!(
-            "{indent}    violations.Add(new Violation({path}, \"required\"));\n"
+            "{indent}    violations.Add(new NexgenRuntime::Violation({path}, \"required\"));\n"
         ));
     }
     out.push_str(&format!(
@@ -468,7 +470,7 @@ fn render_field_parse(out: &mut String, field: &FieldPlan, indent: &str) {
     ));
     if !field.nullable {
         out.push_str(&format!(
-            "{indent}    violations.Add(new Violation({path}, \"explicit null not allowed\"));\n"
+            "{indent}    violations.Add(new NexgenRuntime::Violation({path}, \"explicit null not allowed\"));\n"
         ));
     }
     out.push_str(&format!("{indent}}}\n{indent}else\n{indent}{{\n"));
@@ -525,7 +527,7 @@ fn kind_check(out: &mut String, target: &ParseTarget, kind: &str, expected: &str
         kind => format!("{node}.ValueKind != {JSON_VALUE_KIND}.{kind}"),
     };
     out.push_str(&format!(
-        "{indent}if ({mismatch})\n{indent}{{\n{indent}    violations.Add(new Violation({}, \"expected {expected}\"));\n{indent}}}\n{indent}else\n{indent}{{\n",
+        "{indent}if ({mismatch})\n{indent}{{\n{indent}    violations.Add(new NexgenRuntime::Violation({}, \"expected {expected}\"));\n{indent}}}\n{indent}else\n{indent}{{\n",
         target.path
     ));
 }
@@ -568,7 +570,7 @@ pub(super) fn parse_into(
                 ));
             }
             out.push_str(&format!(
-                "{body_indent}else\n{body_indent}{{\n{body_indent}    violations.Add(new Violation({path}, {} + {parsed}));\n{body_indent}}}\n",
+                "{body_indent}else\n{body_indent}{{\n{body_indent}    violations.Add(new NexgenRuntime::Violation({path}, {} + {parsed}));\n{body_indent}}}\n",
                 cs_string(&closed_reason_prefix(values))
             ));
             out.push_str(&format!("{indent}}}\n"));
@@ -606,7 +608,7 @@ pub(super) fn parse_into(
             checks::closed_scalar_checks(out, &text, path, schema, &CsType::String, &inner);
             let parsed = format!("temporal{depth}");
             out.push_str(&format!(
-                "{inner}if (TemporalSupport.{}({text}, {path}, violations) is {{ }} {parsed})\n{inner}{{\n{inner}    {}\n{inner}}}\n{indent}}}\n",
+                "{inner}if (NexgenRuntime::TemporalSupport.{}({text}, {path}, violations) is {{ }} {parsed})\n{inner}{{\n{inner}    {}\n{inner}}}\n{indent}}}\n",
                 temporal_parse_fn(*kind),
                 sink(&parsed)
             ));
@@ -627,7 +629,7 @@ pub(super) fn parse_into(
             checks::closed_scalar_checks(out, &text, path, schema, &CsType::String, &inner);
             let parsed = format!("bytes{depth}");
             out.push_str(&format!(
-                "{inner}if (Base64Support.{}({text}, {path}, violations) is {{ }} {parsed})\n{inner}{{\n{inner}    {}\n{inner}}}\n{indent}}}\n",
+                "{inner}if (NexgenRuntime::Base64Support.{}({text}, {path}, violations) is {{ }} {parsed})\n{inner}{{\n{inner}    {}\n{inner}}}\n{indent}}}\n",
                 content_encoding_parse_fn(*encoding),
                 sink(&parsed)
             ));
@@ -652,7 +654,7 @@ pub(super) fn parse_into(
             ));
             let loop_indent = format!("{inner}    ");
             out.push_str(&format!(
-                "{loop_indent}var {item_path} = Violation.Index({path}, {index}++);\n"
+                "{loop_indent}var {item_path} = NexgenRuntime::Violation.Index({path}, {index}++);\n"
             ));
             out.push_str(&format!(
                 "{loop_indent}if ({item}.ValueKind == {JSON_VALUE_KIND}.Null)\n{loop_indent}{{\n"
@@ -661,7 +663,7 @@ pub(super) fn parse_into(
                 out.push_str(&format!("{loop_indent}    {items}.Add(null);\n"));
             } else {
                 out.push_str(&format!(
-                    "{loop_indent}    violations.Add(new Violation({item_path}, \"explicit null not allowed\"));\n"
+                    "{loop_indent}    violations.Add(new NexgenRuntime::Violation({item_path}, \"explicit null not allowed\"));\n"
                 ));
             }
             out.push_str(&format!("{loop_indent}    continue;\n{loop_indent}}}\n"));
@@ -735,7 +737,7 @@ fn parse_scalar(
                 "SpecDouble"
             };
             out.push_str(&format!(
-                "{indent}if (SpecJson.{function}({node}, {path}, violations) is {{ }} {local})\n{indent}{{\n"
+                "{indent}if (NexgenRuntime::SpecJson.{function}({node}, {path}, violations) is {{ }} {local})\n{indent}{{\n"
             ));
             Some(local.to_string())
         }
@@ -779,7 +781,7 @@ fn render_object_validate(
             }
         }
         out.push_str(&format!(
-            "{indent}if (value.AdditionalProperties is null)\n{indent}{{\n{indent}    violations.Add(new Violation(Violation.Join(path, \"AdditionalProperties\"), \"required\"));\n{indent}}}\n{indent}else\n{indent}{{\n"
+            "{indent}if (value.AdditionalProperties is null)\n{indent}{{\n{indent}    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, \"AdditionalProperties\"), \"required\"));\n{indent}}}\n{indent}else\n{indent}{{\n"
         ));
         let inner = format!("{indent}    ");
         // The catch-all can only hold members the declared set does not name,
@@ -798,7 +800,7 @@ fn render_object_validate(
             )
         };
         out.push_str(&format!(
-            "{inner}foreach (var entry in value.AdditionalProperties)\n{inner}{{\n{inner}    if ({collides})\n{inner}    {{\n{inner}        violations.Add(new Violation(Violation.Member(path, entry.Key), \"declared property key collision\"));\n{inner}    }}\n"
+            "{inner}foreach (var entry in value.AdditionalProperties)\n{inner}{{\n{inner}    if ({collides})\n{inner}    {{\n{inner}        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), \"declared property key collision\"));\n{inner}    }}\n"
         ));
         if let Some(additional) = typed_additional {
             render_map_entry_validate(
@@ -888,7 +890,7 @@ fn render_field_validate(out: &mut String, field: &FieldPlan, indent: &str) {
     }
     if body.is_empty() {
         out.push_str(&format!(
-            "{indent}if (value.{} is null)\n{indent}{{\n{indent}    violations.Add(new Violation({path}, \"required\"));\n{indent}}}\n",
+            "{indent}if (value.{} is null)\n{indent}{{\n{indent}    violations.Add(new NexgenRuntime::Violation({path}, \"required\"));\n{indent}}}\n",
             field.name
         ));
         return;
@@ -902,7 +904,7 @@ fn render_field_validate(out: &mut String, field: &FieldPlan, indent: &str) {
     out.push_str(&format!("{inner}}}\n"));
     if required_violation {
         out.push_str(&format!(
-            "{inner}else\n{inner}{{\n{inner}    violations.Add(new Violation({path}, \"required\"));\n{inner}}}\n"
+            "{inner}else\n{inner}{{\n{inner}    violations.Add(new NexgenRuntime::Violation({path}, \"required\"));\n{inner}}}\n"
         ));
     }
     out.push_str(&format!("{indent}}}\n"));
@@ -926,7 +928,7 @@ fn render_map_entry_validate(
     position: &str,
     indent: &str,
 ) {
-    let path = "Violation.Member(path, entry.Key)";
+    let path = "NexgenRuntime::Violation.Member(path, entry.Key)";
     out.push_str(&format!(
         "{indent}if (entry.Value is {{ }} member)\n{indent}{{\n"
     ));
@@ -946,7 +948,7 @@ fn render_map_entry_validate(
     out.push_str(&format!("{indent}}}\n"));
     if !additional.nullable && !additional.ty.is_value_type() {
         out.push_str(&format!(
-            "{indent}else\n{indent}{{\n{indent}    violations.Add(new Violation({path}, \"explicit null not allowed\"));\n{indent}}}\n"
+            "{indent}else\n{indent}{{\n{indent}    violations.Add(new NexgenRuntime::Violation({path}, \"explicit null not allowed\"));\n{indent}}}\n"
         ));
     }
 }
@@ -1134,7 +1136,7 @@ fn render_typed_map_body(out: &mut String, model: &ObjectModel, additional: &Typ
         name = model.name
     ));
     out.push_str(&format!(
-        "{indent}if (node.ValueKind != {JSON_VALUE_KIND}.Object)\n{indent}{{\n{indent}    violations.Add(new Violation(path, \"expected object\"));\n{indent}    return null;\n{indent}}}\n{indent}var start = violations.Count;\n{indent}var members = SpecJson.Members(node);\n{indent}var additionalProperties = new {DICTIONARY}<string, {value_type}>();\n{indent}foreach (var member in members)\n{indent}{{\n{inner}var memberPath = Violation.Member(path, member.Key);\n{inner}if (member.Value.ValueKind == {JSON_VALUE_KIND}.Null)\n{inner}{{\n"
+        "{indent}if (node.ValueKind != {JSON_VALUE_KIND}.Object)\n{indent}{{\n{indent}    violations.Add(new NexgenRuntime::Violation(path, \"expected object\"));\n{indent}    return null;\n{indent}}}\n{indent}var start = violations.Count;\n{indent}var members = NexgenRuntime::SpecJson.Members(node);\n{indent}var additionalProperties = new {DICTIONARY}<string, {value_type}>();\n{indent}foreach (var member in members)\n{indent}{{\n{inner}var memberPath = NexgenRuntime::Violation.Member(path, member.Key);\n{inner}if (member.Value.ValueKind == {JSON_VALUE_KIND}.Null)\n{inner}{{\n"
     ));
     if additional.nullable {
         out.push_str(&format!(
@@ -1142,7 +1144,7 @@ fn render_typed_map_body(out: &mut String, model: &ObjectModel, additional: &Typ
         ));
     } else {
         out.push_str(&format!(
-            "{inner}    violations.Add(new Violation(memberPath, \"explicit null not allowed\"));\n{inner}    continue;\n"
+            "{inner}    violations.Add(new NexgenRuntime::Violation(memberPath, \"explicit null not allowed\"));\n{inner}    continue;\n"
         ));
     }
     out.push_str(&format!("{inner}}}\n"));
@@ -1173,7 +1175,7 @@ fn render_typed_map_body(out: &mut String, model: &ObjectModel, additional: &Typ
 
     // Validate.
     out.push_str(&format!(
-        "        internal static void Validate({name} value, string path, {VIOLATIONS} violations)\n        {{\n{indent}if (value.AdditionalProperties is null)\n{indent}{{\n{indent}    violations.Add(new Violation(path, \"expected object\"));\n{indent}    return;\n{indent}}}\n",
+        "        internal static void Validate({name} value, string path, {VIOLATIONS} violations)\n        {{\n{indent}if (value.AdditionalProperties is null)\n{indent}{{\n{indent}    violations.Add(new NexgenRuntime::Violation(path, \"expected object\"));\n{indent}    return;\n{indent}}}\n",
         name = model.name
     ));
     checks::property_count_checks(
@@ -1269,13 +1271,13 @@ fn default_expr(field: &FieldPlan, value: &Value) -> Option<String> {
         (CsType::Temporal(kind), Value::String(text)) => Some(match kind {
             TemporalKind::Time => cs_string(&text.to_ascii_uppercase()),
             _ => format!(
-                "TemporalSupport.{}Literal({})",
+                "NexgenRuntime::TemporalSupport.{}Literal({})",
                 temporal_parse_fn(*kind),
                 cs_string(text)
             ),
         }),
         (CsType::Bytes(encoding), Value::String(text)) => Some(format!(
-            "Base64Support.{}Literal({})",
+            "NexgenRuntime::Base64Support.{}Literal({})",
             content_encoding_parse_fn(*encoding),
             cs_string(text)
         )),
@@ -1400,7 +1402,7 @@ fn render_union_wrapper(out: &mut String, union: &CsUnion, variant: &UnionVarian
         ));
     }
     out.push_str(&format!(
-        "{inner}/// <inheritdoc/>\n{inner}public override bool Equals(object? obj) => obj is {class} other && ValueEquality.Equal(Value, other.Value);\n\n{inner}/// <inheritdoc/>\n{inner}public override int GetHashCode() => ValueEquality.Hash(Value);\n\n{inner}/// <inheritdoc/>\n{inner}public override string ToString() => \"{class}[\" + Value + \"]\";\n{indent}}}\n"
+        "{inner}/// <inheritdoc/>\n{inner}public override bool Equals(object? obj) => obj is {class} other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);\n\n{inner}/// <inheritdoc/>\n{inner}public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);\n\n{inner}/// <inheritdoc/>\n{inner}public override string ToString() => \"{class}[\" + Value + \"]\";\n{indent}}}\n"
     ));
 }
 
@@ -1413,7 +1415,7 @@ fn json_equals_literal(node: &str, value: &Value) -> String {
         Value::Bool(true) => format!("{node}.ValueKind == {JSON_VALUE_KIND}.True"),
         Value::Bool(false) => format!("{node}.ValueKind == {JSON_VALUE_KIND}.False"),
         Value::Number(number) => format!(
-            "{node}.ValueKind == {JSON_VALUE_KIND}.Number && SpecJson.DoubleOf({node}) == {}",
+            "{node}.ValueKind == {JSON_VALUE_KIND}.Number && NexgenRuntime::SpecJson.DoubleOf({node}) == {}",
             checks::bound_literal(number, false)
         ),
         Value::Null => format!("{node}.ValueKind == {JSON_VALUE_KIND}.Null"),
@@ -1450,7 +1452,7 @@ fn render_union_converter(out: &mut String, union: &CsUnion) {
         let inner = format!("{indent}    ");
         if let Some(discriminant) = &union.discriminant {
             out.push_str(&format!(
-                "{inner}if (!node.TryGetProperty({}, out var discriminant) || discriminant.ValueKind is {JSON_VALUE_KIND}.Null or {JSON_VALUE_KIND}.Object or {JSON_VALUE_KIND}.Array)\n{inner}{{\n{inner}    violations.Add(new Violation(path, {}));\n{inner}    return null;\n{inner}}}\n",
+                "{inner}if (!node.TryGetProperty({}, out var discriminant) || discriminant.ValueKind is {JSON_VALUE_KIND}.Null or {JSON_VALUE_KIND}.Object or {JSON_VALUE_KIND}.Array)\n{inner}{{\n{inner}    violations.Add(new NexgenRuntime::Violation(path, {}));\n{inner}    return null;\n{inner}}}\n",
                 cs_string(discriminant),
                 cs_string(&format!("discriminator {discriminant:?} is required"))
             ));
@@ -1473,7 +1475,7 @@ fn render_union_converter(out: &mut String, union: &CsUnion) {
                 out.push_str(&format!("{inner}}}\n"));
             }
             out.push_str(&format!(
-                "{inner}violations.Add(new Violation(path, {} + discriminant.GetRawText() + {}));\n{inner}return null;\n",
+                "{inner}violations.Add(new NexgenRuntime::Violation(path, {} + discriminant.GetRawText() + {}));\n{inner}return null;\n",
                 cs_string(&format!("unknown discriminator {discriminant} ")),
                 cs_string(&format!(": expected one of [{}]", known.join(", ")))
             ));
@@ -1499,7 +1501,7 @@ fn render_union_converter(out: &mut String, union: &CsUnion) {
         ));
     }
     out.push_str(&format!(
-        "{indent}violations.Add(new Violation(path, {}));\n{indent}return null;\n    }}\n\n",
+        "{indent}violations.Add(new NexgenRuntime::Violation(path, {}));\n{indent}return null;\n    }}\n\n",
         cs_string(&format!("expected one of: {}", union.admissible()))
     ));
 
@@ -1525,7 +1527,7 @@ fn render_union_converter(out: &mut String, union: &CsUnion) {
         out.push_str(&format!("{indent}        break;\n"));
     }
     out.push_str(&format!(
-        "{indent}    default:\n{indent}        violations.Add(new Violation(path, {}));\n{indent}        break;\n{indent}}}\n    }}\n\n",
+        "{indent}    default:\n{indent}        violations.Add(new NexgenRuntime::Violation(path, {}));\n{indent}        break;\n{indent}}}\n    }}\n\n",
         cs_string(&format!("expected one of: {}", union.admissible()))
     ));
 
@@ -1567,7 +1569,7 @@ fn render_union_read_object(
 ) {
     if variant.owned_object {
         out.push_str(&format!(
-            "{indent}return new {}.{}(SpecJson.Members(node));\n",
+            "{indent}return new {}.{}(NexgenRuntime::SpecJson.Members(node));\n",
             union.interface, variant.class
         ));
     } else {

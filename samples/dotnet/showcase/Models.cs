@@ -7,6 +7,7 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NexgenRuntime = global::Nexgen.JsonSchema.Showcase;
 
 namespace Nexgen.JsonSchema.Showcase
 {
@@ -51,20 +52,20 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Street, other.Street)
-                && ValueEquality.Equal(City, other.City)
-                && ValueEquality.Equal(Zip, other.Zip)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Street, other.Street)
+                && NexgenRuntime::ValueEquality.Equal(City, other.City)
+                && NexgenRuntime::ValueEquality.Equal(Zip, other.Zip)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Street));
-            hash.Add(ValueEquality.Hash(City));
-            hash.Add(ValueEquality.Hash(Zip));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Street));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(City));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Zip));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -80,11 +81,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Address Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -92,29 +93,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Address value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Address? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Address? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -127,17 +128,17 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedStreet = null;
                 if (!members.TryGetValue("street", out var nodeStreet))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "street"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "street"), "required"));
                 }
                 else if (nodeStreet.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "street"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "street"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeStreet.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "street"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "street"), "expected string"));
                     }
                     else
                     {
@@ -151,13 +152,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeCity.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "city"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "city"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeCity.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "city"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "city"), "expected string"));
                     }
                     else
                     {
@@ -171,11 +172,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeZip.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "zip"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "zip"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeZip, Violation.Join(path, "zip"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeZip, NexgenRuntime::Violation.Join(path, "zip"), violations) is { } value0)
                     {
                         parsedZip = value0;
                     }
@@ -193,18 +194,18 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(Address value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Address value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Street is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "street"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "street"), "required"));
                 }
                 {
                     if (value.Zip is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "zip"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "zip"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                     }
                 }
@@ -223,7 +224,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -231,7 +232,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "street" or "city" or "zip" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -288,14 +289,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -311,11 +312,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override AddressBook Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -323,36 +324,36 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, AddressBook value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static AddressBook? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static AddressBook? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, Address>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (Address.Converter.Parse(member.Value, memberPath, violations) is { } model0)
@@ -367,22 +368,22 @@ namespace Nexgen.JsonSchema.Showcase
                 return new AddressBook { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(AddressBook value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(AddressBook value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
                     if (entry.Value is { } member)
                     {
-                        Address.Converter.Validate(member, Violation.Member(path, entry.Key), violations);
+                        Address.Converter.Validate(member, NexgenRuntime::Violation.Member(path, entry.Key), violations);
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Member(path, entry.Key), "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "explicit null not allowed"));
                     }
                 }
             }
@@ -430,14 +431,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -453,11 +454,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Attributes Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -465,41 +466,41 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Attributes value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Attributes? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Attributes? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, string>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (member.Value.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(memberPath, "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "expected string"));
                     }
                     else
                     {
@@ -509,19 +510,19 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (members.Count < 1)
                 {
-                    violations.Add(new Violation(path, "must have at least 1 properties, got " + members.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 properties, got " + members.Count));
                 }
                 if (members.Count > 3)
                 {
-                    violations.Add(new Violation(path, "must have at most 3 properties, got " + members.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 3 properties, got " + members.Count));
                 }
                 foreach (var propertyName in members.Keys)
                 {
                     var nameViolationStart = violations.Count;
-                    var nameLength = SpecJson.CodePoints(propertyName);
+                    var nameLength = NexgenRuntime::SpecJson.CodePoints(propertyName);
                     if (nameLength > 8)
                     {
-                        violations.Add(new Violation(Violation.Member(path, propertyName), "must have length <= 8, got " + nameLength));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, propertyName), "must have length <= 8, got " + nameLength));
                     }
                     for (var nameViolation = nameViolationStart; nameViolation < violations.Count; nameViolation++)
                     {
@@ -535,28 +536,28 @@ namespace Nexgen.JsonSchema.Showcase
                 return new Attributes { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(Attributes value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Attributes value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 if (value.AdditionalProperties.Count < 1)
                 {
-                    violations.Add(new Violation(path, "must have at least 1 properties, got " + value.AdditionalProperties.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 properties, got " + value.AdditionalProperties.Count));
                 }
                 if (value.AdditionalProperties.Count > 3)
                 {
-                    violations.Add(new Violation(path, "must have at most 3 properties, got " + value.AdditionalProperties.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 3 properties, got " + value.AdditionalProperties.Count));
                 }
                 foreach (var propertyName in value.AdditionalProperties.Keys)
                 {
                     var nameViolationStart = violations.Count;
-                    var nameLength = SpecJson.CodePoints(propertyName);
+                    var nameLength = NexgenRuntime::SpecJson.CodePoints(propertyName);
                     if (nameLength > 8)
                     {
-                        violations.Add(new Violation(Violation.Member(path, propertyName), "must have length <= 8, got " + nameLength));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, propertyName), "must have length <= 8, got " + nameLength));
                     }
                     for (var nameViolation = nameViolationStart; nameViolation < violations.Count; nameViolation++)
                     {
@@ -570,7 +571,7 @@ namespace Nexgen.JsonSchema.Showcase
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Member(path, entry.Key), "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "explicit null not allowed"));
                     }
                 }
             }
@@ -618,14 +619,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -641,11 +642,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override BlobIndex Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -653,46 +654,46 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, BlobIndex value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static BlobIndex? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static BlobIndex? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, byte[]>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (member.Value.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(memberPath, "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "expected string"));
                     }
                     else
                     {
                         var text0 = member.Value.GetString()!;
-                        if (Base64Support.ParseBase64(text0, memberPath, violations) is { } bytes0)
+                        if (NexgenRuntime::Base64Support.ParseBase64(text0, memberPath, violations) is { } bytes0)
                         {
                             additionalProperties[member.Key] = bytes0;
                         }
@@ -705,11 +706,11 @@ namespace Nexgen.JsonSchema.Showcase
                 return new BlobIndex { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(BlobIndex value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(BlobIndex value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
@@ -719,7 +720,7 @@ namespace Nexgen.JsonSchema.Showcase
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Member(path, entry.Key), "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "explicit null not allowed"));
                     }
                 }
             }
@@ -732,7 +733,7 @@ namespace Nexgen.JsonSchema.Showcase
                     writer.WritePropertyName(entry.Key);
                     if (entry.Value is { } entryValue)
                     {
-                        writer.WriteStringValue(Base64Support.FormatBase64(entryValue));
+                        writer.WriteStringValue(NexgenRuntime::Base64Support.FormatBase64(entryValue));
                     }
                     else
                     {
@@ -767,14 +768,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -790,11 +791,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Choices Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -802,36 +803,36 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Choices value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Choices? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Choices? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, ChoicesValue>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (ChoicesValue.Converter.Parse(member.Value, memberPath, violations) is { } model0)
@@ -846,22 +847,22 @@ namespace Nexgen.JsonSchema.Showcase
                 return new Choices { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(Choices value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Choices value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
                     if (entry.Value is { } member)
                     {
-                        ChoicesValue.Converter.Validate(member, Violation.Member(path, entry.Key), violations);
+                        ChoicesValue.Converter.Validate(member, NexgenRuntime::Violation.Member(path, entry.Key), violations);
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Member(path, entry.Key), "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "explicit null not allowed"));
                     }
                 }
             }
@@ -905,11 +906,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ChoicesValue Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -917,27 +918,27 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ChoicesValue value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ChoicesValue? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ChoicesValue? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind == global::System.Text.Json.JsonValueKind.Object)
                 {
                     if (!node.TryGetProperty("kind", out var discriminant) || discriminant.ValueKind is global::System.Text.Json.JsonValueKind.Null or global::System.Text.Json.JsonValueKind.Object or global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(path, "discriminator \"kind\" is required"));
+                        violations.Add(new NexgenRuntime::Violation(path, "discriminator \"kind\" is required"));
                         return null;
                     }
                     if (discriminant.ValueKind == global::System.Text.Json.JsonValueKind.String && discriminant.GetString() == "circle")
@@ -948,14 +949,14 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         return Square.Converter.Parse(node, path, violations);
                     }
-                    violations.Add(new Violation(path, "unknown discriminator kind " + discriminant.GetRawText() + ": expected one of [circle, square]"));
+                    violations.Add(new NexgenRuntime::Violation(path, "unknown discriminator kind " + discriminant.GetRawText() + ": expected one of [circle, square]"));
                     return null;
                 }
-                violations.Add(new Violation(path, "expected one of: Circle, Square"));
+                violations.Add(new NexgenRuntime::Violation(path, "expected one of: Circle, Square"));
                 return null;
             }
 
-            internal static void Validate(ChoicesValue value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ChoicesValue value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 switch (value)
                 {
@@ -966,7 +967,7 @@ namespace Nexgen.JsonSchema.Showcase
                         Square.Converter.Validate(variant1, path, violations);
                         break;
                     default:
-                        violations.Add(new Violation(path, "expected one of: Circle, Square"));
+                        violations.Add(new NexgenRuntime::Violation(path, "expected one of: Circle, Square"));
                         break;
                 }
             }
@@ -1051,18 +1052,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Kind, other.Kind)
-                && ValueEquality.Equal(Radius, other.Radius)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(Radius, other.Radius)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Kind));
-            hash.Add(ValueEquality.Hash(Radius));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Radius));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1078,11 +1079,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Circle Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -1090,29 +1091,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Circle value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Circle? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Circle? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -1125,17 +1126,17 @@ namespace Nexgen.JsonSchema.Showcase
                 KindValue? parsedKind = null;
                 if (!members.TryGetValue("kind", out var nodeKind))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 else if (nodeKind.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeKind.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "kind"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "expected string"));
                     }
                     else
                     {
@@ -1146,22 +1147,22 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "kind"), "must equal \"circle\", got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "must equal \"circle\", got " + closed0));
                         }
                     }
                 }
                 double? parsedRadius = null;
                 if (!members.TryGetValue("radius", out var nodeRadius))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "radius"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "radius"), "required"));
                 }
                 else if (nodeRadius.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "radius"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "radius"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeRadius, Violation.Join(path, "radius"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeRadius, NexgenRuntime::Violation.Join(path, "radius"), violations) is { } value0)
                     {
                         parsedRadius = value0;
                     }
@@ -1178,17 +1179,17 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(Circle value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Circle value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Kind is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 {
                     var member = value.Radius;
                     if (!double.IsFinite(member))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "radius"), "must be a finite number, got " + member));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "radius"), "must be a finite number, got " + member));
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -1199,7 +1200,7 @@ namespace Nexgen.JsonSchema.Showcase
                 wireKeys.Add("radius");
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -1207,7 +1208,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "kind" or "radius" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -1271,20 +1272,20 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Email, other.Email)
-                && ValueEquality.Equal(ShippingStreet, other.ShippingStreet)
-                && ValueEquality.Equal(ShippingZip, other.ShippingZip)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Email, other.Email)
+                && NexgenRuntime::ValueEquality.Equal(ShippingStreet, other.ShippingStreet)
+                && NexgenRuntime::ValueEquality.Equal(ShippingZip, other.ShippingZip)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Email));
-            hash.Add(ValueEquality.Hash(ShippingStreet));
-            hash.Add(ValueEquality.Hash(ShippingZip));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Email));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(ShippingStreet));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(ShippingZip));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1300,11 +1301,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ContactCs Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -1312,29 +1313,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ContactCs value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ContactCs? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ContactCs? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -1350,13 +1351,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeEmail.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "email"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "email"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeEmail.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "email"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "email"), "expected string"));
                     }
                     else
                     {
@@ -1370,13 +1371,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeShippingStreet.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "shippingStreet"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shippingStreet"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeShippingStreet.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "shippingStreet"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shippingStreet"), "expected string"));
                     }
                     else
                     {
@@ -1390,13 +1391,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeShippingZip.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "shippingZip"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shippingZip"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeShippingZip.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "shippingZip"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shippingZip"), "expected string"));
                     }
                     else
                     {
@@ -1406,17 +1407,17 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (members.Count < 1)
                 {
-                    violations.Add(new Violation(path, "must have at least 1 properties, got " + members.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 properties, got " + members.Count));
                 }
                 if (members.Count > 3)
                 {
-                    violations.Add(new Violation(path, "must have at most 3 properties, got " + members.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 3 properties, got " + members.Count));
                 }
                 if (members.ContainsKey("shippingStreet"))
                 {
                     if (!(members.ContainsKey("shippingZip")))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "shippingZip"), "property \"shippingZip\" is required when \"shippingStreet\" is present"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shippingZip"), "property \"shippingZip\" is required when \"shippingStreet\" is present"));
                     }
                 }
                 if (violations.Count > start)
@@ -1432,7 +1433,7 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ContactCs value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ContactCs value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
                 if (value.Email is not null)
@@ -1449,7 +1450,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -1457,23 +1458,23 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "email" or "shippingStreet" or "shippingZip" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
                 if (wireKeys.Count < 1)
                 {
-                    violations.Add(new Violation(path, "must have at least 1 properties, got " + wireKeys.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 properties, got " + wireKeys.Count));
                 }
                 if (wireKeys.Count > 3)
                 {
-                    violations.Add(new Violation(path, "must have at most 3 properties, got " + wireKeys.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 3 properties, got " + wireKeys.Count));
                 }
                 if (wireKeys.Contains("shippingStreet"))
                 {
                     if (!(wireKeys.Contains("shippingZip")))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "shippingZip"), "property \"shippingZip\" is required when \"shippingStreet\" is present"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shippingZip"), "property \"shippingZip\" is required when \"shippingStreet\" is present"));
                     }
                 }
             }
@@ -1529,14 +1530,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1552,11 +1553,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override DateIndex Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -1564,46 +1565,46 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, DateIndex value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static DateIndex? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static DateIndex? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.DateOnly>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (member.Value.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(memberPath, "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "expected string"));
                     }
                     else
                     {
                         var text0 = member.Value.GetString()!;
-                        if (TemporalSupport.ParseDate(text0, memberPath, violations) is { } temporal0)
+                        if (NexgenRuntime::TemporalSupport.ParseDate(text0, memberPath, violations) is { } temporal0)
                         {
                             additionalProperties[member.Key] = temporal0;
                         }
@@ -1616,18 +1617,18 @@ namespace Nexgen.JsonSchema.Showcase
                 return new DateIndex { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(DateIndex value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(DateIndex value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
                     if (entry.Value is { } member)
                     {
-                        TemporalSupport.CheckDate(member, Violation.Member(path, entry.Key), violations);
+                        NexgenRuntime::TemporalSupport.CheckDate(member, NexgenRuntime::Violation.Member(path, entry.Key), violations);
                     }
                 }
             }
@@ -1638,7 +1639,7 @@ namespace Nexgen.JsonSchema.Showcase
                 foreach (var entry in value.AdditionalProperties)
                 {
                     writer.WritePropertyName(entry.Key);
-                    writer.WriteStringValue(TemporalSupport.FormatDate(entry.Value));
+                    writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDate(entry.Value));
                 }
                 writer.WriteEndObject();
             }
@@ -1668,14 +1669,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -1691,11 +1692,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Extras Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -1703,29 +1704,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Extras value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Extras? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Extras? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -1733,7 +1734,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (members.Count > 4)
                 {
-                    violations.Add(new Violation(path, "must have at most 4 properties, got " + members.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 4 properties, got " + members.Count));
                 }
                 if (violations.Count > start)
                 {
@@ -1745,12 +1746,12 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(Extras value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Extras value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -1758,13 +1759,13 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
                 if (wireKeys.Count > 4)
                 {
-                    violations.Add(new Violation(path, "must have at most 4 properties, got " + wireKeys.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 4 properties, got " + wireKeys.Count));
                 }
             }
 
@@ -1804,14 +1805,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Values, other.Values);
+            return NexgenRuntime::ValueEquality.Equal(Values, other.Values);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Values));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Values));
             return hash.ToHashCode();
         }
 
@@ -1827,11 +1828,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ItemRules Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -1839,51 +1840,51 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ItemRules value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ItemRules? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ItemRules? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "values")
                     {
                         continue;
                     }
-                    violations.Add(new Violation(Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
                 }
                 global::System.Collections.Generic.IReadOnlyList<string>? parsedValues = null;
                 if (!members.TryGetValue("values", out var nodeValues))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "values"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "values"), "required"));
                 }
                 else if (nodeValues.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "values"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "values"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeValues.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "values"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "values"), "expected array"));
                     }
                     else
                     {
@@ -1891,38 +1892,38 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeValues.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "values"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "values"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
                                 var value1 = item0.GetString()!;
                                 if (!(string.Equals(value1, "fixed", global::System.StringComparison.Ordinal)))
                                 {
-                                    violations.Add(new Violation(itemPath0, "must equal \"fixed\", got " + value1));
+                                    violations.Add(new NexgenRuntime::Violation(itemPath0, "must equal \"fixed\", got " + value1));
                                 }
                                 items0.Add(value1);
                             }
                         }
                         if (nodeValues.GetArrayLength() < 3)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "values"), "must have at least 3 items, got " + nodeValues.GetArrayLength()));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "values"), "must have at least 3 items, got " + nodeValues.GetArrayLength()));
                         }
                         var rawSeen0 = new global::System.Collections.Generic.Dictionary<string, int>(global::System.StringComparer.Ordinal);
                         var rawIndex0 = 0;
                         foreach (var rawElement in nodeValues.EnumerateArray())
                         {
-                            var rawKey = SpecJson.ValueKey(rawElement);
+                            var rawKey = NexgenRuntime::SpecJson.ValueKey(rawElement);
                             if (rawSeen0.TryGetValue(rawKey, out var priorIndex))
                             {
-                                violations.Add(new Violation(Violation.Join(path, "values"), "duplicate items: element at index " + rawIndex0 + " equals index " + priorIndex));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "values"), "duplicate items: element at index " + rawIndex0 + " equals index " + priorIndex));
                             }
                             else
                             {
@@ -1943,7 +1944,7 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ItemRules value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ItemRules value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 {
                     if (value.Values is { } member)
@@ -1954,25 +1955,25 @@ namespace Nexgen.JsonSchema.Showcase
                             {
                                 if (!(string.Equals(item0, "fixed", global::System.StringComparison.Ordinal)))
                                 {
-                                    violations.Add(new Violation(Violation.Index(Violation.Join(path, "values"), index0), "must equal \"fixed\", got " + item0));
+                                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "values"), index0), "must equal \"fixed\", got " + item0));
                                 }
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "values"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "values"), index0), "explicit null not allowed"));
                             }
                         }
                         if (member.Count < 3)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "values"), "must have at least 3 items, got " + member.Count));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "values"), "must have at least 3 items, got " + member.Count));
                         }
-                        var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(ValueEquality.Comparer);
+                        var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(NexgenRuntime::ValueEquality.Comparer);
                         for (var uniqueIndex0 = 0; uniqueIndex0 < member.Count; uniqueIndex0++)
                         {
-                            var key = (object?)member[uniqueIndex0] ?? ValueEquality.NullKey;
+                            var key = (object?)member[uniqueIndex0] ?? NexgenRuntime::ValueEquality.NullKey;
                             if (seen0.TryGetValue(key, out var priorIndex))
                             {
-                                violations.Add(new Violation(Violation.Join(path, "values"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "values"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
                             }
                             else
                             {
@@ -1982,7 +1983,7 @@ namespace Nexgen.JsonSchema.Showcase
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "values"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "values"), "required"));
                     }
                 }
             }
@@ -2035,14 +2036,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2058,11 +2059,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Labels Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -2070,41 +2071,41 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Labels value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Labels? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Labels? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, string>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (member.Value.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(memberPath, "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "expected string"));
                     }
                     else
                     {
@@ -2114,7 +2115,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (members.Count > 50)
                 {
-                    violations.Add(new Violation(path, "must have at most 50 properties, got " + members.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 50 properties, got " + members.Count));
                 }
                 if (violations.Count > start)
                 {
@@ -2123,16 +2124,16 @@ namespace Nexgen.JsonSchema.Showcase
                 return new Labels { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(Labels value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Labels value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 if (value.AdditionalProperties.Count > 50)
                 {
-                    violations.Add(new Violation(path, "must have at most 50 properties, got " + value.AdditionalProperties.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 50 properties, got " + value.AdditionalProperties.Count));
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
@@ -2141,7 +2142,7 @@ namespace Nexgen.JsonSchema.Showcase
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Member(path, entry.Key), "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "explicit null not allowed"));
                     }
                 }
             }
@@ -2231,18 +2232,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Kind, other.Kind)
-                && ValueEquality.Equal(Href, other.Href)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(Href, other.Href)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Kind));
-            hash.Add(ValueEquality.Hash(Href));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Href));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2258,11 +2259,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override LinkNote Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -2270,29 +2271,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, LinkNote value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static LinkNote? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static LinkNote? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -2305,17 +2306,17 @@ namespace Nexgen.JsonSchema.Showcase
                 KindValue? parsedKind = null;
                 if (!members.TryGetValue("kind", out var nodeKind))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 else if (nodeKind.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeKind.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "kind"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "expected string"));
                     }
                     else
                     {
@@ -2326,32 +2327,32 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "kind"), "must equal \"link\", got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "must equal \"link\", got " + closed0));
                         }
                     }
                 }
                 string? parsedHref = null;
                 if (!members.TryGetValue("href", out var nodeHref))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "href"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "href"), "required"));
                 }
                 else if (nodeHref.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "href"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "href"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeHref.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "href"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "href"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeHref.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "href"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "href"), "must have length >= 1, got " + length0));
                         }
                         parsedHref = value0;
                     }
@@ -2368,24 +2369,24 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(LinkNote value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(LinkNote value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Kind is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 {
                     if (value.Href is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "href"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "href"), "must have length >= 1, got " + length0));
                         }
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "href"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "href"), "required"));
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -2399,7 +2400,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -2407,7 +2408,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "kind" or "href" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -2459,14 +2460,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2482,11 +2483,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Metrics Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -2494,39 +2495,39 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Metrics value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Metrics? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Metrics? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, double>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
-                    if (SpecJson.SpecDouble(member.Value, memberPath, violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(member.Value, memberPath, violations) is { } value0)
                     {
                         additionalProperties[member.Key] = value0;
                     }
@@ -2538,11 +2539,11 @@ namespace Nexgen.JsonSchema.Showcase
                 return new Metrics { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(Metrics value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Metrics value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
@@ -2551,7 +2552,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!double.IsFinite(member))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "must be a finite number, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "must be a finite number, got " + member));
                         }
                     }
                 }
@@ -2593,14 +2594,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2616,11 +2617,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Nicknames Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -2628,33 +2629,33 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Nicknames value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Nicknames? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Nicknames? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, string?>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
                         additionalProperties[member.Key] = null;
@@ -2662,15 +2663,15 @@ namespace Nexgen.JsonSchema.Showcase
                     }
                     if (member.Value.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(memberPath, "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "expected string"));
                     }
                     else
                     {
                         var value0 = member.Value.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 2)
                         {
-                            violations.Add(new Violation(memberPath, "must have length >= 2, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(memberPath, "must have length >= 2, got " + length0));
                         }
                         additionalProperties[member.Key] = value0;
                     }
@@ -2682,21 +2683,21 @@ namespace Nexgen.JsonSchema.Showcase
                 return new Nicknames { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(Nicknames value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Nicknames value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
                     if (entry.Value is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 2)
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "must have length >= 2, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "must have length >= 2, got " + length0));
                         }
                     }
                 }
@@ -2741,11 +2742,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Note Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -2753,27 +2754,27 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Note value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Note? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Note? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind == global::System.Text.Json.JsonValueKind.Object)
                 {
                     if (!node.TryGetProperty("kind", out var discriminant) || discriminant.ValueKind is global::System.Text.Json.JsonValueKind.Null or global::System.Text.Json.JsonValueKind.Object or global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(path, "discriminator \"kind\" is required"));
+                        violations.Add(new NexgenRuntime::Violation(path, "discriminator \"kind\" is required"));
                         return null;
                     }
                     if (discriminant.ValueKind == global::System.Text.Json.JsonValueKind.String && discriminant.GetString() == "text")
@@ -2784,14 +2785,14 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         return LinkNote.Converter.Parse(node, path, violations);
                     }
-                    violations.Add(new Violation(path, "unknown discriminator kind " + discriminant.GetRawText() + ": expected one of [text, link]"));
+                    violations.Add(new NexgenRuntime::Violation(path, "unknown discriminator kind " + discriminant.GetRawText() + ": expected one of [text, link]"));
                     return null;
                 }
-                violations.Add(new Violation(path, "expected one of: TextNote, LinkNote"));
+                violations.Add(new NexgenRuntime::Violation(path, "expected one of: TextNote, LinkNote"));
                 return null;
             }
 
-            internal static void Validate(Note value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Note value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 switch (value)
                 {
@@ -2802,7 +2803,7 @@ namespace Nexgen.JsonSchema.Showcase
                         LinkNote.Converter.Validate(variant1, path, violations);
                         break;
                     default:
-                        violations.Add(new Violation(path, "expected one of: TextNote, LinkNote"));
+                        violations.Add(new NexgenRuntime::Violation(path, "expected one of: TextNote, LinkNote"));
                         break;
                 }
             }
@@ -2845,14 +2846,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -2868,11 +2869,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Quotas Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -2880,51 +2881,51 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Quotas value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Quotas? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Quotas? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, long>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
-                    if (SpecJson.SpecLong(member.Value, memberPath, violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(member.Value, memberPath, violations) is { } value0)
                     {
                         if (value0 < 0L)
                         {
-                            violations.Add(new Violation(memberPath, "must be >= 0, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(memberPath, "must be >= 0, got " + value0));
                         }
                         if (value0 > 100L)
                         {
-                            violations.Add(new Violation(memberPath, "must be <= 100, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(memberPath, "must be <= 100, got " + value0));
                         }
                         if (value0 % 5L != 0)
                         {
-                            violations.Add(new Violation(memberPath, "must be a multiple of 5, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(memberPath, "must be a multiple of 5, got " + value0));
                         }
                         additionalProperties[member.Key] = value0;
                     }
@@ -2936,32 +2937,32 @@ namespace Nexgen.JsonSchema.Showcase
                 return new Quotas { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(Quotas value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Quotas value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
                     if (entry.Value is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                         if (member < 0L)
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "must be >= 0, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "must be >= 0, got " + member));
                         }
                         if (member > 100L)
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "must be <= 100, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "must be <= 100, got " + member));
                         }
                         if (member % 5L != 0)
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "must be a multiple of 5, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "must be a multiple of 5, got " + member));
                         }
                     }
                 }
@@ -3008,16 +3009,16 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Theme, other.Theme)
-                && ValueEquality.Equal(FontSize, other.FontSize);
+            return NexgenRuntime::ValueEquality.Equal(Theme, other.Theme)
+                && NexgenRuntime::ValueEquality.Equal(FontSize, other.FontSize);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Theme));
-            hash.Add(ValueEquality.Hash(FontSize));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Theme));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(FontSize));
             return hash.ToHashCode();
         }
 
@@ -3033,11 +3034,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Settings Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -3045,36 +3046,36 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Settings value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Settings? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Settings? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "theme" || member.Key == "fontSize")
                     {
                         continue;
                     }
-                    violations.Add(new Violation(Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
                 }
                 string? parsedTheme = null;
                 if (!members.TryGetValue("theme", out var nodeTheme))
@@ -3082,13 +3083,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeTheme.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "theme"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "theme"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeTheme.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "theme"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "theme"), "expected string"));
                     }
                     else
                     {
@@ -3102,11 +3103,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeFontSize.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "fontSize"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "fontSize"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeFontSize, Violation.Join(path, "fontSize"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeFontSize, NexgenRuntime::Violation.Join(path, "fontSize"), violations) is { } value0)
                     {
                         parsedFontSize = value0;
                     }
@@ -3122,14 +3123,14 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(Settings value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Settings value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 {
                     if (value.FontSize is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "fontSize"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "fontSize"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                     }
                 }
@@ -3172,11 +3173,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Shape Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -3184,27 +3185,27 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Shape value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Shape? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Shape? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind == global::System.Text.Json.JsonValueKind.Object)
                 {
                     if (!node.TryGetProperty("kind", out var discriminant) || discriminant.ValueKind is global::System.Text.Json.JsonValueKind.Null or global::System.Text.Json.JsonValueKind.Object or global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(path, "discriminator \"kind\" is required"));
+                        violations.Add(new NexgenRuntime::Violation(path, "discriminator \"kind\" is required"));
                         return null;
                     }
                     if (discriminant.ValueKind == global::System.Text.Json.JsonValueKind.String && discriminant.GetString() == "circle")
@@ -3215,14 +3216,14 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         return Square.Converter.Parse(node, path, violations);
                     }
-                    violations.Add(new Violation(path, "unknown discriminator kind " + discriminant.GetRawText() + ": expected one of [circle, square]"));
+                    violations.Add(new NexgenRuntime::Violation(path, "unknown discriminator kind " + discriminant.GetRawText() + ": expected one of [circle, square]"));
                     return null;
                 }
-                violations.Add(new Violation(path, "expected one of: Circle, Square"));
+                violations.Add(new NexgenRuntime::Violation(path, "expected one of: Circle, Square"));
                 return null;
             }
 
-            internal static void Validate(Shape value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Shape value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 switch (value)
                 {
@@ -3233,7 +3234,7 @@ namespace Nexgen.JsonSchema.Showcase
                         Square.Converter.Validate(variant1, path, violations);
                         break;
                     default:
-                        violations.Add(new Violation(path, "expected one of: Circle, Square"));
+                        violations.Add(new NexgenRuntime::Violation(path, "expected one of: Circle, Square"));
                         break;
                 }
             }
@@ -3490,20 +3491,20 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public string Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
-                    var length0 = SpecJson.CodePoints(Value);
+                    var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
                     if (length0 < 3)
                     {
-                        violations.Add(new Violation(path, "must have length >= 3, got " + length0));
+                        violations.Add(new NexgenRuntime::Violation(path, "must have length >= 3, got " + length0));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is IdOrNameUnionString other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is IdOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "IdOrNameUnionString[" + Value + "]";
@@ -3528,23 +3529,23 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public long Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
-                    if (Value < -SpecJson.IntegerCap || Value > SpecJson.IntegerCap)
+                    if (Value < -NexgenRuntime::SpecJson.IntegerCap || Value > NexgenRuntime::SpecJson.IntegerCap)
                     {
-                        violations.Add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+                        violations.Add(new NexgenRuntime::Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
                     }
                     if (Value < 1L)
                     {
-                        violations.Add(new Violation(path, "must be >= 1, got " + Value));
+                        violations.Add(new NexgenRuntime::Violation(path, "must be >= 1, got " + Value));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is IdOrNameUnionInteger other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is IdOrNameUnionInteger other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "IdOrNameUnionInteger[" + Value + "]";
@@ -3562,11 +3563,11 @@ namespace Nexgen.JsonSchema.Showcase
                 public override IdOrNameUnion Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
                 {
                     var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     var value = Parse(node, "", violations);
                     if (value is null || violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     return value;
                 }
@@ -3574,21 +3575,21 @@ namespace Nexgen.JsonSchema.Showcase
                 /// <inheritdoc/>
                 public override void Write(global::System.Text.Json.Utf8JsonWriter writer, IdOrNameUnion value, global::System.Text.Json.JsonSerializerOptions options)
                 {
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     if (value is null)
                     {
-                        violations.Add(new Violation("", "expected object"));
-                        throw Violation.Failure(violations);
+                        violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     Validate(value, "", violations);
                     if (violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     WriteValue(writer, value);
                 }
 
-                internal static IdOrNameUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static IdOrNameUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.String)
                     {
@@ -3605,18 +3606,18 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         var wrapperStart = violations.Count;
                         IdOrNameUnionInteger? wrapped = null;
-                        if (SpecJson.SpecLong(node, path, violations) is { } value0)
+                        if (NexgenRuntime::SpecJson.SpecLong(node, path, violations) is { } value0)
                         {
                             wrapped = new IdOrNameUnionInteger(value0);
                         }
                         wrapped?.Validate(path, violations);
                         return violations.Count > wrapperStart ? null : wrapped;
                     }
-                    violations.Add(new Violation(path, "expected one of: string, integer"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected one of: string, integer"));
                     return null;
                 }
 
-                internal static void Validate(IdOrNameUnion value, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static void Validate(IdOrNameUnion value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     switch (value)
                     {
@@ -3627,7 +3628,7 @@ namespace Nexgen.JsonSchema.Showcase
                             variant1.Validate(path, violations);
                             break;
                         default:
-                            violations.Add(new Violation(path, "expected one of: string, integer"));
+                            violations.Add(new NexgenRuntime::Violation(path, "expected one of: string, integer"));
                             break;
                     }
                 }
@@ -3673,19 +3674,19 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public string Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (!(string.Equals(Value, "auto", global::System.StringComparison.Ordinal)) && !(string.Equals(Value, "manual", global::System.StringComparison.Ordinal)))
                     {
-                        violations.Add(new Violation(path, "must be one of [\"auto\", \"manual\"], got " + Value));
+                        violations.Add(new NexgenRuntime::Violation(path, "must be one of [\"auto\", \"manual\"], got " + Value));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ModeUnionString other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is ModeUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "ModeUnionString[" + Value + "]";
@@ -3710,23 +3711,23 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public long Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
-                    if (Value < -SpecJson.IntegerCap || Value > SpecJson.IntegerCap)
+                    if (Value < -NexgenRuntime::SpecJson.IntegerCap || Value > NexgenRuntime::SpecJson.IntegerCap)
                     {
-                        violations.Add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+                        violations.Add(new NexgenRuntime::Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
                     }
                     if (Value < 0L)
                     {
-                        violations.Add(new Violation(path, "must be >= 0, got " + Value));
+                        violations.Add(new NexgenRuntime::Violation(path, "must be >= 0, got " + Value));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ModeUnionInteger other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is ModeUnionInteger other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "ModeUnionInteger[" + Value + "]";
@@ -3744,11 +3745,11 @@ namespace Nexgen.JsonSchema.Showcase
                 public override ModeUnion Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
                 {
                     var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     var value = Parse(node, "", violations);
                     if (value is null || violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     return value;
                 }
@@ -3756,21 +3757,21 @@ namespace Nexgen.JsonSchema.Showcase
                 /// <inheritdoc/>
                 public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ModeUnion value, global::System.Text.Json.JsonSerializerOptions options)
                 {
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     if (value is null)
                     {
-                        violations.Add(new Violation("", "expected object"));
-                        throw Violation.Failure(violations);
+                        violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     Validate(value, "", violations);
                     if (violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     WriteValue(writer, value);
                 }
 
-                internal static ModeUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static ModeUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.String)
                     {
@@ -3787,18 +3788,18 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         var wrapperStart = violations.Count;
                         ModeUnionInteger? wrapped = null;
-                        if (SpecJson.SpecLong(node, path, violations) is { } value0)
+                        if (NexgenRuntime::SpecJson.SpecLong(node, path, violations) is { } value0)
                         {
                             wrapped = new ModeUnionInteger(value0);
                         }
                         wrapped?.Validate(path, violations);
                         return violations.Count > wrapperStart ? null : wrapped;
                     }
-                    violations.Add(new Violation(path, "expected one of: string, integer"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected one of: string, integer"));
                     return null;
                 }
 
-                internal static void Validate(ModeUnion value, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static void Validate(ModeUnion value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     switch (value)
                     {
@@ -3809,7 +3810,7 @@ namespace Nexgen.JsonSchema.Showcase
                             variant1.Validate(path, violations);
                             break;
                         default:
-                            violations.Add(new Violation(path, "expected one of: string, integer"));
+                            violations.Add(new NexgenRuntime::Violation(path, "expected one of: string, integer"));
                             break;
                     }
                 }
@@ -3856,10 +3857,10 @@ namespace Nexgen.JsonSchema.Showcase
                 public global::System.Collections.Generic.IReadOnlyDictionary<string, global::System.Text.Json.JsonElement> Value { get; }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is PayloadUnionObject other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is PayloadUnionObject other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "PayloadUnionObject[" + Value + "]";
@@ -3885,10 +3886,10 @@ namespace Nexgen.JsonSchema.Showcase
                 public string Value { get; }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is PayloadUnionString other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is PayloadUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "PayloadUnionString[" + Value + "]";
@@ -3906,11 +3907,11 @@ namespace Nexgen.JsonSchema.Showcase
                 public override PayloadUnion Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
                 {
                     var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     var value = Parse(node, "", violations);
                     if (value is null || violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     return value;
                 }
@@ -3918,25 +3919,25 @@ namespace Nexgen.JsonSchema.Showcase
                 /// <inheritdoc/>
                 public override void Write(global::System.Text.Json.Utf8JsonWriter writer, PayloadUnion value, global::System.Text.Json.JsonSerializerOptions options)
                 {
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     if (value is null)
                     {
-                        violations.Add(new Violation("", "expected object"));
-                        throw Violation.Failure(violations);
+                        violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     Validate(value, "", violations);
                     if (violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     WriteValue(writer, value);
                 }
 
-                internal static PayloadUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static PayloadUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.Object)
                     {
-                        return new PayloadUnion.PayloadUnionObject(SpecJson.Members(node));
+                        return new PayloadUnion.PayloadUnionObject(NexgenRuntime::SpecJson.Members(node));
                     }
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.String)
                     {
@@ -3948,11 +3949,11 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         return violations.Count > wrapperStart ? null : wrapped;
                     }
-                    violations.Add(new Violation(path, "expected one of: object, string"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected one of: object, string"));
                     return null;
                 }
 
-                internal static void Validate(PayloadUnion value, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static void Validate(PayloadUnion value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     switch (value)
                     {
@@ -3961,7 +3962,7 @@ namespace Nexgen.JsonSchema.Showcase
                         case PayloadUnionString variant1:
                             break;
                         default:
-                            violations.Add(new Violation(path, "expected one of: object, string"));
+                            violations.Add(new NexgenRuntime::Violation(path, "expected one of: object, string"));
                             break;
                     }
                 }
@@ -4014,10 +4015,10 @@ namespace Nexgen.JsonSchema.Showcase
                 public string Value { get; }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is DetailUnionString other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is DetailUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "DetailUnionString[" + Value + "]";
@@ -4035,11 +4036,11 @@ namespace Nexgen.JsonSchema.Showcase
                 public override DetailUnion Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
                 {
                     var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     var value = Parse(node, "", violations);
                     if (value is null || violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     return value;
                 }
@@ -4047,21 +4048,21 @@ namespace Nexgen.JsonSchema.Showcase
                 /// <inheritdoc/>
                 public override void Write(global::System.Text.Json.Utf8JsonWriter writer, DetailUnion value, global::System.Text.Json.JsonSerializerOptions options)
                 {
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     if (value is null)
                     {
-                        violations.Add(new Violation("", "expected object"));
-                        throw Violation.Failure(violations);
+                        violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     Validate(value, "", violations);
                     if (violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     WriteValue(writer, value);
                 }
 
-                internal static DetailUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static DetailUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.Object)
                     {
@@ -4077,11 +4078,11 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         return violations.Count > wrapperStart ? null : wrapped;
                     }
-                    violations.Add(new Violation(path, "expected one of: ShowcaseDetailObject, string"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected one of: ShowcaseDetailObject, string"));
                     return null;
                 }
 
-                internal static void Validate(DetailUnion value, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static void Validate(DetailUnion value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     switch (value)
                     {
@@ -4091,7 +4092,7 @@ namespace Nexgen.JsonSchema.Showcase
                         case DetailUnionString variant1:
                             break;
                         default:
-                            violations.Add(new Violation(path, "expected one of: ShowcaseDetailObject, string"));
+                            violations.Add(new NexgenRuntime::Violation(path, "expected one of: ShowcaseDetailObject, string"));
                             break;
                     }
                 }
@@ -4137,20 +4138,20 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public string Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
-                    var length0 = SpecJson.CodePoints(Value);
+                    var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
                     if (length0 > 32)
                     {
-                        violations.Add(new Violation(path, "must have length <= 32, got " + length0));
+                        violations.Add(new NexgenRuntime::Violation(path, "must have length <= 32, got " + length0));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ShapeOrNameUnionString other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is ShapeOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "ShapeOrNameUnionString[" + Value + "]";
@@ -4168,11 +4169,11 @@ namespace Nexgen.JsonSchema.Showcase
                 public override ShapeOrNameUnion Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
                 {
                     var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     var value = Parse(node, "", violations);
                     if (value is null || violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     return value;
                 }
@@ -4180,27 +4181,27 @@ namespace Nexgen.JsonSchema.Showcase
                 /// <inheritdoc/>
                 public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShapeOrNameUnion value, global::System.Text.Json.JsonSerializerOptions options)
                 {
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     if (value is null)
                     {
-                        violations.Add(new Violation("", "expected object"));
-                        throw Violation.Failure(violations);
+                        violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     Validate(value, "", violations);
                     if (violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     WriteValue(writer, value);
                 }
 
-                internal static ShapeOrNameUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static ShapeOrNameUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.Object)
                     {
                         if (!node.TryGetProperty("kind", out var discriminant) || discriminant.ValueKind is global::System.Text.Json.JsonValueKind.Null or global::System.Text.Json.JsonValueKind.Object or global::System.Text.Json.JsonValueKind.Array)
                         {
-                            violations.Add(new Violation(path, "discriminator \"kind\" is required"));
+                            violations.Add(new NexgenRuntime::Violation(path, "discriminator \"kind\" is required"));
                             return null;
                         }
                         if (discriminant.ValueKind == global::System.Text.Json.JsonValueKind.String && discriminant.GetString() == "circle")
@@ -4211,7 +4212,7 @@ namespace Nexgen.JsonSchema.Showcase
                         {
                             return Square.Converter.Parse(node, path, violations);
                         }
-                        violations.Add(new Violation(path, "unknown discriminator kind " + discriminant.GetRawText() + ": expected one of [circle, square]"));
+                        violations.Add(new NexgenRuntime::Violation(path, "unknown discriminator kind " + discriminant.GetRawText() + ": expected one of [circle, square]"));
                         return null;
                     }
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.String)
@@ -4225,11 +4226,11 @@ namespace Nexgen.JsonSchema.Showcase
                         wrapped?.Validate(path, violations);
                         return violations.Count > wrapperStart ? null : wrapped;
                     }
-                    violations.Add(new Violation(path, "expected one of: Circle, Square, string"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected one of: Circle, Square, string"));
                     return null;
                 }
 
-                internal static void Validate(ShapeOrNameUnion value, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static void Validate(ShapeOrNameUnion value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     switch (value)
                     {
@@ -4243,7 +4244,7 @@ namespace Nexgen.JsonSchema.Showcase
                             variant2.Validate(path, violations);
                             break;
                         default:
-                            violations.Add(new Violation(path, "expected one of: Circle, Square, string"));
+                            violations.Add(new NexgenRuntime::Violation(path, "expected one of: Circle, Square, string"));
                             break;
                     }
                 }
@@ -4292,27 +4293,27 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public global::System.Collections.Generic.IReadOnlyList<double> Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     for (var index0 = 0; index0 < Value.Count; index0++)
                     {
                         var item0 = Value[index0];
                         if (!double.IsFinite(item0))
                         {
-                            violations.Add(new Violation(Violation.Index(path, index0), "must be a finite number, got " + item0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(path, index0), "must be a finite number, got " + item0));
                         }
                     }
                     if (Value.Count < 1)
                     {
-                        violations.Add(new Violation(path, "must have at least 1 items, got " + Value.Count));
+                        violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 items, got " + Value.Count));
                     }
-                    var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(ValueEquality.Comparer);
+                    var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(NexgenRuntime::ValueEquality.Comparer);
                     for (var uniqueIndex0 = 0; uniqueIndex0 < Value.Count; uniqueIndex0++)
                     {
-                        var key = (object?)SpecJson.NumberKey(Value[uniqueIndex0]) ?? ValueEquality.NullKey;
+                        var key = (object?)NexgenRuntime::SpecJson.NumberKey(Value[uniqueIndex0]) ?? NexgenRuntime::ValueEquality.NullKey;
                         if (seen0.TryGetValue(key, out var priorIndex))
                         {
-                            violations.Add(new Violation(path, "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
+                            violations.Add(new NexgenRuntime::Violation(path, "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
                         }
                         else
                         {
@@ -4322,10 +4323,10 @@ namespace Nexgen.JsonSchema.Showcase
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MeasurementsUnionArray other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is MeasurementsUnionArray other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "MeasurementsUnionArray[" + Value + "]";
@@ -4352,19 +4353,19 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public string Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (!ValuePattern.IsMatch(Value))
                     {
-                        violations.Add(new Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + Value));
+                        violations.Add(new NexgenRuntime::Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + Value));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MeasurementsUnionString other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is MeasurementsUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "MeasurementsUnionString[" + Value + "]";
@@ -4382,11 +4383,11 @@ namespace Nexgen.JsonSchema.Showcase
                 public override MeasurementsUnion Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
                 {
                     var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     var value = Parse(node, "", violations);
                     if (value is null || violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     return value;
                 }
@@ -4394,21 +4395,21 @@ namespace Nexgen.JsonSchema.Showcase
                 /// <inheritdoc/>
                 public override void Write(global::System.Text.Json.Utf8JsonWriter writer, MeasurementsUnion value, global::System.Text.Json.JsonSerializerOptions options)
                 {
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     if (value is null)
                     {
-                        violations.Add(new Violation("", "expected object"));
-                        throw Violation.Failure(violations);
+                        violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     Validate(value, "", violations);
                     if (violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     WriteValue(writer, value);
                 }
 
-                internal static MeasurementsUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static MeasurementsUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.Array)
                     {
@@ -4419,29 +4420,29 @@ namespace Nexgen.JsonSchema.Showcase
                             var index0 = 0;
                             foreach (var item0 in node.EnumerateArray())
                             {
-                                var itemPath0 = Violation.Index(path, index0++);
+                                var itemPath0 = NexgenRuntime::Violation.Index(path, index0++);
                                 if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                                 {
-                                    violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                    violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                     continue;
                                 }
-                                if (SpecJson.SpecDouble(item0, itemPath0, violations) is { } value1)
+                                if (NexgenRuntime::SpecJson.SpecDouble(item0, itemPath0, violations) is { } value1)
                                 {
                                     items0.Add(value1);
                                 }
                             }
                             if (node.GetArrayLength() < 1)
                             {
-                                violations.Add(new Violation(path, "must have at least 1 items, got " + node.GetArrayLength()));
+                                violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 items, got " + node.GetArrayLength()));
                             }
                             var rawSeen0 = new global::System.Collections.Generic.Dictionary<string, int>(global::System.StringComparer.Ordinal);
                             var rawIndex0 = 0;
                             foreach (var rawElement in node.EnumerateArray())
                             {
-                                var rawKey = SpecJson.ValueKey(rawElement);
+                                var rawKey = NexgenRuntime::SpecJson.ValueKey(rawElement);
                                 if (rawSeen0.TryGetValue(rawKey, out var priorIndex))
                                 {
-                                    violations.Add(new Violation(path, "duplicate items: element at index " + rawIndex0 + " equals index " + priorIndex));
+                                    violations.Add(new NexgenRuntime::Violation(path, "duplicate items: element at index " + rawIndex0 + " equals index " + priorIndex));
                                 }
                                 else
                                 {
@@ -4464,11 +4465,11 @@ namespace Nexgen.JsonSchema.Showcase
                         wrapped?.Validate(path, violations);
                         return violations.Count > wrapperStart ? null : wrapped;
                     }
-                    violations.Add(new Violation(path, "expected one of: array, string"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected one of: array, string"));
                     return null;
                 }
 
-                internal static void Validate(MeasurementsUnion value, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static void Validate(MeasurementsUnion value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     switch (value)
                     {
@@ -4479,7 +4480,7 @@ namespace Nexgen.JsonSchema.Showcase
                             variant1.Validate(path, violations);
                             break;
                         default:
-                            violations.Add(new Violation(path, "expected one of: array, string"));
+                            violations.Add(new NexgenRuntime::Violation(path, "expected one of: array, string"));
                             break;
                     }
                 }
@@ -4530,19 +4531,19 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public double Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (!double.IsFinite(Value))
                     {
-                        violations.Add(new Violation(path, "must be a finite number, got " + Value));
+                        violations.Add(new NexgenRuntime::Violation(path, "must be a finite number, got " + Value));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MetricOrLabelUnionNumber other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is MetricOrLabelUnionNumber other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "MetricOrLabelUnionNumber[" + Value + "]";
@@ -4567,20 +4568,20 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public string Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
-                    var length0 = SpecJson.CodePoints(Value);
+                    var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
                     if (length0 < 1)
                     {
-                        violations.Add(new Violation(path, "must have length >= 1, got " + length0));
+                        violations.Add(new NexgenRuntime::Violation(path, "must have length >= 1, got " + length0));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MetricOrLabelUnionString other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is MetricOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "MetricOrLabelUnionString[" + Value + "]";
@@ -4598,11 +4599,11 @@ namespace Nexgen.JsonSchema.Showcase
                 public override MetricOrLabelUnion Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
                 {
                     var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     var value = Parse(node, "", violations);
                     if (value is null || violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     return value;
                 }
@@ -4610,27 +4611,27 @@ namespace Nexgen.JsonSchema.Showcase
                 /// <inheritdoc/>
                 public override void Write(global::System.Text.Json.Utf8JsonWriter writer, MetricOrLabelUnion value, global::System.Text.Json.JsonSerializerOptions options)
                 {
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     if (value is null)
                     {
-                        violations.Add(new Violation("", "expected object"));
-                        throw Violation.Failure(violations);
+                        violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     Validate(value, "", violations);
                     if (violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     WriteValue(writer, value);
                 }
 
-                internal static MetricOrLabelUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static MetricOrLabelUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.Number)
                     {
                         var wrapperStart = violations.Count;
                         MetricOrLabelUnionNumber? wrapped = null;
-                        if (SpecJson.SpecDouble(node, path, violations) is { } value0)
+                        if (NexgenRuntime::SpecJson.SpecDouble(node, path, violations) is { } value0)
                         {
                             wrapped = new MetricOrLabelUnionNumber(value0);
                         }
@@ -4648,11 +4649,11 @@ namespace Nexgen.JsonSchema.Showcase
                         wrapped?.Validate(path, violations);
                         return violations.Count > wrapperStart ? null : wrapped;
                     }
-                    violations.Add(new Violation(path, "expected one of: number, string"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected one of: number, string"));
                     return null;
                 }
 
-                internal static void Validate(MetricOrLabelUnion value, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static void Validate(MetricOrLabelUnion value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     switch (value)
                     {
@@ -4663,7 +4664,7 @@ namespace Nexgen.JsonSchema.Showcase
                             variant1.Validate(path, violations);
                             break;
                         default:
-                            violations.Add(new Violation(path, "expected one of: number, string"));
+                            violations.Add(new NexgenRuntime::Violation(path, "expected one of: number, string"));
                             break;
                     }
                 }
@@ -4709,30 +4710,30 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public global::System.Collections.Generic.IReadOnlyList<Address> Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     for (var index0 = 0; index0 < Value.Count; index0++)
                     {
                         if (Value[index0] is { } item0)
                         {
-                            Address.Converter.Validate(item0, Violation.Index(path, index0), violations);
+                            Address.Converter.Validate(item0, NexgenRuntime::Violation.Index(path, index0), violations);
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Index(path, index0), "explicit null not allowed"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(path, index0), "explicit null not allowed"));
                         }
                     }
                     if (Value.Count < 1)
                     {
-                        violations.Add(new Violation(path, "must have at least 1 items, got " + Value.Count));
+                        violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 items, got " + Value.Count));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionArray other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionArray other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "AddressListOrLabelUnionArray[" + Value + "]";
@@ -4757,20 +4758,20 @@ namespace Nexgen.JsonSchema.Showcase
                 /// </summary>
                 public string Value { get; }
 
-                internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
-                    var length0 = SpecJson.CodePoints(Value);
+                    var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
                     if (length0 < 1)
                     {
-                        violations.Add(new Violation(path, "must have length >= 1, got " + length0));
+                        violations.Add(new NexgenRuntime::Violation(path, "must have length >= 1, got " + length0));
                     }
                 }
 
                 /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionString other && ValueEquality.Equal(Value, other.Value);
+                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
                 /// <inheritdoc/>
-                public override int GetHashCode() => ValueEquality.Hash(Value);
+                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
                 /// <inheritdoc/>
                 public override string ToString() => "AddressListOrLabelUnionString[" + Value + "]";
@@ -4788,11 +4789,11 @@ namespace Nexgen.JsonSchema.Showcase
                 public override AddressListOrLabelUnion Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
                 {
                     var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     var value = Parse(node, "", violations);
                     if (value is null || violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     return value;
                 }
@@ -4800,21 +4801,21 @@ namespace Nexgen.JsonSchema.Showcase
                 /// <inheritdoc/>
                 public override void Write(global::System.Text.Json.Utf8JsonWriter writer, AddressListOrLabelUnion value, global::System.Text.Json.JsonSerializerOptions options)
                 {
-                    var violations = new global::System.Collections.Generic.List<Violation>();
+                    var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                     if (value is null)
                     {
-                        violations.Add(new Violation("", "expected object"));
-                        throw Violation.Failure(violations);
+                        violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     Validate(value, "", violations);
                     if (violations.Count > 0)
                     {
-                        throw Violation.Failure(violations);
+                        throw NexgenRuntime::Violation.Failure(violations);
                     }
                     WriteValue(writer, value);
                 }
 
-                internal static AddressListOrLabelUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static AddressListOrLabelUnion? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.Array)
                     {
@@ -4825,10 +4826,10 @@ namespace Nexgen.JsonSchema.Showcase
                             var index0 = 0;
                             foreach (var item0 in node.EnumerateArray())
                             {
-                                var itemPath0 = Violation.Index(path, index0++);
+                                var itemPath0 = NexgenRuntime::Violation.Index(path, index0++);
                                 if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                                 {
-                                    violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                    violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                     continue;
                                 }
                                 if (Address.Converter.Parse(item0, itemPath0, violations) is { } model1)
@@ -4838,7 +4839,7 @@ namespace Nexgen.JsonSchema.Showcase
                             }
                             if (node.GetArrayLength() < 1)
                             {
-                                violations.Add(new Violation(path, "must have at least 1 items, got " + node.GetArrayLength()));
+                                violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 items, got " + node.GetArrayLength()));
                             }
                             wrapped = new AddressListOrLabelUnionArray(items0);
                         }
@@ -4855,11 +4856,11 @@ namespace Nexgen.JsonSchema.Showcase
                         wrapped?.Validate(path, violations);
                         return violations.Count > wrapperStart ? null : wrapped;
                     }
-                    violations.Add(new Violation(path, "expected one of: array, string"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected one of: array, string"));
                     return null;
                 }
 
-                internal static void Validate(AddressListOrLabelUnion value, string path, global::System.Collections.Generic.List<Violation> violations)
+                internal static void Validate(AddressListOrLabelUnion value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
                 {
                     switch (value)
                     {
@@ -4870,7 +4871,7 @@ namespace Nexgen.JsonSchema.Showcase
                             variant1.Validate(path, violations);
                             break;
                         default:
-                            violations.Add(new Violation(path, "expected one of: array, string"));
+                            violations.Add(new NexgenRuntime::Violation(path, "expected one of: array, string"));
                             break;
                     }
                 }
@@ -5381,176 +5382,176 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Kind, other.Kind)
-                && ValueEquality.Equal(Revision, other.Revision)
-                && ValueEquality.Equal(Enabled, other.Enabled)
-                && ValueEquality.Equal(Status, other.Status)
-                && ValueEquality.Equal(Tier, other.Tier)
-                && ValueEquality.Equal(Scale, other.Scale)
-                && ValueEquality.Equal(Name, other.Name)
-                && ValueEquality.Equal(Count, other.Count)
-                && ValueEquality.Equal(Active, other.Active)
-                && ValueEquality.Equal(Nickname, other.Nickname)
-                && ValueEquality.Equal(Code, other.Code)
-                && ValueEquality.Equal(Sku, other.Sku)
-                && ValueEquality.Equal(Phrase, other.Phrase)
-                && ValueEquality.Equal(RequestId, other.RequestId)
-                && ValueEquality.Equal(ContactEmail, other.ContactEmail)
-                && ValueEquality.Equal(Host, other.Host)
-                && ValueEquality.Equal(Homepage, other.Homepage)
-                && ValueEquality.Equal(Gateway, other.Gateway)
-                && ValueEquality.Equal(Blob, other.Blob)
-                && ValueEquality.Equal(UrlBlob, other.UrlBlob)
-                && ValueEquality.Equal(Retries, other.Retries)
-                && ValueEquality.Equal(Verbose, other.Verbose)
-                && ValueEquality.Equal(Greeting, other.Greeting)
-                && ValueEquality.Equal(Debug, other.Debug)
-                && ValueEquality.Equal(LegacyIdCs, other.LegacyIdCs)
-                && ValueEquality.Equal(MiddleName, other.MiddleName)
-                && ValueEquality.Equal(Category, other.Category)
-                && ValueEquality.Equal(Priority, other.Priority)
-                && ValueEquality.Equal(Level, other.Level)
-                && ValueEquality.Equal(Ratio, other.Ratio)
-                && ValueEquality.Equal(Score, other.Score)
-                && ValueEquality.Equal(Step, other.Step)
-                && ValueEquality.Equal(Tags, other.Tags)
-                && ValueEquality.Equal(Aliases, other.Aliases)
-                && ValueEquality.Equal(Roles, other.Roles)
-                && ValueEquality.Equal(IdOrName, other.IdOrName)
-                && ValueEquality.Equal(Mode, other.Mode)
-                && ValueEquality.Equal(Payload, other.Payload)
-                && ValueEquality.Equal(Detail, other.Detail)
-                && ValueEquality.Equal(ShapeOrName, other.ShapeOrName)
-                && ValueEquality.Equal(Measurements, other.Measurements)
-                && ValueEquality.Equal(Shapes, other.Shapes)
-                && ValueEquality.Equal(Segments, other.Segments)
-                && ValueEquality.Equal(Slots, other.Slots)
-                && ValueEquality.Equal(Grid, other.Grid)
-                && ValueEquality.Equal(NumberGrid, other.NumberGrid)
-                && ValueEquality.Equal(Links, other.Links)
-                && ValueEquality.Equal(Addresses, other.Addresses)
-                && ValueEquality.Equal(AddressBook, other.AddressBook)
-                && ValueEquality.Equal(Dates, other.Dates)
-                && ValueEquality.Equal(DateIndex, other.DateIndex)
-                && ValueEquality.Equal(Blobs, other.Blobs)
-                && ValueEquality.Equal(BlobIndex, other.BlobIndex)
-                && ValueEquality.Equal(Metrics, other.Metrics)
-                && ValueEquality.Equal(MetricOrLabel, other.MetricOrLabel)
-                && ValueEquality.Equal(AddressListOrLabel, other.AddressListOrLabel)
-                && ValueEquality.Equal(Location, other.Location)
-                && ValueEquality.Equal(Audit, other.Audit)
-                && ValueEquality.Equal(Rows, other.Rows)
-                && ValueEquality.Equal(LedgerCs, other.LedgerCs)
-                && ValueEquality.Equal(Metadata, other.Metadata)
-                && ValueEquality.Equal(Quotas, other.Quotas)
-                && ValueEquality.Equal(Tokens, other.Tokens)
-                && ValueEquality.Equal(Nicknames, other.Nicknames)
-                && ValueEquality.Equal(Choices, other.Choices)
-                && ValueEquality.Equal(Extras, other.Extras)
-                && ValueEquality.Equal(Shape, other.Shape)
-                && ValueEquality.Equal(Note, other.Note)
-                && ValueEquality.Equal(Address, other.Address)
-                && ValueEquality.Equal(Labels, other.Labels)
-                && ValueEquality.Equal(Settings, other.Settings)
-                && ValueEquality.Equal(Attributes, other.Attributes)
-                && ValueEquality.Equal(Contact, other.Contact)
-                && ValueEquality.Equal(NullableCount, other.NullableCount)
-                && ValueEquality.Equal(NullableRatio, other.NullableRatio)
-                && ValueEquality.Equal(NullableFlag, other.NullableFlag)
-                && ValueEquality.Equal(NullableTags, other.NullableTags)
-                && ValueEquality.Equal(NullableMode, other.NullableMode)
-                && ValueEquality.Equal(IntegralMeasurements, other.IntegralMeasurements)
-                && ValueEquality.Equal(ByFive, other.ByFive)
-                && ValueEquality.Equal(Wildcard, other.Wildcard)
-                && ValueEquality.Equal(Quoted, other.Quoted);
+            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(Revision, other.Revision)
+                && NexgenRuntime::ValueEquality.Equal(Enabled, other.Enabled)
+                && NexgenRuntime::ValueEquality.Equal(Status, other.Status)
+                && NexgenRuntime::ValueEquality.Equal(Tier, other.Tier)
+                && NexgenRuntime::ValueEquality.Equal(Scale, other.Scale)
+                && NexgenRuntime::ValueEquality.Equal(Name, other.Name)
+                && NexgenRuntime::ValueEquality.Equal(Count, other.Count)
+                && NexgenRuntime::ValueEquality.Equal(Active, other.Active)
+                && NexgenRuntime::ValueEquality.Equal(Nickname, other.Nickname)
+                && NexgenRuntime::ValueEquality.Equal(Code, other.Code)
+                && NexgenRuntime::ValueEquality.Equal(Sku, other.Sku)
+                && NexgenRuntime::ValueEquality.Equal(Phrase, other.Phrase)
+                && NexgenRuntime::ValueEquality.Equal(RequestId, other.RequestId)
+                && NexgenRuntime::ValueEquality.Equal(ContactEmail, other.ContactEmail)
+                && NexgenRuntime::ValueEquality.Equal(Host, other.Host)
+                && NexgenRuntime::ValueEquality.Equal(Homepage, other.Homepage)
+                && NexgenRuntime::ValueEquality.Equal(Gateway, other.Gateway)
+                && NexgenRuntime::ValueEquality.Equal(Blob, other.Blob)
+                && NexgenRuntime::ValueEquality.Equal(UrlBlob, other.UrlBlob)
+                && NexgenRuntime::ValueEquality.Equal(Retries, other.Retries)
+                && NexgenRuntime::ValueEquality.Equal(Verbose, other.Verbose)
+                && NexgenRuntime::ValueEquality.Equal(Greeting, other.Greeting)
+                && NexgenRuntime::ValueEquality.Equal(Debug, other.Debug)
+                && NexgenRuntime::ValueEquality.Equal(LegacyIdCs, other.LegacyIdCs)
+                && NexgenRuntime::ValueEquality.Equal(MiddleName, other.MiddleName)
+                && NexgenRuntime::ValueEquality.Equal(Category, other.Category)
+                && NexgenRuntime::ValueEquality.Equal(Priority, other.Priority)
+                && NexgenRuntime::ValueEquality.Equal(Level, other.Level)
+                && NexgenRuntime::ValueEquality.Equal(Ratio, other.Ratio)
+                && NexgenRuntime::ValueEquality.Equal(Score, other.Score)
+                && NexgenRuntime::ValueEquality.Equal(Step, other.Step)
+                && NexgenRuntime::ValueEquality.Equal(Tags, other.Tags)
+                && NexgenRuntime::ValueEquality.Equal(Aliases, other.Aliases)
+                && NexgenRuntime::ValueEquality.Equal(Roles, other.Roles)
+                && NexgenRuntime::ValueEquality.Equal(IdOrName, other.IdOrName)
+                && NexgenRuntime::ValueEquality.Equal(Mode, other.Mode)
+                && NexgenRuntime::ValueEquality.Equal(Payload, other.Payload)
+                && NexgenRuntime::ValueEquality.Equal(Detail, other.Detail)
+                && NexgenRuntime::ValueEquality.Equal(ShapeOrName, other.ShapeOrName)
+                && NexgenRuntime::ValueEquality.Equal(Measurements, other.Measurements)
+                && NexgenRuntime::ValueEquality.Equal(Shapes, other.Shapes)
+                && NexgenRuntime::ValueEquality.Equal(Segments, other.Segments)
+                && NexgenRuntime::ValueEquality.Equal(Slots, other.Slots)
+                && NexgenRuntime::ValueEquality.Equal(Grid, other.Grid)
+                && NexgenRuntime::ValueEquality.Equal(NumberGrid, other.NumberGrid)
+                && NexgenRuntime::ValueEquality.Equal(Links, other.Links)
+                && NexgenRuntime::ValueEquality.Equal(Addresses, other.Addresses)
+                && NexgenRuntime::ValueEquality.Equal(AddressBook, other.AddressBook)
+                && NexgenRuntime::ValueEquality.Equal(Dates, other.Dates)
+                && NexgenRuntime::ValueEquality.Equal(DateIndex, other.DateIndex)
+                && NexgenRuntime::ValueEquality.Equal(Blobs, other.Blobs)
+                && NexgenRuntime::ValueEquality.Equal(BlobIndex, other.BlobIndex)
+                && NexgenRuntime::ValueEquality.Equal(Metrics, other.Metrics)
+                && NexgenRuntime::ValueEquality.Equal(MetricOrLabel, other.MetricOrLabel)
+                && NexgenRuntime::ValueEquality.Equal(AddressListOrLabel, other.AddressListOrLabel)
+                && NexgenRuntime::ValueEquality.Equal(Location, other.Location)
+                && NexgenRuntime::ValueEquality.Equal(Audit, other.Audit)
+                && NexgenRuntime::ValueEquality.Equal(Rows, other.Rows)
+                && NexgenRuntime::ValueEquality.Equal(LedgerCs, other.LedgerCs)
+                && NexgenRuntime::ValueEquality.Equal(Metadata, other.Metadata)
+                && NexgenRuntime::ValueEquality.Equal(Quotas, other.Quotas)
+                && NexgenRuntime::ValueEquality.Equal(Tokens, other.Tokens)
+                && NexgenRuntime::ValueEquality.Equal(Nicknames, other.Nicknames)
+                && NexgenRuntime::ValueEquality.Equal(Choices, other.Choices)
+                && NexgenRuntime::ValueEquality.Equal(Extras, other.Extras)
+                && NexgenRuntime::ValueEquality.Equal(Shape, other.Shape)
+                && NexgenRuntime::ValueEquality.Equal(Note, other.Note)
+                && NexgenRuntime::ValueEquality.Equal(Address, other.Address)
+                && NexgenRuntime::ValueEquality.Equal(Labels, other.Labels)
+                && NexgenRuntime::ValueEquality.Equal(Settings, other.Settings)
+                && NexgenRuntime::ValueEquality.Equal(Attributes, other.Attributes)
+                && NexgenRuntime::ValueEquality.Equal(Contact, other.Contact)
+                && NexgenRuntime::ValueEquality.Equal(NullableCount, other.NullableCount)
+                && NexgenRuntime::ValueEquality.Equal(NullableRatio, other.NullableRatio)
+                && NexgenRuntime::ValueEquality.Equal(NullableFlag, other.NullableFlag)
+                && NexgenRuntime::ValueEquality.Equal(NullableTags, other.NullableTags)
+                && NexgenRuntime::ValueEquality.Equal(NullableMode, other.NullableMode)
+                && NexgenRuntime::ValueEquality.Equal(IntegralMeasurements, other.IntegralMeasurements)
+                && NexgenRuntime::ValueEquality.Equal(ByFive, other.ByFive)
+                && NexgenRuntime::ValueEquality.Equal(Wildcard, other.Wildcard)
+                && NexgenRuntime::ValueEquality.Equal(Quoted, other.Quoted);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Kind));
-            hash.Add(ValueEquality.Hash(Revision));
-            hash.Add(ValueEquality.Hash(Enabled));
-            hash.Add(ValueEquality.Hash(Status));
-            hash.Add(ValueEquality.Hash(Tier));
-            hash.Add(ValueEquality.Hash(Scale));
-            hash.Add(ValueEquality.Hash(Name));
-            hash.Add(ValueEquality.Hash(Count));
-            hash.Add(ValueEquality.Hash(Active));
-            hash.Add(ValueEquality.Hash(Nickname));
-            hash.Add(ValueEquality.Hash(Code));
-            hash.Add(ValueEquality.Hash(Sku));
-            hash.Add(ValueEquality.Hash(Phrase));
-            hash.Add(ValueEquality.Hash(RequestId));
-            hash.Add(ValueEquality.Hash(ContactEmail));
-            hash.Add(ValueEquality.Hash(Host));
-            hash.Add(ValueEquality.Hash(Homepage));
-            hash.Add(ValueEquality.Hash(Gateway));
-            hash.Add(ValueEquality.Hash(Blob));
-            hash.Add(ValueEquality.Hash(UrlBlob));
-            hash.Add(ValueEquality.Hash(Retries));
-            hash.Add(ValueEquality.Hash(Verbose));
-            hash.Add(ValueEquality.Hash(Greeting));
-            hash.Add(ValueEquality.Hash(Debug));
-            hash.Add(ValueEquality.Hash(LegacyIdCs));
-            hash.Add(ValueEquality.Hash(MiddleName));
-            hash.Add(ValueEquality.Hash(Category));
-            hash.Add(ValueEquality.Hash(Priority));
-            hash.Add(ValueEquality.Hash(Level));
-            hash.Add(ValueEquality.Hash(Ratio));
-            hash.Add(ValueEquality.Hash(Score));
-            hash.Add(ValueEquality.Hash(Step));
-            hash.Add(ValueEquality.Hash(Tags));
-            hash.Add(ValueEquality.Hash(Aliases));
-            hash.Add(ValueEquality.Hash(Roles));
-            hash.Add(ValueEquality.Hash(IdOrName));
-            hash.Add(ValueEquality.Hash(Mode));
-            hash.Add(ValueEquality.Hash(Payload));
-            hash.Add(ValueEquality.Hash(Detail));
-            hash.Add(ValueEquality.Hash(ShapeOrName));
-            hash.Add(ValueEquality.Hash(Measurements));
-            hash.Add(ValueEquality.Hash(Shapes));
-            hash.Add(ValueEquality.Hash(Segments));
-            hash.Add(ValueEquality.Hash(Slots));
-            hash.Add(ValueEquality.Hash(Grid));
-            hash.Add(ValueEquality.Hash(NumberGrid));
-            hash.Add(ValueEquality.Hash(Links));
-            hash.Add(ValueEquality.Hash(Addresses));
-            hash.Add(ValueEquality.Hash(AddressBook));
-            hash.Add(ValueEquality.Hash(Dates));
-            hash.Add(ValueEquality.Hash(DateIndex));
-            hash.Add(ValueEquality.Hash(Blobs));
-            hash.Add(ValueEquality.Hash(BlobIndex));
-            hash.Add(ValueEquality.Hash(Metrics));
-            hash.Add(ValueEquality.Hash(MetricOrLabel));
-            hash.Add(ValueEquality.Hash(AddressListOrLabel));
-            hash.Add(ValueEquality.Hash(Location));
-            hash.Add(ValueEquality.Hash(Audit));
-            hash.Add(ValueEquality.Hash(Rows));
-            hash.Add(ValueEquality.Hash(LedgerCs));
-            hash.Add(ValueEquality.Hash(Metadata));
-            hash.Add(ValueEquality.Hash(Quotas));
-            hash.Add(ValueEquality.Hash(Tokens));
-            hash.Add(ValueEquality.Hash(Nicknames));
-            hash.Add(ValueEquality.Hash(Choices));
-            hash.Add(ValueEquality.Hash(Extras));
-            hash.Add(ValueEquality.Hash(Shape));
-            hash.Add(ValueEquality.Hash(Note));
-            hash.Add(ValueEquality.Hash(Address));
-            hash.Add(ValueEquality.Hash(Labels));
-            hash.Add(ValueEquality.Hash(Settings));
-            hash.Add(ValueEquality.Hash(Attributes));
-            hash.Add(ValueEquality.Hash(Contact));
-            hash.Add(ValueEquality.Hash(NullableCount));
-            hash.Add(ValueEquality.Hash(NullableRatio));
-            hash.Add(ValueEquality.Hash(NullableFlag));
-            hash.Add(ValueEquality.Hash(NullableTags));
-            hash.Add(ValueEquality.Hash(NullableMode));
-            hash.Add(ValueEquality.Hash(IntegralMeasurements));
-            hash.Add(ValueEquality.Hash(ByFive));
-            hash.Add(ValueEquality.Hash(Wildcard));
-            hash.Add(ValueEquality.Hash(Quoted));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Revision));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Enabled));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Status));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Tier));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Scale));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Name));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Count));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Active));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Nickname));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Code));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Sku));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Phrase));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(RequestId));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(ContactEmail));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Host));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Homepage));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Gateway));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Blob));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(UrlBlob));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Retries));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Verbose));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Greeting));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Debug));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(LegacyIdCs));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(MiddleName));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Category));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Priority));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Level));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Ratio));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Score));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Step));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Tags));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Aliases));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Roles));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(IdOrName));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Mode));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Payload));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Detail));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(ShapeOrName));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Measurements));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Shapes));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Segments));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Slots));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Grid));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(NumberGrid));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Links));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Addresses));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AddressBook));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Dates));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(DateIndex));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Blobs));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(BlobIndex));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Metrics));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(MetricOrLabel));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AddressListOrLabel));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Location));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Audit));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Rows));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(LedgerCs));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Metadata));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Quotas));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Tokens));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Nicknames));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Choices));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Extras));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Shape));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Note));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Address));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Labels));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Settings));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Attributes));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Contact));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableCount));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableRatio));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableFlag));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableTags));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(NullableMode));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(IntegralMeasurements));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(ByFive));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Wildcard));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Quoted));
             return hash.ToHashCode();
         }
 
@@ -5575,11 +5576,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Showcase Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -5587,51 +5588,51 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Showcase value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Showcase? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Showcase? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "kind" || member.Key == "revision" || member.Key == "enabled" || member.Key == "status" || member.Key == "tier" || member.Key == "scale" || member.Key == "name" || member.Key == "count" || member.Key == "active" || member.Key == "nickname" || member.Key == "code" || member.Key == "sku" || member.Key == "phrase" || member.Key == "requestId" || member.Key == "contactEmail" || member.Key == "host" || member.Key == "homepage" || member.Key == "gateway" || member.Key == "blob" || member.Key == "urlBlob" || member.Key == "retries" || member.Key == "verbose" || member.Key == "greeting" || member.Key == "debug" || member.Key == "legacyId" || member.Key == "middleName" || member.Key == "category" || member.Key == "priority" || member.Key == "level" || member.Key == "ratio" || member.Key == "score" || member.Key == "step" || member.Key == "tags" || member.Key == "aliases" || member.Key == "roles" || member.Key == "idOrName" || member.Key == "mode" || member.Key == "payload" || member.Key == "detail" || member.Key == "shapeOrName" || member.Key == "measurements" || member.Key == "shapes" || member.Key == "segments" || member.Key == "slots" || member.Key == "grid" || member.Key == "numberGrid" || member.Key == "links" || member.Key == "addresses" || member.Key == "addressBook" || member.Key == "dates" || member.Key == "dateIndex" || member.Key == "blobs" || member.Key == "blobIndex" || member.Key == "metrics" || member.Key == "metricOrLabel" || member.Key == "addressListOrLabel" || member.Key == "location" || member.Key == "audit" || member.Key == "rows" || member.Key == "ledger" || member.Key == "metadata" || member.Key == "quotas" || member.Key == "tokens" || member.Key == "nicknames" || member.Key == "choices" || member.Key == "extras" || member.Key == "shape" || member.Key == "note" || member.Key == "address" || member.Key == "labels" || member.Key == "settings" || member.Key == "attributes" || member.Key == "contact" || member.Key == "nullableCount" || member.Key == "nullableRatio" || member.Key == "nullableFlag" || member.Key == "nullableTags" || member.Key == "nullableMode" || member.Key == "integralMeasurements" || member.Key == "byFive" || member.Key == "wildcard" || member.Key == "quoted")
                     {
                         continue;
                     }
-                    violations.Add(new Violation(Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
                 }
                 KindValue? parsedKind = null;
                 if (!members.TryGetValue("kind", out var nodeKind))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 else if (nodeKind.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeKind.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "kind"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "expected string"));
                     }
                     else
                     {
@@ -5642,22 +5643,22 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "kind"), "must equal \"showcase\", got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "must equal \"showcase\", got " + closed0));
                         }
                     }
                 }
                 RevisionValue? parsedRevision = null;
                 if (!members.TryGetValue("revision", out var nodeRevision))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "revision"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "revision"), "required"));
                 }
                 else if (nodeRevision.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "revision"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "revision"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeRevision, Violation.Join(path, "revision"), violations) is { } closed0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeRevision, NexgenRuntime::Violation.Join(path, "revision"), violations) is { } closed0)
                     {
                         if (closed0 == 1L)
                         {
@@ -5665,24 +5666,24 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "revision"), "must equal 1, got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "revision"), "must equal 1, got " + closed0));
                         }
                     }
                 }
                 EnabledValue? parsedEnabled = null;
                 if (!members.TryGetValue("enabled", out var nodeEnabled))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "enabled"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "enabled"), "required"));
                 }
                 else if (nodeEnabled.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "enabled"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "enabled"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeEnabled.ValueKind is not (global::System.Text.Json.JsonValueKind.True or global::System.Text.Json.JsonValueKind.False))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "enabled"), "expected boolean"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "enabled"), "expected boolean"));
                     }
                     else
                     {
@@ -5693,24 +5694,24 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "enabled"), "must equal true, got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "enabled"), "must equal true, got " + closed0));
                         }
                     }
                 }
                 StatusValue? parsedStatus = null;
                 if (!members.TryGetValue("status", out var nodeStatus))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "status"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "status"), "required"));
                 }
                 else if (nodeStatus.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "status"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "status"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeStatus.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "status"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "status"), "expected string"));
                     }
                     else
                     {
@@ -5729,22 +5730,22 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "status"), "must be one of [\"active\", \"inactive\", \"pending\"], got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "status"), "must be one of [\"active\", \"inactive\", \"pending\"], got " + closed0));
                         }
                     }
                 }
                 TierValue? parsedTier = null;
                 if (!members.TryGetValue("tier", out var nodeTier))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "tier"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tier"), "required"));
                 }
                 else if (nodeTier.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "tier"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tier"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeTier, Violation.Join(path, "tier"), violations) is { } closed0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeTier, NexgenRuntime::Violation.Join(path, "tier"), violations) is { } closed0)
                     {
                         if (closed0 == 1L)
                         {
@@ -5760,22 +5761,22 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "tier"), "must be one of [1, 2, 3], got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tier"), "must be one of [1, 2, 3], got " + closed0));
                         }
                     }
                 }
                 ScaleValue? parsedScale = null;
                 if (!members.TryGetValue("scale", out var nodeScale))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "scale"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "scale"), "required"));
                 }
                 else if (nodeScale.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "scale"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "scale"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeScale, Violation.Join(path, "scale"), violations) is { } closed0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeScale, NexgenRuntime::Violation.Join(path, "scale"), violations) is { } closed0)
                     {
                         if (closed0 == 1.5)
                         {
@@ -5787,36 +5788,36 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "scale"), "must be one of [1.5, 2.5], got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "scale"), "must be one of [1.5, 2.5], got " + closed0));
                         }
                     }
                 }
                 string? parsedName = null;
                 if (!members.TryGetValue("name", out var nodeName))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "name"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "required"));
                 }
                 else if (nodeName.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "name"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeName.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "name"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeName.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "name"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "must have length >= 1, got " + length0));
                         }
                         if (length0 > 64)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "name"), "must have length <= 64, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "must have length <= 64, got " + length0));
                         }
                         parsedName = value0;
                     }
@@ -5824,15 +5825,15 @@ namespace Nexgen.JsonSchema.Showcase
                 long? parsedCount = null;
                 if (!members.TryGetValue("count", out var nodeCount))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "count"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "count"), "required"));
                 }
                 else if (nodeCount.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "count"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "count"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeCount, Violation.Join(path, "count"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeCount, NexgenRuntime::Violation.Join(path, "count"), violations) is { } value0)
                     {
                         parsedCount = value0;
                     }
@@ -5840,17 +5841,17 @@ namespace Nexgen.JsonSchema.Showcase
                 bool? parsedActive = null;
                 if (!members.TryGetValue("active", out var nodeActive))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "active"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "active"), "required"));
                 }
                 else if (nodeActive.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "active"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "active"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeActive.ValueKind is not (global::System.Text.Json.JsonValueKind.True or global::System.Text.Json.JsonValueKind.False))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "active"), "expected boolean"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "active"), "expected boolean"));
                     }
                     else
                     {
@@ -5864,21 +5865,21 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeNickname.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "nickname"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nickname"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeNickname.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "nickname"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nickname"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeNickname.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 > 12)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nickname"), "must have length <= 12, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nickname"), "must have length <= 12, got " + length0));
                         }
                         parsedNickname = value0;
                     }
@@ -5889,25 +5890,25 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeCode.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "code"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeCode.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "code"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeCode.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 2)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "code"), "must have length >= 2, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "must have length >= 2, got " + length0));
                         }
                         if (length0 > 5)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "code"), "must have length <= 5, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "must have length <= 5, got " + length0));
                         }
                         parsedCode = value0;
                     }
@@ -5918,20 +5919,20 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeSku.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "sku"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "sku"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeSku.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "sku"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "sku"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeSku.GetString()!;
                         if (!SkuPattern.IsMatch(value0))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "sku"), "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "sku"), "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + value0));
                         }
                         parsedSku = value0;
                     }
@@ -5942,20 +5943,20 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodePhrase.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "phrase"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "phrase"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodePhrase.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "phrase"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "phrase"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodePhrase.GetString()!;
                         if (!PhrasePattern.IsMatch(value0))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "phrase"), "must match pattern " + "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+[\\t\\n\\x0B\\f\\r ](?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+\\z" + ", got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "phrase"), "must match pattern " + "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+[\\t\\n\\x0B\\f\\r ](?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+\\z" + ", got " + value0));
                         }
                         parsedPhrase = value0;
                     }
@@ -5966,20 +5967,20 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeRequestId.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "requestId"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "requestId"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeRequestId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "requestId"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "requestId"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeRequestId.GetString()!;
                         if (!RequestIdFormat.IsMatch(value0))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "requestId"), "must be a valid uuid, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "requestId"), "must be a valid uuid, got " + value0));
                         }
                         parsedRequestId = value0;
                     }
@@ -5990,20 +5991,20 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeContactEmail.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "contactEmail"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "contactEmail"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeContactEmail.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "contactEmail"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "contactEmail"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeContactEmail.GetString()!;
-                        if (SpecJson.CodePoints(value0) > 254 || !ContactEmailFormat.IsMatch(value0))
+                        if (NexgenRuntime::SpecJson.CodePoints(value0) > 254 || !ContactEmailFormat.IsMatch(value0))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "contactEmail"), "must be a valid email, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "contactEmail"), "must be a valid email, got " + value0));
                         }
                         parsedContactEmail = value0;
                     }
@@ -6014,20 +6015,20 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeHost.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "host"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "host"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeHost.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "host"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "host"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeHost.GetString()!;
-                        if (SpecJson.CodePoints(value0) > 253 || !HostFormat.IsMatch(value0))
+                        if (NexgenRuntime::SpecJson.CodePoints(value0) > 253 || !HostFormat.IsMatch(value0))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "host"), "must be a valid hostname, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "host"), "must be a valid hostname, got " + value0));
                         }
                         parsedHost = value0;
                     }
@@ -6038,20 +6039,20 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeHomepage.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "homepage"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "homepage"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeHomepage.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "homepage"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "homepage"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeHomepage.GetString()!;
                         if (!HomepageFormat.IsMatch(value0))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "homepage"), "must be a valid uri, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "homepage"), "must be a valid uri, got " + value0));
                         }
                         parsedHomepage = value0;
                     }
@@ -6062,20 +6063,20 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeGateway.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "gateway"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "gateway"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeGateway.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "gateway"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "gateway"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeGateway.GetString()!;
                         if (!GatewayFormat.IsMatch(value0))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "gateway"), "must be a valid ipv4, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "gateway"), "must be a valid ipv4, got " + value0));
                         }
                         parsedGateway = value0;
                     }
@@ -6086,18 +6087,18 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeBlob.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "blob"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "blob"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeBlob.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "blob"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "blob"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeBlob.GetString()!;
-                        if (Base64Support.ParseBase64(text0, Violation.Join(path, "blob"), violations) is { } bytes0)
+                        if (NexgenRuntime::Base64Support.ParseBase64(text0, NexgenRuntime::Violation.Join(path, "blob"), violations) is { } bytes0)
                         {
                             parsedBlob = bytes0;
                         }
@@ -6109,18 +6110,18 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeUrlBlob.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "urlBlob"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "urlBlob"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeUrlBlob.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "urlBlob"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "urlBlob"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeUrlBlob.GetString()!;
-                        if (Base64Support.ParseBase64Url(text0, Violation.Join(path, "urlBlob"), violations) is { } bytes0)
+                        if (NexgenRuntime::Base64Support.ParseBase64Url(text0, NexgenRuntime::Violation.Join(path, "urlBlob"), violations) is { } bytes0)
                         {
                             parsedUrlBlob = bytes0;
                         }
@@ -6132,11 +6133,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeRetries.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "retries"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "retries"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeRetries, Violation.Join(path, "retries"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeRetries, NexgenRuntime::Violation.Join(path, "retries"), violations) is { } value0)
                     {
                         parsedRetries = value0;
                     }
@@ -6147,13 +6148,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeVerbose.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "verbose"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "verbose"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeVerbose.ValueKind is not (global::System.Text.Json.JsonValueKind.True or global::System.Text.Json.JsonValueKind.False))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "verbose"), "expected boolean"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "verbose"), "expected boolean"));
                     }
                     else
                     {
@@ -6167,13 +6168,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeGreeting.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "greeting"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "greeting"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeGreeting.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "greeting"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "greeting"), "expected string"));
                     }
                     else
                     {
@@ -6187,13 +6188,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeDebug.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "debug"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "debug"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeDebug.ValueKind is not (global::System.Text.Json.JsonValueKind.True or global::System.Text.Json.JsonValueKind.False))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "debug"), "expected boolean"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "debug"), "expected boolean"));
                     }
                     else
                     {
@@ -6207,13 +6208,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeLegacyIdCs.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "legacyId"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "legacyId"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeLegacyIdCs.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "legacyId"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "legacyId"), "expected string"));
                     }
                     else
                     {
@@ -6232,7 +6233,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (nodeMiddleName.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "middleName"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "middleName"), "expected string"));
                     }
                     else
                     {
@@ -6243,7 +6244,7 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedCategory = null;
                 if (!members.TryGetValue("category", out var nodeCategory))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "category"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "category"), "required"));
                 }
                 else if (nodeCategory.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
@@ -6252,7 +6253,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (nodeCategory.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "category"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "category"), "expected string"));
                     }
                     else
                     {
@@ -6266,19 +6267,19 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodePriority.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "priority"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "priority"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodePriority, Violation.Join(path, "priority"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodePriority, NexgenRuntime::Violation.Join(path, "priority"), violations) is { } value0)
                     {
                         if (value0 < 1L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "priority"), "must be >= 1, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "priority"), "must be >= 1, got " + value0));
                         }
                         if (value0 > 10L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "priority"), "must be <= 10, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "priority"), "must be <= 10, got " + value0));
                         }
                         parsedPriority = value0;
                     }
@@ -6289,15 +6290,15 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeLevel.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "level"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "level"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeLevel, Violation.Join(path, "level"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeLevel, NexgenRuntime::Violation.Join(path, "level"), violations) is { } value0)
                     {
                         if (value0 <= 0L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "level"), "must be > 0, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "level"), "must be > 0, got " + value0));
                         }
                         parsedLevel = value0;
                     }
@@ -6308,19 +6309,19 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeRatio.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "ratio"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "ratio"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeRatio, Violation.Join(path, "ratio"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeRatio, NexgenRuntime::Violation.Join(path, "ratio"), violations) is { } value0)
                     {
                         if (value0 < 5.0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "ratio"), "must be >= 5, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "ratio"), "must be >= 5, got " + value0));
                         }
                         if (value0 % 5.0 != 0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "ratio"), "must be a multiple of 5, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "ratio"), "must be a multiple of 5, got " + value0));
                         }
                         parsedRatio = value0;
                     }
@@ -6331,11 +6332,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeScore.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "score"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "score"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeScore, Violation.Join(path, "score"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeScore, NexgenRuntime::Violation.Join(path, "score"), violations) is { } value0)
                     {
                         parsedScore = value0;
                     }
@@ -6346,15 +6347,15 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeStep.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "step"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "step"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeStep, Violation.Join(path, "step"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeStep, NexgenRuntime::Violation.Join(path, "step"), violations) is { } value0)
                     {
                         if (value0 % 3L != 0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "step"), "must be a multiple of 3, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "step"), "must be a multiple of 3, got " + value0));
                         }
                         parsedStep = value0;
                     }
@@ -6365,13 +6366,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeTags.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "tags"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tags"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeTags.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "tags"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tags"), "expected array"));
                     }
                     else
                     {
@@ -6379,15 +6380,15 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeTags.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "tags"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "tags"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
@@ -6397,11 +6398,11 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         if (nodeTags.GetArrayLength() < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "tags"), "must have at least 1 items, got " + nodeTags.GetArrayLength()));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tags"), "must have at least 1 items, got " + nodeTags.GetArrayLength()));
                         }
                         if (nodeTags.GetArrayLength() > 5)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "tags"), "must have at most 5 items, got " + nodeTags.GetArrayLength()));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tags"), "must have at most 5 items, got " + nodeTags.GetArrayLength()));
                         }
                         parsedTags = items0;
                     }
@@ -6412,13 +6413,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeAliases.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "aliases"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "aliases"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeAliases.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "aliases"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "aliases"), "expected array"));
                     }
                     else
                     {
@@ -6426,15 +6427,15 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeAliases.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "aliases"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "aliases"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
@@ -6446,10 +6447,10 @@ namespace Nexgen.JsonSchema.Showcase
                         var rawIndex0 = 0;
                         foreach (var rawElement in nodeAliases.EnumerateArray())
                         {
-                            var rawKey = SpecJson.ValueKey(rawElement);
+                            var rawKey = NexgenRuntime::SpecJson.ValueKey(rawElement);
                             if (rawSeen0.TryGetValue(rawKey, out var priorIndex))
                             {
-                                violations.Add(new Violation(Violation.Join(path, "aliases"), "duplicate items: element at index " + rawIndex0 + " equals index " + priorIndex));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "aliases"), "duplicate items: element at index " + rawIndex0 + " equals index " + priorIndex));
                             }
                             else
                             {
@@ -6466,13 +6467,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeRoles.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "roles"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roles"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeRoles.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "roles"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roles"), "expected array"));
                     }
                     else
                     {
@@ -6480,15 +6481,15 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeRoles.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "roles"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "roles"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
@@ -6506,11 +6507,11 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         if (rawMatchCount0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "roles"), "too few matching items: at least 1, got " + rawMatchCount0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roles"), "too few matching items: at least 1, got " + rawMatchCount0));
                         }
                         if (rawMatchCount0 > 2)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "roles"), "too many matching items: at most 2, got " + rawMatchCount0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roles"), "too many matching items: at most 2, got " + rawMatchCount0));
                         }
                         parsedRoles = items0;
                     }
@@ -6521,11 +6522,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeIdOrName.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "idOrName"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "idOrName"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (IdOrNameUnion.Converter.Parse(nodeIdOrName, Violation.Join(path, "idOrName"), violations) is { } model0)
+                    if (IdOrNameUnion.Converter.Parse(nodeIdOrName, NexgenRuntime::Violation.Join(path, "idOrName"), violations) is { } model0)
                     {
                         parsedIdOrName = model0;
                     }
@@ -6536,11 +6537,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeMode.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "mode"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "mode"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (ModeUnion.Converter.Parse(nodeMode, Violation.Join(path, "mode"), violations) is { } model0)
+                    if (ModeUnion.Converter.Parse(nodeMode, NexgenRuntime::Violation.Join(path, "mode"), violations) is { } model0)
                     {
                         parsedMode = model0;
                     }
@@ -6551,11 +6552,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodePayload.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "payload"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "payload"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (PayloadUnion.Converter.Parse(nodePayload, Violation.Join(path, "payload"), violations) is { } model0)
+                    if (PayloadUnion.Converter.Parse(nodePayload, NexgenRuntime::Violation.Join(path, "payload"), violations) is { } model0)
                     {
                         parsedPayload = model0;
                     }
@@ -6566,11 +6567,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeDetail.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "detail"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "detail"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (DetailUnion.Converter.Parse(nodeDetail, Violation.Join(path, "detail"), violations) is { } model0)
+                    if (DetailUnion.Converter.Parse(nodeDetail, NexgenRuntime::Violation.Join(path, "detail"), violations) is { } model0)
                     {
                         parsedDetail = model0;
                     }
@@ -6581,11 +6582,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeShapeOrName.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "shapeOrName"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shapeOrName"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (ShapeOrNameUnion.Converter.Parse(nodeShapeOrName, Violation.Join(path, "shapeOrName"), violations) is { } model0)
+                    if (ShapeOrNameUnion.Converter.Parse(nodeShapeOrName, NexgenRuntime::Violation.Join(path, "shapeOrName"), violations) is { } model0)
                     {
                         parsedShapeOrName = model0;
                     }
@@ -6596,11 +6597,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeMeasurements.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "measurements"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "measurements"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (MeasurementsUnion.Converter.Parse(nodeMeasurements, Violation.Join(path, "measurements"), violations) is { } model0)
+                    if (MeasurementsUnion.Converter.Parse(nodeMeasurements, NexgenRuntime::Violation.Join(path, "measurements"), violations) is { } model0)
                     {
                         parsedMeasurements = model0;
                     }
@@ -6611,13 +6612,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeShapes.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "shapes"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shapes"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeShapes.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "shapes"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shapes"), "expected array"));
                     }
                     else
                     {
@@ -6625,10 +6626,10 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeShapes.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "shapes"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "shapes"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (Shape.Converter.Parse(item0, itemPath0, violations) is { } model1)
@@ -6645,13 +6646,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeSegments.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "segments"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "segments"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeSegments.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "segments"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "segments"), "expected array"));
                     }
                     else
                     {
@@ -6659,10 +6660,10 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeSegments.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "segments"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "segments"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (ShowcaseSegmentsItem.Converter.Parse(item0, itemPath0, violations) is { } model1)
@@ -6679,13 +6680,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeSlots.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "slots"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "slots"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeSlots.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "slots"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "slots"), "expected array"));
                     }
                     else
                     {
@@ -6693,7 +6694,7 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeSlots.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "slots"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "slots"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
                                 items0.Add(null);
@@ -6701,15 +6702,15 @@ namespace Nexgen.JsonSchema.Showcase
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
                                 var value1 = item0.GetString()!;
-                                var length1 = SpecJson.CodePoints(value1);
+                                var length1 = NexgenRuntime::SpecJson.CodePoints(value1);
                                 if (length1 < 2)
                                 {
-                                    violations.Add(new Violation(itemPath0, "must have length >= 2, got " + length1));
+                                    violations.Add(new NexgenRuntime::Violation(itemPath0, "must have length >= 2, got " + length1));
                                 }
                                 items0.Add(value1);
                             }
@@ -6723,13 +6724,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeGrid.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "grid"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "grid"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeGrid.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "grid"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "grid"), "expected array"));
                     }
                     else
                     {
@@ -6737,15 +6738,15 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeGrid.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "grid"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "grid"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                             {
-                                violations.Add(new Violation(itemPath0, "expected array"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected array"));
                             }
                             else
                             {
@@ -6753,13 +6754,13 @@ namespace Nexgen.JsonSchema.Showcase
                                 var index1 = 0;
                                 foreach (var item1 in item0.EnumerateArray())
                                 {
-                                    var itemPath1 = Violation.Index(itemPath0, index1++);
+                                    var itemPath1 = NexgenRuntime::Violation.Index(itemPath0, index1++);
                                     if (item1.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                                     {
-                                        violations.Add(new Violation(itemPath1, "explicit null not allowed"));
+                                        violations.Add(new NexgenRuntime::Violation(itemPath1, "explicit null not allowed"));
                                         continue;
                                     }
-                                    if (SpecJson.SpecLong(item1, itemPath1, violations) is { } value2)
+                                    if (NexgenRuntime::SpecJson.SpecLong(item1, itemPath1, violations) is { } value2)
                                     {
                                         items1.Add(value2);
                                     }
@@ -6776,13 +6777,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeNumberGrid.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "numberGrid"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "numberGrid"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeNumberGrid.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "numberGrid"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "numberGrid"), "expected array"));
                     }
                     else
                     {
@@ -6790,15 +6791,15 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeNumberGrid.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "numberGrid"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "numberGrid"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                             {
-                                violations.Add(new Violation(itemPath0, "expected array"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected array"));
                             }
                             else
                             {
@@ -6806,13 +6807,13 @@ namespace Nexgen.JsonSchema.Showcase
                                 var index1 = 0;
                                 foreach (var item1 in item0.EnumerateArray())
                                 {
-                                    var itemPath1 = Violation.Index(itemPath0, index1++);
+                                    var itemPath1 = NexgenRuntime::Violation.Index(itemPath0, index1++);
                                     if (item1.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                                     {
-                                        violations.Add(new Violation(itemPath1, "explicit null not allowed"));
+                                        violations.Add(new NexgenRuntime::Violation(itemPath1, "explicit null not allowed"));
                                         continue;
                                     }
-                                    if (SpecJson.SpecDouble(item1, itemPath1, violations) is { } value2)
+                                    if (NexgenRuntime::SpecJson.SpecDouble(item1, itemPath1, violations) is { } value2)
                                     {
                                         items1.Add(value2);
                                     }
@@ -6829,13 +6830,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeLinks.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "links"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "links"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeLinks.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "links"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "links"), "expected array"));
                     }
                     else
                     {
@@ -6843,22 +6844,22 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeLinks.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "links"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "links"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
                                 var value1 = item0.GetString()!;
                                 if (!global::System.Text.RegularExpressions.Regex.IsMatch(value1, "^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant))
                                 {
-                                    violations.Add(new Violation(itemPath0, "must be a valid uri, got " + value1));
+                                    violations.Add(new NexgenRuntime::Violation(itemPath0, "must be a valid uri, got " + value1));
                                 }
                                 items0.Add(value1);
                             }
@@ -6872,13 +6873,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeAddresses.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "addresses"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "addresses"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeAddresses.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "addresses"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "addresses"), "expected array"));
                     }
                     else
                     {
@@ -6886,10 +6887,10 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeAddresses.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "addresses"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "addresses"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (Address.Converter.Parse(item0, itemPath0, violations) is { } model1)
@@ -6906,11 +6907,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeAddressBook.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "addressBook"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "addressBook"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (AddressBook.Converter.Parse(nodeAddressBook, Violation.Join(path, "addressBook"), violations) is { } model0)
+                    if (AddressBook.Converter.Parse(nodeAddressBook, NexgenRuntime::Violation.Join(path, "addressBook"), violations) is { } model0)
                     {
                         parsedAddressBook = model0;
                     }
@@ -6921,13 +6922,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeDates.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "dates"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "dates"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeDates.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "dates"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "dates"), "expected array"));
                     }
                     else
                     {
@@ -6935,20 +6936,20 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeDates.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "dates"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "dates"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
                                 var text1 = item0.GetString()!;
-                                if (TemporalSupport.ParseDate(text1, itemPath0, violations) is { } temporal1)
+                                if (NexgenRuntime::TemporalSupport.ParseDate(text1, itemPath0, violations) is { } temporal1)
                                 {
                                     items0.Add(temporal1);
                                 }
@@ -6963,11 +6964,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeDateIndex.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "dateIndex"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "dateIndex"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (DateIndex.Converter.Parse(nodeDateIndex, Violation.Join(path, "dateIndex"), violations) is { } model0)
+                    if (DateIndex.Converter.Parse(nodeDateIndex, NexgenRuntime::Violation.Join(path, "dateIndex"), violations) is { } model0)
                     {
                         parsedDateIndex = model0;
                     }
@@ -6978,13 +6979,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeBlobs.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "blobs"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "blobs"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeBlobs.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "blobs"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "blobs"), "expected array"));
                     }
                     else
                     {
@@ -6992,20 +6993,20 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeBlobs.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "blobs"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "blobs"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
                                 var text1 = item0.GetString()!;
-                                if (Base64Support.ParseBase64(text1, itemPath0, violations) is { } bytes1)
+                                if (NexgenRuntime::Base64Support.ParseBase64(text1, itemPath0, violations) is { } bytes1)
                                 {
                                     items0.Add(bytes1);
                                 }
@@ -7020,11 +7021,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeBlobIndex.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "blobIndex"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "blobIndex"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (BlobIndex.Converter.Parse(nodeBlobIndex, Violation.Join(path, "blobIndex"), violations) is { } model0)
+                    if (BlobIndex.Converter.Parse(nodeBlobIndex, NexgenRuntime::Violation.Join(path, "blobIndex"), violations) is { } model0)
                     {
                         parsedBlobIndex = model0;
                     }
@@ -7035,11 +7036,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeMetrics.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "metrics"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "metrics"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Metrics.Converter.Parse(nodeMetrics, Violation.Join(path, "metrics"), violations) is { } model0)
+                    if (Metrics.Converter.Parse(nodeMetrics, NexgenRuntime::Violation.Join(path, "metrics"), violations) is { } model0)
                     {
                         parsedMetrics = model0;
                     }
@@ -7050,11 +7051,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeMetricOrLabel.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "metricOrLabel"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "metricOrLabel"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (MetricOrLabelUnion.Converter.Parse(nodeMetricOrLabel, Violation.Join(path, "metricOrLabel"), violations) is { } model0)
+                    if (MetricOrLabelUnion.Converter.Parse(nodeMetricOrLabel, NexgenRuntime::Violation.Join(path, "metricOrLabel"), violations) is { } model0)
                     {
                         parsedMetricOrLabel = model0;
                     }
@@ -7065,11 +7066,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeAddressListOrLabel.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "addressListOrLabel"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "addressListOrLabel"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (AddressListOrLabelUnion.Converter.Parse(nodeAddressListOrLabel, Violation.Join(path, "addressListOrLabel"), violations) is { } model0)
+                    if (AddressListOrLabelUnion.Converter.Parse(nodeAddressListOrLabel, NexgenRuntime::Violation.Join(path, "addressListOrLabel"), violations) is { } model0)
                     {
                         parsedAddressListOrLabel = model0;
                     }
@@ -7080,11 +7081,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeLocation.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "location"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "location"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (ShowcaseLocation.Converter.Parse(nodeLocation, Violation.Join(path, "location"), violations) is { } model0)
+                    if (ShowcaseLocation.Converter.Parse(nodeLocation, NexgenRuntime::Violation.Join(path, "location"), violations) is { } model0)
                     {
                         parsedLocation = model0;
                     }
@@ -7098,7 +7099,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else
                 {
-                    if (ShowcaseAudit.Converter.Parse(nodeAudit, Violation.Join(path, "audit"), violations) is { } model0)
+                    if (ShowcaseAudit.Converter.Parse(nodeAudit, NexgenRuntime::Violation.Join(path, "audit"), violations) is { } model0)
                     {
                         parsedAudit = model0;
                     }
@@ -7109,13 +7110,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeRows.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "rows"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "rows"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeRows.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "rows"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "rows"), "expected array"));
                     }
                     else
                     {
@@ -7123,10 +7124,10 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeRows.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "rows"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "rows"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (ShowcaseRowsItem.Converter.Parse(item0, itemPath0, violations) is { } model1)
@@ -7143,11 +7144,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeLedgerCs.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "ledger"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "ledger"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (ShowcaseLedger.Converter.Parse(nodeLedgerCs, Violation.Join(path, "ledger"), violations) is { } model0)
+                    if (ShowcaseLedger.Converter.Parse(nodeLedgerCs, NexgenRuntime::Violation.Join(path, "ledger"), violations) is { } model0)
                     {
                         parsedLedgerCs = model0;
                     }
@@ -7158,11 +7159,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeMetadata.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "metadata"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "metadata"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (ShowcaseMetadata.Converter.Parse(nodeMetadata, Violation.Join(path, "metadata"), violations) is { } model0)
+                    if (ShowcaseMetadata.Converter.Parse(nodeMetadata, NexgenRuntime::Violation.Join(path, "metadata"), violations) is { } model0)
                     {
                         parsedMetadata = model0;
                     }
@@ -7173,11 +7174,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeQuotas.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "quotas"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "quotas"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Quotas.Converter.Parse(nodeQuotas, Violation.Join(path, "quotas"), violations) is { } model0)
+                    if (Quotas.Converter.Parse(nodeQuotas, NexgenRuntime::Violation.Join(path, "quotas"), violations) is { } model0)
                     {
                         parsedQuotas = model0;
                     }
@@ -7188,11 +7189,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeTokens.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "tokens"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tokens"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Tokens.Converter.Parse(nodeTokens, Violation.Join(path, "tokens"), violations) is { } model0)
+                    if (Tokens.Converter.Parse(nodeTokens, NexgenRuntime::Violation.Join(path, "tokens"), violations) is { } model0)
                     {
                         parsedTokens = model0;
                     }
@@ -7203,11 +7204,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeNicknames.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "nicknames"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nicknames"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Nicknames.Converter.Parse(nodeNicknames, Violation.Join(path, "nicknames"), violations) is { } model0)
+                    if (Nicknames.Converter.Parse(nodeNicknames, NexgenRuntime::Violation.Join(path, "nicknames"), violations) is { } model0)
                     {
                         parsedNicknames = model0;
                     }
@@ -7218,11 +7219,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeChoices.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "choices"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "choices"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Choices.Converter.Parse(nodeChoices, Violation.Join(path, "choices"), violations) is { } model0)
+                    if (Choices.Converter.Parse(nodeChoices, NexgenRuntime::Violation.Join(path, "choices"), violations) is { } model0)
                     {
                         parsedChoices = model0;
                     }
@@ -7233,11 +7234,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeExtras.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "extras"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "extras"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Extras.Converter.Parse(nodeExtras, Violation.Join(path, "extras"), violations) is { } model0)
+                    if (Extras.Converter.Parse(nodeExtras, NexgenRuntime::Violation.Join(path, "extras"), violations) is { } model0)
                     {
                         parsedExtras = model0;
                     }
@@ -7248,11 +7249,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeShape.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "shape"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "shape"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Shape.Converter.Parse(nodeShape, Violation.Join(path, "shape"), violations) is { } model0)
+                    if (Shape.Converter.Parse(nodeShape, NexgenRuntime::Violation.Join(path, "shape"), violations) is { } model0)
                     {
                         parsedShape = model0;
                     }
@@ -7263,11 +7264,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeNote.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "note"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "note"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Note.Converter.Parse(nodeNote, Violation.Join(path, "note"), violations) is { } model0)
+                    if (Note.Converter.Parse(nodeNote, NexgenRuntime::Violation.Join(path, "note"), violations) is { } model0)
                     {
                         parsedNote = model0;
                     }
@@ -7278,11 +7279,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeAddress.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "address"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "address"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Address.Converter.Parse(nodeAddress, Violation.Join(path, "address"), violations) is { } model0)
+                    if (Address.Converter.Parse(nodeAddress, NexgenRuntime::Violation.Join(path, "address"), violations) is { } model0)
                     {
                         parsedAddress = model0;
                     }
@@ -7293,11 +7294,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeLabels.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "labels"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "labels"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Labels.Converter.Parse(nodeLabels, Violation.Join(path, "labels"), violations) is { } model0)
+                    if (Labels.Converter.Parse(nodeLabels, NexgenRuntime::Violation.Join(path, "labels"), violations) is { } model0)
                     {
                         parsedLabels = model0;
                     }
@@ -7308,11 +7309,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeSettings.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "settings"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "settings"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Settings.Converter.Parse(nodeSettings, Violation.Join(path, "settings"), violations) is { } model0)
+                    if (Settings.Converter.Parse(nodeSettings, NexgenRuntime::Violation.Join(path, "settings"), violations) is { } model0)
                     {
                         parsedSettings = model0;
                     }
@@ -7323,11 +7324,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeAttributes.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "attributes"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "attributes"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (Attributes.Converter.Parse(nodeAttributes, Violation.Join(path, "attributes"), violations) is { } model0)
+                    if (Attributes.Converter.Parse(nodeAttributes, NexgenRuntime::Violation.Join(path, "attributes"), violations) is { } model0)
                     {
                         parsedAttributes = model0;
                     }
@@ -7338,11 +7339,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeContact.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "contact"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "contact"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (ContactCs.Converter.Parse(nodeContact, Violation.Join(path, "contact"), violations) is { } model0)
+                    if (ContactCs.Converter.Parse(nodeContact, NexgenRuntime::Violation.Join(path, "contact"), violations) is { } model0)
                     {
                         parsedContact = model0;
                     }
@@ -7356,15 +7357,15 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeNullableCount, Violation.Join(path, "nullableCount"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeNullableCount, NexgenRuntime::Violation.Join(path, "nullableCount"), violations) is { } value0)
                     {
                         if (value0 < 1L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableCount"), "must be >= 1, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableCount"), "must be >= 1, got " + value0));
                         }
                         if (value0 > 10L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableCount"), "must be <= 10, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableCount"), "must be <= 10, got " + value0));
                         }
                         parsedNullableCount = value0;
                     }
@@ -7378,11 +7379,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeNullableRatio, Violation.Join(path, "nullableRatio"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeNullableRatio, NexgenRuntime::Violation.Join(path, "nullableRatio"), violations) is { } value0)
                     {
                         if (value0 % 2.0 != 0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableRatio"), "must be a multiple of 2, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableRatio"), "must be a multiple of 2, got " + value0));
                         }
                         parsedNullableRatio = value0;
                     }
@@ -7398,7 +7399,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (nodeNullableFlag.ValueKind is not (global::System.Text.Json.JsonValueKind.True or global::System.Text.Json.JsonValueKind.False))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "nullableFlag"), "expected boolean"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableFlag"), "expected boolean"));
                     }
                     else
                     {
@@ -7417,7 +7418,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (nodeNullableTags.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "nullableTags"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableTags"), "expected array"));
                     }
                     else
                     {
@@ -7425,15 +7426,15 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeNullableTags.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "nullableTags"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "nullableTags"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
                             if (item0.ValueKind != global::System.Text.Json.JsonValueKind.String)
                             {
-                                violations.Add(new Violation(itemPath0, "expected string"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "expected string"));
                             }
                             else
                             {
@@ -7443,16 +7444,16 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         if (nodeNullableTags.GetArrayLength() < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableTags"), "must have at least 1 items, got " + nodeNullableTags.GetArrayLength()));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableTags"), "must have at least 1 items, got " + nodeNullableTags.GetArrayLength()));
                         }
                         var rawSeen0 = new global::System.Collections.Generic.Dictionary<string, int>(global::System.StringComparer.Ordinal);
                         var rawIndex0 = 0;
                         foreach (var rawElement in nodeNullableTags.EnumerateArray())
                         {
-                            var rawKey = SpecJson.ValueKey(rawElement);
+                            var rawKey = NexgenRuntime::SpecJson.ValueKey(rawElement);
                             if (rawSeen0.TryGetValue(rawKey, out var priorIndex))
                             {
-                                violations.Add(new Violation(Violation.Join(path, "nullableTags"), "duplicate items: element at index " + rawIndex0 + " equals index " + priorIndex));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableTags"), "duplicate items: element at index " + rawIndex0 + " equals index " + priorIndex));
                             }
                             else
                             {
@@ -7474,7 +7475,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (nodeNullableMode.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "nullableMode"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableMode"), "expected string"));
                     }
                     else
                     {
@@ -7489,7 +7490,7 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableMode"), "must be one of [\"auto\", \"manual\"], got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableMode"), "must be one of [\"auto\", \"manual\"], got " + closed0));
                         }
                     }
                 }
@@ -7499,13 +7500,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeIntegralMeasurements.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "integralMeasurements"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "integralMeasurements"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeIntegralMeasurements.ValueKind != global::System.Text.Json.JsonValueKind.Array)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "integralMeasurements"), "expected array"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "integralMeasurements"), "expected array"));
                     }
                     else
                     {
@@ -7513,13 +7514,13 @@ namespace Nexgen.JsonSchema.Showcase
                         var index0 = 0;
                         foreach (var item0 in nodeIntegralMeasurements.EnumerateArray())
                         {
-                            var itemPath0 = Violation.Index(Violation.Join(path, "integralMeasurements"), index0++);
+                            var itemPath0 = NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "integralMeasurements"), index0++);
                             if (item0.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                             {
-                                violations.Add(new Violation(itemPath0, "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(itemPath0, "explicit null not allowed"));
                                 continue;
                             }
-                            if (SpecJson.SpecDouble(item0, itemPath0, violations) is { } value1)
+                            if (NexgenRuntime::SpecJson.SpecDouble(item0, itemPath0, violations) is { } value1)
                             {
                                 items0.Add(value1);
                             }
@@ -7527,14 +7528,14 @@ namespace Nexgen.JsonSchema.Showcase
                         var rawMatchCount0 = 0;
                         foreach (var rawElement in nodeIntegralMeasurements.EnumerateArray())
                         {
-                            if (SpecJson.IsSpecLong(rawElement) && (true))
+                            if (NexgenRuntime::SpecJson.IsSpecLong(rawElement) && (true))
                             {
                                 rawMatchCount0++;
                             }
                         }
                         if (rawMatchCount0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "integralMeasurements"), "no element matches the required schema"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "integralMeasurements"), "no element matches the required schema"));
                         }
                         parsedIntegralMeasurements = items0;
                     }
@@ -7545,15 +7546,15 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeByFive.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "byFive"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "byFive"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeByFive, Violation.Join(path, "byFive"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeByFive, NexgenRuntime::Violation.Join(path, "byFive"), violations) is { } value0)
                     {
                         if (value0 % 5.0 != 0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "byFive"), "must be a multiple of 5, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "byFive"), "must be a multiple of 5, got " + value0));
                         }
                         parsedByFive = value0;
                     }
@@ -7564,20 +7565,20 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeWildcard.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "wildcard"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "wildcard"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeWildcard.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "wildcard"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "wildcard"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeWildcard.GetString()!;
                         if (!WildcardPattern.IsMatch(value0))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "wildcard"), "must match pattern " + "a(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\n])b" + ", got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "wildcard"), "must match pattern " + "a(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\n])b" + ", got " + value0));
                         }
                         parsedWildcard = value0;
                     }
@@ -7588,13 +7589,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeQuoted.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "quoted"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "quoted"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeQuoted.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "quoted"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "quoted"), "expected string"));
                     }
                     else
                     {
@@ -7693,78 +7694,78 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(Showcase value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Showcase value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Kind is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 if (value.Revision is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "revision"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "revision"), "required"));
                 }
                 if (value.Enabled is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "enabled"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "enabled"), "required"));
                 }
                 if (value.Status is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "status"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "status"), "required"));
                 }
                 if (value.Tier is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "tier"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tier"), "required"));
                 }
                 if (value.Scale is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "scale"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "scale"), "required"));
                 }
                 {
                     if (value.Name is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "name"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "must have length >= 1, got " + length0));
                         }
                         if (length0 > 64)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "name"), "must have length <= 64, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "must have length <= 64, got " + length0));
                         }
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "name"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "required"));
                     }
                 }
                 {
                     var member = value.Count;
-                    if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                    if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "count"), "exceeds \u00b1(2^53-1) integer cap"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "count"), "exceeds \u00b1(2^53-1) integer cap"));
                     }
                 }
                 {
                     if (value.Nickname is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 > 12)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nickname"), "must have length <= 12, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nickname"), "must have length <= 12, got " + length0));
                         }
                     }
                 }
                 {
                     if (value.Code is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 2)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "code"), "must have length >= 2, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "must have length >= 2, got " + length0));
                         }
                         if (length0 > 5)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "code"), "must have length <= 5, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "must have length <= 5, got " + length0));
                         }
                     }
                 }
@@ -7773,7 +7774,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!SkuPattern.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "sku"), "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "sku"), "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + member));
                         }
                     }
                 }
@@ -7782,7 +7783,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!PhrasePattern.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "phrase"), "must match pattern " + "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+[\\t\\n\\x0B\\f\\r ](?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+\\z" + ", got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "phrase"), "must match pattern " + "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+[\\t\\n\\x0B\\f\\r ](?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+\\z" + ", got " + member));
                         }
                     }
                 }
@@ -7791,25 +7792,25 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!RequestIdFormat.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "requestId"), "must be a valid uuid, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "requestId"), "must be a valid uuid, got " + member));
                         }
                     }
                 }
                 {
                     if (value.ContactEmail is { } member)
                     {
-                        if (SpecJson.CodePoints(member) > 254 || !ContactEmailFormat.IsMatch(member))
+                        if (NexgenRuntime::SpecJson.CodePoints(member) > 254 || !ContactEmailFormat.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "contactEmail"), "must be a valid email, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "contactEmail"), "must be a valid email, got " + member));
                         }
                     }
                 }
                 {
                     if (value.Host is { } member)
                     {
-                        if (SpecJson.CodePoints(member) > 253 || !HostFormat.IsMatch(member))
+                        if (NexgenRuntime::SpecJson.CodePoints(member) > 253 || !HostFormat.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "host"), "must be a valid hostname, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "host"), "must be a valid hostname, got " + member));
                         }
                     }
                 }
@@ -7818,7 +7819,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!HomepageFormat.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "homepage"), "must be a valid uri, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "homepage"), "must be a valid uri, got " + member));
                         }
                     }
                 }
@@ -7827,46 +7828,46 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!GatewayFormat.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "gateway"), "must be a valid ipv4, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "gateway"), "must be a valid ipv4, got " + member));
                         }
                     }
                 }
                 {
                     if (value.Retries is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "retries"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "retries"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                     }
                 }
                 {
                     if (value.Priority is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "priority"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "priority"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                         if (member < 1L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "priority"), "must be >= 1, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "priority"), "must be >= 1, got " + member));
                         }
                         if (member > 10L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "priority"), "must be <= 10, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "priority"), "must be <= 10, got " + member));
                         }
                     }
                 }
                 {
                     if (value.Level is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "level"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "level"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                         if (member <= 0L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "level"), "must be > 0, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "level"), "must be > 0, got " + member));
                         }
                     }
                 }
@@ -7875,15 +7876,15 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!double.IsFinite(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "ratio"), "must be a finite number, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "ratio"), "must be a finite number, got " + member));
                         }
                         if (member < 5.0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "ratio"), "must be >= 5, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "ratio"), "must be >= 5, got " + member));
                         }
                         if (member % 5.0 != 0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "ratio"), "must be a multiple of 5, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "ratio"), "must be a multiple of 5, got " + member));
                         }
                     }
                 }
@@ -7892,20 +7893,20 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!double.IsFinite(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "score"), "must be a finite number, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "score"), "must be a finite number, got " + member));
                         }
                     }
                 }
                 {
                     if (value.Step is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "step"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "step"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                         if (member % 3L != 0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "step"), "must be a multiple of 3, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "step"), "must be a multiple of 3, got " + member));
                         }
                     }
                 }
@@ -7919,16 +7920,16 @@ namespace Nexgen.JsonSchema.Showcase
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "tags"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "tags"), index0), "explicit null not allowed"));
                             }
                         }
                         if (member.Count < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "tags"), "must have at least 1 items, got " + member.Count));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tags"), "must have at least 1 items, got " + member.Count));
                         }
                         if (member.Count > 5)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "tags"), "must have at most 5 items, got " + member.Count));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "tags"), "must have at most 5 items, got " + member.Count));
                         }
                     }
                 }
@@ -7942,16 +7943,16 @@ namespace Nexgen.JsonSchema.Showcase
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "aliases"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "aliases"), index0), "explicit null not allowed"));
                             }
                         }
-                        var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(ValueEquality.Comparer);
+                        var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(NexgenRuntime::ValueEquality.Comparer);
                         for (var uniqueIndex0 = 0; uniqueIndex0 < member.Count; uniqueIndex0++)
                         {
-                            var key = (object?)member[uniqueIndex0] ?? ValueEquality.NullKey;
+                            var key = (object?)member[uniqueIndex0] ?? NexgenRuntime::ValueEquality.NullKey;
                             if (seen0.TryGetValue(key, out var priorIndex))
                             {
-                                violations.Add(new Violation(Violation.Join(path, "aliases"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "aliases"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
                             }
                             else
                             {
@@ -7970,7 +7971,7 @@ namespace Nexgen.JsonSchema.Showcase
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "roles"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "roles"), index0), "explicit null not allowed"));
                             }
                         }
                         var matchCount0 = 0;
@@ -7983,48 +7984,48 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         if (matchCount0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "roles"), "too few matching items: at least 1, got " + matchCount0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roles"), "too few matching items: at least 1, got " + matchCount0));
                         }
                         if (matchCount0 > 2)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "roles"), "too many matching items: at most 2, got " + matchCount0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "roles"), "too many matching items: at most 2, got " + matchCount0));
                         }
                     }
                 }
                 {
                     if (value.IdOrName is { } member)
                     {
-                        IdOrNameUnion.Converter.Validate(member, Violation.Join(path, "idOrName"), violations);
+                        IdOrNameUnion.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "idOrName"), violations);
                     }
                 }
                 {
                     if (value.Mode is { } member)
                     {
-                        ModeUnion.Converter.Validate(member, Violation.Join(path, "mode"), violations);
+                        ModeUnion.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "mode"), violations);
                     }
                 }
                 {
                     if (value.Payload is { } member)
                     {
-                        PayloadUnion.Converter.Validate(member, Violation.Join(path, "payload"), violations);
+                        PayloadUnion.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "payload"), violations);
                     }
                 }
                 {
                     if (value.Detail is { } member)
                     {
-                        DetailUnion.Converter.Validate(member, Violation.Join(path, "detail"), violations);
+                        DetailUnion.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "detail"), violations);
                     }
                 }
                 {
                     if (value.ShapeOrName is { } member)
                     {
-                        ShapeOrNameUnion.Converter.Validate(member, Violation.Join(path, "shapeOrName"), violations);
+                        ShapeOrNameUnion.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "shapeOrName"), violations);
                     }
                 }
                 {
                     if (value.Measurements is { } member)
                     {
-                        MeasurementsUnion.Converter.Validate(member, Violation.Join(path, "measurements"), violations);
+                        MeasurementsUnion.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "measurements"), violations);
                     }
                 }
                 {
@@ -8034,11 +8035,11 @@ namespace Nexgen.JsonSchema.Showcase
                         {
                             if (member[index0] is { } item0)
                             {
-                                Shape.Converter.Validate(item0, Violation.Index(Violation.Join(path, "shapes"), index0), violations);
+                                Shape.Converter.Validate(item0, NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "shapes"), index0), violations);
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "shapes"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "shapes"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -8050,11 +8051,11 @@ namespace Nexgen.JsonSchema.Showcase
                         {
                             if (member[index0] is { } item0)
                             {
-                                ShowcaseSegmentsItem.Converter.Validate(item0, Violation.Index(Violation.Join(path, "segments"), index0), violations);
+                                ShowcaseSegmentsItem.Converter.Validate(item0, NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "segments"), index0), violations);
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "segments"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "segments"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -8066,10 +8067,10 @@ namespace Nexgen.JsonSchema.Showcase
                         {
                             if (member[index0] is { } item0)
                             {
-                                var length1 = SpecJson.CodePoints(item0);
+                                var length1 = NexgenRuntime::SpecJson.CodePoints(item0);
                                 if (length1 < 2)
                                 {
-                                    violations.Add(new Violation(Violation.Index(Violation.Join(path, "slots"), index0), "must have length >= 2, got " + length1));
+                                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "slots"), index0), "must have length >= 2, got " + length1));
                                 }
                             }
                         }
@@ -8085,15 +8086,15 @@ namespace Nexgen.JsonSchema.Showcase
                                 for (var index1 = 0; index1 < item0.Count; index1++)
                                 {
                                     var item1 = item0[index1];
-                                    if (item1 < -SpecJson.IntegerCap || item1 > SpecJson.IntegerCap)
+                                    if (item1 < -NexgenRuntime::SpecJson.IntegerCap || item1 > NexgenRuntime::SpecJson.IntegerCap)
                                     {
-                                        violations.Add(new Violation(Violation.Index(Violation.Index(Violation.Join(path, "grid"), index0), index1), "exceeds \u00b1(2^53-1) integer cap"));
+                                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "grid"), index0), index1), "exceeds \u00b1(2^53-1) integer cap"));
                                     }
                                 }
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "grid"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "grid"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -8110,13 +8111,13 @@ namespace Nexgen.JsonSchema.Showcase
                                     var item1 = item0[index1];
                                     if (!double.IsFinite(item1))
                                     {
-                                        violations.Add(new Violation(Violation.Index(Violation.Index(Violation.Join(path, "numberGrid"), index0), index1), "must be a finite number, got " + item1));
+                                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "numberGrid"), index0), index1), "must be a finite number, got " + item1));
                                     }
                                 }
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "numberGrid"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "numberGrid"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -8130,12 +8131,12 @@ namespace Nexgen.JsonSchema.Showcase
                             {
                                 if (!global::System.Text.RegularExpressions.Regex.IsMatch(item0, "^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant))
                                 {
-                                    violations.Add(new Violation(Violation.Index(Violation.Join(path, "links"), index0), "must be a valid uri, got " + item0));
+                                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "links"), index0), "must be a valid uri, got " + item0));
                                 }
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "links"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "links"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -8147,11 +8148,11 @@ namespace Nexgen.JsonSchema.Showcase
                         {
                             if (member[index0] is { } item0)
                             {
-                                Address.Converter.Validate(item0, Violation.Index(Violation.Join(path, "addresses"), index0), violations);
+                                Address.Converter.Validate(item0, NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "addresses"), index0), violations);
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "addresses"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "addresses"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -8159,7 +8160,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (value.AddressBook is { } member)
                     {
-                        AddressBook.Converter.Validate(member, Violation.Join(path, "addressBook"), violations);
+                        AddressBook.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "addressBook"), violations);
                     }
                 }
                 {
@@ -8168,14 +8169,14 @@ namespace Nexgen.JsonSchema.Showcase
                         for (var index0 = 0; index0 < member.Count; index0++)
                         {
                             var item0 = member[index0];
-                            TemporalSupport.CheckDate(item0, Violation.Index(Violation.Join(path, "dates"), index0), violations);
+                            NexgenRuntime::TemporalSupport.CheckDate(item0, NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "dates"), index0), violations);
                         }
                     }
                 }
                 {
                     if (value.DateIndex is { } member)
                     {
-                        DateIndex.Converter.Validate(member, Violation.Join(path, "dateIndex"), violations);
+                        DateIndex.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "dateIndex"), violations);
                     }
                 }
                 {
@@ -8188,7 +8189,7 @@ namespace Nexgen.JsonSchema.Showcase
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "blobs"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "blobs"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -8196,37 +8197,37 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (value.BlobIndex is { } member)
                     {
-                        BlobIndex.Converter.Validate(member, Violation.Join(path, "blobIndex"), violations);
+                        BlobIndex.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "blobIndex"), violations);
                     }
                 }
                 {
                     if (value.Metrics is { } member)
                     {
-                        Metrics.Converter.Validate(member, Violation.Join(path, "metrics"), violations);
+                        Metrics.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "metrics"), violations);
                     }
                 }
                 {
                     if (value.MetricOrLabel is { } member)
                     {
-                        MetricOrLabelUnion.Converter.Validate(member, Violation.Join(path, "metricOrLabel"), violations);
+                        MetricOrLabelUnion.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "metricOrLabel"), violations);
                     }
                 }
                 {
                     if (value.AddressListOrLabel is { } member)
                     {
-                        AddressListOrLabelUnion.Converter.Validate(member, Violation.Join(path, "addressListOrLabel"), violations);
+                        AddressListOrLabelUnion.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "addressListOrLabel"), violations);
                     }
                 }
                 {
                     if (value.Location is { } member)
                     {
-                        ShowcaseLocation.Converter.Validate(member, Violation.Join(path, "location"), violations);
+                        ShowcaseLocation.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "location"), violations);
                     }
                 }
                 {
                     if (value.Audit is { } member)
                     {
-                        ShowcaseAudit.Converter.Validate(member, Violation.Join(path, "audit"), violations);
+                        ShowcaseAudit.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "audit"), violations);
                     }
                 }
                 {
@@ -8236,11 +8237,11 @@ namespace Nexgen.JsonSchema.Showcase
                         {
                             if (member[index0] is { } item0)
                             {
-                                ShowcaseRowsItem.Converter.Validate(item0, Violation.Index(Violation.Join(path, "rows"), index0), violations);
+                                ShowcaseRowsItem.Converter.Validate(item0, NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "rows"), index0), violations);
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "rows"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "rows"), index0), "explicit null not allowed"));
                             }
                         }
                     }
@@ -8248,101 +8249,101 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (value.LedgerCs is { } member)
                     {
-                        ShowcaseLedger.Converter.Validate(member, Violation.Join(path, "ledger"), violations);
+                        ShowcaseLedger.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "ledger"), violations);
                     }
                 }
                 {
                     if (value.Metadata is { } member)
                     {
-                        ShowcaseMetadata.Converter.Validate(member, Violation.Join(path, "metadata"), violations);
+                        ShowcaseMetadata.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "metadata"), violations);
                     }
                 }
                 {
                     if (value.Quotas is { } member)
                     {
-                        Quotas.Converter.Validate(member, Violation.Join(path, "quotas"), violations);
+                        Quotas.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "quotas"), violations);
                     }
                 }
                 {
                     if (value.Tokens is { } member)
                     {
-                        Tokens.Converter.Validate(member, Violation.Join(path, "tokens"), violations);
+                        Tokens.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "tokens"), violations);
                     }
                 }
                 {
                     if (value.Nicknames is { } member)
                     {
-                        Nicknames.Converter.Validate(member, Violation.Join(path, "nicknames"), violations);
+                        Nicknames.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "nicknames"), violations);
                     }
                 }
                 {
                     if (value.Choices is { } member)
                     {
-                        Choices.Converter.Validate(member, Violation.Join(path, "choices"), violations);
+                        Choices.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "choices"), violations);
                     }
                 }
                 {
                     if (value.Extras is { } member)
                     {
-                        Extras.Converter.Validate(member, Violation.Join(path, "extras"), violations);
+                        Extras.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "extras"), violations);
                     }
                 }
                 {
                     if (value.Shape is { } member)
                     {
-                        Shape.Converter.Validate(member, Violation.Join(path, "shape"), violations);
+                        Shape.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "shape"), violations);
                     }
                 }
                 {
                     if (value.Note is { } member)
                     {
-                        Note.Converter.Validate(member, Violation.Join(path, "note"), violations);
+                        Note.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "note"), violations);
                     }
                 }
                 {
                     if (value.Address is { } member)
                     {
-                        Address.Converter.Validate(member, Violation.Join(path, "address"), violations);
+                        Address.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "address"), violations);
                     }
                 }
                 {
                     if (value.Labels is { } member)
                     {
-                        Labels.Converter.Validate(member, Violation.Join(path, "labels"), violations);
+                        Labels.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "labels"), violations);
                     }
                 }
                 {
                     if (value.Settings is { } member)
                     {
-                        Settings.Converter.Validate(member, Violation.Join(path, "settings"), violations);
+                        Settings.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "settings"), violations);
                     }
                 }
                 {
                     if (value.Attributes is { } member)
                     {
-                        Attributes.Converter.Validate(member, Violation.Join(path, "attributes"), violations);
+                        Attributes.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "attributes"), violations);
                     }
                 }
                 {
                     if (value.Contact is { } member)
                     {
-                        ContactCs.Converter.Validate(member, Violation.Join(path, "contact"), violations);
+                        ContactCs.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "contact"), violations);
                     }
                 }
                 {
                     if (value.NullableCount is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableCount"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableCount"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                         if (member < 1L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableCount"), "must be >= 1, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableCount"), "must be >= 1, got " + member));
                         }
                         if (member > 10L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableCount"), "must be <= 10, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableCount"), "must be <= 10, got " + member));
                         }
                     }
                 }
@@ -8351,11 +8352,11 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!double.IsFinite(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableRatio"), "must be a finite number, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableRatio"), "must be a finite number, got " + member));
                         }
                         if (member % 2.0 != 0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableRatio"), "must be a multiple of 2, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableRatio"), "must be a multiple of 2, got " + member));
                         }
                     }
                 }
@@ -8369,20 +8370,20 @@ namespace Nexgen.JsonSchema.Showcase
                             }
                             else
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "nullableTags"), index0), "explicit null not allowed"));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "nullableTags"), index0), "explicit null not allowed"));
                             }
                         }
                         if (member.Count < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "nullableTags"), "must have at least 1 items, got " + member.Count));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableTags"), "must have at least 1 items, got " + member.Count));
                         }
-                        var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(ValueEquality.Comparer);
+                        var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(NexgenRuntime::ValueEquality.Comparer);
                         for (var uniqueIndex0 = 0; uniqueIndex0 < member.Count; uniqueIndex0++)
                         {
-                            var key = (object?)member[uniqueIndex0] ?? ValueEquality.NullKey;
+                            var key = (object?)member[uniqueIndex0] ?? NexgenRuntime::ValueEquality.NullKey;
                             if (seen0.TryGetValue(key, out var priorIndex))
                             {
-                                violations.Add(new Violation(Violation.Join(path, "nullableTags"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "nullableTags"), "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
                             }
                             else
                             {
@@ -8399,20 +8400,20 @@ namespace Nexgen.JsonSchema.Showcase
                             var item0 = member[index0];
                             if (!double.IsFinite(item0))
                             {
-                                violations.Add(new Violation(Violation.Index(Violation.Join(path, "integralMeasurements"), index0), "must be a finite number, got " + item0));
+                                violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(NexgenRuntime::Violation.Join(path, "integralMeasurements"), index0), "must be a finite number, got " + item0));
                             }
                         }
                         var matchCount0 = 0;
                         foreach (var item in member)
                         {
-                            if (item is { } candidate && (double.IsFinite(candidate) && candidate == global::System.Math.Round(candidate) && global::System.Math.Abs(candidate) <= SpecJson.IntegerCap) && (true))
+                            if (item is { } candidate && (double.IsFinite(candidate) && candidate == global::System.Math.Round(candidate) && global::System.Math.Abs(candidate) <= NexgenRuntime::SpecJson.IntegerCap) && (true))
                             {
                                 matchCount0++;
                             }
                         }
                         if (matchCount0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "integralMeasurements"), "no element matches the required schema"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "integralMeasurements"), "no element matches the required schema"));
                         }
                     }
                 }
@@ -8421,11 +8422,11 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!double.IsFinite(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "byFive"), "must be a finite number, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "byFive"), "must be a finite number, got " + member));
                         }
                         if (member % 5.0 != 0)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "byFive"), "must be a multiple of 5, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "byFive"), "must be a multiple of 5, got " + member));
                         }
                     }
                 }
@@ -8434,7 +8435,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!WildcardPattern.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "wildcard"), "must match pattern " + "a(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\n])b" + ", got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "wildcard"), "must match pattern " + "a(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\n])b" + ", got " + member));
                         }
                     }
                 }
@@ -8530,12 +8531,12 @@ namespace Nexgen.JsonSchema.Showcase
                 if (value.Blob is { } memberBlob)
                 {
                     writer.WritePropertyName("blob");
-                    writer.WriteStringValue(Base64Support.FormatBase64(memberBlob));
+                    writer.WriteStringValue(NexgenRuntime::Base64Support.FormatBase64(memberBlob));
                 }
                 if (value.UrlBlob is { } memberUrlBlob)
                 {
                     writer.WritePropertyName("urlBlob");
-                    writer.WriteStringValue(Base64Support.FormatBase64Url(memberUrlBlob));
+                    writer.WriteStringValue(NexgenRuntime::Base64Support.FormatBase64Url(memberUrlBlob));
                 }
                 if (value.Retries is { } memberRetries)
                 {
@@ -8823,7 +8824,7 @@ namespace Nexgen.JsonSchema.Showcase
                     writer.WriteStartArray();
                     foreach (var item0 in memberDates)
                     {
-                        writer.WriteStringValue(TemporalSupport.FormatDate(item0));
+                        writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDate(item0));
                     }
                     writer.WriteEndArray();
                 }
@@ -8840,7 +8841,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (item0 is { } present0)
                         {
-                            writer.WriteStringValue(Base64Support.FormatBase64(present0));
+                            writer.WriteStringValue(NexgenRuntime::Base64Support.FormatBase64(present0));
                         }
                         else
                         {
@@ -9061,16 +9062,16 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(By, other.By)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(By, other.By)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(By));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(By));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9086,11 +9087,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseAudit Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -9098,29 +9099,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseAudit value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseAudit? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseAudit? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -9133,25 +9134,25 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedBy = null;
                 if (!members.TryGetValue("by", out var nodeBy))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "by"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "by"), "required"));
                 }
                 else if (nodeBy.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "by"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "by"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeBy.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "by"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "by"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeBy.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "by"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "by"), "must have length >= 1, got " + length0));
                         }
                         parsedBy = value0;
                     }
@@ -9167,20 +9168,20 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ShowcaseAudit value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseAudit value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 {
                     if (value.By is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "by"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "by"), "must have length >= 1, got " + length0));
                         }
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "by"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "by"), "required"));
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -9190,7 +9191,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -9198,7 +9199,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "by" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -9255,18 +9256,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Code, other.Code)
-                && ValueEquality.Equal(Hint, other.Hint)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Code, other.Code)
+                && NexgenRuntime::ValueEquality.Equal(Hint, other.Hint)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Code));
-            hash.Add(ValueEquality.Hash(Hint));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Code));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Hint));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9282,11 +9283,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseDetailObject Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -9294,29 +9295,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseDetailObject value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseDetailObject? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseDetailObject? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -9329,25 +9330,25 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedCode = null;
                 if (!members.TryGetValue("code", out var nodeCode))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "code"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "required"));
                 }
                 else if (nodeCode.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "code"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeCode.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "code"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeCode.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "code"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "must have length >= 1, got " + length0));
                         }
                         parsedCode = value0;
                     }
@@ -9358,13 +9359,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeHint.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "hint"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "hint"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeHint.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "hint"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "hint"), "expected string"));
                     }
                     else
                     {
@@ -9384,20 +9385,20 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ShowcaseDetailObject value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseDetailObject value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 {
                     if (value.Code is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "code"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "must have length >= 1, got " + length0));
                         }
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "code"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "code"), "required"));
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -9411,7 +9412,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -9419,7 +9420,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "code" or "hint" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -9471,14 +9472,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9494,11 +9495,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseLedger Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -9506,36 +9507,36 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseLedger value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseLedger? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseLedger? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, ShowcaseLedgerValue>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (ShowcaseLedgerValue.Converter.Parse(member.Value, memberPath, violations) is { } model0)
@@ -9550,22 +9551,22 @@ namespace Nexgen.JsonSchema.Showcase
                 return new ShowcaseLedger { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(ShowcaseLedger value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseLedger value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
                     if (entry.Value is { } member)
                     {
-                        ShowcaseLedgerValue.Converter.Validate(member, Violation.Member(path, entry.Key), violations);
+                        ShowcaseLedgerValue.Converter.Validate(member, NexgenRuntime::Violation.Member(path, entry.Key), violations);
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Member(path, entry.Key), "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "explicit null not allowed"));
                     }
                 }
             }
@@ -9618,16 +9619,16 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Amount, other.Amount)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Amount, other.Amount)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Amount));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Amount));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9643,11 +9644,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseLedgerValue Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -9655,29 +9656,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseLedgerValue value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseLedgerValue? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseLedgerValue? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -9690,19 +9691,19 @@ namespace Nexgen.JsonSchema.Showcase
                 long? parsedAmount = null;
                 if (!members.TryGetValue("amount", out var nodeAmount))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "amount"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "amount"), "required"));
                 }
                 else if (nodeAmount.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "amount"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "amount"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeAmount, Violation.Join(path, "amount"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeAmount, NexgenRuntime::Violation.Join(path, "amount"), violations) is { } value0)
                     {
                         if (value0 < 0L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "amount"), "must be >= 0, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "amount"), "must be >= 0, got " + value0));
                         }
                         parsedAmount = value0;
                     }
@@ -9718,24 +9719,24 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ShowcaseLedgerValue value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseLedgerValue value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 {
                     var member = value.Amount;
-                    if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                    if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "amount"), "exceeds \u00b1(2^53-1) integer cap"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "amount"), "exceeds \u00b1(2^53-1) integer cap"));
                     }
                     if (member < 0L)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "amount"), "must be >= 0, got " + member));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "amount"), "must be >= 0, got " + member));
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
                 wireKeys.Add("amount");
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -9743,7 +9744,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "amount" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -9797,18 +9798,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(City, other.City)
-                && ValueEquality.Equal(Geo, other.Geo)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(City, other.City)
+                && NexgenRuntime::ValueEquality.Equal(Geo, other.Geo)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(City));
-            hash.Add(ValueEquality.Hash(Geo));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(City));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Geo));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -9824,11 +9825,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseLocation Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -9836,29 +9837,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseLocation value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseLocation? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseLocation? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -9871,25 +9872,25 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedCity = null;
                 if (!members.TryGetValue("city", out var nodeCity))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "city"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "city"), "required"));
                 }
                 else if (nodeCity.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "city"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "city"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeCity.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "city"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "city"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeCity.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "city"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "city"), "must have length >= 1, got " + length0));
                         }
                         parsedCity = value0;
                     }
@@ -9900,11 +9901,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeGeo.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "geo"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "geo"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (ShowcaseLocationGeo.Converter.Parse(nodeGeo, Violation.Join(path, "geo"), violations) is { } model0)
+                    if (ShowcaseLocationGeo.Converter.Parse(nodeGeo, NexgenRuntime::Violation.Join(path, "geo"), violations) is { } model0)
                     {
                         parsedGeo = model0;
                     }
@@ -9921,26 +9922,26 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ShowcaseLocation value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseLocation value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 {
                     if (value.City is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "city"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "city"), "must have length >= 1, got " + length0));
                         }
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "city"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "city"), "required"));
                     }
                 }
                 {
                     if (value.Geo is { } member)
                     {
-                        ShowcaseLocationGeo.Converter.Validate(member, Violation.Join(path, "geo"), violations);
+                        ShowcaseLocationGeo.Converter.Validate(member, NexgenRuntime::Violation.Join(path, "geo"), violations);
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -9954,7 +9955,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -9962,7 +9963,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "city" or "geo" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -10024,18 +10025,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Lat, other.Lat)
-                && ValueEquality.Equal(Lon, other.Lon)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Lat, other.Lat)
+                && NexgenRuntime::ValueEquality.Equal(Lon, other.Lon)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Lat));
-            hash.Add(ValueEquality.Hash(Lon));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Lat));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Lon));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -10051,11 +10052,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseLocationGeo Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -10063,29 +10064,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseLocationGeo value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseLocationGeo? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseLocationGeo? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -10101,11 +10102,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeLat.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "lat"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "lat"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeLat, Violation.Join(path, "lat"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeLat, NexgenRuntime::Violation.Join(path, "lat"), violations) is { } value0)
                     {
                         parsedLat = value0;
                     }
@@ -10116,11 +10117,11 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeLon.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "lon"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "lon"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeLon, Violation.Join(path, "lon"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeLon, NexgenRuntime::Violation.Join(path, "lon"), violations) is { } value0)
                     {
                         parsedLon = value0;
                     }
@@ -10137,14 +10138,14 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ShowcaseLocationGeo value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseLocationGeo value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 {
                     if (value.Lat is { } member)
                     {
                         if (!double.IsFinite(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "lat"), "must be a finite number, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "lat"), "must be a finite number, got " + member));
                         }
                     }
                 }
@@ -10153,7 +10154,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!double.IsFinite(member))
                         {
-                            violations.Add(new Violation(Violation.Join(path, "lon"), "must be a finite number, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "lon"), "must be a finite number, got " + member));
                         }
                     }
                 }
@@ -10168,7 +10169,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -10176,7 +10177,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "lat" or "lon" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -10228,14 +10229,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -10251,11 +10252,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseMetadata Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -10263,29 +10264,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseMetadata value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseMetadata? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseMetadata? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -10293,7 +10294,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (members.Count > 3)
                 {
-                    violations.Add(new Violation(path, "must have at most 3 properties, got " + members.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 3 properties, got " + members.Count));
                 }
                 if (violations.Count > start)
                 {
@@ -10305,12 +10306,12 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ShowcaseMetadata value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseMetadata value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -10318,13 +10319,13 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (!wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
                 if (wireKeys.Count > 3)
                 {
-                    violations.Add(new Violation(path, "must have at most 3 properties, got " + wireKeys.Count));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at most 3 properties, got " + wireKeys.Count));
                 }
             }
 
@@ -10369,16 +10370,16 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Cell, other.Cell)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Cell, other.Cell)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Cell));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Cell));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -10394,11 +10395,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseRowsItem Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -10406,29 +10407,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseRowsItem value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseRowsItem? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseRowsItem? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -10441,25 +10442,25 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedCell = null;
                 if (!members.TryGetValue("cell", out var nodeCell))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "cell"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "cell"), "required"));
                 }
                 else if (nodeCell.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "cell"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "cell"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeCell.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "cell"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "cell"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeCell.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "cell"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "cell"), "must have length >= 1, got " + length0));
                         }
                         parsedCell = value0;
                     }
@@ -10475,20 +10476,20 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(ShowcaseRowsItem value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseRowsItem value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 {
                     if (value.Cell is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "cell"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "cell"), "must have length >= 1, got " + length0));
                         }
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "cell"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "cell"), "required"));
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -10498,7 +10499,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -10506,7 +10507,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "cell" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -10556,20 +10557,20 @@ namespace Nexgen.JsonSchema.Showcase
             /// </summary>
             public string Value { get; }
 
-            internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
-                var length0 = SpecJson.CodePoints(Value);
+                var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
                 if (length0 < 2)
                 {
-                    violations.Add(new Violation(path, "must have length >= 2, got " + length0));
+                    violations.Add(new NexgenRuntime::Violation(path, "must have length >= 2, got " + length0));
                 }
             }
 
             /// <inheritdoc/>
-            public override bool Equals(object? obj) => obj is ShowcaseSegmentsItemString other && ValueEquality.Equal(Value, other.Value);
+            public override bool Equals(object? obj) => obj is ShowcaseSegmentsItemString other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => ValueEquality.Hash(Value);
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
             /// <inheritdoc/>
             public override string ToString() => "ShowcaseSegmentsItemString[" + Value + "]";
@@ -10594,23 +10595,23 @@ namespace Nexgen.JsonSchema.Showcase
             /// </summary>
             public long Value { get; }
 
-            internal void Validate(string path, global::System.Collections.Generic.List<Violation> violations)
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
-                if (Value < -SpecJson.IntegerCap || Value > SpecJson.IntegerCap)
+                if (Value < -NexgenRuntime::SpecJson.IntegerCap || Value > NexgenRuntime::SpecJson.IntegerCap)
                 {
-                    violations.Add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+                    violations.Add(new NexgenRuntime::Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
                 }
                 if (Value < 0L)
                 {
-                    violations.Add(new Violation(path, "must be >= 0, got " + Value));
+                    violations.Add(new NexgenRuntime::Violation(path, "must be >= 0, got " + Value));
                 }
             }
 
             /// <inheritdoc/>
-            public override bool Equals(object? obj) => obj is ShowcaseSegmentsItemInteger other && ValueEquality.Equal(Value, other.Value);
+            public override bool Equals(object? obj) => obj is ShowcaseSegmentsItemInteger other && NexgenRuntime::ValueEquality.Equal(Value, other.Value);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => ValueEquality.Hash(Value);
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(Value);
 
             /// <inheritdoc/>
             public override string ToString() => "ShowcaseSegmentsItemInteger[" + Value + "]";
@@ -10628,11 +10629,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override ShowcaseSegmentsItem Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -10640,21 +10641,21 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ShowcaseSegmentsItem value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static ShowcaseSegmentsItem? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static ShowcaseSegmentsItem? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind == global::System.Text.Json.JsonValueKind.String)
                 {
@@ -10671,18 +10672,18 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     var wrapperStart = violations.Count;
                     ShowcaseSegmentsItemInteger? wrapped = null;
-                    if (SpecJson.SpecLong(node, path, violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(node, path, violations) is { } value0)
                     {
                         wrapped = new ShowcaseSegmentsItemInteger(value0);
                     }
                     wrapped?.Validate(path, violations);
                     return violations.Count > wrapperStart ? null : wrapped;
                 }
-                violations.Add(new Violation(path, "expected one of: string, integer"));
+                violations.Add(new NexgenRuntime::Violation(path, "expected one of: string, integer"));
                 return null;
             }
 
-            internal static void Validate(ShowcaseSegmentsItem value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(ShowcaseSegmentsItem value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 switch (value)
                 {
@@ -10693,7 +10694,7 @@ namespace Nexgen.JsonSchema.Showcase
                         variant1.Validate(path, violations);
                         break;
                     default:
-                        violations.Add(new Violation(path, "expected one of: string, integer"));
+                        violations.Add(new NexgenRuntime::Violation(path, "expected one of: string, integer"));
                         break;
                 }
             }
@@ -10736,14 +10737,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Id, other.Id);
+            return NexgenRuntime::ValueEquality.Equal(Id, other.Id);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Id));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Id));
             return hash.ToHashCode();
         }
 
@@ -10759,11 +10760,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override GetShowcaseInput Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -10771,51 +10772,51 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, GetShowcaseInput value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static GetShowcaseInput? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static GetShowcaseInput? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "id")
                     {
                         continue;
                     }
-                    violations.Add(new Violation(Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
                 }
                 string? parsedId = null;
                 if (!members.TryGetValue("id", out var nodeId))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "required"));
                 }
                 else if (nodeId.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "id"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "expected string"));
                     }
                     else
                     {
@@ -10833,11 +10834,11 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(GetShowcaseInput value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(GetShowcaseInput value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Id is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "required"));
                 }
             }
 
@@ -10919,18 +10920,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Kind, other.Kind)
-                && ValueEquality.Equal(Side, other.Side)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(Side, other.Side)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Kind));
-            hash.Add(ValueEquality.Hash(Side));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Side));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -10946,11 +10947,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Square Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -10958,29 +10959,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Square value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Square? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Square? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -10993,17 +10994,17 @@ namespace Nexgen.JsonSchema.Showcase
                 KindValue? parsedKind = null;
                 if (!members.TryGetValue("kind", out var nodeKind))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 else if (nodeKind.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeKind.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "kind"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "expected string"));
                     }
                     else
                     {
@@ -11014,22 +11015,22 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "kind"), "must equal \"square\", got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "must equal \"square\", got " + closed0));
                         }
                     }
                 }
                 double? parsedSide = null;
                 if (!members.TryGetValue("side", out var nodeSide))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "side"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "side"), "required"));
                 }
                 else if (nodeSide.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "side"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "side"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecDouble(nodeSide, Violation.Join(path, "side"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecDouble(nodeSide, NexgenRuntime::Violation.Join(path, "side"), violations) is { } value0)
                     {
                         parsedSide = value0;
                     }
@@ -11046,17 +11047,17 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(Square value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Square value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Kind is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 {
                     var member = value.Side;
                     if (!double.IsFinite(member))
                     {
-                        violations.Add(new Violation(Violation.Join(path, "side"), "must be a finite number, got " + member));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "side"), "must be a finite number, got " + member));
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -11067,7 +11068,7 @@ namespace Nexgen.JsonSchema.Showcase
                 wireKeys.Add("side");
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -11075,7 +11076,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "kind" or "side" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -11166,18 +11167,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Kind, other.Kind)
-                && ValueEquality.Equal(Body, other.Body)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(Body, other.Body)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Kind));
-            hash.Add(ValueEquality.Hash(Body));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Body));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -11193,11 +11194,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override TextNote Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -11205,29 +11206,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, TextNote value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static TextNote? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static TextNote? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -11240,17 +11241,17 @@ namespace Nexgen.JsonSchema.Showcase
                 KindValue? parsedKind = null;
                 if (!members.TryGetValue("kind", out var nodeKind))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 else if (nodeKind.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeKind.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "kind"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "expected string"));
                     }
                     else
                     {
@@ -11261,32 +11262,32 @@ namespace Nexgen.JsonSchema.Showcase
                         }
                         else
                         {
-                            violations.Add(new Violation(Violation.Join(path, "kind"), "must equal \"text\", got " + closed0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "must equal \"text\", got " + closed0));
                         }
                     }
                 }
                 string? parsedBody = null;
                 if (!members.TryGetValue("body", out var nodeBody))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "body"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "required"));
                 }
                 else if (nodeBody.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "body"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeBody.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "body"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "expected string"));
                     }
                     else
                     {
                         var value0 = nodeBody.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "body"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "must have length >= 1, got " + length0));
                         }
                         parsedBody = value0;
                     }
@@ -11303,24 +11304,24 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(TextNote value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(TextNote value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Kind is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "required"));
                 }
                 {
                     if (value.Body is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 1)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "body"), "must have length >= 1, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "must have length >= 1, got " + length0));
                         }
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Join(path, "body"), "required"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "body"), "required"));
                     }
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
@@ -11334,7 +11335,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -11342,7 +11343,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "kind" or "body" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -11394,14 +11395,14 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -11419,11 +11420,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Tokens Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -11431,57 +11432,57 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Tokens value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Tokens? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Tokens? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, string>();
                 foreach (var member in members)
                 {
-                    var memberPath = Violation.Member(path, member.Key);
+                    var memberPath = NexgenRuntime::Violation.Member(path, member.Key);
                     if (member.Value.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                     {
-                        violations.Add(new Violation(memberPath, "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "explicit null not allowed"));
                         continue;
                     }
                     if (member.Value.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(memberPath, "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(memberPath, "expected string"));
                     }
                     else
                     {
                         var value0 = member.Value.GetString()!;
-                        var length0 = SpecJson.CodePoints(value0);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(value0);
                         if (length0 < 2)
                         {
-                            violations.Add(new Violation(memberPath, "must have length >= 2, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(memberPath, "must have length >= 2, got " + length0));
                         }
                         if (length0 > 8)
                         {
-                            violations.Add(new Violation(memberPath, "must have length <= 8, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(memberPath, "must have length <= 8, got " + length0));
                         }
                         if (!ValuePattern.IsMatch(value0))
                         {
-                            violations.Add(new Violation(memberPath, "must match pattern " + "^[a-z]+\\z" + ", got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(memberPath, "must match pattern " + "^[a-z]+\\z" + ", got " + value0));
                         }
                         additionalProperties[member.Key] = value0;
                     }
@@ -11493,34 +11494,34 @@ namespace Nexgen.JsonSchema.Showcase
                 return new Tokens { AdditionalProperties = additionalProperties };
             }
 
-            internal static void Validate(Tokens value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Tokens value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return;
                 }
                 foreach (var entry in value.AdditionalProperties)
                 {
                     if (entry.Value is { } member)
                     {
-                        var length0 = SpecJson.CodePoints(member);
+                        var length0 = NexgenRuntime::SpecJson.CodePoints(member);
                         if (length0 < 2)
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "must have length >= 2, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "must have length >= 2, got " + length0));
                         }
                         if (length0 > 8)
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "must have length <= 8, got " + length0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "must have length <= 8, got " + length0));
                         }
                         if (!ValuePattern.IsMatch(member))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "must match pattern " + "^[a-z]+\\z" + ", got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "must match pattern " + "^[a-z]+\\z" + ", got " + member));
                         }
                     }
                     else
                     {
-                        violations.Add(new Violation(Violation.Member(path, entry.Key), "explicit null not allowed"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "explicit null not allowed"));
                     }
                 }
             }
@@ -11588,22 +11589,22 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Id, other.Id)
-                && ValueEquality.Equal(Kind, other.Kind)
-                && ValueEquality.Equal(Name, other.Name)
-                && ValueEquality.Equal(Size, other.Size)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Id, other.Id)
+                && NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(Name, other.Name)
+                && NexgenRuntime::ValueEquality.Equal(Size, other.Size)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Id));
-            hash.Add(ValueEquality.Hash(Kind));
-            hash.Add(ValueEquality.Hash(Name));
-            hash.Add(ValueEquality.Hash(Size));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Id));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Name));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Size));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -11619,11 +11620,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override Widget Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -11631,29 +11632,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Widget value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Widget? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static Widget? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -11666,17 +11667,17 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedId = null;
                 if (!members.TryGetValue("id", out var nodeId))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "required"));
                 }
                 else if (nodeId.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "id"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "expected string"));
                     }
                     else
                     {
@@ -11690,13 +11691,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeKind.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeKind.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "kind"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "expected string"));
                     }
                     else
                     {
@@ -11707,17 +11708,17 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedName = null;
                 if (!members.TryGetValue("name", out var nodeName))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "name"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "required"));
                 }
                 else if (nodeName.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "name"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeName.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "name"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "expected string"));
                     }
                     else
                     {
@@ -11731,19 +11732,19 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeSize.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "size"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "size"), "explicit null not allowed"));
                 }
                 else
                 {
-                    if (SpecJson.SpecLong(nodeSize, Violation.Join(path, "size"), violations) is { } value0)
+                    if (NexgenRuntime::SpecJson.SpecLong(nodeSize, NexgenRuntime::Violation.Join(path, "size"), violations) is { } value0)
                     {
                         if (value0 < 10L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "size"), "must be >= 10, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "size"), "must be >= 10, got " + value0));
                         }
                         if (value0 > 20L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "size"), "must be <= 20, got " + value0));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "size"), "must be <= 20, got " + value0));
                         }
                         parsedSize = value0;
                     }
@@ -11762,30 +11763,30 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(Widget value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(Widget value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Id is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "required"));
                 }
                 if (value.Name is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "name"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "name"), "required"));
                 }
                 {
                     if (value.Size is { } member)
                     {
-                        if (member < -SpecJson.IntegerCap || member > SpecJson.IntegerCap)
+                        if (member < -NexgenRuntime::SpecJson.IntegerCap || member > NexgenRuntime::SpecJson.IntegerCap)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "size"), "exceeds \u00b1(2^53-1) integer cap"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "size"), "exceeds \u00b1(2^53-1) integer cap"));
                         }
                         if (member < 10L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "size"), "must be >= 10, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "size"), "must be >= 10, got " + member));
                         }
                         if (member > 20L)
                         {
-                            violations.Add(new Violation(Violation.Join(path, "size"), "must be <= 20, got " + member));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "size"), "must be <= 20, got " + member));
                         }
                     }
                 }
@@ -11808,7 +11809,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -11816,7 +11817,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "id" or "kind" or "name" or "size" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
@@ -11888,18 +11889,18 @@ namespace Nexgen.JsonSchema.Showcase
             {
                 return true;
             }
-            return ValueEquality.Equal(Id, other.Id)
-                && ValueEquality.Equal(Kind, other.Kind)
-                && ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
+            return NexgenRuntime::ValueEquality.Equal(Id, other.Id)
+                && NexgenRuntime::ValueEquality.Equal(Kind, other.Kind)
+                && NexgenRuntime::ValueEquality.Equal(AdditionalProperties, other.AdditionalProperties);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(ValueEquality.Hash(Id));
-            hash.Add(ValueEquality.Hash(Kind));
-            hash.Add(ValueEquality.Hash(AdditionalProperties));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Id));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(Kind));
+            hash.Add(NexgenRuntime::ValueEquality.Hash(AdditionalProperties));
             return hash.ToHashCode();
         }
 
@@ -11915,11 +11916,11 @@ namespace Nexgen.JsonSchema.Showcase
             public override WidgetBase Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 return value;
             }
@@ -11927,29 +11928,29 @@ namespace Nexgen.JsonSchema.Showcase
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, WidgetBase value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<Violation>();
+                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
                 if (value is null)
                 {
-                    violations.Add(new Violation("", "expected object"));
-                    throw Violation.Failure(violations);
+                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw Violation.Failure(violations);
+                    throw NexgenRuntime::Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static WidgetBase? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static WidgetBase? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new Violation(path, "expected object"));
+                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = SpecJson.Members(node);
+                var members = NexgenRuntime::SpecJson.Members(node);
                 var additionalProperties = new global::System.Collections.Generic.Dictionary<string, global::System.Text.Json.JsonElement>();
                 foreach (var member in members)
                 {
@@ -11962,17 +11963,17 @@ namespace Nexgen.JsonSchema.Showcase
                 string? parsedId = null;
                 if (!members.TryGetValue("id", out var nodeId))
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "required"));
                 }
                 else if (nodeId.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeId.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "id"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "expected string"));
                     }
                     else
                     {
@@ -11986,13 +11987,13 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 else if (nodeKind.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "kind"), "explicit null not allowed"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeKind.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new Violation(Violation.Join(path, "kind"), "expected string"));
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "kind"), "expected string"));
                     }
                     else
                     {
@@ -12012,11 +12013,11 @@ namespace Nexgen.JsonSchema.Showcase
                 };
             }
 
-            internal static void Validate(WidgetBase value, string path, global::System.Collections.Generic.List<Violation> violations)
+            internal static void Validate(WidgetBase value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
             {
                 if (value.Id is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "id"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "id"), "required"));
                 }
                 var wireKeys = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
                 if (value.Id is not null)
@@ -12029,7 +12030,7 @@ namespace Nexgen.JsonSchema.Showcase
                 }
                 if (value.AdditionalProperties is null)
                 {
-                    violations.Add(new Violation(Violation.Join(path, "AdditionalProperties"), "required"));
+                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "AdditionalProperties"), "required"));
                 }
                 else
                 {
@@ -12037,7 +12038,7 @@ namespace Nexgen.JsonSchema.Showcase
                     {
                         if (entry.Key is "id" or "kind" || !wireKeys.Add(entry.Key))
                         {
-                            violations.Add(new Violation(Violation.Member(path, entry.Key), "declared property key collision"));
+                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, entry.Key), "declared property key collision"));
                         }
                     }
                 }
