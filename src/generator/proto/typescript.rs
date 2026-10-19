@@ -62,13 +62,35 @@ impl ExternalModelBackend for ModelBackend {
     }
 }
 
-fn oneof_wire_field(
+enum ModelWireField<'a> {
+    Value(Cow<'a, RenderedField>),
+    Oneof(OneofField<'a>),
+}
+
+impl ModelWireField<'_> {
+    fn field(&self) -> &RenderedField {
+        match self {
+            Self::Value(field) => field,
+            Self::Oneof(oneof) => oneof.field,
+        }
+    }
+}
+
+struct OneofField<'a> {
+    field: &'a RenderedField,
+    local_name: String,
+    wire_group: String,
+    required: bool,
+    cases: Vec<OneofCase>,
+}
+
+fn oneof_wire_field<'a>(
     api_plan: &PlannedSpec,
-    record: &RecordSpec<PlannedFamily>,
     field: &RecordFieldSpec<PlannedFamily>,
-    rendered: &RenderedField,
+    rendered: &'a RenderedField,
+    local_name: String,
     resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
-) -> Option<RenderedField> {
+) -> Option<OneofField<'a>> {
     let PlannedWireFieldBinding::VariantMembers { wire_name, members } =
         field.data.wire_binding.as_ref()?
     else {
@@ -95,18 +117,13 @@ fn oneof_wire_field(
             conversion,
         });
     }
-    let (from_wire_expr, to_wire_expr) = oneof_expressions(
-        &record.name,
-        &rendered.name,
-        &typescript_generated_field_name(wire_name),
-        &rendered.annotation,
-        field.required,
-        &cases,
-    );
-    let mut wire_field = rendered.clone();
-    wire_field.from_wire_expr = from_wire_expr;
-    wire_field.to_wire_expr = to_wire_expr;
-    Some(wire_field)
+    Some(OneofField {
+        field: rendered,
+        local_name,
+        wire_group: typescript_generated_field_name(wire_name),
+        required: field.required,
+        cases,
+    })
 }
 
 fn generic_carrier_expressions(
@@ -155,19 +172,25 @@ fn model_wire_fields<'a>(
     record: &RecordSpec<PlannedFamily>,
     api_plan: &PlannedSpec,
     resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
-) -> Vec<Cow<'a, RenderedField>> {
+) -> Vec<ModelWireField<'a>> {
     model
         .fields
         .iter()
-        .map(|rendered| {
+        .enumerate()
+        .map(|(index, rendered)| {
             let (_, field) = record
                 .model_fields()
                 .find(|(_, field)| typescript_generated_field_name(&field.name) == rendered.name)
                 .expect("rendered model field should have a planned field");
-            if let Some(wire_field) =
-                oneof_wire_field(api_plan, record, field, rendered, resolve_type)
+            let local_name = if index == 0 {
+                "result".to_string()
+            } else {
+                format!("result{index}")
+            };
+            if let Some(oneof) =
+                oneof_wire_field(api_plan, field, rendered, local_name, resolve_type)
             {
-                return Cow::Owned(wire_field);
+                return ModelWireField::Oneof(oneof);
             }
             let wire_expr = format!("{{wire}}.{}", rendered.wire_name);
             if let Some((from_wire, to_wire)) =
@@ -176,7 +199,7 @@ fn model_wire_fields<'a>(
                 let mut wire_field = rendered.clone();
                 wire_field.from_wire_expr = from_wire;
                 wire_field.to_wire_expr = to_wire;
-                return Cow::Owned(wire_field);
+                return ModelWireField::Value(Cow::Owned(wire_field));
             }
             // Flattened fields still belong to their nested protobuf record.
             let mut wire_field = Cow::Borrowed(rendered);
@@ -221,7 +244,7 @@ fn model_wire_fields<'a>(
                     );
                 }
             }
-            wire_field
+            ModelWireField::Value(wire_field)
         })
         .collect()
 }
@@ -272,68 +295,75 @@ struct OneofCase {
     conversion: Option<WireValueConversion>,
 }
 
-/// Read the SDK discriminator directly. Writes include it so plain wire objects
-/// retain the same contract across JSON payload conversion.
-fn oneof_expressions(
-    owner: &str,
-    field: &str,
-    wire_group: &str,
-    annotation: &str,
-    required: bool,
-    cases: &[OneofCase],
-) -> (String, String) {
-    let missing = format!("missing required field {owner}.{field}");
-    let mut read = format!(
-        "((): {annotation}{} => {{\n",
-        if required { "" } else { " | undefined" }
-    );
-    read.push_str(&format!("      switch ({{wire}}.{wire_group}) {{\n"));
-    let mut write = format!("(() => {{\n      const result = model.{field};\n");
-    if !required {
-        write.push_str("      if (result == null) return {};\n");
-    } else {
-        write.push_str(&format!(
-            "      if (result == null) throw new Error(\"{missing}\");\n"
-        ));
-    }
-    write.push_str("      switch (result.tag) {\n");
-    for case in cases {
-        let wire = format!(
-            "requiredField({{wire}}.{}, {owner:?}, {:?})",
-            case.wire_name, case.wire_name
-        );
+fn render_oneof_from_proto(output: &mut String, owner: &str, oneof: &OneofField<'_>) {
+    let name = &oneof.local_name;
+    let field = &oneof.field.name;
+    output.push_str(&format!(
+        "  let {name}: {}{};\n  switch (proto.{}) {{\n",
+        oneof.field.annotation,
+        if oneof.required { "" } else { " | undefined" },
+        oneof.wire_group,
+    ));
+    for case in &oneof.cases {
+        let wire =
+            required_field_expr(&format!("proto.{}", case.wire_name), owner, &case.wire_name);
         let decoded = case
             .conversion
             .as_ref()
             .map(|c| c.from_wire_expr(&wire))
             .unwrap_or(wire.clone());
+        output.push_str(&format!(
+            "    case {:?}:\n      {name} = {{ tag: {:?}, value: {decoded} }};\n      break;\n",
+            case.wire_name, case.tag
+        ));
+    }
+    if oneof.required {
+        output.push_str(&format!(
+            "    case undefined:\n      throw new Error(\"missing required field {owner}.{field}\");\n"
+        ));
+    } else {
+        output.push_str(&format!(
+            "    case undefined:\n      {name} = undefined;\n      break;\n"
+        ));
+    }
+    output.push_str(&format!(
+        "    default:\n      throw new Error(\"invalid oneof discriminator for {owner}.{field}\");\n  }}\n"
+    ));
+}
+
+fn render_oneof_to_proto(output: &mut String, owner: &str, oneof: &OneofField<'_>) {
+    let name = &oneof.local_name;
+    let field = &oneof.field.name;
+    let value = format!("model.{field}");
+    if oneof.required {
+        output.push_str(&format!(
+            "  const {name} = {};\n",
+            required_field_expr(&value, owner, field)
+        ));
+    } else {
+        output.push_str(&format!(
+            "  const {name} = {value};\n  if ({name} != null) {{\n"
+        ));
+    }
+    let indent = if oneof.required { "  " } else { "    " };
+    output.push_str(&format!("{indent}switch ({name}.tag) {{\n"));
+    for case in &oneof.cases {
         let encoded = case
             .conversion
             .as_ref()
-            .map(|c| c.to_wire_expr("result.value"))
-            .unwrap_or_else(|| "result.value".into());
-        read.push_str(&format!(
-            "        case {:?}: return {{ tag: {:?}, value: {decoded} }};\n",
-            case.wire_name, case.tag
-        ));
-        write.push_str(&format!(
-            "        case {:?}: return {{ {wire_group}: {:?} as const, {}: {encoded} }};\n",
-            case.tag, case.wire_name, case.wire_name
+            .map(|c| c.to_wire_expr(&format!("{name}.value")))
+            .unwrap_or_else(|| format!("{name}.value"));
+        output.push_str(&format!(
+            "{indent}  case {:?}:\n{indent}    proto.{} = {:?};\n{indent}    proto.{} = {encoded};\n{indent}    break;\n",
+            case.tag, oneof.wire_group, case.wire_name, case.wire_name,
         ));
     }
-    if required {
-        read.push_str(&format!(
-            "        case undefined: throw new Error(\"{missing}\");\n"
-        ));
-    } else {
-        read.push_str("        case undefined: return undefined;\n");
-    }
-    read.push_str(&format!(
-        "        default: throw new Error(\"invalid oneof discriminator for {owner}.{field}\");\n"
+    output.push_str(&format!(
+        "{indent}  default:\n{indent}    throw new Error(\"invalid oneof tag for {owner}.{field}\");\n{indent}}}\n"
     ));
-    read.push_str("      }\n    })()");
-    write.push_str(&format!("        default: throw new Error(\"invalid oneof tag for {owner}.{field}\");\n      }}\n    }})()"));
-    (read, write)
+    if !oneof.required {
+        output.push_str("  }\n");
+    }
 }
 
 impl ModelBackend {
@@ -656,7 +686,7 @@ fn render_model_to_proto_function(
     output: &mut String,
     model: &RenderedModel,
     planned_record: &RecordSpec<PlannedFamily>,
-    fields: &[Cow<'_, RenderedField>],
+    fields: &[ModelWireField<'_>],
     function_name: &str,
 ) {
     let wire_annotation = rendered_model_wire_annotation(model, planned_record);
@@ -687,25 +717,40 @@ fn render_model_to_proto_function(
     output.push_str("  if (model == null) {\n");
     output.push_str("    return undefined;\n");
     output.push_str("  }\n");
-    if model.fields.is_empty() && model.sourced_fields.is_empty() {
+    if fields
+        .iter()
+        .any(|field| matches!(field, ModelWireField::Oneof(_)))
+    {
+        output.push_str(&format!("  const proto: {wire_annotation} = {{}};\n"));
+        for field in fields {
+            match field {
+                ModelWireField::Oneof(oneof) => {
+                    render_oneof_to_proto(output, &planned_record.name, oneof)
+                }
+                ModelWireField::Value(field) => {
+                    output.push_str(&format!(
+                        "  proto.{} = {};\n",
+                        field.wire_name, field.to_wire_expr
+                    ));
+                }
+            }
+        }
+        for field in &model.sourced_fields {
+            output.push_str(&format!(
+                "  proto.{} = {};\n",
+                field.name, field.to_wire_expr
+            ));
+        }
+        output.push_str("  return proto;\n");
+    } else if model.fields.is_empty() && model.sourced_fields.is_empty() {
         output.push_str("  return {};\n");
     } else {
         output.push_str("  return {\n");
         for field in fields {
             output.push_str("    ");
-            let oneof = planned_record.fields.values().any(|planned| {
-                typescript_generated_field_name(&planned.name) == field.name
-                    && matches!(
-                        planned.data.wire_binding,
-                        Some(PlannedWireFieldBinding::VariantMembers { .. })
-                    )
-            });
-            if oneof {
-                output.push_str("...");
-            } else {
-                output.push_str(&field.wire_name);
-                output.push_str(": ");
-            }
+            let field = field.field();
+            output.push_str(&field.wire_name);
+            output.push_str(": ");
             output.push_str(&field.to_wire_expr);
             output.push_str(",\n");
         }
@@ -725,7 +770,7 @@ fn render_model_from_proto_function(
     output: &mut String,
     model: &RenderedModel,
     planned_record: &RecordSpec<PlannedFamily>,
-    fields: &[Cow<'_, RenderedField>],
+    fields: &[ModelWireField<'_>],
     function_name: &str,
 ) {
     let wire_annotation = rendered_model_wire_annotation(model, planned_record);
@@ -759,8 +804,25 @@ fn render_model_from_proto_function(
     if model.fields.is_empty() && model.sourced_fields.is_empty() {
         output.push_str("  return {};\n");
     } else {
+        for field in fields {
+            if let ModelWireField::Oneof(oneof) = field {
+                render_oneof_from_proto(output, &planned_record.name, oneof);
+            }
+        }
         output.push_str("  return {\n");
         for field in fields {
+            if let ModelWireField::Oneof(oneof) = field {
+                if oneof.field.name == oneof.local_name {
+                    output.push_str(&format!("    {},\n", oneof.local_name));
+                } else {
+                    output.push_str(&format!(
+                        "    {}: {},\n",
+                        oneof.field.name, oneof.local_name
+                    ));
+                }
+                continue;
+            }
+            let field = field.field();
             if field.flattened_fields.is_empty() {
                 output.push_str("    ");
                 output.push_str(&field.name);

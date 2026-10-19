@@ -32,29 +32,31 @@ function outcomeFromProto<OutputT>(
   if (proto == null) {
     return undefined;
   }
+  let result: OutcomeValue<OutputT>;
+  switch (proto.value) {
+    case "success":
+      result = {
+        tag: "success",
+        value: support.singleValueFromPayloads<OutputT>(
+          requiredField(proto.success, "Outcome", "success"),
+        ),
+      };
+      break;
+    case "failure":
+      result = {
+        tag: "failure",
+        value: support.failureFromProto(
+          requiredField(proto.failure, "Outcome", "failure"),
+        ),
+      };
+      break;
+    case undefined:
+      throw new Error("missing required field Outcome.value");
+    default:
+      throw new Error("invalid oneof discriminator for Outcome.value");
+  }
   return {
-    value: ((): OutcomeValue<OutputT> => {
-      switch (proto.value) {
-        case "success":
-          return {
-            tag: "success",
-            value: support.singleValueFromPayloads<OutputT>(
-              requiredField(proto.success, "Outcome", "success"),
-            ),
-          };
-        case "failure":
-          return {
-            tag: "failure",
-            value: support.failureFromProto(
-              requiredField(proto.failure, "Outcome", "failure"),
-            ),
-          };
-        case undefined:
-          throw new Error("missing required field Outcome.value");
-        default:
-          throw new Error("invalid oneof discriminator for Outcome.value");
-      }
-    })(),
+    value: result,
   };
 }
 
@@ -64,26 +66,21 @@ function outcomeToProto<OutputT>(
   if (model == null) {
     return undefined;
   }
-  return {
-    ...(() => {
-      const result = model.value;
-      if (result == null) throw new Error("missing required field Outcome.value");
-      switch (result.tag) {
-        case "success":
-          return {
-            value: "success" as const,
-            success: support.payloadsToProto([result.value]),
-          };
-        case "failure":
-          return {
-            value: "failure" as const,
-            failure: support.failureToProto(result.value),
-          };
-        default:
-          throw new Error("invalid oneof tag for Outcome.value");
-      }
-    })(),
-  };
+  const proto: temporal.api.update.v1.IOutcome = {};
+  const result = requiredField(model.value, "Outcome", "value");
+  switch (result.tag) {
+    case "success":
+      proto.value = "success";
+      proto.success = support.payloadsToProto([result.value]);
+      break;
+    case "failure":
+      proto.value = "failure";
+      proto.failure = support.failureToProto(result.value);
+      break;
+    default:
+      throw new Error("invalid oneof tag for Outcome.value");
+  }
+  return proto;
 }
 
 export const outcomeTransferTypeConverter = {
@@ -110,6 +107,26 @@ function pauseActivityRequestFromProto(
   if (proto == null) {
     return undefined;
   }
+  let result3: ActivitySelection | undefined;
+  switch (proto.activity) {
+    case "id":
+      result3 = {
+        tag: "id",
+        value: requiredField(proto.id, "PauseActivityRequest", "id"),
+      };
+      break;
+    case "type":
+      result3 = {
+        tag: "type",
+        value: requiredField(proto.type, "PauseActivityRequest", "type"),
+      };
+      break;
+    case undefined:
+      result3 = undefined;
+      break;
+    default:
+      throw new Error("invalid oneof discriminator for PauseActivityRequest.activity");
+  }
   return {
     namespace: requiredField(
       proto.namespace === "" ? undefined : proto.namespace,
@@ -123,26 +140,7 @@ function pauseActivityRequestFromProto(
       "PauseActivityRequest",
       "identity",
     ),
-    activity: ((): ActivitySelection | undefined => {
-      switch (proto.activity) {
-        case "id":
-          return {
-            tag: "id",
-            value: requiredField(proto.id, "PauseActivityRequest", "id"),
-          };
-        case "type":
-          return {
-            tag: "type",
-            value: requiredField(proto.type, "PauseActivityRequest", "type"),
-          };
-        case undefined:
-          return undefined;
-        default:
-          throw new Error(
-            "invalid oneof discriminator for PauseActivityRequest.activity",
-          );
-      }
-    })(),
+    activity: result3,
     reason: requiredField(
       proto.reason === "" ? undefined : proto.reason,
       "PauseActivityRequest",
@@ -162,28 +160,31 @@ function pauseActivityRequestToProto(
   if (model == null) {
     return undefined;
   }
-  return {
-    namespace: requiredField(model.namespace, "PauseActivityRequest", "namespace"),
-    execution:
-      model.execution == null
-        ? undefined
-        : (workflowExecutionToProto(model.execution) ?? {}),
-    identity: requiredField(model.identity, "PauseActivityRequest", "identity"),
-    ...(() => {
-      const result = model.activity;
-      if (result == null) return {};
-      switch (result.tag) {
-        case "id":
-          return { activity: "id" as const, id: result.value };
-        case "type":
-          return { activity: "type" as const, type: result.value };
-        default:
-          throw new Error("invalid oneof tag for PauseActivityRequest.activity");
-      }
-    })(),
-    reason: requiredField(model.reason, "PauseActivityRequest", "reason"),
-    requestId: requiredField(model.requestId, "PauseActivityRequest", "requestId"),
-  };
+  const proto: temporal.api.workflowservice.v1.IPauseActivityRequest = {};
+  proto.namespace = requiredField(model.namespace, "PauseActivityRequest", "namespace");
+  proto.execution =
+    model.execution == null
+      ? undefined
+      : (workflowExecutionToProto(model.execution) ?? {});
+  proto.identity = requiredField(model.identity, "PauseActivityRequest", "identity");
+  const result3 = model.activity;
+  if (result3 != null) {
+    switch (result3.tag) {
+      case "id":
+        proto.activity = "id";
+        proto.id = result3.value;
+        break;
+      case "type":
+        proto.activity = "type";
+        proto.type = result3.value;
+        break;
+      default:
+        throw new Error("invalid oneof tag for PauseActivityRequest.activity");
+    }
+  }
+  proto.reason = requiredField(model.reason, "PauseActivityRequest", "reason");
+  proto.requestId = requiredField(model.requestId, "PauseActivityRequest", "requestId");
+  return proto;
 }
 
 export const pauseActivityRequestTransferTypeConverter = {

@@ -50,29 +50,31 @@ function onCompleteRequestFromProto<OutputT, SourceContextT>(
   if (proto == null) {
     return undefined;
   }
+  let result: OnCompleteRequestResult<OutputT>;
+  switch (proto.result) {
+    case "success":
+      result = {
+        tag: "success",
+        value: support.payloadToValue<OutputT>(
+          requiredField(proto.success, "OnCompleteRequest", "success"),
+        ),
+      };
+      break;
+    case "failure":
+      result = {
+        tag: "failure",
+        value: support.failureFromProto(
+          requiredField(proto.failure, "OnCompleteRequest", "failure"),
+        ),
+      };
+      break;
+    case undefined:
+      throw new Error("missing required field OnCompleteRequest.result");
+    default:
+      throw new Error("invalid oneof discriminator for OnCompleteRequest.result");
+  }
   return {
-    result: ((): OnCompleteRequestResult<OutputT> => {
-      switch (proto.result) {
-        case "success":
-          return {
-            tag: "success",
-            value: support.payloadToValue<OutputT>(
-              requiredField(proto.success, "OnCompleteRequest", "success"),
-            ),
-          };
-        case "failure":
-          return {
-            tag: "failure",
-            value: support.failureFromProto(
-              requiredField(proto.failure, "OnCompleteRequest", "failure"),
-            ),
-          };
-        case undefined:
-          throw new Error("missing required field OnCompleteRequest.result");
-        default:
-          throw new Error("invalid oneof discriminator for OnCompleteRequest.result");
-      }
-    })(),
+    result,
     sourceContext: support.payloadToValue<SourceContextT>(
       requiredField(proto.sourceContext, "OnCompleteRequest", "sourceContext"),
     ),
@@ -85,28 +87,22 @@ function onCompleteRequestToProto<OutputT, SourceContextT>(
   if (model == null) {
     return undefined;
   }
-  return {
-    ...(() => {
-      const result = model.result;
-      if (result == null)
-        throw new Error("missing required field OnCompleteRequest.result");
-      switch (result.tag) {
-        case "success":
-          return {
-            result: "success" as const,
-            success: support.valueToPayload(result.value),
-          };
-        case "failure":
-          return {
-            result: "failure" as const,
-            failure: support.failureToProto(result.value),
-          };
-        default:
-          throw new Error("invalid oneof tag for OnCompleteRequest.result");
-      }
-    })(),
-    sourceContext: support.valueToPayload(model.sourceContext),
-  };
+  const proto: temporal.api.notificationservice.v1.IOnCompleteRequest = {};
+  const result = requiredField(model.result, "OnCompleteRequest", "result");
+  switch (result.tag) {
+    case "success":
+      proto.result = "success";
+      proto.success = support.valueToPayload(result.value);
+      break;
+    case "failure":
+      proto.result = "failure";
+      proto.failure = support.failureToProto(result.value);
+      break;
+    default:
+      throw new Error("invalid oneof tag for OnCompleteRequest.result");
+  }
+  proto.sourceContext = support.valueToPayload(model.sourceContext);
+  return proto;
 }
 
 export const onCompleteRequestTransferTypeConverter = {
