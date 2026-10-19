@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/nexus-rpc/sdk-go/nexus"
@@ -158,59 +157,4 @@ func (s *FunctionExecutionIntegrationSuite) TestFunctionArgumentForms() {
 	s.Equal([]string{"one", "two"}, stringSliceField(s.calls[3].Input, "Args"))
 	s.Equal("named-varargs-function", stringField(s.calls[4].Input, "Function"))
 	s.Equal("validVarargsFunction", stringField(s.calls[5].Input, "Function"))
-}
-
-func stringSliceField(value any, name string) []string {
-	reflected := reflect.ValueOf(value)
-	if reflected.Kind() == reflect.Pointer {
-		reflected = reflected.Elem()
-	}
-	if reflected.Kind() == reflect.Struct {
-		field := reflected.FieldByName(name)
-		if values := stringSliceValue(field); values != nil {
-			return values
-		}
-	}
-	if reflected.Kind() == reflect.Map && reflected.Type().Key().Kind() == reflect.String {
-		mapValue := reflected.MapIndex(reflect.ValueOf(name))
-		if values := stringSliceValue(mapValue); values != nil {
-			return values
-		}
-	}
-	return nil
-}
-
-func stringSliceValue(value reflect.Value) []string {
-	if !value.IsValid() {
-		return nil
-	}
-	for value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer {
-		if value.IsNil() {
-			return nil
-		}
-		value = value.Elem()
-	}
-	if value.Kind() != reflect.Slice {
-		return nil
-	}
-	values := make([]string, 0, value.Len())
-	for i := 0; i < value.Len(); i++ {
-		item := value.Index(i)
-		for item.Kind() == reflect.Interface || item.Kind() == reflect.Pointer {
-			if item.IsNil() {
-				item = reflect.Value{}
-				break
-			}
-			item = item.Elem()
-		}
-		if !item.IsValid() {
-			values = append(values, "")
-			continue
-		}
-		if item.Kind() != reflect.String {
-			return nil
-		}
-		values = append(values, item.String())
-	}
-	return values
 }

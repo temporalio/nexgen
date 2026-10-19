@@ -337,13 +337,16 @@ interface namespace-service {
     )
     .unwrap();
 
-    // The sourced map is bound to a field-unique local, evaluated once, and
-    // copied into a properly typed proto map.
-    assert!(rendered.contains("sourcedData := support.NamespaceData(ctx)"));
-    assert!(rendered.contains("if len(sourcedData) > 0 {"));
-    assert!(rendered.contains("message.Data = make(map[string]string, len(sourcedData))"));
-    assert!(rendered.contains("for k, v := range sourcedData {"));
+    assert!(
+        rendered
+            .contains("type namespaceInfo struct {\n\tName *string\n\tData map[string]string\n}")
+    );
+    assert!(rendered.contains("\trequest.Data = support.NamespaceData(ctx)\n"));
+    assert!(rendered.contains("if len(m.Data) > 0 {"));
+    assert!(rendered.contains("message.Data = make(map[string]string, len(m.Data))"));
+    assert!(rendered.contains("for k, v := range m.Data {"));
     assert!(rendered.contains("message.Data[k] = v"));
+    assert!(rendered.contains("out.Data = make(map[string]string, len(proto.GetData()))"));
     assert!(rendered.contains("support \"example.com/nexgen/support\""));
 
     // With no other converter to register the package, a sourced field alone

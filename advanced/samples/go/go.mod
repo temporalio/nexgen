@@ -5,8 +5,8 @@ go 1.26.0
 require (
 	github.com/nexus-rpc/sdk-go v0.7.0
 	github.com/stretchr/testify v1.10.0
-	go.temporal.io/api v1.63.5
-	go.temporal.io/sdk v1.48.1-0.20260828193328-cfdc74a4e624
+	go.temporal.io/api v1.63.6
+	go.temporal.io/sdk v1.49.1-0.20261015151930-66b69e0851ff
 	google.golang.org/protobuf v1.36.11
 )
 

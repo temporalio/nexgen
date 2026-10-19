@@ -13,4 +13,4 @@ jobs:
     uses: temporalio/.github/.github/workflows/changelog-fragments.yml@93ec6e249854f594f7c73e1ceda7ec2a23773add
     with:
       sdk-rust-path: .changelog-tool
-      sdk-rust-revision: 38f831515fb4be0e4e0bbcfe9504d0ffbbb43a0f
+      sdk-rust-revision: 2c1ee2debb851a0183d46764ce1eee73a96b35b3
