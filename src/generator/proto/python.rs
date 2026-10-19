@@ -4,6 +4,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 
 use crate::error::{Error, Result};
 use crate::generator::ExternalModelBackend;
+use crate::generator::names::NameScope;
 use crate::generator::python::{
     PythonFieldDefaultKind, PythonGeneratedName, PythonImports, RenderedField, RenderedModel,
     RenderedModelFragments, RenderedRecordWireBlock, RenderedVariant, ResolvedFieldKind,
@@ -622,8 +623,10 @@ fn field_read(
     generic_carrier: Option<ProtoGenericCarrier>,
     type_arguments: &[(String, String)],
     policy: WireReadPolicy,
+    value: &str,
+    names: &mut NameScope,
 ) -> RenderedWireRead {
-    let proto_expr = format!("value.{proto_name}");
+    let proto_expr = format!("{value}.{proto_name}");
     let value_expr = match generic_carrier {
         Some(carrier) => generic_carrier_from_proto_expr(
             carrier,
@@ -633,10 +636,10 @@ fn field_read(
         ),
         None => match &field.field_type {
             PlannedType::Map(_, _) => {
-                map_value_from_proto_expr(resolved_value_type, proto_name, type_arguments)
+                map_value_from_proto_expr(resolved_value_type, &proto_expr, type_arguments, names)
             }
             PlannedType::List(_) => {
-                repeated_from_proto_expr(resolved_value_type, proto_name, type_arguments)
+                repeated_from_proto_expr(resolved_value_type, &proto_expr, type_arguments, names)
             }
             _ => from_proto_value_expr(resolved_value_type, &proto_expr, type_arguments),
         },
@@ -646,25 +649,32 @@ fn field_read(
         WireReadPolicy::Required { missing_error } => {
             let mut setup_lines = Vec::new();
             if field_has_proto_presence(field) {
-                setup_lines.push(format!("if not value.HasField(\"{proto_name}\"):"));
+                setup_lines.push(format!("if not {value}.HasField(\"{proto_name}\"):"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
             } else if matches!(&field.field_type, PlannedType::String | PlannedType::Bytes) {
-                setup_lines.push(format!("if not value.{proto_name}:"));
+                setup_lines.push(format!("if not {proto_expr}:"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
             }
-            setup_lines.push(format!("{attr_name} = {value_expr}"));
+            let local = names.fresh(attr_name);
+            setup_lines.push(format!("{local} = {value_expr}"));
             RenderedWireRead {
                 setup_lines,
-                expr: attr_name.to_string(),
+                expr: local,
             }
         }
         WireReadPolicy::Optional => RenderedWireRead {
             setup_lines: Vec::new(),
-            expr: optional_from_proto_expr(field, resolved_value_type, proto_name, value_expr),
+            expr: optional_from_proto_expr(
+                field,
+                resolved_value_type,
+                proto_name,
+                value_expr,
+                value,
+            ),
         },
         WireReadPolicy::Default { default_expr } => RenderedWireRead {
             setup_lines: Vec::new(),
-            expr: defaulted_from_proto_expr(field, proto_name, value_expr, default_expr),
+            expr: defaulted_from_proto_expr(field, proto_name, value_expr, default_expr, value),
         },
     }
 }
@@ -676,10 +686,12 @@ fn field_write(
     resolved_value_type: &ResolvedFieldType,
     generic_carrier: Option<ProtoGenericCarrier>,
     optional_guard: bool,
+    message: &str,
+    names: &mut NameScope,
 ) -> RenderedWireWrite {
     let lines = match generic_carrier {
         Some(carrier) => {
-            generic_carrier_to_proto_lines(carrier, value_expr, proto_name, optional_guard)
+            generic_carrier_to_proto_lines(carrier, value_expr, proto_name, optional_guard, message)
         }
         None => match &field.field_type {
             PlannedType::Map(_, _) => map_value_to_proto_lines(
@@ -687,11 +699,24 @@ fn field_write(
                 value_expr,
                 proto_name,
                 optional_guard,
+                message,
+                names,
             ),
-            PlannedType::List(_) => {
-                repeated_to_proto_lines(resolved_value_type, value_expr, proto_name, optional_guard)
-            }
-            _ => value_to_proto_lines(resolved_value_type, value_expr, proto_name, optional_guard),
+            PlannedType::List(_) => repeated_to_proto_lines(
+                resolved_value_type,
+                value_expr,
+                proto_name,
+                optional_guard,
+                message,
+                names,
+            ),
+            _ => value_to_proto_lines(
+                resolved_value_type,
+                value_expr,
+                proto_name,
+                optional_guard,
+                message,
+            ),
         },
     };
     RenderedWireWrite { lines }
@@ -746,7 +771,7 @@ fn concrete_type_hint(annotation: &str, type_arguments: &[(String, String)]) -> 
     output
 }
 
-fn runtime_type_arguments(model: &RenderedModel) -> Vec<(String, String)> {
+fn runtime_type_arguments(model: &RenderedModel, names: &mut NameScope) -> Vec<(String, String)> {
     let mut arguments = Vec::new();
     for parameter in &model.type_parameters {
         let stem = parameter
@@ -754,16 +779,7 @@ fn runtime_type_arguments(model: &RenderedModel) -> Vec<(String, String)> {
             .filter(|stem| !stem.is_empty())
             .unwrap_or(parameter);
         let base_name = format!("{}_type", stem.to_snake_case());
-        let mut name = base_name.clone();
-        let mut suffix = 1;
-        while arguments
-            .iter()
-            .any(|(_, existing): &(String, String)| existing == &name)
-            || model.fields.iter().any(|field| field.attr_name == name)
-        {
-            suffix += 1;
-            name = format!("{base_name}_{suffix}");
-        }
+        let name = names.fresh(&base_name);
         arguments.push((parameter.clone(), name));
     }
     arguments
@@ -774,6 +790,7 @@ fn generic_carrier_to_proto_lines(
     value_expr: &str,
     proto_name: &str,
     optional_guard: bool,
+    message: &str,
 ) -> Vec<String> {
     let mut lines = Vec::new();
     if optional_guard {
@@ -785,7 +802,7 @@ fn generic_carrier_to_proto_lines(
         ProtoGenericCarrier::Payloads => format!("_support.payloads_to_proto([{value_expr}])"),
     };
     lines.push(format!(
-        "{indent}message.{proto_name}.CopyFrom({converted})"
+        "{indent}{message}.{proto_name}.CopyFrom({converted})"
     ));
     lines
 }
@@ -797,6 +814,7 @@ fn function_field_write(
     converter: &str,
     resolved_type: &ResolvedFieldType,
     optional_guard: bool,
+    message: &str,
 ) -> RenderedWireWrite {
     let converted_value = format!("{converter}({value_expr})");
     let mut lines = Vec::new();
@@ -806,9 +824,11 @@ fn function_field_write(
     let indent = if optional_guard { "    " } else { "" };
     match resolved_type.kind {
         ResolvedFieldKind::Message => lines.push(format!(
-            "{indent}message.{proto_name}.CopyFrom({converted_value})"
+            "{indent}{message}.{proto_name}.CopyFrom({converted_value})"
         )),
-        _ => lines.push(format!("{indent}message.{proto_name} = {converted_value}")),
+        _ => lines.push(format!(
+            "{indent}{message}.{proto_name} = {converted_value}"
+        )),
     }
     RenderedWireWrite { lines }
 }
@@ -822,12 +842,15 @@ fn optional_from_proto_expr(
     resolved_type: &ResolvedFieldType,
     proto_name: &str,
     value_expr: String,
+    value: &str,
 ) -> String {
     if field_has_proto_presence(field) {
-        format!("{value_expr} if value.HasField(\"{proto_name}\") else None")
-    } else if let Some(present_expr) =
-        no_presence_default_value_present_expr(field, resolved_type, proto_name)
-    {
+        format!("{value_expr} if {value}.HasField(\"{proto_name}\") else None")
+    } else if let Some(present_expr) = no_presence_default_value_present_expr(
+        field,
+        resolved_type,
+        &format!("{value}.{proto_name}"),
+    ) {
         format!("{value_expr} if {present_expr} else None")
     } else {
         value_expr
@@ -837,15 +860,15 @@ fn optional_from_proto_expr(
 fn no_presence_default_value_present_expr(
     field: &RecordFieldSpec<PlannedFamily>,
     resolved_type: &ResolvedFieldType,
-    proto_name: &str,
+    proto_expr: &str,
 ) -> Option<String> {
     match resolved_type.kind {
-        ResolvedFieldKind::Enum => Some(format!("value.{proto_name} != 0")),
+        ResolvedFieldKind::Enum => Some(format!("{proto_expr} != 0")),
         ResolvedFieldKind::Scalar => match field.field_type.without_option() {
             PlannedType::Bool | PlannedType::String | PlannedType::Bytes => {
-                Some(format!("bool(value.{proto_name})"))
+                Some(format!("bool({proto_expr})"))
             }
-            PlannedType::Int(_) | PlannedType::Float => Some(format!("value.{proto_name} != 0")),
+            PlannedType::Int(_) | PlannedType::Float => Some(format!("{proto_expr} != 0")),
             _ => None,
         },
         _ => None,
@@ -857,9 +880,10 @@ fn defaulted_from_proto_expr(
     proto_name: &str,
     value_expr: String,
     default_expr: String,
+    value: &str,
 ) -> String {
     if field_has_proto_presence(field) {
-        format!("{value_expr} if value.HasField(\"{proto_name}\") else {default_expr}")
+        format!("{value_expr} if {value}.HasField(\"{proto_name}\") else {default_expr}")
     } else {
         value_expr
     }
@@ -867,37 +891,43 @@ fn defaulted_from_proto_expr(
 
 fn repeated_from_proto_expr(
     resolved_type: &ResolvedFieldType,
-    proto_name: &str,
+    proto_expr: &str,
     type_arguments: &[(String, String)],
+    names: &NameScope,
 ) -> String {
+    let item = names.child_scope().fresh("item");
     match resolved_type.kind {
         ResolvedFieldKind::Message => format!(
-            "[{} for item in value.{proto_name}]",
-            message_from_proto_expr(resolved_type, "item", type_arguments)
+            "[{} for {item} in {proto_expr}]",
+            message_from_proto_expr(resolved_type, &item, type_arguments)
         ),
         ResolvedFieldKind::Enum => format!(
-            "[{} for item in value.{proto_name}]",
-            enum_from_proto_expr(resolved_type, "item")
+            "[{} for {item} in {proto_expr}]",
+            enum_from_proto_expr(resolved_type, &item)
         ),
-        _ => format!("list(value.{proto_name})"),
+        _ => format!("list({proto_expr})"),
     }
 }
 
 fn map_value_from_proto_expr(
     map_value_type: &ResolvedFieldType,
-    proto_name: &str,
+    proto_expr: &str,
     type_arguments: &[(String, String)],
+    names: &NameScope,
 ) -> String {
+    let mut comprehension = names.child_scope();
+    let key = comprehension.fresh("key");
+    let item = comprehension.fresh("item");
     match map_value_type.kind {
         ResolvedFieldKind::Message => format!(
-            "{{key: {} for key, item in value.{proto_name}.items()}}",
-            message_from_proto_expr(map_value_type, "item", type_arguments)
+            "{{{key}: {} for {key}, {item} in {proto_expr}.items()}}",
+            message_from_proto_expr(map_value_type, &item, type_arguments)
         ),
         ResolvedFieldKind::Enum => format!(
-            "{{key: {} for key, item in value.{proto_name}.items()}}",
-            enum_from_proto_expr(map_value_type, "item")
+            "{{{key}: {} for {key}, {item} in {proto_expr}.items()}}",
+            enum_from_proto_expr(map_value_type, &item)
         ),
-        _ => format!("{{key: item for key, item in value.{proto_name}.items()}}"),
+        _ => format!("{{{key}: {item} for {key}, {item} in {proto_expr}.items()}}"),
     }
 }
 
@@ -946,6 +976,8 @@ fn repeated_to_proto_lines(
     value_expr: &str,
     proto_name: &str,
     optional_guard: bool,
+    message: &str,
+    names: &mut NameScope,
 ) -> Vec<String> {
     let mut lines = Vec::new();
     if optional_guard {
@@ -954,22 +986,29 @@ fn repeated_to_proto_lines(
     let indent = if optional_guard { "    " } else { "" };
     match resolved_type.kind {
         ResolvedFieldKind::Message => {
-            lines.push(format!("{indent}for element in {value_expr}:"));
-            lines.push(format!("{indent}    item = message.{proto_name}.add()"));
+            let element = names.fresh("value");
+            let item = names.fresh("item");
+            lines.push(format!("{indent}for {element} in {value_expr}:"));
+            lines.push(format!("{indent}    {item} = {message}.{proto_name}.add()"));
             lines.push(format!(
-                "{indent}    item.CopyFrom({})",
+                "{indent}    {item}.CopyFrom({})",
                 resolved_type
                     .wire_conversion
                     .as_ref()
                     .expect("message conversion should be present")
-                    .to_wire_expr("element")
+                    .to_wire_expr(&element)
             ));
         }
-        ResolvedFieldKind::Enum => lines.push(format!(
-            "{indent}message.{proto_name}.extend({} for value in {value_expr})",
-            enum_to_proto_expr(resolved_type, "value")
+        ResolvedFieldKind::Enum => {
+            let element = names.child_scope().fresh("value");
+            lines.push(format!(
+                "{indent}{message}.{proto_name}.extend({} for {element} in {value_expr})",
+                enum_to_proto_expr(resolved_type, &element)
+            ));
+        }
+        _ => lines.push(format!(
+            "{indent}{message}.{proto_name}.extend({value_expr})"
         )),
-        _ => lines.push(format!("{indent}message.{proto_name}.extend({value_expr})")),
     }
     lines
 }
@@ -979,6 +1018,8 @@ fn map_value_to_proto_lines(
     value_expr: &str,
     proto_name: &str,
     optional_guard: bool,
+    message: &str,
+    names: &mut NameScope,
 ) -> Vec<String> {
     let mut lines = Vec::new();
     if optional_guard {
@@ -987,21 +1028,32 @@ fn map_value_to_proto_lines(
     let indent = if optional_guard { "    " } else { "" };
     match map_value_type.kind {
         ResolvedFieldKind::Message => {
-            lines.push(format!("{indent}for key, element in {value_expr}.items():"));
+            let key = names.fresh("key");
+            let element = names.fresh("value");
             lines.push(format!(
-                "{indent}    message.{proto_name}[key].CopyFrom({})",
+                "{indent}for {key}, {element} in {value_expr}.items():"
+            ));
+            lines.push(format!(
+                "{indent}    {message}.{proto_name}[{key}].CopyFrom({})",
                 map_value_type
                     .wire_conversion
                     .as_ref()
                     .expect("message conversion should be present")
-                    .to_wire_expr("element")
+                    .to_wire_expr(&element)
             ));
         }
-        ResolvedFieldKind::Enum => lines.push(format!(
-            "{indent}message.{proto_name}.update({{key: {} for key, value in {value_expr}.items()}})",
-            enum_to_proto_expr(map_value_type, "value")
+        ResolvedFieldKind::Enum => {
+            let mut comprehension = names.child_scope();
+            let key = comprehension.fresh("key");
+            let element = comprehension.fresh("value");
+            lines.push(format!(
+                "{indent}{message}.{proto_name}.update({{{key}: {} for {key}, {element} in {value_expr}.items()}})",
+                enum_to_proto_expr(map_value_type, &element)
+            ));
+        }
+        _ => lines.push(format!(
+            "{indent}{message}.{proto_name}.update({value_expr})"
         )),
-        _ => lines.push(format!("{indent}message.{proto_name}.update({value_expr})")),
     }
     lines
 }
@@ -1011,6 +1063,7 @@ fn value_to_proto_lines(
     value_expr: &str,
     proto_name: &str,
     optional_guard: bool,
+    message: &str,
 ) -> Vec<String> {
     let mut lines = Vec::new();
     if optional_guard {
@@ -1019,7 +1072,7 @@ fn value_to_proto_lines(
     let indent = if optional_guard { "    " } else { "" };
     match resolved_type.kind {
         ResolvedFieldKind::Message => lines.push(format!(
-            "{indent}message.{proto_name}.CopyFrom({})",
+            "{indent}{message}.{proto_name}.CopyFrom({})",
             resolved_type
                 .wire_conversion
                 .as_ref()
@@ -1027,10 +1080,10 @@ fn value_to_proto_lines(
                 .to_wire_expr(value_expr)
         )),
         ResolvedFieldKind::Enum => lines.push(format!(
-            "{indent}message.{proto_name} = {}",
+            "{indent}{message}.{proto_name} = {}",
             enum_to_proto_expr(resolved_type, value_expr)
         )),
-        _ => lines.push(format!("{indent}message.{proto_name} = {value_expr}")),
+        _ => lines.push(format!("{indent}{message}.{proto_name} = {value_expr}")),
     }
     lines
 }
@@ -1101,6 +1154,59 @@ pub(crate) fn python_replacement_type_name(
     replacement.type_name.value().map(str::to_string)
 }
 
+/// Reserve referenced globals before allocating function locals. Conservatively
+/// retaining identifiers also protects authored expressions without rewriting them.
+fn reserve_python_reference(names: &mut NameScope, reference: &str) {
+    for identifier in reference.split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_')) {
+        if !identifier.is_empty() {
+            names.reserve(identifier);
+        }
+    }
+}
+
+fn converter_scope(
+    model: &RenderedModel,
+    proto_ref: &PythonReference,
+    fields: &[ProtoField],
+) -> NameScope {
+    let mut names = NameScope::default();
+    for name in ["typing", "_support", "ValueError", "bool", "int", "list"] {
+        names.reserve(name);
+    }
+    reserve_python_reference(&mut names, &model.name);
+    reserve_python_reference(&mut names, &proto_ref.type_ref);
+    for parameter in &model.type_parameters {
+        names.reserve(parameter);
+    }
+    let reserve_type = |names: &mut NameScope, field: &ResolvedFieldType| {
+        reserve_python_reference(names, &field.annotation);
+        if let Some(conversion) = &field.wire_conversion {
+            // Template slots are generated expressions, not module bindings.
+            for expr in [&conversion.from_wire, &conversion.to_wire] {
+                reserve_python_reference(
+                    names,
+                    &expr
+                        .replace("{value}", "")
+                        .replace("{wire}", "")
+                        .replace("{type_hint}", ""),
+                );
+            }
+        }
+    };
+    for field in &model.fields {
+        reserve_type(&mut names, &field.wire_value_type);
+    }
+    for field in fields {
+        if let Some(oneof) = &field.oneof {
+            for case in &oneof.cases {
+                reserve_python_reference(&mut names, &case.class_name);
+                reserve_type(&mut names, &case.payload_type);
+            }
+        }
+    }
+    names
+}
+
 fn render_record_wire_block(
     api_plan: &PlannedSpec,
     model: &RenderedModel,
@@ -1116,7 +1222,7 @@ fn render_record_wire_block(
         .filter(|field| field.visibility != crate::spec::RecordFieldVisibility::Omitted)
         .map(|field| ModelBackend::analyze_field(api_plan, planned_model, field, resolve_type))
         .collect::<Result<Vec<_>>>()?;
-    let type_arguments = runtime_type_arguments(model);
+    let scope = converter_scope(model, &proto_ref, &proto_fields);
     let converter_model_annotation = if model.type_parameters.is_empty() {
         model.name.clone()
     } else {
@@ -1136,16 +1242,21 @@ fn render_record_wire_block(
         String::new(),
     ];
     {
+        let mut names = scope.child_scope();
+        let receiver = names.fresh("self");
+        let value = names.fresh("value");
+        let type_hint = names.fresh("type_hint");
+        let type_arguments = runtime_type_arguments(model, &mut names);
         if !model.fields.is_empty() {
             output.push('\n');
         }
         output.push_str("    @typing_extensions.override\n");
         output.push_str("    def from_transfer_type(\n");
-        output.push_str("        self,\n");
-        output.push_str("        value: ");
+        output.push_str(&format!("        {receiver},\n"));
+        output.push_str(&format!("        {value}: "));
         output.push_str(&proto_ref.type_ref);
         output.push_str(",\n");
-        output.push_str("        type_hint: type[");
+        output.push_str(&format!("        {type_hint}: type["));
         output.push_str(&converter_model_annotation);
         output.push_str("],\n");
         output.push_str("    ) -> ");
@@ -1168,7 +1279,7 @@ fn render_record_wire_block(
                 if type_arguments.len() == 1 {
                     output.push(',');
                 }
-                output.push_str(" = typing.get_args(type_hint) or (");
+                output.push_str(&format!(" = typing.get_args({type_hint}) or ("));
                 output.push_str(
                     &std::iter::repeat_n("typing.Any", type_arguments.len())
                         .collect::<Vec<_>>()
@@ -1179,6 +1290,7 @@ fn render_record_wire_block(
                 }
                 output.push_str(")\n");
             }
+            let mut reads = Vec::new();
             for (((field_name, planned_field), rendered_field), proto_field) in planned_model
                 .fields
                 .iter()
@@ -1189,80 +1301,47 @@ fn render_record_wire_block(
                 .zip(model.fields.iter())
                 .zip(proto_fields.iter())
             {
-                let read = proto_field.oneof.as_ref().map_or_else(
-                    || {
-                        field_read(
-                            field_name,
-                            &rendered_field.attr_name,
-                            planned_field,
-                            &rendered_field.wire_value_type,
-                            proto_field.generic_carrier,
-                            &type_arguments,
-                            field_read_policy(&model.name, rendered_field),
-                        )
-                    },
-                    |oneof| {
-                        oneof_field_read(
-                            &model.name,
-                            &rendered_field.attr_name,
-                            oneof,
-                            &type_arguments,
-                            matches!(
-                                rendered_field.default_kind,
-                                PythonFieldDefaultKind::Required
-                            ),
-                        )
-                    },
-                );
+                let read = match &proto_field.oneof {
+                    None => field_read(
+                        field_name,
+                        &rendered_field.attr_name,
+                        planned_field,
+                        &rendered_field.wire_value_type,
+                        proto_field.generic_carrier,
+                        &type_arguments,
+                        field_read_policy(&model.name, rendered_field),
+                        &value,
+                        &mut names,
+                    ),
+                    Some(oneof) => oneof_field_read(
+                        &model.name,
+                        &rendered_field.attr_name,
+                        oneof,
+                        &type_arguments,
+                        matches!(
+                            rendered_field.default_kind,
+                            PythonFieldDefaultKind::Required
+                        ),
+                        &value,
+                        &mut names,
+                    ),
+                };
                 for line in &read.setup_lines {
                     output.push_str("        ");
                     output.push_str(line);
                     output.push('\n');
                 }
+                reads.push((rendered_field.attr_name.as_str(), read.expr));
             }
 
             output.push_str("        return ");
             output.push_str(&model.name);
             output.push_str("(\n");
-            for (((field_name, planned_field), rendered_field), proto_field) in planned_model
-                .fields
-                .iter()
-                .filter(|(_, field)| {
-                    field.visibility != crate::spec::RecordFieldVisibility::Omitted
-                })
-                .map(|(name, field)| (name.as_str(), field))
-                .zip(model.fields.iter())
-                .zip(proto_fields.iter())
-            {
-                let read = proto_field.oneof.as_ref().map_or_else(
-                    || {
-                        field_read(
-                            field_name,
-                            &rendered_field.attr_name,
-                            planned_field,
-                            &rendered_field.wire_value_type,
-                            proto_field.generic_carrier,
-                            &type_arguments,
-                            field_read_policy(&model.name, rendered_field),
-                        )
-                    },
-                    |oneof| {
-                        oneof_field_read(
-                            &model.name,
-                            &rendered_field.attr_name,
-                            oneof,
-                            &type_arguments,
-                            matches!(
-                                rendered_field.default_kind,
-                                PythonFieldDefaultKind::Required
-                            ),
-                        )
-                    },
-                );
+            for (attr_name, expr) in reads {
                 output.push_str("            ");
-                output.push_str(&rendered_field.attr_name);
+                output.push_str(attr_name);
                 output.push_str("=");
-                output.push_str(&read.expr);
+                output.push_str(&expr);
                 output.push_str(",\n");
             }
             output.push_str("        )\n");
@@ -1270,6 +1349,10 @@ fn render_record_wire_block(
     }
     let wrote_method = true;
     {
+        let mut names = scope.child_scope();
+        let receiver = names.fresh("self");
+        let value = names.fresh("value");
+        let message = names.fresh("message");
         if model.fields.is_empty() {
             if wrote_method {
                 output.push('\n');
@@ -1282,14 +1365,14 @@ fn render_record_wire_block(
         }
         output.push_str("    @typing_extensions.override\n");
         output.push_str("    def to_transfer_type(\n");
-        output.push_str("        self,\n");
-        output.push_str("        value: ");
+        output.push_str(&format!("        {receiver},\n"));
+        output.push_str(&format!("        {value}: "));
         output.push_str(&converter_model_annotation);
         output.push_str(",\n");
         output.push_str("    ) -> ");
         output.push_str(&proto_ref.type_ref);
         output.push_str(":\n");
-        output.push_str("        message = ");
+        output.push_str(&format!("        {message} = "));
         output.push_str(&proto_ref.type_ref);
         output.push_str("()\n");
         for (((field_name, planned_field), rendered_field), proto_field) in planned_model
@@ -1300,13 +1383,15 @@ fn render_record_wire_block(
             .zip(model.fields.iter())
             .zip(proto_fields.iter())
         {
-            let value_expr = format!("value.{}", rendered_field.attr_name);
+            let value_expr = format!("{value}.{}", rendered_field.attr_name);
             let write = field_write_for_rendered_field(
                 field_name,
                 planned_field,
                 rendered_field,
                 proto_field,
                 &value_expr,
+                &message,
+                &mut names,
             );
             for line in &write.lines {
                 output.push_str("        ");
@@ -1314,7 +1399,7 @@ fn render_record_wire_block(
                 output.push('\n');
             }
         }
-        output.push_str("        return message\n");
+        output.push_str(&format!("        return {message}\n"));
     }
 
     let mut imports = PythonImports {
@@ -1385,6 +1470,8 @@ fn field_write_for_rendered_field(
     rendered_field: &RenderedField,
     proto_field: &ProtoField,
     value_expr: &str,
+    message: &str,
+    names: &mut NameScope,
 ) -> RenderedWireWrite {
     if let Some(oneof) = &proto_field.oneof {
         return oneof_field_write(
@@ -1394,6 +1481,7 @@ fn field_write_for_rendered_field(
                 rendered_field.default_kind,
                 PythonFieldDefaultKind::Required
             ),
+            message,
         );
     }
     let optional_guard = matches!(
@@ -1420,6 +1508,7 @@ fn field_write_for_rendered_field(
             &format!("_support.{converter}"),
             &rendered_field.wire_value_type,
             optional_guard,
+            message,
         ),
         None => field_write(
             field_name,
@@ -1428,6 +1517,8 @@ fn field_write_for_rendered_field(
             &rendered_field.wire_value_type,
             proto_field.generic_carrier,
             optional_guard,
+            message,
+            names,
         ),
     }
 }
@@ -1438,8 +1529,10 @@ fn oneof_field_read(
     oneof: &ProtoOneof,
     type_arguments: &[(String, String)],
     required: bool,
+    value: &str,
+    names: &mut NameScope,
 ) -> RenderedWireRead {
-    let local_var = format!("_oneof_{attr_name}");
+    let local_var = names.fresh(&format!("_oneof_{attr_name}"));
     let mut annotation = oneof
         .cases
         .iter()
@@ -1452,7 +1545,7 @@ fn oneof_field_read(
     let mut setup_lines = vec![
         format!("{local_var}: {annotation}"),
         format!(
-            "match value.WhichOneof({}):",
+            "match {value}.WhichOneof({}):",
             python_string_literal(&oneof.name)
         ),
     ];
@@ -1468,12 +1561,12 @@ fn oneof_field_read(
                 Some(carrier) => generic_carrier_from_proto_expr(
                     carrier,
                     &case.payload_type,
-                    &format!("value.{}", case.proto_name),
+                    &format!("{value}.{}", case.proto_name),
                     type_arguments,
                 ),
                 None => from_proto_value_expr(
                     &case.payload_type,
-                    &format!("value.{}", case.proto_name),
+                    &format!("{value}.{}", case.proto_name),
                     type_arguments,
                 ),
             }
@@ -1494,7 +1587,12 @@ fn oneof_field_read(
     }
 }
 
-fn oneof_field_write(oneof: &ProtoOneof, value_expr: &str, required: bool) -> RenderedWireWrite {
+fn oneof_field_write(
+    oneof: &ProtoOneof,
+    value_expr: &str,
+    required: bool,
+    message: &str,
+) -> RenderedWireWrite {
     let mut lines = Vec::new();
     let case_indent = if required {
         ""
@@ -1507,14 +1605,19 @@ fn oneof_field_write(oneof: &ProtoOneof, value_expr: &str, required: bool) -> Re
         lines.push(format!("{case_indent}    case {}():", case.class_name));
         let case_value_expr = format!("{value_expr}.value");
         let case_lines = match case.generic_carrier {
-            Some(carrier) => {
-                generic_carrier_to_proto_lines(carrier, &case_value_expr, &case.proto_name, false)
-            }
+            Some(carrier) => generic_carrier_to_proto_lines(
+                carrier,
+                &case_value_expr,
+                &case.proto_name,
+                false,
+                message,
+            ),
             None => value_to_proto_lines(
                 &case.payload_type,
                 &case_value_expr,
                 &case.proto_name,
                 false,
+                message,
             ),
         };
         for line in case_lines {

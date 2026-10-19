@@ -5,6 +5,7 @@ pub(crate) mod dotnet;
 pub(crate) mod go;
 pub(crate) mod java;
 pub(crate) mod json_schema;
+mod names;
 pub(crate) mod proto;
 pub(crate) mod python;
 mod resource_plan;

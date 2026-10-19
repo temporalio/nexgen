@@ -703,6 +703,123 @@ func DescriptorName(ctx workflow.Context, value any) string { return "descriptor
 }
 
 #[test]
+fn go_file_imports_freshen_sdk_support_and_proto_aliases() {
+    let root = project_root();
+    for (alias, system_nexus) in [
+        ("workflow", false),
+        ("support", false),
+        ("time", false),
+        ("converter", false),
+        ("internal", true),
+        ("commonconverter", true),
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        for file in ["go.mod", "go.sum"] {
+            fs::copy(
+                root.join("advanced/samples/go").join(file),
+                temp.path().join(file),
+            )
+            .unwrap();
+        }
+        let support = temp.path().join("support");
+        fs::create_dir(&support).unwrap();
+        for entry in fs::read_dir(root.join("advanced/samples/go/support")).unwrap() {
+            let entry = entry.unwrap();
+            if entry.path().extension().is_some_and(|ext| ext == "go") {
+                fs::copy(entry.path(), support.join(entry.file_name())).unwrap();
+            }
+        }
+        let input = temp.path().join("extra.wit");
+        fs::write(
+            &input,
+            r#"package test:imports;
+world api { export imports; }
+/// @nexus.endpoint "ordinary"
+interface imports {
+  record extra-request { note: string }
+  extra-call: func(request: extra-request);
+}
+"#,
+        )
+        .unwrap();
+        let main_input = temp.path().join("roundtrip.wit");
+        let additions = format!(
+            r#"
+  /// @nexus.type go="go.temporal.io/sdk/client:{alias}.StartWorkflowOptions"
+  type options = placeholder;
+  record request {{ options: options }}
+  execute: func(request: request);
+"#
+        );
+        let source = if system_nexus {
+            // System callbacks have a different support-converter contract.
+            // Use a model without overrides so this fixture tests aliasing,
+            // not compatibility with the ordinary sample support functions.
+            format!(
+                r#"package test:roundtrip;
+world api {{ export type-roundtrip-service; }}
+interface type-roundtrip-service {{
+  type placeholder = string;
+  {additions}
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
+  record execution {{ workflow-id: string, run-id: string }}
+  echo: func(request: execution) -> execution;
+}}
+"#
+            )
+        } else {
+            fs::read_to_string(root.join("advanced/samples/inputs/type-roundtrip.wit"))
+                .unwrap()
+                .replace(
+                    "  // The records below",
+                    &format!("{additions}\n  // The records below"),
+                )
+        };
+        fs::write(&main_input, source).unwrap();
+        let request = GenerateRequest {
+            language: nexgen::language::Language::Go,
+            input_paths: vec![main_input, root.join("advanced/samples/inputs/deps"), input],
+            support_package: Some("go.temporal.io/sdk/advanced/samples/go/support".into()),
+            descriptor_paths: vec![descriptor_path(&root)],
+            output_path: temp.path().join("output"),
+            format: false,
+            config: nexgen::nexgen_config::NexgenConfig {
+                mode: nexgen::generator::GenerationMode::NativeApi,
+                system_nexus,
+            },
+            java_package_name: None,
+            ts_date_time_types: Default::default(),
+        };
+        generate_to_file(&request).unwrap();
+        let files = fs::read_dir(&request.output_path)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                (entry.file_name(), fs::read_to_string(entry.path()).unwrap())
+            })
+            .collect::<BTreeMap<_, _>>();
+        generate_to_file(&request).unwrap();
+        for (name, contents) in files {
+            assert_eq!(
+                contents,
+                fs::read_to_string(request.output_path.join(name)).unwrap()
+            );
+        }
+        let build = Command::new("go")
+            .args(["test", "./..."])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "alias {alias}:\n{}\n{}",
+            String::from_utf8_lossy(&build.stdout),
+            String::from_utf8_lossy(&build.stderr)
+        );
+    }
+}
+
+#[test]
 fn go_explicit_descriptors_control_signal_api_and_packing_independent_of_wire_name() {
     for args_field in ["signal-input", "notification-payloads"] {
         for (args_type, public_args, packing) in [

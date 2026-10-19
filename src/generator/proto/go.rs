@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
@@ -106,7 +106,6 @@ pub(in crate::generator) type GoConversionResult<T> = std::result::Result<T, Str
 pub(in crate::generator) struct ModelBackend {
     package: GoPackageContext,
     support_package: Option<String>,
-    imports: RefCell<GoImportCollector>,
     proto_models: BTreeMap<String, PlannedTypeInfo>,
     wire_models: RefCell<BTreeMap<String, RenderedModelWire>>,
     /// Models that appear as a top-level Nexus operation input or output, and
@@ -120,57 +119,18 @@ impl ModelBackend {
         package: GoPackageContext,
         support_package: Option<String>,
     ) -> Self {
-        let mut imports = GoImportCollector::default();
-        // Generated code uses fixed SDK and standard-library import names.
-        // Reserve them before assigning aliases to protobuf packages.
-        imports.used_aliases.extend(
-            [
-                "context",
-                "errors",
-                "fmt",
-                "reflect",
-                "runtime",
-                "strings",
-                "time",
-                "workflow",
-                "converter",
-                "commonconverter",
-                "internal",
-                "nexus",
-            ]
-            .into_iter()
-            .map(str::to_string),
-        );
-        if support_package.is_some() {
-            imports.used_aliases.insert("support".to_string());
-        }
         Self {
             package,
             support_package,
-            imports: RefCell::new(imports),
             proto_models: BTreeMap::new(),
             wire_models: RefCell::new(BTreeMap::new()),
             transfer_models: RefCell::new(BTreeSet::new()),
         }
     }
 
-    pub(in crate::generator) fn imports(&self) -> Ref<'_, GoImportCollector> {
-        self.imports.borrow()
-    }
-
-    fn register_support_import(&self) {
-        if let Some(path) = &self.support_package {
-            self.imports
-                .borrow_mut()
-                .by_path
-                .insert(path.clone(), "support".to_string());
-        }
-    }
-
     pub(in crate::generator) fn support_converter(&self, name: String) -> String {
         if self.support_package.is_some() {
-            self.register_support_import();
-            format!("support.{name}")
+            self.package.support_reference(&name)
         } else {
             name
         }
@@ -220,8 +180,11 @@ impl ModelBackend {
 
     fn proto_type(&self, info: &PlannedTypeInfo) -> Option<String> {
         let proto_ref = go_proto_ref(info)?;
-        let alias = self.imports.borrow_mut().register(&proto_ref);
-        Some(proto_ref.qualified(&alias))
+        Some(self.package.proto_reference(
+            &proto_ref.import_path,
+            &proto_ref.alias,
+            &proto_ref.type_name,
+        ))
     }
 
     pub(in crate::generator) fn record_model(&mut self, key: &str, message: &PlannedMessageType) {
@@ -235,16 +198,6 @@ impl ModelBackend {
     }
 
     pub(in crate::generator) fn set_model_wire(&self, key: String, wire: RenderedModelWire) {
-        if crate::nexgen_config::current().system_nexus
-            && !self
-                .package
-                .is_self_import("go.temporal.io/sdk/internal/common/converter")
-        {
-            self.imports.borrow_mut().by_path.insert(
-                "go.temporal.io/sdk/internal/common/converter".to_string(),
-                "commonconverter".to_string(),
-            );
-        }
         self.wire_models.borrow_mut().insert(key, wire);
     }
 
@@ -279,11 +232,6 @@ impl ModelBackend {
         }
         self.transfer_models.borrow_mut().insert(key.to_string());
         Ok(())
-    }
-
-    /// Whether any transfer-type converter will be emitted. Drives SDK imports.
-    pub(in crate::generator) fn renders_transfer_type_converters(&self) -> bool {
-        !self.transfer_models.borrow().is_empty()
     }
 
     pub(in crate::generator) fn render_model_converters(
@@ -363,44 +311,6 @@ impl ExternalModelBackend<PlannedValueType> for ModelBackend {
     }
 }
 
-/// Collects and de-duplicates Go proto imports, assigning a unique alias to
-/// each import path. When two distinct import paths request the same alias
-/// (e.g. two `v1` packages both aliased `enums`), later ones are suffixed with
-/// a numeric disambiguator.
-#[derive(Debug, Default)]
-pub(in crate::generator) struct GoImportCollector {
-    by_path: IndexMap<String, String>,
-    used_aliases: BTreeSet<String>,
-}
-
-impl GoImportCollector {
-    fn register(&mut self, proto_ref: &GoProtoRef) -> String {
-        if let Some(existing) = self.by_path.get(&proto_ref.import_path) {
-            return existing.clone();
-        }
-        let mut alias = proto_ref.alias.clone();
-        if self.used_aliases.contains(&alias) {
-            let mut counter = 2;
-            loop {
-                let candidate = format!("{}{counter}", proto_ref.alias);
-                if !self.used_aliases.contains(&candidate) {
-                    alias = candidate;
-                    break;
-                }
-                counter += 1;
-            }
-        }
-        self.used_aliases.insert(alias.clone());
-        self.by_path
-            .insert(proto_ref.import_path.clone(), alias.clone());
-        alias
-    }
-
-    pub(in crate::generator) fn paths(&self) -> impl Iterator<Item = (&String, &String)> {
-        self.by_path.iter()
-    }
-}
-
 /// A reference to a Go protobuf type, derived from a proto descriptor's
 /// `go_package` file option and the type's fully-qualified name.
 #[derive(Debug, Clone)]
@@ -408,12 +318,6 @@ struct GoProtoRef {
     import_path: String,
     alias: String,
     type_name: String,
-}
-
-impl GoProtoRef {
-    fn qualified(&self, alias: &str) -> String {
-        format!("{alias}.{}", self.type_name)
-    }
 }
 
 fn go_proto_ref(info: &PlannedTypeInfo) -> Option<GoProtoRef> {
@@ -819,9 +723,6 @@ impl OperationBinding {
                     .is_some_and(|resource| resource.requires_data_converter))
     }
 
-    pub(in crate::generator) fn requires_fmt(&self) -> bool {
-        self.output_returns_pointer
-    }
     pub(in crate::generator) fn returned_resource_type_name(&self) -> Option<&str> {
         self.resource_return
             .as_ref()
@@ -1805,7 +1706,8 @@ fn build_field_conversion(
                     format!("\ttyped, ok := converted.({native_go_type})"),
                     "\tif !ok {".to_string(),
                     format!(
-                        "\t\treturn fmt.Errorf(\"nexgen decoded field {go_field} has unexpected type %T\", converted)"
+                        "\t\treturn {}(\"nexgen decoded field {go_field} has unexpected type %T\", converted)",
+                        backend.package.qualified_expr("fmt", "fmt.Errorf")
                     ),
                     "\t}".to_string(),
                     format!("\tout.{go_field} = typed"),
@@ -2298,6 +2200,8 @@ fn render_model_converters(
     let proto_value_type = wire.proto_type.trim_start_matches('*');
     let (model_ident, _) = split_go_type_decl_name(&model.name);
     let base = go_unexported_name(model_ident);
+    package.reserve_declaration(&format!("{base}ToProto"));
+    package.reserve_declaration(&format!("{base}FromProto"));
 
     output.push('\n');
     output.push_str("func ");

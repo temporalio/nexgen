@@ -279,10 +279,10 @@ class _TaskQueuePartitionsTransferTypeConverter(
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse:
         message = temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse()
         if value.workflow_task_queue_partitions:
-            for element in value.workflow_task_queue_partitions:
+            for value2 in value.workflow_task_queue_partitions:
                 item = message.workflow_task_queue_partitions.add()
                 item.CopyFrom(
-                    _TaskQueuePartitionTransferTypeConverter().to_transfer_type(element)
+                    _TaskQueuePartitionTransferTypeConverter().to_transfer_type(value2)
                 )
         return message
 
@@ -379,9 +379,9 @@ class _BadBinariesTransferTypeConverter(
     ) -> temporalio.api.namespace.v1.message_pb2.BadBinaries:
         message = temporalio.api.namespace.v1.message_pb2.BadBinaries()
         if value.binaries:
-            for key, element in value.binaries.items():
+            for key, value2 in value.binaries.items():
                 message.binaries[key].CopyFrom(
-                    _BadBinaryTransferTypeConverter().to_transfer_type(element)
+                    _BadBinaryTransferTypeConverter().to_transfer_type(value2)
                 )
         return message
 

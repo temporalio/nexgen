@@ -899,6 +899,155 @@ fn assert_python_script_succeeds(script: &str, args: &[&str]) {
     );
 }
 
+#[test]
+fn python_proto_converter_bindings_do_not_shadow_parameters_or_globals() {
+    let root = project_root();
+    let temp = tempfile::tempdir().unwrap();
+    let input = temp.path().join("collisions.wit");
+    let source = fs::read_to_string(wit_input_path(&root, "type-roundtrip"))
+        .unwrap()
+        .replace(
+            "workflow-id: string,",
+            "/// @nexus.proto-field \"workflow_id\"\n    value: string,",
+        )
+        .replace(
+            "run-id: string,",
+            "/// @nexus.proto-field \"run_id\"\n    type-hint: string,",
+        )
+        .replace(
+            "key: string,",
+            "/// @nexus.proto-field \"key\"\n    message: string,",
+        )
+        .replace(
+            "owner-host-name: string,",
+            "/// @nexus.proto-field \"owner_host_name\"\n    item: string,",
+        )
+        .replace(
+            "reason: string,",
+            "/// @nexus.proto-field \"reason\"\n    element: string,",
+        )
+        .replace(
+            "operator: string,",
+            "/// @nexus.proto-field \"operator\"\n    key: string,",
+        )
+        .replace(
+            "binaries: option<map<string, bad-binary>>,",
+            "/// @nexus.proto-field \"binaries\"\n    typing: option<map<string, bad-binary>>,",
+        )
+        .replace(
+            "/// @nexus.omit\n    activity-task-queue-partitions: placeholder,",
+            "activity-task-queue-partitions: option<list<task-queue-partition>>,",
+        );
+    fs::write(&input, source).unwrap();
+    let request = GenerateRequest {
+        language: Language::Python,
+        input_paths: vec![input, linked_inputs_path(&root)],
+        support_package: Some("temporal_support".into()),
+        descriptor_paths: vec![descriptor_path(&root)],
+        output_path: temp.path().join("output"),
+        format: false,
+        config: Default::default(),
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    };
+    generate_to_file(&request).unwrap();
+    let oneof_input = temp.path().join("oneofs.wit");
+    let source = fs::read_to_string(wit_input_path(&root, "proto-oneof"))
+        .unwrap()
+        .replace(
+            "namespace: string,",
+            "/// @nexus.proto-field \"namespace\"\n    value: string,",
+        )
+        .replace(
+            "identity: string,",
+            "/// @nexus.proto-field \"identity\"\n    self: string,",
+        )
+        .replace(
+            "reason: string,",
+            "/// @nexus.proto-field \"reason\"\n    type-hint: string,",
+        )
+        .replace(
+            "request-id: string,",
+            "/// @nexus.proto-field \"request_id\"\n    typing: string,",
+        );
+    fs::write(&oneof_input, source).unwrap();
+    generate_to_file(&GenerateRequest {
+        input_paths: vec![oneof_input, linked_inputs_path(&root)],
+        output_path: temp.path().join("oneofs"),
+        language: Language::Python,
+        support_package: Some("temporal_support".into()),
+        descriptor_paths: vec![descriptor_path(&root)],
+        format: false,
+        config: Default::default(),
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let first = read_python_package_files(&request.output_path);
+    generate_to_file(&request).unwrap();
+    assert_eq!(first, read_python_package_files(&request.output_path));
+    assert_python_script_succeeds(
+        r#"
+import sys
+sys.path[:0] = sys.argv[1:]
+from output.models import (
+    WorkflowExecution, WorkflowExecutionInfo, TaskQueuePartition,
+    TaskQueuePartitions, BadBinary, BadBinaries,
+    _WorkflowExecutionInfoTransferTypeConverter,
+    _TaskQueuePartitionsTransferTypeConverter, _BadBinariesTransferTypeConverter,
+)
+
+def roundtrip(converter, model):
+    wire = converter.to_transfer_type(model)
+    decoded_wire = type(wire).FromString(wire.SerializeToString())
+    assert converter.from_transfer_type(decoded_wire, type(model)) == model
+
+execution = WorkflowExecution(value="child", type_hint="run")
+roundtrip(_WorkflowExecutionInfoTransferTypeConverter(),
+          WorkflowExecutionInfo(execution=execution, parent_execution=execution))
+part = TaskQueuePartition(message="partition", item="host")
+roundtrip(_TaskQueuePartitionsTransferTypeConverter(), TaskQueuePartitions(
+    workflow_task_queue_partitions=[part], activity_task_queue_partitions=[part]))
+roundtrip(_BadBinariesTransferTypeConverter(),
+          BadBinaries(typing={"binary": BadBinary(element="reason", key="operator")}))
+
+from oneofs.models import (
+    Outcome, OutcomeValueSuccess, PauseActivityRequest, ActivitySelectionId,
+    _OutcomeTransferTypeConverter, _PauseActivityRequestTransferTypeConverter,
+)
+for activity in [None, ActivitySelectionId("activity")]:
+    roundtrip(_PauseActivityRequestTransferTypeConverter(), PauseActivityRequest(
+        value="namespace", self="identity", activity=activity,
+        type_hint="reason", typing="request-id"))
+from unittest.mock import patch
+from temporalio.converter import PayloadConverter
+with patch("temporalio.nexus.system._current_user_payload_converter",
+           return_value=PayloadConverter.default):
+    converter = _OutcomeTransferTypeConverter[str]()
+    model = Outcome[str](value=OutcomeValueSuccess[str]("result"))
+    wire = converter.to_transfer_type(model)
+    assert converter.from_transfer_type(type(wire).FromString(wire.SerializeToString()), Outcome[str]) == model
+"#,
+        &[
+            temp.path().to_str().unwrap(),
+            python_root(&root).to_str().unwrap(),
+        ],
+    );
+    let check = Command::new("uv")
+        .current_dir(python_root(&root))
+        .args(["run", "--locked", "basedpyright", "--level", "error"])
+        .arg(&request.output_path)
+        .arg(temp.path().join("oneofs"))
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&check.stdout),
+        String::from_utf8_lossy(&check.stderr)
+    );
+}
+
 fn unique_output_path(label: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
