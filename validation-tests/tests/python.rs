@@ -900,6 +900,99 @@ fn assert_python_script_succeeds(script: &str, args: &[&str]) {
 }
 
 #[test]
+fn python_operation_bindings_preserve_request_and_normalized_argument_fields() {
+    let root = project_root();
+    let temp = tempfile::tempdir().unwrap();
+    let input = temp.path().join("bindings.wit");
+    fs::write(
+        &input,
+        r#"package test:bindings;
+world api { export service; }
+interface functions {
+  type placeholder = string;
+  /// @nexus.type python="list[typing.Any]"
+  type payloads = placeholder;
+  /// @nexus.function-args varargs=true
+  call: func(args: payloads) -> string;
+  /// @nexus.function signature="call" args-field="args" alternate-type="string"
+  type callback = placeholder;
+}
+/// @nexus.endpoint "ordinary"
+interface service {
+  use functions.{callback};
+  record request {
+    request: string,
+    request2: string,
+    value: string,
+    message: string,
+  }
+  record callable-request {
+    callback: callback,
+    request: string,
+    normalized-args: string,
+  }
+  echo: func(request: request) -> request;
+  invoke: func(request: callable-request) -> callable-request;
+}
+"#,
+    )
+    .unwrap();
+    let output = temp.path().join("output");
+    generate_to_file(&GenerateRequest {
+        language: Language::Python,
+        input_paths: vec![input],
+        descriptor_paths: vec![],
+        support_package: Some("temporal_support".into()),
+        output_path: output.clone(),
+        format: false,
+        config: NexgenConfig {
+            mode: GenerationMode::NativeApi,
+            system_nexus: false,
+        },
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    assert_python_script_succeeds(
+        r#"
+import asyncio, importlib, sys
+sys.path[:0] = sys.argv[1:]
+echo = importlib.import_module("output.operations.echo")
+invoke = importlib.import_module("output.operations.invoke")
+async def capture(model):
+    return model
+echo._echo = capture
+invoke._invoke = capture
+async def check():
+    model = await echo.echo(request="original", request2="second", value="value", message="message")
+    assert (model.request, model.request2, model.value, model.message) == ("original", "second", "value", "message")
+    model = await invoke.invoke(callback="function", args=["argument"], request="original", normalized_args="sentinel")
+    assert model.callback == "function"
+    assert model.args == ["argument"]
+    assert model.request == "original"
+    assert model.normalized_args == "sentinel"
+asyncio.run(check())
+"#,
+        &[
+            temp.path().to_str().unwrap(),
+            python_root(&root).to_str().unwrap(),
+        ],
+    );
+    let check = Command::new("uv")
+        .current_dir(python_root(&root))
+        .args(["run", "--locked", "basedpyright", "--level", "error"])
+        .arg(output)
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&check.stdout),
+        String::from_utf8_lossy(&check.stderr)
+    );
+}
+
+#[test]
 fn python_proto_converter_bindings_do_not_shadow_parameters_or_globals() {
     let root = project_root();
     let temp = tempfile::tempdir().unwrap();

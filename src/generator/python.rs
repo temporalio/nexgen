@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 
 use crate::error::{Error, Result};
 use crate::generator::json_schema::python as python_json;
+use crate::generator::names::{Binding, NameScope};
 use crate::generator::proto::python as python_proto;
 use crate::generator::render_request_plan;
 use crate::generator::{
@@ -6611,14 +6612,6 @@ fn render_endpoint_parameter(output: &mut String, service: &RenderedService<'_>)
     }
 }
 
-fn endpoint_forward_args(service: &RenderedService<'_>) -> &'static str {
-    if service.endpoint.is_none() {
-        "endpoint, request"
-    } else {
-        "request"
-    }
-}
-
 fn render_request_only_operation_function(
     output: &mut String,
     service: &RenderedService<'_>,
@@ -7095,6 +7088,85 @@ fn python_docstring_literal_text(value: &str) -> String {
     escaped
 }
 
+struct PythonOperationBindings {
+    request: Binding,
+    positional: Binding,
+    endpoint: Option<Binding>,
+    normalized: BTreeMap<String, Binding>,
+    flattened: BTreeMap<String, Binding>,
+}
+
+impl PythonOperationBindings {
+    fn prepare(service: &RenderedService<'_>, input: &RenderedUnpackedInput) -> Self {
+        let mut scope = NameScope::default();
+        scope.reserve(&input.model_name);
+        for field in &input.parameters {
+            scope.reserve(&field.attr_name);
+        }
+        for function in &input.functions {
+            if let Some(parameters) = python_function_fixed_positional_args(function) {
+                for parameter in parameters {
+                    scope.reserve(&parameter.name);
+                }
+            }
+        }
+        let endpoint = service.endpoint.is_none().then(|| scope.bind("endpoint"));
+        let positional = scope.bind("positional_args");
+        let request = scope.bind("request");
+        let normalized = input
+            .functions
+            .iter()
+            .map(|f| {
+                (
+                    f.args_field_name.clone(),
+                    scope.bind(&format!("normalized_{}", f.args_field_name)),
+                )
+            })
+            .collect();
+        let flattened = input
+            .flattened_messages
+            .iter()
+            .map(|f| (f.local_name.clone(), scope.bind(&f.local_name)))
+            .collect();
+        Self {
+            request,
+            positional,
+            endpoint,
+            normalized,
+            flattened,
+        }
+    }
+
+    fn field_expr(&self, field: &RenderedUnpackedRequestField, normalize: bool) -> String {
+        if normalize && let Some(binding) = self.normalized.get(&field.value_expr) {
+            return binding.to_string();
+        }
+        let value = self
+            .flattened
+            .get(&field.value_expr)
+            .map(ToString::to_string)
+            .unwrap_or_else(|| field.value_expr.clone());
+        match field.default_kind {
+            PythonFieldDefaultKind::EmptyList => format!("{value} or []"),
+            PythonFieldDefaultKind::EmptyDict => format!("{value} or {{}}"),
+            _ => value,
+        }
+    }
+
+    fn render_endpoint(&self, output: &mut String) {
+        if let Some(endpoint) = &self.endpoint {
+            output.push_str(&format!("    {endpoint}: str,\n"));
+        }
+    }
+
+    fn render_forward_args(&self, output: &mut String) {
+        if let Some(endpoint) = &self.endpoint {
+            output.push_str(&format!("{endpoint}, "));
+        }
+        output.push_str(&self.request);
+    }
+}
+
 fn render_unpacked_operation_function(
     output: &mut String,
     service: &RenderedService<'_>,
@@ -7105,6 +7177,7 @@ fn render_unpacked_operation_function(
         render_function_unpacked_implementation(output, service, operation, unpacked_input);
         return;
     }
+    let bindings = PythonOperationBindings::prepare(service, unpacked_input);
 
     if operation.deprecated {
         output.push_str(
@@ -7114,7 +7187,7 @@ fn render_unpacked_operation_function(
     output.push_str("async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
-    render_endpoint_parameter(output, service);
+    bindings.render_endpoint(output);
     output.push_str("    *,\n");
     for field in &unpacked_input.parameters {
         output.push_str("    ");
@@ -7154,23 +7227,27 @@ fn render_unpacked_operation_function(
     }
     render_unpacked_operation_docstring(output, operation, unpacked_input, None);
     for flattened_message in &unpacked_input.flattened_messages {
-        render_flattened_message_setup(output, flattened_message);
+        render_flattened_message_setup_named(
+            output,
+            flattened_message,
+            &bindings.flattened[&flattened_message.local_name],
+        );
     }
-    output.push_str("    request = ");
+    output.push_str(&format!("    {} = ", bindings.request));
     output.push_str(&unpacked_input.model_name);
     output.push_str("(\n");
     for field in &unpacked_input.request_fields {
         output.push_str("        ");
         output.push_str(&field.attr_name);
         output.push('=');
-        output.push_str(&unpacked_request_field_value_expr(field));
+        output.push_str(&bindings.field_expr(field, false));
         output.push_str(",\n");
     }
     output.push_str("    )\n");
     output.push_str("    return await ");
     output.push_str(&request_operation_function_name(service, operation));
     output.push('(');
-    output.push_str(endpoint_forward_args(service));
+    bindings.render_forward_args(output);
     output.push_str(")\n");
 }
 
@@ -7210,6 +7287,7 @@ fn render_function_unpacked_implementation(
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
 ) {
+    let bindings = PythonOperationBindings::prepare(service, unpacked_input);
     if operation.deprecated {
         output.push_str(
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
@@ -7218,7 +7296,7 @@ fn render_function_unpacked_implementation(
     output.push_str("async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
-    render_endpoint_parameter(output, service);
+    bindings.render_endpoint(output);
 
     let primary_function = primary_function(&unpacked_input.functions);
     if let Some(function) = primary_function {
@@ -7236,7 +7314,7 @@ fn render_function_unpacked_implementation(
                 output.push_str(",\n");
             }
         } else {
-            output.push_str("    *positional_args: ");
+            output.push_str(&format!("    *{}: ", bindings.positional));
             output.push_str(&python_function_positional_args_annotation(function));
             output.push_str(",\n");
         }
@@ -7325,9 +7403,9 @@ fn render_function_unpacked_implementation(
         if function.primary && matches!(function.args, RenderedFunctionArgs::Typed { .. }) {
             continue;
         }
-        let normalized_args_name = format!("normalized_{}", function.args_field_name);
+        let normalized_args_name = &bindings.normalized[&function.args_field_name];
         if function.primary {
-            output.push_str("    if positional_args and ");
+            output.push_str(&format!("    if {} and ", bindings.positional));
             output.push_str(&function.args_field_name);
             output.push_str(" is not None:\n");
             output.push_str(
@@ -7340,8 +7418,8 @@ fn render_function_unpacked_implementation(
             output.push_str(": ");
             output.push_str(&python_function_normalized_args_annotation(function));
             output.push_str(" | None = (\n");
-            output.push_str("        list(positional_args)\n");
-            output.push_str("        if positional_args\n");
+            output.push_str(&format!("        list({})\n", bindings.positional));
+            output.push_str(&format!("        if {}\n", bindings.positional));
             output.push_str("        else ");
             output.push_str(&function.args_field_name);
             output.push('\n');
@@ -7384,19 +7462,18 @@ fn render_function_unpacked_implementation(
         }
     }
     for flattened_message in &unpacked_input.flattened_messages {
-        render_flattened_message_setup(output, flattened_message);
+        render_flattened_message_setup_named(
+            output,
+            flattened_message,
+            &bindings.flattened[&flattened_message.local_name],
+        );
     }
 
-    output.push_str("    request = ");
+    output.push_str(&format!("    {} = ", bindings.request));
     output.push_str(&unpacked_input.model_name);
     output.push_str("(\n");
     for field in &unpacked_input.request_fields {
-        let value_expr = unpacked_input
-            .functions
-            .iter()
-            .find(|function| function.args_field_name == field.value_expr)
-            .map(|function| format!("normalized_{}", function.args_field_name))
-            .unwrap_or_else(|| unpacked_request_field_value_expr(field));
+        let value_expr = bindings.field_expr(field, true);
         output.push_str("        ");
         output.push_str(&field.attr_name);
         output.push('=');
@@ -7407,7 +7484,7 @@ fn render_function_unpacked_implementation(
     output.push_str("    return await ");
     output.push_str(&request_operation_function_name(service, operation));
     output.push('(');
-    output.push_str(endpoint_forward_args(service));
+    bindings.render_forward_args(output);
     output.push_str(")\n");
 }
 
@@ -7435,6 +7512,14 @@ fn render_flattened_message_setup(
     output: &mut String,
     flattened_message: &RenderedFlattenedMessage,
 ) {
+    render_flattened_message_setup_named(output, flattened_message, &flattened_message.local_name);
+}
+
+fn render_flattened_message_setup_named(
+    output: &mut String,
+    flattened_message: &RenderedFlattenedMessage,
+    local_name: &str,
+) {
     let always_construct = flattened_message.required
         || flattened_message
             .fields
@@ -7442,7 +7527,7 @@ fn render_flattened_message_setup(
             .any(|field| field.default_kind == PythonFieldDefaultKind::Required);
 
     output.push_str("    ");
-    output.push_str(&flattened_message.local_name);
+    output.push_str(local_name);
     output.push_str(" = ");
     if always_construct {
         output.push_str(&flattened_message.model_name);

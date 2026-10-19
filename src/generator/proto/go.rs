@@ -340,6 +340,16 @@ fn go_proto_ref(info: &PlannedTypeInfo) -> Option<GoProtoRef> {
     })
 }
 
+pub(in crate::generator) fn prepare_import(info: &PlannedTypeInfo, package: &GoPackageContext) {
+    if let Some(reference) = go_proto_ref(info) {
+        package.proto_reference(
+            &reference.import_path,
+            &reference.alias,
+            &reference.type_name,
+        );
+    }
+}
+
 fn parse_go_package_option(go_package: &str) -> (String, String) {
     if let Some((path, alias)) = go_package.split_once(';') {
         (path.to_string(), alias.to_string())

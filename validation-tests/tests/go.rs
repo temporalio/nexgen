@@ -703,6 +703,124 @@ func DescriptorName(ctx workflow.Context, value any) string { return "descriptor
 }
 
 #[test]
+fn go_wrapper_bindings_preserve_colliding_optional_fields_at_runtime() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = project_root();
+    for file in ["go.mod", "go.sum"] {
+        fs::copy(
+            root.join("advanced/samples/go").join(file),
+            temp.path().join(file),
+        )
+        .unwrap();
+    }
+    let input = temp.path().join("collision.wit");
+    fs::write(
+        &input,
+        r#"package test:shadowing;
+world api { export service; }
+/// @nexus.endpoint "ordinary"
+interface service {
+  record request {
+    ctx: option<string>,
+    ctx2: option<string>,
+    opts: option<string>,
+    opts2: option<string>,
+    request: option<string>,
+    %result: option<string>,
+    value: option<string>,
+    message: option<string>,
+    echo: option<string>,
+  }
+  echo: func(request: request) -> request;
+  ctx: func(request: request) -> request;
+}
+"#,
+    )
+    .unwrap();
+    let output = temp.path().join("output");
+    generate_to_file(&GenerateRequest {
+        language: nexgen::language::Language::Go,
+        input_paths: vec![input],
+        descriptor_paths: vec![],
+        support_package: Some("example.com/support".into()),
+        output_path: output.clone(),
+        format: false,
+        config: nexgen::nexgen_config::NexgenConfig {
+            mode: nexgen::generator::GenerationMode::NativeApi,
+            system_nexus: false,
+        },
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    fs::write(
+        output.join("bindings_test.go"),
+        r#"package output
+import (
+    "context"
+    "testing"
+    "github.com/nexus-rpc/sdk-go/nexus"
+    "go.temporal.io/sdk/testsuite"
+    "go.temporal.io/sdk/workflow"
+)
+func TestBindings(t *testing.T) {
+    for _, opts := range []EchoOptions{
+        {},
+        {Ctx:"ctx", Ctx2:"ctx2", Opts:"opts", Opts2:"opts2", Request:"request",
+         Result:"result", Value:"value", Message:"message", Echo:"echo"},
+    } {
+        var suite testsuite.WorkflowTestSuite
+        env := suite.NewTestWorkflowEnvironment()
+        service := nexus.NewService("Service")
+        operation := nexus.NewSyncOperation("Echo",
+            func(_ context.Context, input Request, _ nexus.StartOperationOptions) (Request, error) {
+                return input, nil
+            })
+        if err := service.Register(operation); err != nil { t.Fatal(err) }
+        if err := service.Register(nexus.NewSyncOperation("Ctx",
+            func(_ context.Context, input Request, _ nexus.StartOperationOptions) (Request, error) {
+                return input, nil
+            })); err != nil { t.Fatal(err) }
+        env.RegisterNexusService(service)
+        env.ExecuteWorkflow(func(ctx workflow.Context) (Request, error) {
+            var result Request
+            err := Echo(ctx, opts).Get(ctx, &result)
+            if err == nil { err = Ctx(ctx, CtxOptions(opts)).Get(ctx, &result) }
+            return result, err
+        })
+        if err := env.GetWorkflowError(); err != nil { t.Fatal(err) }
+        var got Request
+        if err := env.GetWorkflowResult(&got); err != nil { t.Fatal(err) }
+        for _, field := range []struct{ value *string; want string }{
+            {got.Ctx,opts.Ctx}, {got.Ctx2,opts.Ctx2}, {got.Opts,opts.Opts},
+            {got.Opts2,opts.Opts2}, {got.Request,opts.Request}, {got.Result,opts.Result},
+            {got.Value,opts.Value}, {got.Message,opts.Message}, {got.Echo,opts.Echo},
+        } {
+            if field.want == "" {
+                if field.value != nil { t.Fatalf("absent field became %q", *field.value) }
+            } else if field.value == nil || *field.value != field.want {
+                t.Fatalf("field = %v, want %q", field.value, field.want)
+            }
+        }
+    }
+}
+"#,
+    )
+    .unwrap();
+    let result = Command::new("go")
+        .args(["test", "./output"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+}
+
+#[test]
 fn go_file_imports_freshen_sdk_support_and_proto_aliases() {
     let root = project_root();
     for (alias, system_nexus) in [
@@ -710,6 +828,9 @@ fn go_file_imports_freshen_sdk_support_and_proto_aliases() {
         ("support", false),
         ("time", false),
         ("converter", false),
+        ("ctx", false),
+        ("m", false),
+        ("opts", false),
         ("internal", true),
         ("commonconverter", true),
     ] {

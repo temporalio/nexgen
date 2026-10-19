@@ -1,4 +1,25 @@
 use std::collections::BTreeSet;
+use std::fmt;
+use std::ops::Deref;
+
+/// A prepared lexical binding. Keep this value with the rendered function:
+/// declarations and references share it rather than deriving a name again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Binding(String);
+
+impl Deref for Binding {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for Binding {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
 
 /// Names visible to a generated lexical scope. Backends supply valid identifiers
 /// and decide which language constructs introduce a scope.
@@ -8,6 +29,10 @@ pub(super) struct NameScope {
 }
 
 impl NameScope {
+    pub(super) fn bind(&mut self, preferred: &str) -> Binding {
+        Binding(self.fresh(preferred))
+    }
+
     pub(super) fn reserve(&mut self, name: impl Into<String>) {
         self.occupied.insert(name.into());
     }
@@ -39,6 +64,19 @@ impl NameScope {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prepared_bindings_retain_their_identity_when_a_scope_grows() {
+        let mut scope = NameScope::default();
+        let context = scope.bind("ctx");
+        let field = scope.bind("ctx");
+        let reference = field.clone();
+        let mut body = scope.child_scope();
+        assert_eq!(&*body.bind("ctx"), "ctx3");
+        assert_eq!(&*context, "ctx");
+        assert_eq!(field, reference);
+        assert_eq!(format!("{field} = &opts.Ctx"), "ctx2 = &opts.Ctx");
+    }
 
     #[test]
     fn fresh_names_skip_reserved_suffixes_deterministically() {

@@ -26,11 +26,198 @@ use crate::spec::{
 use crate::spec::{ApiSpecBranch, ApiSpecLeaf, ApiSpecNode, ApiSpecTree};
 
 use super::json_schema::go as json;
-use super::names::NameScope;
+use super::names::{Binding, NameScope};
 use super::proto::go as proto;
 
-mod imports;
-use imports::{GoImports, ImportKind};
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ImportKind {
+    Generated,
+    Authored,
+    Proto,
+    Fallback,
+}
+
+#[derive(Debug, Default)]
+struct GoImport {
+    preferences: BTreeSet<(ImportKind, String)>,
+    fixed: BTreeSet<String>,
+    binding: Option<Binding>,
+}
+
+/// Go's adapter to the shared binding allocator. Requirements come from planned
+/// types and backend dependencies, never from rendering a file to discover names.
+#[derive(Debug, Default)]
+struct GoImports {
+    imports: BTreeMap<String, GoImport>,
+    names: NameScope,
+    fixed_qualifiers: BTreeSet<String>,
+    opaque_authored_code: bool,
+    prepared: bool,
+}
+
+impl GoImports {
+    fn reserve(&mut self, name: &str) {
+        self.names.reserve(name);
+    }
+
+    fn require(&mut self, path: &str, preferred: &str, kind: ImportKind) -> String {
+        let import = self.imports.entry(path.to_string()).or_default();
+        import.preferences.insert((kind, preferred.to_string()));
+        if self.prepared && import.binding.is_none() {
+            // Dependencies introduced by a renderer keep existing bindings
+            // stable; there is no frozen-table indexing or second render.
+            import.binding = Some(self.names.bind(preferred));
+        }
+        import
+            .binding
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| preferred.to_string())
+    }
+
+    fn require_fixed(&mut self, path: &str, alias: &str) {
+        self.imports
+            .entry(path.to_string())
+            .or_default()
+            .fixed
+            .insert(alias.to_string());
+    }
+
+    fn pin_helper(&mut self, helper: &str) {
+        if let Some((qualifier, _)) = helper.split_once('.') {
+            self.fixed_qualifiers.insert(qualifier.to_string());
+        }
+    }
+
+    fn prepare(&mut self) -> Result<()> {
+        let conflict = |reason| Error::UnsupportedGoType {
+            context: "Go import bindings".to_string(),
+            reason,
+        };
+        for import in self.imports.values_mut() {
+            for (kind, preferred) in &import.preferences {
+                if self.fixed_qualifiers.contains(preferred)
+                    || (self.opaque_authored_code
+                        && matches!(kind, ImportKind::Authored | ImportKind::Generated))
+                {
+                    import.fixed.insert(preferred.clone());
+                }
+            }
+            if import.fixed.len() > 1 {
+                return Err(conflict("an opaque expression requires multiple qualifiers for the same import; use one authored qualifier".to_string()));
+            }
+        }
+        for (path, import) in &mut self.imports {
+            if let Some(alias) = import.fixed.first() {
+                if alias == "_" || is_go_keyword(alias) || self.names.contains(alias) {
+                    return Err(conflict(format!(
+                        "fixed import qualifier `{alias}` for `{path}` conflicts with another binding; change the authored qualifier"
+                    )));
+                }
+                import.binding = Some(self.names.bind(alias));
+            }
+        }
+        let mut pending: Vec<_> = self
+            .imports
+            .iter_mut()
+            .filter(|(_, i)| i.binding.is_none())
+            .collect();
+        pending.sort_by(|(pa, a), (pb, b)| {
+            a.preferences
+                .first()
+                .cmp(&b.preferences.first())
+                .then(pa.cmp(pb))
+        });
+        for (_, import) in pending {
+            let (_, preferred) = import.preferences.first().expect("import preference");
+            let preferred = if is_go_keyword(preferred) {
+                format!("{preferred}_")
+            } else {
+                preferred.clone()
+            };
+            import.binding = Some(self.names.bind(&preferred));
+        }
+        self.prepared = true;
+        Ok(())
+    }
+
+    fn paths(&self) -> Vec<(String, String)> {
+        self.imports
+            .iter()
+            .map(|(path, import)| {
+                let alias = import
+                    .binding
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .or_else(|| import.fixed.first().cloned())
+                    .unwrap_or_else(|| {
+                        import
+                            .preferences
+                            .first()
+                            .expect("import preference")
+                            .1
+                            .clone()
+                    });
+                (path.clone(), alias)
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod file_binding_tests {
+    use super::*;
+
+    #[test]
+    fn import_preparation_is_deterministic_and_reserves_declarations() {
+        let allocate = |reverse: bool| {
+            let mut imports = GoImports::default();
+            let mut requirements = [
+                ("example.org/proto", "workflow", ImportKind::Proto),
+                (
+                    "go.temporal.io/sdk/workflow",
+                    "workflow",
+                    ImportKind::Generated,
+                ),
+            ];
+            if reverse {
+                requirements.reverse();
+            }
+            imports.reserve("workflow2");
+            for (path, alias, kind) in requirements {
+                imports.require(path, alias, kind);
+            }
+            imports.prepare().unwrap();
+            imports.paths()
+        };
+        assert_eq!(allocate(false), allocate(true));
+        assert_eq!(allocate(false)[0].1, "workflow3");
+    }
+
+    #[test]
+    fn fixed_helpers_are_explicit_constraints() {
+        let mut imports = GoImports::default();
+        imports.require("example.org/a", "helper", ImportKind::Authored);
+        imports.require("example.org/b", "helper", ImportKind::Authored);
+        imports.pin_helper("helper.Convert");
+        assert!(imports.prepare().is_err());
+    }
+
+    #[test]
+    fn late_dependency_does_not_invalidate_prepared_bindings() {
+        let mut imports = GoImports::default();
+        imports.require("example.org/a", "helper", ImportKind::Authored);
+        imports.prepare().unwrap();
+        assert_eq!(
+            imports.require("example.org/b", "helper", ImportKind::Authored),
+            "helper2"
+        );
+        assert_eq!(
+            imports.require("example.org/a", "helper", ImportKind::Authored),
+            "helper"
+        );
+    }
+}
 
 type FunctionArgsSpec = GenericFunctionArgsSpec<PlannedFamily>;
 type FunctionFieldSpec = GenericFunctionFieldSpec<PlannedFamily>;
@@ -612,7 +799,7 @@ impl GoPackageContext {
         } else if reference.contains('.') && !reference.contains('/') && !reference.contains(':') {
             // A bare qualifier in authored code is opaque. The registry binds
             // it to a known import without rewriting the expression.
-            self.imports.borrow_mut().preserve_expression(reference);
+            self.imports.borrow_mut().pin_helper(reference);
             reference.to_string()
         } else {
             self.go_type_expr(reference)
@@ -743,6 +930,296 @@ impl GoPackageContext {
     }
 }
 
+fn prepare_go_type(kind: &PlannedType, package: &GoPackageContext) {
+    match kind {
+        PlannedType::External(ExternalTypeSpec::Alias(alias)) => {
+            if let Some(expr) = alias.type_name.value() {
+                package.go_type_expr(expr);
+            }
+            prepare_go_type(&alias.target, package);
+        }
+        PlannedType::External(ExternalTypeSpec::Proto(proto_type)) => {
+            let (info, replacement) = match proto_type {
+                PlannedProtoType::Message(message) => (&message.proto, &message.replacement),
+                PlannedProtoType::Enum(enumeration) => {
+                    (&enumeration.proto, &enumeration.replacement)
+                }
+            };
+            proto::prepare_import(info, package);
+            if let Some(replacement) = replacement
+                && let Some(expr) = replacement.type_name.value()
+            {
+                package.go_type_expr(expr);
+            }
+        }
+        PlannedType::Option(inner) | PlannedType::List(inner) => prepare_go_type(inner, package),
+        PlannedType::Map(key, value) => {
+            prepare_go_type(key, package);
+            prepare_go_type(value, package);
+        }
+        PlannedType::Tuple(items) => {
+            for item in items {
+                prepare_go_type(item, package);
+            }
+        }
+        PlannedType::Result { ok, err } => {
+            for item in [ok, err].into_iter().flatten() {
+                prepare_go_type(item, package);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn prepare_go_function(function: &FunctionFieldSpec, package: &GoPackageContext) {
+    if let Some(helper) = &function.name_extractor {
+        package.function_name_extractor(helper);
+    }
+    if let Some(descriptor) = &function.type_descriptor {
+        for annotation in [&descriptor.value_type, &descriptor.args_type] {
+            if let Some(value) = annotation.value() {
+                package.go_type_expr(value);
+            }
+        }
+    }
+    match &function.args {
+        FunctionArgsSpec::Varargs { prefix, .. } => {
+            for argument in prefix {
+                prepare_go_type(&argument.field_type, package);
+            }
+        }
+        FunctionArgsSpec::Fixed(arguments) => {
+            for argument in arguments {
+                prepare_go_type(&argument.field_type, package);
+            }
+        }
+    }
+    match &function.result {
+        FunctionResultSpec::Authored(kind) => prepare_go_type(kind, package),
+        FunctionResultSpec::Annotation(annotation) => {
+            if let Some(value) = annotation.value() {
+                package.go_type_expr(value);
+            }
+        }
+    }
+}
+
+/// Prepare metadata once, before source fragments capture import references.
+fn prepare_go_file(plan: &PlannedSpec, package: &GoPackageContext) -> Result<()> {
+    for local in [
+        "ctx",
+        "request",
+        "result",
+        "m",
+        "message",
+        "proto",
+        "out",
+        "cfg",
+        "converted",
+        "err",
+        "dc",
+        "item",
+        "k",
+        "v",
+        "typed",
+        "ok",
+        "c",
+        "fut",
+    ] {
+        package.reserve_declaration(local);
+    }
+    for (_, record) in plan.records() {
+        package.reserve_declaration(&record.name);
+        package.reserve_declaration(&go_unexported_name(&record.name));
+        package.reserve_declaration(&format!("{}ToProto", go_unexported_name(&record.name)));
+        package.reserve_declaration(&format!("{}FromProto", go_unexported_name(&record.name)));
+        if let Some(info) = &record.data.proto {
+            proto::prepare_import(info, package);
+        }
+        for field in record.fields.values() {
+            prepare_go_type(&field.field_type, package);
+            if let Some(function) = &field.function {
+                prepare_go_function(function, package);
+            }
+            if let Some(binding) = &field.data.wire_binding {
+                match binding {
+                    crate::planning::PlannedWireFieldBinding::Value { wire_type, .. } => {
+                        prepare_go_type(wire_type, package)
+                    }
+                    crate::planning::PlannedWireFieldBinding::VariantMembers {
+                        members, ..
+                    } => {
+                        for member in members {
+                            prepare_go_type(&member.wire_type, package);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (_, enumeration) in plan.enums() {
+        package.reserve_declaration(&enumeration.name);
+        package.reserve_declaration(&go_unexported_name(&enumeration.name));
+        for value in &enumeration.values {
+            package.reserve_declaration(&format!("{}{}", enumeration.name, value.name));
+            package.reserve_declaration(&format!(
+                "{}{}",
+                go_unexported_name(&enumeration.name),
+                value.name
+            ));
+        }
+    }
+    for (_, flags) in plan.flags() {
+        package.reserve_declaration(&flags.name);
+        package.reserve_declaration(&go_unexported_name(&flags.name));
+        for flag in &flags.flags {
+            package.reserve_declaration(&format!("{}{}", flags.name, flag.name));
+            package.reserve_declaration(&format!(
+                "{}{}",
+                go_unexported_name(&flags.name),
+                flag.name
+            ));
+        }
+    }
+    for (_, variant) in plan.variants() {
+        package.reserve_declaration(&variant.name);
+        package.reserve_declaration(&go_unexported_name(&variant.name));
+        for case in &variant.cases {
+            package.reserve_declaration(&format!("{}{}", variant.name, case.name));
+            package.reserve_declaration(&format!(
+                "{}{}",
+                go_unexported_name(&variant.name),
+                case.name
+            ));
+            if let Some(payload) = &case.payload {
+                prepare_go_type(payload, package);
+            }
+        }
+    }
+    package.workflow_context_type();
+    package.transfer_type_converter_type();
+    package.new_transfer_type_converter();
+    if crate::nexgen_config::current().system_nexus {
+        package.system_nexus_config_type();
+        package.workflow_data_converter();
+    }
+    for (path, reference) in [
+        ("fmt", "fmt.Errorf"),
+        ("reflect", "reflect.ValueOf"),
+        ("runtime", "runtime.FuncForPC"),
+        ("strings", "strings.Split"),
+    ] {
+        package.qualified_expr(path, reference);
+    }
+    if let Some(path) = &package.support_package {
+        package
+            .imports
+            .borrow_mut()
+            .require(path, "support", ImportKind::Generated);
+    }
+    let mut paths = BTreeSet::new();
+    collect_imports_from_plan(plan, &mut paths);
+    for path in paths {
+        if !package.is_self_import(&path) {
+            let alias = path.rsplit('/').next().unwrap_or(&path);
+            package
+                .imports
+                .borrow_mut()
+                .require(&path, alias, ImportKind::Fallback);
+        }
+    }
+    for service in &plan.services {
+        for resource in &service.resources {
+            package.reserve_declaration(&resource.data.type_name);
+            package.reserve_declaration(&format!("New{}", resource.data.type_name));
+            for field in &resource.data.fields {
+                prepare_go_type(&field.kind, package);
+            }
+        }
+        for operation in &service.operations {
+            let name = go_field_name(&operation.name);
+            package.reserve_declaration(&go_unexported_name(&name));
+            package.reserve_declaration(&name);
+            package.reserve_declaration(&format!("{name}Options"));
+            package.reserve_declaration(&format!("{name}Typed"));
+            if let Some(input) = &operation.input {
+                prepare_go_type(input, package);
+            }
+            if let Some(output) = &operation.output {
+                prepare_go_type(output, package);
+            }
+            if let Some(transform) = &operation.output_transform {
+                if let Some(expr) = transform.type_name.value() {
+                    package.go_type_expr(expr);
+                }
+                package.imports.borrow_mut().opaque_authored_code = true;
+            }
+            if let Some(helper) = operation.serialization_context.value() {
+                package.function_name_extractor(helper);
+            }
+        }
+    }
+    if !plan_uses_json_models(plan) {
+        package.imports.borrow_mut().prepare()?;
+    }
+    Ok(())
+}
+
+// Only import-use pruning uses source tokens. Binding allocation and opaque
+// expression constraints never depend on this lexer.
+fn referenced_go_qualifiers(code: &str) -> BTreeSet<String> {
+    let bytes = code.as_bytes();
+    let mut index = 0;
+    let mut qualifiers = BTreeSet::new();
+    while index < bytes.len() {
+        match bytes[index] {
+            b'"' | b'\'' | b'`' => {
+                let quote = bytes[index];
+                index += 1;
+                while index < bytes.len() {
+                    let byte = bytes[index];
+                    index += 1;
+                    if byte == quote {
+                        break;
+                    }
+                    if byte == b'\\' && quote != b'`' {
+                        index = (index + 1).min(bytes.len());
+                    }
+                }
+            }
+            b'/' if bytes.get(index + 1) == Some(&b'/') => {
+                while index < bytes.len() && bytes[index] != b'\n' {
+                    index += 1;
+                }
+            }
+            b'/' if bytes.get(index + 1) == Some(&b'*') => {
+                index += 2;
+                while index < bytes.len() {
+                    if bytes.get(index..index + 2) == Some(b"*/") {
+                        index += 2;
+                        break;
+                    }
+                    index += 1;
+                }
+            }
+            byte if is_go_ident_start(byte) => {
+                let start = index;
+                index += 1;
+                while index < bytes.len() && is_go_ident_continue(bytes[index]) {
+                    index += 1;
+                }
+                if next_non_whitespace(bytes, index) == Some(b'.')
+                    && previous_non_whitespace(bytes, start) != Some(b'.')
+                {
+                    qualifiers.insert(code[start..index].to_string());
+                }
+            }
+            _ => index += 1,
+        }
+    }
+    qualifiers
+}
+
 /// Entry point for the Go code generator.
 ///
 struct GoGenerationResult {
@@ -765,14 +1242,7 @@ fn generate_in_tree(
     tree_models: &[PlannedJsonType],
     primary_origin: GeneratedFileOrigin,
 ) -> Result<GoGenerationResult> {
-    // Wire fragments contain rendered type references. Discover imports and
-    // declarations first, freeze their aliases, then rebuild the fragments with
-    // final names. This is backend-local emission, not an API-model pass.
-    let imports = Rc::default();
-    ApiPlanner::new(api_plan, options, tree_models, Rc::clone(&imports))?
-        .generate(primary_origin.clone())?;
-    imports.borrow_mut().freeze()?;
-    ApiPlanner::new(api_plan, options, tree_models, imports)?.generate(primary_origin)
+    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin)
 }
 
 /// Every JSON model declared anywhere in the generate closure.
@@ -1115,10 +1585,9 @@ impl<'a> ApiPlanner<'a> {
         api_plan: &'a PlannedSpec,
         options: &GoOptions,
         tree_models: &[PlannedJsonType],
-        file_imports: Rc<RefCell<GoImports>>,
     ) -> Result<Self> {
-        let mut package = GoPackageContext::new(api_plan, options)?;
-        package.imports = file_imports;
+        let package = GoPackageContext::new(api_plan, options)?;
+        prepare_go_file(api_plan, &package)?;
         let mut imports = BTreeSet::new();
 
         // Re-scan all resolved type expressions to collect import paths.
@@ -1358,6 +1827,9 @@ impl<'a> ApiPlanner<'a> {
                     .require_fixed(path, path.rsplit('/').next().unwrap_or(path));
             }
         }
+        if !self.package.imports.borrow().prepared {
+            self.package.imports.borrow_mut().prepare()?;
+        }
         let output = render_file(
             &self.package,
             &model_fragments.body,
@@ -1405,13 +1877,6 @@ impl<'a> ApiPlanner<'a> {
                 ),
             })?;
         let output = operation_output(operation, self.api_plan);
-        if let Some(expr) = operation
-            .output_transform
-            .as_ref()
-            .and_then(|t| t.transform.value())
-        {
-            self.package.imports.borrow_mut().preserve_expression(expr);
-        }
         self.resolve_message_types(&input)?;
         let model_type_parameters = record_for_message(self.api_plan, &input)
             .map(|record| self.api_plan.record_type_parameters(&record.full_name))
@@ -2122,7 +2587,7 @@ pub(in crate::generator) struct RenderedOperation<'a> {
 }
 
 /// A single parameter in an unpacked convenience wrapper function signature.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct RenderedUnpackedParam {
     /// Exported Go field name used when setting the request struct field
     /// (e.g. `"UserId"`).
@@ -3598,7 +4063,7 @@ fn render_file(
 fn finish_go_file(package: &GoPackageContext, body: String) -> String {
     let mut output = format!("{GENERATED_HEADER}\n\npackage {}\n", package.package_name);
     let imports = package.imports.borrow().paths();
-    let qualifiers = imports::referenced_qualifiers(&body);
+    let qualifiers = referenced_go_qualifiers(&body);
     let used: Vec<_> = imports
         .iter()
         .filter(|(_, alias)| qualifiers.contains(alias))
@@ -5005,6 +5470,7 @@ fn render_function_name_inlining(
     output: &mut String,
     params: &[RenderedUnpackedParam],
     package: &GoPackageContext,
+    bindings: &GoWrapperBindings,
 ) {
     for param in params {
         if param
@@ -5012,8 +5478,15 @@ fn render_function_name_inlining(
             .as_ref()
             .is_some_and(|function| !function_value_is_string(function))
         {
-            let name = function_name_local_var_for_params(param, params);
-            render_function_name_inline_assignment_named(output, param, &name, package);
+            let mut argument = param.clone();
+            argument.param_name = bindings.parameters[&param.field_name].to_string();
+            render_function_name_inline_assignment_named(
+                output,
+                &argument,
+                &bindings.function_names[&param.field_name],
+                package,
+                &bindings.context,
+            );
         }
     }
 }
@@ -5024,7 +5497,7 @@ fn render_function_name_inline_assignment(
     package: &GoPackageContext,
 ) {
     let name_var = function_name_local_var(param);
-    render_function_name_inline_assignment_named(output, param, &name_var, package);
+    render_function_name_inline_assignment_named(output, param, &name_var, package, "ctx");
 }
 
 fn render_function_name_inline_assignment_named(
@@ -5032,6 +5505,7 @@ fn render_function_name_inline_assignment_named(
     param: &RenderedUnpackedParam,
     name_var: &str,
     package: &GoPackageContext,
+    context: &str,
 ) {
     if let Some(helper) = param
         .function
@@ -5039,7 +5513,7 @@ fn render_function_name_inline_assignment_named(
         .and_then(|f| f.name_extractor.as_deref())
     {
         output.push_str(&format!(
-            "\t{name_var} := {}(ctx, {})\n",
+            "\t{name_var} := {}({context}, {})\n",
             package.function_name_extractor(helper),
             param.param_name
         ));
@@ -5102,20 +5576,96 @@ fn function_name_local_var(param: &RenderedUnpackedParam) -> String {
     format!("{}Name", param.param_name)
 }
 
-fn function_name_local_var_for_params(
-    target: &RenderedUnpackedParam,
-    params: &[RenderedUnpackedParam],
-) -> String {
-    let base = function_name_local_var(target);
-    let mut names = NameScope::default();
-    for name in params
-        .iter()
-        .map(|param| param.param_name.as_str())
-        .chain(["ctx", "opts", "arg", "args"])
-    {
-        names.reserve(name);
+struct GoWrapperBindings {
+    context: Binding,
+    options: Binding,
+    typed_argument: Option<Binding>,
+    parameters: BTreeMap<String, Binding>,
+    defaults: BTreeMap<String, Binding>,
+    function_names: BTreeMap<String, Binding>,
+}
+
+impl GoWrapperBindings {
+    fn prepare(
+        operation: &RenderedOperation<'_>,
+        params: &[RenderedUnpackedParam],
+        package: &GoPackageContext,
+        typed: bool,
+    ) -> Self {
+        let mut scope = NameScope::default();
+        scope.reserve(&operation.func_name);
+        scope.reserve(split_go_type_decl_name(&operation.input_type).0);
+        // Only bindings referenced in the body need protection. Go parameter
+        // scope starts in the body, so signature-only imports may be shadowed.
+        for param in params {
+            if param.default_punning_zero.is_some()
+                || has_explicit_args(param)
+                || (typed && param.function_args.is_some())
+            {
+                for (_, alias) in package.imports.borrow().paths() {
+                    if param.go_type.contains(&format!("{alias}.")) {
+                        scope.reserve(alias);
+                    }
+                }
+            }
+            if let Some(function) = &param.function {
+                if let Some(helper) = &function.name_extractor {
+                    let reference = package.function_name_extractor(helper);
+                    if let Some((root, _)) = reference.split_once('.') {
+                        scope.reserve(root);
+                    }
+                } else if !function_value_is_string(function) {
+                    for (path, reference) in [
+                        ("reflect", "reflect.ValueOf"),
+                        ("runtime", "runtime.FuncForPC"),
+                        ("strings", "strings.Split"),
+                    ] {
+                        let reference = package.qualified_expr(path, reference);
+                        scope.reserve(reference.split_once('.').expect("qualified function").0);
+                    }
+                }
+            }
+        }
+        let context = scope.bind("ctx");
+        let options = scope.bind("opts");
+        let typed_argument = typed.then(|| scope.bind("arg"));
+        let mut parameters = BTreeMap::new();
+        for param in ordered_positional_params(params) {
+            let preferred = if has_explicit_args(param) {
+                singular_args_public_param_name(param)
+            } else {
+                param.param_name.clone()
+            };
+            parameters.insert(param.field_name.clone(), scope.bind(&preferred));
+        }
+        let defaults = params
+            .iter()
+            .filter(|p| param_belongs_in_options(p) && p.default_punning_zero.is_some())
+            .map(|p| (p.field_name.clone(), scope.bind(&p.param_name)))
+            .collect();
+        let function_names = params
+            .iter()
+            .filter(|p| {
+                p.function
+                    .as_ref()
+                    .is_some_and(|f| !function_value_is_string(f))
+            })
+            .map(|p| {
+                (
+                    p.field_name.clone(),
+                    scope.bind(&function_name_local_var(p)),
+                )
+            })
+            .collect();
+        Self {
+            context,
+            options,
+            typed_argument,
+            parameters,
+            defaults,
+            function_names,
+        }
     }
-    names.fresh(&base)
 }
 
 fn wrapper_input_docs<'a>(
@@ -5183,13 +5733,14 @@ fn render_convenience_wrapper(
 ) {
     let exported_name = go_field_name(operation.name);
     let type_params = wrapper_type_parameters(operation, params, None, package, visibility);
+    let bindings = GoWrapperBindings::prepare(operation, params, package, false);
 
     let positional_params = ordered_positional_params(params);
     let input_docs = wrapper_input_docs(positional_params.iter().copied());
     render_operation_doc_comment(output, operation, &input_docs);
 
     let mut signature_params: Vec<(String, String)> = vec![(
-        "opts".to_string(),
+        bindings.options.to_string(),
         go_generic_reference(
             &format!("{exported_name}Options"),
             &operation.model_type_parameters,
@@ -5197,18 +5748,15 @@ fn render_convenience_wrapper(
         ),
     )];
     signature_params.extend(positional_params.iter().enumerate().map(|(index, p)| {
-        wrapper_param_signature(
+        let (_, ty) = wrapper_param_signature(
             p,
             params,
             index + 1 == positional_params.len(),
             package,
             visibility,
-        )
+        );
+        (bindings.parameters[&p.field_name].to_string(), ty)
     }));
-
-    // The signature is multi-line when it has more than 3 parameters total
-    // (counting `ctx` plus the parameters above).
-    let multiline_signature = signature_params.len() + 1 > 3;
 
     // Function signature
     output.push_str("func ");
@@ -5225,29 +5773,7 @@ fn render_convenience_wrapper(
         }
         output.push(']');
     }
-    if multiline_signature {
-        output.push_str("(\n\tctx ");
-        output.push_str(&package.workflow_context_type());
-        output.push_str(",\n");
-        for (name, ty) in &signature_params {
-            output.push('\t');
-            output.push_str(name);
-            output.push(' ');
-            output.push_str(ty);
-            output.push_str(",\n");
-        }
-        output.push(')');
-    } else {
-        output.push_str("(ctx ");
-        output.push_str(&package.workflow_context_type());
-        for (name, ty) in &signature_params {
-            output.push_str(", ");
-            output.push_str(name);
-            output.push(' ');
-            output.push_str(ty);
-        }
-        output.push(')');
-    }
+    render_operation_params(output, &signature_params, package, &bindings.context);
     output.push(' ');
 
     // Return type
@@ -5257,45 +5783,14 @@ fn render_convenience_wrapper(
     // Function body -- build the request as a multi-line struct literal,
     // sourcing required fields from positional args and optional fields from
     // opts.
-    render_public_default_punning_locals(output, params);
-    render_function_name_inlining(output, params, package);
+    render_public_default_punning_locals(output, params, &bindings);
+    render_function_name_inlining(output, params, package, &bindings);
     output.push_str("\treturn ");
     output.push_str(&operation.func_name);
-    output.push_str("(ctx, ");
+    output.push_str(&format!("({}, ", bindings.context));
     output.push_str(&operation.input_type);
     output.push_str("{\n");
-    for param in params {
-        output.push_str("\t\t");
-        output.push_str(&param.field_name);
-        output.push_str(": ");
-        if param
-            .function
-            .as_ref()
-            .is_some_and(function_value_is_string)
-        {
-            output.push_str(&param.param_name);
-        } else if has_explicit_args(param) {
-            output.push_str(&format!(
-                "{}{{{}}}",
-                param.go_type,
-                singular_args_public_param_name(param)
-            ));
-        } else if param.function.is_some() {
-            output.push_str(&function_name_local_var_for_params(param, params));
-        } else if param.function_args.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.default_punning_zero.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.embed_in_options {
-            output.push('&');
-            output.push_str("opts.");
-            output.push_str(&param.field_name);
-        } else {
-            output.push_str("opts.");
-            output.push_str(&param.field_name);
-        }
-        output.push_str(",\n");
-    }
+    render_wrapper_fields(output, params, &bindings, None);
     output.push_str("\t})\n");
 
     output.push_str("}\n");
@@ -5308,6 +5803,48 @@ fn singular_args_public_param_name(param: &RenderedUnpackedParam) -> String {
         .map(|prefix| format!("{prefix}Arg"))
         .or_else(|| (param.param_name == "args").then(|| "arg".to_string()))
         .unwrap_or_else(|| param.param_name.clone())
+}
+
+fn render_wrapper_fields(
+    output: &mut String,
+    params: &[RenderedUnpackedParam],
+    bindings: &GoWrapperBindings,
+    primary: Option<&FunctionFieldSpec>,
+) {
+    for param in params {
+        let expr = if primary.is_some() && param.function_args.as_ref() == primary {
+            format!(
+                "{}{{{}}}",
+                param.go_type,
+                bindings.typed_argument.as_ref().expect("typed argument")
+            )
+        } else if param
+            .function
+            .as_ref()
+            .is_some_and(function_value_is_string)
+        {
+            bindings.parameters[&param.field_name].to_string()
+        } else if has_explicit_args(param) {
+            format!(
+                "{}{{{}}}",
+                param.go_type, bindings.parameters[&param.field_name]
+            )
+        } else if param.function.is_some() {
+            bindings.function_names[&param.field_name].to_string()
+        } else if param.function_args.is_some() {
+            bindings.parameters[&param.field_name].to_string()
+        } else if param.default_punning_zero.is_some() {
+            bindings.defaults[&param.field_name].to_string()
+        } else {
+            format!(
+                "{}{}.{}",
+                if param.embed_in_options { "&" } else { "" },
+                bindings.options,
+                param.field_name
+            )
+        };
+        output.push_str(&format!("\t\t{}: {expr},\n", param.field_name));
+    }
 }
 
 fn wrapper_param_signature(
@@ -5357,24 +5894,28 @@ fn wrapper_param_signature(
     }
 }
 
-fn render_public_default_punning_locals(output: &mut String, params: &[RenderedUnpackedParam]) {
+fn render_public_default_punning_locals(
+    output: &mut String,
+    params: &[RenderedUnpackedParam],
+    bindings: &GoWrapperBindings,
+) {
     for param in params
         .iter()
         .filter(|param| param_belongs_in_options(param))
     {
         if let Some(zero) = &param.default_punning_zero {
             output.push_str("\tvar ");
-            output.push_str(&param.param_name);
+            output.push_str(&bindings.defaults[&param.field_name]);
             output.push(' ');
             output.push_str(&param.go_type);
             output.push('\n');
-            output.push_str("\tif opts.");
+            output.push_str(&format!("\tif {}.", bindings.options));
             output.push_str(&param.field_name);
             output.push_str(" != ");
             output.push_str(zero);
             output.push_str(" {\n\t\t");
-            output.push_str(&param.param_name);
-            output.push_str(" = &opts.");
+            output.push_str(&bindings.defaults[&param.field_name]);
+            output.push_str(&format!(" = &{}.", bindings.options));
             output.push_str(&param.field_name);
             output.push_str("\n\t}\n");
         }
@@ -5385,10 +5926,11 @@ fn render_operation_params(
     output: &mut String,
     signature_params: &[(String, String)],
     package: &GoPackageContext,
+    context: &Binding,
 ) {
     let multiline_signature = signature_params.len() + 1 > 3;
     if multiline_signature {
-        output.push_str("(\n\tctx ");
+        output.push_str(&format!("(\n\t{context} "));
         output.push_str(&package.workflow_context_type());
         output.push_str(",\n");
         for (name, ty) in signature_params {
@@ -5400,7 +5942,7 @@ fn render_operation_params(
         }
         output.push(')');
     } else {
-        output.push_str("(ctx ");
+        output.push_str(&format!("({context} "));
         output.push_str(&package.workflow_context_type());
         for (name, ty) in signature_params {
             output.push_str(", ");
@@ -5423,11 +5965,12 @@ fn render_typed_convenience_wrapper(
     let primary = unary_primary_varargs_function_param(params)
         .expect("typed wrapper requires a unary-capable primary function");
     let function = primary.function.as_ref().unwrap();
+    let bindings = GoWrapperBindings::prepare(operation, params, package, true);
     let exported_name = format!("{}Typed", go_field_name(operation.name));
     let options_name = format!("{}Options", go_field_name(operation.name));
     let (arg_type, result_type) = typed_wrapper_type_parameter_names(primary);
     let mut signature = vec![(
-        "opts".to_string(),
+        bindings.options.to_string(),
         go_generic_reference(&options_name, &operation.model_type_parameters, false),
     )];
     let positional = ordered_positional_params(params);
@@ -5444,20 +5987,28 @@ fn render_typed_convenience_wrapper(
             };
             args.push(arg_type.clone());
             signature.push((
-                param.param_name.clone(),
+                bindings.parameters[&param.field_name].to_string(),
                 format!("func({}) {result_type}", args.join(", ")),
             ));
-            signature.push(("arg".to_string(), arg_type.clone()));
+            signature.push((
+                bindings
+                    .typed_argument
+                    .as_ref()
+                    .expect("typed argument")
+                    .to_string(),
+                arg_type.clone(),
+            ));
         } else if param.function_args.as_ref() == Some(function) {
             continue;
         } else {
-            signature.push(wrapper_param_signature(
+            let (_, ty) = wrapper_param_signature(
                 param,
                 params,
                 index + 1 == positional.len(),
                 package,
                 visibility,
-            ));
+            );
+            signature.push((bindings.parameters[&param.field_name].to_string(), ty));
         }
     }
     render_operation_doc_comment(
@@ -5476,52 +6027,18 @@ fn render_typed_convenience_wrapper(
             .join(", "),
     );
     output.push(']');
-    render_operation_params(output, &signature, package);
+    render_operation_params(output, &signature, package, &bindings.context);
     output.push(' ');
     render_operation_wrapper_return_type(output, package);
     output.push_str(" {\n");
-    render_public_default_punning_locals(output, params);
-    render_function_name_inlining(output, params, package);
+    render_public_default_punning_locals(output, params, &bindings);
+    render_function_name_inlining(output, params, package, &bindings);
     output.push_str("\treturn ");
     output.push_str(&operation.func_name);
-    output.push_str("(ctx, ");
+    output.push_str(&format!("({}, ", bindings.context));
     output.push_str(&operation.input_type);
     output.push_str("{\n");
-    for param in params {
-        output.push_str("\t\t");
-        output.push_str(&param.field_name);
-        output.push_str(": ");
-        if param.field_name == primary.field_name {
-            output.push_str(&function_name_local_var_for_params(param, params));
-        } else if param.function_args.as_ref() == Some(function) {
-            output.push_str(&format!("{}{{arg}}", param.go_type));
-        } else if param
-            .function
-            .as_ref()
-            .is_some_and(function_value_is_string)
-        {
-            output.push_str(&param.param_name);
-        } else if has_explicit_args(param) {
-            output.push_str(&format!(
-                "{}{{{}}}",
-                param.go_type,
-                singular_args_public_param_name(param)
-            ));
-        } else if param.function.is_some() {
-            output.push_str(&function_name_local_var_for_params(param, params));
-        } else if param.function_args.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.default_punning_zero.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.embed_in_options {
-            output.push_str("&opts.");
-            output.push_str(&param.field_name);
-        } else {
-            output.push_str("opts.");
-            output.push_str(&param.field_name);
-        }
-        output.push_str(",\n");
-    }
+    render_wrapper_fields(output, params, &bindings, Some(function));
     output.push_str("\t})\n}\n");
 }
 

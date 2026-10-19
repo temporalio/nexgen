@@ -115,3 +115,14 @@ flowchart LR
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
   the consuming module can only resolve it from the tree-wide manifest.
+
+Lexical binding allocation belongs to language emission, not to the shared API
+model or a new compiler pass. Prepare bindings before emitting a function and
+reuse those bindings for declarations and references. Each backend owns its
+language's scope rules. Python converter and operation scopes and Go convenience
+wrappers use this mechanism; it is not yet universal across backends.
+
+Go prepares import requirements from planned metadata before constructing source
+fragments and runs the generator once. Opaque authored expressions keep fixed
+import constraints rather than inferred lexical scopes. Source-token inspection
+is used only to prune unused imports, not to allocate names.

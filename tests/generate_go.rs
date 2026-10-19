@@ -675,7 +675,7 @@ interface collision-service {
 
   record execute-request {
     function: executable-function,
-    function-name: string,
+    function-name: option<string>,
     rv: string,
     full-name: string,
     elements: string,

@@ -655,11 +655,11 @@ fn field_read(
                 setup_lines.push(format!("if not {proto_expr}:"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
             }
-            let local = names.fresh(attr_name);
+            let local = names.bind(attr_name);
             setup_lines.push(format!("{local} = {value_expr}"));
             RenderedWireRead {
                 setup_lines,
-                expr: local,
+                expr: local.to_string(),
             }
         }
         WireReadPolicy::Optional => RenderedWireRead {
@@ -779,8 +779,8 @@ fn runtime_type_arguments(model: &RenderedModel, names: &mut NameScope) -> Vec<(
             .filter(|stem| !stem.is_empty())
             .unwrap_or(parameter);
         let base_name = format!("{}_type", stem.to_snake_case());
-        let name = names.fresh(&base_name);
-        arguments.push((parameter.clone(), name));
+        let name = names.bind(&base_name);
+        arguments.push((parameter.clone(), name.to_string()));
     }
     arguments
 }
@@ -895,7 +895,7 @@ fn repeated_from_proto_expr(
     type_arguments: &[(String, String)],
     names: &NameScope,
 ) -> String {
-    let item = names.child_scope().fresh("item");
+    let item = names.child_scope().bind("item");
     match resolved_type.kind {
         ResolvedFieldKind::Message => format!(
             "[{} for {item} in {proto_expr}]",
@@ -916,8 +916,8 @@ fn map_value_from_proto_expr(
     names: &NameScope,
 ) -> String {
     let mut comprehension = names.child_scope();
-    let key = comprehension.fresh("key");
-    let item = comprehension.fresh("item");
+    let key = comprehension.bind("key");
+    let item = comprehension.bind("item");
     match map_value_type.kind {
         ResolvedFieldKind::Message => format!(
             "{{{key}: {} for {key}, {item} in {proto_expr}.items()}}",
@@ -986,8 +986,8 @@ fn repeated_to_proto_lines(
     let indent = if optional_guard { "    " } else { "" };
     match resolved_type.kind {
         ResolvedFieldKind::Message => {
-            let element = names.fresh("value");
-            let item = names.fresh("item");
+            let element = names.bind("value");
+            let item = names.bind("item");
             lines.push(format!("{indent}for {element} in {value_expr}:"));
             lines.push(format!("{indent}    {item} = {message}.{proto_name}.add()"));
             lines.push(format!(
@@ -1000,7 +1000,7 @@ fn repeated_to_proto_lines(
             ));
         }
         ResolvedFieldKind::Enum => {
-            let element = names.child_scope().fresh("value");
+            let element = names.child_scope().bind("value");
             lines.push(format!(
                 "{indent}{message}.{proto_name}.extend({} for {element} in {value_expr})",
                 enum_to_proto_expr(resolved_type, &element)
@@ -1028,8 +1028,8 @@ fn map_value_to_proto_lines(
     let indent = if optional_guard { "    " } else { "" };
     match map_value_type.kind {
         ResolvedFieldKind::Message => {
-            let key = names.fresh("key");
-            let element = names.fresh("value");
+            let key = names.bind("key");
+            let element = names.bind("value");
             lines.push(format!(
                 "{indent}for {key}, {element} in {value_expr}.items():"
             ));
@@ -1044,8 +1044,8 @@ fn map_value_to_proto_lines(
         }
         ResolvedFieldKind::Enum => {
             let mut comprehension = names.child_scope();
-            let key = comprehension.fresh("key");
-            let element = comprehension.fresh("value");
+            let key = comprehension.bind("key");
+            let element = comprehension.bind("value");
             lines.push(format!(
                 "{indent}{message}.{proto_name}.update({{{key}: {} for {key}, {element} in {value_expr}.items()}})",
                 enum_to_proto_expr(map_value_type, &element)
@@ -1154,17 +1154,8 @@ pub(crate) fn python_replacement_type_name(
     replacement.type_name.value().map(str::to_string)
 }
 
-/// Reserve referenced globals before allocating function locals. Conservatively
-/// retaining identifiers also protects authored expressions without rewriting them.
-fn reserve_python_reference(names: &mut NameScope, reference: &str) {
-    for identifier in reference.split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_')) {
-        if !identifier.is_empty() {
-            names.reserve(identifier);
-        }
-    }
-}
-
 fn converter_scope(
+    plan: &PlannedSpec,
     model: &RenderedModel,
     proto_ref: &PythonReference,
     fields: &[ProtoField],
@@ -1173,23 +1164,34 @@ fn converter_scope(
     for name in ["typing", "_support", "ValueError", "bool", "int", "list"] {
         names.reserve(name);
     }
-    reserve_python_reference(&mut names, &model.name);
-    reserve_python_reference(&mut names, &proto_ref.type_ref);
+    names.reserve(&model.name);
+    names.reserve(
+        proto_ref
+            .module_path
+            .split('.')
+            .next()
+            .expect("module root"),
+    );
+    for (_, record) in plan.records() {
+        names.reserve(&record.name);
+        names.reserve(format!("_{}TransferTypeConverter", record.name));
+    }
+    for (_, enumeration) in plan.enums() {
+        names.reserve(&enumeration.name);
+    }
+    for (_, variant) in plan.variants() {
+        names.reserve(&variant.name);
+    }
     for parameter in &model.type_parameters {
         names.reserve(parameter);
     }
     let reserve_type = |names: &mut NameScope, field: &ResolvedFieldType| {
-        reserve_python_reference(names, &field.annotation);
+        for module in &field.imports.module_imports {
+            names.reserve(module.split('.').next().expect("module root"));
+        }
         if let Some(conversion) = &field.wire_conversion {
-            // Template slots are generated expressions, not module bindings.
-            for expr in [&conversion.from_wire, &conversion.to_wire] {
-                reserve_python_reference(
-                    names,
-                    &expr
-                        .replace("{value}", "")
-                        .replace("{wire}", "")
-                        .replace("{type_hint}", ""),
-                );
+            for module in &conversion.imports.module_imports {
+                names.reserve(module.split('.').next().expect("module root"));
             }
         }
     };
@@ -1199,7 +1201,7 @@ fn converter_scope(
     for field in fields {
         if let Some(oneof) = &field.oneof {
             for case in &oneof.cases {
-                reserve_python_reference(&mut names, &case.class_name);
+                names.reserve(&case.class_name);
                 reserve_type(&mut names, &case.payload_type);
             }
         }
@@ -1222,7 +1224,7 @@ fn render_record_wire_block(
         .filter(|field| field.visibility != crate::spec::RecordFieldVisibility::Omitted)
         .map(|field| ModelBackend::analyze_field(api_plan, planned_model, field, resolve_type))
         .collect::<Result<Vec<_>>>()?;
-    let scope = converter_scope(model, &proto_ref, &proto_fields);
+    let scope = converter_scope(api_plan, model, &proto_ref, &proto_fields);
     let converter_model_annotation = if model.type_parameters.is_empty() {
         model.name.clone()
     } else {
@@ -1243,9 +1245,9 @@ fn render_record_wire_block(
     ];
     {
         let mut names = scope.child_scope();
-        let receiver = names.fresh("self");
-        let value = names.fresh("value");
-        let type_hint = names.fresh("type_hint");
+        let receiver = names.bind("self");
+        let value = names.bind("value");
+        let type_hint = names.bind("type_hint");
         let type_arguments = runtime_type_arguments(model, &mut names);
         if !model.fields.is_empty() {
             output.push('\n');
@@ -1350,9 +1352,9 @@ fn render_record_wire_block(
     let wrote_method = true;
     {
         let mut names = scope.child_scope();
-        let receiver = names.fresh("self");
-        let value = names.fresh("value");
-        let message = names.fresh("message");
+        let receiver = names.bind("self");
+        let value = names.bind("value");
+        let message = names.bind("message");
         if model.fields.is_empty() {
             if wrote_method {
                 output.push('\n');
@@ -1532,7 +1534,7 @@ fn oneof_field_read(
     value: &str,
     names: &mut NameScope,
 ) -> RenderedWireRead {
-    let local_var = names.fresh(&format!("_oneof_{attr_name}"));
+    let local_var = names.bind(&format!("_oneof_{attr_name}"));
     let mut annotation = oneof
         .cases
         .iter()
@@ -1583,7 +1585,7 @@ fn oneof_field_read(
     }
     RenderedWireRead {
         setup_lines,
-        expr: local_var,
+        expr: local_var.to_string(),
     }
 }
 
