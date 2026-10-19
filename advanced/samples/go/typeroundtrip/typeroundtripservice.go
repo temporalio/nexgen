@@ -7,6 +7,11 @@ import (
 
 	activity "go.temporal.io/api/activity/v1"
 	command "go.temporal.io/api/command/v1"
+	common "go.temporal.io/api/common/v1"
+	namespace "go.temporal.io/api/namespace/v1"
+	taskqueue "go.temporal.io/api/taskqueue/v1"
+	workflow2 "go.temporal.io/api/workflow/v1"
+	workflowservice "go.temporal.io/api/workflowservice/v1"
 	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/temporal"
@@ -36,6 +41,51 @@ func failureOperation(ctx workflow.Context, request FailureContainer) workflow.F
 	result, resultSettable := workflow.NewFuture(ctx)
 	workflow.Go(ctx, func(ctx workflow.Context) {
 		var value FailureContainer
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
+	})
+	return result
+}
+
+func workflowExecutionInfoOperation(ctx workflow.Context, request WorkflowExecutionInfo) workflow.Future {
+	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
+	fut := c.ExecuteOperation(ctx, "WorkflowExecutionInfoOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value WorkflowExecutionInfo
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
+	})
+	return result
+}
+
+func taskQueuePartitionsOperation(ctx workflow.Context, request TaskQueuePartitions) workflow.Future {
+	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
+	fut := c.ExecuteOperation(ctx, "TaskQueuePartitionsOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value TaskQueuePartitions
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
+	})
+	return result
+}
+
+func badBinariesOperation(ctx workflow.Context, request BadBinaries) workflow.Future {
+	c := workflow.NewNexusClient("temporal-system", "TypeRoundtripService")
+	fut := c.ExecuteOperation(ctx, "BadBinariesOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value BadBinaries
 		if err := fut.Get(ctx, &value); err != nil {
 			resultSettable.SetError(err)
 			return
@@ -189,6 +239,234 @@ func (FailureContainer) TransferTypeConverter() (converter.TransferTypeConverter
 	)
 }
 
+type WorkflowExecutionInfo struct {
+	// Execution - Required.
+	Execution WorkflowExecution
+	// ParentExecution - Optional.
+	ParentExecution *WorkflowExecution
+}
+
+func (m WorkflowExecutionInfo) GetExecution() WorkflowExecution {
+	return m.Execution
+}
+
+func (m WorkflowExecutionInfo) GetParentExecution() *WorkflowExecution {
+	return m.ParentExecution
+}
+
+func workflowExecutionInfoToProto(m *WorkflowExecutionInfo) (*workflow2.WorkflowExecutionInfo, error) {
+	message := &workflow2.WorkflowExecutionInfo{}
+	{
+		converted, err := workflowExecutionToProto(&m.Execution)
+		if err != nil {
+			return nil, err
+		}
+		message.Execution = converted
+	}
+	if m.ParentExecution != nil {
+		converted, err := workflowExecutionToProto(m.ParentExecution)
+		if err != nil {
+			return nil, err
+		}
+		message.ParentExecution = converted
+	}
+	return message, nil
+}
+
+func workflowExecutionInfoFromProto(proto *workflow2.WorkflowExecutionInfo, out *WorkflowExecutionInfo) error {
+	*out = WorkflowExecutionInfo{}
+	if err := workflowExecutionFromProto(proto.GetExecution(), &out.Execution); err != nil {
+		return err
+	}
+	if proto.GetParentExecution() != nil {
+		out.ParentExecution = new(WorkflowExecution)
+		if err := workflowExecutionFromProto(proto.GetParentExecution(), out.ParentExecution); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (WorkflowExecutionInfo) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return converter.NewTransferTypeConverter(
+		workflowExecutionInfoToProto,
+		workflowExecutionInfoFromProto,
+	)
+}
+
+type WorkflowExecution struct {
+	// WorkflowID - Required.
+	WorkflowID string
+	// RunID - Required.
+	RunID string
+}
+
+func (m WorkflowExecution) GetWorkflowID() string {
+	return m.WorkflowID
+}
+
+func (m WorkflowExecution) GetRunID() string {
+	return m.RunID
+}
+
+func workflowExecutionToProto(m *WorkflowExecution) (*common.WorkflowExecution, error) {
+	message := &common.WorkflowExecution{}
+	message.WorkflowId = m.WorkflowID
+	message.RunId = m.RunID
+	return message, nil
+}
+
+func workflowExecutionFromProto(proto *common.WorkflowExecution, out *WorkflowExecution) error {
+	*out = WorkflowExecution{}
+	out.WorkflowID = proto.GetWorkflowId()
+	out.RunID = proto.GetRunId()
+	return nil
+}
+
+type TaskQueuePartitions struct {
+	// WorkflowTaskQueuePartitions - Optional.
+	WorkflowTaskQueuePartitions []TaskQueuePartition
+}
+
+func (m TaskQueuePartitions) GetWorkflowTaskQueuePartitions() []TaskQueuePartition {
+	return m.WorkflowTaskQueuePartitions
+}
+
+func taskQueuePartitionsToProto(m *TaskQueuePartitions) (*workflowservice.ListTaskQueuePartitionsResponse, error) {
+	message := &workflowservice.ListTaskQueuePartitionsResponse{}
+	for _, item := range m.WorkflowTaskQueuePartitions {
+		converted, err := taskQueuePartitionToProto(&item)
+		if err != nil {
+			return nil, err
+		}
+		message.WorkflowTaskQueuePartitions = append(message.WorkflowTaskQueuePartitions, converted)
+	}
+	return message, nil
+}
+
+func taskQueuePartitionsFromProto(proto *workflowservice.ListTaskQueuePartitionsResponse, out *TaskQueuePartitions) error {
+	*out = TaskQueuePartitions{}
+	for _, item := range proto.GetWorkflowTaskQueuePartitions() {
+		var converted TaskQueuePartition
+		if err := taskQueuePartitionFromProto(item, &converted); err != nil {
+			return err
+		}
+		out.WorkflowTaskQueuePartitions = append(out.WorkflowTaskQueuePartitions, converted)
+	}
+	return nil
+}
+
+func (TaskQueuePartitions) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return converter.NewTransferTypeConverter(
+		taskQueuePartitionsToProto,
+		taskQueuePartitionsFromProto,
+	)
+}
+
+type TaskQueuePartition struct {
+	// Key - Required.
+	Key string
+	// OwnerHostName - Required.
+	OwnerHostName string
+}
+
+func (m TaskQueuePartition) GetKey() string {
+	return m.Key
+}
+
+func (m TaskQueuePartition) GetOwnerHostName() string {
+	return m.OwnerHostName
+}
+
+func taskQueuePartitionToProto(m *TaskQueuePartition) (*taskqueue.TaskQueuePartitionMetadata, error) {
+	message := &taskqueue.TaskQueuePartitionMetadata{}
+	message.Key = m.Key
+	message.OwnerHostName = m.OwnerHostName
+	return message, nil
+}
+
+func taskQueuePartitionFromProto(proto *taskqueue.TaskQueuePartitionMetadata, out *TaskQueuePartition) error {
+	*out = TaskQueuePartition{}
+	out.Key = proto.GetKey()
+	out.OwnerHostName = proto.GetOwnerHostName()
+	return nil
+}
+
+type BadBinaries struct {
+	// Binaries - Optional.
+	Binaries map[string]BadBinary
+}
+
+func (m BadBinaries) GetBinaries() map[string]BadBinary {
+	return m.Binaries
+}
+
+func badBinariesToProto(m *BadBinaries) (*namespace.BadBinaries, error) {
+	message := &namespace.BadBinaries{}
+	if len(m.Binaries) > 0 {
+		message.Binaries = make(map[string]*namespace.BadBinaryInfo, len(m.Binaries))
+		for k, v := range m.Binaries {
+			converted, err := badBinaryToProto(&v)
+			if err != nil {
+				return nil, err
+			}
+			message.Binaries[k] = converted
+		}
+	}
+	return message, nil
+}
+
+func badBinariesFromProto(proto *namespace.BadBinaries, out *BadBinaries) error {
+	*out = BadBinaries{}
+	if len(proto.GetBinaries()) > 0 {
+		out.Binaries = make(map[string]BadBinary, len(proto.GetBinaries()))
+		for k, v := range proto.GetBinaries() {
+			var converted BadBinary
+			if err := badBinaryFromProto(v, &converted); err != nil {
+				return err
+			}
+			out.Binaries[k] = converted
+		}
+	}
+	return nil
+}
+
+func (BadBinaries) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return converter.NewTransferTypeConverter(
+		badBinariesToProto,
+		badBinariesFromProto,
+	)
+}
+
+type BadBinary struct {
+	// Reason - Required.
+	Reason string
+	// Operator - Required.
+	Operator string
+}
+
+func (m BadBinary) GetReason() string {
+	return m.Reason
+}
+
+func (m BadBinary) GetOperator() string {
+	return m.Operator
+}
+
+func badBinaryToProto(m *BadBinary) (*namespace.BadBinaryInfo, error) {
+	message := &namespace.BadBinaryInfo{}
+	message.Reason = m.Reason
+	message.Operator = m.Operator
+	return message, nil
+}
+
+func badBinaryFromProto(proto *namespace.BadBinaryInfo, out *BadBinary) error {
+	*out = BadBinary{}
+	out.Reason = proto.GetReason()
+	out.Operator = proto.GetOperator()
+	return nil
+}
+
 type ActivityOptionsOperationOptions struct {
 	// TaskQueue - Optional.
 	TaskQueue string
@@ -225,5 +503,41 @@ type FailureOperationOptions struct {
 func FailureOperation(ctx workflow.Context, opts FailureOperationOptions) workflow.Future {
 	return failureOperation(ctx, FailureContainer{
 		Failure: opts.Failure,
+	})
+}
+
+type WorkflowExecutionInfoOperationOptions struct {
+	// Execution - Required.
+	Execution WorkflowExecution
+	// ParentExecution - Optional.
+	ParentExecution *WorkflowExecution
+}
+
+func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecutionInfoOperationOptions) workflow.Future {
+	return workflowExecutionInfoOperation(ctx, WorkflowExecutionInfo{
+		Execution:       opts.Execution,
+		ParentExecution: opts.ParentExecution,
+	})
+}
+
+type TaskQueuePartitionsOperationOptions struct {
+	// WorkflowTaskQueuePartitions - Optional.
+	WorkflowTaskQueuePartitions []TaskQueuePartition
+}
+
+func TaskQueuePartitionsOperation(ctx workflow.Context, opts TaskQueuePartitionsOperationOptions) workflow.Future {
+	return taskQueuePartitionsOperation(ctx, TaskQueuePartitions{
+		WorkflowTaskQueuePartitions: opts.WorkflowTaskQueuePartitions,
+	})
+}
+
+type BadBinariesOperationOptions struct {
+	// Binaries - Optional.
+	Binaries map[string]BadBinary
+}
+
+func BadBinariesOperation(ctx workflow.Context, opts BadBinariesOperationOptions) workflow.Future {
+	return badBinariesOperation(ctx, BadBinaries{
+		Binaries: opts.Binaries,
 	})
 }

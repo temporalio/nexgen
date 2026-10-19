@@ -197,7 +197,38 @@ impl ModelBackend {
         support_namespace: Option<&str>,
     ) -> String {
         match kind {
-            PlannedType::List(_) | PlannedType::Map(_, _) => source_expr.to_string(),
+            PlannedType::List(value) => {
+                let converted =
+                    self.field_kind_to_wire_expr(value, "item", false, api_plan, support_namespace);
+                format!("System.Linq.Enumerable.Select({source_expr}, item => {converted})")
+            }
+            PlannedType::Map(key, value) => {
+                let key = self.field_kind_to_wire_expr(
+                    key,
+                    "entry.Key",
+                    false,
+                    api_plan,
+                    support_namespace,
+                );
+                let value = self.field_kind_to_wire_expr(
+                    value,
+                    "entry.Value",
+                    false,
+                    api_plan,
+                    support_namespace,
+                );
+                format!(
+                    "System.Linq.Enumerable.ToDictionary({source_expr}, entry => {key}, entry => {value})"
+                )
+            }
+            PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec { target, .. })) => self
+                .field_kind_to_wire_expr(
+                    target,
+                    source_expr,
+                    optional,
+                    api_plan,
+                    support_namespace,
+                ),
             value => self.value_to_wire_expr(
                 value,
                 source_expr,
@@ -637,18 +668,15 @@ fn render_model_transfer_converter(
     output.push_str(&raw_type);
     output.push_str("();\n");
     for (field_name, sourced_field, _source_expr) in model.sourced_fields() {
-        output.push_str("        proto.");
-        output.push_str(&csharp_type_name(field_name));
-        output.push_str(" = ");
-        let source_expr = crate::generator::dotnet::field_property_name(sourced_field);
-        output.push_str(&backend.field_kind_to_wire_expr(
-            &sourced_field.field_type,
-            &source_expr,
-            false,
+        render_field_to_proto_assignment(
+            backend,
+            output,
+            model,
+            field_name,
+            sourced_field,
             api_plan,
             support_namespace,
-        ));
-        output.push_str(";\n");
+        );
     }
     for (field_name, field) in model.model_fields() {
         render_field_to_proto_assignment(
@@ -1096,6 +1124,28 @@ fn value_from_wire_expr(
                 support_namespace,
             )
         }
+        PlannedType::List(value) => {
+            let converted =
+                value_from_wire_expr(value, "item", false, None, api_plan, support_namespace);
+            format!(
+                "System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select({source_expr}, item => {converted}))"
+            )
+        }
+        PlannedType::Map(key, value) => {
+            let key =
+                value_from_wire_expr(key, "entry.Key", false, None, api_plan, support_namespace);
+            let value = value_from_wire_expr(
+                value,
+                "entry.Value",
+                false,
+                None,
+                api_plan,
+                support_namespace,
+            );
+            format!(
+                "System.Linq.Enumerable.ToDictionary({source_expr}, entry => {key}, entry => {value})"
+            )
+        }
         _ => source_expr.to_string(),
     }
 }
@@ -1185,10 +1235,16 @@ fn render_field_to_proto_assignment(
         return;
     }
     let target = format!("proto.{}", csharp_type_name(field_name));
+    let collection = matches!(
+        field.field_type.validation_type(),
+        PlannedType::List(_) | PlannedType::Map(_, _)
+    );
+    let assignment = if collection { ".Add(" } else { " = " };
+    let end = if collection { ");\n" } else { ";\n" };
     if field.required {
         output.push_str("        ");
         output.push_str(&target);
-        output.push_str(" = ");
+        output.push_str(assignment);
         output.push_str(&field_to_proto_expr(
             backend,
             model,
@@ -1198,7 +1254,7 @@ fn render_field_to_proto_assignment(
             api_plan,
             support_namespace,
         ));
-        output.push_str(";\n");
+        output.push_str(end);
     } else {
         output.push_str("        if (");
         output.push_str(&source_expr);
@@ -1207,7 +1263,7 @@ fn render_field_to_proto_assignment(
         output.push_str(")\n        {\n");
         output.push_str("            ");
         output.push_str(&target);
-        output.push_str(" = ");
+        output.push_str(assignment);
         output.push_str(&field_to_proto_expr(
             backend,
             model,
@@ -1217,7 +1273,7 @@ fn render_field_to_proto_assignment(
             api_plan,
             support_namespace,
         ));
-        output.push_str(";\n");
+        output.push_str(end);
         if let Some(default_expr) = default_enum_proto_expr(field) {
             output.push_str("        }\n        else\n        {\n            ");
             output.push_str(&target);

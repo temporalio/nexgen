@@ -74,6 +74,93 @@ namespace Nexgen.TypeRoundtripService
 
     }
 
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(BadBinaries.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record BadBinaries
+    {
+        public IReadOnlyDictionary<string, BadBinary>? Binaries { get; init; }
+
+        internal static BadBinaries FromTransferType(Temporalio.Api.Namespace.V1.BadBinaries wire)
+        {
+            return new BadBinaries()
+            {
+                Binaries = System.Linq.Enumerable.ToDictionary(wire.Binaries, entry => entry.Key, entry => BadBinary.FromTransferType(entry.Value)),
+            };
+        }
+
+        internal Temporalio.Api.Namespace.V1.BadBinaries ToTransferType()
+        {
+            var proto = new Temporalio.Api.Namespace.V1.BadBinaries();
+            if (Binaries is { } binaries)
+            {
+                proto.Binaries.Add(System.Linq.Enumerable.ToDictionary(binaries, entry => entry.Key, entry => (Temporalio.Api.Namespace.V1.BadBinaryInfo)entry.Value.ToTransferType()));
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Namespace.V1.BadBinaries);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((BadBinaries)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : BadBinaries.FromTransferType((Temporalio.Api.Namespace.V1.BadBinaries)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(BadBinary.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record BadBinary
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BadBinary"/> class.
+        /// </summary>
+        public BadBinary(string reason, string @operator)
+        {
+            Reason = reason;
+            Operator = @operator;
+        }
+
+        public string Reason { get; init; }
+        public string Operator { get; init; }
+
+        internal static BadBinary FromTransferType(Temporalio.Api.Namespace.V1.BadBinaryInfo wire)
+        {
+            return new BadBinary(wire.Reason, wire.Operator);
+        }
+
+        internal Temporalio.Api.Namespace.V1.BadBinaryInfo ToTransferType()
+        {
+            var proto = new Temporalio.Api.Namespace.V1.BadBinaryInfo();
+            proto.Reason = Reason;
+            proto.Operator = Operator;
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Namespace.V1.BadBinaryInfo);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((BadBinary)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : BadBinary.FromTransferType((Temporalio.Api.Namespace.V1.BadBinaryInfo)transferType);
+        }
+
+    }
+
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(FailureContainer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record FailureContainer
@@ -111,6 +198,190 @@ namespace Nexgen.TypeRoundtripService
 
             /// <summary>Converts a transfer-type value to this model.</summary>
             public object? FromTransferType(object? transferType) => transferType is null ? null : FailureContainer.FromTransferType((Temporalio.Api.Command.V1.FailWorkflowExecutionCommandAttributes)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(TaskQueuePartition.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record TaskQueuePartition
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TaskQueuePartition"/> class.
+        /// </summary>
+        public TaskQueuePartition(string key, string ownerHostName)
+        {
+            Key = key;
+            OwnerHostName = ownerHostName;
+        }
+
+        public string Key { get; init; }
+        public string OwnerHostName { get; init; }
+
+        internal static TaskQueuePartition FromTransferType(Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata wire)
+        {
+            return new TaskQueuePartition(wire.Key, wire.OwnerHostName);
+        }
+
+        internal Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata ToTransferType()
+        {
+            var proto = new Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata();
+            proto.Key = Key;
+            proto.OwnerHostName = OwnerHostName;
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((TaskQueuePartition)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : TaskQueuePartition.FromTransferType((Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(TaskQueuePartitions.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record TaskQueuePartitions
+    {
+        public IReadOnlyList<TaskQueuePartition>? WorkflowTaskQueuePartitions { get; init; }
+
+        internal static TaskQueuePartitions FromTransferType(Temporalio.Api.WorkflowService.V1.ListTaskQueuePartitionsResponse wire)
+        {
+            return new TaskQueuePartitions()
+            {
+                WorkflowTaskQueuePartitions = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.WorkflowTaskQueuePartitions, item => TaskQueuePartition.FromTransferType(item))),
+            };
+        }
+
+        internal Temporalio.Api.WorkflowService.V1.ListTaskQueuePartitionsResponse ToTransferType()
+        {
+            var proto = new Temporalio.Api.WorkflowService.V1.ListTaskQueuePartitionsResponse();
+            if (WorkflowTaskQueuePartitions is { } workflowTaskQueuePartitions)
+            {
+                proto.WorkflowTaskQueuePartitions.Add(System.Linq.Enumerable.Select(workflowTaskQueuePartitions, item => (Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata)item.ToTransferType()));
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.WorkflowService.V1.ListTaskQueuePartitionsResponse);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((TaskQueuePartitions)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : TaskQueuePartitions.FromTransferType((Temporalio.Api.WorkflowService.V1.ListTaskQueuePartitionsResponse)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(WorkflowExecution.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record WorkflowExecution
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WorkflowExecution"/> class.
+        /// </summary>
+        public WorkflowExecution(string workflowId, string runId)
+        {
+            WorkflowId = workflowId;
+            RunId = runId;
+        }
+
+        public string WorkflowId { get; init; }
+        public string RunId { get; init; }
+
+        internal static WorkflowExecution FromTransferType(Temporalio.Api.Common.V1.WorkflowExecution wire)
+        {
+            return new WorkflowExecution(wire.WorkflowId, wire.RunId);
+        }
+
+        internal Temporalio.Api.Common.V1.WorkflowExecution ToTransferType()
+        {
+            var proto = new Temporalio.Api.Common.V1.WorkflowExecution();
+            proto.WorkflowId = WorkflowId;
+            proto.RunId = RunId;
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Common.V1.WorkflowExecution);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((WorkflowExecution)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : WorkflowExecution.FromTransferType((Temporalio.Api.Common.V1.WorkflowExecution)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(WorkflowExecutionInfo.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record WorkflowExecutionInfo
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WorkflowExecutionInfo"/> class.
+        /// </summary>
+        public WorkflowExecutionInfo(WorkflowExecution execution)
+        {
+            Execution = execution;
+        }
+
+        public WorkflowExecution Execution { get; init; }
+        public WorkflowExecution? ParentExecution { get; init; }
+
+        internal static WorkflowExecutionInfo FromTransferType(Temporalio.Api.Workflow.V1.WorkflowExecutionInfo wire)
+        {
+            return new WorkflowExecutionInfo(WorkflowExecution.FromTransferType(wire.Execution))
+            {
+                ParentExecution = wire.ParentExecution == null ? null : WorkflowExecution.FromTransferType(wire.ParentExecution),
+            };
+        }
+
+        internal Temporalio.Api.Workflow.V1.WorkflowExecutionInfo ToTransferType()
+        {
+            var proto = new Temporalio.Api.Workflow.V1.WorkflowExecutionInfo();
+            proto.Execution = (Temporalio.Api.Common.V1.WorkflowExecution)Execution.ToTransferType();
+            if (ParentExecution is { } parentExecution)
+            {
+                proto.ParentExecution = (Temporalio.Api.Common.V1.WorkflowExecution)parentExecution.ToTransferType();
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Workflow.V1.WorkflowExecutionInfo);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((WorkflowExecutionInfo)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : WorkflowExecutionInfo.FromTransferType((Temporalio.Api.Workflow.V1.WorkflowExecutionInfo)transferType);
         }
 
     }

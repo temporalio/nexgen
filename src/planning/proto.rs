@@ -123,9 +123,10 @@ pub(crate) fn relative_descriptor_name(full_name: &str, package: &str) -> String
 }
 
 fn field_has_presence(field: &FieldDescriptorProto, field_type: Option<Type>) -> bool {
-    matches!(field_type, Some(Type::Message))
-        || field.proto3_optional.unwrap_or(false)
-        || field.oneof_index.is_some()
+    field_label(field) != Some(Label::Repeated)
+        && (matches!(field_type, Some(Type::Message))
+            || field.proto3_optional.unwrap_or(false)
+            || field.oneof_index.is_some())
 }
 
 fn field_label(field: &FieldDescriptorProto) -> Option<Label> {

@@ -121,6 +121,26 @@ impl ModelBackend {
         support_package: Option<String>,
     ) -> Self {
         let mut imports = GoImportCollector::default();
+        // Generated code uses fixed SDK and standard-library import names.
+        // Reserve them before assigning aliases to protobuf packages.
+        imports.used_aliases.extend(
+            [
+                "context",
+                "errors",
+                "fmt",
+                "reflect",
+                "runtime",
+                "strings",
+                "time",
+                "workflow",
+                "converter",
+                "commonconverter",
+                "internal",
+                "nexus",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        );
         if support_package.is_some() {
             imports.used_aliases.insert("support".to_string());
         }
@@ -220,11 +240,10 @@ impl ModelBackend {
                 .package
                 .is_self_import("go.temporal.io/sdk/internal/common/converter")
         {
-            self.imports.borrow_mut().register(&GoProtoRef {
-                import_path: "go.temporal.io/sdk/internal/common/converter".to_string(),
-                alias: "commonconverter".to_string(),
-                type_name: "SystemNexusConfig".to_string(),
-            });
+            self.imports.borrow_mut().by_path.insert(
+                "go.temporal.io/sdk/internal/common/converter".to_string(),
+                "commonconverter".to_string(),
+            );
         }
         self.wire_models.borrow_mut().insert(key, wire);
     }

@@ -38,6 +38,33 @@ namespace Nexgen.TypeRoundtripService
         public System.Exception? Failure { get; set; }
     }
 
+    [GeneratedCode("nexgen", null)]
+    public class WorkflowExecutionInfoOperationOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WorkflowExecutionInfoOperationOptions"/> class.
+        /// </summary>
+        public WorkflowExecutionInfoOperationOptions(WorkflowExecution execution)
+        {
+            Execution = execution;
+        }
+
+        public WorkflowExecution Execution { get; set; }
+        public WorkflowExecution? ParentExecution { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class TaskQueuePartitionsOperationOptions
+    {
+        public IReadOnlyList<TaskQueuePartition>? WorkflowTaskQueuePartitions { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class BadBinariesOperationOptions
+    {
+        public IReadOnlyDictionary<string, BadBinary>? Binaries { get; set; }
+    }
+
     /// <summary>
     /// Provides generated workflow operation helpers.
     /// </summary>
@@ -85,6 +112,63 @@ namespace Nexgen.TypeRoundtripService
                 Failure = options?.Failure,
             };
             return FailureOperationAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<WorkflowExecutionInfo> WorkflowExecutionInfoOperationAsync(WorkflowExecutionInfo request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeRoundtripService>(TypeRoundtripServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<WorkflowExecutionInfo>(svc => svc.WorkflowExecutionInfoOperation(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<WorkflowExecutionInfo> WorkflowExecutionInfoOperationAsync(WorkflowExecutionInfoOperationOptions options)
+        {
+            var request = new WorkflowExecutionInfo(options.Execution)
+            {
+                ParentExecution = options.ParentExecution,
+            };
+            return WorkflowExecutionInfoOperationAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<TaskQueuePartitions> TaskQueuePartitionsOperationAsync(TaskQueuePartitions request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeRoundtripService>(TypeRoundtripServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<TaskQueuePartitions>(svc => svc.TaskQueuePartitionsOperation(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<TaskQueuePartitions> TaskQueuePartitionsOperationAsync(TaskQueuePartitionsOperationOptions? options = null)
+        {
+            var request = new TaskQueuePartitions()
+            {
+                WorkflowTaskQueuePartitions = options?.WorkflowTaskQueuePartitions,
+            };
+            return TaskQueuePartitionsOperationAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<BadBinaries> BadBinariesOperationAsync(BadBinaries request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeRoundtripService>(TypeRoundtripServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<BadBinaries>(svc => svc.BadBinariesOperation(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<BadBinaries> BadBinariesOperationAsync(BadBinariesOperationOptions? options = null)
+        {
+            var request = new BadBinaries()
+            {
+                Binaries = options?.Binaries,
+            };
+            return BadBinariesOperationAsync(request);
         }
 
     }

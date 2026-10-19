@@ -2,4 +2,13 @@
 
 export { activityOptionsOperation } from "./operations/activity-options-operation";
 export { failureOperation } from "./operations/failure-operation";
-export type { ActivityOptions, FailureContainer } from "./models";
+export { workflowExecutionInfoOperation } from "./operations/workflow-execution-info-operation";
+export { taskQueuePartitionsOperation } from "./operations/task-queue-partitions-operation";
+export { badBinariesOperation } from "./operations/bad-binaries-operation";
+export type {
+  ActivityOptions,
+  BadBinaries,
+  FailureContainer,
+  TaskQueuePartitions,
+  WorkflowExecutionInfo,
+} from "./models";

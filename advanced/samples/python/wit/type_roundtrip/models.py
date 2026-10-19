@@ -8,6 +8,11 @@ import datetime
 import temporalio.common
 import temporalio.api.activity.v1.message_pb2
 import temporalio.api.command.v1.message_pb2
+import temporalio.api.common.v1.message_pb2
+import temporalio.api.namespace.v1.message_pb2
+import temporalio.api.taskqueue.v1.message_pb2
+import temporalio.api.workflow.v1.message_pb2
+import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.converter
 
 import temporal_support as _support
@@ -122,4 +127,313 @@ class _FailureContainerTransferTypeConverter(
 
 temporalio.converter.transfer_type_convertible(_FailureContainerTransferTypeConverter)(
     FailureContainer
+)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class WorkflowExecutionInfo:
+    execution: WorkflowExecution
+    parent_execution: WorkflowExecution | None = None
+
+
+class _WorkflowExecutionInfoTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        WorkflowExecutionInfo,
+        temporalio.api.workflow.v1.message_pb2.WorkflowExecutionInfo,
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.workflow.v1.message_pb2.WorkflowExecutionInfo] | None
+    ) = temporalio.api.workflow.v1.message_pb2.WorkflowExecutionInfo
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.workflow.v1.message_pb2.WorkflowExecutionInfo,
+        type_hint: type[WorkflowExecutionInfo],
+    ) -> WorkflowExecutionInfo:
+        if not value.HasField("execution"):
+            raise ValueError("missing required field WorkflowExecutionInfo.execution")
+        execution = _WorkflowExecutionTransferTypeConverter().from_transfer_type(
+            value.execution, WorkflowExecution
+        )
+        return WorkflowExecutionInfo(
+            execution=execution,
+            parent_execution=_WorkflowExecutionTransferTypeConverter().from_transfer_type(
+                value.parent_execution, WorkflowExecution
+            )
+            if value.HasField("parent_execution")
+            else None,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: WorkflowExecutionInfo,
+    ) -> temporalio.api.workflow.v1.message_pb2.WorkflowExecutionInfo:
+        message = temporalio.api.workflow.v1.message_pb2.WorkflowExecutionInfo()
+        message.execution.CopyFrom(
+            _WorkflowExecutionTransferTypeConverter().to_transfer_type(value.execution)
+        )
+        if value.parent_execution is not None:
+            message.parent_execution.CopyFrom(
+                _WorkflowExecutionTransferTypeConverter().to_transfer_type(
+                    value.parent_execution
+                )
+            )
+        return message
+
+
+temporalio.converter.transfer_type_convertible(
+    _WorkflowExecutionInfoTransferTypeConverter
+)(WorkflowExecutionInfo)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class WorkflowExecution:
+    workflow_id: str
+    run_id: str
+
+
+class _WorkflowExecutionTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        WorkflowExecution, temporalio.api.common.v1.message_pb2.WorkflowExecution
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.common.v1.message_pb2.WorkflowExecution] | None
+    ) = temporalio.api.common.v1.message_pb2.WorkflowExecution
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.common.v1.message_pb2.WorkflowExecution,
+        type_hint: type[WorkflowExecution],
+    ) -> WorkflowExecution:
+        if not value.workflow_id:
+            raise ValueError("missing required field WorkflowExecution.workflow_id")
+        workflow_id = value.workflow_id
+        if not value.run_id:
+            raise ValueError("missing required field WorkflowExecution.run_id")
+        run_id = value.run_id
+        return WorkflowExecution(
+            workflow_id=workflow_id,
+            run_id=run_id,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: WorkflowExecution,
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        message = temporalio.api.common.v1.message_pb2.WorkflowExecution()
+        message.workflow_id = value.workflow_id
+        message.run_id = value.run_id
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_WorkflowExecutionTransferTypeConverter)(
+    WorkflowExecution
+)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class TaskQueuePartitions:
+    workflow_task_queue_partitions: list[TaskQueuePartition] | None = dataclasses.field(
+        default_factory=list
+    )
+
+
+class _TaskQueuePartitionsTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        TaskQueuePartitions,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
+    ]
+):
+    transfer_type: (
+        type[
+            temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse
+        ]
+        | None
+    ) = temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
+        type_hint: type[TaskQueuePartitions],
+    ) -> TaskQueuePartitions:
+        return TaskQueuePartitions(
+            workflow_task_queue_partitions=[
+                _TaskQueuePartitionTransferTypeConverter().from_transfer_type(
+                    item, TaskQueuePartition
+                )
+                for item in value.workflow_task_queue_partitions
+            ],
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: TaskQueuePartitions,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse:
+        message = temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse()
+        if value.workflow_task_queue_partitions:
+            for element in value.workflow_task_queue_partitions:
+                item = message.workflow_task_queue_partitions.add()
+                item.CopyFrom(
+                    _TaskQueuePartitionTransferTypeConverter().to_transfer_type(element)
+                )
+        return message
+
+
+temporalio.converter.transfer_type_convertible(
+    _TaskQueuePartitionsTransferTypeConverter
+)(TaskQueuePartitions)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class TaskQueuePartition:
+    key: str
+    owner_host_name: str
+
+
+class _TaskQueuePartitionTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        TaskQueuePartition,
+        temporalio.api.taskqueue.v1.message_pb2.TaskQueuePartitionMetadata,
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.taskqueue.v1.message_pb2.TaskQueuePartitionMetadata] | None
+    ) = temporalio.api.taskqueue.v1.message_pb2.TaskQueuePartitionMetadata
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.taskqueue.v1.message_pb2.TaskQueuePartitionMetadata,
+        type_hint: type[TaskQueuePartition],
+    ) -> TaskQueuePartition:
+        if not value.key:
+            raise ValueError("missing required field TaskQueuePartition.key")
+        key = value.key
+        if not value.owner_host_name:
+            raise ValueError(
+                "missing required field TaskQueuePartition.owner_host_name"
+            )
+        owner_host_name = value.owner_host_name
+        return TaskQueuePartition(
+            key=key,
+            owner_host_name=owner_host_name,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: TaskQueuePartition,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueuePartitionMetadata:
+        message = temporalio.api.taskqueue.v1.message_pb2.TaskQueuePartitionMetadata()
+        message.key = value.key
+        message.owner_host_name = value.owner_host_name
+        return message
+
+
+temporalio.converter.transfer_type_convertible(
+    _TaskQueuePartitionTransferTypeConverter
+)(TaskQueuePartition)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class BadBinaries:
+    binaries: dict[str, BadBinary] | None = dataclasses.field(default_factory=dict)
+
+
+class _BadBinariesTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        BadBinaries, temporalio.api.namespace.v1.message_pb2.BadBinaries
+    ]
+):
+    transfer_type: type[temporalio.api.namespace.v1.message_pb2.BadBinaries] | None = (
+        temporalio.api.namespace.v1.message_pb2.BadBinaries
+    )
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.namespace.v1.message_pb2.BadBinaries,
+        type_hint: type[BadBinaries],
+    ) -> BadBinaries:
+        return BadBinaries(
+            binaries={
+                key: _BadBinaryTransferTypeConverter().from_transfer_type(
+                    item, BadBinary
+                )
+                for key, item in value.binaries.items()
+            },
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: BadBinaries,
+    ) -> temporalio.api.namespace.v1.message_pb2.BadBinaries:
+        message = temporalio.api.namespace.v1.message_pb2.BadBinaries()
+        if value.binaries:
+            for key, element in value.binaries.items():
+                message.binaries[key].CopyFrom(
+                    _BadBinaryTransferTypeConverter().to_transfer_type(element)
+                )
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_BadBinariesTransferTypeConverter)(
+    BadBinaries
+)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class BadBinary:
+    reason: str
+    operator: str
+
+
+class _BadBinaryTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        BadBinary, temporalio.api.namespace.v1.message_pb2.BadBinaryInfo
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.namespace.v1.message_pb2.BadBinaryInfo] | None
+    ) = temporalio.api.namespace.v1.message_pb2.BadBinaryInfo
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.namespace.v1.message_pb2.BadBinaryInfo,
+        type_hint: type[BadBinary],
+    ) -> BadBinary:
+        if not value.reason:
+            raise ValueError("missing required field BadBinary.reason")
+        reason = value.reason
+        if not value.operator:
+            raise ValueError("missing required field BadBinary.operator")
+        operator = value.operator
+        return BadBinary(
+            reason=reason,
+            operator=operator,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: BadBinary,
+    ) -> temporalio.api.namespace.v1.message_pb2.BadBinaryInfo:
+        message = temporalio.api.namespace.v1.message_pb2.BadBinaryInfo()
+        message.reason = value.reason
+        message.operator = value.operator
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_BadBinaryTransferTypeConverter)(
+    BadBinary
 )  # pyright: ignore[reportUnusedCallResult]
