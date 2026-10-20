@@ -1975,17 +1975,22 @@ public API; no handwritten options class or operation wrapper is required.
 
 Records use constructors, getters, and builders. Enums are Java enums, flags are
 `EnumSet` values, variants and results are tagged values, and tuples use
-generated classes. Generic arguments propagate through nested records and
-protobuf payload carriers. Protobuf-backed models declare a Temporal transfer
-converter and expose `toProto` and `fromProto` methods for explicit conversion.
-Transfer converters obtain the active `DataConverter` by calling
-`currentDataConverter()` on the configured support class. The SDK owns converter
-scoping; system Nexus conversion fails when no user converter context is active.
+generated classes. Generic arguments propagate through native models.
+Protobuf-backed models declare a Temporal transfer converter and expose
+`toProto()` and `fromProto(proto)` for structural conversion. Embedded payloads
+remain serialized: Java models use protobuf `Payload`, `Payloads`, `Memo`,
+`Header`, `SearchAttributes`, and `Failure` representations. Even fields
+authored with a generic value type retain the serialized carrier when their
+protobuf field is a payload. Transfer conversion neither invokes a user
+converter nor requires payload type hints or a converter scope. API code
+serializes user values before constructing the model and decodes results when it
+has the expected types. `Payloads` remains an opaque batch so packing codecs can
+change the payload count without affecting model conversion.
 
 Use `java`, `java-from`, and `java-to` on `@nexus.type` for native SDK mappings.
-Conversion helpers receive the active `DataConverter` followed by the value.
-Sourced-field helpers remain ordinary calls relative to the support class, while
-serialization-context helpers receive the generated operation request.
+Structural conversion helpers receive only the value. Sourced-field helpers
+remain ordinary calls relative to the support class, while serialization-context
+helpers receive the generated operation request.
 
 `NexgenRuntime` is generated Java runtime code. It is separate from the
 user-owned class selected by `--support-package`; the Rust Java backend emits

@@ -65,28 +65,21 @@ public final class WorkflowExecutionInfo {
     }
   }
 
-  public io.temporal.api.workflow.v1.WorkflowExecutionInfo toProto(
-      io.temporal.common.converter.DataConverter converter) {
+  public io.temporal.api.workflow.v1.WorkflowExecutionInfo toProto() {
     io.temporal.api.workflow.v1.WorkflowExecutionInfo.Builder proto =
         io.temporal.api.workflow.v1.WorkflowExecutionInfo.newBuilder();
-    if (this.execution != null) proto.setExecution((this.execution).toProto(converter));
-    if (this.parentExecution != null)
-      proto.setParentExecution((this.parentExecution).toProto(converter));
+    if (this.execution != null) proto.setExecution((this.execution).toProto());
+    if (this.parentExecution != null) proto.setParentExecution((this.parentExecution).toProto());
     return proto.build();
   }
 
   public static WorkflowExecutionInfo fromProto(
-      io.temporal.api.workflow.v1.WorkflowExecutionInfo proto,
-      io.temporal.common.converter.DataConverter converter,
-      java.lang.reflect.Type modelType) {
+      io.temporal.api.workflow.v1.WorkflowExecutionInfo proto) {
     Builder builder = WorkflowExecutionInfo.newBuilder();
-    builder.setExecution(
-        wit.typeroundtrip.WorkflowExecution.fromProto(
-            proto.getExecution(), converter, wit.typeroundtrip.WorkflowExecution.class));
+    builder.setExecution(wit.typeroundtrip.WorkflowExecution.fromProto(proto.getExecution()));
     if (proto.hasParentExecution())
       builder.setParentExecution(
-          wit.typeroundtrip.WorkflowExecution.fromProto(
-              proto.getParentExecution(), converter, wit.typeroundtrip.WorkflowExecution.class));
+          wit.typeroundtrip.WorkflowExecution.fromProto(proto.getParentExecution()));
     return builder.build();
   }
 
@@ -97,18 +90,13 @@ public final class WorkflowExecutionInfo {
     }
 
     public Object toTransferType(WorkflowExecutionInfo value) {
-      return value == null
-          ? null
-          : value.toProto(support.TemporalModelConverters.currentDataConverter());
+      return value == null ? null : value.toProto();
     }
 
     public WorkflowExecutionInfo fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto(
-              (io.temporal.api.workflow.v1.WorkflowExecutionInfo) value,
-              support.TemporalModelConverters.currentDataConverter(),
-              valueType);
+          : fromProto((io.temporal.api.workflow.v1.WorkflowExecutionInfo) value);
     }
   }
 }

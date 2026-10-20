@@ -2,7 +2,7 @@
 package wit.protooneof;
 
 @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = OutcomeValue.Deserializer.class)
-public final class OutcomeValue<OutputT> {
+public final class OutcomeValue {
   public enum Tag {
     @com.fasterxml.jackson.annotation.JsonProperty("success")
     SUCCESS,
@@ -26,12 +26,12 @@ public final class OutcomeValue<OutputT> {
     return value;
   }
 
-  public static <OutputT> OutcomeValue<OutputT> success(OutputT value) {
-    return new OutcomeValue<OutputT>(Tag.SUCCESS, value);
+  public static OutcomeValue success(io.temporal.api.common.v1.Payloads value) {
+    return new OutcomeValue(Tag.SUCCESS, value);
   }
 
-  public static <OutputT> OutcomeValue<OutputT> failure(RuntimeException value) {
-    return new OutcomeValue<OutputT>(Tag.FAILURE, value);
+  public static OutcomeValue failure(io.temporal.api.failure.v1.Failure value) {
+    return new OutcomeValue(Tag.FAILURE, value);
   }
 
   public static final class Deserializer
@@ -61,11 +61,14 @@ public final class OutcomeValue<OutputT> {
       switch (node.get("tag").asText()) {
         case "success":
           return OutcomeValue.success(
-              context.readTreeAsValue(node.get("value"), modelType.containedTypeOrUnknown(0)));
+              context.readTreeAsValue(
+                  node.get("value"),
+                  context.constructType(io.temporal.api.common.v1.Payloads.class)));
         case "failure":
           return OutcomeValue.failure(
               context.readTreeAsValue(
-                  node.get("value"), context.constructType(RuntimeException.class)));
+                  node.get("value"),
+                  context.constructType(io.temporal.api.failure.v1.Failure.class)));
         default:
           throw new java.io.IOException("Unknown variant tag: " + node.get("tag"));
       }

@@ -98,6 +98,7 @@ fn generate_api(
                     .or_insert_with(|| entry.clone());
             }
         }
+        preserve_embedded_payloads(&mut resolved_spec);
         let ctx = Context {
             spec: &resolved_spec,
             package: &pkg,
@@ -121,7 +122,8 @@ fn generate_api(
                 ),
             )
         };
-        for entry in leaf.spec.types.values() {
+        for key in leaf.spec.types.keys() {
+            let entry = &resolved_spec.types[key];
             match &entry.declaration {
                 TypeDeclSpec::Record(record) => {
                     insert(&record.name.to_upper_camel_case(), ctx.record(record))?
@@ -243,6 +245,91 @@ fn generate_api(
         files: files.into_files(),
         warnings: Vec::new(),
     })
+}
+
+/// A protobuf payload carrier stays opaque even when the authored field uses a
+/// generic value type. Java API code owns serialization before model construction.
+fn preserve_embedded_payloads(spec: &mut PlannedSpec) {
+    let mut variant_payloads = BTreeMap::new();
+    for entry in spec.types.values_mut() {
+        let TypeDeclSpec::Record(record) = &mut entry.declaration else {
+            continue;
+        };
+        for field in record.fields.values_mut() {
+            match &field.data.wire_binding {
+                Some(PlannedWireFieldBinding::Value { wire_type, .. }) => {
+                    if let Some(opaque) = serialized_field_type(&field.field_type, wire_type) {
+                        field.field_type = opaque;
+                        field.annotation = None;
+                    }
+                }
+                Some(PlannedWireFieldBinding::VariantMembers { members, .. }) => {
+                    if let TypeSpec::Variant(variant) = field.field_type.without_option() {
+                        for member in members {
+                            variant_payloads.insert(
+                                (variant.full_name.clone(), member.wire_name.clone()),
+                                member.wire_type.clone(),
+                            );
+                        }
+                    }
+                }
+                None => {}
+            }
+        }
+    }
+    for entry in spec.types.values_mut() {
+        if let TypeDeclSpec::Variant(variant) = &mut entry.declaration {
+            for case in &mut variant.cases {
+                if let (Some(payload), Some(wire)) = (
+                    &case.payload,
+                    variant_payloads.get(&(variant.full_name.clone(), case.wire_name.clone())),
+                ) {
+                    if let Some(opaque) = serialized_field_type(payload, wire) {
+                        case.payload = Some(opaque);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn serialized_field_type(ty: &PlannedType, wire: &PlannedType) -> Option<PlannedType> {
+    if let TypeSpec::Option(inner) = ty {
+        return serialized_field_type(inner, wire).map(|opaque| TypeSpec::Option(Box::new(opaque)));
+    }
+    match wire.without_option() {
+        TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message)))
+            if matches!(
+                message.proto.full_name.as_str(),
+                "temporal.api.common.v1.Payload"
+                    | "temporal.api.common.v1.Payloads"
+                    | "temporal.api.failure.v1.Failure"
+            ) =>
+        {
+            Some(wire.without_option().clone())
+        }
+        TypeSpec::List(wire_inner) => match ty {
+            TypeSpec::List(inner) => serialized_field_type(inner, wire_inner)
+                .map(|opaque| TypeSpec::List(Box::new(opaque))),
+            _ => None,
+        },
+        TypeSpec::Map(wire_key, wire_value) => match ty {
+            TypeSpec::Map(key, value) => {
+                let opaque_key = serialized_field_type(key, wire_key);
+                let opaque_value = serialized_field_type(value, wire_value);
+                if opaque_key.is_none() && opaque_value.is_none() {
+                    None
+                } else {
+                    Some(TypeSpec::Map(
+                        Box::new(opaque_key.unwrap_or_else(|| key.as_ref().clone())),
+                        Box::new(opaque_value.unwrap_or_else(|| value.as_ref().clone())),
+                    ))
+                }
+            }
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 struct Context<'a> {
@@ -786,7 +873,7 @@ impl Context<'_> {
         )
         .unwrap();
         if let Some(proto) = &record.data.proto {
-            out.push_str(&self.proto_record(record, &name, &args, &params, proto));
+            out.push_str(&self.proto_record(record, &name, &args, proto));
         }
         out.push_str("}\n");
         out
@@ -796,14 +883,11 @@ impl Context<'_> {
         record: &Record,
         name: &str,
         args: &str,
-        params: &[TypeParameterUsage],
         proto: &PlannedProtoTypeInfo,
     ) -> String {
         let p = proto_name(proto);
-        let converter = self.helper("currentDataConverter()");
-        let mut out = format!(
-            "  public {p} toProto(io.temporal.common.converter.DataConverter converter) {{\n    {p}.Builder proto = {p}.newBuilder();\n"
-        );
+        let mut out =
+            format!("  public {p} toProto() {{\n    {p}.Builder proto = {p}.newBuilder();\n");
         for f in record.fields.values() {
             if matches!(f.visibility, RecordFieldVisibility::Omitted) {
                 continue;
@@ -862,7 +946,7 @@ impl Context<'_> {
             }
         }
         out.push_str("    return proto.build();\n  }\n");
-        writeln!(out, "  public static {args} {name}{args} fromProto({p} proto, io.temporal.common.converter.DataConverter converter, java.lang.reflect.Type modelType) {{\n    Builder{args} builder = {name}.{args}newBuilder();").unwrap();
+        writeln!(out, "  public static {args} {name}{args} fromProto({p} proto) {{\n    Builder{args} builder = {name}.{args}newBuilder();").unwrap();
         for f in record.fields.values().filter(|f| {
             matches!(
                 f.visibility,
@@ -883,7 +967,7 @@ impl Context<'_> {
                     _ => "",
                 };
                 let value = format!("proto.get{}{suffix}()", field.name());
-                let expr = self.from_wire(&f.field_type, wire_type, &value, params, field);
+                let expr = self.from_wire(&f.field_type, wire_type, &value, field);
                 let condition = if !f.required && f.data.has_presence.unwrap_or(false) {
                     if field.repeated() {
                         format!("if (proto.get{}Count() > 0) ", field.name())
@@ -919,7 +1003,6 @@ impl Context<'_> {
                                                 "proto.get{}()",
                                                 self.proto_field(proto, &m.wire_name).name()
                                             ),
-                                            params,
                                             self.proto_field(proto, &m.wire_name),
                                         )
                                     })
@@ -939,7 +1022,7 @@ impl Context<'_> {
                 }
             }
         }
-        writeln!(out, "    return builder.build();\n  }}\n  public static final class Converter implements io.temporal.common.converter.TransferTypeConverter<{name}> {{\n    public java.lang.reflect.Type getTransferType(java.lang.reflect.Type valueType) {{ return {p}.class; }}\n    public Object toTransferType({name} value) {{ return value == null ? null : value.toProto({converter}); }}\n    public {name} fromTransferType(Object value, java.lang.reflect.Type valueType) {{ return value == null ? null : fromProto(({p}) value, {converter}, valueType); }}\n  }}").unwrap();
+        writeln!(out, "    return builder.build();\n  }}\n  public static final class Converter implements io.temporal.common.converter.TransferTypeConverter<{name}> {{\n    public java.lang.reflect.Type getTransferType(java.lang.reflect.Type valueType) {{ return {p}.class; }}\n    public Object toTransferType({name} value) {{ return value == null ? null : value.toProto(); }}\n    public {name} fromTransferType(Object value, java.lang.reflect.Type valueType) {{ return value == null ? null : fromProto(({p}) value); }}\n  }}").unwrap();
         out
     }
     fn to_wire(
@@ -951,7 +1034,7 @@ impl Context<'_> {
     ) -> String {
         let value = format!("({value})");
         let expression = match ty.without_option() {
-            TypeSpec::Record(_) => format!("{value}.toProto(converter)"),
+            TypeSpec::Record(_) => format!("{value}.toProto()"),
             TypeSpec::Enum(_) => format!("{}.forNumber({value}.getNumber())", self.wire_type(wire)),
             TypeSpec::Flags(flags) => format!(
                 "{value}.stream().mapToLong({}::getBit).reduce(0L, (left, right) -> left | right)",
@@ -970,7 +1053,7 @@ impl Context<'_> {
                         )
                     }
                 } else {
-                    self.carrier_to_wire(ty, wire, &value)
+                    value.clone()
                 }
             }
             TypeSpec::Map(k, v) => {
@@ -990,25 +1073,21 @@ impl Context<'_> {
                     );
                     self.map_expression(&value, &entry, &key, &value_expr)
                 } else {
-                    self.carrier_to_wire(ty, wire, &value)
+                    value.clone()
                 }
             }
-            TypeSpec::TypeParameter(_) => self.carrier_to_wire(ty, wire, &value),
+            TypeSpec::TypeParameter(_) => value.clone(),
             TypeSpec::External(ExternalTypeSpec::Alias(a)) if a.type_name.value().is_none() => {
                 self.to_wire(&a.target, wire, &value, field)
             }
             TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => {
                 if let Some(helper) = m.replacement.as_ref().and_then(|r| r.to_proto.value()) {
-                    format!("{}(converter, {value})", self.helper(helper))
-                } else if m.proto.full_name.ends_with(".Payload") {
-                    format!("converter.toPayload({value}).get()")
-                } else if m.proto.full_name.ends_with(".Payloads") {
-                    format!(
-                        "converter.toPayloads({value}.toArray()).orElse(io.temporal.api.common.v1.Payloads.getDefaultInstance())"
-                    )
+                    format!("{}({value})", self.helper(helper))
+                } else if self.ty(ty) == proto_name(&m.proto) {
+                    value.clone()
                 } else if m.replacement.is_some() {
                     format!(
-                        "{}(converter, {value})",
+                        "{}({value})",
                         self.helper(&format!("{}ToProto", m.model_name.to_lower_camel_case()))
                     )
                 } else {
@@ -1027,7 +1106,7 @@ impl Context<'_> {
                     .replacement
                     .as_ref()
                     .and_then(|r| r.to_proto.value())
-                    .map(|helper| format!("{}(converter, {value})", self.helper(helper)))
+                    .map(|helper| format!("{}({value})", self.helper(helper)))
                     .unwrap_or(value),
                 _ => value,
             },
@@ -1059,18 +1138,6 @@ impl Context<'_> {
         format!(
             "{values}.entrySet().stream().collect(java.util.LinkedHashMap::new, ({map}, {entry}) -> {map}.put({key}, {value}), java.util.Map::putAll)"
         )
-    }
-    fn carrier_to_wire(&self, _ty: &PlannedType, wire: &PlannedType, value: &str) -> String {
-        match wire.without_option() {
-            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m)))
-                if m.proto.full_name.ends_with(".Payloads") =>
-            {
-                format!(
-                    "converter.toPayloads({value}).orElse(io.temporal.api.common.v1.Payloads.getDefaultInstance())"
-                )
-            }
-            _ => format!("converter.toPayload({value}).get()"),
-        }
     }
     fn reflect_type(&self, ty: &PlannedType, params: &[TypeParameterUsage]) -> String {
         let rt = self.runtime();
@@ -1132,98 +1199,17 @@ impl Context<'_> {
             }
         }
     }
-    fn raw_type(&self, ty: &PlannedType, params: &[TypeParameterUsage]) -> String {
-        if matches!(ty.without_option(), TypeSpec::TypeParameter(_)) {
-            self.need(RuntimeFeature::RawType);
-            format!(
-                "{}.rawType({})",
-                self.runtime(),
-                self.reflect_type(ty, params)
-            )
-        } else {
-            format!("{}.class", self.ty(ty).split('<').next().unwrap())
-        }
-    }
-    fn decode_payload(
-        &self,
-        ty: &PlannedType,
-        wire: &PlannedType,
-        value: &str,
-        params: &[TypeParameterUsage],
-    ) -> String {
-        let t = self.ty(ty);
-        let raw = self.raw_type(ty, params);
-        let generic = self.reflect_type(ty, params);
-        if matches!(wire.without_option(), TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) if m.proto.full_name.ends_with(".Payloads"))
-        {
-            format!(
-                "({t}) converter.fromPayloads(0, java.util.Optional.of({value}), {raw}, {generic})"
-            )
-        } else {
-            format!("({t}) converter.fromPayload({value}, {raw}, {generic})")
-        }
-    }
-    fn decode_sequence(
-        &self,
-        ty: &PlannedType,
-        value: &str,
-        params: &[TypeParameterUsage],
-    ) -> String {
-        self.need(RuntimeFeature::Sequence);
-        let element = match ty.without_option() {
-            TypeSpec::List(inner) => Some(inner.as_ref()),
-            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => {
-                match m.authored_type.as_deref() {
-                    Some(TypeSpec::List(inner)) => Some(inner.as_ref()),
-                    _ => None,
-                }
-            }
-            _ => None,
-        };
-        let (raw, generic) = if let Some(element) = element {
-            (
-                self.raw_type(element, params),
-                self.reflect_type(element, params),
-            )
-        } else {
-            // The ordinary SDK payloads mapping is a raw or Object-valued list.
-            let t = self.ty(ty);
-            let element = t
-                .strip_prefix("java.util.List<")
-                .and_then(|t| t.strip_suffix('>'))
-                .unwrap_or("Object");
-            let raw = format!("{}.class", element.split('<').next().unwrap());
-            let generic = if element.contains('<') {
-                format!(
-                    "new com.fasterxml.jackson.core.type.TypeReference<{element}>() {{}}.getType()"
-                )
-            } else {
-                raw.clone()
-            };
-            (raw, generic)
-        };
-        format!(
-            "({}) (Object) {}.decodeSequence({value}, converter, {raw}, {generic})",
-            self.ty(ty),
-            self.runtime()
-        )
-    }
     fn from_wire(
         &self,
         ty: &PlannedType,
         wire: &PlannedType,
         value: &str,
-        params: &[TypeParameterUsage],
         field: WireField<'_>,
     ) -> String {
         let t = self.ty(ty);
         match ty.without_option() {
             TypeSpec::String | TypeSpec::Bool => value.into(),
-            TypeSpec::Record(_) => format!(
-                "{}.fromProto({value}, converter, {})",
-                t.split('<').next().unwrap(),
-                self.reflect_type(ty, params)
-            ),
+            TypeSpec::Record(_) => format!("{}.fromProto({value})", t.split('<').next().unwrap()),
             TypeSpec::Enum(_) => format!("{t}.fromNumber(({value}).getNumber())"),
             TypeSpec::Flags(flags) => {
                 let name = self.named(&flags.full_name, &flags.name);
@@ -1249,7 +1235,7 @@ impl Context<'_> {
             TypeSpec::List(inner) => {
                 if let TypeSpec::List(w) = wire.without_option() {
                     let item = self.variable("item");
-                    let converted = self.from_wire(inner, w, &item, params, field);
+                    let converted = self.from_wire(inner, w, &item, field);
                     if converted == item {
                         format!("new java.util.ArrayList<>({value})")
                     } else {
@@ -1258,7 +1244,7 @@ impl Context<'_> {
                         )
                     }
                 } else {
-                    self.decode_sequence(ty, value, params)
+                    value.into()
                 }
             }
             TypeSpec::Map(k, v) => {
@@ -1268,14 +1254,12 @@ impl Context<'_> {
                         k,
                         wk,
                         &format!("{entry}.getKey()"),
-                        params,
                         self.map_field(field, "key"),
                     );
                     let val = self.from_wire(
                         v,
                         wv,
                         &format!("{entry}.getValue()"),
-                        params,
                         self.map_field(field, "value"),
                     );
                     self.map_expression(&format!("({value})"), &entry, &key, &val)
@@ -1283,20 +1267,18 @@ impl Context<'_> {
                     format!("({t}) {value}")
                 }
             }
-            TypeSpec::TypeParameter(_) => self.decode_payload(ty, wire, value, params),
+            TypeSpec::TypeParameter(_) => value.into(),
             TypeSpec::External(ExternalTypeSpec::Alias(a)) if a.type_name.value().is_none() => {
-                self.from_wire(&a.target, wire, value, params, field)
+                self.from_wire(&a.target, wire, value, field)
             }
             TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => {
                 if let Some(helper) = m.replacement.as_ref().and_then(|r| r.from_proto.value()) {
-                    format!("{}(converter, {value})", self.helper(helper))
-                } else if m.proto.full_name.ends_with(".Payloads") {
-                    self.decode_sequence(ty, value, params)
-                } else if m.proto.full_name.ends_with(".Payload") {
-                    self.decode_payload(ty, wire, value, params)
+                    format!("{}({value})", self.helper(helper))
+                } else if t == proto_name(&m.proto) {
+                    value.into()
                 } else if m.replacement.is_some() {
                     format!(
-                        "{}(converter, {value})",
+                        "{}({value})",
                         self.helper(&format!("{}FromProto", m.model_name.to_lower_camel_case()))
                     )
                 } else {
@@ -1315,7 +1297,7 @@ impl Context<'_> {
                     .replacement
                     .as_ref()
                     .and_then(|r| r.from_proto.value())
-                    .map(|helper| format!("{}(converter, {value})", self.helper(helper)))
+                    .map(|helper| format!("{}({value})", self.helper(helper)))
                     .unwrap_or_else(|| format!("({t}) {value}")),
                 _ => format!("({t}) {value}"),
             },
@@ -1848,8 +1830,6 @@ impl Context<'_> {
 enum RuntimeFeature {
     Parameterized,
     Argument,
-    RawType,
-    Sequence,
     FunctionReference,
     Result,
 }
@@ -1874,8 +1854,6 @@ fn java_runtime(needs: &RuntimeNeeds) -> String {
         out.push_str(match feature {
             RuntimeFeature::Parameterized => JAVA_PARAMETERIZED,
             RuntimeFeature::Argument => JAVA_ARGUMENT,
-            RuntimeFeature::RawType => JAVA_RAW_TYPE,
-            RuntimeFeature::Sequence => JAVA_SEQUENCE,
             RuntimeFeature::FunctionReference => JAVA_FUNCTION_REFERENCE,
             RuntimeFeature::Result => JAVA_RESULT,
         });
@@ -1924,18 +1902,6 @@ const JAVA_PARAMETERIZED: &str = r###"  public static java.lang.reflect.Type par
 
 const JAVA_ARGUMENT: &str = r###"  public static java.lang.reflect.Type argument(java.lang.reflect.Type type, int index) {
     return type instanceof java.lang.reflect.ParameterizedType ? ((java.lang.reflect.ParameterizedType) type).getActualTypeArguments()[index] : Object.class;
-  }
-"###;
-
-const JAVA_RAW_TYPE: &str = r###"  public static Class<?> rawType(java.lang.reflect.Type type) {
-    return type instanceof Class ? (Class<?>) type : type instanceof java.lang.reflect.ParameterizedType ? (Class<?>) ((java.lang.reflect.ParameterizedType) type).getRawType() : Object.class;
-  }
-"###;
-
-const JAVA_SEQUENCE: &str = r###"  public static <T> java.util.List<T> decodeSequence(io.temporal.api.common.v1.Payloads payloads, io.temporal.common.converter.DataConverter converter, Class<T> elementClass, java.lang.reflect.Type elementType) {
-    java.util.List<T> result = new java.util.ArrayList<>();
-    for (io.temporal.api.common.v1.Payload payload : payloads.getPayloadsList()) result.add(converter.fromPayload(payload, elementClass, elementType));
-    return result;
   }
 "###;
 
