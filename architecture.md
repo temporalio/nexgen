@@ -115,10 +115,3 @@ flowchart LR
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
   the consuming module can only resolve it from the tree-wide manifest.
-
-## Java formatting
-
-Java formatting runs after emission when requested. The Java backend owns the
-pinned google-java-format invocation and tool cache. It receives the generated
-file manifest so formatting leaves neighboring handwritten files untouched.
-Sample regeneration uses the same generation-time formatting path.

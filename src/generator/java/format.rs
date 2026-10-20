@@ -8,8 +8,8 @@ use crate::generator::GeneratedFiles;
 
 const VERSION: &str = "1.24.0";
 
-/// Format only this invocation's emitted Java files, preserving neighboring user files.
-pub(crate) fn format(output: &Path, generated: &GeneratedFiles) -> Result<()> {
+/// Prepare formatting for only this invocation's emitted Java files.
+pub(crate) fn commands(output: &Path, generated: &GeneratedFiles) -> Result<Vec<Command>> {
     let root = fs::canonicalize(output).map_err(|source| Error::ReadFile {
         path: output.to_owned(),
         source,
@@ -21,21 +21,18 @@ pub(crate) fn format(output: &Path, generated: &GeneratedFiles) -> Result<()> {
         .map(|path| root.join(path))
         .collect::<Vec<_>>();
     if files.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let jar = formatter_jar(output)?;
     // Bound argument sizes on platforms with small command-line limits.
-    for batch in files.chunks(32) {
-        run(
-            Command::new("java")
-                .arg("-jar")
-                .arg(&jar)
-                .arg("--replace")
-                .args(batch),
-            output,
-        )?;
-    }
-    Ok(())
+    Ok(files
+        .chunks(32)
+        .map(|batch| {
+            let mut command = Command::new("java");
+            command.arg("-jar").arg(&jar).arg("--replace").args(batch);
+            command
+        })
+        .collect())
 }
 
 fn formatter_jar(output: &Path) -> Result<PathBuf> {
@@ -71,7 +68,7 @@ fn formatter_jar(output: &Path) -> Result<PathBuf> {
         "Downloading google-java-format {VERSION} to {}",
         jar.display()
     );
-    run(
+    crate::run_formatter(
         Command::new("curl")
             .args([
                 "--fail",
@@ -93,21 +90,4 @@ fn formatter_jar(output: &Path) -> Result<PathBuf> {
         source: error.error,
     })?;
     Ok(jar)
-}
-
-fn run(command: &mut Command, output: &Path) -> Result<()> {
-    let description = format!("{command:?}");
-    let status = command.status().map_err(|source| Error::RunFormatter {
-        path: output.to_owned(),
-        command: description.clone(),
-        source,
-    })?;
-    if !status.success() {
-        return Err(Error::FormatterFailed {
-            path: output.to_owned(),
-            command: description,
-            status,
-        });
-    }
-    Ok(())
 }
