@@ -1982,6 +1982,11 @@ Transfer converters obtain the active `DataConverter` by calling
 `currentDataConverter()` on the configured support class. The SDK owns converter
 scoping; system Nexus conversion fails when no user converter context is active.
 
+The signal-with-start SDK path serializes the request and deserializes a
+payload-free response. Future responses with embedded user payloads must expose
+generic model parameters and receive concrete Java type information from the
+calling API; they must not rely on decoding an untyped `Object` field.
+
 Use `java`, `java-from`, and `java-to` on `@nexus.type` for native SDK mappings.
 Conversion helpers receive the active `DataConverter` followed by the value.
 Sourced-field helpers remain ordinary calls relative to the support class, while
