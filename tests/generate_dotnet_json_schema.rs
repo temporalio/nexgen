@@ -94,11 +94,19 @@ fn csharp_json_examples_render_expected_language_features() {
             ],
         );
         let services = showcase.file("Services.cs");
+        // The contract is the API without `--native-api`, so it is public;
+        // with it, callers use the generated client and the contract stays
+        // internal.
+        let contract = if mode == GenerationMode::NativeApi {
+            "internal interface IShowcaseServiceCs"
+        } else {
+            "public interface IShowcaseServiceCs"
+        };
+        assert_has(services, &[contract]);
         assert_has(
             services,
             &[
                 "[NexusService(\"example.showcase.v1.ShowcaseService\")]",
-                "public interface IShowcaseServiceCs",
                 "[NexusOperation(\"GetShowcase\")]",
                 "GetShowcaseCs(",
             ],

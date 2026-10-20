@@ -2969,12 +2969,19 @@ fn csharp_json_services_render_docs_deprecation_and_one_sided_io() {
             case.generate(&["legacy.nexusrpc.yaml"])
         };
         let services = output.file("Services.cs");
+        // The contract is public unless `--native-api` puts a client in front.
+        let visibility = if native { "internal" } else { "public" };
+        assert_has(
+            services,
+            &[&format!(
+                "    /// <summary>\n    /// Legacy API.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    [global::System.Obsolete(\"This service is deprecated.\")]\n    [NexusService(\"example.legacy.v1.Legacy\")]\n    {visibility} interface ILegacyCs\n"
+            )],
+        );
         assert_has(
             services,
             &[
-                // The service is documented and deprecated; overrides rename
-                // the C# identifiers and keep the wire names.
-                "    /// <summary>\n    /// Legacy API.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    [global::System.Obsolete(\"This service is deprecated.\")]\n    [NexusService(\"example.legacy.v1.Legacy\")]\n    public interface ILegacyCs\n",
+                // The service is documented and deprecated (above); overrides
+                // rename the C# identifiers and keep the wire names.
                 "        /// Ping the service.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        [global::System.Obsolete(\"This operation is deprecated.\")]\n        [NexusOperation(\"Ping\")]\n        void PingCs();\n",
                 // An absent input is a no-arg method; an absent output is `void`.
                 "void Submit(Input request);",

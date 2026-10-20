@@ -15,7 +15,7 @@ namespace Temporalio.Workflows
 
     [GeneratedCode("nexgen", null)]
     [NexusService("InterceptorService")]
-    public interface IInterceptorService
+    internal interface IInterceptorService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("FirstOperation")]

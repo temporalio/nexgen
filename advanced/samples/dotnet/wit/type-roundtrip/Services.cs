@@ -15,7 +15,7 @@ namespace Nexgen.TypeRoundtripService
 
     [GeneratedCode("nexgen", null)]
     [NexusService("TypeRoundtripService")]
-    public interface ITypeRoundtripService
+    internal interface ITypeRoundtripService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("ActivityOptionsOperation")]

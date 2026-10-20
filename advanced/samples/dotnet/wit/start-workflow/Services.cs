@@ -15,7 +15,7 @@ namespace Nexgen.StartWorkflowService
 
     [GeneratedCode("nexgen", null)]
     [NexusService("StartWorkflowService")]
-    public interface IStartWorkflowService
+    internal interface IStartWorkflowService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("StartWorkflow")]

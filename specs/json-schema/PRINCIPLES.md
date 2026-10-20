@@ -835,13 +835,14 @@ model member scope and closed-value constant scope.
     code spells framework types `global::`-qualified too, so no schema type name
     can shadow them. The generator emits formatted C# directly; no external
     formatter runs.
-14. **Services are `public` NexusRpc interfaces.** Each service is a
-    `[NexusService(fqn)]` `public interface I<Name>` with one
-    `[NexusOperation(wire)]` method per operation (see [[services]]). It is
-    public, like Java's service interface, so a handler
-    (`[NexusServiceHandler(typeof(I<Name>))]`) or a caller
-    (`Workflow.CreateNexusWorkflowClient<I<Name>>`) in another assembly can name
-    it. Definitions mode emits the contract only, with no handler or client
-    scaffolding; the sample suite implements and calls it end to end over a real
-    Nexus endpoint (§5), with both synchronous operations and an asynchronous,
-    workflow-backed one.
+14. **Services are NexusRpc interfaces, `public` unless `--native-api`.** Each
+    service is a `[NexusService(fqn)]` `interface I<Name>` with one
+    `[NexusOperation(wire)]` method per operation (see [[services]]). Without
+    `--native-api` the contract is the API, so it is `public`, like Java's
+    service interface: a handler (`[NexusServiceHandler(typeof(I<Name>))]`) or a
+    caller (`Workflow.CreateNexusWorkflowClient<I<Name>>`) in another assembly
+    can name it. With `--native-api`, callers use the generated `<Name>Client`
+    wrapper instead, so the contract is `internal`. Definitions mode emits the
+    contract only, with no handler or client scaffolding; the sample suite
+    implements and calls it end to end over a real Nexus endpoint (§5), with
+    both synchronous operations and an asynchronous, workflow-backed one.

@@ -15,7 +15,7 @@ namespace Nexgen.TypeShowcase
 
     [GeneratedCode("nexgen", null)]
     [NexusService("TypeShowcase")]
-    public interface ITypeShowcase
+    internal interface ITypeShowcase
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("GetUser")]
