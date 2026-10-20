@@ -2026,6 +2026,17 @@ flattened records expose their fields directly. The operation constructs the
 request internally; no handwritten options class or operation wrapper is
 required.
 
+Protobuf-bound varargs function fields can specify `java-call-extractor` on
+`@nexus.function` to additionally generate typed overloads. These take a shared
+`Class<T>` receiver interface and `Functions.Proc1<T>` callbacks instead of
+names. For example, signal-with-start accepts `w -> w.run(input)` and
+`w -> w.notifySignal(signal)`. The SDK-owned extractor receives the interface,
+callback, and a `BiConsumer<String, Object[]>` receiving the resolved name and
+arguments. The generated method maps these arguments to the request's authored
+API field names. Typed calls reject argument lists also supplied in options. The
+name-based overload remains available. This needs no new planning metadata or
+compiler pass; SDK hooks own method metadata lookup and invocation capture.
+
 Records use constructors, getters, and builders. Enums are Java enums, flags are
 `EnumSet` values, variants and results are tagged values, and tuples use
 generated classes. Generic arguments propagate through nested records and

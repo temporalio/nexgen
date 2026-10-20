@@ -128,6 +128,13 @@ options class. Public methods build the transfer request and call a
 package-private execution helper, also used by generated resource methods. This
 is Java rendering policy, with no additional planning pass or metadata.
 
+Function fields with call-extractor hooks also expose a typed overload using a
+shared receiver interface and invocation callbacks. The generator calls
+SDK-owned extractors to resolve annotated method names and arguments, then fills
+the same request builder. Capture state and workflow method metadata remain in
+the SDK, outside the generated runtime. Existing function argument-field
+metadata maps wire keys to their authored Java API names.
+
 The Java backend renders native declarations and external protobuf bindings from
 `PlannedFamily`, alongside its existing JSON Schema renderer. Java-specific type
 mapping, descriptor-based protobuf class naming, and runtime helpers belong to

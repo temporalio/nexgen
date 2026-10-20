@@ -25,6 +25,18 @@ public final class TemporalModelConverters {
     return Workflow.getInfo().getNamespace();
   }
 
+  public static <T> void captureWorkflowCall(
+      Class<T> workflowInterface, io.temporal.workflow.Functions.Proc1<T> call,
+      java.util.function.BiConsumer<String, Object[]> result) {
+    io.temporal.internal.nexus.system.TemporalModelConverters.captureWorkflowCall(workflowInterface, call, result);
+  }
+
+  public static <T> void captureSignalCall(
+      Class<T> workflowInterface, io.temporal.workflow.Functions.Proc1<T> call,
+      java.util.function.BiConsumer<String, Object[]> result) {
+    io.temporal.internal.nexus.system.TemporalModelConverters.captureSignalCall(workflowInterface, call, result);
+  }
+
   public static WorkflowSerializationContext signalWithStartWorkflowSerializationContext(
       SignalWithStartWorkflowRequest request) {
     return new WorkflowSerializationContext(request.getNamespace(), request.getId());
