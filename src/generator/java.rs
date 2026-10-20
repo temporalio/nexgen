@@ -1882,6 +1882,7 @@ impl Context<'_> {
         generic: &str,
         result_type: &str,
         generic_output: bool,
+        typed: bool,
     ) -> Result<String> {
         let Some(model) = self.operation_input_record(operation) else {
             return Ok(String::new());
@@ -1895,24 +1896,60 @@ impl Context<'_> {
             .iter()
             .filter(|f| !api_field_required(f))
             .collect::<Vec<_>>();
+        let captured_arguments = required
+            .iter()
+            .filter_map(|field| captured_function(field))
+            .flat_map(|function| &function.arg_fields)
+            .filter_map(|key| model.fields.get(key).map(|field| field.name.as_str()))
+            .collect::<BTreeSet<_>>();
         let mut names = required
             .iter()
             .map(|f| ident(&f.name))
             .collect::<BTreeSet<_>>();
+        names.extend(
+            generic
+                .trim()
+                .trim_start_matches('<')
+                .trim_end_matches('>')
+                .split(',')
+                .map(|name| name.trim().to_string()),
+        );
+        let interface = available_identifier("workflowInterface", &mut names);
         let endpoint = available_identifier("endpoint", &mut names);
         let result_parameter = available_identifier("resultType", &mut names);
         let options = available_identifier("options", &mut names);
         let builder = available_identifier("requestBuilder", &mut names);
         let request = available_identifier("request", &mut names);
+        let capture_name = available_identifier("capturedName", &mut names);
+        let capture_values = available_identifier("capturedArguments", &mut names);
         let mut parameters = Vec::new();
         let mut arguments = Vec::new();
+        // Callback extractors share a receiver type, so workflow and signal
+        // callbacks are checked against the same workflow interface.
+        let receiver = available_identifier("WorkflowInterface", &mut names);
+        let generic = if typed {
+            parameters.push(format!("Class<{receiver}> {interface}"));
+            arguments.push(interface.clone());
+            if generic.is_empty() {
+                format!("<{receiver}> ")
+            } else {
+                generic.replacen('<', &format!("<{receiver}, "), 1)
+            }
+        } else {
+            generic.to_string()
+        };
         if service.endpoint.is_none() {
             parameters.push(format!("String {endpoint}"));
             arguments.push(endpoint.clone());
         }
         for field in &required {
             let name = ident(&field.name);
-            parameters.push(format!("{} {name}", self.field_ty(field)));
+            let ty = if typed && captured_function(field).is_some() {
+                format!("io.temporal.workflow.Functions.Proc1<{receiver}>")
+            } else {
+                self.field_ty(field)
+            };
+            parameters.push(format!("{ty} {name}"));
             arguments.push(name);
         }
         if generic_output {
@@ -1921,6 +1958,11 @@ impl Context<'_> {
         }
         let method = ident(&operation.name);
         let mut out = String::new();
+        let typed_doc = typed.then(|| format!(
+            "{}\n\nEach callback must invoke exactly one method on its receiver. Method names and arguments are captured without executing the call. Supply callback arguments through the callback, not options. The callback return value is discarded.",
+            operation.doc.value().unwrap_or_default(),
+        ));
+        let doc = typed_doc.as_deref().or(operation.doc.value());
         if !optional.is_empty() {
             let options_name = self.operation_options_name(service, operation);
             let args = self.type_args(&self.options_type_parameters(&fields));
@@ -1933,10 +1975,13 @@ impl Context<'_> {
                 .collect::<Vec<_>>()
                 .join(", ");
             let returned = if result_type == "void" { "" } else { "return " };
+            if typed {
+                render_java_doc_comment(&mut out, "  ", doc, &[]);
+            }
             writeln!(out, "  public static {generic}{result_type} {method}({}) {{\n    {returned}{method}({forwarded});\n  }}", parameters.join(", ")).unwrap();
             parameters.push(format!("{options_type} {options}"));
         }
-        render_java_doc_comment(&mut out, "  ", operation.doc.value(), &[]);
+        render_java_doc_comment(&mut out, "  ", doc, &[]);
         writeln!(
             out,
             "  public static {generic}{result_type} {method}({}) {{",
@@ -1948,6 +1993,12 @@ impl Context<'_> {
         let input_args = self.type_args(&self.spec.record_type_parameters(&model.full_name));
         writeln!(out, "    {input_class}.Builder{input_args} {builder} = {input_class}.{input_args}newBuilder();").unwrap();
         for field in required {
+            if let Some(function) = captured_function(field).filter(|_| typed) {
+                let extractor = self.helper(function.call_extractor.as_ref().unwrap());
+                let arguments = &model.fields[&function.arg_fields[0]].name;
+                writeln!(out, "    {extractor}({interface}, {}, ({capture_name}, {capture_values}) -> {{ {builder}.set{}({capture_name}); {builder}.set{}(java.util.Arrays.asList({capture_values})); }});", ident(&field.name), field.name.to_upper_camel_case(), arguments.to_upper_camel_case()).unwrap();
+                continue;
+            }
             writeln!(
                 out,
                 "    {builder}.set{}(java.util.Objects.requireNonNull({}, {}));",
@@ -1961,6 +2012,10 @@ impl Context<'_> {
             writeln!(out, "    if ({options} != null) {{").unwrap();
             for field in optional {
                 let name = field.name.to_upper_camel_case();
+                if typed && captured_arguments.contains(field.name.as_str()) {
+                    writeln!(out, "      if ({options}.get{name}() != null) throw new IllegalArgumentException({});", literal(&format!("{} must be supplied through the typed callback, not options", ident(&field.name)))).unwrap();
+                    continue;
+                }
                 writeln!(out, "      if ({options}.get{name}() != null) {builder}.set{name}({options}.get{name}());").unwrap();
             }
             out.push_str("    }\n");
@@ -2122,7 +2177,22 @@ impl Context<'_> {
                 &generic,
                 result_ty,
                 !output_type_parameter.is_empty(),
+                false,
             )?);
+            if self.operation_input_record(op).is_some_and(|model| {
+                model.public_fields().any(|(_, field)| {
+                    api_field_required(field) && captured_function(field).is_some()
+                })
+            }) {
+                out.push_str(&self.public_operation(
+                    service,
+                    op,
+                    &generic,
+                    result_ty,
+                    !output_type_parameter.is_empty(),
+                    true,
+                )?);
+            }
             let visibility = if self.operation_input_record(op).is_some() {
                 ""
             } else {
@@ -2140,6 +2210,17 @@ fn api_field_required(field: &RecordFieldSpec<PlannedFamily>) -> bool {
         && !matches!(field.field_type, TypeSpec::Option(_))
         && field.default_value.is_none()
         && field.data.default_enum_value.is_none()
+}
+
+fn captured_function(
+    field: &RecordFieldSpec<PlannedFamily>,
+) -> Option<&FunctionFieldSpec<PlannedFamily>> {
+    field.function.as_ref().filter(|function| {
+        function.call_extractor.is_some()
+            && function.arg_fields.len() == 1
+            && matches!(function.args, FunctionArgsSpec::Varargs { .. })
+            && field.data.wire_binding.is_some()
+    })
 }
 
 fn request_operation_name(operation: &OperationSpec<PlannedFamily>) -> String {

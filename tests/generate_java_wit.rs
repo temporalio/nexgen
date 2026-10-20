@@ -94,6 +94,7 @@ interface example-service {
     assert!(operations.contains("static io.temporal.workflow.Request executeFirst("));
     assert!(!operations.contains("public static io.temporal.workflow.Request executeFirst("));
     assert!(!output.join("FirstOptions.java").exists());
+    assert!(!operations.contains("Functions.Proc1<"));
 }
 
 #[test]
@@ -112,6 +113,22 @@ fn operation_api_splits_required_arguments_from_generated_options() {
         "public static io.temporal.workflow.ExternalWorkflowStub executeSignalWithStartWorkflow("
     ));
     assert!(operations.contains("requestBuilder.setStaticSummary(options.getStaticSummary())"));
+    assert!(operations.contains("Class<WorkflowInterface> workflowInterface"));
+    assert!(operations.contains("Functions.Proc1<WorkflowInterface> workflow"));
+    assert!(operations.contains("Functions.Proc1<WorkflowInterface> signal"));
+    assert!(operations.contains("support.TemporalModelConverters.captureWorkflowCall("));
+    assert!(operations.contains("support.TemporalModelConverters.captureSignalCall("));
+    assert!(
+        operations.contains("requestBuilder.setArgs(java.util.Arrays.asList(capturedArguments))")
+    );
+    assert!(
+        operations
+            .contains("requestBuilder.setSignalArgs(java.util.Arrays.asList(capturedArguments))")
+    );
+    assert!(
+        operations.contains("signalArgs must be supplied through the typed callback, not options")
+    );
+    assert!(!operations.contains("requestBuilder.setSignalInput("));
     let options = fs::read_to_string(output.join("SignalWithStartWorkflowOptions.java")).unwrap();
     for expected in [
         "setArgs(Object... values)",
