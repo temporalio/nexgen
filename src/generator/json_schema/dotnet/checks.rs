@@ -46,8 +46,9 @@ fn display_bound(literal: &str) -> &str {
 }
 
 fn push_violation(out: &mut String, indent: &str, condition: &str, path: &str, reason: &str) {
+    let rt = super::runtime_prefix();
     out.push_str(&format!(
-        "{indent}if ({condition})\n{indent}{{\n{indent}    violations.Add(new NexgenRuntime::Violation({path}, {reason}));\n{indent}}}\n"
+        "{indent}if ({condition})\n{indent}{{\n{indent}    violations.Add(new {rt}Violation({path}, {reason}));\n{indent}}}\n"
     ));
 }
 
@@ -185,7 +186,8 @@ pub(super) fn regex_statics(
 /// The code-point length of a C# string (never `.Length`, which counts UTF-16
 /// units).
 pub(super) fn code_points(value: &str) -> String {
-    format!("NexgenRuntime::SpecJson.CodePoints({value})")
+    let rt = super::runtime_prefix();
+    format!("{rt}SpecJson.CodePoints({value})")
 }
 
 /// `minLength`/`maxLength`/`pattern`/`format` over a `string` value.
@@ -435,12 +437,13 @@ fn matcher_condition(
 
 /// The type guard a typed `contains` matcher puts on an in-memory element.
 fn typed_matcher_guard(matcher: &Schema, element: &str, ty: &CsType) -> String {
+    let rt = super::runtime_prefix();
     match (matcher_kind(matcher, ty), ty) {
         ("string", CsType::String) | ("boolean", CsType::Boolean) => "true".to_string(),
         ("integer" | "number", CsType::Long) => "true".to_string(),
         ("number", CsType::Double) => format!("double.IsFinite({element})"),
         ("integer", CsType::Double) => format!(
-            "double.IsFinite({element}) && {element} == global::System.Math.Round({element}) && global::System.Math.Abs({element}) <= NexgenRuntime::SpecJson.IntegerCap"
+            "double.IsFinite({element}) && {element} == global::System.Math.Round({element}) && global::System.Math.Abs({element}) <= {rt}SpecJson.IntegerCap"
         ),
         _ => "false".to_string(),
     }
@@ -459,15 +462,16 @@ fn needs_unique_key(ty: &CsType) -> bool {
 /// canonical wire string (the operand the parse side compares), a `number`
 /// folds `-0.0` onto `0.0`.
 pub(super) fn unique_key(ty: &CsType, element: &str, depth: usize) -> String {
+    let rt = super::runtime_prefix();
     let bound = format!("keyed{depth}");
     match ty {
-        CsType::Double => format!("NexgenRuntime::SpecJson.NumberKey({element})"),
+        CsType::Double => format!("{rt}SpecJson.NumberKey({element})"),
         CsType::Temporal(kind) => format!(
-            "({element} is {{ }} {bound} ? (object)NexgenRuntime::TemporalSupport.{}({bound}) : null)",
+            "({element} is {{ }} {bound} ? (object){rt}TemporalSupport.{}({bound}) : null)",
             temporal_format_fn(*kind)
         ),
         CsType::Bytes(encoding) => format!(
-            "({element} is {{ }} {bound} ? (object)NexgenRuntime::Base64Support.{}({bound}) : null)",
+            "({element} is {{ }} {bound} ? (object){rt}Base64Support.{}({bound}) : null)",
             content_encoding_format_fn(*encoding)
         ),
         CsType::List(inner, _) if needs_unique_key(inner) => {
@@ -623,22 +627,23 @@ pub(super) fn array_checks(
     indent: &str,
     depth: usize,
 ) {
+    let rt = super::runtime_prefix();
     count_checks(out, &format!("{list}.Count"), path, constraints, indent);
     if constraints.unique_items {
         let seen = format!("seen{depth}");
         let index = format!("uniqueIndex{depth}");
         out.push_str(&format!(
-            "{indent}var {seen} = new global::System.Collections.Generic.Dictionary<object, int>(NexgenRuntime::ValueEquality.Comparer);\n"
+            "{indent}var {seen} = new global::System.Collections.Generic.Dictionary<object, int>({rt}ValueEquality.Comparer);\n"
         ));
         out.push_str(&format!(
             "{indent}for (var {index} = 0; {index} < {list}.Count; {index}++)\n{indent}{{\n"
         ));
         out.push_str(&format!(
-            "{indent}    var key = (object?){} ?? NexgenRuntime::ValueEquality.NullKey;\n",
+            "{indent}    var key = (object?){} ?? {rt}ValueEquality.NullKey;\n",
             unique_key(element, &format!("{list}[{index}]"), 0)
         ));
         out.push_str(&format!(
-            "{indent}    if ({seen}.TryGetValue(key, out var priorIndex))\n{indent}    {{\n{indent}        violations.Add(new NexgenRuntime::Violation({path}, \"duplicate items: element at index \" + {index} + \" equals index \" + priorIndex));\n{indent}    }}\n{indent}    else\n{indent}    {{\n{indent}        {seen}[key] = {index};\n{indent}    }}\n{indent}}}\n"
+            "{indent}    if ({seen}.TryGetValue(key, out var priorIndex))\n{indent}    {{\n{indent}        violations.Add(new {rt}Violation({path}, \"duplicate items: element at index \" + {index} + \" equals index \" + priorIndex));\n{indent}    }}\n{indent}    else\n{indent}    {{\n{indent}        {seen}[key] = {index};\n{indent}    }}\n{indent}}}\n"
         ));
     }
     if let Some(matcher) = &constraints.contains {
@@ -675,6 +680,7 @@ pub(super) fn raw_array_checks(
     indent: &str,
     depth: usize,
 ) {
+    let rt = super::runtime_prefix();
     count_checks(
         out,
         &format!("{node}.GetArrayLength()"),
@@ -689,7 +695,7 @@ pub(super) fn raw_array_checks(
             "{indent}var {seen} = new global::System.Collections.Generic.Dictionary<string, int>(global::System.StringComparer.Ordinal);\n{indent}var {index} = 0;\n"
         ));
         out.push_str(&format!(
-            "{indent}foreach (var rawElement in {node}.EnumerateArray())\n{indent}{{\n{indent}    var rawKey = NexgenRuntime::SpecJson.ValueKey(rawElement);\n{indent}    if ({seen}.TryGetValue(rawKey, out var priorIndex))\n{indent}    {{\n{indent}        violations.Add(new NexgenRuntime::Violation({path}, \"duplicate items: element at index \" + {index} + \" equals index \" + priorIndex));\n{indent}    }}\n{indent}    else\n{indent}    {{\n{indent}        {seen}[rawKey] = {index};\n{indent}    }}\n{indent}    {index}++;\n{indent}}}\n"
+            "{indent}foreach (var rawElement in {node}.EnumerateArray())\n{indent}{{\n{indent}    var rawKey = {rt}SpecJson.ValueKey(rawElement);\n{indent}    if ({seen}.TryGetValue(rawKey, out var priorIndex))\n{indent}    {{\n{indent}        violations.Add(new {rt}Violation({path}, \"duplicate items: element at index \" + {index} + \" equals index \" + priorIndex));\n{indent}    }}\n{indent}    else\n{indent}    {{\n{indent}        {seen}[rawKey] = {index};\n{indent}    }}\n{indent}    {index}++;\n{indent}}}\n"
         ));
     }
     if let Some(matcher) = &constraints.contains {
@@ -699,7 +705,7 @@ pub(super) fn raw_array_checks(
                     "rawElement.ValueKind == {}.String",
                     super::types::JSON_VALUE_KIND
                 ),
-                "rawElement.GetString()!",
+                "rawElement.GetString()!".to_string(),
                 CsType::String,
             ),
             "boolean" => (
@@ -707,22 +713,26 @@ pub(super) fn raw_array_checks(
                     "rawElement.ValueKind is {kind}.True or {kind}.False",
                     kind = super::types::JSON_VALUE_KIND
                 ),
-                "rawElement.GetBoolean()",
+                "rawElement.GetBoolean()".to_string(),
                 CsType::Boolean,
             ),
             "integer" => (
-                "NexgenRuntime::SpecJson.IsSpecLong(rawElement)".to_string(),
-                "NexgenRuntime::SpecJson.DoubleOf(rawElement)",
+                format!("{rt}SpecJson.IsSpecLong(rawElement)"),
+                format!("{rt}SpecJson.DoubleOf(rawElement)"),
                 CsType::Double,
             ),
             "number" => (
-                "NexgenRuntime::SpecJson.IsFiniteNumber(rawElement)".to_string(),
-                "NexgenRuntime::SpecJson.DoubleOf(rawElement)",
+                format!("{rt}SpecJson.IsFiniteNumber(rawElement)"),
+                format!("{rt}SpecJson.DoubleOf(rawElement)"),
                 CsType::Double,
             ),
-            _ => ("false".to_string(), "rawElement", element.clone()),
+            _ => (
+                "false".to_string(),
+                "rawElement".to_string(),
+                element.clone(),
+            ),
         };
-        let condition = matcher_condition(matcher, value, &ty, position);
+        let condition = matcher_condition(matcher, &value, &ty, position);
         let match_count = format!("rawMatchCount{depth}");
         out.push_str(&format!(
             "{indent}var {match_count} = 0;\n{indent}foreach (var rawElement in {node}.EnumerateArray())\n{indent}{{\n{indent}    if ({guard} && ({condition}))\n{indent}    {{\n{indent}        {match_count}++;\n{indent}    }}\n{indent}}}\n"
@@ -777,13 +787,14 @@ pub(super) fn property_name_checks(
     subschema: &Schema,
     indent: &str,
 ) {
+    let rt = super::runtime_prefix();
     let constraints = StringConstraints::from_schema(subschema);
     if constraints.is_empty() && subschema.const_value.is_none() && subschema.enum_values.is_none()
     {
         return;
     }
     let inner = format!("{indent}    ");
-    let key_path = format!("NexgenRuntime::Violation.Member({path}, propertyName)");
+    let key_path = format!("{rt}Violation.Member({path}, propertyName)");
     out.push_str(&format!(
         "{indent}foreach (var propertyName in {keys})\n{indent}{{\n"
     ));
@@ -847,6 +858,7 @@ pub(super) fn dependent_required_checks(
     indent: &str,
     present: &dyn Fn(&str) -> String,
 ) {
+    let rt = super::runtime_prefix();
     let Some(dependent_required) = &schema.dependent_required else {
         return;
     };
@@ -863,7 +875,7 @@ pub(super) fn dependent_required_checks(
                 &format!("{indent}    "),
                 &format!("!({})", present(dependent)),
                 &format!(
-                    "NexgenRuntime::Violation.Join({path}, {})",
+                    "{rt}Violation.Join({path}, {})",
                     cs_string(&crate::generator::json_schema::violation_member_segment(
                         dependent
                     ))
@@ -896,6 +908,7 @@ pub(super) fn representability_checks(
     indent: &str,
     depth: usize,
 ) {
+    let rt = super::runtime_prefix();
     match ty {
         CsType::Double => push_violation(
             out,
@@ -907,14 +920,12 @@ pub(super) fn representability_checks(
         CsType::Long => push_violation(
             out,
             indent,
-            &format!(
-                "{value} < -NexgenRuntime::SpecJson.IntegerCap || {value} > NexgenRuntime::SpecJson.IntegerCap"
-            ),
+            &format!("{value} < -{rt}SpecJson.IntegerCap || {value} > {rt}SpecJson.IntegerCap"),
             path,
             "\"exceeds \\u00b1(2^53-1) integer cap\"",
         ),
         CsType::Temporal(kind) => out.push_str(&format!(
-            "{indent}NexgenRuntime::TemporalSupport.{}({value}, {path}, violations);\n",
+            "{indent}{rt}TemporalSupport.{}({value}, {path}, violations);\n",
             temporal_check_fn(*kind)
         )),
         // A nested model or union validates itself, re-rooted at this path.
@@ -928,7 +939,7 @@ pub(super) fn representability_checks(
                 .is_some_and(super::schema::allows_null);
             let index = format!("index{depth}");
             let item = format!("item{depth}");
-            let item_path = format!("NexgenRuntime::Violation.Index({path}, {index})");
+            let item_path = format!("{rt}Violation.Index({path}, {index})");
             // A reference element (or a nullable one) can be null in memory; a
             // non-nullable value-type element cannot.
             let null_check = !element.is_value_type() || nullable_elements;
@@ -970,7 +981,7 @@ pub(super) fn representability_checks(
                     ));
                     if null_violation {
                         out.push_str(&format!(
-                            "{indent}    else\n{indent}    {{\n{indent}        violations.Add(new NexgenRuntime::Violation({item_path}, \"explicit null not allowed\"));\n{indent}    }}\n"
+                            "{indent}    else\n{indent}    {{\n{indent}        violations.Add(new {rt}Violation({item_path}, \"explicit null not allowed\"));\n{indent}    }}\n"
                         ));
                     }
                 } else {
@@ -1047,14 +1058,14 @@ pub(super) fn value_checks(
 
 /// The canonical wire string of a materialized (temporal / bytes) value.
 pub(super) fn materialized_wire(ty: &CsType, value: &str) -> String {
+    let rt = super::runtime_prefix();
     match ty {
-        CsType::Temporal(kind) => format!(
-            "NexgenRuntime::TemporalSupport.{}({value})",
-            temporal_format_fn(*kind)
-        ),
+        CsType::Temporal(kind) => {
+            format!("{rt}TemporalSupport.{}({value})", temporal_format_fn(*kind))
+        }
         CsType::Bytes(encoding) => {
             format!(
-                "NexgenRuntime::Base64Support.{}({value})",
+                "{rt}Base64Support.{}({value})",
                 content_encoding_format_fn(*encoding)
             )
         }

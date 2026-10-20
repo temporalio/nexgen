@@ -26,8 +26,13 @@ pub(super) const READ_ONLY_DICTIONARY: &str =
     "global::System.Collections.Generic.IReadOnlyDictionary";
 pub(super) const JSON_ELEMENT: &str = "global::System.Text.Json.JsonElement";
 pub(super) const JSON_VALUE_KIND: &str = "global::System.Text.Json.JsonValueKind";
-pub(super) const VIOLATIONS: &str =
-    "global::System.Collections.Generic.List<NexgenRuntime::Violation>";
+/// The violation list every generated `Parse`/`Validate` collects into.
+pub(super) fn violations_type() -> String {
+    format!(
+        "global::System.Collections.Generic.List<{}Violation>",
+        super::runtime_prefix()
+    )
+}
 
 /// Resolution context for one input module. Every model reference resolves
 /// through `registry` (planned full name → namespace and type name) so a type

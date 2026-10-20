@@ -17,6 +17,7 @@ mod runtime;
 mod schema;
 mod types;
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -37,11 +38,27 @@ pub(crate) use types::{
 pub(in crate::generator) const GENERATED_CODE_ATTRIBUTE: &str =
     "[global::System.CodeDom.Compiler.GeneratedCode(\"nexgen\", null)]";
 
-/// The namespace alias generated model code qualifies the runtime support types
-/// with (`NexgenRuntime::Violation`). An alias qualifier resolves only against
-/// `using` aliases, so no member, nested type, or local can capture it, and a
-/// schema member may take any runtime type's name.
-pub(crate) const RUNTIME_ALIAS: &str = "NexgenRuntime";
+thread_local! {
+    /// The namespace the runtime support types live in for the run currently
+    /// rendering. Generated model code names them fully qualified
+    /// (`global::<namespace>.Violation`), which no member, nested type, or local
+    /// can capture. Model rendering is single-threaded per file, so a
+    /// thread-local avoids threading the namespace through every emitter.
+    static RUNTIME_NAMESPACE: RefCell<String> = const { RefCell::new(String::new()) };
+}
+
+/// The `global::`-qualified prefix generated model code spells a runtime
+/// support type with: `global::Nexgen.JsonSchema.Chat.` before `Violation`.
+pub(super) fn runtime_prefix() -> String {
+    RUNTIME_NAMESPACE.with(|namespace| {
+        let namespace = namespace.borrow();
+        assert!(
+            !namespace.is_empty(),
+            "the C# runtime namespace is set while models render"
+        );
+        format!("global::{namespace}.")
+    })
+}
 
 /// The runtime support types. They are reserved identifiers in every C# module
 /// scope (P15): the runtime namespace declares them alongside a module's types.
@@ -233,9 +250,6 @@ pub(in crate::generator) struct ModelBackend {
 #[derive(Debug, Default)]
 pub(in crate::generator) struct RenderedModelFragments {
     pub(in crate::generator) body: String,
-    /// `using` aliases the model bodies need: the [`RUNTIME_ALIAS`] namespace
-    /// alias.
-    pub(in crate::generator) aliases: Vec<String>,
 }
 
 impl RenderedModelFragments {
@@ -363,6 +377,11 @@ impl ExternalModelBackend<PlannedJsonType> for ModelBackend {
         if self.models.is_empty() {
             return Ok(RenderedModelFragments::default());
         }
+        RUNTIME_NAMESPACE.with(|namespace| {
+            namespace
+                .borrow_mut()
+                .clone_from(&self.tree.runtime_namespace)
+        });
         let mut body = String::from("#pragma warning disable CS0612, CS0618\n\n");
         for (index, model) in self.models.iter().enumerate() {
             if index > 0 {
@@ -370,11 +389,7 @@ impl ExternalModelBackend<PlannedJsonType> for ModelBackend {
             }
             self.render_model(&mut body, model)?;
         }
-        let aliases = vec![format!(
-            "{RUNTIME_ALIAS} = global::{}",
-            self.tree.runtime_namespace
-        )];
-        Ok(RenderedModelFragments { body, aliases })
+        Ok(RenderedModelFragments { body })
     }
 
     fn model_type_annotation(&self, json_type: &PlannedJsonType) -> Option<String> {
