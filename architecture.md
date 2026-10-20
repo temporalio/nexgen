@@ -116,6 +116,31 @@ flowchart LR
   names a model whose `x-<lang>-name` override is declared in the other file, so
   the consuming module can only resolve it from the tree-wide manifest.
 
+## Java emission
+
+Native Java operation rendering honors the selected operations-class name.
+Explicit names produce an inheritable generated base for SDK facades, allowing
+new operations to become available without editing the facade. Package placement
+is controlled by the Java package option; request builders carry API options.
+
+The Java backend renders native declarations and external protobuf bindings from
+`PlannedFamily`, alongside its existing JSON Schema renderer. Java-specific type
+mapping, descriptor-based protobuf class naming, and runtime helpers belong to
+`src/generator/java.rs`. JSON Schema orchestration and rendering live in
+`src/generator/json_schema/java.rs`; the formatter is a child module under
+`src/generator/java/`. No additional compiler pass is required.
+
+The Java renderer receives the existing descriptor index directly for protobuf
+accessor names, collection shapes, and numeric widths. It emits typed protobuf
+getters/setters and ordinary Java collection conversions. Runtime requirements
+are tracked locally during Java rendering; only referenced helpers and value
+types are emitted. This adds no planning metadata or compiler pass.
+
+System Nexus generation also emits `system-nexus-roots.txt`. Its entries come
+from the protobuf transfer types of operation inputs and outputs, including
+payload-free responses. SDK build-time visitor generators consume this manifest
+without maintaining a separate list of operation message names.
+
 ## Java formatting
 
 Java formatting runs after emission when requested. The Java backend owns the

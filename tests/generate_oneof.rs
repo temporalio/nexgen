@@ -194,7 +194,7 @@ fn typescript_emits_a_complete_conversion_pair() {
 }
 
 #[test]
-fn java_rejects_an_ordinary_reachable_proto_model() {
+fn java_generates_an_ordinary_reachable_proto_model() {
     let temp = tempfile::tempdir().unwrap();
     let path = temp.path().join("java-proto.wit");
     fs::write(
@@ -216,11 +216,8 @@ interface api {
     )
     .unwrap();
 
-    let error = generate(Language::Java, &path).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("Java code generation does not support protobuf-backed model"),
-        "{error}"
-    );
+    let output = generate(Language::Java, &path).unwrap();
+    assert!(output.contains("TransferTypeConvertible(WorkflowExecution.Converter.class)"));
+    assert!(output.contains("io.temporal.api.common.v1.WorkflowExecution toProto"));
+    assert!(output.contains("public static  WorkflowExecution fromProto"));
 }
