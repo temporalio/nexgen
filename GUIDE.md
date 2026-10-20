@@ -1970,8 +1970,14 @@ Set `@nexus.operations-class java="WorkflowOperations"` on an interface to emit
 an abstract operations class with a protected constructor. An SDK facade can
 extend it once to expose every generated static operation, including operations
 added later. Use `--package-name io.temporal.workflow` to put the models and
-operations in the SDK's workflow package. The generated request builders are the
-public API; no handwritten options class or operation wrapper is required.
+operations in the SDK's workflow package. Record-input operations take required
+fields as parameters and optional or defaulted fields through a generated
+`<Operation>Options` class. An overload omitting options uses defaults. Options
+have builders and copy builders; payload argument lists also accept varargs.
+Sourced and omitted fields stay out of the public arguments and options, while
+flattened records expose their fields directly. The operation constructs the
+request internally; no handwritten options class or operation wrapper is
+required.
 
 Records use constructors, getters, and builders. Enums are Java enums, flags are
 `EnumSet` values, variants and results are tagged values, and tuples use

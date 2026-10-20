@@ -5,7 +5,15 @@ package wit.multioperationservice;
 public final class InterceptorServiceOperations {
   private InterceptorServiceOperations() {}
 
-  public static wit.multioperationservice.Response firstOperation(
+  public static wit.multioperationservice.Response firstOperation(String id) {
+    wit.multioperationservice.Request.Builder requestBuilder =
+        wit.multioperationservice.Request.newBuilder();
+    requestBuilder.setId(java.util.Objects.requireNonNull(id, "id"));
+    wit.multioperationservice.Request request = requestBuilder.build();
+    return executeFirstOperation(request);
+  }
+
+  static wit.multioperationservice.Response executeFirstOperation(
       wit.multioperationservice.Request request) {
     wit.multioperationservice.Response result =
         (wit.multioperationservice.Response)
@@ -22,7 +30,15 @@ public final class InterceptorServiceOperations {
     return result;
   }
 
-  public static wit.multioperationservice.Response secondOperation(
+  public static wit.multioperationservice.Response secondOperation(String id) {
+    wit.multioperationservice.Request.Builder requestBuilder =
+        wit.multioperationservice.Request.newBuilder();
+    requestBuilder.setId(java.util.Objects.requireNonNull(id, "id"));
+    wit.multioperationservice.Request request = requestBuilder.build();
+    return executeSecondOperation(request);
+  }
+
+  static wit.multioperationservice.Response executeSecondOperation(
       wit.multioperationservice.Request request) {
     wit.multioperationservice.Response result =
         (wit.multioperationservice.Response)

@@ -6,6 +6,28 @@ public final class TypeRoundtripServiceOperations {
   private TypeRoundtripServiceOperations() {}
 
   public static wit.typeroundtrip.ActivityOptions activityOptionsOperation(
+      io.temporal.common.RetryOptions retryPolicy) {
+    return activityOptionsOperation(
+        retryPolicy, wit.typeroundtrip.ActivityOptionsOperationOptions.getDefaultInstance());
+  }
+
+  public static wit.typeroundtrip.ActivityOptions activityOptionsOperation(
+      io.temporal.common.RetryOptions retryPolicy,
+      wit.typeroundtrip.ActivityOptionsOperationOptions options) {
+    wit.typeroundtrip.ActivityOptions.Builder requestBuilder =
+        wit.typeroundtrip.ActivityOptions.newBuilder();
+    requestBuilder.setRetryPolicy(java.util.Objects.requireNonNull(retryPolicy, "retryPolicy"));
+    if (options != null) {
+      if (options.getTaskQueue() != null) requestBuilder.setTaskQueue(options.getTaskQueue());
+      if (options.getScheduleToCloseTimeout() != null)
+        requestBuilder.setScheduleToCloseTimeout(options.getScheduleToCloseTimeout());
+      if (options.getPriority() != null) requestBuilder.setPriority(options.getPriority());
+    }
+    wit.typeroundtrip.ActivityOptions request = requestBuilder.build();
+    return executeActivityOptionsOperation(request);
+  }
+
+  static wit.typeroundtrip.ActivityOptions executeActivityOptionsOperation(
       wit.typeroundtrip.ActivityOptions request) {
     wit.typeroundtrip.ActivityOptions result =
         (wit.typeroundtrip.ActivityOptions)
@@ -22,7 +44,22 @@ public final class TypeRoundtripServiceOperations {
     return result;
   }
 
+  public static wit.typeroundtrip.FailureContainer failureOperation() {
+    return failureOperation(wit.typeroundtrip.FailureOperationOptions.getDefaultInstance());
+  }
+
   public static wit.typeroundtrip.FailureContainer failureOperation(
+      wit.typeroundtrip.FailureOperationOptions options) {
+    wit.typeroundtrip.FailureContainer.Builder requestBuilder =
+        wit.typeroundtrip.FailureContainer.newBuilder();
+    if (options != null) {
+      if (options.getFailure() != null) requestBuilder.setFailure(options.getFailure());
+    }
+    wit.typeroundtrip.FailureContainer request = requestBuilder.build();
+    return executeFailureOperation(request);
+  }
+
+  static wit.typeroundtrip.FailureContainer executeFailureOperation(
       wit.typeroundtrip.FailureContainer request) {
     wit.typeroundtrip.FailureContainer result =
         (wit.typeroundtrip.FailureContainer)
@@ -40,6 +77,26 @@ public final class TypeRoundtripServiceOperations {
   }
 
   public static wit.typeroundtrip.WorkflowExecutionInfo workflowExecutionInfoOperation(
+      wit.typeroundtrip.WorkflowExecution execution) {
+    return workflowExecutionInfoOperation(
+        execution, wit.typeroundtrip.WorkflowExecutionInfoOperationOptions.getDefaultInstance());
+  }
+
+  public static wit.typeroundtrip.WorkflowExecutionInfo workflowExecutionInfoOperation(
+      wit.typeroundtrip.WorkflowExecution execution,
+      wit.typeroundtrip.WorkflowExecutionInfoOperationOptions options) {
+    wit.typeroundtrip.WorkflowExecutionInfo.Builder requestBuilder =
+        wit.typeroundtrip.WorkflowExecutionInfo.newBuilder();
+    requestBuilder.setExecution(java.util.Objects.requireNonNull(execution, "execution"));
+    if (options != null) {
+      if (options.getParentExecution() != null)
+        requestBuilder.setParentExecution(options.getParentExecution());
+    }
+    wit.typeroundtrip.WorkflowExecutionInfo request = requestBuilder.build();
+    return executeWorkflowExecutionInfoOperation(request);
+  }
+
+  static wit.typeroundtrip.WorkflowExecutionInfo executeWorkflowExecutionInfoOperation(
       wit.typeroundtrip.WorkflowExecutionInfo request) {
     wit.typeroundtrip.WorkflowExecutionInfo result =
         (wit.typeroundtrip.WorkflowExecutionInfo)
@@ -56,7 +113,24 @@ public final class TypeRoundtripServiceOperations {
     return result;
   }
 
+  public static wit.typeroundtrip.TaskQueuePartitions taskQueuePartitionsOperation() {
+    return taskQueuePartitionsOperation(
+        wit.typeroundtrip.TaskQueuePartitionsOperationOptions.getDefaultInstance());
+  }
+
   public static wit.typeroundtrip.TaskQueuePartitions taskQueuePartitionsOperation(
+      wit.typeroundtrip.TaskQueuePartitionsOperationOptions options) {
+    wit.typeroundtrip.TaskQueuePartitions.Builder requestBuilder =
+        wit.typeroundtrip.TaskQueuePartitions.newBuilder();
+    if (options != null) {
+      if (options.getWorkflowTaskQueuePartitions() != null)
+        requestBuilder.setWorkflowTaskQueuePartitions(options.getWorkflowTaskQueuePartitions());
+    }
+    wit.typeroundtrip.TaskQueuePartitions request = requestBuilder.build();
+    return executeTaskQueuePartitionsOperation(request);
+  }
+
+  static wit.typeroundtrip.TaskQueuePartitions executeTaskQueuePartitionsOperation(
       wit.typeroundtrip.TaskQueuePartitions request) {
     wit.typeroundtrip.TaskQueuePartitions result =
         (wit.typeroundtrip.TaskQueuePartitions)
@@ -73,7 +147,22 @@ public final class TypeRoundtripServiceOperations {
     return result;
   }
 
+  public static wit.typeroundtrip.BadBinaries badBinariesOperation() {
+    return badBinariesOperation(wit.typeroundtrip.BadBinariesOperationOptions.getDefaultInstance());
+  }
+
   public static wit.typeroundtrip.BadBinaries badBinariesOperation(
+      wit.typeroundtrip.BadBinariesOperationOptions options) {
+    wit.typeroundtrip.BadBinaries.Builder requestBuilder =
+        wit.typeroundtrip.BadBinaries.newBuilder();
+    if (options != null) {
+      if (options.getBinaries() != null) requestBuilder.setBinaries(options.getBinaries());
+    }
+    wit.typeroundtrip.BadBinaries request = requestBuilder.build();
+    return executeBadBinariesOperation(request);
+  }
+
+  static wit.typeroundtrip.BadBinaries executeBadBinariesOperation(
       wit.typeroundtrip.BadBinaries request) {
     wit.typeroundtrip.BadBinaries result =
         (wit.typeroundtrip.BadBinaries)

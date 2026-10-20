@@ -5,7 +5,34 @@ package wit.startworkflow;
 public final class StartWorkflowServiceOperations {
   private StartWorkflowServiceOperations() {}
 
-  public static StartedWorkflow startWorkflow(wit.startworkflow.StartWorkflowRequest request) {
+  public static StartedWorkflow startWorkflow(
+      String workflow, String workflowId, String taskQueue) {
+    return startWorkflow(
+        workflow,
+        workflowId,
+        taskQueue,
+        wit.startworkflow.StartWorkflowOptions.getDefaultInstance());
+  }
+
+  public static StartedWorkflow startWorkflow(
+      String workflow,
+      String workflowId,
+      String taskQueue,
+      wit.startworkflow.StartWorkflowOptions options) {
+    wit.startworkflow.StartWorkflowRequest.Builder requestBuilder =
+        wit.startworkflow.StartWorkflowRequest.newBuilder();
+    requestBuilder.setWorkflow(java.util.Objects.requireNonNull(workflow, "workflow"));
+    requestBuilder.setWorkflowId(java.util.Objects.requireNonNull(workflowId, "workflowId"));
+    requestBuilder.setTaskQueue(java.util.Objects.requireNonNull(taskQueue, "taskQueue"));
+    if (options != null) {
+      if (options.getWorkflowStartDelay() != null)
+        requestBuilder.setWorkflowStartDelay(options.getWorkflowStartDelay());
+    }
+    wit.startworkflow.StartWorkflowRequest request = requestBuilder.build();
+    return executeStartWorkflow(request);
+  }
+
+  static StartedWorkflow executeStartWorkflow(wit.startworkflow.StartWorkflowRequest request) {
     wit.startworkflow.StartWorkflowResult result =
         (wit.startworkflow.StartWorkflowResult)
             io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
@@ -21,7 +48,34 @@ public final class StartWorkflowServiceOperations {
     return new StartedWorkflow(request.getNamespace(), request.getWorkflowId(), result.getRunId());
   }
 
-  public static StartedWorkflow restartWorkflow(wit.startworkflow.StartWorkflowRequest request) {
+  public static StartedWorkflow restartWorkflow(
+      String workflow, String workflowId, String taskQueue) {
+    return restartWorkflow(
+        workflow,
+        workflowId,
+        taskQueue,
+        wit.startworkflow.RestartWorkflowOptions.getDefaultInstance());
+  }
+
+  public static StartedWorkflow restartWorkflow(
+      String workflow,
+      String workflowId,
+      String taskQueue,
+      wit.startworkflow.RestartWorkflowOptions options) {
+    wit.startworkflow.StartWorkflowRequest.Builder requestBuilder =
+        wit.startworkflow.StartWorkflowRequest.newBuilder();
+    requestBuilder.setWorkflow(java.util.Objects.requireNonNull(workflow, "workflow"));
+    requestBuilder.setWorkflowId(java.util.Objects.requireNonNull(workflowId, "workflowId"));
+    requestBuilder.setTaskQueue(java.util.Objects.requireNonNull(taskQueue, "taskQueue"));
+    if (options != null) {
+      if (options.getWorkflowStartDelay() != null)
+        requestBuilder.setWorkflowStartDelay(options.getWorkflowStartDelay());
+    }
+    wit.startworkflow.StartWorkflowRequest request = requestBuilder.build();
+    return executeRestartWorkflow(request);
+  }
+
+  static StartedWorkflow executeRestartWorkflow(wit.startworkflow.StartWorkflowRequest request) {
     wit.startworkflow.StartWorkflowResult result =
         (wit.startworkflow.StartWorkflowResult)
             io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
@@ -38,6 +92,26 @@ public final class StartWorkflowServiceOperations {
   }
 
   public static wit.startworkflow.CancelWorkflowResponse cancelWorkflow(
+      wit.startworkflow.WorkflowExecution workflowExecution) {
+    return cancelWorkflow(
+        workflowExecution, wit.startworkflow.CancelWorkflowOptions.getDefaultInstance());
+  }
+
+  public static wit.startworkflow.CancelWorkflowResponse cancelWorkflow(
+      wit.startworkflow.WorkflowExecution workflowExecution,
+      wit.startworkflow.CancelWorkflowOptions options) {
+    wit.startworkflow.CancelWorkflowRequest.Builder requestBuilder =
+        wit.startworkflow.CancelWorkflowRequest.newBuilder();
+    requestBuilder.setWorkflowExecution(
+        java.util.Objects.requireNonNull(workflowExecution, "workflowExecution"));
+    if (options != null) {
+      if (options.getReason() != null) requestBuilder.setReason(options.getReason());
+    }
+    wit.startworkflow.CancelWorkflowRequest request = requestBuilder.build();
+    return executeCancelWorkflow(request);
+  }
+
+  static wit.startworkflow.CancelWorkflowResponse executeCancelWorkflow(
       wit.startworkflow.CancelWorkflowRequest request) {
     wit.startworkflow.CancelWorkflowResponse result =
         (wit.startworkflow.CancelWorkflowResponse)

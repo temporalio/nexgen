@@ -5,7 +5,7 @@ use std::fmt::Write;
 use std::path::PathBuf;
 
 use self::java_string_literal as literal;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::generator::json_schema::java as java_json;
 use crate::generator::{
     GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GeneratedOutputLayout,
@@ -178,7 +178,12 @@ fn generate_api(
                 .to_upper_camel_case();
             insert(&n, ctx.service(service, &n))?;
             if crate::nexgen_config::current().mode == crate::generator::GenerationMode::NativeApi {
-                insert(&operations_class(service), ctx.operations(service))?;
+                insert(&operations_class(service), ctx.operations(service)?)?;
+                for operation in &service.operations {
+                    if let Some(options) = ctx.operation_options(service, operation)? {
+                        insert(&options.0, options.1)?;
+                    }
+                }
             }
             for resource in &service.resources {
                 insert(
@@ -578,8 +583,16 @@ impl Context<'_> {
         }
     }
     fn record(&self, record: &Record) -> String {
-        let name = record.name.to_upper_camel_case();
         let params = self.spec.record_type_parameters(&record.full_name);
+        self.render_record(record, &params, false)
+    }
+    fn render_record(
+        &self,
+        record: &Record,
+        params: &[TypeParameterUsage],
+        options: bool,
+    ) -> String {
+        let name = record.name.to_upper_camel_case();
         let args = self.type_args(&params);
         let fields = record
             .fields
@@ -643,17 +656,30 @@ impl Context<'_> {
             )
             .unwrap();
         }
+        if options {
+            writeln!(out, "  public static {args} {name}{args} getDefaultInstance() {{ return {name}.{args}newBuilder().build(); }}").unwrap();
+        }
+        let constructor_prefix = if options {
+            "  private"
+        } else {
+            "  @com.fasterxml.jackson.annotation.JsonCreator\n  public"
+        };
         writeln!(
             out,
-            "  @com.fasterxml.jackson.annotation.JsonCreator\n  public {name}({}) {{",
+            "{constructor_prefix} {name}({}) {{",
             fields
                 .iter()
-                .map(|f| format!(
-                    "@com.fasterxml.jackson.annotation.JsonProperty({}) {} {}",
-                    literal(&ident(&f.name)),
-                    self.field_ty(f),
-                    ident(&f.name)
-                ))
+                .map(|f| {
+                    let annotation = if options {
+                        String::new()
+                    } else {
+                        format!(
+                            "@com.fasterxml.jackson.annotation.JsonProperty({}) ",
+                            literal(&ident(&f.name))
+                        )
+                    };
+                    format!("{annotation}{} {}", self.field_ty(f), ident(&f.name))
+                })
                 .collect::<Vec<_>>()
                 .join(", ")
         )
@@ -728,6 +754,14 @@ impl Context<'_> {
                 ident(&f.name)
             )
             .unwrap();
+            if options && self.field_ty(f) == "java.util.List<Object>" {
+                if matches!(&f.data.wire_binding, Some(PlannedWireFieldBinding::Value { wire_type, .. })
+                    if matches!(wire_type.without_option(), TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m)))
+                        if m.proto.full_name == "temporal.api.common.v1.Payloads"))
+                {
+                    writeln!(out, "    public Builder{args} set{}(Object... values) {{ this.{} = values == null ? null : java.util.Arrays.asList(values); return this; }}", f.name.to_upper_camel_case(), ident(&f.name)).unwrap();
+                }
+            }
         }
         for field in &fields {
             if field.data.wire_binding.is_none() {
@@ -1616,7 +1650,12 @@ impl Context<'_> {
                     let call = format!(
                         "{}.{}({prefix}{})",
                         operations_class(service),
-                        ident(operation_name),
+                        service
+                            .operations
+                            .iter()
+                            .find(|op| op.name == *operation_name)
+                            .map(request_operation_name)
+                            .unwrap_or_else(|| ident(operation_name)),
                         self.request_plan(request_plan)
                     );
                     writeln!(
@@ -1705,7 +1744,247 @@ impl Context<'_> {
         out.push_str("    return null;\n  }\n}\n");
         out
     }
-    fn operations(&self, service: &ServiceSpec<PlannedFamily>) -> String {
+    fn operation_input_record(&self, operation: &OperationSpec<PlannedFamily>) -> Option<&Record> {
+        let TypeSpec::Record(record) = operation.input.as_ref()?.without_option() else {
+            return None;
+        };
+        self.spec.record(&record.full_name)
+    }
+    fn operation_api_fields(&self, model: &Record) -> Result<Vec<RecordFieldSpec<PlannedFamily>>> {
+        let mut fields = Vec::new();
+        for (_, field) in model.public_fields() {
+            if let TypeSpec::Record(nested) = field.field_type.without_option() {
+                if let Some(nested) = self
+                    .spec
+                    .record(&nested.full_name)
+                    .filter(|r| r.flatten_in_api)
+                {
+                    for (_, child) in nested.public_fields() {
+                        let mut child = child.clone();
+                        child.required &= field.required;
+                        if child
+                            .flattened_annotation
+                            .as_ref()
+                            .is_some_and(|a| a.value().is_some())
+                        {
+                            child.annotation = child.flattened_annotation.clone();
+                        }
+                        fields.push(child);
+                    }
+                    continue;
+                }
+            }
+            let mut field = field.clone();
+            if field.function.is_some() && field.data.wire_binding.is_none() {
+                let callable = format!("{}Function", field.name.to_upper_camel_case());
+                let qualified = format!("{}.{callable}", self.named(&model.full_name, &model.name));
+                field.annotation = Some(SelectedTextSpec {
+                    value: Some(self.field_ty(&field).replace(&callable, &qualified)),
+                    import: None,
+                });
+                field.function = None;
+            }
+            fields.push(field);
+        }
+        let mut names = BTreeSet::new();
+        for field in &fields {
+            if !names.insert(ident(&field.name)) {
+                return Err(Error::FlattenedApiFieldConflict {
+                    type_name: model.full_name.clone(),
+                    field: ident(&field.name),
+                    conflicting_field: field.name.clone(),
+                });
+            }
+        }
+        Ok(fields)
+    }
+    fn operation_options_name(
+        &self,
+        service: &ServiceSpec<PlannedFamily>,
+        operation: &OperationSpec<PlannedFamily>,
+    ) -> String {
+        let prefix = if self
+            .spec
+            .services
+            .iter()
+            .flat_map(|s| &s.operations)
+            .filter(|op| op.name.to_upper_camel_case() == operation.name.to_upper_camel_case())
+            .count()
+            > 1
+        {
+            service.name.to_upper_camel_case()
+        } else {
+            String::new()
+        };
+        format!("{prefix}{}Options", operation.name.to_upper_camel_case())
+    }
+    fn options_type_parameters(
+        &self,
+        fields: &[RecordFieldSpec<PlannedFamily>],
+    ) -> Vec<TypeParameterUsage> {
+        let mut parameters = BTreeMap::new();
+        for field in fields.iter().filter(|f| !api_field_required(f)) {
+            if field
+                .annotation
+                .as_ref()
+                .is_none_or(|a| a.value().is_none())
+            {
+                for parameter in self.spec.type_parameters(&field.field_type) {
+                    parameters
+                        .entry(parameter.parameter.full_name.clone())
+                        .or_insert(parameter);
+                }
+            }
+        }
+        parameters.into_values().collect()
+    }
+    fn operation_options(
+        &self,
+        service: &ServiceSpec<PlannedFamily>,
+        operation: &OperationSpec<PlannedFamily>,
+    ) -> Result<Option<(String, String)>> {
+        let Some(model) = self.operation_input_record(operation) else {
+            return Ok(None);
+        };
+        let fields = self.operation_api_fields(model)?;
+        let parameters = self.options_type_parameters(&fields);
+        let fields = fields
+            .into_iter()
+            .filter(|f| !api_field_required(f))
+            .map(|mut f| {
+                f.required = false;
+                (f.name.clone(), f)
+            })
+            .collect::<indexmap::IndexMap<_, _>>();
+        if fields.is_empty() {
+            return Ok(None);
+        }
+        let name = self.operation_options_name(service, operation);
+        let options = RecordSpec {
+            name: name.clone(),
+            full_name: format!("{}.{}", model.full_name, name),
+            doc: operation.doc.clone(),
+            source: None,
+            experimental: operation.experimental,
+            flatten_in_api: false,
+            fields,
+            data: Default::default(),
+        };
+        Ok(Some((
+            name,
+            self.render_record(&options, &parameters, true),
+        )))
+    }
+    fn public_operation(
+        &self,
+        service: &ServiceSpec<PlannedFamily>,
+        operation: &OperationSpec<PlannedFamily>,
+        generic: &str,
+        result_type: &str,
+        generic_output: bool,
+    ) -> Result<String> {
+        let Some(model) = self.operation_input_record(operation) else {
+            return Ok(String::new());
+        };
+        let fields = self.operation_api_fields(model)?;
+        let required = fields
+            .iter()
+            .filter(|f| api_field_required(f))
+            .collect::<Vec<_>>();
+        let optional = fields
+            .iter()
+            .filter(|f| !api_field_required(f))
+            .collect::<Vec<_>>();
+        let mut names = required
+            .iter()
+            .map(|f| ident(&f.name))
+            .collect::<BTreeSet<_>>();
+        let endpoint = available_identifier("endpoint", &mut names);
+        let result_parameter = available_identifier("resultType", &mut names);
+        let options = available_identifier("options", &mut names);
+        let builder = available_identifier("requestBuilder", &mut names);
+        let request = available_identifier("request", &mut names);
+        let mut parameters = Vec::new();
+        let mut arguments = Vec::new();
+        if service.endpoint.is_none() {
+            parameters.push(format!("String {endpoint}"));
+            arguments.push(endpoint.clone());
+        }
+        for field in &required {
+            let name = ident(&field.name);
+            parameters.push(format!("{} {name}", self.field_ty(field)));
+            arguments.push(name);
+        }
+        if generic_output {
+            parameters.push(format!("java.lang.reflect.Type {result_parameter}"));
+            arguments.push(result_parameter.clone());
+        }
+        let method = ident(&operation.name);
+        let mut out = String::new();
+        if !optional.is_empty() {
+            let options_name = self.operation_options_name(service, operation);
+            let args = self.type_args(&self.options_type_parameters(&fields));
+            let options_type = format!("{}.{options_name}{args}", self.package);
+            let default = format!("{}.{options_name}.{args}getDefaultInstance()", self.package);
+            let forwarded = arguments
+                .iter()
+                .cloned()
+                .chain(std::iter::once(default))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let returned = if result_type == "void" { "" } else { "return " };
+            writeln!(out, "  public static {generic}{result_type} {method}({}) {{\n    {returned}{method}({forwarded});\n  }}", parameters.join(", ")).unwrap();
+            parameters.push(format!("{options_type} {options}"));
+        }
+        render_java_doc_comment(&mut out, "  ", operation.doc.value(), &[]);
+        writeln!(
+            out,
+            "  public static {generic}{result_type} {method}({}) {{",
+            parameters.join(", ")
+        )
+        .unwrap();
+        let input_type = self.ty(operation.input.as_ref().unwrap());
+        let input_class = input_type.split('<').next().unwrap();
+        let input_args = self.type_args(&self.spec.record_type_parameters(&model.full_name));
+        writeln!(out, "    {input_class}.Builder{input_args} {builder} = {input_class}.{input_args}newBuilder();").unwrap();
+        for field in required {
+            writeln!(
+                out,
+                "    {builder}.set{}(java.util.Objects.requireNonNull({}, {}));",
+                field.name.to_upper_camel_case(),
+                ident(&field.name),
+                literal(&ident(&field.name))
+            )
+            .unwrap();
+        }
+        if !optional.is_empty() {
+            writeln!(out, "    if ({options} != null) {{").unwrap();
+            for field in optional {
+                let name = field.name.to_upper_camel_case();
+                writeln!(out, "      if ({options}.get{name}() != null) {builder}.set{name}({options}.get{name}());").unwrap();
+            }
+            out.push_str("    }\n");
+        }
+        writeln!(out, "    {input_type} {request} = {builder}.build();").unwrap();
+        let mut arguments = Vec::new();
+        if service.endpoint.is_none() {
+            arguments.push(endpoint);
+        }
+        arguments.push(request);
+        if generic_output {
+            arguments.push(result_parameter);
+        }
+        let returned = if result_type == "void" { "" } else { "return " };
+        writeln!(
+            out,
+            "    {returned}{}({});\n  }}",
+            request_operation_name(operation),
+            arguments.join(", ")
+        )
+        .unwrap();
+        Ok(out)
+    }
+    fn operations(&self, service: &ServiceSpec<PlannedFamily>) -> Result<String> {
         let name = operations_class(service);
         let (modifier, visibility) = if service.operations_class.value().is_some() {
             ("abstract", "protected")
@@ -1755,7 +2034,7 @@ impl Context<'_> {
             } else {
                 format!("<{}> ", params.into_iter().collect::<Vec<_>>().join(", "))
             };
-            let method = ident(&op.name);
+            let method = request_operation_name(op);
             let endpoint = literal(service.endpoint.as_deref().unwrap_or(""));
             let resource_result = op
                 .data
@@ -1837,11 +2116,49 @@ impl Context<'_> {
             } else {
                 format!("return {transform};")
             };
-            writeln!(out, "  public static {generic}{result_ty} {method}({method_parameters}) {{\n    {output} result = ({output}) io.temporal.workflow.Workflow.newUntypedNexusServiceStub({}, io.temporal.workflow.NexusServiceOptions.newBuilder().setEndpoint({endpoint}).build()).execute({}, {raw_output}.class, {output_type_expression}, {argument});\n    {result_statement}\n  }}", literal(&service.wire_name), literal(&op.wire_name)).unwrap();
+            out.push_str(&self.public_operation(
+                service,
+                op,
+                &generic,
+                result_ty,
+                !output_type_parameter.is_empty(),
+            )?);
+            let visibility = if self.operation_input_record(op).is_some() {
+                ""
+            } else {
+                "public "
+            };
+            writeln!(out, "  {visibility}static {generic}{result_ty} {method}({method_parameters}) {{\n    {output} result = ({output}) io.temporal.workflow.Workflow.newUntypedNexusServiceStub({}, io.temporal.workflow.NexusServiceOptions.newBuilder().setEndpoint({endpoint}).build()).execute({}, {raw_output}.class, {output_type_expression}, {argument});\n    {result_statement}\n  }}", literal(&service.wire_name), literal(&op.wire_name)).unwrap();
         }
         out.push_str("}\n");
-        out
+        Ok(out)
     }
+}
+
+fn api_field_required(field: &RecordFieldSpec<PlannedFamily>) -> bool {
+    field.required
+        && !matches!(field.field_type, TypeSpec::Option(_))
+        && field.default_value.is_none()
+        && field.data.default_enum_value.is_none()
+}
+
+fn request_operation_name(operation: &OperationSpec<PlannedFamily>) -> String {
+    if matches!(
+        operation.input.as_ref().map(TypeSpec::without_option),
+        Some(TypeSpec::Record(_))
+    ) {
+        format!("execute{}", operation.name.to_upper_camel_case())
+    } else {
+        ident(&operation.name)
+    }
+}
+
+fn available_identifier(base: &str, used: &mut BTreeSet<String>) -> String {
+    let mut name = base.to_string();
+    while !used.insert(name.clone()) {
+        name.push('_');
+    }
+    name
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

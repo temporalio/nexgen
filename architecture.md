@@ -121,7 +121,12 @@ flowchart LR
 Native Java operation rendering honors the selected operations-class name.
 Explicit names produce an inheritable generated base for SDK facades, allowing
 new operations to become available without editing the facade. Package placement
-is controlled by the Java package option; request builders carry API options.
+is controlled by the Java package option. The renderer splits record inputs
+using existing requiredness, defaults, visibility, and flattening metadata:
+required fields become method parameters and optional fields become a generated
+options class. Public methods build the transfer request and call a
+package-private execution helper, also used by generated resource methods. This
+is Java rendering policy, with no additional planning pass or metadata.
 
 The Java backend renders native declarations and external protobuf bindings from
 `PlannedFamily`, alongside its existing JSON Schema renderer. Java-specific type

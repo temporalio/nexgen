@@ -6,6 +6,19 @@ public final class FunctionExecutionOperations {
   private FunctionExecutionOperations() {}
 
   public static wit.functionexecution.ExecuteFunctionResult executeFunction(
+      wit.functionexecution.ExecuteFunctionRequest.FunctionFunction function,
+      String name,
+      Boolean enabled) {
+    wit.functionexecution.ExecuteFunctionRequest.Builder requestBuilder =
+        wit.functionexecution.ExecuteFunctionRequest.newBuilder();
+    requestBuilder.setFunction(java.util.Objects.requireNonNull(function, "function"));
+    requestBuilder.setName(java.util.Objects.requireNonNull(name, "name"));
+    requestBuilder.setEnabled(java.util.Objects.requireNonNull(enabled, "enabled"));
+    wit.functionexecution.ExecuteFunctionRequest request = requestBuilder.build();
+    return executeExecuteFunction(request);
+  }
+
+  static wit.functionexecution.ExecuteFunctionResult executeExecuteFunction(
       wit.functionexecution.ExecuteFunctionRequest request) {
     wit.functionexecution.ExecuteFunctionResult result =
         (wit.functionexecution.ExecuteFunctionResult)
@@ -23,6 +36,19 @@ public final class FunctionExecutionOperations {
   }
 
   public static wit.functionexecution.ExecuteCountedFunctionResult executeCountedFunction(
+      wit.functionexecution.ExecuteCountedFunctionRequest.FunctionFunction function,
+      String name,
+      Integer count) {
+    wit.functionexecution.ExecuteCountedFunctionRequest.Builder requestBuilder =
+        wit.functionexecution.ExecuteCountedFunctionRequest.newBuilder();
+    requestBuilder.setFunction(java.util.Objects.requireNonNull(function, "function"));
+    requestBuilder.setName(java.util.Objects.requireNonNull(name, "name"));
+    requestBuilder.setCount(java.util.Objects.requireNonNull(count, "count"));
+    wit.functionexecution.ExecuteCountedFunctionRequest request = requestBuilder.build();
+    return executeExecuteCountedFunction(request);
+  }
+
+  static wit.functionexecution.ExecuteCountedFunctionResult executeExecuteCountedFunction(
       wit.functionexecution.ExecuteCountedFunctionRequest request) {
     wit.functionexecution.ExecuteCountedFunctionResult result =
         (wit.functionexecution.ExecuteCountedFunctionResult)
@@ -40,6 +66,21 @@ public final class FunctionExecutionOperations {
   }
 
   public static wit.functionexecution.ExecuteNamedFunctionResult executeNamedFunction(
+      wit.functionexecution.NexgenRuntime.FunctionReference<
+              wit.functionexecution.ExecuteNamedFunctionRequest.FunctionFunction, String>
+          function,
+      String name,
+      Boolean enabled) {
+    wit.functionexecution.ExecuteNamedFunctionRequest.Builder requestBuilder =
+        wit.functionexecution.ExecuteNamedFunctionRequest.newBuilder();
+    requestBuilder.setFunction(java.util.Objects.requireNonNull(function, "function"));
+    requestBuilder.setName(java.util.Objects.requireNonNull(name, "name"));
+    requestBuilder.setEnabled(java.util.Objects.requireNonNull(enabled, "enabled"));
+    wit.functionexecution.ExecuteNamedFunctionRequest request = requestBuilder.build();
+    return executeExecuteNamedFunction(request);
+  }
+
+  static wit.functionexecution.ExecuteNamedFunctionResult executeExecuteNamedFunction(
       wit.functionexecution.ExecuteNamedFunctionRequest request) {
     wit.functionexecution.ExecuteNamedFunctionResult result =
         (wit.functionexecution.ExecuteNamedFunctionResult)
@@ -57,6 +98,25 @@ public final class FunctionExecutionOperations {
   }
 
   public static wit.functionexecution.ExecuteVarargsFunctionResult executeVarargsFunction(
+      wit.functionexecution.ExecuteVarargsFunctionRequest.FunctionFunction function) {
+    return executeVarargsFunction(
+        function, wit.functionexecution.ExecuteVarargsFunctionOptions.getDefaultInstance());
+  }
+
+  public static wit.functionexecution.ExecuteVarargsFunctionResult executeVarargsFunction(
+      wit.functionexecution.ExecuteVarargsFunctionRequest.FunctionFunction function,
+      wit.functionexecution.ExecuteVarargsFunctionOptions options) {
+    wit.functionexecution.ExecuteVarargsFunctionRequest.Builder requestBuilder =
+        wit.functionexecution.ExecuteVarargsFunctionRequest.newBuilder();
+    requestBuilder.setFunction(java.util.Objects.requireNonNull(function, "function"));
+    if (options != null) {
+      if (options.getArgs() != null) requestBuilder.setArgs(options.getArgs());
+    }
+    wit.functionexecution.ExecuteVarargsFunctionRequest request = requestBuilder.build();
+    return executeExecuteVarargsFunction(request);
+  }
+
+  static wit.functionexecution.ExecuteVarargsFunctionResult executeExecuteVarargsFunction(
       wit.functionexecution.ExecuteVarargsFunctionRequest request) {
     wit.functionexecution.ExecuteVarargsFunctionResult result =
         (wit.functionexecution.ExecuteVarargsFunctionResult)
@@ -74,6 +134,29 @@ public final class FunctionExecutionOperations {
   }
 
   public static wit.functionexecution.ExecuteNamedVarargsFunctionResult executeNamedVarargsFunction(
+      wit.functionexecution.NexgenRuntime.FunctionReference<
+              wit.functionexecution.ExecuteNamedVarargsFunctionRequest.FunctionFunction, String>
+          function) {
+    return executeNamedVarargsFunction(
+        function, wit.functionexecution.ExecuteNamedVarargsFunctionOptions.getDefaultInstance());
+  }
+
+  public static wit.functionexecution.ExecuteNamedVarargsFunctionResult executeNamedVarargsFunction(
+      wit.functionexecution.NexgenRuntime.FunctionReference<
+              wit.functionexecution.ExecuteNamedVarargsFunctionRequest.FunctionFunction, String>
+          function,
+      wit.functionexecution.ExecuteNamedVarargsFunctionOptions options) {
+    wit.functionexecution.ExecuteNamedVarargsFunctionRequest.Builder requestBuilder =
+        wit.functionexecution.ExecuteNamedVarargsFunctionRequest.newBuilder();
+    requestBuilder.setFunction(java.util.Objects.requireNonNull(function, "function"));
+    if (options != null) {
+      if (options.getArgs() != null) requestBuilder.setArgs(options.getArgs());
+    }
+    wit.functionexecution.ExecuteNamedVarargsFunctionRequest request = requestBuilder.build();
+    return executeExecuteNamedVarargsFunction(request);
+  }
+
+  static wit.functionexecution.ExecuteNamedVarargsFunctionResult executeExecuteNamedVarargsFunction(
       wit.functionexecution.ExecuteNamedVarargsFunctionRequest request) {
     wit.functionexecution.ExecuteNamedVarargsFunctionResult result =
         (wit.functionexecution.ExecuteNamedVarargsFunctionResult)
