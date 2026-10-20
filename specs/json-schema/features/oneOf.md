@@ -658,14 +658,15 @@ uses ([[additionalProperties]]). Writing dispatches on the member's runtime
 type: a model through its own converter, a wrapper by writing its `Value`.
 
 A **property-level** union is the same interface nested in the declaring model
-as `<Member>Union` (`Showcase.DetailUnion`), so it cannot collide with the
-member's own property name. As in Java, its wrappers are declared beside the
-interface in the declaring model rather than inside it, so a call site names
-`Showcase.DetailUnionString` instead of repeating the interface name
-(`Showcase.DetailUnion.DetailUnionString`). The wrappers therefore share the
-model's member scope, and a member spelled like one is a P15 collision. Its
-structured branches are top-level records that name the interface through the
-declaring type:
+as `<Member>Union` (`Showcase.DetailUnion`). The suffix is required: C# keeps a
+type's properties and nested types in one declaration space, so the interface
+cannot share the `Detail` property's name (CS0102; see **PRINCIPLES C# §2**). As
+in Java, its wrappers are declared beside the interface in the declaring model
+rather than inside it, so a call site names `Showcase.DetailUnionString` instead
+of repeating the interface name (`Showcase.DetailUnion.DetailUnionString`). The
+wrappers therefore share the model's member scope, and a member spelled like one
+is a P15 collision. Its structured branches are top-level records that name the
+interface through the declaring type:
 
 ```csharp
 public sealed record Showcase
