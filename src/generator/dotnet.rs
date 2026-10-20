@@ -109,12 +109,6 @@ impl<'a> ApiPlanner<'a> {
         }
         let module_imports = self.namespaces.module_imports(self.api_plan);
         imports.extend(module_imports.iter().map(String::as_str));
-        imports.extend(
-            self.external_model_fragments
-                .aliases
-                .iter()
-                .map(String::as_str),
-        );
         let mut output = generated_file_prelude(namespace, &imports);
         if needs_result {
             render_result_helper(&mut output);

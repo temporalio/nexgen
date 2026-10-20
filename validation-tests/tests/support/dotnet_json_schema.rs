@@ -2898,9 +2898,9 @@ Check.ParseFails<Holder>("{\"stamp\":\"x\",\"myJsonElement\":{\"value\":\"nope\"
     );
 }
 
-/// Generated code spells the runtime support types through the
-/// `NexgenRuntime::` alias qualifier, which no member or type can capture, so
-/// a member may take a runtime type's name and a type may take the alias's.
+/// Generated code spells the runtime support types fully qualified
+/// (`global::<root namespace>.Violation`), which no member or type can capture,
+/// so a member may take a runtime type's name.
 #[test]
 fn csharp_json_runtime_type_names_are_free_member_names() {
     let case = JsonCase::new("runtime-member-names");

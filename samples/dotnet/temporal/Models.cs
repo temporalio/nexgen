@@ -7,7 +7,6 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using NexgenRuntime = global::Nexgen.JsonSchema.Temporal;
 
 namespace Nexgen.JsonSchema.Temporal
 {
@@ -84,32 +83,32 @@ namespace Nexgen.JsonSchema.Temporal
             {
                 return true;
             }
-            return NexgenRuntime::ValueEquality.Equal(this.CreatedAt, other.CreatedAt)
-                && NexgenRuntime::ValueEquality.Equal(this.Birthday, other.Birthday)
-                && NexgenRuntime::ValueEquality.Equal(this.Alarm, other.Alarm)
-                && NexgenRuntime::ValueEquality.Equal(this.Timeout, other.Timeout)
-                && NexgenRuntime::ValueEquality.Equal(this.UpdatedAt, other.UpdatedAt)
-                && NexgenRuntime::ValueEquality.Equal(this.ExpiresOn, other.ExpiresOn)
-                && NexgenRuntime::ValueEquality.Equal(this.Reminder, other.Reminder)
-                && NexgenRuntime::ValueEquality.Equal(this.RetryDelay, other.RetryDelay)
-                && NexgenRuntime::ValueEquality.Equal(this.DeletedAt, other.DeletedAt)
-                && NexgenRuntime::ValueEquality.Equal(this.ArchivedOn, other.ArchivedOn);
+            return global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.CreatedAt, other.CreatedAt)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.Birthday, other.Birthday)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.Alarm, other.Alarm)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.Timeout, other.Timeout)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.UpdatedAt, other.UpdatedAt)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.ExpiresOn, other.ExpiresOn)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.Reminder, other.Reminder)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.RetryDelay, other.RetryDelay)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.DeletedAt, other.DeletedAt)
+                && global::Nexgen.JsonSchema.Temporal.ValueEquality.Equal(this.ArchivedOn, other.ArchivedOn);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
             var hash = new global::System.HashCode();
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.CreatedAt));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Birthday));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Alarm));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Timeout));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.UpdatedAt));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ExpiresOn));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.Reminder));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.RetryDelay));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.DeletedAt));
-            hash.Add(NexgenRuntime::ValueEquality.Hash(this.ArchivedOn));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.CreatedAt));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.Birthday));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.Alarm));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.Timeout));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.UpdatedAt));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.ExpiresOn));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.Reminder));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.RetryDelay));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.DeletedAt));
+            hash.Add(global::Nexgen.JsonSchema.Temporal.ValueEquality.Hash(this.ArchivedOn));
             return hash.ToHashCode();
         }
 
@@ -125,11 +124,11 @@ namespace Nexgen.JsonSchema.Temporal
             public override Temporal Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
             {
                 var node = global::System.Text.Json.JsonElement.ParseValue(ref reader);
-                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
+                var violations = new global::System.Collections.Generic.List<global::Nexgen.JsonSchema.Temporal.Violation>();
                 var value = Parse(node, "", violations);
                 if (value is null || violations.Count > 0)
                 {
-                    throw NexgenRuntime::Violation.Failure(violations);
+                    throw global::Nexgen.JsonSchema.Temporal.Violation.Failure(violations);
                 }
                 return value;
             }
@@ -137,56 +136,56 @@ namespace Nexgen.JsonSchema.Temporal
             /// <inheritdoc/>
             public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Temporal value, global::System.Text.Json.JsonSerializerOptions options)
             {
-                var violations = new global::System.Collections.Generic.List<NexgenRuntime::Violation>();
+                var violations = new global::System.Collections.Generic.List<global::Nexgen.JsonSchema.Temporal.Violation>();
                 if (value is null)
                 {
-                    violations.Add(new NexgenRuntime::Violation("", "expected object"));
-                    throw NexgenRuntime::Violation.Failure(violations);
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation("", "expected object"));
+                    throw global::Nexgen.JsonSchema.Temporal.Violation.Failure(violations);
                 }
                 Validate(value, "", violations);
                 if (violations.Count > 0)
                 {
-                    throw NexgenRuntime::Violation.Failure(violations);
+                    throw global::Nexgen.JsonSchema.Temporal.Violation.Failure(violations);
                 }
                 WriteValue(writer, value);
             }
 
-            internal static Temporal? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            internal static Temporal? Parse(global::System.Text.Json.JsonElement node, string path, global::System.Collections.Generic.List<global::Nexgen.JsonSchema.Temporal.Violation> violations)
             {
                 if (node.ValueKind != global::System.Text.Json.JsonValueKind.Object)
                 {
-                    violations.Add(new NexgenRuntime::Violation(path, "expected object"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(path, "expected object"));
                     return null;
                 }
                 var start = violations.Count;
-                var members = NexgenRuntime::SpecJson.Members(node);
+                var members = global::Nexgen.JsonSchema.Temporal.SpecJson.Members(node);
                 foreach (var member in members)
                 {
                     if (member.Key == "createdAt" || member.Key == "birthday" || member.Key == "alarm" || member.Key == "timeout" || member.Key == "updatedAt" || member.Key == "expiresOn" || member.Key == "reminder" || member.Key == "retryDelay" || member.Key == "deletedAt" || member.Key == "archivedOn")
                     {
                         continue;
                     }
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Member(path, member.Key), "unknown field"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Member(path, member.Key), "unknown field"));
                 }
                 global::System.DateTimeOffset? parsedCreatedAt = null;
                 if (!members.TryGetValue("createdAt", out var nodeCreatedAt))
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "createdAt"), "required"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "createdAt"), "required"));
                 }
                 else if (nodeCreatedAt.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "createdAt"), "explicit null not allowed"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "createdAt"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeCreatedAt.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "createdAt"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "createdAt"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeCreatedAt.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseDateTime(text0, NexgenRuntime::Violation.Join(path, "createdAt"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseDateTime(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "createdAt"), violations) is { } temporal0)
                         {
                             parsedCreatedAt = temporal0;
                         }
@@ -195,22 +194,22 @@ namespace Nexgen.JsonSchema.Temporal
                 global::System.DateOnly? parsedBirthday = null;
                 if (!members.TryGetValue("birthday", out var nodeBirthday))
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "birthday"), "required"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "birthday"), "required"));
                 }
                 else if (nodeBirthday.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "birthday"), "explicit null not allowed"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "birthday"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeBirthday.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "birthday"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "birthday"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeBirthday.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseDate(text0, NexgenRuntime::Violation.Join(path, "birthday"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseDate(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "birthday"), violations) is { } temporal0)
                         {
                             parsedBirthday = temporal0;
                         }
@@ -219,22 +218,22 @@ namespace Nexgen.JsonSchema.Temporal
                 string? parsedAlarm = null;
                 if (!members.TryGetValue("alarm", out var nodeAlarm))
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "alarm"), "required"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "alarm"), "required"));
                 }
                 else if (nodeAlarm.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "alarm"), "explicit null not allowed"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "alarm"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeAlarm.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "alarm"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "alarm"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeAlarm.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseTime(text0, NexgenRuntime::Violation.Join(path, "alarm"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseTime(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "alarm"), violations) is { } temporal0)
                         {
                             parsedAlarm = temporal0;
                         }
@@ -243,22 +242,22 @@ namespace Nexgen.JsonSchema.Temporal
                 global::System.TimeSpan? parsedTimeout = null;
                 if (!members.TryGetValue("timeout", out var nodeTimeout))
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "timeout"), "required"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "timeout"), "required"));
                 }
                 else if (nodeTimeout.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "timeout"), "explicit null not allowed"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "timeout"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeTimeout.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "timeout"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "timeout"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeTimeout.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseDuration(text0, NexgenRuntime::Violation.Join(path, "timeout"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseDuration(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "timeout"), violations) is { } temporal0)
                         {
                             parsedTimeout = temporal0;
                         }
@@ -270,18 +269,18 @@ namespace Nexgen.JsonSchema.Temporal
                 }
                 else if (nodeUpdatedAt.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "updatedAt"), "explicit null not allowed"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "updatedAt"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeUpdatedAt.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "updatedAt"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "updatedAt"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeUpdatedAt.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseDateTime(text0, NexgenRuntime::Violation.Join(path, "updatedAt"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseDateTime(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "updatedAt"), violations) is { } temporal0)
                         {
                             parsedUpdatedAt = temporal0;
                         }
@@ -293,18 +292,18 @@ namespace Nexgen.JsonSchema.Temporal
                 }
                 else if (nodeExpiresOn.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "expiresOn"), "explicit null not allowed"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "expiresOn"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeExpiresOn.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "expiresOn"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "expiresOn"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeExpiresOn.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseDate(text0, NexgenRuntime::Violation.Join(path, "expiresOn"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseDate(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "expiresOn"), violations) is { } temporal0)
                         {
                             parsedExpiresOn = temporal0;
                         }
@@ -316,18 +315,18 @@ namespace Nexgen.JsonSchema.Temporal
                 }
                 else if (nodeReminder.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "reminder"), "explicit null not allowed"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "reminder"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeReminder.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "reminder"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "reminder"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeReminder.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseTime(text0, NexgenRuntime::Violation.Join(path, "reminder"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseTime(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "reminder"), violations) is { } temporal0)
                         {
                             parsedReminder = temporal0;
                         }
@@ -339,18 +338,18 @@ namespace Nexgen.JsonSchema.Temporal
                 }
                 else if (nodeRetryDelay.ValueKind == global::System.Text.Json.JsonValueKind.Null)
                 {
-                    violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "retryDelay"), "explicit null not allowed"));
+                    violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "retryDelay"), "explicit null not allowed"));
                 }
                 else
                 {
                     if (nodeRetryDelay.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "retryDelay"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "retryDelay"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeRetryDelay.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseDuration(text0, NexgenRuntime::Violation.Join(path, "retryDelay"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseDuration(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "retryDelay"), violations) is { } temporal0)
                         {
                             parsedRetryDelay = temporal0;
                         }
@@ -367,12 +366,12 @@ namespace Nexgen.JsonSchema.Temporal
                 {
                     if (nodeDeletedAt.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "deletedAt"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "deletedAt"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeDeletedAt.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseDateTime(text0, NexgenRuntime::Violation.Join(path, "deletedAt"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseDateTime(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "deletedAt"), violations) is { } temporal0)
                         {
                             parsedDeletedAt = temporal0;
                         }
@@ -389,12 +388,12 @@ namespace Nexgen.JsonSchema.Temporal
                 {
                     if (nodeArchivedOn.ValueKind != global::System.Text.Json.JsonValueKind.String)
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "archivedOn"), "expected string"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "archivedOn"), "expected string"));
                     }
                     else
                     {
                         var text0 = nodeArchivedOn.GetString()!;
-                        if (NexgenRuntime::TemporalSupport.ParseDate(text0, NexgenRuntime::Violation.Join(path, "archivedOn"), violations) is { } temporal0)
+                        if (global::Nexgen.JsonSchema.Temporal.TemporalSupport.ParseDate(text0, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "archivedOn"), violations) is { } temporal0)
                         {
                             parsedArchivedOn = temporal0;
                         }
@@ -419,64 +418,64 @@ namespace Nexgen.JsonSchema.Temporal
                 };
             }
 
-            internal static void Validate(Temporal value, string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            internal static void Validate(Temporal value, string path, global::System.Collections.Generic.List<global::Nexgen.JsonSchema.Temporal.Violation> violations)
             {
                 {
                     var member = value.CreatedAt;
-                    NexgenRuntime::TemporalSupport.CheckDateTime(member, NexgenRuntime::Violation.Join(path, "createdAt"), violations);
+                    global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckDateTime(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "createdAt"), violations);
                 }
                 {
                     var member = value.Birthday;
-                    NexgenRuntime::TemporalSupport.CheckDate(member, NexgenRuntime::Violation.Join(path, "birthday"), violations);
+                    global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckDate(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "birthday"), violations);
                 }
                 {
                     if (value.Alarm is { } member)
                     {
-                        NexgenRuntime::TemporalSupport.CheckTime(member, NexgenRuntime::Violation.Join(path, "alarm"), violations);
+                        global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckTime(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "alarm"), violations);
                     }
                     else
                     {
-                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Join(path, "alarm"), "required"));
+                        violations.Add(new global::Nexgen.JsonSchema.Temporal.Violation(global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "alarm"), "required"));
                     }
                 }
                 {
                     var member = value.Timeout;
-                    NexgenRuntime::TemporalSupport.CheckDuration(member, NexgenRuntime::Violation.Join(path, "timeout"), violations);
+                    global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckDuration(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "timeout"), violations);
                 }
                 {
                     if (value.UpdatedAt is { } member)
                     {
-                        NexgenRuntime::TemporalSupport.CheckDateTime(member, NexgenRuntime::Violation.Join(path, "updatedAt"), violations);
+                        global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckDateTime(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "updatedAt"), violations);
                     }
                 }
                 {
                     if (value.ExpiresOn is { } member)
                     {
-                        NexgenRuntime::TemporalSupport.CheckDate(member, NexgenRuntime::Violation.Join(path, "expiresOn"), violations);
+                        global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckDate(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "expiresOn"), violations);
                     }
                 }
                 {
                     if (value.Reminder is { } member)
                     {
-                        NexgenRuntime::TemporalSupport.CheckTime(member, NexgenRuntime::Violation.Join(path, "reminder"), violations);
+                        global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckTime(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "reminder"), violations);
                     }
                 }
                 {
                     if (value.RetryDelay is { } member)
                     {
-                        NexgenRuntime::TemporalSupport.CheckDuration(member, NexgenRuntime::Violation.Join(path, "retryDelay"), violations);
+                        global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckDuration(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "retryDelay"), violations);
                     }
                 }
                 {
                     if (value.DeletedAt is { } member)
                     {
-                        NexgenRuntime::TemporalSupport.CheckDateTime(member, NexgenRuntime::Violation.Join(path, "deletedAt"), violations);
+                        global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckDateTime(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "deletedAt"), violations);
                     }
                 }
                 {
                     if (value.ArchivedOn is { } member)
                     {
-                        NexgenRuntime::TemporalSupport.CheckDate(member, NexgenRuntime::Violation.Join(path, "archivedOn"), violations);
+                        global::Nexgen.JsonSchema.Temporal.TemporalSupport.CheckDate(member, global::Nexgen.JsonSchema.Temporal.Violation.Join(path, "archivedOn"), violations);
                     }
                 }
             }
@@ -485,45 +484,45 @@ namespace Nexgen.JsonSchema.Temporal
             {
                 writer.WriteStartObject();
                 writer.WritePropertyName("createdAt");
-                writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDateTime(value.CreatedAt));
+                writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatDateTime(value.CreatedAt));
                 writer.WritePropertyName("birthday");
-                writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDate(value.Birthday));
+                writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatDate(value.Birthday));
                 if (value.Alarm is { } memberAlarm)
                 {
                     writer.WritePropertyName("alarm");
-                    writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatTime(memberAlarm));
+                    writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatTime(memberAlarm));
                 }
                 writer.WritePropertyName("timeout");
-                writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDuration(value.Timeout));
+                writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatDuration(value.Timeout));
                 if (value.UpdatedAt is { } memberUpdatedAt)
                 {
                     writer.WritePropertyName("updatedAt");
-                    writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDateTime(memberUpdatedAt));
+                    writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatDateTime(memberUpdatedAt));
                 }
                 if (value.ExpiresOn is { } memberExpiresOn)
                 {
                     writer.WritePropertyName("expiresOn");
-                    writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDate(memberExpiresOn));
+                    writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatDate(memberExpiresOn));
                 }
                 if (value.Reminder is { } memberReminder)
                 {
                     writer.WritePropertyName("reminder");
-                    writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatTime(memberReminder));
+                    writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatTime(memberReminder));
                 }
                 if (value.RetryDelay is { } memberRetryDelay)
                 {
                     writer.WritePropertyName("retryDelay");
-                    writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDuration(memberRetryDelay));
+                    writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatDuration(memberRetryDelay));
                 }
                 if (value.DeletedAt is { } memberDeletedAt)
                 {
                     writer.WritePropertyName("deletedAt");
-                    writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDateTime(memberDeletedAt));
+                    writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatDateTime(memberDeletedAt));
                 }
                 if (value.ArchivedOn is { } memberArchivedOn)
                 {
                     writer.WritePropertyName("archivedOn");
-                    writer.WriteStringValue(NexgenRuntime::TemporalSupport.FormatDate(memberArchivedOn));
+                    writer.WriteStringValue(global::Nexgen.JsonSchema.Temporal.TemporalSupport.FormatDate(memberArchivedOn));
                 }
                 writer.WriteEndObject();
             }
