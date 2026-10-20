@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.10] - 2026-10-20
+
+### Added
+
+- Go system Nexus code generation supports `@nexus.serialization-context` helpers and emits an operation registry keyed by wire service and operation names, allowing the SDK to select the serialization context for an operation's nested user payloads.
+- Generated Go model types expose value-receiver getters for exported fields, allowing support packages to consume models through interfaces without importing the generated package.
+- Go WIT function references support `go-value-type` / `go-args-type` representation overrides and `go-name-extractor` helpers that can resolve registered workflow aliases.
+- TypeScript generation now supports the notification-service, proto-generic, and proto-oneof WIT examples, including nested generic protobuf payload carriers, required and optional oneofs, and model-only exports with generic transfer converters.
+- Generated TypeScript protobuf helpers now use non-null input/output contracts, and oneof switches fail typechecking when a discriminator or variant case is unhandled.
+
+### Changed
+
+- Generated protobuf-backed Go models used as eligible top-level Nexus inputs or outputs implement `TransferTypeConverter`, deferring model conversion to the SDK. Ordinary Nexus models use the public transfer converter API; system Nexus models receive the SDK-selected data converter with the operation's serialization context applied.
+- Generated Go request models expose `@nexus.source` fields as exported fields populated at the operation call site before SDK conversion, making them available to serialization-context helpers.
+- Generated TypeScript `requiredField` helpers are now private to the modules that use them, rather than exported from `models.ts`; unused definitions are omitted.
+- Go convenience wrappers derive function argument grouping and variadic placement from their signatures and primary role, not argument-field names. Signals retain their name-and-single-payload API through explicit Go representation overrides.
+- `cargo test --all-features` no longer requires language-specific toolchains. `cargo validate <language>` now runs that language's generated-code compilation and runtime regressions alongside its sample checks.
+- `cargo validate conformance` checks JSON Schema behavior across Go, Java, Python, and TypeScript, and is included in full validation.
+
+### Fixed
+
+- Render `@nexus.doc` on WIT variants and their cases in Python, TypeScript, Go, and .NET, including per-language overrides and protobuf oneof-backed cases.
+- Go and .NET now honor `@nexus.default` WIT directives.
+- Fix .NET protobuf-backed model conversion for list elements and map values, populating protobuf collections instead of assigning incompatible model collections.
+- Fix accidental identifier shadowing in Python transfer converters and Go imports.
+- Fix protobuf collection presence metadata; collections don't have presence.
+- Preserve `@nexus.doc` on generated Python WIT record classes, including protobuf-backed and empty records.
+- Go generation now selects system Nexus behavior with `--system-nexus`, not endpoint names.
+- Render `@nexus.experimental` warnings on WIT variants in Python, TypeScript, Go, and .NET without marking individual cases experimental.
+
 ## [0.2.9] - 2026-10-12
 
 ### Added
