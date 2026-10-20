@@ -31,7 +31,7 @@ public final class StartedWorkflow {
   }
 
   public void cancel(@com.fasterxml.jackson.annotation.JsonProperty("reason") String reason) {
-    StartWorkflowServiceOperations.cancelWorkflow(
+    StartWorkflowServiceOperations.executeCancelWorkflow(
         wit.startworkflow.CancelWorkflowRequest.newBuilder()
             .setWorkflowExecution(
                 wit.startworkflow.WorkflowExecution.newBuilder()
@@ -45,7 +45,7 @@ public final class StartedWorkflow {
   public StartedWorkflow restartWorkflow(
       @com.fasterxml.jackson.annotation.JsonProperty("workflow") String workflow,
       @com.fasterxml.jackson.annotation.JsonProperty("taskQueue") String taskQueue) {
-    return StartWorkflowServiceOperations.restartWorkflow(
+    return StartWorkflowServiceOperations.executeRestartWorkflow(
         wit.startworkflow.StartWorkflowRequest.newBuilder()
             .setWorkflowId(this.workflowId)
             .setWorkflow(workflow)

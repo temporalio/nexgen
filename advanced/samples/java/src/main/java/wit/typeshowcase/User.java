@@ -48,7 +48,7 @@ public final class User {
   }
 
   public User updateEmail(@com.fasterxml.jackson.annotation.JsonProperty("email") String email) {
-    return TypeShowcaseOperations.updateEmail(
+    return TypeShowcaseOperations.executeUpdateEmail(
         wit.typeshowcase.UpdateEmailRequest.newBuilder()
             .setUserId(this.userId)
             .setEmail(email)
@@ -57,7 +57,7 @@ public final class User {
 
   public User rename(
       @com.fasterxml.jackson.annotation.JsonProperty("displayName") String displayName) {
-    return TypeShowcaseOperations.rename(
+    return TypeShowcaseOperations.executeRename(
         wit.typeshowcase.RenameRequest.newBuilder()
             .setUserId(this.userId)
             .setDisplayName(displayName)
@@ -65,7 +65,7 @@ public final class User {
   }
 
   public void deactivate(@com.fasterxml.jackson.annotation.JsonProperty("reason") String reason) {
-    TypeShowcaseOperations.deactivate(
+    TypeShowcaseOperations.executeDeactivate(
         wit.typeshowcase.DeactivateRequest.newBuilder()
             .setUserId(this.userId)
             .setReason(reason)

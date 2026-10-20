@@ -31,7 +31,7 @@ public final class User {
   }
 
   public User updateEmail(@com.fasterxml.jackson.annotation.JsonProperty("email") String email) {
-    return UserServiceOperations.updateEmail(
+    return UserServiceOperations.executeUpdateEmail(
         endpoint,
         wit.userservice.UpdateEmailRequest.newBuilder()
             .setUserId(this.userId)

@@ -89,6 +89,68 @@ interface example-service {
     assert!(operations.contains(" first("));
     assert!(operations.contains(" second("));
     assert!(!output.join("ExampleServiceOperations.java").exists());
+    assert!(operations.contains(" first(String value)"));
+    assert!(operations.contains(" second(String value)"));
+    assert!(operations.contains("static io.temporal.workflow.Request executeFirst("));
+    assert!(!operations.contains("public static io.temporal.workflow.Request executeFirst("));
+    assert!(!output.join("FirstOptions.java").exists());
+}
+
+#[test]
+fn operation_api_splits_required_arguments_from_generated_options() {
+    let temp = generate("workflow-service", GenerationMode::NativeApi, true);
+    let output = temp.path().join("generated");
+    let operations = fs::read_to_string(output.join("WorkflowOperations.java")).unwrap();
+    assert!(operations.contains(
+        "signalWithStartWorkflow(String workflow, String id, String taskQueue, String signal)"
+    ));
+    assert!(
+        operations
+            .contains("String signal, test.generated.SignalWithStartWorkflowOptions options)")
+    );
+    assert!(!operations.contains(
+        "public static io.temporal.workflow.ExternalWorkflowStub executeSignalWithStartWorkflow("
+    ));
+    assert!(operations.contains("requestBuilder.setStaticSummary(options.getStaticSummary())"));
+    let options = fs::read_to_string(output.join("SignalWithStartWorkflowOptions.java")).unwrap();
+    for expected in [
+        "setArgs(Object... values)",
+        "setSignalArgs(Object... values)",
+        "setStaticSummary(String value)",
+        "setStaticDetails(String value)",
+        "getDefaultInstance()",
+        "toBuilder()",
+        "WorkflowIdReusePolicy.forNumber(1)",
+    ] {
+        assert!(
+            options.contains(expected),
+            "missing option behavior: {expected}"
+        );
+    }
+    for hidden in [
+        "getWorkflow()",
+        "getId()",
+        "getTaskQueue()",
+        "getSignal()",
+        "getNamespace()",
+        "getRequestId()",
+        "getHeaders()",
+        "getUserMetadata()",
+        "TransferConverter",
+        "JsonCreator",
+    ] {
+        assert!(
+            !options.contains(hidden),
+            "request-only field leaked into options: {hidden}"
+        );
+    }
+    let definitions = generate("workflow-service", GenerationMode::DefinitionsOnly, true);
+    assert!(
+        !definitions
+            .path()
+            .join("generated/SignalWithStartWorkflowOptions.java")
+            .exists()
+    );
 }
 
 #[test]

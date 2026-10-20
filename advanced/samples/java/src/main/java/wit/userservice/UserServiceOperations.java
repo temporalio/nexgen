@@ -5,7 +5,15 @@ package wit.userservice;
 public final class UserServiceOperations {
   private UserServiceOperations() {}
 
-  public static wit.userservice.User getUser(
+  public static wit.userservice.User getUser(String endpoint, String userId) {
+    wit.userservice.GetUserRequest.Builder requestBuilder =
+        wit.userservice.GetUserRequest.newBuilder();
+    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
+    wit.userservice.GetUserRequest request = requestBuilder.build();
+    return executeGetUser(endpoint, request);
+  }
+
+  static wit.userservice.User executeGetUser(
       String endpoint, wit.userservice.GetUserRequest request) {
     wit.userservice.User result =
         (wit.userservice.User)
@@ -19,7 +27,16 @@ public final class UserServiceOperations {
     return result.withEndpoint(endpoint);
   }
 
-  public static wit.userservice.User updateEmail(
+  public static wit.userservice.User updateEmail(String endpoint, String userId, String email) {
+    wit.userservice.UpdateEmailRequest.Builder requestBuilder =
+        wit.userservice.UpdateEmailRequest.newBuilder();
+    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
+    requestBuilder.setEmail(java.util.Objects.requireNonNull(email, "email"));
+    wit.userservice.UpdateEmailRequest request = requestBuilder.build();
+    return executeUpdateEmail(endpoint, request);
+  }
+
+  static wit.userservice.User executeUpdateEmail(
       String endpoint, wit.userservice.UpdateEmailRequest request) {
     wit.userservice.User result =
         (wit.userservice.User)
