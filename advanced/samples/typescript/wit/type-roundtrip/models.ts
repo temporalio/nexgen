@@ -105,3 +105,257 @@ export const failureContainerTransferTypeConverter = {
     return failureContainerToProto(value);
   },
 };
+export interface WorkflowExecutionInfo {
+  execution: WorkflowExecution;
+  parentExecution?: WorkflowExecution;
+}
+
+function workflowExecutionInfoFromProto(
+  proto: temporal.api.workflow.v1.IWorkflowExecutionInfo,
+): WorkflowExecutionInfo {
+  return {
+    execution: workflowExecutionFromProto(
+      requiredField(proto.execution, "WorkflowExecutionInfo", "execution"),
+    ),
+    parentExecution:
+      proto.parentExecution == null
+        ? undefined
+        : workflowExecutionFromProto(proto.parentExecution),
+  };
+}
+
+function workflowExecutionInfoToProto(
+  model: WorkflowExecutionInfo,
+): temporal.api.workflow.v1.IWorkflowExecutionInfo {
+  return {
+    execution: workflowExecutionToProto(
+      requiredField(model.execution, "WorkflowExecutionInfo", "execution"),
+    ),
+    parentExecution:
+      model.parentExecution == null
+        ? undefined
+        : workflowExecutionToProto(model.parentExecution),
+  };
+}
+
+export const workflowExecutionInfoTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.workflow.v1.IWorkflowExecutionInfo,
+  ): WorkflowExecutionInfo {
+    return workflowExecutionInfoFromProto(value);
+  },
+
+  toTransferType(
+    value: WorkflowExecutionInfo,
+  ): temporal.api.workflow.v1.IWorkflowExecutionInfo {
+    return workflowExecutionInfoToProto(value);
+  },
+};
+export interface WorkflowExecution {
+  workflowId: string;
+  runId: string;
+}
+
+function workflowExecutionFromProto(
+  proto: temporal.api.common.v1.IWorkflowExecution,
+): WorkflowExecution {
+  return {
+    workflowId: requiredField(
+      proto.workflowId === "" ? undefined : proto.workflowId,
+      "WorkflowExecution",
+      "workflowId",
+    ),
+    runId: requiredField(
+      proto.runId === "" ? undefined : proto.runId,
+      "WorkflowExecution",
+      "runId",
+    ),
+  };
+}
+
+function workflowExecutionToProto(
+  model: WorkflowExecution,
+): temporal.api.common.v1.IWorkflowExecution {
+  return {
+    workflowId: requiredField(model.workflowId, "WorkflowExecution", "workflowId"),
+    runId: requiredField(model.runId, "WorkflowExecution", "runId"),
+  };
+}
+
+export const workflowExecutionTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.common.v1.IWorkflowExecution,
+  ): WorkflowExecution {
+    return workflowExecutionFromProto(value);
+  },
+
+  toTransferType(value: WorkflowExecution): temporal.api.common.v1.IWorkflowExecution {
+    return workflowExecutionToProto(value);
+  },
+};
+export interface TaskQueuePartitions {
+  workflowTaskQueuePartitions?: TaskQueuePartition[];
+}
+
+function taskQueuePartitionsFromProto(
+  proto: temporal.api.workflowservice.v1.IListTaskQueuePartitionsResponse,
+): TaskQueuePartitions {
+  return {
+    workflowTaskQueuePartitions: proto.workflowTaskQueuePartitions?.map((value: any) =>
+      taskQueuePartitionFromProto(value),
+    ),
+  };
+}
+
+function taskQueuePartitionsToProto(
+  model: TaskQueuePartitions,
+): temporal.api.workflowservice.v1.IListTaskQueuePartitionsResponse {
+  return {
+    workflowTaskQueuePartitions: model.workflowTaskQueuePartitions?.map((value) =>
+      taskQueuePartitionToProto(value),
+    ),
+  };
+}
+
+export const taskQueuePartitionsTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.workflowservice.v1.IListTaskQueuePartitionsResponse,
+  ): TaskQueuePartitions {
+    return taskQueuePartitionsFromProto(value);
+  },
+
+  toTransferType(
+    value: TaskQueuePartitions,
+  ): temporal.api.workflowservice.v1.IListTaskQueuePartitionsResponse {
+    return taskQueuePartitionsToProto(value);
+  },
+};
+export interface TaskQueuePartition {
+  key: string;
+  ownerHostName: string;
+}
+
+function taskQueuePartitionFromProto(
+  proto: temporal.api.taskqueue.v1.ITaskQueuePartitionMetadata,
+): TaskQueuePartition {
+  return {
+    key: requiredField(
+      proto.key === "" ? undefined : proto.key,
+      "TaskQueuePartition",
+      "key",
+    ),
+    ownerHostName: requiredField(
+      proto.ownerHostName === "" ? undefined : proto.ownerHostName,
+      "TaskQueuePartition",
+      "ownerHostName",
+    ),
+  };
+}
+
+function taskQueuePartitionToProto(
+  model: TaskQueuePartition,
+): temporal.api.taskqueue.v1.ITaskQueuePartitionMetadata {
+  return {
+    key: requiredField(model.key, "TaskQueuePartition", "key"),
+    ownerHostName: requiredField(
+      model.ownerHostName,
+      "TaskQueuePartition",
+      "ownerHostName",
+    ),
+  };
+}
+
+export const taskQueuePartitionTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.taskqueue.v1.ITaskQueuePartitionMetadata,
+  ): TaskQueuePartition {
+    return taskQueuePartitionFromProto(value);
+  },
+
+  toTransferType(
+    value: TaskQueuePartition,
+  ): temporal.api.taskqueue.v1.ITaskQueuePartitionMetadata {
+    return taskQueuePartitionToProto(value);
+  },
+};
+export interface BadBinaries {
+  binaries?: Record<string, BadBinary>;
+}
+
+function badBinariesFromProto(
+  proto: temporal.api.namespace.v1.IBadBinaries,
+): BadBinaries {
+  return {
+    binaries:
+      proto.binaries == null
+        ? undefined
+        : (Object.fromEntries(
+            Object.entries(proto.binaries as Record<string, any>).map(
+              ([key, value]: [string, any]) => [key, badBinaryFromProto(value)],
+            ),
+          ) as Record<string, BadBinary>),
+  };
+}
+
+function badBinariesToProto(
+  model: BadBinaries,
+): temporal.api.namespace.v1.IBadBinaries {
+  return {
+    binaries:
+      model.binaries == null
+        ? undefined
+        : Object.fromEntries(
+            Object.entries(model.binaries as Record<string, any>).map(
+              ([key, value]: [string, any]) => [key, badBinaryToProto(value)],
+            ),
+          ),
+  };
+}
+
+export const badBinariesTransferTypeConverter = {
+  fromTransferType(value: temporal.api.namespace.v1.IBadBinaries): BadBinaries {
+    return badBinariesFromProto(value);
+  },
+
+  toTransferType(value: BadBinaries): temporal.api.namespace.v1.IBadBinaries {
+    return badBinariesToProto(value);
+  },
+};
+export interface BadBinary {
+  reason: string;
+  operator: string;
+}
+
+function badBinaryFromProto(
+  proto: temporal.api.namespace.v1.IBadBinaryInfo,
+): BadBinary {
+  return {
+    reason: requiredField(
+      proto.reason === "" ? undefined : proto.reason,
+      "BadBinary",
+      "reason",
+    ),
+    operator: requiredField(
+      proto.operator === "" ? undefined : proto.operator,
+      "BadBinary",
+      "operator",
+    ),
+  };
+}
+
+function badBinaryToProto(model: BadBinary): temporal.api.namespace.v1.IBadBinaryInfo {
+  return {
+    reason: requiredField(model.reason, "BadBinary", "reason"),
+    operator: requiredField(model.operator, "BadBinary", "operator"),
+  };
+}
+
+export const badBinaryTransferTypeConverter = {
+  fromTransferType(value: temporal.api.namespace.v1.IBadBinaryInfo): BadBinary {
+    return badBinaryFromProto(value);
+  },
+
+  toTransferType(value: BadBinary): temporal.api.namespace.v1.IBadBinaryInfo {
+    return badBinaryToProto(value);
+  },
+};

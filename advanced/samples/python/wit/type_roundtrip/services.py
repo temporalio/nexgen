@@ -5,7 +5,10 @@ from __future__ import annotations
 from nexusrpc import Operation, service
 from .models import (
     ActivityOptions,
+    BadBinaries,
     FailureContainer,
+    TaskQueuePartitions,
+    WorkflowExecutionInfo,
 )
 
 
@@ -20,3 +23,18 @@ class TypeRoundtripService:
         FailureContainer,
         FailureContainer,
     ] = Operation(name="FailureOperation")
+
+    workflow_execution_info_operation: Operation[
+        WorkflowExecutionInfo,
+        WorkflowExecutionInfo,
+    ] = Operation(name="WorkflowExecutionInfoOperation")
+
+    task_queue_partitions_operation: Operation[
+        TaskQueuePartitions,
+        TaskQueuePartitions,
+    ] = Operation(name="TaskQueuePartitionsOperation")
+
+    bad_binaries_operation: Operation[
+        BadBinaries,
+        BadBinaries,
+    ] = Operation(name="BadBinariesOperation")

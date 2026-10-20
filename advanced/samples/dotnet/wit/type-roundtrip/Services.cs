@@ -25,6 +25,18 @@ namespace Nexgen.TypeRoundtripService
         [NexusOperation("FailureOperation")]
         FailureContainer FailureOperation(FailureContainer request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("WorkflowExecutionInfoOperation")]
+        WorkflowExecutionInfo WorkflowExecutionInfoOperation(WorkflowExecutionInfo request);
+
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("TaskQueuePartitionsOperation")]
+        TaskQueuePartitions TaskQueuePartitionsOperation(TaskQueuePartitions request);
+
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("BadBinariesOperation")]
+        BadBinaries BadBinariesOperation(BadBinaries request);
+
     }
 
     internal interface INexgenOperationInfo
@@ -63,6 +75,12 @@ namespace Nexgen.TypeRoundtripService
                 TypeRoundtripServiceServiceDefinition.Operations["ActivityOptionsOperation"]),
             [("TypeRoundtripService", "FailureOperation")] = new NexgenOperationInfo<FailureContainer, FailureContainer>(
                 TypeRoundtripServiceServiceDefinition.Operations["FailureOperation"]),
+            [("TypeRoundtripService", "WorkflowExecutionInfoOperation")] = new NexgenOperationInfo<WorkflowExecutionInfo, WorkflowExecutionInfo>(
+                TypeRoundtripServiceServiceDefinition.Operations["WorkflowExecutionInfoOperation"]),
+            [("TypeRoundtripService", "TaskQueuePartitionsOperation")] = new NexgenOperationInfo<TaskQueuePartitions, TaskQueuePartitions>(
+                TypeRoundtripServiceServiceDefinition.Operations["TaskQueuePartitionsOperation"]),
+            [("TypeRoundtripService", "BadBinariesOperation")] = new NexgenOperationInfo<BadBinaries, BadBinaries>(
+                TypeRoundtripServiceServiceDefinition.Operations["BadBinariesOperation"]),
         };
     }
 

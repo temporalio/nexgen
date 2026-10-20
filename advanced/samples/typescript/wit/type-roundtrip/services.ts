@@ -4,8 +4,17 @@ import * as nexus from "nexus-rpc";
 import {
   activityOptionsTransferTypeConverter,
   failureContainerTransferTypeConverter,
+  workflowExecutionInfoTransferTypeConverter,
+  taskQueuePartitionsTransferTypeConverter,
+  badBinariesTransferTypeConverter,
 } from "./models";
-import type { ActivityOptions, FailureContainer } from "./models";
+import type {
+  ActivityOptions,
+  FailureContainer,
+  WorkflowExecutionInfo,
+  TaskQueuePartitions,
+  BadBinaries,
+} from "./models";
 
 export const typeRoundtripService = nexus.service("TypeRoundtripService", {
   activityOptionsOperation: nexus.operation<ActivityOptions, ActivityOptions>({
@@ -17,5 +26,26 @@ export const typeRoundtripService = nexus.service("TypeRoundtripService", {
     name: "FailureOperation",
     inputType: { transferTypeConverter: failureContainerTransferTypeConverter },
     outputType: { transferTypeConverter: failureContainerTransferTypeConverter },
+  }),
+  workflowExecutionInfoOperation: nexus.operation<
+    WorkflowExecutionInfo,
+    WorkflowExecutionInfo
+  >({
+    name: "WorkflowExecutionInfoOperation",
+    inputType: { transferTypeConverter: workflowExecutionInfoTransferTypeConverter },
+    outputType: { transferTypeConverter: workflowExecutionInfoTransferTypeConverter },
+  }),
+  taskQueuePartitionsOperation: nexus.operation<
+    TaskQueuePartitions,
+    TaskQueuePartitions
+  >({
+    name: "TaskQueuePartitionsOperation",
+    inputType: { transferTypeConverter: taskQueuePartitionsTransferTypeConverter },
+    outputType: { transferTypeConverter: taskQueuePartitionsTransferTypeConverter },
+  }),
+  badBinariesOperation: nexus.operation<BadBinaries, BadBinaries>({
+    name: "BadBinariesOperation",
+    inputType: { transferTypeConverter: badBinariesTransferTypeConverter },
+    outputType: { transferTypeConverter: badBinariesTransferTypeConverter },
   }),
 });

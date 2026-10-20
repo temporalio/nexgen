@@ -6,6 +6,7 @@ import uuid
 
 from nexusrpc import Operation
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
+import pytest
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
@@ -69,6 +70,88 @@ class TypeRoundtripServiceHandler:
         assert isinstance(failure.__cause__, temporalio.exceptions.ApplicationError)
         assert failure.__cause__.message == "inner failure"
         return input
+
+    @sync_operation
+    async def workflow_execution_info_operation(
+        self,
+        _ctx: StartOperationContext,
+        input: type_roundtrip_models.WorkflowExecutionInfo,
+    ) -> type_roundtrip_models.WorkflowExecutionInfo:
+        return input
+
+    @sync_operation
+    async def task_queue_partitions_operation(
+        self,
+        _ctx: StartOperationContext,
+        input: type_roundtrip_models.TaskQueuePartitions,
+    ) -> type_roundtrip_models.TaskQueuePartitions:
+        return input
+
+    @sync_operation
+    async def bad_binaries_operation(
+        self,
+        _ctx: StartOperationContext,
+        input: type_roundtrip_models.BadBinaries,
+    ) -> type_roundtrip_models.BadBinaries:
+        return input
+
+
+@pytest.mark.parametrize("populated", [False, True])
+def test_nested_model_collections_round_trip(populated: bool) -> None:
+    partitions = type_roundtrip_models.TaskQueuePartitions(
+        workflow_task_queue_partitions=[
+            type_roundtrip_models.TaskQueuePartition(
+                key="first", owner_host_name="first-host"
+            ),
+            type_roundtrip_models.TaskQueuePartition(
+                key="second", owner_host_name="second-host"
+            ),
+        ]
+        if populated
+        else None
+    )
+    partition_converter = getattr(partitions, "__temporal_transfer_type_converter")
+    wire_partitions = partition_converter.to_transfer_type(partitions)
+    assert [
+        (item.key, item.owner_host_name)
+        for item in wire_partitions.workflow_task_queue_partitions
+    ] == ([("first", "first-host"), ("second", "second-host")] if populated else [])
+    decoded_partitions = partition_converter.from_transfer_type(
+        wire_partitions, type_roundtrip_models.TaskQueuePartitions
+    )
+    assert decoded_partitions.workflow_task_queue_partitions == (
+        partitions.workflow_task_queue_partitions or []
+    )
+
+    binaries = type_roundtrip_models.BadBinaries(
+        binaries={
+            "first": type_roundtrip_models.BadBinary(
+                reason="first-reason", operator="first-operator"
+            ),
+            "second": type_roundtrip_models.BadBinary(
+                reason="second-reason", operator="second-operator"
+            ),
+        }
+        if populated
+        else None
+    )
+    binary_converter = getattr(binaries, "__temporal_transfer_type_converter")
+    wire_binaries = binary_converter.to_transfer_type(binaries)
+    assert {
+        key: (item.reason, item.operator)
+        for key, item in wire_binaries.binaries.items()
+    } == (
+        {
+            "first": ("first-reason", "first-operator"),
+            "second": ("second-reason", "second-operator"),
+        }
+        if populated
+        else {}
+    )
+    decoded_binaries = binary_converter.from_transfer_type(
+        wire_binaries, type_roundtrip_models.BadBinaries
+    )
+    assert decoded_binaries.binaries == (binaries.binaries or {})
 
 
 @workflow.defn
