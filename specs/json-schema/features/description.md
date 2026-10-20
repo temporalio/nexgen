@@ -80,7 +80,7 @@ Loader behavior:
   other than line feed and tab, notably U+0000 → **reject**. Degenerate metadata
   in the same class as the empty string, and unrepresentable in a comment in at
   least two targets, so rejecting once at load is the only form that keeps the
-  five accept sets identical (P1); escaping it four different ways is not.
+  five accept sets identical (P1); escaping it five different ways is not.
   Diagnostic names the offending code point.
 - `description` as a **sibling of `$ref`** is **not** rejected: a
   sibling-bearing `$ref` is rewritten to an implicit `allOf` and **merged** (see

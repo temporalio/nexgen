@@ -659,8 +659,6 @@ encoding cannot introduce a new name collision.
 
 ## C#
 
-**Status:** C# support is in progress and not yet complete.
-
 The C# backend follows the Java backend's structure (collecting per-model
 deserializer, spec-strict primitive parse, validate-then-write) in C# idiom.
 

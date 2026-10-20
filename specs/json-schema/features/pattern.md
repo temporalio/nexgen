@@ -58,7 +58,7 @@ and Go's `regexp` both implement — not a dependency on Go.
 
 Rationale (citing [[PRINCIPLES.md]]):
 - **P1 (identical cross-language validation).** The same `(pattern, instance)`
-  must produce the same accept/reject in Go, TS, Python, and Java. The five
+  must produce the same accept/reject in C#, Go, TS, Python, and Java. The five
   engines diverge on the axes below; each is pinned to the portable choice, and
   the conformance corpus then caught three more
   (**Conformance-verified gate rules**, further below):

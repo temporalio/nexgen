@@ -37,9 +37,10 @@ Rationale (citing [[PRINCIPLES.md]]):
 - **P1 (polyglot wire compatibility)**: an operation's wire name is the single
   contract every language must agree on. The five SDKs default an omitted name
   *differently* (Go requires it; Java defaults to the unqualified method name;
-  Python to the class/attr name; TS requires it), so the generator
-  **always emits the resolved wire name explicitly** rather than relying on any
-  SDK default — identical bytes on the wire in every target.
+  Python to the class/attr name; C# to the unqualified method name; TS requires
+  it), so the generator **always emits the resolved wire name explicitly**
+  rather than relying on any SDK default — identical bytes on the wire in every
+  target.
 - **P2 (idiomatic output)**: each target uses its native service idiom — Go a
   typed `struct` of `OperationReference`s, TS a `nexus.service(...)` object,
   Python an `@nexusrpc.service` class, Java a `@Service` interface.
@@ -143,10 +144,10 @@ services:                       # map<service-name, service-def>
   neither has Nexus envelope semantics in this format.
 - The resolved wire name is **always emitted explicitly** (`name=…` /
   `@Operation(name=…)` / the Go struct field / the TS `name` key), even when it
-  equals what the SDK would default to. This is P1 itself: the four SDKs default
-  an omitted name *differently* (Go/TS require one; Java/Python derive it from
-  the identifier), so leaning on any default would make the wire contract vary
-  per target and shift silently if the identifier is later recased. The
+  equals what the SDK would default to. This is P1 itself: the five SDKs default
+  an omitted name *differently* (Go/TS require one; Java/Python/C# derive it
+  from the identifier), so leaning on any default would make the wire contract
+  vary per target and shift silently if the identifier is later recased. The
   redundancy is cosmetic; the explicitness is the cross-language wire guarantee,
   so it is kept unconditionally.
 
