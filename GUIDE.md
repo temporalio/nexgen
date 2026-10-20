@@ -1956,3 +1956,13 @@ records, and type parameters backed by the supported Payload/Payloads carriers
 are preserved. Linked records are validated but not edited; missing fields there
 must be fixed in the dependency package. Reconciliation completes before the
 output is written, and rerunning it on complete WIT leaves the model unchanged.
+
+## Formatting Java Output
+
+`--format` runs google-java-format 1.24.0, matching the Java SDK's formatter.
+Only Java files emitted by the current invocation are formatted. A JDK must be
+on `PATH`. The standalone JAR is downloaded using `curl` on first use and cached
+under `$XDG_CACHE_HOME/nexgen`, `%LOCALAPPDATA%/nexgen`, or
+`$HOME/.cache/nexgen`. Set `NEXGEN_JAVA_FORMAT_JAR` to a local 1.24.0
+all-dependencies JAR for offline generation. Java sample regeneration uses this
+same formatting path.

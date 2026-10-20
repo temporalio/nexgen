@@ -12,9 +12,7 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import json_schema.api.kb.SpecNumbers;
 import json_schema.api.kb.Violation;
@@ -23,104 +21,114 @@ import org.jspecify.annotations.Nullable;
 @JsonSerialize(using = GetCategoryTreeInput.Serializer.class)
 @JsonDeserialize(using = GetCategoryTreeInput.Deserializer.class)
 public final class GetCategoryTreeInput {
-    private final String rootId;
+  private final String rootId;
 
-    public GetCategoryTreeInput(String rootId) {
-        this.rootId = rootId;
+  public GetCategoryTreeInput(String rootId) {
+    this.rootId = rootId;
+  }
+
+  public String getRootId() {
+    return rootId;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getRootId() {
-        return rootId;
+    if (!(other instanceof GetCategoryTreeInput)) {
+      return false;
     }
+    GetCategoryTreeInput that = (GetCategoryTreeInput) other;
+    return Objects.equals(this.rootId, that.rootId);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(rootId);
+  }
+
+  @Override
+  public String toString() {
+    return "GetCategoryTreeInput{" + "rootId=" + rootId + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<GetCategoryTreeInput> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof GetCategoryTreeInput)) {
-            return false;
-        }
-        GetCategoryTreeInput that = (GetCategoryTreeInput) other;
-        return Objects.equals(this.rootId, that.rootId);
+    public void serialize(
+        GetCategoryTreeInput value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.rootId == null) {
+        violations.add(new Violation("rootId", "required"));
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.rootId != null) {
+        gen.writeStringField("rootId", value.rootId);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<GetCategoryTreeInput> {
     @Override
-    public int hashCode() {
-        return Objects.hash(rootId);
-    }
-
-    @Override
-    public String toString() {
-        return "GetCategoryTreeInput{"
-            + "rootId=" + rootId
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<GetCategoryTreeInput> {
-        @Override
-        public void serialize(GetCategoryTreeInput value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.rootId == null) {
-                violations.add(new Violation("rootId", "required"));
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.rootId != null) {
-                gen.writeStringField("rootId", value.rootId);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public GetCategoryTreeInput deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "rootId":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<GetCategoryTreeInput> {
-        @Override
-        public GetCategoryTreeInput deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "rootId":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String rootId = null;
-            {
-                JsonNode field = node.get("rootId");
-                if (field == null) {
-                    violations.add(new Violation("rootId", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("rootId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("rootId", "expected string"));
-                    } else {
-                        rootId = field.textValue();
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new GetCategoryTreeInput(rootId);
+      }
+      String rootId = null;
+      {
+        JsonNode field = node.get("rootId");
+        if (field == null) {
+          violations.add(new Violation("rootId", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("rootId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("rootId", "expected string"));
+          } else {
+            rootId = field.textValue();
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new GetCategoryTreeInput(rootId);
     }
+  }
 }

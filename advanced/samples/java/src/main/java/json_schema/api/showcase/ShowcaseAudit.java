@@ -21,139 +21,148 @@ import org.jspecify.annotations.Nullable;
 @JsonSerialize(using = ShowcaseAudit.Serializer.class)
 @JsonDeserialize(using = ShowcaseAudit.Deserializer.class)
 public final class ShowcaseAudit {
-    private final String by;
-    private final Map<String, JsonNode> additionalProperties;
+  private final String by;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public ShowcaseAudit(String by, Map<String, JsonNode> additionalProperties) {
-        this.by = by;
-        this.additionalProperties = additionalProperties;
+  public ShowcaseAudit(String by, Map<String, JsonNode> additionalProperties) {
+    this.by = by;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public String getBy() {
+    return by;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getBy() {
-        return by;
+    if (!(other instanceof ShowcaseAudit)) {
+      return false;
     }
+    ShowcaseAudit that = (ShowcaseAudit) other;
+    return Objects.equals(this.by, that.by)
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(by, additionalProperties);
+  }
 
+  @Override
+  public String toString() {
+    return "ShowcaseAudit{" + "by=" + by + ", additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseAudit> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(ShowcaseAudit value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.by == null) {
+        violations.add(new Violation("by", "required"));
+      } else {
+        int length = value.by.codePointCount(0, value.by.length());
+        if (length < 1) {
+          violations.add(new Violation("by", "must have length >= 1, got " + length));
         }
-        if (!(other instanceof ShowcaseAudit)) {
-            return false;
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.by != null) {
+        wireKeys.add("by");
+      }
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
         }
-        ShowcaseAudit that = (ShowcaseAudit) other;
-        return Objects.equals(this.by, that.by)
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.by != null) {
+        gen.writeStringField("by", value.by);
+      }
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseAudit> {
     @Override
-    public int hashCode() {
-        return Objects.hash(by, additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "ShowcaseAudit{"
-            + "by=" + by
-            + ", additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseAudit> {
-        @Override
-        public void serialize(ShowcaseAudit value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.by == null) {
-                violations.add(new Violation("by", "required"));
-            } else {
-                int length = value.by.codePointCount(0, value.by.length());
-                if (length < 1) {
-                    violations.add(new Violation("by", "must have length >= 1, got " + length));
-                }
-            }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.by != null) {
-                wireKeys.add("by");
-            }
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.by != null) {
-                gen.writeStringField("by", value.by);
-            }
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public ShowcaseAudit deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "by":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseAudit> {
-        @Override
-        public ShowcaseAudit deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
+      }
+      String by = null;
+      {
+        JsonNode field = node.get("by");
+        if (field == null) {
+          violations.add(new Violation("by", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("by", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("by", "expected string"));
+          } else {
+            by = field.textValue();
+            int length = by.codePointCount(0, by.length());
+            if (length < 1) {
+              violations.add(new Violation("by", "must have length >= 1, got " + length));
             }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "by":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            String by = null;
-            {
-                JsonNode field = node.get("by");
-                if (field == null) {
-                    violations.add(new Violation("by", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("by", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("by", "expected string"));
-                    } else {
-                        by = field.textValue();
-                        int length = by.codePointCount(0, by.length());
-                        if (length < 1) {
-                            violations.add(new Violation("by", "must have length >= 1, got " + length));
-                        }
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new ShowcaseAudit(by, additionalProperties);
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new ShowcaseAudit(by, additionalProperties);
     }
+  }
 }

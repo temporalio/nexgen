@@ -4,26 +4,18 @@ package json_schema.definitions.chat;
 import io.nexusrpc.Operation;
 import io.nexusrpc.Service;
 
-/**
- * Send messages and look up rooms.
- */
+/** Send messages and look up rooms. */
 @Service(name = "example.chat.v1.ChatService")
 public interface ChatService {
-    /**
-     * Post a message to a room.
-     */
-    @Operation(name = "SendMessage")
-    SendMessageOutput sendMessage(SendMessageInput input);
+  /** Post a message to a room. */
+  @Operation(name = "SendMessage")
+  SendMessageOutput sendMessage(SendMessageInput input);
 
-    /**
-     * Look up a room by id.
-     */
-    @Operation(name = "GetRoom")
-    Room getRoom(GetRoomInput input);
+  /** Look up a room by id. */
+  @Operation(name = "GetRoom")
+  Room getRoom(GetRoomInput input);
 
-    /**
-     * Liveness probe.
-     */
-    @Operation(name = "Ping")
-    void ping();
+  /** Liveness probe. */
+  @Operation(name = "Ping")
+  void ping();
 }

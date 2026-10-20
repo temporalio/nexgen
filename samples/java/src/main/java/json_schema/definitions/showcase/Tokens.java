@@ -19,129 +19,148 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A typed map with a refined *string* member: 2 to 8 code points of lowercase ASCII.
- * Exercises the member-level `minLength`/`maxLength`/`pattern` in every language.
+ * A typed map with a refined *string* member: 2 to 8 code points of lowercase ASCII. Exercises the
+ * member-level `minLength`/`maxLength`/`pattern` in every language.
  */
 @JsonSerialize(using = Tokens.Serializer.class)
 @JsonDeserialize(using = Tokens.Deserializer.class)
 public final class Tokens {
-    private static final java.util.regex.Pattern VALUE_PATTERN = java.util.regex.Pattern.compile("^[a-z]+\\z");
+  private static final java.util.regex.Pattern VALUE_PATTERN =
+      java.util.regex.Pattern.compile("^[a-z]+\\z");
 
-    private final Map<String, String> additionalProperties;
+  private final Map<String, String> additionalProperties;
 
-    public Tokens(Map<String, String> additionalProperties) {
-        this.additionalProperties = additionalProperties;
+  public Tokens(Map<String, String> additionalProperties) {
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Map<String, String> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public Map<String, String> getAdditionalProperties() {
-        return additionalProperties;
+    if (!(other instanceof Tokens)) {
+      return false;
     }
+    return Objects.equals(this.additionalProperties, ((Tokens) other).additionalProperties);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "Tokens{" + "additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Tokens> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Tokens value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.additionalProperties == null) {
+        violations.add(new Violation("", "expected object"));
+      } else {
+        for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
+          if (entry.getValue() == null) {
+            violations.add(
+                new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
+            continue;
+          }
+          int length = entry.getValue().codePointCount(0, entry.getValue().length());
+          if (length < 2) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()), "must have length >= 2, got " + length));
+          }
+          if (length > 8) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()), "must have length <= 8, got " + length));
+          }
+          if (!VALUE_PATTERN.matcher(entry.getValue()).find()) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()),
+                    "must match pattern " + "^[a-z]+\\z" + ", got " + entry.getValue()));
+          }
         }
-        if (!(other instanceof Tokens)) {
-            return false;
-        }
-        return Objects.equals(this.additionalProperties, ((Tokens) other).additionalProperties);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
+        gen.writeStringField(entry.getKey(), entry.getValue());
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Tokens> {
     @Override
-    public int hashCode() {
-        return Objects.hash(additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "Tokens{"
-            + "additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Tokens> {
-        @Override
-        public void serialize(Tokens value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.additionalProperties == null) {
-                violations.add(new Violation("", "expected object"));
-            } else {
-                for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
-                    if (entry.getValue() == null) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
-                        continue;
-                    }
-                    int length = entry.getValue().codePointCount(0, entry.getValue().length());
-                    if (length < 2) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must have length >= 2, got " + length));
-                    }
-                    if (length > 8) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must have length <= 8, got " + length));
-                    }
-                    if (!VALUE_PATTERN.matcher(entry.getValue()).find()) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must match pattern " + "^[a-z]+\\z" + ", got " + entry.getValue()));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
-                gen.writeStringField(entry.getKey(), entry.getValue());
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public Tokens deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, String> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        JsonNode element = node.get(key);
+        if (element.isNull()) {
+          violations.add(new Violation(path, "explicit null not allowed"));
+          continue;
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Tokens> {
-        @Override
-        public Tokens deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, String> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                JsonNode element = node.get(key);
-                if (element.isNull()) {
-                    violations.add(new Violation(path, "explicit null not allowed"));
-                    continue;
-                }
-                if (!element.isTextual()) {
-                    violations.add(new Violation(path, "expected string value"));
-                } else {
-                    String value = element.textValue();
-                    int length = value.codePointCount(0, value.length());
-                    if (length < 2) {
-                        violations.add(new Violation(path, "must have length >= 2, got " + length));
-                    }
-                    if (length > 8) {
-                        violations.add(new Violation(path, "must have length <= 8, got " + length));
-                    }
-                    if (!VALUE_PATTERN.matcher(value).find()) {
-                        violations.add(new Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + value));
-                    }
-                    additionalProperties.put(key, value);
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Tokens(additionalProperties);
+        if (!element.isTextual()) {
+          violations.add(new Violation(path, "expected string value"));
+        } else {
+          String value = element.textValue();
+          int length = value.codePointCount(0, value.length());
+          if (length < 2) {
+            violations.add(new Violation(path, "must have length >= 2, got " + length));
+          }
+          if (length > 8) {
+            violations.add(new Violation(path, "must have length <= 8, got " + length));
+          }
+          if (!VALUE_PATTERN.matcher(value).find()) {
+            violations.add(
+                new Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + value));
+          }
+          additionalProperties.put(key, value);
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Tokens(additionalProperties);
     }
+  }
 }

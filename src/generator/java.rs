@@ -13,6 +13,8 @@ use crate::planning::{PlannedFamily, PlannedJsonType};
 use crate::spec::{ApiSpecLeaf, ApiSpecNode};
 use crate::spec::{ExternalTypeSpec, ModulePath, ServiceSpec, TypeSpec};
 
+pub(crate) mod format;
+
 const DEFAULT_PACKAGE: &str = "generated";
 const JAVA_FORMAT_LINE_LENGTH: usize = 88;
 

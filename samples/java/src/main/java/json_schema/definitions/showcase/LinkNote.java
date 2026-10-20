@@ -20,231 +20,244 @@ import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A link note branch, named inline.
- */
+/** A link note branch, named inline. */
 @JsonSerialize(using = LinkNote.Serializer.class)
 @JsonDeserialize(using = LinkNote.Deserializer.class)
 public final class LinkNote implements Note {
-    public static final class Kind {
-        public static final Kind LINK = new Kind("link");
+  public static final class Kind {
+    public static final Kind LINK = new Kind("link");
 
-        private final String value;
+    private final String value;
 
-        private Kind(String value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static @Nullable Kind fromString(String value) {
-            if (value == null) {
-                return null;
-            }
-            if ("link".equals(value)) {
-                return LINK;
-            }
-            throw new IllegalArgumentException("must equal \"link\", got \"" + value + "\"");
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Kind)) {
-                return false;
-            }
-            Kind that = (Kind) other;
-            return Objects.equals(this.value, that.value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Kind[" + value + "]";
-        }
+    private Kind(String value) {
+      this.value = value;
     }
 
-    private final Kind kind;
-    private final String href;
-    private final Map<String, JsonNode> additionalProperties;
-
-    public LinkNote(Kind kind, String href, Map<String, JsonNode> additionalProperties) {
-        this.kind = kind;
-        this.href = href;
-        this.additionalProperties = additionalProperties;
+    @JsonCreator
+    public static @Nullable Kind fromString(String value) {
+      if (value == null) {
+        return null;
+      }
+      if ("link".equals(value)) {
+        return LINK;
+      }
+      throw new IllegalArgumentException("must equal \"link\", got \"" + value + "\"");
     }
 
-    public Kind getKind() {
-        return kind;
-    }
-
-    public String getHref() {
-        return href;
-    }
-
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
+    @JsonValue
+    public String getValue() {
+      return value;
     }
 
     @Override
     public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof LinkNote)) {
-            return false;
-        }
-        LinkNote that = (LinkNote) other;
-        return Objects.equals(this.kind, that.kind)
-            && Objects.equals(this.href, that.href)
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Kind)) {
+        return false;
+      }
+      Kind that = (Kind) other;
+      return Objects.equals(this.value, that.value);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(kind, href, additionalProperties);
+      return Objects.hash(value);
     }
 
     @Override
     public String toString() {
-        return "LinkNote{"
-            + "kind=" + kind
-            + ", href=" + href
-            + ", additionalProperties=" + additionalProperties
-            + "}";
+      return "Kind[" + value + "]";
     }
+  }
 
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<LinkNote> {
-        @Override
-        public void serialize(LinkNote value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.kind == null) {
-                violations.add(new Violation("kind", "required"));
-            }
-            if (value.href == null) {
-                violations.add(new Violation("href", "required"));
+  private final Kind kind;
+  private final String href;
+  private final Map<String, JsonNode> additionalProperties;
+
+  public LinkNote(Kind kind, String href, Map<String, JsonNode> additionalProperties) {
+    this.kind = kind;
+    this.href = href;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Kind getKind() {
+    return kind;
+  }
+
+  public String getHref() {
+    return href;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (!(other instanceof LinkNote)) {
+      return false;
+    }
+    LinkNote that = (LinkNote) other;
+    return Objects.equals(this.kind, that.kind)
+        && Objects.equals(this.href, that.href)
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(kind, href, additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "LinkNote{"
+        + "kind="
+        + kind
+        + ", href="
+        + href
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<LinkNote> {
+    @Override
+    public void serialize(LinkNote value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.kind == null) {
+        violations.add(new Violation("kind", "required"));
+      }
+      if (value.href == null) {
+        violations.add(new Violation("href", "required"));
+      } else {
+        int length = value.href.codePointCount(0, value.href.length());
+        if (length < 1) {
+          violations.add(new Violation("href", "must have length >= 1, got " + length));
+        }
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.kind != null) {
+        wireKeys.add("kind");
+      }
+      if (value.href != null) {
+        wireKeys.add("href");
+      }
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.kind != null) {
+        gen.writeStringField("kind", value.kind.getValue());
+      }
+      if (value.href != null) {
+        gen.writeStringField("href", value.href);
+      }
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
+    }
+  }
+
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<LinkNote> {
+    @Override
+    public LinkNote deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "href":
+          case "kind":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
+        }
+      }
+      Kind kind = null;
+      {
+        JsonNode field = node.get("kind");
+        if (field == null) {
+          violations.add(new Violation("kind", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("kind", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("kind", "expected string"));
+          } else {
+            String kindValue = field.textValue();
+            if ("link".equals(kindValue)) {
+              kind = Kind.LINK;
             } else {
-                int length = value.href.codePointCount(0, value.href.length());
-                if (length < 1) {
-                    violations.add(new Violation("href", "must have length >= 1, got " + length));
-                }
+              violations.add(new Violation("kind", "must equal \"link\""));
             }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.kind != null) {
-                wireKeys.add("kind");
-            }
-            if (value.href != null) {
-                wireKeys.add("href");
-            }
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.kind != null) {
-                gen.writeStringField("kind", value.kind.getValue());
-            }
-            if (value.href != null) {
-                gen.writeStringField("href", value.href);
-            }
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+          }
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<LinkNote> {
-        @Override
-        public LinkNote deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
+      }
+      String href = null;
+      {
+        JsonNode field = node.get("href");
+        if (field == null) {
+          violations.add(new Violation("href", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("href", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("href", "expected string"));
+          } else {
+            href = field.textValue();
+            int length = href.codePointCount(0, href.length());
+            if (length < 1) {
+              violations.add(new Violation("href", "must have length >= 1, got " + length));
             }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "href":
-                    case "kind":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            Kind kind = null;
-            {
-                JsonNode field = node.get("kind");
-                if (field == null) {
-                    violations.add(new Violation("kind", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("kind", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("kind", "expected string"));
-                    } else {
-                        String kindValue = field.textValue();
-                        if ("link".equals(kindValue)) {
-                            kind = Kind.LINK;
-                        } else {
-                            violations.add(new Violation("kind", "must equal \"link\""));
-                        }
-                    }
-                }
-            }
-            String href = null;
-            {
-                JsonNode field = node.get("href");
-                if (field == null) {
-                    violations.add(new Violation("href", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("href", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("href", "expected string"));
-                    } else {
-                        href = field.textValue();
-                        int length = href.codePointCount(0, href.length());
-                        if (length < 1) {
-                            violations.add(new Violation("href", "must have length >= 1, got " + length));
-                        }
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new LinkNote(kind, href, additionalProperties);
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new LinkNote(kind, href, additionalProperties);
     }
+  }
 }

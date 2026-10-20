@@ -2,133 +2,123 @@
 package json_schema.definitions.showcase;
 
 import com.fasterxml.jackson.annotation.JsonValue;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import io.temporal.failure.ApplicationFailure;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 public interface ShowcaseSegmentsItem {
-    static @Nullable ShowcaseSegmentsItem fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-        if (node.isTextual()) {
-            ShowcaseSegmentsItemString wrapped = new ShowcaseSegmentsItemString(node.textValue());
-            wrapped.validate(path, violations);
-            return wrapped;
-        }
-        if (node.isNumber()) {
-            Long parsed = SpecNumbers.specLong(node, path, violations);
-            if (parsed == null) {
-                return null;
-            }
-            ShowcaseSegmentsItemInteger wrapped = new ShowcaseSegmentsItemInteger(parsed);
-            wrapped.validate(path, violations);
-            return wrapped;
-        }
-        violations.add(new Violation(path, "expected one of: string, integer"));
+  static @Nullable ShowcaseSegmentsItem fromNode(
+      JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+    if (node.isTextual()) {
+      ShowcaseSegmentsItemString wrapped = new ShowcaseSegmentsItemString(node.textValue());
+      wrapped.validate(path, violations);
+      return wrapped;
+    }
+    if (node.isNumber()) {
+      Long parsed = SpecNumbers.specLong(node, path, violations);
+      if (parsed == null) {
         return null;
+      }
+      ShowcaseSegmentsItemInteger wrapped = new ShowcaseSegmentsItemInteger(parsed);
+      wrapped.validate(path, violations);
+      return wrapped;
+    }
+    violations.add(new Violation(path, "expected one of: string, integer"));
+    return null;
+  }
+
+  static void validate(ShowcaseSegmentsItem value, String path, List<Violation> violations) {
+    if (value instanceof ShowcaseSegmentsItemString) {
+      ((ShowcaseSegmentsItemString) value).validate(path, violations);
+    }
+    if (value instanceof ShowcaseSegmentsItemInteger) {
+      ((ShowcaseSegmentsItemInteger) value).validate(path, violations);
+    }
+  }
+
+  public static final class ShowcaseSegmentsItemString implements ShowcaseSegmentsItem {
+    private final String value;
+
+    public ShowcaseSegmentsItemString(String value) {
+      this.value = value;
     }
 
-    static void validate(ShowcaseSegmentsItem value, String path, List<Violation> violations) {
-        if (value instanceof ShowcaseSegmentsItemString) {
-            ((ShowcaseSegmentsItemString) value).validate(path, violations);
-        }
-        if (value instanceof ShowcaseSegmentsItemInteger) {
-            ((ShowcaseSegmentsItemInteger) value).validate(path, violations);
-        }
+    @JsonValue
+    public String getValue() {
+      return value;
     }
 
-    public static final class ShowcaseSegmentsItemString implements ShowcaseSegmentsItem {
-        private final String value;
-
-        public ShowcaseSegmentsItemString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            int length = value.codePointCount(0, value.length());
-            if (length < 2) {
-                violations.add(new Violation(path, "must have length >= 2, got " + length));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof ShowcaseSegmentsItemString)) {
-                return false;
-            }
-            return Objects.equals(value, ((ShowcaseSegmentsItemString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "ShowcaseSegmentsItemString[" + value + "]";
-        }
+    void validate(String path, List<Violation> violations) {
+      int length = value.codePointCount(0, value.length());
+      if (length < 2) {
+        violations.add(new Violation(path, "must have length >= 2, got " + length));
+      }
     }
 
-    public static final class ShowcaseSegmentsItemInteger implements ShowcaseSegmentsItem {
-        private final long value;
-
-        public ShowcaseSegmentsItemInteger(long value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public long getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            if (value < -SpecNumbers.INTEGER_CAP || value > SpecNumbers.INTEGER_CAP) {
-                violations.add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
-            }
-            if (value < 0L) {
-                violations.add(new Violation(path, "must be >= 0, got " + value));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof ShowcaseSegmentsItemInteger)) {
-                return false;
-            }
-            return Objects.equals(value, ((ShowcaseSegmentsItemInteger) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "ShowcaseSegmentsItemInteger[" + value + "]";
-        }
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ShowcaseSegmentsItemString)) {
+        return false;
+      }
+      return Objects.equals(value, ((ShowcaseSegmentsItemString) other).value);
     }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "ShowcaseSegmentsItemString[" + value + "]";
+    }
+  }
+
+  public static final class ShowcaseSegmentsItemInteger implements ShowcaseSegmentsItem {
+    private final long value;
+
+    public ShowcaseSegmentsItemInteger(long value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public long getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      if (value < -SpecNumbers.INTEGER_CAP || value > SpecNumbers.INTEGER_CAP) {
+        violations.add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+      }
+      if (value < 0L) {
+        violations.add(new Violation(path, "must be >= 0, got " + value));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ShowcaseSegmentsItemInteger)) {
+        return false;
+      }
+      return Objects.equals(value, ((ShowcaseSegmentsItemInteger) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "ShowcaseSegmentsItemInteger[" + value + "]";
+    }
+  }
 }

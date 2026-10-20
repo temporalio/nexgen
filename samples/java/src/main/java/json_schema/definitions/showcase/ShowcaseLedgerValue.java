@@ -21,134 +21,149 @@ import org.jspecify.annotations.Nullable;
 @JsonSerialize(using = ShowcaseLedgerValue.Serializer.class)
 @JsonDeserialize(using = ShowcaseLedgerValue.Deserializer.class)
 public final class ShowcaseLedgerValue {
-    private final long amount;
-    private final Map<String, JsonNode> additionalProperties;
+  private final long amount;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public ShowcaseLedgerValue(long amount, Map<String, JsonNode> additionalProperties) {
-        this.amount = amount;
-        this.additionalProperties = additionalProperties;
+  public ShowcaseLedgerValue(long amount, Map<String, JsonNode> additionalProperties) {
+    this.amount = amount;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public long getAmount() {
+    return amount;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public long getAmount() {
-        return amount;
+    if (!(other instanceof ShowcaseLedgerValue)) {
+      return false;
     }
+    ShowcaseLedgerValue that = (ShowcaseLedgerValue) other;
+    return this.amount == that.amount
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(amount, additionalProperties);
+  }
 
+  @Override
+  public String toString() {
+    return "ShowcaseLedgerValue{"
+        + "amount="
+        + amount
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseLedgerValue> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(
+        ShowcaseLedgerValue value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      {
+        if (value.amount < -SpecNumbers.INTEGER_CAP || value.amount > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("amount", "exceeds \u00b1(2^53-1) integer cap"));
         }
-        if (!(other instanceof ShowcaseLedgerValue)) {
-            return false;
+        if (value.amount < 0L) {
+          violations.add(new Violation("amount", "must be >= 0, got " + value.amount));
         }
-        ShowcaseLedgerValue that = (ShowcaseLedgerValue) other;
-        return this.amount == that.amount
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
-    }
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      wireKeys.add("amount");
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      gen.writeNumberField("amount", value.amount);
 
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
+    }
+  }
+
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseLedgerValue> {
     @Override
-    public int hashCode() {
-        return Objects.hash(amount, additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "ShowcaseLedgerValue{"
-            + "amount=" + amount
-            + ", additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseLedgerValue> {
-        @Override
-        public void serialize(ShowcaseLedgerValue value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            {
-                if (value.amount < -SpecNumbers.INTEGER_CAP || value.amount > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("amount", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-                if (value.amount < 0L) {
-                    violations.add(new Violation("amount", "must be >= 0, got " + value.amount));
-                }
-            }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            wireKeys.add("amount");
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            gen.writeNumberField("amount", value.amount);
-
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public ShowcaseLedgerValue deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "amount":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseLedgerValue> {
-        @Override
-        public ShowcaseLedgerValue deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
+      }
+      long amount = 0L;
+      {
+        JsonNode field = node.get("amount");
+        if (field == null) {
+          violations.add(new Violation("amount", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("amount", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "amount", violations);
+          if (numberValue != null) {
+            amount = numberValue;
+            if (numberValue < 0L) {
+              violations.add(new Violation("amount", "must be >= 0, got " + numberValue));
             }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "amount":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            long amount = 0L;
-            {
-                JsonNode field = node.get("amount");
-                if (field == null) {
-                    violations.add(new Violation("amount", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("amount", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "amount", violations);
-                    if (numberValue != null) {
-                        amount = numberValue;
-                        if (numberValue < 0L) {
-                            violations.add(new Violation("amount", "must be >= 0, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new ShowcaseLedgerValue(amount, additionalProperties);
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new ShowcaseLedgerValue(amount, additionalProperties);
     }
+  }
 }

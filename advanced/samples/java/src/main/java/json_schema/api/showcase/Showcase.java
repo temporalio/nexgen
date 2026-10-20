@@ -24,5310 +24,5929 @@ import org.jspecify.annotations.Nullable;
 /**
  * Showcase
  *
- * Root object exercising the supported JSON-Schema feature subset: required and
- * optional fields of every scalar type, optional+nullable and required+nullable
- * members, arrays, a nested object via $ref, a typed-map, a closed object, an open
- * (catch-all) object, a string const, a scalar default, and member docs.
+ * <p>Root object exercising the supported JSON-Schema feature subset: required and optional fields
+ * of every scalar type, optional+nullable and required+nullable members, arrays, a nested object
+ * via $ref, a typed-map, a closed object, an open (catch-all) object, a string const, a scalar
+ * default, and member docs.
  */
 @JsonSerialize(using = Showcase.Serializer.class)
 @JsonDeserialize(using = Showcase.Deserializer.class)
 public final class Showcase {
-    public interface IdOrName {
-        static @Nullable IdOrName fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-            if (node.isTextual()) {
-                IdOrNameString wrapped = new IdOrNameString(node.textValue());
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            if (node.isNumber()) {
-                Long parsed = SpecNumbers.specLong(node, path, violations);
-                if (parsed == null) {
-                    return null;
-                }
-                IdOrNameInteger wrapped = new IdOrNameInteger(parsed);
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            violations.add(new Violation(path, "expected one of: string, integer"));
-            return null;
-        }
-
-        static void validate(IdOrName value, String path, List<Violation> violations) {
-            if (value instanceof IdOrNameString) {
-                ((IdOrNameString) value).validate(path, violations);
-            }
-            if (value instanceof IdOrNameInteger) {
-                ((IdOrNameInteger) value).validate(path, violations);
-            }
-        }
-    }
-
-    public static final class IdOrNameString implements IdOrName {
-        private final String value;
-
-        public IdOrNameString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            int length = value.codePointCount(0, value.length());
-            if (length < 3) {
-                violations.add(new Violation(path, "must have length >= 3, got " + length));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof IdOrNameString)) {
-                return false;
-            }
-            return Objects.equals(value, ((IdOrNameString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "IdOrNameString[" + value + "]";
-        }
-    }
-
-    public static final class IdOrNameInteger implements IdOrName {
-        private final long value;
-
-        public IdOrNameInteger(long value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public long getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            if (value < -SpecNumbers.INTEGER_CAP || value > SpecNumbers.INTEGER_CAP) {
-                violations.add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
-            }
-            if (value < 1L) {
-                violations.add(new Violation(path, "must be >= 1, got " + value));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof IdOrNameInteger)) {
-                return false;
-            }
-            return Objects.equals(value, ((IdOrNameInteger) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "IdOrNameInteger[" + value + "]";
-        }
-    }
-
-    public interface Mode {
-        static @Nullable Mode fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-            if (node.isTextual()) {
-                ModeString wrapped = new ModeString(node.textValue());
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            if (node.isNumber()) {
-                Long parsed = SpecNumbers.specLong(node, path, violations);
-                if (parsed == null) {
-                    return null;
-                }
-                ModeInteger wrapped = new ModeInteger(parsed);
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            violations.add(new Violation(path, "expected one of: string, integer"));
-            return null;
-        }
-
-        static void validate(Mode value, String path, List<Violation> violations) {
-            if (value instanceof ModeString) {
-                ((ModeString) value).validate(path, violations);
-            }
-            if (value instanceof ModeInteger) {
-                ((ModeInteger) value).validate(path, violations);
-            }
-        }
-    }
-
-    public static final class ModeString implements Mode {
-        private final String value;
-
-        public ModeString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            if (!("auto".equals(value)) && !("manual".equals(value))) {
-                violations.add(new Violation(path, "must be one of [\"auto\", \"manual\"], got " + value));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof ModeString)) {
-                return false;
-            }
-            return Objects.equals(value, ((ModeString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "ModeString[" + value + "]";
-        }
-    }
-
-    public static final class ModeInteger implements Mode {
-        private final long value;
-
-        public ModeInteger(long value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public long getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            if (value < -SpecNumbers.INTEGER_CAP || value > SpecNumbers.INTEGER_CAP) {
-                violations.add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
-            }
-            if (value < 0L) {
-                violations.add(new Violation(path, "must be >= 0, got " + value));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof ModeInteger)) {
-                return false;
-            }
-            return Objects.equals(value, ((ModeInteger) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "ModeInteger[" + value + "]";
-        }
-    }
-
-    public interface Payload {
-        static @Nullable Payload fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-            if (node.isObject()) {
-                Map<String, JsonNode> members = new LinkedHashMap<>();
-                Iterator<String> memberNames = node.fieldNames();
-                while (memberNames.hasNext()) {
-                    String memberName = memberNames.next();
-                    members.put(memberName, node.get(memberName));
-                }
-                return new PayloadObject(members);
-            }
-            if (node.isTextual()) {
-                return new PayloadString(node.textValue());
-            }
-            violations.add(new Violation(path, "expected one of: object, string"));
-            return null;
-        }
-    }
-
-    public static final class PayloadObject implements Payload {
-        private final Map<String, JsonNode> value;
-
-        public PayloadObject(Map<String, JsonNode> value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public Map<String, JsonNode> getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof PayloadObject)) {
-                return false;
-            }
-            return Objects.equals(value, ((PayloadObject) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "PayloadObject[" + value + "]";
-        }
-    }
-
-    public static final class PayloadString implements Payload {
-        private final String value;
-
-        public PayloadString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof PayloadString)) {
-                return false;
-            }
-            return Objects.equals(value, ((PayloadString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "PayloadString[" + value + "]";
-        }
-    }
-
-    public interface Detail {
-        static @Nullable Detail fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-            if (node.isObject()) {
-                try {
-                    return context.readTreeAsValue(node, ShowcaseDetailObject.class);
-                } catch (ApplicationFailure nested) {
-                    if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                        throw nested;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                    for (Violation violation : nestedViolations) {
-                        violations.add(violation.withPathPrefix(path));
-                    }
-                    return null;
-                } catch (IOException nested) {
-                    violations.add(new Violation(path, nested.getMessage()));
-                    return null;
-                }
-            }
-            if (node.isTextual()) {
-                return new DetailString(node.textValue());
-            }
-            violations.add(new Violation(path, "expected one of: ShowcaseDetailObject, string"));
-            return null;
-        }
-    }
-
-    public static final class DetailString implements Detail {
-        private final String value;
-
-        public DetailString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof DetailString)) {
-                return false;
-            }
-            return Objects.equals(value, ((DetailString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "DetailString[" + value + "]";
-        }
-    }
-
-    public interface ShapeOrName {
-        static @Nullable ShapeOrName fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-            if (node.isObject()) {
-                JsonNode disc = node.get("kind");
-                if (disc == null || disc.isNull() || !disc.isValueNode()) {
-                    violations.add(new Violation(path, "discriminator \"kind\" is required"));
-                    return null;
-                }
-                if (disc.isTextual() && "circle".equals(disc.textValue())) {
-                    try {
-                        return context.readTreeAsValue(node, Circle.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix(path));
-                        }
-                        return null;
-                    } catch (IOException nested) {
-                        violations.add(new Violation(path, nested.getMessage()));
-                        return null;
-                    }
-                }
-                if (disc.isTextual() && "square".equals(disc.textValue())) {
-                    try {
-                        return context.readTreeAsValue(node, Square.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix(path));
-                        }
-                        return null;
-                    } catch (IOException nested) {
-                        violations.add(new Violation(path, nested.getMessage()));
-                        return null;
-                    }
-                }
-                violations.add(new Violation(path, "unknown discriminator kind " + disc.asText() + ": expected one of [circle, square]"));
-                return null;
-            }
-            if (node.isTextual()) {
-                ShapeOrNameString wrapped = new ShapeOrNameString(node.textValue());
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            violations.add(new Violation(path, "expected one of: Circle, Square, string"));
-            return null;
-        }
-
-        static void validate(ShapeOrName value, String path, List<Violation> violations) {
-            if (value instanceof ShapeOrNameString) {
-                ((ShapeOrNameString) value).validate(path, violations);
-            }
-        }
-    }
-
-    public static final class ShapeOrNameString implements ShapeOrName {
-        private final String value;
-
-        public ShapeOrNameString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            int length = value.codePointCount(0, value.length());
-            if (length > 32) {
-                violations.add(new Violation(path, "must have length <= 32, got " + length));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof ShapeOrNameString)) {
-                return false;
-            }
-            return Objects.equals(value, ((ShapeOrNameString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "ShapeOrNameString[" + value + "]";
-        }
-    }
-
-    public interface Measurements {
-        static @Nullable Measurements fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-            if (node.isArray()) {
-                List<Double> items = new ArrayList<>();
-                for (int index = 0; index < node.size(); index++) {
-                    JsonNode element = node.get(index);
-                    String elementPath = path + "[" + index + "]";
-                    Double parsed = SpecNumbers.specDouble(element, elementPath, violations);
-                    if (parsed != null) {
-                        items.add(parsed);
-                    }
-                }
-                if (node.size() < 1) {
-                    violations.add(new Violation(path, "must have at least 1 items, got " + node.size()));
-                }
-                java.util.Map<Object, Integer> rawSeen = new java.util.HashMap<>();
-                for (int rawIndex = 0; rawIndex < node.size(); rawIndex++) {
-                    Object rawKey = SpecNumbers.valueKey(node.get(rawIndex));
-                    Integer priorIndex = rawSeen.get(rawKey);
-                    if (priorIndex != null) {
-                        violations.add(new Violation(path, "duplicate items: element at index " + rawIndex + " equals index " + priorIndex));
-                    } else {
-                        rawSeen.put(rawKey, rawIndex);
-                    }
-                }
-                return new MeasurementsArray(items);
-            }
-            if (node.isTextual()) {
-                MeasurementsString wrapped = new MeasurementsString(node.textValue());
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            violations.add(new Violation(path, "expected one of: array, string"));
-            return null;
-        }
-
-        static void validate(Measurements value, String path, List<Violation> violations) {
-            if (value instanceof MeasurementsArray) {
-                ((MeasurementsArray) value).validate(path, violations);
-            }
-            if (value instanceof MeasurementsString) {
-                ((MeasurementsString) value).validate(path, violations);
-            }
-        }
-    }
-
-    public static final class MeasurementsArray implements Measurements {
-        private final List<Double> value;
-
-        public MeasurementsArray(List<Double> value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public List<Double> getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            for (int finiteIndex0 = 0; finiteIndex0 < value.size(); finiteIndex0++) {
-                Double finiteValue0 = value.get(finiteIndex0);
-                if (finiteValue0 != null) {
-                    if (!Double.isFinite(finiteValue0)) {
-                        violations.add(new Violation(path + "[" + finiteIndex0 + "]", "must be a finite number, got " + finiteValue0));
-                    }
-                }
-            }
-            if (value.size() < 1) {
-                violations.add(new Violation(path, "must have at least 1 items, got " + value.size()));
-            }
-            java.util.Map<Object, Integer> seen = new java.util.HashMap<>();
-            for (int index = 0; index < value.size(); index++) {
-                Object element = SpecNumbers.numberKey(value.get(index));
-                Integer priorIndex = seen.get(element);
-                if (priorIndex != null) {
-                    violations.add(new Violation(path, "duplicate items: element at index " + index + " equals index " + priorIndex));
-                } else {
-                    seen.put(element, index);
-                }
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof MeasurementsArray)) {
-                return false;
-            }
-            return Objects.equals(value, ((MeasurementsArray) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "MeasurementsArray[" + value + "]";
-        }
-    }
-
-    public static final class MeasurementsString implements Measurements {
-        private static final java.util.regex.Pattern VALUE_PATTERN = java.util.regex.Pattern.compile("^[a-z]+\\z");
-
-        private final String value;
-
-        public MeasurementsString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            if (!VALUE_PATTERN.matcher(value).find()) {
-                violations.add(new Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + value));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof MeasurementsString)) {
-                return false;
-            }
-            return Objects.equals(value, ((MeasurementsString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "MeasurementsString[" + value + "]";
-        }
-    }
-
-    public interface MetricOrLabel {
-        static @Nullable MetricOrLabel fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-            if (node.isNumber()) {
-                Double parsed = SpecNumbers.specDouble(node, path, violations);
-                if (parsed == null) {
-                    return null;
-                }
-                MetricOrLabelNumber wrapped = new MetricOrLabelNumber(parsed);
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            if (node.isTextual()) {
-                MetricOrLabelString wrapped = new MetricOrLabelString(node.textValue());
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            violations.add(new Violation(path, "expected one of: number, string"));
-            return null;
-        }
-
-        static void validate(MetricOrLabel value, String path, List<Violation> violations) {
-            if (value instanceof MetricOrLabelNumber) {
-                ((MetricOrLabelNumber) value).validate(path, violations);
-            }
-            if (value instanceof MetricOrLabelString) {
-                ((MetricOrLabelString) value).validate(path, violations);
-            }
-        }
-    }
-
-    public static final class MetricOrLabelNumber implements MetricOrLabel {
-        private final double value;
-
-        public MetricOrLabelNumber(double value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public double getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            if (!Double.isFinite(value)) {
-                violations.add(new Violation(path, "must be a finite number, got " + value));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof MetricOrLabelNumber)) {
-                return false;
-            }
-            return Objects.equals(value, ((MetricOrLabelNumber) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "MetricOrLabelNumber[" + value + "]";
-        }
-    }
-
-    public static final class MetricOrLabelString implements MetricOrLabel {
-        private final String value;
-
-        public MetricOrLabelString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            int length = value.codePointCount(0, value.length());
-            if (length < 1) {
-                violations.add(new Violation(path, "must have length >= 1, got " + length));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof MetricOrLabelString)) {
-                return false;
-            }
-            return Objects.equals(value, ((MetricOrLabelString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "MetricOrLabelString[" + value + "]";
-        }
-    }
-
-    public interface AddressListOrLabel {
-        static @Nullable AddressListOrLabel fromNode(JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
-            if (node.isArray()) {
-                List<Address> items = new ArrayList<>();
-                for (int index = 0; index < node.size(); index++) {
-                    JsonNode element = node.get(index);
-                    String elementPath = path + "[" + index + "]";
-                    try {
-                        items.add(context.readTreeAsValue(element, Address.class));
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix(elementPath));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation(elementPath, nested.getMessage()));
-                    }
-                }
-                if (node.size() < 1) {
-                    violations.add(new Violation(path, "must have at least 1 items, got " + node.size()));
-                }
-                return new AddressListOrLabelArray(items);
-            }
-            if (node.isTextual()) {
-                AddressListOrLabelString wrapped = new AddressListOrLabelString(node.textValue());
-                wrapped.validate(path, violations);
-                return wrapped;
-            }
-            violations.add(new Violation(path, "expected one of: array, string"));
-            return null;
-        }
-
-        static void validate(AddressListOrLabel value, String path, List<Violation> violations) {
-            if (value instanceof AddressListOrLabelArray) {
-                ((AddressListOrLabelArray) value).validate(path, violations);
-            }
-            if (value instanceof AddressListOrLabelString) {
-                ((AddressListOrLabelString) value).validate(path, violations);
-            }
-        }
-    }
-
-    public static final class AddressListOrLabelArray implements AddressListOrLabel {
-        private final List<Address> value;
-
-        public AddressListOrLabelArray(List<Address> value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public List<Address> getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            if (value.size() < 1) {
-                violations.add(new Violation(path, "must have at least 1 items, got " + value.size()));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof AddressListOrLabelArray)) {
-                return false;
-            }
-            return Objects.equals(value, ((AddressListOrLabelArray) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "AddressListOrLabelArray[" + value + "]";
-        }
-    }
-
-    public static final class AddressListOrLabelString implements AddressListOrLabel {
-        private final String value;
-
-        public AddressListOrLabelString(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        void validate(String path, List<Violation> violations) {
-            int length = value.codePointCount(0, value.length());
-            if (length < 1) {
-                violations.add(new Violation(path, "must have length >= 1, got " + length));
-            }
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof AddressListOrLabelString)) {
-                return false;
-            }
-            return Objects.equals(value, ((AddressListOrLabelString) other).value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "AddressListOrLabelString[" + value + "]";
-        }
-    }
-
-    public static final class Kind {
-        public static final Kind SHOWCASE = new Kind("showcase");
-
-        private final String value;
-
-        private Kind(String value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static @Nullable Kind fromString(String value) {
-            if (value == null) {
-                return null;
-            }
-            if ("showcase".equals(value)) {
-                return SHOWCASE;
-            }
-            throw new IllegalArgumentException("must equal \"showcase\", got \"" + value + "\"");
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Kind)) {
-                return false;
-            }
-            Kind that = (Kind) other;
-            return Objects.equals(this.value, that.value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Kind[" + value + "]";
-        }
-    }
-
-    public static final class Revision {
-        public static final Revision REVISION_JAVA = new Revision(1L);
-
-        private final long value;
-
-        private Revision(long value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static Revision fromLong(long value) {
-            if (value == 1L) {
-                return REVISION_JAVA;
-            }
-            throw new IllegalArgumentException("must equal 1, got " + value);
-        }
-
-        @JsonValue
-        public long getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Revision)) {
-                return false;
-            }
-            Revision that = (Revision) other;
-            return this.value == that.value;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Revision[" + value + "]";
-        }
-    }
-
-    public static final class Enabled {
-        public static final Enabled TRUE = new Enabled(true);
-
-        private final boolean value;
-
-        private Enabled(boolean value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static Enabled fromBoolean(boolean value) {
-            if (value == true) {
-                return TRUE;
-            }
-            throw new IllegalArgumentException("must equal true, got " + value);
-        }
-
-        @JsonValue
-        public boolean getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Enabled)) {
-                return false;
-            }
-            Enabled that = (Enabled) other;
-            return this.value == that.value;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Enabled[" + value + "]";
-        }
-    }
-
-    public static final class Status {
-        public static final Status ACTIVE_JAVA = new Status("active");
-        public static final Status INACTIVE = new Status("inactive");
-        public static final Status PENDING = new Status("pending");
-
-        private final String value;
-
-        private Status(String value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static @Nullable Status fromString(String value) {
-            if (value == null) {
-                return null;
-            }
-            if ("active".equals(value)) {
-                return ACTIVE_JAVA;
-            }
-            if ("inactive".equals(value)) {
-                return INACTIVE;
-            }
-            if ("pending".equals(value)) {
-                return PENDING;
-            }
-            throw new IllegalArgumentException("must be one of [\"active\", \"inactive\", \"pending\"], got \"" + value + "\"");
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Status)) {
-                return false;
-            }
-            Status that = (Status) other;
-            return Objects.equals(this.value, that.value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Status[" + value + "]";
-        }
-    }
-
-    public static final class Tier {
-        public static final Tier V_1 = new Tier(1L);
-        public static final Tier V_2 = new Tier(2L);
-        public static final Tier V_3 = new Tier(3L);
-
-        private final long value;
-
-        private Tier(long value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static Tier fromLong(long value) {
-            if (value == 1L) {
-                return V_1;
-            }
-            if (value == 2L) {
-                return V_2;
-            }
-            if (value == 3L) {
-                return V_3;
-            }
-            throw new IllegalArgumentException("must be one of [1, 2, 3], got " + value);
-        }
-
-        @JsonValue
-        public long getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Tier)) {
-                return false;
-            }
-            Tier that = (Tier) other;
-            return this.value == that.value;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Tier[" + value + "]";
-        }
-    }
-
-    public static final class Scale {
-        public static final Scale V_1_5 = new Scale(1.5);
-        public static final Scale V_2_5 = new Scale(2.5);
-
-        private final double value;
-
-        private Scale(double value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static Scale fromDouble(double value) {
-            if (value == 1.5) {
-                return V_1_5;
-            }
-            if (value == 2.5) {
-                return V_2_5;
-            }
-            throw new IllegalArgumentException("must be one of [1.5, 2.5], got " + value);
-        }
-
-        @JsonValue
-        public double getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Scale)) {
-                return false;
-            }
-            Scale that = (Scale) other;
-            return this.value == that.value;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Scale[" + value + "]";
-        }
-    }
-
-    public static final class NullableMode {
-        public static final NullableMode AUTO = new NullableMode("auto");
-        public static final NullableMode MANUAL = new NullableMode("manual");
-
-        private final String value;
-
-        private NullableMode(String value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static @Nullable NullableMode fromString(String value) {
-            if (value == null) {
-                return null;
-            }
-            if ("auto".equals(value)) {
-                return AUTO;
-            }
-            if ("manual".equals(value)) {
-                return MANUAL;
-            }
-            throw new IllegalArgumentException("must be one of [\"auto\", \"manual\"], got \"" + value + "\"");
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof NullableMode)) {
-                return false;
-            }
-            NullableMode that = (NullableMode) other;
-            return Objects.equals(this.value, that.value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "NullableMode[" + value + "]";
-        }
-    }
-
-    private static final java.util.regex.Pattern SKU_PATTERN = java.util.regex.Pattern.compile("^[A-Z]{2,4}\\z");
-    private static final java.util.regex.Pattern PHRASE_PATTERN = java.util.regex.Pattern.compile("^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\\z");
-    private static final java.util.regex.Pattern REQUEST_ID_FORMAT = java.util.regex.Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\z");
-    private static final java.util.regex.Pattern CONTACT_EMAIL_FORMAT = java.util.regex.Pattern.compile("^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+\\z");
-    private static final java.util.regex.Pattern HOST_FORMAT = java.util.regex.Pattern.compile("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\\z");
-    private static final java.util.regex.Pattern HOMEPAGE_FORMAT = java.util.regex.Pattern.compile("^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z");
-    private static final java.util.regex.Pattern GATEWAY_FORMAT = java.util.regex.Pattern.compile("^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\z");
-    private static final java.util.regex.Pattern WILDCARD_PATTERN = java.util.regex.Pattern.compile("a[^\\n]b");
-
-    private final Kind kind;
-    private final Revision revision;
-    private final Enabled enabled;
-    private final Status status;
-    private final Tier tier;
-    private final Scale scale;
-    private final String name;
-    private final long count;
-    private final boolean active;
-    private final @Nullable String nickname;
-    private final @Nullable String code;
-    private final @Nullable String sku;
-    private final @Nullable String phrase;
-    private final @Nullable String requestId;
-    private final @Nullable String contactEmail;
-    private final @Nullable String host;
-    private final @Nullable String homepage;
-    private final @Nullable String gateway;
-    private final byte @Nullable [] blob;
-    private final byte @Nullable [] urlBlob;
-    private final @Nullable Long retries;
-    private final @Nullable Boolean verbose;
-    private final @Nullable String greeting;
-    private final @Nullable Boolean debug;
-    private final @Nullable String legacyIdJava;
-    private final @Nullable String middleName;
-    private final @Nullable String category;
-    private final @Nullable Long priority;
-    private final @Nullable Long level;
-    private final @Nullable Double ratio;
-    private final @Nullable Double score;
-    private final @Nullable Long step;
-    private final @Nullable List<String> tags;
-    private final @Nullable List<String> aliases;
-    private final @Nullable List<String> roles;
-    private final @Nullable IdOrName idOrName;
-    private final @Nullable Mode mode;
-    private final @Nullable Payload payload;
-    private final @Nullable Detail detail;
-    private final @Nullable ShapeOrName shapeOrName;
-    private final @Nullable Measurements measurements;
-    private final @Nullable List<Shape> shapes;
-    private final @Nullable List<ShowcaseSegmentsItem> segments;
-    private final @Nullable List<@Nullable String> slots;
-    private final @Nullable List<List<Long>> grid;
-    private final @Nullable List<List<Double>> numberGrid;
-    private final @Nullable List<String> links;
-    private final @Nullable List<Address> addresses;
-    private final @Nullable AddressBook addressBook;
-    private final @Nullable List<LocalDate> dates;
-    private final @Nullable DateIndex dateIndex;
-    private final @Nullable List<byte[]> blobs;
-    private final @Nullable BlobIndex blobIndex;
-    private final @Nullable Metrics metrics;
-    private final @Nullable MetricOrLabel metricOrLabel;
-    private final @Nullable AddressListOrLabel addressListOrLabel;
-    private final @Nullable ShowcaseLocation location;
-    private final @Nullable ShowcaseAudit audit;
-    private final @Nullable List<ShowcaseRowsItem> rows;
-    private final @Nullable ShowcaseLedger ledgerJava;
-    private final @Nullable ShowcaseMetadata metadata;
-    private final @Nullable Quotas quotas;
-    private final @Nullable Tokens tokens;
-    private final @Nullable Nicknames nicknames;
-    private final @Nullable Choices choices;
-    private final @Nullable Extras extras;
-    private final @Nullable Shape shape;
-    private final @Nullable Note note;
-    private final @Nullable Address address;
-    private final @Nullable Labels labels;
-    private final @Nullable Settings settings;
-    private final @Nullable Attributes attributes;
-    private final @Nullable ContactJava contact;
-    private final @Nullable Long nullableCount;
-    private final @Nullable Double nullableRatio;
-    private final @Nullable Boolean nullableFlag;
-    private final @Nullable List<String> nullableTags;
-    private final @Nullable NullableMode nullableMode;
-    private final @Nullable List<Double> integralMeasurements;
-    private final @Nullable Double byFive;
-    private final @Nullable String wildcard;
-    private final @Nullable String quoted;
-
-    public Showcase(Kind kind, Revision revision, Enabled enabled, Status status, Tier tier, Scale scale, String name, long count, boolean active, @Nullable String nickname, @Nullable String code, @Nullable String sku, @Nullable String phrase, @Nullable String requestId, @Nullable String contactEmail, @Nullable String host, @Nullable String homepage, @Nullable String gateway, byte @Nullable [] blob, byte @Nullable [] urlBlob, @Nullable Long retries, @Nullable Boolean verbose, @Nullable String greeting, @Nullable Boolean debug, @Nullable String legacyIdJava, @Nullable String middleName, @Nullable String category, @Nullable Long priority, @Nullable Long level, @Nullable Double ratio, @Nullable Double score, @Nullable Long step, @Nullable List<String> tags, @Nullable List<String> aliases, @Nullable List<String> roles, @Nullable IdOrName idOrName, @Nullable Mode mode, @Nullable Payload payload, @Nullable Detail detail, @Nullable ShapeOrName shapeOrName, @Nullable Measurements measurements, @Nullable List<Shape> shapes, @Nullable List<ShowcaseSegmentsItem> segments, @Nullable List<@Nullable String> slots, @Nullable List<List<Long>> grid, @Nullable List<List<Double>> numberGrid, @Nullable List<String> links, @Nullable List<Address> addresses, @Nullable AddressBook addressBook, @Nullable List<LocalDate> dates, @Nullable DateIndex dateIndex, @Nullable List<byte[]> blobs, @Nullable BlobIndex blobIndex, @Nullable Metrics metrics, @Nullable MetricOrLabel metricOrLabel, @Nullable AddressListOrLabel addressListOrLabel, @Nullable ShowcaseLocation location, @Nullable ShowcaseAudit audit, @Nullable List<ShowcaseRowsItem> rows, @Nullable ShowcaseLedger ledgerJava, @Nullable ShowcaseMetadata metadata, @Nullable Quotas quotas, @Nullable Tokens tokens, @Nullable Nicknames nicknames, @Nullable Choices choices, @Nullable Extras extras, @Nullable Shape shape, @Nullable Note note, @Nullable Address address, @Nullable Labels labels, @Nullable Settings settings, @Nullable Attributes attributes, @Nullable ContactJava contact, @Nullable Long nullableCount, @Nullable Double nullableRatio, @Nullable Boolean nullableFlag, @Nullable List<String> nullableTags, @Nullable NullableMode nullableMode, @Nullable List<Double> integralMeasurements, @Nullable Double byFive, @Nullable String wildcard, @Nullable String quoted) {
-        this.kind = kind;
-        this.revision = revision;
-        this.enabled = enabled;
-        this.status = status;
-        this.tier = tier;
-        this.scale = scale;
-        this.name = name;
-        this.count = count;
-        this.active = active;
-        this.nickname = nickname;
-        this.code = code;
-        this.sku = sku;
-        this.phrase = phrase;
-        this.requestId = requestId;
-        this.contactEmail = contactEmail;
-        this.host = host;
-        this.homepage = homepage;
-        this.gateway = gateway;
-        this.blob = blob;
-        this.urlBlob = urlBlob;
-        this.retries = retries;
-        this.verbose = verbose;
-        this.greeting = greeting;
-        this.debug = debug;
-        this.legacyIdJava = legacyIdJava;
-        this.middleName = middleName;
-        this.category = category;
-        this.priority = priority;
-        this.level = level;
-        this.ratio = ratio;
-        this.score = score;
-        this.step = step;
-        this.tags = tags;
-        this.aliases = aliases;
-        this.roles = roles;
-        this.idOrName = idOrName;
-        this.mode = mode;
-        this.payload = payload;
-        this.detail = detail;
-        this.shapeOrName = shapeOrName;
-        this.measurements = measurements;
-        this.shapes = shapes;
-        this.segments = segments;
-        this.slots = slots;
-        this.grid = grid;
-        this.numberGrid = numberGrid;
-        this.links = links;
-        this.addresses = addresses;
-        this.addressBook = addressBook;
-        this.dates = dates;
-        this.dateIndex = dateIndex;
-        this.blobs = blobs;
-        this.blobIndex = blobIndex;
-        this.metrics = metrics;
-        this.metricOrLabel = metricOrLabel;
-        this.addressListOrLabel = addressListOrLabel;
-        this.location = location;
-        this.audit = audit;
-        this.rows = rows;
-        this.ledgerJava = ledgerJava;
-        this.metadata = metadata;
-        this.quotas = quotas;
-        this.tokens = tokens;
-        this.nicknames = nicknames;
-        this.choices = choices;
-        this.extras = extras;
-        this.shape = shape;
-        this.note = note;
-        this.address = address;
-        this.labels = labels;
-        this.settings = settings;
-        this.attributes = attributes;
-        this.contact = contact;
-        this.nullableCount = nullableCount;
-        this.nullableRatio = nullableRatio;
-        this.nullableFlag = nullableFlag;
-        this.nullableTags = nullableTags;
-        this.nullableMode = nullableMode;
-        this.integralMeasurements = integralMeasurements;
-        this.byFive = byFive;
-        this.wildcard = wildcard;
-        this.quoted = quoted;
-    }
-
-    /**
-     * Discriminator; always "showcase".
-     */
-    public Kind getKind() {
-        return kind;
-    }
-
-    /**
-     * Integer const; always 1. Also exercises the single-`const` value override:
-     * `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived
-     * name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the
-     * wire value stays `1`. TS/Python are inert here (no const override keyword — the
-     * value is emitted as a plain literal type).
-     */
-    public Revision getRevision() {
-        return revision;
-    }
-
-    /**
-     * Boolean const; always true.
-     */
-    public Enabled getEnabled() {
-        return enabled;
-    }
-
-    /**
-     * Closed string value set. Also exercises the enum value-constant override:
-     * `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted
-     * constant to the value name plus a per-language suffix (Go `ActiveGo`, Java
-     * `ACTIVE_JAVA`) while the wire value stays `active`. TS/Python are inert here (no
-     * enum override keyword).
-     */
-    public Status getStatus() {
-        return status;
-    }
-
-    /**
-     * Closed integer value set.
-     */
-    public Tier getTier() {
-        return tier;
-    }
-
-    /**
-     * Closed number value set (exercises the Python float exception: emitted as plain
-     * float, validated by membership).
-     */
-    public Scale getScale() {
-        return scale;
-    }
-
-    /**
-     * Display name
-     *
-     * Required human-readable name, 1 to 64 code points.
-     */
-    public String getName() {
-        return name;
-    }
-
-    /**
-     * Required integer scalar.
-     */
-    public long getCount() {
-        return count;
-    }
-
-    /**
-     * Required boolean scalar.
-     */
-    public boolean getActive() {
-        return active;
-    }
-
-    /**
-     * Optional short name, at most 12 code points.
-     */
-    public @Nullable String getNickname() {
-        return nickname;
-    }
-
-    /**
-     * Optional code, 2 to 5 code points. Counted in Unicode code points, so a
-     * multi-byte value (e.g. "a😀b", 3 code points / 6 UTF-8 bytes) is valid.
-     */
-    public @Nullable String getCode() {
-        return code;
-    }
-
-    /**
-     * Optional product code: 2 to 4 uppercase ASCII letters, anchored (`^[A-Z]{2,4}$`).
-     * Exercises the RE2-safe `pattern` gate.
-     */
-    public @Nullable String getSku() {
-        return sku;
-    }
-
-    /**
-     * Optional two-word phrase separated by whitespace (`^&#92;S+&#92;s&#92;S+$`).
-     * Exercises the loader's `&#92;s`/`&#92;S` → ASCII-class normalization and the
-     * per-target `$` end-anchor rewrite (Python `&#92;Z` / Java `&#92;z`), so a Unicode
-     * space (NBSP) and a trailing newline are rejected consistently across all four
-     * languages.
-     */
-    public @Nullable String getPhrase() {
-        return phrase;
-    }
-
-    /**
-     * Optional request identifier; asserted RFC 4122 UUID via `format: uuid`. Stays
-     * `string`-typed (format assertion, no materialization); the pinned regex is
-     * validated identically across all four languages.
-     */
-    public @Nullable String getRequestId() {
-        return requestId;
-    }
-
-    /**
-     * Optional contact address; asserted ASCII dot-atom `format: email` (single `@`,
-     * &gt;=2-label domain, total length &lt;= 254, guard-before-regex).
-     */
-    public @Nullable String getContactEmail() {
-        return contactEmail;
-    }
-
-    /**
-     * Optional host name; asserted RFC 1123 `format: hostname` (LDH labels, total
-     * length &lt;= 253).
-     */
-    public @Nullable String getHost() {
-        return host;
-    }
-
-    /**
-     * Optional homepage; asserted RFC 3986 `format: uri` (scheme required, ASCII only;
-     * an IP-literal host is validated by the spliced ipv6 grammar).
-     */
-    public @Nullable String getHomepage() {
-        return homepage;
-    }
-
-    /**
-     * Optional gateway address; asserted dotted-quad IPv4 via format ipv4.
-     */
-    public @Nullable String getGateway() {
-        return gateway;
-    }
-
-    /**
-     * Optional binary payload carried as a `contentEncoding: base64` string,
-     * materialized to native bytes (Go []byte, TS Uint8Array, Python bytes, Java
-     * byte[]). The wire is canonical padded standard base64; a malformed value is
-     * rejected by the pinned regex before decode.
-     */
-    public byte @Nullable [] getBlob() {
-        return blob;
-    }
-
-    /**
-     * Optional binary payload carried as a `contentEncoding: base64url` string
-     * (URL-safe alphabet, unpadded, RFC 4648 §5), materialized to the same native bytes
-     * type. The same bytes encode to a different wire than base64 ("Pj4+" vs "Pj4-").
-     */
-    public byte @Nullable [] getUrlBlob() {
-        return urlBlob;
-    }
-
-    /**
-     * Retry budget
-     *
-     * Optional integer with a schema default.
-     */
-    public @Nullable Long getRetries() {
-        return retries;
-    }
-
-    public long getRetriesOrDefault() {
-        return retries != null ? retries : 3L;
-    }
-
-    public @Nullable Boolean getVerbose() {
-        return verbose;
-    }
-
-    /**
-     * Greeting
-     *
-     * Optional string with a schema default, surfaced on read.
-     */
-    public @Nullable String getGreeting() {
-        return greeting;
-    }
-
-    public String getGreetingOrDefault() {
-        return greeting != null ? greeting : "hello";
-    }
-
-    /**
-     * Debug flag
-     *
-     * Optional boolean with a schema default.
-     */
-    public @Nullable Boolean getDebug() {
-        return debug;
-    }
-
-    public boolean getDebugOrDefault() {
-        return debug != null ? debug : false;
-    }
-
-    /**
-     * Deprecated legacy identifier; prefer `requestId`. Exercises the native
-     * deprecation marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python
-     * PEP 702 @deprecated). Also exercises the property-level `x-&lt;lang&gt;-name`
-     * override (the Stage 4 escape hatch): the emitted member identifier is renamed to
-     * the derived name plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`,
-     * Python `legacy_id_py`, Java `legacyIdJava`) while the wire name stays `legacyId`
-     * (json tag / alias / @JsonProperty).
-     *
-     * @deprecated This field is deprecated.
-     */
-    @Deprecated
-    public @Nullable String getLegacyIdJava() {
-        return legacyIdJava;
-    }
-
-    /**
-     * Optional and nullable; may be absent or explicitly null.
-     */
-    public @Nullable String getMiddleName() {
-        return middleName;
-    }
-
-    /**
-     * Required but nullable; may be explicitly cleared to null.
-     */
-    public @Nullable String getCategory() {
-        return category;
-    }
-
-    /**
-     * Optional integer bounded to the inclusive range [1, 10].
-     */
-    public @Nullable Long getPriority() {
-        return priority;
-    }
-
-    /**
-     * Optional integer that must be strictly greater than 0.
-     */
-    public @Nullable Long getLevel() {
-        return level;
-    }
-
-    /**
-     * Optional number that must be a non-negative multiple of 5.
-     */
-    public @Nullable Double getRatio() {
-        return ratio;
-    }
-
-    /**
-     * Optional unbounded finite number.
-     */
-    public @Nullable Double getScore() {
-        return score;
-    }
-
-    /**
-     * Optional integer that must be a multiple of 3.
-     */
-    public @Nullable Long getStep() {
-        return step;
-    }
-
-    /**
-     * Ordered list of free-form tags; 1 to 5 entries.
-     */
-    public @Nullable List<String> getTags() {
-        return tags;
-    }
-
-    /**
-     * Alternate names; each must be distinct.
-     */
-    public @Nullable List<String> getAliases() {
-        return aliases;
-    }
-
-    /**
-     * Access roles; must contain between one and two "admin" entries.
-     */
-    public @Nullable List<String> getRoles() {
-        return roles;
-    }
-
-    /**
-     * Disjoint-kind union (oneOf sum type): the wire value is either a string of at
-     * least 3 code points or an integer of at least 1, selected by its JSON token. Not
-     * a member of a discriminated union — the token itself is the selector. Each branch
-     * also carries its **own constraints**: once the token selects a branch, the value
-     * is held to everything that branch declares, in both directions, with the union's
-     * path on the violation.
-     */
-    public @Nullable IdOrName getIdOrName() {
-        return idOrName;
-    }
-
-    /**
-     * A union whose string branch is a **closed value set**: either one of two named
-     * modes or an unbounded non-negative integer. The branch narrows to its own
-     * admissible values (a Go/Java membership check, a TypeScript literal union, a
-     * Python `Literal`), so an unknown string is a Violation while any non-negative
-     * integer is accepted.
-     */
-    public @Nullable Mode getMode() {
-        return mode;
-    }
-
-    /**
-     * Mixed-kind union whose object branch is an inline free-form object: the wire
-     * value is either an arbitrary object (members carried verbatim) or a string,
-     * selected by its JSON token. The free-form object is the one object branch that
-     * needs no type name — TypeScript and Python carry it structurally, Go and Java
-     * wrap it as `&lt;Union&gt;Object`.
-     */
-    public @Nullable Payload getPayload() {
-        return payload;
-    }
-
-    /**
-     * Mixed-kind union whose object branch is an inline *structured* object, written
-     * directly on the property rather than in `$defs`. It is the only object branch of
-     * this union, so it derives its name from the union it belongs to —
-     * `ShowcaseDetailObject` — and is emitted as an ordinary model: its members keep
-     * their own constraints and it stays open to unknown ones.
-     */
-    public @Nullable Detail getDetail() {
-        return detail;
-    }
-
-    /**
-     * Tagged object union mixed with a scalar kind: the two selector layers compose —
-     * the JSON token picks object-vs-string, and, for an object, the shared required
-     * `kind` const picks Circle-vs-Square. Written inline on the property, so the union
-     * itself is named after its position (`ShowcaseShapeOrName` / nested
-     * `Showcase.ShapeOrName`), and it reuses the `Circle`/`Square` branches of `shape`
-     * — a branch type may belong to more than one union (Go gains a second marker
-     * method, Java a second implemented interface). The scalar branch carries a length
-     * bound of its own; the object branches validate through their own models.
-     */
-    public @Nullable ShapeOrName getShapeOrName() {
-        return shapeOrName;
-    }
-
-    /**
-     * Mixed-kind union with an array branch: the wire value is either a non-empty list
-     * of distinct numbers or a lowercase preset name, selected by its JSON token. An
-     * array branch has no definition to take a name from, so Go and Java emit it as the
-     * synthesized `&lt;Union&gt;Array` variant (a defined type / a `@JsonValue`
-     * wrapper) while TypeScript and Python carry it structurally as `number[]` /
-     * `list[float]`. Both branches carry their own constraints — the array's
-     * `minItems`/`uniqueItems` and the string's `pattern` — so the array-vs-string
-     * choice is validated as well as selected.
-     */
-    public @Nullable Measurements getMeasurements() {
-        return measurements;
-    }
-
-    /**
-     * A list whose element type is a named union: every element is routed to exactly
-     * one branch by the union's own selector, and its index carries into the violation
-     * path (`shapes[1]`). Go and Java cannot decode a sealed interface as a whole, so
-     * the element decodes through the union's dispatcher one at a time.
-     */
-    public @Nullable List<Shape> getShapes() {
-        return shapes;
-    }
-
-    /**
-     * A list whose element union is written **inline**. An element has no name of its
-     * own, so the union is named after its position — `ShowcaseSegmentsItem` — moved
-     * into `$defs`, and the element becomes a `$ref` at it; from there it is an
-     * ordinary named union in every language.
-     */
-    public @Nullable List<ShowcaseSegmentsItem> getSegments() {
-        return segments;
-    }
-
-    /**
-     * A list of **nullable, constrained scalar elements** — the two-branch nullability
-     * `oneOf` rather than a sum type, so nothing is named: the elements themselves
-     * become nullable (`[]*string`, `(string | null)[]`, `list[str | None]`,
-     * `List&lt;@Nullable String&gt;`) while each present string retains its own minimum
-     * length and the list stays a list.
-     */
-    public @Nullable List<@Nullable String> getSlots() {
-        return slots;
-    }
-
-    /**
-     * A nested array: `items` at depth two. Each level decodes elementwise, so a bad
-     * element is reported at its own two-dimensional index (`grid[1][0]`).
-     */
-    public @Nullable List<List<Long>> getGrid() {
-        return grid;
-    }
-
-    /**
-     * A nested array of numbers used to prove recursive finite-number validation and
-     * two-dimensional indexed aggregation.
-     */
-    public @Nullable List<List<Double>> getNumberGrid() {
-        return numberGrid;
-    }
-
-    /**
-     * A list of scalar URI values; every element keeps its format assertion.
-     */
-    public @Nullable List<String> getLinks() {
-        return links;
-    }
-
-    /**
-     * A list of referenced models, converted and validated elementwise.
-     */
-    public @Nullable List<Address> getAddresses() {
-        return addresses;
-    }
-
-    public @Nullable AddressBook getAddressBook() {
-        return addressBook;
-    }
-
-    /**
-     * Materialized calendar dates in an array.
-     */
-    public @Nullable List<LocalDate> getDates() {
-        return dates;
-    }
-
-    public @Nullable DateIndex getDateIndex() {
-        return dateIndex;
-    }
-
-    /**
-     * Materialized base64 byte strings in an array.
-     */
-    public @Nullable List<byte[]> getBlobs() {
-        return blobs;
-    }
-
-    public @Nullable BlobIndex getBlobIndex() {
-        return blobIndex;
-    }
-
-    public @Nullable Metrics getMetrics() {
-        return metrics;
-    }
-
-    /**
-     * A finite number branch or a non-empty string branch.
-     */
-    public @Nullable MetricOrLabel getMetricOrLabel() {
-        return metricOrLabel;
-    }
-
-    /**
-     * A union whose array branch contains referenced models, proving that branch
-     * conversion uses the ordinary recursive array mapper.
-     */
-    public @Nullable AddressListOrLabel getAddressListOrLabel() {
-        return addressListOrLabel;
-    }
-
-    public @Nullable ShowcaseLocation getLocation() {
-        return location;
-    }
-
-    /**
-     * A nullable inline object. The nullability wrapper emits no type of its own, so
-     * the object inside it takes the property's name — `ShowcaseAudit`, the same name
-     * it would take written plainly: adding or removing nullability never renames the
-     * type.
-     */
-    public @Nullable ShowcaseAudit getAudit() {
-        return audit;
-    }
-
-    /**
-     * A list whose element is an inline object, named after its position
-     * (`ShowcaseRowsItem`) exactly as an inline element *union* is.
-     */
-    public @Nullable List<ShowcaseRowsItem> getRows() {
-        return rows;
-    }
-
-    public @Nullable ShowcaseLedger getLedgerJava() {
-        return ledgerJava;
-    }
-
-    public @Nullable ShowcaseMetadata getMetadata() {
-        return metadata;
-    }
-
-    public @Nullable Quotas getQuotas() {
-        return quotas;
-    }
-
-    public @Nullable Tokens getTokens() {
-        return tokens;
-    }
-
-    public @Nullable Nicknames getNicknames() {
-        return nicknames;
-    }
-
-    public @Nullable Choices getChoices() {
-        return choices;
-    }
-
-    public @Nullable Extras getExtras() {
-        return extras;
-    }
-
-    public @Nullable Shape getShape() {
-        return shape;
-    }
-
-    public @Nullable Note getNote() {
-        return note;
-    }
-
-    public @Nullable Address getAddress() {
-        return address;
-    }
-
-    public @Nullable Labels getLabels() {
-        return labels;
-    }
-
-    public @Nullable Settings getSettings() {
-        return settings;
-    }
-
-    public @Nullable Attributes getAttributes() {
-        return attributes;
-    }
-
-    public @Nullable ContactJava getContact() {
-        return contact;
-    }
-
-    /**
-     * Optional and nullable **integer**, with bounds on the non-null branch. The
-     * nullability wrapper carries no `type` of its own, so an emitter that reads the
-     * wrapper rather than the branch loses both the element type and every constraint
-     * on it. Go emits `*int64`, TS `number | null`, Python `int | None`, Java
-     * `@Nullable Long`, and `1 &lt;= v &lt;= 10` is enforced in all four, in both
-     * directions.
-     */
-    public @Nullable Long getNullableCount() {
-        return nullableCount;
-    }
-
-    /**
-     * Optional and nullable number with a divisor on the non-null branch.
-     */
-    public @Nullable Double getNullableRatio() {
-        return nullableRatio;
-    }
-
-    /**
-     * Optional and nullable boolean.
-     */
-    public @Nullable Boolean getNullableFlag() {
-        return nullableFlag;
-    }
-
-    /**
-     * Optional and nullable **array**, with element and count constraints on the
-     * non-null branch. Optional + nullable, so the Go field stays `[]string` and a wire
-     * `null` decodes to a nil slice.
-     */
-    public @Nullable List<String> getNullableTags() {
-        return nullableTags;
-    }
-
-    /**
-     * Optional and nullable **closed value set** — the closed type survives the
-     * nullability wrapper, so an unknown string is a Violation rather than an accepted
-     * value.
-     */
-    public @Nullable NullableMode getNullableMode() {
-        return nullableMode;
-    }
-
-    /**
-     * An integer `contains` matcher over number elements: the matcher's own predicate
-     * decides a match, and the +/-(2^53-1) integer cap applies to it in every language.
-     */
-    public @Nullable List<Double> getIntegralMeasurements() {
-        return integralMeasurements;
-    }
-
-    /**
-     * A number-field divisor. Divisibility is IEEE `fmod` over the stored binary64
-     * value, not exact decimal arithmetic, so all four agree at magnitudes where the
-     * shortest decimal spelling and the stored double diverge.
-     */
-    public @Nullable Double getByFive() {
-        return byFive;
-    }
-
-    /**
-     * A pattern containing a bare dot, normalized to an explicit negated class so the
-     * four regex engines agree on line terminators (`&#92;r`, U+0085, U+2028, U+2029),
-     * which their native `.` does not.
-     */
-    public @Nullable String getWildcard() {
-        return wildcard;
-    }
-
-    /**
-     * Ends with a quote "
-     */
-    public @Nullable String getQuoted() {
-        return quoted;
+  public interface IdOrName {
+    static @Nullable IdOrName fromNode(
+        JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+      if (node.isTextual()) {
+        IdOrNameString wrapped = new IdOrNameString(node.textValue());
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      if (node.isNumber()) {
+        Long parsed = SpecNumbers.specLong(node, path, violations);
+        if (parsed == null) {
+          return null;
+        }
+        IdOrNameInteger wrapped = new IdOrNameInteger(parsed);
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      violations.add(new Violation(path, "expected one of: string, integer"));
+      return null;
+    }
+
+    static void validate(IdOrName value, String path, List<Violation> violations) {
+      if (value instanceof IdOrNameString) {
+        ((IdOrNameString) value).validate(path, violations);
+      }
+      if (value instanceof IdOrNameInteger) {
+        ((IdOrNameInteger) value).validate(path, violations);
+      }
+    }
+  }
+
+  public static final class IdOrNameString implements IdOrName {
+    private final String value;
+
+    public IdOrNameString(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      int length = value.codePointCount(0, value.length());
+      if (length < 3) {
+        violations.add(new Violation(path, "must have length >= 3, got " + length));
+      }
     }
 
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof Showcase)) {
-            return false;
-        }
-        Showcase that = (Showcase) other;
-        return Objects.equals(this.kind, that.kind)
-            && Objects.equals(this.revision, that.revision)
-            && Objects.equals(this.enabled, that.enabled)
-            && Objects.equals(this.status, that.status)
-            && Objects.equals(this.tier, that.tier)
-            && Objects.equals(this.scale, that.scale)
-            && Objects.equals(this.name, that.name)
-            && this.count == that.count
-            && this.active == that.active
-            && Objects.equals(this.nickname, that.nickname)
-            && Objects.equals(this.code, that.code)
-            && Objects.equals(this.sku, that.sku)
-            && Objects.equals(this.phrase, that.phrase)
-            && Objects.equals(this.requestId, that.requestId)
-            && Objects.equals(this.contactEmail, that.contactEmail)
-            && Objects.equals(this.host, that.host)
-            && Objects.equals(this.homepage, that.homepage)
-            && Objects.equals(this.gateway, that.gateway)
-            && java.util.Arrays.equals(this.blob, that.blob)
-            && java.util.Arrays.equals(this.urlBlob, that.urlBlob)
-            && Objects.equals(this.retries, that.retries)
-            && Objects.equals(this.verbose, that.verbose)
-            && Objects.equals(this.greeting, that.greeting)
-            && Objects.equals(this.debug, that.debug)
-            && Objects.equals(this.legacyIdJava, that.legacyIdJava)
-            && Objects.equals(this.middleName, that.middleName)
-            && Objects.equals(this.category, that.category)
-            && Objects.equals(this.priority, that.priority)
-            && Objects.equals(this.level, that.level)
-            && Objects.equals(this.ratio, that.ratio)
-            && Objects.equals(this.score, that.score)
-            && Objects.equals(this.step, that.step)
-            && Objects.equals(this.tags, that.tags)
-            && Objects.equals(this.aliases, that.aliases)
-            && Objects.equals(this.roles, that.roles)
-            && Objects.equals(this.idOrName, that.idOrName)
-            && Objects.equals(this.mode, that.mode)
-            && Objects.equals(this.payload, that.payload)
-            && Objects.equals(this.detail, that.detail)
-            && Objects.equals(this.shapeOrName, that.shapeOrName)
-            && Objects.equals(this.measurements, that.measurements)
-            && Objects.equals(this.shapes, that.shapes)
-            && Objects.equals(this.segments, that.segments)
-            && Objects.equals(this.slots, that.slots)
-            && Objects.equals(this.grid, that.grid)
-            && Objects.equals(this.numberGrid, that.numberGrid)
-            && Objects.equals(this.links, that.links)
-            && Objects.equals(this.addresses, that.addresses)
-            && Objects.equals(this.addressBook, that.addressBook)
-            && Objects.equals(this.dates, that.dates)
-            && Objects.equals(this.dateIndex, that.dateIndex)
-            && Base64Support.listEquals(this.blobs, that.blobs)
-            && Objects.equals(this.blobIndex, that.blobIndex)
-            && Objects.equals(this.metrics, that.metrics)
-            && Objects.equals(this.metricOrLabel, that.metricOrLabel)
-            && Objects.equals(this.addressListOrLabel, that.addressListOrLabel)
-            && Objects.equals(this.location, that.location)
-            && Objects.equals(this.audit, that.audit)
-            && Objects.equals(this.rows, that.rows)
-            && Objects.equals(this.ledgerJava, that.ledgerJava)
-            && Objects.equals(this.metadata, that.metadata)
-            && Objects.equals(this.quotas, that.quotas)
-            && Objects.equals(this.tokens, that.tokens)
-            && Objects.equals(this.nicknames, that.nicknames)
-            && Objects.equals(this.choices, that.choices)
-            && Objects.equals(this.extras, that.extras)
-            && Objects.equals(this.shape, that.shape)
-            && Objects.equals(this.note, that.note)
-            && Objects.equals(this.address, that.address)
-            && Objects.equals(this.labels, that.labels)
-            && Objects.equals(this.settings, that.settings)
-            && Objects.equals(this.attributes, that.attributes)
-            && Objects.equals(this.contact, that.contact)
-            && Objects.equals(this.nullableCount, that.nullableCount)
-            && Objects.equals(this.nullableRatio, that.nullableRatio)
-            && Objects.equals(this.nullableFlag, that.nullableFlag)
-            && Objects.equals(this.nullableTags, that.nullableTags)
-            && Objects.equals(this.nullableMode, that.nullableMode)
-            && Objects.equals(this.integralMeasurements, that.integralMeasurements)
-            && Objects.equals(this.byFive, that.byFive)
-            && Objects.equals(this.wildcard, that.wildcard)
-            && Objects.equals(this.quoted, that.quoted);
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof IdOrNameString)) {
+        return false;
+      }
+      return Objects.equals(value, ((IdOrNameString) other).value);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(kind, revision, enabled, status, tier, scale, name, count, active, nickname, code, sku, phrase, requestId, contactEmail, host, homepage, gateway, java.util.Arrays.hashCode(blob), java.util.Arrays.hashCode(urlBlob), retries, verbose, greeting, debug, legacyIdJava, middleName, category, priority, level, ratio, score, step, tags, aliases, roles, idOrName, mode, payload, detail, shapeOrName, measurements, shapes, segments, slots, grid, numberGrid, links, addresses, addressBook, dates, dateIndex, Base64Support.listHashCode(blobs), blobIndex, metrics, metricOrLabel, addressListOrLabel, location, audit, rows, ledgerJava, metadata, quotas, tokens, nicknames, choices, extras, shape, note, address, labels, settings, attributes, contact, nullableCount, nullableRatio, nullableFlag, nullableTags, nullableMode, integralMeasurements, byFive, wildcard, quoted);
+      return Objects.hash(value);
     }
 
     @Override
     public String toString() {
-        return "Showcase{"
-            + "kind=" + kind
-            + ", revision=" + revision
-            + ", enabled=" + enabled
-            + ", status=" + status
-            + ", tier=" + tier
-            + ", scale=" + scale
-            + ", name=" + name
-            + ", count=" + count
-            + ", active=" + active
-            + ", nickname=" + nickname
-            + ", code=" + code
-            + ", sku=" + sku
-            + ", phrase=" + phrase
-            + ", requestId=" + requestId
-            + ", contactEmail=" + contactEmail
-            + ", host=" + host
-            + ", homepage=" + homepage
-            + ", gateway=" + gateway
-            + ", blob=" + java.util.Arrays.toString(blob)
-            + ", urlBlob=" + java.util.Arrays.toString(urlBlob)
-            + ", retries=" + retries
-            + ", verbose=" + verbose
-            + ", greeting=" + greeting
-            + ", debug=" + debug
-            + ", legacyIdJava=" + legacyIdJava
-            + ", middleName=" + middleName
-            + ", category=" + category
-            + ", priority=" + priority
-            + ", level=" + level
-            + ", ratio=" + ratio
-            + ", score=" + score
-            + ", step=" + step
-            + ", tags=" + tags
-            + ", aliases=" + aliases
-            + ", roles=" + roles
-            + ", idOrName=" + idOrName
-            + ", mode=" + mode
-            + ", payload=" + payload
-            + ", detail=" + detail
-            + ", shapeOrName=" + shapeOrName
-            + ", measurements=" + measurements
-            + ", shapes=" + shapes
-            + ", segments=" + segments
-            + ", slots=" + slots
-            + ", grid=" + grid
-            + ", numberGrid=" + numberGrid
-            + ", links=" + links
-            + ", addresses=" + addresses
-            + ", addressBook=" + addressBook
-            + ", dates=" + dates
-            + ", dateIndex=" + dateIndex
-            + ", blobs=" + Base64Support.listToString(blobs)
-            + ", blobIndex=" + blobIndex
-            + ", metrics=" + metrics
-            + ", metricOrLabel=" + metricOrLabel
-            + ", addressListOrLabel=" + addressListOrLabel
-            + ", location=" + location
-            + ", audit=" + audit
-            + ", rows=" + rows
-            + ", ledgerJava=" + ledgerJava
-            + ", metadata=" + metadata
-            + ", quotas=" + quotas
-            + ", tokens=" + tokens
-            + ", nicknames=" + nicknames
-            + ", choices=" + choices
-            + ", extras=" + extras
-            + ", shape=" + shape
-            + ", note=" + note
-            + ", address=" + address
-            + ", labels=" + labels
-            + ", settings=" + settings
-            + ", attributes=" + attributes
-            + ", contact=" + contact
-            + ", nullableCount=" + nullableCount
-            + ", nullableRatio=" + nullableRatio
-            + ", nullableFlag=" + nullableFlag
-            + ", nullableTags=" + nullableTags
-            + ", nullableMode=" + nullableMode
-            + ", integralMeasurements=" + integralMeasurements
-            + ", byFive=" + byFive
-            + ", wildcard=" + wildcard
-            + ", quoted=" + quoted
-            + "}";
+      return "IdOrNameString[" + value + "]";
+    }
+  }
+
+  public static final class IdOrNameInteger implements IdOrName {
+    private final long value;
+
+    public IdOrNameInteger(long value) {
+      this.value = value;
     }
 
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Showcase> {
-        @Override
-        public void serialize(Showcase value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.kind == null) {
-                violations.add(new Violation("kind", "required"));
-            }
-            if (value.revision == null) {
-                violations.add(new Violation("revision", "required"));
-            }
-            if (value.enabled == null) {
-                violations.add(new Violation("enabled", "required"));
-            }
-            if (value.status == null) {
-                violations.add(new Violation("status", "required"));
-            }
-            if (value.tier == null) {
-                violations.add(new Violation("tier", "required"));
-            }
-            if (value.scale == null) {
-                violations.add(new Violation("scale", "required"));
-            }
-            if (value.name == null) {
-                violations.add(new Violation("name", "required"));
-            } else {
-                int length = value.name.codePointCount(0, value.name.length());
-                if (length < 1) {
-                    violations.add(new Violation("name", "must have length >= 1, got " + length));
-                }
-                if (length > 64) {
-                    violations.add(new Violation("name", "must have length <= 64, got " + length));
-                }
-            }
-            {
-                if (value.count < -SpecNumbers.INTEGER_CAP || value.count > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("count", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-            }
-            if (value.nickname != null) {
-                int length = value.nickname.codePointCount(0, value.nickname.length());
-                if (length > 12) {
-                    violations.add(new Violation("nickname", "must have length <= 12, got " + length));
-                }
-            }
-            if (value.code != null) {
-                int length = value.code.codePointCount(0, value.code.length());
-                if (length < 2) {
-                    violations.add(new Violation("code", "must have length >= 2, got " + length));
-                }
-                if (length > 5) {
-                    violations.add(new Violation("code", "must have length <= 5, got " + length));
-                }
-            }
-            if (value.sku != null) {
-                if (!SKU_PATTERN.matcher(value.sku).find()) {
-                    violations.add(new Violation("sku", "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + value.sku));
-                }
-            }
-            if (value.phrase != null) {
-                if (!PHRASE_PATTERN.matcher(value.phrase).find()) {
-                    violations.add(new Violation("phrase", "must match pattern " + "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\\z" + ", got " + value.phrase));
-                }
-            }
-            if (value.requestId != null) {
-                if (!REQUEST_ID_FORMAT.matcher(value.requestId).find()) {
-                    violations.add(new Violation("requestId", "must be a valid uuid, got " + value.requestId));
-                }
-            }
-            if (value.contactEmail != null) {
-                if (value.contactEmail.codePointCount(0, value.contactEmail.length()) > 254 || !CONTACT_EMAIL_FORMAT.matcher(value.contactEmail).find()) {
-                    violations.add(new Violation("contactEmail", "must be a valid email, got " + value.contactEmail));
-                }
-            }
-            if (value.host != null) {
-                if (value.host.codePointCount(0, value.host.length()) > 253 || !HOST_FORMAT.matcher(value.host).find()) {
-                    violations.add(new Violation("host", "must be a valid hostname, got " + value.host));
-                }
-            }
-            if (value.homepage != null) {
-                if (!HOMEPAGE_FORMAT.matcher(value.homepage).find()) {
-                    violations.add(new Violation("homepage", "must be a valid uri, got " + value.homepage));
-                }
-            }
-            if (value.gateway != null) {
-                if (!GATEWAY_FORMAT.matcher(value.gateway).find()) {
-                    violations.add(new Violation("gateway", "must be a valid ipv4, got " + value.gateway));
-                }
-            }
-            if (value.retries != null) {
-                if (value.retries < -SpecNumbers.INTEGER_CAP || value.retries > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("retries", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-            }
-            if (value.priority != null) {
-                if (value.priority < -SpecNumbers.INTEGER_CAP || value.priority > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("priority", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-                if (value.priority < 1L) {
-                    violations.add(new Violation("priority", "must be >= 1, got " + value.priority));
-                }
-                if (value.priority > 10L) {
-                    violations.add(new Violation("priority", "must be <= 10, got " + value.priority));
-                }
-            }
-            if (value.level != null) {
-                if (value.level < -SpecNumbers.INTEGER_CAP || value.level > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("level", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-                if (value.level <= 0L) {
-                    violations.add(new Violation("level", "must be > 0, got " + value.level));
-                }
-            }
-            if (value.ratio != null) {
-                if (!Double.isFinite(value.ratio)) {
-                    violations.add(new Violation("ratio", "must be a finite number, got " + value.ratio));
-                }
-                if (value.ratio < 5.0) {
-                    violations.add(new Violation("ratio", "must be >= 5, got " + value.ratio));
-                }
-                if (value.ratio % 5.0 != 0) {
-                    violations.add(new Violation("ratio", "must be a multiple of 5, got " + value.ratio));
-                }
-            }
-            if (value.score != null) {
-                if (!Double.isFinite(value.score)) {
-                    violations.add(new Violation("score", "must be a finite number, got " + value.score));
-                }
-            }
-            if (value.step != null) {
-                if (value.step < -SpecNumbers.INTEGER_CAP || value.step > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("step", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-                if (value.step % 3L != 0) {
-                    violations.add(new Violation("step", "must be a multiple of 3, got " + value.step));
-                }
-            }
-            if (value.tags != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.tags.size(); validationIndex0++) {
-                    String validationValue0 = value.tags.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("tags" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-                if (value.tags.size() < 1) {
-                    violations.add(new Violation("tags", "must have at least 1 items, got " + value.tags.size()));
-                }
-                if (value.tags.size() > 5) {
-                    violations.add(new Violation("tags", "must have at most 5 items, got " + value.tags.size()));
-                }
-            }
-            if (value.aliases != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.aliases.size(); validationIndex0++) {
-                    String validationValue0 = value.aliases.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("aliases" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-                java.util.Map<Object, Integer> seen = new java.util.HashMap<>();
-                for (int index = 0; index < value.aliases.size(); index++) {
-                    Object element = value.aliases.get(index);
-                    Integer priorIndex = seen.get(element);
-                    if (priorIndex != null) {
-                        violations.add(new Violation("aliases", "duplicate items: element at index " + index + " equals index " + priorIndex));
-                    } else {
-                        seen.put(element, index);
-                    }
-                }
-            }
-            if (value.roles != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.roles.size(); validationIndex0++) {
-                    String validationValue0 = value.roles.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("roles" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-                int matchCount = 0;
-                for (String element : value.roles) {
-                    if (element != null && (true) && ("admin".equals(element))) {
-                        matchCount++;
-                    }
-                }
-                if (matchCount < 1) {
-                    violations.add(new Violation("roles", "too few matching items: at least 1, got " + matchCount));
-                }
-                if (matchCount > 2) {
-                    violations.add(new Violation("roles", "too many matching items: at most 2, got " + matchCount));
-                }
-            }
-            if (value.idOrName != null) {
-                IdOrName.validate(value.idOrName, "idOrName", violations);
-            }
-            if (value.mode != null) {
-                Mode.validate(value.mode, "mode", violations);
-            }
-            if (value.shapeOrName != null) {
-                ShapeOrName.validate(value.shapeOrName, "shapeOrName", violations);
-            }
-            if (value.measurements != null) {
-                Measurements.validate(value.measurements, "measurements", violations);
-            }
-            if (value.shapes != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.shapes.size(); validationIndex0++) {
-                    Shape validationValue0 = value.shapes.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("shapes" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-            }
-            if (value.segments != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.segments.size(); validationIndex0++) {
-                    ShowcaseSegmentsItem validationValue0 = value.segments.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("segments" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-                for (int index = 0; index < value.segments.size(); index++) {
-                    ShowcaseSegmentsItem.validate(value.segments.get(index), "segments" + "[" + index + "]", violations);
-                }
-            }
-            if (value.slots != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.slots.size(); validationIndex0++) {
-                    String validationValue0 = value.slots.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        continue;
-                    } else {
-                        int nestedLength = validationValue0.codePointCount(0, validationValue0.length());
-                        if (nestedLength < 2) {
-                            violations.add(new Violation("slots" + "[" + validationIndex0 + "]", "must have length >= 2, got " + nestedLength));
-                        }
-                    }
-                }
-            }
-            if (value.grid != null) {
-                for (int integerCapIndex0 = 0; integerCapIndex0 < value.grid.size(); integerCapIndex0++) {
-                    List<Long> integerCapValue0 = value.grid.get(integerCapIndex0);
-                    if (integerCapValue0 != null) {
-                        for (int integerCapIndex1 = 0; integerCapIndex1 < integerCapValue0.size(); integerCapIndex1++) {
-                            Long integerCapValue1 = integerCapValue0.get(integerCapIndex1);
-                            if (integerCapValue1 != null) {
-                                if (integerCapValue1 < -SpecNumbers.INTEGER_CAP || integerCapValue1 > SpecNumbers.INTEGER_CAP) {
-                                    violations.add(new Violation("grid" + "[" + integerCapIndex0 + "]" + "[" + integerCapIndex1 + "]", "exceeds \u00b1(2^53-1) integer cap"));
-                                }
-                            }
-                        }
-                    }
-                }
-                for (int validationIndex0 = 0; validationIndex0 < value.grid.size(); validationIndex0++) {
-                    List<Long> validationValue0 = value.grid.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("grid" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                        for (int validationIndex1 = 0; validationIndex1 < validationValue0.size(); validationIndex1++) {
-                            Long validationValue1 = validationValue0.get(validationIndex1);
-                            if (validationValue1 == null) {
-                                violations.add(new Violation("grid" + "[" + validationIndex0 + "]" + "[" + validationIndex1 + "]", "explicit null not allowed"));
-                            } else {
-                            }
-                        }
-                    }
-                }
-            }
-            if (value.numberGrid != null) {
-                for (int finiteIndex0 = 0; finiteIndex0 < value.numberGrid.size(); finiteIndex0++) {
-                    List<Double> finiteValue0 = value.numberGrid.get(finiteIndex0);
-                    if (finiteValue0 != null) {
-                        for (int finiteIndex1 = 0; finiteIndex1 < finiteValue0.size(); finiteIndex1++) {
-                            Double finiteValue1 = finiteValue0.get(finiteIndex1);
-                            if (finiteValue1 != null) {
-                                if (!Double.isFinite(finiteValue1)) {
-                                    violations.add(new Violation("numberGrid" + "[" + finiteIndex0 + "]" + "[" + finiteIndex1 + "]", "must be a finite number, got " + finiteValue1));
-                                }
-                            }
-                        }
-                    }
-                }
-                for (int validationIndex0 = 0; validationIndex0 < value.numberGrid.size(); validationIndex0++) {
-                    List<Double> validationValue0 = value.numberGrid.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("numberGrid" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                        for (int validationIndex1 = 0; validationIndex1 < validationValue0.size(); validationIndex1++) {
-                            Double validationValue1 = validationValue0.get(validationIndex1);
-                            if (validationValue1 == null) {
-                                violations.add(new Violation("numberGrid" + "[" + validationIndex0 + "]" + "[" + validationIndex1 + "]", "explicit null not allowed"));
-                            } else {
-                            }
-                        }
-                    }
-                }
-            }
-            if (value.links != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.links.size(); validationIndex0++) {
-                    String validationValue0 = value.links.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("links" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                        if (!java.util.regex.Pattern.compile("^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z").matcher(validationValue0).find()) {
-                            violations.add(new Violation("links" + "[" + validationIndex0 + "]", "must be a valid uri, got " + validationValue0));
-                        }
-                    }
-                }
-            }
-            if (value.addresses != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.addresses.size(); validationIndex0++) {
-                    Address validationValue0 = value.addresses.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("addresses" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-            }
-            if (value.dates != null) {
-                for (int temporalIndex0 = 0; temporalIndex0 < value.dates.size(); temporalIndex0++) {
-                    LocalDate temporalValue0 = value.dates.get(temporalIndex0);
-                    if (temporalValue0 != null) {
-                        TemporalSupport.checkDate(temporalValue0, "dates" + "[" + temporalIndex0 + "]", violations);
-                    }
-                }
-                for (int validationIndex0 = 0; validationIndex0 < value.dates.size(); validationIndex0++) {
-                    LocalDate validationValue0 = value.dates.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("dates" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                        String nestedWire1 = TemporalSupport.formatDate(validationValue0);
-                    }
-                }
-            }
-            if (value.blobs != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.blobs.size(); validationIndex0++) {
-                    byte[] validationValue0 = value.blobs.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("blobs" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                        String nestedWire1 = Base64Support.formatBase64(validationValue0);
-                    }
-                }
-            }
-            if (value.metricOrLabel != null) {
-                MetricOrLabel.validate(value.metricOrLabel, "metricOrLabel", violations);
-            }
-            if (value.addressListOrLabel != null) {
-                AddressListOrLabel.validate(value.addressListOrLabel, "addressListOrLabel", violations);
-            }
-            if (value.rows != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.rows.size(); validationIndex0++) {
-                    ShowcaseRowsItem validationValue0 = value.rows.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("rows" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-            }
-            if (value.nullableCount != null) {
-                if (value.nullableCount < -SpecNumbers.INTEGER_CAP || value.nullableCount > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("nullableCount", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-                if (value.nullableCount < 1L) {
-                    violations.add(new Violation("nullableCount", "must be >= 1, got " + value.nullableCount));
-                }
-                if (value.nullableCount > 10L) {
-                    violations.add(new Violation("nullableCount", "must be <= 10, got " + value.nullableCount));
-                }
-            }
-            if (value.nullableRatio != null) {
-                if (!Double.isFinite(value.nullableRatio)) {
-                    violations.add(new Violation("nullableRatio", "must be a finite number, got " + value.nullableRatio));
-                }
-                if (value.nullableRatio % 2.0 != 0) {
-                    violations.add(new Violation("nullableRatio", "must be a multiple of 2, got " + value.nullableRatio));
-                }
-            }
-            if (value.nullableTags != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.nullableTags.size(); validationIndex0++) {
-                    String validationValue0 = value.nullableTags.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("nullableTags" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-                if (value.nullableTags.size() < 1) {
-                    violations.add(new Violation("nullableTags", "must have at least 1 items, got " + value.nullableTags.size()));
-                }
-                java.util.Map<Object, Integer> seen = new java.util.HashMap<>();
-                for (int index = 0; index < value.nullableTags.size(); index++) {
-                    Object element = value.nullableTags.get(index);
-                    Integer priorIndex = seen.get(element);
-                    if (priorIndex != null) {
-                        violations.add(new Violation("nullableTags", "duplicate items: element at index " + index + " equals index " + priorIndex));
-                    } else {
-                        seen.put(element, index);
-                    }
-                }
-            }
-            if (value.integralMeasurements != null) {
-                for (int finiteIndex0 = 0; finiteIndex0 < value.integralMeasurements.size(); finiteIndex0++) {
-                    Double finiteValue0 = value.integralMeasurements.get(finiteIndex0);
-                    if (finiteValue0 != null) {
-                        if (!Double.isFinite(finiteValue0)) {
-                            violations.add(new Violation("integralMeasurements" + "[" + finiteIndex0 + "]", "must be a finite number, got " + finiteValue0));
-                        }
-                    }
-                }
-                for (int validationIndex0 = 0; validationIndex0 < value.integralMeasurements.size(); validationIndex0++) {
-                    Double validationValue0 = value.integralMeasurements.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("integralMeasurements" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-                int matchCount = 0;
-                for (Double element : value.integralMeasurements) {
-                    if (element != null && (Double.isFinite(element) && element == Math.rint(element) && element >= -(double) SpecNumbers.INTEGER_CAP && element <= (double) SpecNumbers.INTEGER_CAP) && (true)) {
-                        matchCount++;
-                    }
-                }
-                if (matchCount < 1) {
-                    violations.add(new Violation("integralMeasurements", "no element matches the required schema"));
-                }
-            }
-            if (value.byFive != null) {
-                if (!Double.isFinite(value.byFive)) {
-                    violations.add(new Violation("byFive", "must be a finite number, got " + value.byFive));
-                }
-                if (value.byFive % 5.0 != 0) {
-                    violations.add(new Violation("byFive", "must be a multiple of 5, got " + value.byFive));
-                }
-            }
-            if (value.wildcard != null) {
-                if (!WILDCARD_PATTERN.matcher(value.wildcard).find()) {
-                    violations.add(new Violation("wildcard", "must match pattern " + "a[^\\n]b" + ", got " + value.wildcard));
-                }
-            }
-            gen.writeStartObject();
-            if (value.kind != null) {
-                gen.writeStringField("kind", value.kind.getValue());
-            }
-            if (value.revision != null) {
-                gen.writeNumberField("revision", value.revision.getValue());
-            }
-            if (value.enabled != null) {
-                gen.writeBooleanField("enabled", value.enabled.getValue());
-            }
-            if (value.status != null) {
-                gen.writeStringField("status", value.status.getValue());
-            }
-            if (value.tier != null) {
-                gen.writeNumberField("tier", value.tier.getValue());
-            }
-            if (value.scale != null) {
-                gen.writeNumberField("scale", value.scale.getValue());
-            }
-            if (value.name != null) {
-                gen.writeStringField("name", value.name);
-            }
-            gen.writeNumberField("count", value.count);
+    @JsonValue
+    public long getValue() {
+      return value;
+    }
 
-            gen.writeBooleanField("active", value.active);
+    void validate(String path, List<Violation> violations) {
+      if (value < -SpecNumbers.INTEGER_CAP || value > SpecNumbers.INTEGER_CAP) {
+        violations.add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+      }
+      if (value < 1L) {
+        violations.add(new Violation(path, "must be >= 1, got " + value));
+      }
+    }
 
-            if (value.nickname != null) {
-                gen.writeStringField("nickname", value.nickname);
-            }
-            if (value.code != null) {
-                gen.writeStringField("code", value.code);
-            }
-            if (value.sku != null) {
-                gen.writeStringField("sku", value.sku);
-            }
-            if (value.phrase != null) {
-                gen.writeStringField("phrase", value.phrase);
-            }
-            if (value.requestId != null) {
-                gen.writeStringField("requestId", value.requestId);
-            }
-            if (value.contactEmail != null) {
-                gen.writeStringField("contactEmail", value.contactEmail);
-            }
-            if (value.host != null) {
-                gen.writeStringField("host", value.host);
-            }
-            if (value.homepage != null) {
-                gen.writeStringField("homepage", value.homepage);
-            }
-            if (value.gateway != null) {
-                gen.writeStringField("gateway", value.gateway);
-            }
-            if (value.blob != null) {
-                gen.writeStringField("blob", Base64Support.formatBase64(value.blob));
-            }
-            if (value.urlBlob != null) {
-                gen.writeStringField("urlBlob", Base64Support.formatBase64Url(value.urlBlob));
-            }
-            if (value.retries != null) {
-                gen.writeNumberField("retries", value.retries);
-            }
-            if (value.verbose != null) {
-                gen.writeBooleanField("verbose", value.verbose);
-            }
-            if (value.greeting != null) {
-                gen.writeStringField("greeting", value.greeting);
-            }
-            if (value.debug != null) {
-                gen.writeBooleanField("debug", value.debug);
-            }
-            if (value.legacyIdJava != null) {
-                gen.writeStringField("legacyId", value.legacyIdJava);
-            }
-            if (value.middleName != null) {
-                gen.writeStringField("middleName", value.middleName);
-            }
-            if (value.category != null) {
-                gen.writeStringField("category", value.category);
-            } else {
-                gen.writeNullField("category");
-            }
-            if (value.priority != null) {
-                gen.writeNumberField("priority", value.priority);
-            }
-            if (value.level != null) {
-                gen.writeNumberField("level", value.level);
-            }
-            if (value.ratio != null) {
-                gen.writeNumberField("ratio", value.ratio);
-            }
-            if (value.score != null) {
-                gen.writeNumberField("score", value.score);
-            }
-            if (value.step != null) {
-                gen.writeNumberField("step", value.step);
-            }
-            if (value.tags != null) {
-                gen.writeFieldName("tags");
-                serializers.defaultSerializeValue(value.tags, gen);
-            }
-            if (value.aliases != null) {
-                gen.writeFieldName("aliases");
-                serializers.defaultSerializeValue(value.aliases, gen);
-            }
-            if (value.roles != null) {
-                gen.writeFieldName("roles");
-                serializers.defaultSerializeValue(value.roles, gen);
-            }
-            if (value.idOrName != null) {
-                gen.writeFieldName("idOrName");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.idOrName, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("idOrName"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.mode != null) {
-                gen.writeFieldName("mode");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.mode, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("mode"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.payload != null) {
-                gen.writeFieldName("payload");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.payload, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("payload"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.detail != null) {
-                gen.writeFieldName("detail");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.detail, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("detail"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.shapeOrName != null) {
-                gen.writeFieldName("shapeOrName");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.shapeOrName, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("shapeOrName"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.measurements != null) {
-                gen.writeFieldName("measurements");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.measurements, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("measurements"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.shapes != null) {
-                gen.writeFieldName("shapes");
-                gen.writeStartArray();
-                for (int nestedIndex0 = 0; nestedIndex0 < value.shapes.size(); nestedIndex0++) {
-                    Shape nestedElement0 = value.shapes.get(nestedIndex0);
-                    if (nestedElement0 == null) {
-                        gen.writeNull();
-                    } else {
-                        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                        try {
-                            serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
-                            nestedBuffer1.serialize(gen);
-                        } catch (ApplicationFailure nested1) {
-                            if (!"PayloadValidationError".equals(nested1.getType()) || nested1.getDetails().getSize() == 0) {
-                                throw nested1;
-                            }
-                            // The locally-created failure retains the original list as its first detail.
-                            // This unchecked cast is cheap and performs no serialization.
-                            @SuppressWarnings("unchecked")
-                            List<Violation> nestedViolations1 = (List<Violation>) nested1.getDetails().get(0, List.class);
-                            for (Violation nestedViolation1 : nestedViolations1) {
-                                violations.add(nestedViolation1.withPathPrefix("shapes" + "[" + nestedIndex0 + "]"));
-                            }
-                            gen.writeNull();
-                        }
-                    }
-                }
-                gen.writeEndArray();
-            }
-            if (value.segments != null) {
-                gen.writeFieldName("segments");
-                gen.writeStartArray();
-                for (int nestedIndex0 = 0; nestedIndex0 < value.segments.size(); nestedIndex0++) {
-                    ShowcaseSegmentsItem nestedElement0 = value.segments.get(nestedIndex0);
-                    if (nestedElement0 == null) {
-                        gen.writeNull();
-                    } else {
-                        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                        try {
-                            serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
-                            nestedBuffer1.serialize(gen);
-                        } catch (ApplicationFailure nested1) {
-                            if (!"PayloadValidationError".equals(nested1.getType()) || nested1.getDetails().getSize() == 0) {
-                                throw nested1;
-                            }
-                            // The locally-created failure retains the original list as its first detail.
-                            // This unchecked cast is cheap and performs no serialization.
-                            @SuppressWarnings("unchecked")
-                            List<Violation> nestedViolations1 = (List<Violation>) nested1.getDetails().get(0, List.class);
-                            for (Violation nestedViolation1 : nestedViolations1) {
-                                violations.add(nestedViolation1.withPathPrefix("segments" + "[" + nestedIndex0 + "]"));
-                            }
-                            gen.writeNull();
-                        }
-                    }
-                }
-                gen.writeEndArray();
-            }
-            if (value.slots != null) {
-                gen.writeFieldName("slots");
-                serializers.defaultSerializeValue(value.slots, gen);
-            }
-            if (value.grid != null) {
-                gen.writeFieldName("grid");
-                serializers.defaultSerializeValue(value.grid, gen);
-            }
-            if (value.numberGrid != null) {
-                gen.writeFieldName("numberGrid");
-                serializers.defaultSerializeValue(value.numberGrid, gen);
-            }
-            if (value.links != null) {
-                gen.writeFieldName("links");
-                serializers.defaultSerializeValue(value.links, gen);
-            }
-            if (value.addresses != null) {
-                gen.writeFieldName("addresses");
-                gen.writeStartArray();
-                for (int nestedIndex0 = 0; nestedIndex0 < value.addresses.size(); nestedIndex0++) {
-                    Address nestedElement0 = value.addresses.get(nestedIndex0);
-                    if (nestedElement0 == null) {
-                        gen.writeNull();
-                    } else {
-                        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                        try {
-                            serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
-                            nestedBuffer1.serialize(gen);
-                        } catch (ApplicationFailure nested1) {
-                            if (!"PayloadValidationError".equals(nested1.getType()) || nested1.getDetails().getSize() == 0) {
-                                throw nested1;
-                            }
-                            // The locally-created failure retains the original list as its first detail.
-                            // This unchecked cast is cheap and performs no serialization.
-                            @SuppressWarnings("unchecked")
-                            List<Violation> nestedViolations1 = (List<Violation>) nested1.getDetails().get(0, List.class);
-                            for (Violation nestedViolation1 : nestedViolations1) {
-                                violations.add(nestedViolation1.withPathPrefix("addresses" + "[" + nestedIndex0 + "]"));
-                            }
-                            gen.writeNull();
-                        }
-                    }
-                }
-                gen.writeEndArray();
-            }
-            if (value.addressBook != null) {
-                gen.writeFieldName("addressBook");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.addressBook, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("addressBook"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.dates != null) {
-                gen.writeFieldName("dates");
-                gen.writeStartArray();
-                for (int wireIndex0 = 0; wireIndex0 < value.dates.size(); wireIndex0++) {
-                    @Nullable LocalDate wireElement0 = value.dates.get(wireIndex0);
-                    if (wireElement0 == null) {
-                        gen.writeNull();
-                    } else {
-                        gen.writeString(TemporalSupport.formatDate(wireElement0));
-                    }
-                }
-                gen.writeEndArray();
-            }
-            if (value.dateIndex != null) {
-                gen.writeFieldName("dateIndex");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.dateIndex, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("dateIndex"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.blobs != null) {
-                gen.writeFieldName("blobs");
-                gen.writeStartArray();
-                for (int wireIndex0 = 0; wireIndex0 < value.blobs.size(); wireIndex0++) {
-                    byte @Nullable [] wireElement0 = value.blobs.get(wireIndex0);
-                    if (wireElement0 == null) {
-                        gen.writeNull();
-                    } else {
-                        gen.writeString(Base64Support.formatBase64(wireElement0));
-                    }
-                }
-                gen.writeEndArray();
-            }
-            if (value.blobIndex != null) {
-                gen.writeFieldName("blobIndex");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.blobIndex, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("blobIndex"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.metrics != null) {
-                gen.writeFieldName("metrics");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.metrics, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("metrics"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.metricOrLabel != null) {
-                gen.writeFieldName("metricOrLabel");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.metricOrLabel, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("metricOrLabel"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.addressListOrLabel != null) {
-                gen.writeFieldName("addressListOrLabel");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.addressListOrLabel, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("addressListOrLabel"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.location != null) {
-                gen.writeFieldName("location");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.location, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("location"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.audit != null) {
-                gen.writeFieldName("audit");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.audit, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("audit"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.rows != null) {
-                gen.writeFieldName("rows");
-                gen.writeStartArray();
-                for (int nestedIndex0 = 0; nestedIndex0 < value.rows.size(); nestedIndex0++) {
-                    ShowcaseRowsItem nestedElement0 = value.rows.get(nestedIndex0);
-                    if (nestedElement0 == null) {
-                        gen.writeNull();
-                    } else {
-                        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                        try {
-                            serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
-                            nestedBuffer1.serialize(gen);
-                        } catch (ApplicationFailure nested1) {
-                            if (!"PayloadValidationError".equals(nested1.getType()) || nested1.getDetails().getSize() == 0) {
-                                throw nested1;
-                            }
-                            // The locally-created failure retains the original list as its first detail.
-                            // This unchecked cast is cheap and performs no serialization.
-                            @SuppressWarnings("unchecked")
-                            List<Violation> nestedViolations1 = (List<Violation>) nested1.getDetails().get(0, List.class);
-                            for (Violation nestedViolation1 : nestedViolations1) {
-                                violations.add(nestedViolation1.withPathPrefix("rows" + "[" + nestedIndex0 + "]"));
-                            }
-                            gen.writeNull();
-                        }
-                    }
-                }
-                gen.writeEndArray();
-            }
-            if (value.ledgerJava != null) {
-                gen.writeFieldName("ledger");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.ledgerJava, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("ledger"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.metadata != null) {
-                gen.writeFieldName("metadata");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.metadata, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("metadata"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.quotas != null) {
-                gen.writeFieldName("quotas");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.quotas, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("quotas"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.tokens != null) {
-                gen.writeFieldName("tokens");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.tokens, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("tokens"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.nicknames != null) {
-                gen.writeFieldName("nicknames");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.nicknames, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("nicknames"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.choices != null) {
-                gen.writeFieldName("choices");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.choices, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("choices"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.extras != null) {
-                gen.writeFieldName("extras");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.extras, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("extras"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.shape != null) {
-                gen.writeFieldName("shape");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.shape, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("shape"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.note != null) {
-                gen.writeFieldName("note");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.note, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("note"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.address != null) {
-                gen.writeFieldName("address");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.address, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("address"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.labels != null) {
-                gen.writeFieldName("labels");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.labels, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("labels"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.settings != null) {
-                gen.writeFieldName("settings");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.settings, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("settings"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.attributes != null) {
-                gen.writeFieldName("attributes");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.attributes, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("attributes"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.contact != null) {
-                gen.writeFieldName("contact");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.contact, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("contact"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.nullableCount != null) {
-                gen.writeNumberField("nullableCount", value.nullableCount);
-            }
-            if (value.nullableRatio != null) {
-                gen.writeNumberField("nullableRatio", value.nullableRatio);
-            }
-            if (value.nullableFlag != null) {
-                gen.writeBooleanField("nullableFlag", value.nullableFlag);
-            }
-            if (value.nullableTags != null) {
-                gen.writeFieldName("nullableTags");
-                serializers.defaultSerializeValue(value.nullableTags, gen);
-            }
-            if (value.nullableMode != null) {
-                gen.writeStringField("nullableMode", value.nullableMode.getValue());
-            }
-            if (value.integralMeasurements != null) {
-                gen.writeFieldName("integralMeasurements");
-                serializers.defaultSerializeValue(value.integralMeasurements, gen);
-            }
-            if (value.byFive != null) {
-                gen.writeNumberField("byFive", value.byFive);
-            }
-            if (value.wildcard != null) {
-                gen.writeStringField("wildcard", value.wildcard);
-            }
-            if (value.quoted != null) {
-                gen.writeStringField("quoted", value.quoted);
-            }
-            gen.writeEndObject();
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            pending.serialize(target);
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof IdOrNameInteger)) {
+        return false;
+      }
+      return Objects.equals(value, ((IdOrNameInteger) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "IdOrNameInteger[" + value + "]";
+    }
+  }
+
+  public interface Mode {
+    static @Nullable Mode fromNode(
+        JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+      if (node.isTextual()) {
+        ModeString wrapped = new ModeString(node.textValue());
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      if (node.isNumber()) {
+        Long parsed = SpecNumbers.specLong(node, path, violations);
+        if (parsed == null) {
+          return null;
         }
+        ModeInteger wrapped = new ModeInteger(parsed);
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      violations.add(new Violation(path, "expected one of: string, integer"));
+      return null;
     }
 
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Showcase> {
-        @Override
-        public Showcase deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "active":
-                    case "address":
-                    case "addressBook":
-                    case "addressListOrLabel":
-                    case "addresses":
-                    case "aliases":
-                    case "attributes":
-                    case "audit":
-                    case "blob":
-                    case "blobIndex":
-                    case "blobs":
-                    case "byFive":
-                    case "category":
-                    case "choices":
-                    case "code":
-                    case "contact":
-                    case "contactEmail":
-                    case "count":
-                    case "dateIndex":
-                    case "dates":
-                    case "debug":
-                    case "detail":
-                    case "enabled":
-                    case "extras":
-                    case "gateway":
-                    case "greeting":
-                    case "grid":
-                    case "homepage":
-                    case "host":
-                    case "idOrName":
-                    case "integralMeasurements":
-                    case "kind":
-                    case "labels":
-                    case "ledger":
-                    case "legacyId":
-                    case "level":
-                    case "links":
-                    case "location":
-                    case "measurements":
-                    case "metadata":
-                    case "metricOrLabel":
-                    case "metrics":
-                    case "middleName":
-                    case "mode":
-                    case "name":
-                    case "nickname":
-                    case "nicknames":
-                    case "note":
-                    case "nullableCount":
-                    case "nullableFlag":
-                    case "nullableMode":
-                    case "nullableRatio":
-                    case "nullableTags":
-                    case "numberGrid":
-                    case "payload":
-                    case "phrase":
-                    case "priority":
-                    case "quotas":
-                    case "quoted":
-                    case "ratio":
-                    case "requestId":
-                    case "retries":
-                    case "revision":
-                    case "roles":
-                    case "rows":
-                    case "scale":
-                    case "score":
-                    case "segments":
-                    case "settings":
-                    case "shape":
-                    case "shapeOrName":
-                    case "shapes":
-                    case "sku":
-                    case "slots":
-                    case "status":
-                    case "step":
-                    case "tags":
-                    case "tier":
-                    case "tokens":
-                    case "urlBlob":
-                    case "verbose":
-                    case "wildcard":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            Kind kind = null;
-            {
-                JsonNode field = node.get("kind");
-                if (field == null) {
-                    violations.add(new Violation("kind", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("kind", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("kind", "expected string"));
-                    } else {
-                        String kindValue = field.textValue();
-                        if ("showcase".equals(kindValue)) {
-                            kind = Kind.SHOWCASE;
-                        } else {
-                            violations.add(new Violation("kind", "must equal \"showcase\""));
-                        }
-                    }
-                }
-            }
-            Revision revision = null;
-            {
-                JsonNode field = node.get("revision");
-                if (field == null) {
-                    violations.add(new Violation("revision", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("revision", "explicit null not allowed"));
-                } else {
-                    Long revisionValue = SpecNumbers.specLong(field, "revision", violations);
-                    if (revisionValue != null) {
-                        if (revisionValue == 1L) {
-                            revision = Revision.REVISION_JAVA;
-                        } else {
-                            violations.add(new Violation("revision", "must equal 1"));
-                        }
-                    }
-                }
-            }
-            Enabled enabled = null;
-            {
-                JsonNode field = node.get("enabled");
-                if (field == null) {
-                    violations.add(new Violation("enabled", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("enabled", "explicit null not allowed"));
-                } else {
-                    if (!field.isBoolean()) {
-                        violations.add(new Violation("enabled", "expected boolean"));
-                    } else {
-                        boolean enabledValue = field.booleanValue();
-                        if (enabledValue == true) {
-                            enabled = Enabled.TRUE;
-                        } else {
-                            violations.add(new Violation("enabled", "must equal true"));
-                        }
-                    }
-                }
-            }
-            Status status = null;
-            {
-                JsonNode field = node.get("status");
-                if (field == null) {
-                    violations.add(new Violation("status", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("status", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("status", "expected string"));
-                    } else {
-                        String statusValue = field.textValue();
-                        if ("active".equals(statusValue)) {
-                            status = Status.ACTIVE_JAVA;
-                        } else if ("inactive".equals(statusValue)) {
-                            status = Status.INACTIVE;
-                        } else if ("pending".equals(statusValue)) {
-                            status = Status.PENDING;
-                        } else {
-                            violations.add(new Violation("status", "must be one of [\"active\", \"inactive\", \"pending\"], got " + statusValue));
-                        }
-                    }
-                }
-            }
-            Tier tier = null;
-            {
-                JsonNode field = node.get("tier");
-                if (field == null) {
-                    violations.add(new Violation("tier", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("tier", "explicit null not allowed"));
-                } else {
-                    Long tierValue = SpecNumbers.specLong(field, "tier", violations);
-                    if (tierValue != null) {
-                        if (tierValue == 1L) {
-                            tier = Tier.V_1;
-                        } else if (tierValue == 2L) {
-                            tier = Tier.V_2;
-                        } else if (tierValue == 3L) {
-                            tier = Tier.V_3;
-                        } else {
-                            violations.add(new Violation("tier", "must be one of [1, 2, 3], got " + tierValue));
-                        }
-                    }
-                }
-            }
-            Scale scale = null;
-            {
-                JsonNode field = node.get("scale");
-                if (field == null) {
-                    violations.add(new Violation("scale", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("scale", "explicit null not allowed"));
-                } else {
-                    Double scaleValue = SpecNumbers.specDouble(field, "scale", violations);
-                    if (scaleValue != null) {
-                        if (scaleValue == 1.5) {
-                            scale = Scale.V_1_5;
-                        } else if (scaleValue == 2.5) {
-                            scale = Scale.V_2_5;
-                        } else {
-                            violations.add(new Violation("scale", "must be one of [1.5, 2.5], got " + scaleValue));
-                        }
-                    }
-                }
-            }
-            String name = null;
-            {
-                JsonNode field = node.get("name");
-                if (field == null) {
-                    violations.add(new Violation("name", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("name", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("name", "expected string"));
-                    } else {
-                        name = field.textValue();
-                        int length = name.codePointCount(0, name.length());
-                        if (length < 1) {
-                            violations.add(new Violation("name", "must have length >= 1, got " + length));
-                        }
-                        if (length > 64) {
-                            violations.add(new Violation("name", "must have length <= 64, got " + length));
-                        }
-                    }
-                }
-            }
-            long count = 0L;
-            {
-                JsonNode field = node.get("count");
-                if (field == null) {
-                    violations.add(new Violation("count", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("count", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "count", violations);
-                    if (numberValue != null) {
-                        count = numberValue;
-                    }
-                }
-            }
-            boolean active = false;
-            {
-                JsonNode field = node.get("active");
-                if (field == null) {
-                    violations.add(new Violation("active", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("active", "explicit null not allowed"));
-                } else {
-                    if (!field.isBoolean()) {
-                        violations.add(new Violation("active", "expected boolean"));
-                    } else {
-                        active = field.booleanValue();
-                    }
-                }
-            }
-            String nickname = null;
-            {
-                JsonNode field = node.get("nickname");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("nickname", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("nickname", "expected string"));
-                    } else {
-                        nickname = field.textValue();
-                        int length = nickname.codePointCount(0, nickname.length());
-                        if (length > 12) {
-                            violations.add(new Violation("nickname", "must have length <= 12, got " + length));
-                        }
-                    }
-                }
-            }
-            String code = null;
-            {
-                JsonNode field = node.get("code");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("code", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("code", "expected string"));
-                    } else {
-                        code = field.textValue();
-                        int length = code.codePointCount(0, code.length());
-                        if (length < 2) {
-                            violations.add(new Violation("code", "must have length >= 2, got " + length));
-                        }
-                        if (length > 5) {
-                            violations.add(new Violation("code", "must have length <= 5, got " + length));
-                        }
-                    }
-                }
-            }
-            String sku = null;
-            {
-                JsonNode field = node.get("sku");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("sku", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("sku", "expected string"));
-                    } else {
-                        sku = field.textValue();
-                        if (!SKU_PATTERN.matcher(sku).find()) {
-                            violations.add(new Violation("sku", "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + sku));
-                        }
-                    }
-                }
-            }
-            String phrase = null;
-            {
-                JsonNode field = node.get("phrase");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("phrase", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("phrase", "expected string"));
-                    } else {
-                        phrase = field.textValue();
-                        if (!PHRASE_PATTERN.matcher(phrase).find()) {
-                            violations.add(new Violation("phrase", "must match pattern " + "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\\z" + ", got " + phrase));
-                        }
-                    }
-                }
-            }
-            String requestId = null;
-            {
-                JsonNode field = node.get("requestId");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("requestId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("requestId", "expected string"));
-                    } else {
-                        requestId = field.textValue();
-                        if (!REQUEST_ID_FORMAT.matcher(requestId).find()) {
-                            violations.add(new Violation("requestId", "must be a valid uuid, got " + requestId));
-                        }
-                    }
-                }
-            }
-            String contactEmail = null;
-            {
-                JsonNode field = node.get("contactEmail");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("contactEmail", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("contactEmail", "expected string"));
-                    } else {
-                        contactEmail = field.textValue();
-                        if (contactEmail.codePointCount(0, contactEmail.length()) > 254 || !CONTACT_EMAIL_FORMAT.matcher(contactEmail).find()) {
-                            violations.add(new Violation("contactEmail", "must be a valid email, got " + contactEmail));
-                        }
-                    }
-                }
-            }
-            String host = null;
-            {
-                JsonNode field = node.get("host");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("host", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("host", "expected string"));
-                    } else {
-                        host = field.textValue();
-                        if (host.codePointCount(0, host.length()) > 253 || !HOST_FORMAT.matcher(host).find()) {
-                            violations.add(new Violation("host", "must be a valid hostname, got " + host));
-                        }
-                    }
-                }
-            }
-            String homepage = null;
-            {
-                JsonNode field = node.get("homepage");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("homepage", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("homepage", "expected string"));
-                    } else {
-                        homepage = field.textValue();
-                        if (!HOMEPAGE_FORMAT.matcher(homepage).find()) {
-                            violations.add(new Violation("homepage", "must be a valid uri, got " + homepage));
-                        }
-                    }
-                }
-            }
-            String gateway = null;
-            {
-                JsonNode field = node.get("gateway");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("gateway", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("gateway", "expected string"));
-                    } else {
-                        gateway = field.textValue();
-                        if (!GATEWAY_FORMAT.matcher(gateway).find()) {
-                            violations.add(new Violation("gateway", "must be a valid ipv4, got " + gateway));
-                        }
-                    }
-                }
-            }
-            byte[] blob = null;
-            {
-                JsonNode field = node.get("blob");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("blob", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("blob", "expected string"));
-                    } else {
-                        blob = Base64Support.parseBase64(field.textValue(), "blob", violations);
-                    }
-                }
-            }
-            byte[] urlBlob = null;
-            {
-                JsonNode field = node.get("urlBlob");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("urlBlob", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("urlBlob", "expected string"));
-                    } else {
-                        urlBlob = Base64Support.parseBase64Url(field.textValue(), "urlBlob", violations);
-                    }
-                }
-            }
-            Long retries = null;
-            {
-                JsonNode field = node.get("retries");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("retries", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "retries", violations);
-                    if (numberValue != null) {
-                        retries = numberValue;
-                    }
-                }
-            }
-            Boolean verbose = null;
-            {
-                JsonNode field = node.get("verbose");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("verbose", "explicit null not allowed"));
-                } else {
-                    if (!field.isBoolean()) {
-                        violations.add(new Violation("verbose", "expected boolean"));
-                    } else {
-                        verbose = field.booleanValue();
-                    }
-                }
-            }
-            String greeting = null;
-            {
-                JsonNode field = node.get("greeting");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("greeting", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("greeting", "expected string"));
-                    } else {
-                        greeting = field.textValue();
-                    }
-                }
-            }
-            Boolean debug = null;
-            {
-                JsonNode field = node.get("debug");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("debug", "explicit null not allowed"));
-                } else {
-                    if (!field.isBoolean()) {
-                        violations.add(new Violation("debug", "expected boolean"));
-                    } else {
-                        debug = field.booleanValue();
-                    }
-                }
-            }
-            String legacyIdJava = null;
-            {
-                JsonNode field = node.get("legacyId");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("legacyId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("legacyId", "expected string"));
-                    } else {
-                        legacyIdJava = field.textValue();
-                    }
-                }
-            }
-            String middleName = null;
-            {
-                JsonNode field = node.get("middleName");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("middleName", "expected string"));
-                    } else {
-                        middleName = field.textValue();
-                    }
-                }
-            }
-            String category = null;
-            {
-                JsonNode field = node.get("category");
-                if (field == null) {
-                    violations.add(new Violation("category", "required"));
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("category", "expected string"));
-                    } else {
-                        category = field.textValue();
-                    }
-                }
-            }
-            Long priority = null;
-            {
-                JsonNode field = node.get("priority");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("priority", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "priority", violations);
-                    if (numberValue != null) {
-                        priority = numberValue;
-                        if (numberValue < 1L) {
-                            violations.add(new Violation("priority", "must be >= 1, got " + numberValue));
-                        }
-                        if (numberValue > 10L) {
-                            violations.add(new Violation("priority", "must be <= 10, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            Long level = null;
-            {
-                JsonNode field = node.get("level");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("level", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "level", violations);
-                    if (numberValue != null) {
-                        level = numberValue;
-                        if (numberValue <= 0L) {
-                            violations.add(new Violation("level", "must be > 0, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            Double ratio = null;
-            {
-                JsonNode field = node.get("ratio");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("ratio", "explicit null not allowed"));
-                } else {
-                    Double numberValue = SpecNumbers.specDouble(field, "ratio", violations);
-                    if (numberValue != null) {
-                        ratio = numberValue;
-                        if (numberValue < 5.0) {
-                            violations.add(new Violation("ratio", "must be >= 5, got " + numberValue));
-                        }
-                        if (numberValue % 5.0 != 0) {
-                            violations.add(new Violation("ratio", "must be a multiple of 5, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            Double score = null;
-            {
-                JsonNode field = node.get("score");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("score", "explicit null not allowed"));
-                } else {
-                    Double numberValue = SpecNumbers.specDouble(field, "score", violations);
-                    if (numberValue != null) {
-                        score = numberValue;
-                    }
-                }
-            }
-            Long step = null;
-            {
-                JsonNode field = node.get("step");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("step", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "step", violations);
-                    if (numberValue != null) {
-                        step = numberValue;
-                        if (numberValue % 3L != 0) {
-                            violations.add(new Violation("step", "must be a multiple of 3, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            List<String> tags = null;
-            {
-                JsonNode field = node.get("tags");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("tags", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("tags", "expected array"));
-                    } else {
-                        List<String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "tags" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                items.add(parsed);
-                            }
-                        }
-                        tags = items;
-                        if (field.size() < 1) {
-                            violations.add(new Violation("tags", "must have at least 1 items, got " + field.size()));
-                        }
-                        if (field.size() > 5) {
-                            violations.add(new Violation("tags", "must have at most 5 items, got " + field.size()));
-                        }
-                    }
-                }
-            }
-            List<String> aliases = null;
-            {
-                JsonNode field = node.get("aliases");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("aliases", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("aliases", "expected array"));
-                    } else {
-                        List<String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "aliases" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                items.add(parsed);
-                            }
-                        }
-                        aliases = items;
-                        java.util.Map<Object, Integer> rawSeen = new java.util.HashMap<>();
-                        for (int rawIndex = 0; rawIndex < field.size(); rawIndex++) {
-                            Object rawKey = SpecNumbers.valueKey(field.get(rawIndex));
-                            Integer priorIndex = rawSeen.get(rawKey);
-                            if (priorIndex != null) {
-                                violations.add(new Violation("aliases", "duplicate items: element at index " + rawIndex + " equals index " + priorIndex));
-                            } else {
-                                rawSeen.put(rawKey, rawIndex);
-                            }
-                        }
-                    }
-                }
-            }
-            List<String> roles = null;
-            {
-                JsonNode field = node.get("roles");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("roles", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("roles", "expected array"));
-                    } else {
-                        List<String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "roles" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                items.add(parsed);
-                            }
-                        }
-                        roles = items;
-                        int rawMatchCount = 0;
-                        for (JsonNode rawElement : field) {
-                            if (rawElement.isTextual() && ("admin".equals(rawElement.textValue()))) {
-                                rawMatchCount++;
-                            }
-                        }
-                        if (rawMatchCount < 1) {
-                            violations.add(new Violation("roles", "too few matching items: at least 1, got " + rawMatchCount));
-                        }
-                        if (rawMatchCount > 2) {
-                            violations.add(new Violation("roles", "too many matching items: at most 2, got " + rawMatchCount));
-                        }
-                    }
-                }
-            }
-            IdOrName idOrName = null;
-            {
-                JsonNode field = node.get("idOrName");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("idOrName", "explicit null not allowed"));
-                } else {
-                    idOrName = IdOrName.fromNode(field, "idOrName", violations, context);
-                }
-            }
-            Mode mode = null;
-            {
-                JsonNode field = node.get("mode");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("mode", "explicit null not allowed"));
-                } else {
-                    mode = Mode.fromNode(field, "mode", violations, context);
-                }
-            }
-            Payload payload = null;
-            {
-                JsonNode field = node.get("payload");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("payload", "explicit null not allowed"));
-                } else {
-                    payload = Payload.fromNode(field, "payload", violations, context);
-                }
-            }
-            Detail detail = null;
-            {
-                JsonNode field = node.get("detail");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("detail", "explicit null not allowed"));
-                } else {
-                    detail = Detail.fromNode(field, "detail", violations, context);
-                }
-            }
-            ShapeOrName shapeOrName = null;
-            {
-                JsonNode field = node.get("shapeOrName");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("shapeOrName", "explicit null not allowed"));
-                } else {
-                    shapeOrName = ShapeOrName.fromNode(field, "shapeOrName", violations, context);
-                }
-            }
-            Measurements measurements = null;
-            {
-                JsonNode field = node.get("measurements");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("measurements", "explicit null not allowed"));
-                } else {
-                    measurements = Measurements.fromNode(field, "measurements", violations, context);
-                }
-            }
-            List<Shape> shapes = null;
-            {
-                JsonNode field = node.get("shapes");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("shapes", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("shapes", "expected array"));
-                    } else {
-                        List<Shape> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "shapes" + "[" + index + "]";
-                            Shape parsedItems = Shape.fromNode(element, elementPath, violations, context);
-                            if (parsedItems != null) {
-                                items.add(parsedItems);
-                            }
-                        }
-                        shapes = items;
-                    }
-                }
-            }
-            List<ShowcaseSegmentsItem> segments = null;
-            {
-                JsonNode field = node.get("segments");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("segments", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("segments", "expected array"));
-                    } else {
-                        List<ShowcaseSegmentsItem> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "segments" + "[" + index + "]";
-                            ShowcaseSegmentsItem parsedItems = ShowcaseSegmentsItem.fromNode(element, elementPath, violations, context);
-                            if (parsedItems != null) {
-                                items.add(parsedItems);
-                            }
-                        }
-                        segments = items;
-                    }
-                }
-            }
-            List<@Nullable String> slots = null;
-            {
-                JsonNode field = node.get("slots");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("slots", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("slots", "expected array"));
-                    } else {
-                        List<@Nullable String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "slots" + "[" + index + "]";
-                            if (element.isNull()) {
-                                items.add(null);
-                                continue;
-                            }
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                int nestedLength = parsed.codePointCount(0, parsed.length());
-                                if (nestedLength < 2) {
-                                    violations.add(new Violation(elementPath, "must have length >= 2, got " + nestedLength));
-                                }
-                                items.add(parsed);
-                            }
-                        }
-                        slots = items;
-                    }
-                }
-            }
-            List<List<Long>> grid = null;
-            {
-                JsonNode field = node.get("grid");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("grid", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("grid", "expected array"));
-                    } else {
-                        List<List<Long>> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "grid" + "[" + index + "]";
-                            if (!element.isArray()) {
-                                violations.add(new Violation(elementPath, "expected array"));
-                            } else {
-                                List<Long> items1 = new ArrayList<>();
-                                for (int index1 = 0; index1 < element.size(); index1++) {
-                                    JsonNode element1 = element.get(index1);
-                                    String path1 = elementPath + "[" + index1 + "]";
-                                    Long parsed = SpecNumbers.specLong(element1, path1, violations);
-                                    if (parsed != null) {
-                                        items1.add(parsed);
-                                    }
-                                }
-                                items.add(items1);
-                            }
-                        }
-                        grid = items;
-                    }
-                }
-            }
-            List<List<Double>> numberGrid = null;
-            {
-                JsonNode field = node.get("numberGrid");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("numberGrid", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("numberGrid", "expected array"));
-                    } else {
-                        List<List<Double>> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "numberGrid" + "[" + index + "]";
-                            if (!element.isArray()) {
-                                violations.add(new Violation(elementPath, "expected array"));
-                            } else {
-                                List<Double> items1 = new ArrayList<>();
-                                for (int index1 = 0; index1 < element.size(); index1++) {
-                                    JsonNode element1 = element.get(index1);
-                                    String path1 = elementPath + "[" + index1 + "]";
-                                    Double parsed = SpecNumbers.specDouble(element1, path1, violations);
-                                    if (parsed != null) {
-                                        items1.add(parsed);
-                                    }
-                                }
-                                items.add(items1);
-                            }
-                        }
-                        numberGrid = items;
-                    }
-                }
-            }
-            List<String> links = null;
-            {
-                JsonNode field = node.get("links");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("links", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("links", "expected array"));
-                    } else {
-                        List<String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "links" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                if (!java.util.regex.Pattern.compile("^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z").matcher(parsed).find()) {
-                                    violations.add(new Violation(elementPath, "must be a valid uri, got " + parsed));
-                                }
-                                items.add(parsed);
-                            }
-                        }
-                        links = items;
-                    }
-                }
-            }
-            List<Address> addresses = null;
-            {
-                JsonNode field = node.get("addresses");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("addresses", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("addresses", "expected array"));
-                    } else {
-                        List<Address> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "addresses" + "[" + index + "]";
-                            try {
-                                items.add(context.readTreeAsValue(element, Address.class));
-                            } catch (ApplicationFailure nested) {
-                                if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                                    throw nested;
-                                }
-                                // The locally-created failure retains the original list as its first detail.
-                                // This unchecked cast is cheap and performs no serialization.
-                                @SuppressWarnings("unchecked")
-                                List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                                for (Violation violation : nestedViolations) {
-                                    violations.add(violation.withPathPrefix(elementPath));
-                                }
-                            } catch (IOException nested) {
-                                violations.add(new Violation(elementPath, nested.getMessage()));
-                            }
-                        }
-                        addresses = items;
-                    }
-                }
-            }
-            AddressBook addressBook = null;
-            {
-                JsonNode field = node.get("addressBook");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("addressBook", "explicit null not allowed"));
-                } else {
-                    try {
-                        addressBook = context.readTreeAsValue(field, AddressBook.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("addressBook"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("addressBook", nested.getMessage()));
-                    }
-                }
-            }
-            List<LocalDate> dates = null;
-            {
-                JsonNode field = node.get("dates");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("dates", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("dates", "expected array"));
-                    } else {
-                        List<LocalDate> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "dates" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                LocalDate parsed = TemporalSupport.parseDate(element.textValue(), elementPath, violations);
-                                if (parsed != null) {
-                                    items.add(parsed);
-                                }
-                            }
-                        }
-                        dates = items;
-                    }
-                }
-            }
-            DateIndex dateIndex = null;
-            {
-                JsonNode field = node.get("dateIndex");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("dateIndex", "explicit null not allowed"));
-                } else {
-                    try {
-                        dateIndex = context.readTreeAsValue(field, DateIndex.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("dateIndex"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("dateIndex", nested.getMessage()));
-                    }
-                }
-            }
-            List<byte[]> blobs = null;
-            {
-                JsonNode field = node.get("blobs");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("blobs", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("blobs", "expected array"));
-                    } else {
-                        List<byte[]> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "blobs" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                byte[] parsed = Base64Support.parseBase64(element.textValue(), elementPath, violations);
-                                if (parsed != null) {
-                                    items.add(parsed);
-                                }
-                            }
-                        }
-                        blobs = items;
-                    }
-                }
-            }
-            BlobIndex blobIndex = null;
-            {
-                JsonNode field = node.get("blobIndex");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("blobIndex", "explicit null not allowed"));
-                } else {
-                    try {
-                        blobIndex = context.readTreeAsValue(field, BlobIndex.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("blobIndex"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("blobIndex", nested.getMessage()));
-                    }
-                }
-            }
-            Metrics metrics = null;
-            {
-                JsonNode field = node.get("metrics");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("metrics", "explicit null not allowed"));
-                } else {
-                    try {
-                        metrics = context.readTreeAsValue(field, Metrics.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("metrics"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("metrics", nested.getMessage()));
-                    }
-                }
-            }
-            MetricOrLabel metricOrLabel = null;
-            {
-                JsonNode field = node.get("metricOrLabel");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("metricOrLabel", "explicit null not allowed"));
-                } else {
-                    metricOrLabel = MetricOrLabel.fromNode(field, "metricOrLabel", violations, context);
-                }
-            }
-            AddressListOrLabel addressListOrLabel = null;
-            {
-                JsonNode field = node.get("addressListOrLabel");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("addressListOrLabel", "explicit null not allowed"));
-                } else {
-                    addressListOrLabel = AddressListOrLabel.fromNode(field, "addressListOrLabel", violations, context);
-                }
-            }
-            ShowcaseLocation location = null;
-            {
-                JsonNode field = node.get("location");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("location", "explicit null not allowed"));
-                } else {
-                    try {
-                        location = context.readTreeAsValue(field, ShowcaseLocation.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("location"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("location", nested.getMessage()));
-                    }
-                }
-            }
-            ShowcaseAudit audit = null;
-            {
-                JsonNode field = node.get("audit");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    try {
-                        audit = context.readTreeAsValue(field, ShowcaseAudit.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("audit"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("audit", nested.getMessage()));
-                    }
-                }
-            }
-            List<ShowcaseRowsItem> rows = null;
-            {
-                JsonNode field = node.get("rows");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("rows", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("rows", "expected array"));
-                    } else {
-                        List<ShowcaseRowsItem> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "rows" + "[" + index + "]";
-                            try {
-                                items.add(context.readTreeAsValue(element, ShowcaseRowsItem.class));
-                            } catch (ApplicationFailure nested) {
-                                if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                                    throw nested;
-                                }
-                                // The locally-created failure retains the original list as its first detail.
-                                // This unchecked cast is cheap and performs no serialization.
-                                @SuppressWarnings("unchecked")
-                                List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                                for (Violation violation : nestedViolations) {
-                                    violations.add(violation.withPathPrefix(elementPath));
-                                }
-                            } catch (IOException nested) {
-                                violations.add(new Violation(elementPath, nested.getMessage()));
-                            }
-                        }
-                        rows = items;
-                    }
-                }
-            }
-            ShowcaseLedger ledgerJava = null;
-            {
-                JsonNode field = node.get("ledger");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("ledger", "explicit null not allowed"));
-                } else {
-                    try {
-                        ledgerJava = context.readTreeAsValue(field, ShowcaseLedger.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("ledger"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("ledger", nested.getMessage()));
-                    }
-                }
-            }
-            ShowcaseMetadata metadata = null;
-            {
-                JsonNode field = node.get("metadata");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("metadata", "explicit null not allowed"));
-                } else {
-                    try {
-                        metadata = context.readTreeAsValue(field, ShowcaseMetadata.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("metadata"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("metadata", nested.getMessage()));
-                    }
-                }
-            }
-            Quotas quotas = null;
-            {
-                JsonNode field = node.get("quotas");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("quotas", "explicit null not allowed"));
-                } else {
-                    try {
-                        quotas = context.readTreeAsValue(field, Quotas.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("quotas"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("quotas", nested.getMessage()));
-                    }
-                }
-            }
-            Tokens tokens = null;
-            {
-                JsonNode field = node.get("tokens");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("tokens", "explicit null not allowed"));
-                } else {
-                    try {
-                        tokens = context.readTreeAsValue(field, Tokens.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("tokens"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("tokens", nested.getMessage()));
-                    }
-                }
-            }
-            Nicknames nicknames = null;
-            {
-                JsonNode field = node.get("nicknames");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("nicknames", "explicit null not allowed"));
-                } else {
-                    try {
-                        nicknames = context.readTreeAsValue(field, Nicknames.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("nicknames"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("nicknames", nested.getMessage()));
-                    }
-                }
-            }
-            Choices choices = null;
-            {
-                JsonNode field = node.get("choices");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("choices", "explicit null not allowed"));
-                } else {
-                    try {
-                        choices = context.readTreeAsValue(field, Choices.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("choices"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("choices", nested.getMessage()));
-                    }
-                }
-            }
-            Extras extras = null;
-            {
-                JsonNode field = node.get("extras");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("extras", "explicit null not allowed"));
-                } else {
-                    try {
-                        extras = context.readTreeAsValue(field, Extras.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("extras"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("extras", nested.getMessage()));
-                    }
-                }
-            }
-            Shape shape = null;
-            {
-                JsonNode field = node.get("shape");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("shape", "explicit null not allowed"));
-                } else {
-                    shape = Shape.fromNode(field, "shape", violations, context);
-                }
-            }
-            Note note = null;
-            {
-                JsonNode field = node.get("note");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("note", "explicit null not allowed"));
-                } else {
-                    note = Note.fromNode(field, "note", violations, context);
-                }
-            }
-            Address address = null;
-            {
-                JsonNode field = node.get("address");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("address", "explicit null not allowed"));
-                } else {
-                    try {
-                        address = context.readTreeAsValue(field, Address.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("address"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("address", nested.getMessage()));
-                    }
-                }
-            }
-            Labels labels = null;
-            {
-                JsonNode field = node.get("labels");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("labels", "explicit null not allowed"));
-                } else {
-                    try {
-                        labels = context.readTreeAsValue(field, Labels.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("labels"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("labels", nested.getMessage()));
-                    }
-                }
-            }
-            Settings settings = null;
-            {
-                JsonNode field = node.get("settings");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("settings", "explicit null not allowed"));
-                } else {
-                    try {
-                        settings = context.readTreeAsValue(field, Settings.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("settings"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("settings", nested.getMessage()));
-                    }
-                }
-            }
-            Attributes attributes = null;
-            {
-                JsonNode field = node.get("attributes");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("attributes", "explicit null not allowed"));
-                } else {
-                    try {
-                        attributes = context.readTreeAsValue(field, Attributes.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("attributes"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("attributes", nested.getMessage()));
-                    }
-                }
-            }
-            ContactJava contact = null;
-            {
-                JsonNode field = node.get("contact");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("contact", "explicit null not allowed"));
-                } else {
-                    try {
-                        contact = context.readTreeAsValue(field, ContactJava.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("contact"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("contact", nested.getMessage()));
-                    }
-                }
-            }
-            Long nullableCount = null;
-            {
-                JsonNode field = node.get("nullableCount");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "nullableCount", violations);
-                    if (numberValue != null) {
-                        nullableCount = numberValue;
-                        if (numberValue < 1L) {
-                            violations.add(new Violation("nullableCount", "must be >= 1, got " + numberValue));
-                        }
-                        if (numberValue > 10L) {
-                            violations.add(new Violation("nullableCount", "must be <= 10, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            Double nullableRatio = null;
-            {
-                JsonNode field = node.get("nullableRatio");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    Double numberValue = SpecNumbers.specDouble(field, "nullableRatio", violations);
-                    if (numberValue != null) {
-                        nullableRatio = numberValue;
-                        if (numberValue % 2.0 != 0) {
-                            violations.add(new Violation("nullableRatio", "must be a multiple of 2, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            Boolean nullableFlag = null;
-            {
-                JsonNode field = node.get("nullableFlag");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isBoolean()) {
-                        violations.add(new Violation("nullableFlag", "expected boolean"));
-                    } else {
-                        nullableFlag = field.booleanValue();
-                    }
-                }
-            }
-            List<String> nullableTags = null;
-            {
-                JsonNode field = node.get("nullableTags");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("nullableTags", "expected array"));
-                    } else {
-                        List<String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "nullableTags" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                items.add(parsed);
-                            }
-                        }
-                        nullableTags = items;
-                        if (field.size() < 1) {
-                            violations.add(new Violation("nullableTags", "must have at least 1 items, got " + field.size()));
-                        }
-                        java.util.Map<Object, Integer> rawSeen = new java.util.HashMap<>();
-                        for (int rawIndex = 0; rawIndex < field.size(); rawIndex++) {
-                            Object rawKey = SpecNumbers.valueKey(field.get(rawIndex));
-                            Integer priorIndex = rawSeen.get(rawKey);
-                            if (priorIndex != null) {
-                                violations.add(new Violation("nullableTags", "duplicate items: element at index " + rawIndex + " equals index " + priorIndex));
-                            } else {
-                                rawSeen.put(rawKey, rawIndex);
-                            }
-                        }
-                    }
-                }
-            }
-            NullableMode nullableMode = null;
-            {
-                JsonNode field = node.get("nullableMode");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("nullableMode", "expected string"));
-                    } else {
-                        String nullableModeValue = field.textValue();
-                        if ("auto".equals(nullableModeValue)) {
-                            nullableMode = NullableMode.AUTO;
-                        } else if ("manual".equals(nullableModeValue)) {
-                            nullableMode = NullableMode.MANUAL;
-                        } else {
-                            violations.add(new Violation("nullableMode", "must be one of [\"auto\", \"manual\"], got " + nullableModeValue));
-                        }
-                    }
-                }
-            }
-            List<Double> integralMeasurements = null;
-            {
-                JsonNode field = node.get("integralMeasurements");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("integralMeasurements", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("integralMeasurements", "expected array"));
-                    } else {
-                        List<Double> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "integralMeasurements" + "[" + index + "]";
-                            Double parsed = SpecNumbers.specDouble(element, elementPath, violations);
-                            if (parsed != null) {
-                                items.add(parsed);
-                            }
-                        }
-                        integralMeasurements = items;
-                        int rawMatchCount = 0;
-                        for (JsonNode rawElement : field) {
-                            if (SpecNumbers.isSpecLong(rawElement) && (true)) {
-                                rawMatchCount++;
-                            }
-                        }
-                        if (rawMatchCount < 1) {
-                            violations.add(new Violation("integralMeasurements", "no element matches the required schema"));
-                        }
-                    }
-                }
-            }
-            Double byFive = null;
-            {
-                JsonNode field = node.get("byFive");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("byFive", "explicit null not allowed"));
-                } else {
-                    Double numberValue = SpecNumbers.specDouble(field, "byFive", violations);
-                    if (numberValue != null) {
-                        byFive = numberValue;
-                        if (numberValue % 5.0 != 0) {
-                            violations.add(new Violation("byFive", "must be a multiple of 5, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            String wildcard = null;
-            {
-                JsonNode field = node.get("wildcard");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("wildcard", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("wildcard", "expected string"));
-                    } else {
-                        wildcard = field.textValue();
-                        if (!WILDCARD_PATTERN.matcher(wildcard).find()) {
-                            violations.add(new Violation("wildcard", "must match pattern " + "a[^\\n]b" + ", got " + wildcard));
-                        }
-                    }
-                }
-            }
-            String quoted = null;
-            {
-                JsonNode field = node.get("quoted");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("quoted", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("quoted", "expected string"));
-                    } else {
-                        quoted = field.textValue();
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Showcase(kind, revision, enabled, status, tier, scale, name, count, active, nickname, code, sku, phrase, requestId, contactEmail, host, homepage, gateway, blob, urlBlob, retries, verbose, greeting, debug, legacyIdJava, middleName, category, priority, level, ratio, score, step, tags, aliases, roles, idOrName, mode, payload, detail, shapeOrName, measurements, shapes, segments, slots, grid, numberGrid, links, addresses, addressBook, dates, dateIndex, blobs, blobIndex, metrics, metricOrLabel, addressListOrLabel, location, audit, rows, ledgerJava, metadata, quotas, tokens, nicknames, choices, extras, shape, note, address, labels, settings, attributes, contact, nullableCount, nullableRatio, nullableFlag, nullableTags, nullableMode, integralMeasurements, byFive, wildcard, quoted);
-        }
+    static void validate(Mode value, String path, List<Violation> violations) {
+      if (value instanceof ModeString) {
+        ((ModeString) value).validate(path, violations);
+      }
+      if (value instanceof ModeInteger) {
+        ((ModeInteger) value).validate(path, violations);
+      }
     }
+  }
+
+  public static final class ModeString implements Mode {
+    private final String value;
+
+    public ModeString(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      if (!("auto".equals(value)) && !("manual".equals(value))) {
+        violations.add(new Violation(path, "must be one of [\"auto\", \"manual\"], got " + value));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ModeString)) {
+        return false;
+      }
+      return Objects.equals(value, ((ModeString) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "ModeString[" + value + "]";
+    }
+  }
+
+  public static final class ModeInteger implements Mode {
+    private final long value;
+
+    public ModeInteger(long value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public long getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      if (value < -SpecNumbers.INTEGER_CAP || value > SpecNumbers.INTEGER_CAP) {
+        violations.add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+      }
+      if (value < 0L) {
+        violations.add(new Violation(path, "must be >= 0, got " + value));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ModeInteger)) {
+        return false;
+      }
+      return Objects.equals(value, ((ModeInteger) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "ModeInteger[" + value + "]";
+    }
+  }
+
+  public interface Payload {
+    static @Nullable Payload fromNode(
+        JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+      if (node.isObject()) {
+        Map<String, JsonNode> members = new LinkedHashMap<>();
+        Iterator<String> memberNames = node.fieldNames();
+        while (memberNames.hasNext()) {
+          String memberName = memberNames.next();
+          members.put(memberName, node.get(memberName));
+        }
+        return new PayloadObject(members);
+      }
+      if (node.isTextual()) {
+        return new PayloadString(node.textValue());
+      }
+      violations.add(new Violation(path, "expected one of: object, string"));
+      return null;
+    }
+  }
+
+  public static final class PayloadObject implements Payload {
+    private final Map<String, JsonNode> value;
+
+    public PayloadObject(Map<String, JsonNode> value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public Map<String, JsonNode> getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof PayloadObject)) {
+        return false;
+      }
+      return Objects.equals(value, ((PayloadObject) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "PayloadObject[" + value + "]";
+    }
+  }
+
+  public static final class PayloadString implements Payload {
+    private final String value;
+
+    public PayloadString(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof PayloadString)) {
+        return false;
+      }
+      return Objects.equals(value, ((PayloadString) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "PayloadString[" + value + "]";
+    }
+  }
+
+  public interface Detail {
+    static @Nullable Detail fromNode(
+        JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+      if (node.isObject()) {
+        try {
+          return context.readTreeAsValue(node, ShowcaseDetailObject.class);
+        } catch (ApplicationFailure nested) {
+          if (!"PayloadValidationError".equals(nested.getType())
+              || nested.getDetails().getSize() == 0) {
+            throw nested;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations =
+              (List<Violation>) nested.getDetails().get(0, List.class);
+          for (Violation violation : nestedViolations) {
+            violations.add(violation.withPathPrefix(path));
+          }
+          return null;
+        } catch (IOException nested) {
+          violations.add(new Violation(path, nested.getMessage()));
+          return null;
+        }
+      }
+      if (node.isTextual()) {
+        return new DetailString(node.textValue());
+      }
+      violations.add(new Violation(path, "expected one of: ShowcaseDetailObject, string"));
+      return null;
+    }
+  }
+
+  public static final class DetailString implements Detail {
+    private final String value;
+
+    public DetailString(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof DetailString)) {
+        return false;
+      }
+      return Objects.equals(value, ((DetailString) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "DetailString[" + value + "]";
+    }
+  }
+
+  public interface ShapeOrName {
+    static @Nullable ShapeOrName fromNode(
+        JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+      if (node.isObject()) {
+        JsonNode disc = node.get("kind");
+        if (disc == null || disc.isNull() || !disc.isValueNode()) {
+          violations.add(new Violation(path, "discriminator \"kind\" is required"));
+          return null;
+        }
+        if (disc.isTextual() && "circle".equals(disc.textValue())) {
+          try {
+            return context.readTreeAsValue(node, Circle.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix(path));
+            }
+            return null;
+          } catch (IOException nested) {
+            violations.add(new Violation(path, nested.getMessage()));
+            return null;
+          }
+        }
+        if (disc.isTextual() && "square".equals(disc.textValue())) {
+          try {
+            return context.readTreeAsValue(node, Square.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix(path));
+            }
+            return null;
+          } catch (IOException nested) {
+            violations.add(new Violation(path, nested.getMessage()));
+            return null;
+          }
+        }
+        violations.add(
+            new Violation(
+                path,
+                "unknown discriminator kind "
+                    + disc.asText()
+                    + ": expected one of [circle, square]"));
+        return null;
+      }
+      if (node.isTextual()) {
+        ShapeOrNameString wrapped = new ShapeOrNameString(node.textValue());
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      violations.add(new Violation(path, "expected one of: Circle, Square, string"));
+      return null;
+    }
+
+    static void validate(ShapeOrName value, String path, List<Violation> violations) {
+      if (value instanceof ShapeOrNameString) {
+        ((ShapeOrNameString) value).validate(path, violations);
+      }
+    }
+  }
+
+  public static final class ShapeOrNameString implements ShapeOrName {
+    private final String value;
+
+    public ShapeOrNameString(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      int length = value.codePointCount(0, value.length());
+      if (length > 32) {
+        violations.add(new Violation(path, "must have length <= 32, got " + length));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ShapeOrNameString)) {
+        return false;
+      }
+      return Objects.equals(value, ((ShapeOrNameString) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "ShapeOrNameString[" + value + "]";
+    }
+  }
+
+  public interface Measurements {
+    static @Nullable Measurements fromNode(
+        JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+      if (node.isArray()) {
+        List<Double> items = new ArrayList<>();
+        for (int index = 0; index < node.size(); index++) {
+          JsonNode element = node.get(index);
+          String elementPath = path + "[" + index + "]";
+          Double parsed = SpecNumbers.specDouble(element, elementPath, violations);
+          if (parsed != null) {
+            items.add(parsed);
+          }
+        }
+        if (node.size() < 1) {
+          violations.add(new Violation(path, "must have at least 1 items, got " + node.size()));
+        }
+        java.util.Map<Object, Integer> rawSeen = new java.util.HashMap<>();
+        for (int rawIndex = 0; rawIndex < node.size(); rawIndex++) {
+          Object rawKey = SpecNumbers.valueKey(node.get(rawIndex));
+          Integer priorIndex = rawSeen.get(rawKey);
+          if (priorIndex != null) {
+            violations.add(
+                new Violation(
+                    path,
+                    "duplicate items: element at index "
+                        + rawIndex
+                        + " equals index "
+                        + priorIndex));
+          } else {
+            rawSeen.put(rawKey, rawIndex);
+          }
+        }
+        return new MeasurementsArray(items);
+      }
+      if (node.isTextual()) {
+        MeasurementsString wrapped = new MeasurementsString(node.textValue());
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      violations.add(new Violation(path, "expected one of: array, string"));
+      return null;
+    }
+
+    static void validate(Measurements value, String path, List<Violation> violations) {
+      if (value instanceof MeasurementsArray) {
+        ((MeasurementsArray) value).validate(path, violations);
+      }
+      if (value instanceof MeasurementsString) {
+        ((MeasurementsString) value).validate(path, violations);
+      }
+    }
+  }
+
+  public static final class MeasurementsArray implements Measurements {
+    private final List<Double> value;
+
+    public MeasurementsArray(List<Double> value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public List<Double> getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      for (int finiteIndex0 = 0; finiteIndex0 < value.size(); finiteIndex0++) {
+        Double finiteValue0 = value.get(finiteIndex0);
+        if (finiteValue0 != null) {
+          if (!Double.isFinite(finiteValue0)) {
+            violations.add(
+                new Violation(
+                    path + "[" + finiteIndex0 + "]",
+                    "must be a finite number, got " + finiteValue0));
+          }
+        }
+      }
+      if (value.size() < 1) {
+        violations.add(new Violation(path, "must have at least 1 items, got " + value.size()));
+      }
+      java.util.Map<Object, Integer> seen = new java.util.HashMap<>();
+      for (int index = 0; index < value.size(); index++) {
+        Object element = SpecNumbers.numberKey(value.get(index));
+        Integer priorIndex = seen.get(element);
+        if (priorIndex != null) {
+          violations.add(
+              new Violation(
+                  path,
+                  "duplicate items: element at index " + index + " equals index " + priorIndex));
+        } else {
+          seen.put(element, index);
+        }
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof MeasurementsArray)) {
+        return false;
+      }
+      return Objects.equals(value, ((MeasurementsArray) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "MeasurementsArray[" + value + "]";
+    }
+  }
+
+  public static final class MeasurementsString implements Measurements {
+    private static final java.util.regex.Pattern VALUE_PATTERN =
+        java.util.regex.Pattern.compile("^[a-z]+\\z");
+
+    private final String value;
+
+    public MeasurementsString(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      if (!VALUE_PATTERN.matcher(value).find()) {
+        violations.add(
+            new Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + value));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof MeasurementsString)) {
+        return false;
+      }
+      return Objects.equals(value, ((MeasurementsString) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "MeasurementsString[" + value + "]";
+    }
+  }
+
+  public interface MetricOrLabel {
+    static @Nullable MetricOrLabel fromNode(
+        JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+      if (node.isNumber()) {
+        Double parsed = SpecNumbers.specDouble(node, path, violations);
+        if (parsed == null) {
+          return null;
+        }
+        MetricOrLabelNumber wrapped = new MetricOrLabelNumber(parsed);
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      if (node.isTextual()) {
+        MetricOrLabelString wrapped = new MetricOrLabelString(node.textValue());
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      violations.add(new Violation(path, "expected one of: number, string"));
+      return null;
+    }
+
+    static void validate(MetricOrLabel value, String path, List<Violation> violations) {
+      if (value instanceof MetricOrLabelNumber) {
+        ((MetricOrLabelNumber) value).validate(path, violations);
+      }
+      if (value instanceof MetricOrLabelString) {
+        ((MetricOrLabelString) value).validate(path, violations);
+      }
+    }
+  }
+
+  public static final class MetricOrLabelNumber implements MetricOrLabel {
+    private final double value;
+
+    public MetricOrLabelNumber(double value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public double getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      if (!Double.isFinite(value)) {
+        violations.add(new Violation(path, "must be a finite number, got " + value));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof MetricOrLabelNumber)) {
+        return false;
+      }
+      return Objects.equals(value, ((MetricOrLabelNumber) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "MetricOrLabelNumber[" + value + "]";
+    }
+  }
+
+  public static final class MetricOrLabelString implements MetricOrLabel {
+    private final String value;
+
+    public MetricOrLabelString(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      int length = value.codePointCount(0, value.length());
+      if (length < 1) {
+        violations.add(new Violation(path, "must have length >= 1, got " + length));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof MetricOrLabelString)) {
+        return false;
+      }
+      return Objects.equals(value, ((MetricOrLabelString) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "MetricOrLabelString[" + value + "]";
+    }
+  }
+
+  public interface AddressListOrLabel {
+    static @Nullable AddressListOrLabel fromNode(
+        JsonNode node, String path, List<Violation> violations, DeserializationContext context) {
+      if (node.isArray()) {
+        List<Address> items = new ArrayList<>();
+        for (int index = 0; index < node.size(); index++) {
+          JsonNode element = node.get(index);
+          String elementPath = path + "[" + index + "]";
+          try {
+            items.add(context.readTreeAsValue(element, Address.class));
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix(elementPath));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation(elementPath, nested.getMessage()));
+          }
+        }
+        if (node.size() < 1) {
+          violations.add(new Violation(path, "must have at least 1 items, got " + node.size()));
+        }
+        return new AddressListOrLabelArray(items);
+      }
+      if (node.isTextual()) {
+        AddressListOrLabelString wrapped = new AddressListOrLabelString(node.textValue());
+        wrapped.validate(path, violations);
+        return wrapped;
+      }
+      violations.add(new Violation(path, "expected one of: array, string"));
+      return null;
+    }
+
+    static void validate(AddressListOrLabel value, String path, List<Violation> violations) {
+      if (value instanceof AddressListOrLabelArray) {
+        ((AddressListOrLabelArray) value).validate(path, violations);
+      }
+      if (value instanceof AddressListOrLabelString) {
+        ((AddressListOrLabelString) value).validate(path, violations);
+      }
+    }
+  }
+
+  public static final class AddressListOrLabelArray implements AddressListOrLabel {
+    private final List<Address> value;
+
+    public AddressListOrLabelArray(List<Address> value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public List<Address> getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      if (value.size() < 1) {
+        violations.add(new Violation(path, "must have at least 1 items, got " + value.size()));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof AddressListOrLabelArray)) {
+        return false;
+      }
+      return Objects.equals(value, ((AddressListOrLabelArray) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "AddressListOrLabelArray[" + value + "]";
+    }
+  }
+
+  public static final class AddressListOrLabelString implements AddressListOrLabel {
+    private final String value;
+
+    public AddressListOrLabelString(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    void validate(String path, List<Violation> violations) {
+      int length = value.codePointCount(0, value.length());
+      if (length < 1) {
+        violations.add(new Violation(path, "must have length >= 1, got " + length));
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof AddressListOrLabelString)) {
+        return false;
+      }
+      return Objects.equals(value, ((AddressListOrLabelString) other).value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "AddressListOrLabelString[" + value + "]";
+    }
+  }
+
+  public static final class Kind {
+    public static final Kind SHOWCASE = new Kind("showcase");
+
+    private final String value;
+
+    private Kind(String value) {
+      this.value = value;
+    }
+
+    @JsonCreator
+    public static @Nullable Kind fromString(String value) {
+      if (value == null) {
+        return null;
+      }
+      if ("showcase".equals(value)) {
+        return SHOWCASE;
+      }
+      throw new IllegalArgumentException("must equal \"showcase\", got \"" + value + "\"");
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Kind)) {
+        return false;
+      }
+      Kind that = (Kind) other;
+      return Objects.equals(this.value, that.value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "Kind[" + value + "]";
+    }
+  }
+
+  public static final class Revision {
+    public static final Revision REVISION_JAVA = new Revision(1L);
+
+    private final long value;
+
+    private Revision(long value) {
+      this.value = value;
+    }
+
+    @JsonCreator
+    public static Revision fromLong(long value) {
+      if (value == 1L) {
+        return REVISION_JAVA;
+      }
+      throw new IllegalArgumentException("must equal 1, got " + value);
+    }
+
+    @JsonValue
+    public long getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Revision)) {
+        return false;
+      }
+      Revision that = (Revision) other;
+      return this.value == that.value;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "Revision[" + value + "]";
+    }
+  }
+
+  public static final class Enabled {
+    public static final Enabled TRUE = new Enabled(true);
+
+    private final boolean value;
+
+    private Enabled(boolean value) {
+      this.value = value;
+    }
+
+    @JsonCreator
+    public static Enabled fromBoolean(boolean value) {
+      if (value == true) {
+        return TRUE;
+      }
+      throw new IllegalArgumentException("must equal true, got " + value);
+    }
+
+    @JsonValue
+    public boolean getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Enabled)) {
+        return false;
+      }
+      Enabled that = (Enabled) other;
+      return this.value == that.value;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "Enabled[" + value + "]";
+    }
+  }
+
+  public static final class Status {
+    public static final Status ACTIVE_JAVA = new Status("active");
+    public static final Status INACTIVE = new Status("inactive");
+    public static final Status PENDING = new Status("pending");
+
+    private final String value;
+
+    private Status(String value) {
+      this.value = value;
+    }
+
+    @JsonCreator
+    public static @Nullable Status fromString(String value) {
+      if (value == null) {
+        return null;
+      }
+      if ("active".equals(value)) {
+        return ACTIVE_JAVA;
+      }
+      if ("inactive".equals(value)) {
+        return INACTIVE;
+      }
+      if ("pending".equals(value)) {
+        return PENDING;
+      }
+      throw new IllegalArgumentException(
+          "must be one of [\"active\", \"inactive\", \"pending\"], got \"" + value + "\"");
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Status)) {
+        return false;
+      }
+      Status that = (Status) other;
+      return Objects.equals(this.value, that.value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "Status[" + value + "]";
+    }
+  }
+
+  public static final class Tier {
+    public static final Tier V_1 = new Tier(1L);
+    public static final Tier V_2 = new Tier(2L);
+    public static final Tier V_3 = new Tier(3L);
+
+    private final long value;
+
+    private Tier(long value) {
+      this.value = value;
+    }
+
+    @JsonCreator
+    public static Tier fromLong(long value) {
+      if (value == 1L) {
+        return V_1;
+      }
+      if (value == 2L) {
+        return V_2;
+      }
+      if (value == 3L) {
+        return V_3;
+      }
+      throw new IllegalArgumentException("must be one of [1, 2, 3], got " + value);
+    }
+
+    @JsonValue
+    public long getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Tier)) {
+        return false;
+      }
+      Tier that = (Tier) other;
+      return this.value == that.value;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "Tier[" + value + "]";
+    }
+  }
+
+  public static final class Scale {
+    public static final Scale V_1_5 = new Scale(1.5);
+    public static final Scale V_2_5 = new Scale(2.5);
+
+    private final double value;
+
+    private Scale(double value) {
+      this.value = value;
+    }
+
+    @JsonCreator
+    public static Scale fromDouble(double value) {
+      if (value == 1.5) {
+        return V_1_5;
+      }
+      if (value == 2.5) {
+        return V_2_5;
+      }
+      throw new IllegalArgumentException("must be one of [1.5, 2.5], got " + value);
+    }
+
+    @JsonValue
+    public double getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Scale)) {
+        return false;
+      }
+      Scale that = (Scale) other;
+      return this.value == that.value;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "Scale[" + value + "]";
+    }
+  }
+
+  public static final class NullableMode {
+    public static final NullableMode AUTO = new NullableMode("auto");
+    public static final NullableMode MANUAL = new NullableMode("manual");
+
+    private final String value;
+
+    private NullableMode(String value) {
+      this.value = value;
+    }
+
+    @JsonCreator
+    public static @Nullable NullableMode fromString(String value) {
+      if (value == null) {
+        return null;
+      }
+      if ("auto".equals(value)) {
+        return AUTO;
+      }
+      if ("manual".equals(value)) {
+        return MANUAL;
+      }
+      throw new IllegalArgumentException(
+          "must be one of [\"auto\", \"manual\"], got \"" + value + "\"");
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof NullableMode)) {
+        return false;
+      }
+      NullableMode that = (NullableMode) other;
+      return Objects.equals(this.value, that.value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+      return "NullableMode[" + value + "]";
+    }
+  }
+
+  private static final java.util.regex.Pattern SKU_PATTERN =
+      java.util.regex.Pattern.compile("^[A-Z]{2,4}\\z");
+  private static final java.util.regex.Pattern PHRASE_PATTERN =
+      java.util.regex.Pattern.compile(
+          "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\\z");
+  private static final java.util.regex.Pattern REQUEST_ID_FORMAT =
+      java.util.regex.Pattern.compile(
+          "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\z");
+  private static final java.util.regex.Pattern CONTACT_EMAIL_FORMAT =
+      java.util.regex.Pattern.compile(
+          "^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+\\z");
+  private static final java.util.regex.Pattern HOST_FORMAT =
+      java.util.regex.Pattern.compile(
+          "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\\z");
+  private static final java.util.regex.Pattern HOMEPAGE_FORMAT =
+      java.util.regex.Pattern.compile(
+          "^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z");
+  private static final java.util.regex.Pattern GATEWAY_FORMAT =
+      java.util.regex.Pattern.compile(
+          "^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\z");
+  private static final java.util.regex.Pattern WILDCARD_PATTERN =
+      java.util.regex.Pattern.compile("a[^\\n]b");
+
+  private final Kind kind;
+  private final Revision revision;
+  private final Enabled enabled;
+  private final Status status;
+  private final Tier tier;
+  private final Scale scale;
+  private final String name;
+  private final long count;
+  private final boolean active;
+  private final @Nullable String nickname;
+  private final @Nullable String code;
+  private final @Nullable String sku;
+  private final @Nullable String phrase;
+  private final @Nullable String requestId;
+  private final @Nullable String contactEmail;
+  private final @Nullable String host;
+  private final @Nullable String homepage;
+  private final @Nullable String gateway;
+  private final byte @Nullable [] blob;
+  private final byte @Nullable [] urlBlob;
+  private final @Nullable Long retries;
+  private final @Nullable Boolean verbose;
+  private final @Nullable String greeting;
+  private final @Nullable Boolean debug;
+  private final @Nullable String legacyIdJava;
+  private final @Nullable String middleName;
+  private final @Nullable String category;
+  private final @Nullable Long priority;
+  private final @Nullable Long level;
+  private final @Nullable Double ratio;
+  private final @Nullable Double score;
+  private final @Nullable Long step;
+  private final @Nullable List<String> tags;
+  private final @Nullable List<String> aliases;
+  private final @Nullable List<String> roles;
+  private final @Nullable IdOrName idOrName;
+  private final @Nullable Mode mode;
+  private final @Nullable Payload payload;
+  private final @Nullable Detail detail;
+  private final @Nullable ShapeOrName shapeOrName;
+  private final @Nullable Measurements measurements;
+  private final @Nullable List<Shape> shapes;
+  private final @Nullable List<ShowcaseSegmentsItem> segments;
+  private final @Nullable List<@Nullable String> slots;
+  private final @Nullable List<List<Long>> grid;
+  private final @Nullable List<List<Double>> numberGrid;
+  private final @Nullable List<String> links;
+  private final @Nullable List<Address> addresses;
+  private final @Nullable AddressBook addressBook;
+  private final @Nullable List<LocalDate> dates;
+  private final @Nullable DateIndex dateIndex;
+  private final @Nullable List<byte[]> blobs;
+  private final @Nullable BlobIndex blobIndex;
+  private final @Nullable Metrics metrics;
+  private final @Nullable MetricOrLabel metricOrLabel;
+  private final @Nullable AddressListOrLabel addressListOrLabel;
+  private final @Nullable ShowcaseLocation location;
+  private final @Nullable ShowcaseAudit audit;
+  private final @Nullable List<ShowcaseRowsItem> rows;
+  private final @Nullable ShowcaseLedger ledgerJava;
+  private final @Nullable ShowcaseMetadata metadata;
+  private final @Nullable Quotas quotas;
+  private final @Nullable Tokens tokens;
+  private final @Nullable Nicknames nicknames;
+  private final @Nullable Choices choices;
+  private final @Nullable Extras extras;
+  private final @Nullable Shape shape;
+  private final @Nullable Note note;
+  private final @Nullable Address address;
+  private final @Nullable Labels labels;
+  private final @Nullable Settings settings;
+  private final @Nullable Attributes attributes;
+  private final @Nullable ContactJava contact;
+  private final @Nullable Long nullableCount;
+  private final @Nullable Double nullableRatio;
+  private final @Nullable Boolean nullableFlag;
+  private final @Nullable List<String> nullableTags;
+  private final @Nullable NullableMode nullableMode;
+  private final @Nullable List<Double> integralMeasurements;
+  private final @Nullable Double byFive;
+  private final @Nullable String wildcard;
+  private final @Nullable String quoted;
+
+  public Showcase(
+      Kind kind,
+      Revision revision,
+      Enabled enabled,
+      Status status,
+      Tier tier,
+      Scale scale,
+      String name,
+      long count,
+      boolean active,
+      @Nullable String nickname,
+      @Nullable String code,
+      @Nullable String sku,
+      @Nullable String phrase,
+      @Nullable String requestId,
+      @Nullable String contactEmail,
+      @Nullable String host,
+      @Nullable String homepage,
+      @Nullable String gateway,
+      byte @Nullable [] blob,
+      byte @Nullable [] urlBlob,
+      @Nullable Long retries,
+      @Nullable Boolean verbose,
+      @Nullable String greeting,
+      @Nullable Boolean debug,
+      @Nullable String legacyIdJava,
+      @Nullable String middleName,
+      @Nullable String category,
+      @Nullable Long priority,
+      @Nullable Long level,
+      @Nullable Double ratio,
+      @Nullable Double score,
+      @Nullable Long step,
+      @Nullable List<String> tags,
+      @Nullable List<String> aliases,
+      @Nullable List<String> roles,
+      @Nullable IdOrName idOrName,
+      @Nullable Mode mode,
+      @Nullable Payload payload,
+      @Nullable Detail detail,
+      @Nullable ShapeOrName shapeOrName,
+      @Nullable Measurements measurements,
+      @Nullable List<Shape> shapes,
+      @Nullable List<ShowcaseSegmentsItem> segments,
+      @Nullable List<@Nullable String> slots,
+      @Nullable List<List<Long>> grid,
+      @Nullable List<List<Double>> numberGrid,
+      @Nullable List<String> links,
+      @Nullable List<Address> addresses,
+      @Nullable AddressBook addressBook,
+      @Nullable List<LocalDate> dates,
+      @Nullable DateIndex dateIndex,
+      @Nullable List<byte[]> blobs,
+      @Nullable BlobIndex blobIndex,
+      @Nullable Metrics metrics,
+      @Nullable MetricOrLabel metricOrLabel,
+      @Nullable AddressListOrLabel addressListOrLabel,
+      @Nullable ShowcaseLocation location,
+      @Nullable ShowcaseAudit audit,
+      @Nullable List<ShowcaseRowsItem> rows,
+      @Nullable ShowcaseLedger ledgerJava,
+      @Nullable ShowcaseMetadata metadata,
+      @Nullable Quotas quotas,
+      @Nullable Tokens tokens,
+      @Nullable Nicknames nicknames,
+      @Nullable Choices choices,
+      @Nullable Extras extras,
+      @Nullable Shape shape,
+      @Nullable Note note,
+      @Nullable Address address,
+      @Nullable Labels labels,
+      @Nullable Settings settings,
+      @Nullable Attributes attributes,
+      @Nullable ContactJava contact,
+      @Nullable Long nullableCount,
+      @Nullable Double nullableRatio,
+      @Nullable Boolean nullableFlag,
+      @Nullable List<String> nullableTags,
+      @Nullable NullableMode nullableMode,
+      @Nullable List<Double> integralMeasurements,
+      @Nullable Double byFive,
+      @Nullable String wildcard,
+      @Nullable String quoted) {
+    this.kind = kind;
+    this.revision = revision;
+    this.enabled = enabled;
+    this.status = status;
+    this.tier = tier;
+    this.scale = scale;
+    this.name = name;
+    this.count = count;
+    this.active = active;
+    this.nickname = nickname;
+    this.code = code;
+    this.sku = sku;
+    this.phrase = phrase;
+    this.requestId = requestId;
+    this.contactEmail = contactEmail;
+    this.host = host;
+    this.homepage = homepage;
+    this.gateway = gateway;
+    this.blob = blob;
+    this.urlBlob = urlBlob;
+    this.retries = retries;
+    this.verbose = verbose;
+    this.greeting = greeting;
+    this.debug = debug;
+    this.legacyIdJava = legacyIdJava;
+    this.middleName = middleName;
+    this.category = category;
+    this.priority = priority;
+    this.level = level;
+    this.ratio = ratio;
+    this.score = score;
+    this.step = step;
+    this.tags = tags;
+    this.aliases = aliases;
+    this.roles = roles;
+    this.idOrName = idOrName;
+    this.mode = mode;
+    this.payload = payload;
+    this.detail = detail;
+    this.shapeOrName = shapeOrName;
+    this.measurements = measurements;
+    this.shapes = shapes;
+    this.segments = segments;
+    this.slots = slots;
+    this.grid = grid;
+    this.numberGrid = numberGrid;
+    this.links = links;
+    this.addresses = addresses;
+    this.addressBook = addressBook;
+    this.dates = dates;
+    this.dateIndex = dateIndex;
+    this.blobs = blobs;
+    this.blobIndex = blobIndex;
+    this.metrics = metrics;
+    this.metricOrLabel = metricOrLabel;
+    this.addressListOrLabel = addressListOrLabel;
+    this.location = location;
+    this.audit = audit;
+    this.rows = rows;
+    this.ledgerJava = ledgerJava;
+    this.metadata = metadata;
+    this.quotas = quotas;
+    this.tokens = tokens;
+    this.nicknames = nicknames;
+    this.choices = choices;
+    this.extras = extras;
+    this.shape = shape;
+    this.note = note;
+    this.address = address;
+    this.labels = labels;
+    this.settings = settings;
+    this.attributes = attributes;
+    this.contact = contact;
+    this.nullableCount = nullableCount;
+    this.nullableRatio = nullableRatio;
+    this.nullableFlag = nullableFlag;
+    this.nullableTags = nullableTags;
+    this.nullableMode = nullableMode;
+    this.integralMeasurements = integralMeasurements;
+    this.byFive = byFive;
+    this.wildcard = wildcard;
+    this.quoted = quoted;
+  }
+
+  /** Discriminator; always "showcase". */
+  public Kind getKind() {
+    return kind;
+  }
+
+  /**
+   * Integer const; always 1. Also exercises the single-`const` value override:
+   * `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived name plus a
+   * per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the wire value stays `1`.
+   * TS/Python are inert here (no const override keyword — the value is emitted as a plain literal
+   * type).
+   */
+  public Revision getRevision() {
+    return revision;
+  }
+
+  /** Boolean const; always true. */
+  public Enabled getEnabled() {
+    return enabled;
+  }
+
+  /**
+   * Closed string value set. Also exercises the enum value-constant override:
+   * `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant to the value
+   * name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`) while the wire value stays
+   * `active`. TS/Python are inert here (no enum override keyword).
+   */
+  public Status getStatus() {
+    return status;
+  }
+
+  /** Closed integer value set. */
+  public Tier getTier() {
+    return tier;
+  }
+
+  /**
+   * Closed number value set (exercises the Python float exception: emitted as plain float,
+   * validated by membership).
+   */
+  public Scale getScale() {
+    return scale;
+  }
+
+  /**
+   * Display name
+   *
+   * <p>Required human-readable name, 1 to 64 code points.
+   */
+  public String getName() {
+    return name;
+  }
+
+  /** Required integer scalar. */
+  public long getCount() {
+    return count;
+  }
+
+  /** Required boolean scalar. */
+  public boolean getActive() {
+    return active;
+  }
+
+  /** Optional short name, at most 12 code points. */
+  public @Nullable String getNickname() {
+    return nickname;
+  }
+
+  /**
+   * Optional code, 2 to 5 code points. Counted in Unicode code points, so a multi-byte value (e.g.
+   * "a😀b", 3 code points / 6 UTF-8 bytes) is valid.
+   */
+  public @Nullable String getCode() {
+    return code;
+  }
+
+  /**
+   * Optional product code: 2 to 4 uppercase ASCII letters, anchored (`^[A-Z]{2,4}$`). Exercises the
+   * RE2-safe `pattern` gate.
+   */
+  public @Nullable String getSku() {
+    return sku;
+  }
+
+  /**
+   * Optional two-word phrase separated by whitespace (`^&#92;S+&#92;s&#92;S+$`). Exercises the
+   * loader's `&#92;s`/`&#92;S` → ASCII-class normalization and the per-target `$` end-anchor
+   * rewrite (Python `&#92;Z` / Java `&#92;z`), so a Unicode space (NBSP) and a trailing newline are
+   * rejected consistently across all four languages.
+   */
+  public @Nullable String getPhrase() {
+    return phrase;
+  }
+
+  /**
+   * Optional request identifier; asserted RFC 4122 UUID via `format: uuid`. Stays `string`-typed
+   * (format assertion, no materialization); the pinned regex is validated identically across all
+   * four languages.
+   */
+  public @Nullable String getRequestId() {
+    return requestId;
+  }
+
+  /**
+   * Optional contact address; asserted ASCII dot-atom `format: email` (single `@`, &gt;=2-label
+   * domain, total length &lt;= 254, guard-before-regex).
+   */
+  public @Nullable String getContactEmail() {
+    return contactEmail;
+  }
+
+  /**
+   * Optional host name; asserted RFC 1123 `format: hostname` (LDH labels, total length &lt;= 253).
+   */
+  public @Nullable String getHost() {
+    return host;
+  }
+
+  /**
+   * Optional homepage; asserted RFC 3986 `format: uri` (scheme required, ASCII only; an IP-literal
+   * host is validated by the spliced ipv6 grammar).
+   */
+  public @Nullable String getHomepage() {
+    return homepage;
+  }
+
+  /** Optional gateway address; asserted dotted-quad IPv4 via format ipv4. */
+  public @Nullable String getGateway() {
+    return gateway;
+  }
+
+  /**
+   * Optional binary payload carried as a `contentEncoding: base64` string, materialized to native
+   * bytes (Go []byte, TS Uint8Array, Python bytes, Java byte[]). The wire is canonical padded
+   * standard base64; a malformed value is rejected by the pinned regex before decode.
+   */
+  public byte @Nullable [] getBlob() {
+    return blob;
+  }
+
+  /**
+   * Optional binary payload carried as a `contentEncoding: base64url` string (URL-safe alphabet,
+   * unpadded, RFC 4648 §5), materialized to the same native bytes type. The same bytes encode to a
+   * different wire than base64 ("Pj4+" vs "Pj4-").
+   */
+  public byte @Nullable [] getUrlBlob() {
+    return urlBlob;
+  }
+
+  /**
+   * Retry budget
+   *
+   * <p>Optional integer with a schema default.
+   */
+  public @Nullable Long getRetries() {
+    return retries;
+  }
+
+  public long getRetriesOrDefault() {
+    return retries != null ? retries : 3L;
+  }
+
+  public @Nullable Boolean getVerbose() {
+    return verbose;
+  }
+
+  /**
+   * Greeting
+   *
+   * <p>Optional string with a schema default, surfaced on read.
+   */
+  public @Nullable String getGreeting() {
+    return greeting;
+  }
+
+  public String getGreetingOrDefault() {
+    return greeting != null ? greeting : "hello";
+  }
+
+  /**
+   * Debug flag
+   *
+   * <p>Optional boolean with a schema default.
+   */
+  public @Nullable Boolean getDebug() {
+    return debug;
+  }
+
+  public boolean getDebugOrDefault() {
+    return debug != null ? debug : false;
+  }
+
+  /**
+   * Deprecated legacy identifier; prefer `requestId`. Exercises the native deprecation marker (Go
+   * // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702 @deprecated). Also exercises
+   * the property-level `x-&lt;lang&gt;-name` override (the Stage 4 escape hatch): the emitted
+   * member identifier is renamed to the derived name plus a per-language suffix (Go `LegacyIdGo`,
+   * TS `legacyIdTs`, Python `legacy_id_py`, Java `legacyIdJava`) while the wire name stays
+   * `legacyId` (json tag / alias / @JsonProperty).
+   *
+   * @deprecated This field is deprecated.
+   */
+  @Deprecated
+  public @Nullable String getLegacyIdJava() {
+    return legacyIdJava;
+  }
+
+  /** Optional and nullable; may be absent or explicitly null. */
+  public @Nullable String getMiddleName() {
+    return middleName;
+  }
+
+  /** Required but nullable; may be explicitly cleared to null. */
+  public @Nullable String getCategory() {
+    return category;
+  }
+
+  /** Optional integer bounded to the inclusive range [1, 10]. */
+  public @Nullable Long getPriority() {
+    return priority;
+  }
+
+  /** Optional integer that must be strictly greater than 0. */
+  public @Nullable Long getLevel() {
+    return level;
+  }
+
+  /** Optional number that must be a non-negative multiple of 5. */
+  public @Nullable Double getRatio() {
+    return ratio;
+  }
+
+  /** Optional unbounded finite number. */
+  public @Nullable Double getScore() {
+    return score;
+  }
+
+  /** Optional integer that must be a multiple of 3. */
+  public @Nullable Long getStep() {
+    return step;
+  }
+
+  /** Ordered list of free-form tags; 1 to 5 entries. */
+  public @Nullable List<String> getTags() {
+    return tags;
+  }
+
+  /** Alternate names; each must be distinct. */
+  public @Nullable List<String> getAliases() {
+    return aliases;
+  }
+
+  /** Access roles; must contain between one and two "admin" entries. */
+  public @Nullable List<String> getRoles() {
+    return roles;
+  }
+
+  /**
+   * Disjoint-kind union (oneOf sum type): the wire value is either a string of at least 3 code
+   * points or an integer of at least 1, selected by its JSON token. Not a member of a discriminated
+   * union — the token itself is the selector. Each branch also carries its **own constraints**:
+   * once the token selects a branch, the value is held to everything that branch declares, in both
+   * directions, with the union's path on the violation.
+   */
+  public @Nullable IdOrName getIdOrName() {
+    return idOrName;
+  }
+
+  /**
+   * A union whose string branch is a **closed value set**: either one of two named modes or an
+   * unbounded non-negative integer. The branch narrows to its own admissible values (a Go/Java
+   * membership check, a TypeScript literal union, a Python `Literal`), so an unknown string is a
+   * Violation while any non-negative integer is accepted.
+   */
+  public @Nullable Mode getMode() {
+    return mode;
+  }
+
+  /**
+   * Mixed-kind union whose object branch is an inline free-form object: the wire value is either an
+   * arbitrary object (members carried verbatim) or a string, selected by its JSON token. The
+   * free-form object is the one object branch that needs no type name — TypeScript and Python carry
+   * it structurally, Go and Java wrap it as `&lt;Union&gt;Object`.
+   */
+  public @Nullable Payload getPayload() {
+    return payload;
+  }
+
+  /**
+   * Mixed-kind union whose object branch is an inline *structured* object, written directly on the
+   * property rather than in `$defs`. It is the only object branch of this union, so it derives its
+   * name from the union it belongs to — `ShowcaseDetailObject` — and is emitted as an ordinary
+   * model: its members keep their own constraints and it stays open to unknown ones.
+   */
+  public @Nullable Detail getDetail() {
+    return detail;
+  }
+
+  /**
+   * Tagged object union mixed with a scalar kind: the two selector layers compose — the JSON token
+   * picks object-vs-string, and, for an object, the shared required `kind` const picks
+   * Circle-vs-Square. Written inline on the property, so the union itself is named after its
+   * position (`ShowcaseShapeOrName` / nested `Showcase.ShapeOrName`), and it reuses the
+   * `Circle`/`Square` branches of `shape` — a branch type may belong to more than one union (Go
+   * gains a second marker method, Java a second implemented interface). The scalar branch carries a
+   * length bound of its own; the object branches validate through their own models.
+   */
+  public @Nullable ShapeOrName getShapeOrName() {
+    return shapeOrName;
+  }
+
+  /**
+   * Mixed-kind union with an array branch: the wire value is either a non-empty list of distinct
+   * numbers or a lowercase preset name, selected by its JSON token. An array branch has no
+   * definition to take a name from, so Go and Java emit it as the synthesized `&lt;Union&gt;Array`
+   * variant (a defined type / a `@JsonValue` wrapper) while TypeScript and Python carry it
+   * structurally as `number[]` / `list[float]`. Both branches carry their own constraints — the
+   * array's `minItems`/`uniqueItems` and the string's `pattern` — so the array-vs-string choice is
+   * validated as well as selected.
+   */
+  public @Nullable Measurements getMeasurements() {
+    return measurements;
+  }
+
+  /**
+   * A list whose element type is a named union: every element is routed to exactly one branch by
+   * the union's own selector, and its index carries into the violation path (`shapes[1]`). Go and
+   * Java cannot decode a sealed interface as a whole, so the element decodes through the union's
+   * dispatcher one at a time.
+   */
+  public @Nullable List<Shape> getShapes() {
+    return shapes;
+  }
+
+  /**
+   * A list whose element union is written **inline**. An element has no name of its own, so the
+   * union is named after its position — `ShowcaseSegmentsItem` — moved into `$defs`, and the
+   * element becomes a `$ref` at it; from there it is an ordinary named union in every language.
+   */
+  public @Nullable List<ShowcaseSegmentsItem> getSegments() {
+    return segments;
+  }
+
+  /**
+   * A list of **nullable, constrained scalar elements** — the two-branch nullability `oneOf` rather
+   * than a sum type, so nothing is named: the elements themselves become nullable (`[]*string`,
+   * `(string | null)[]`, `list[str | None]`, `List&lt;@Nullable String&gt;`) while each present
+   * string retains its own minimum length and the list stays a list.
+   */
+  public @Nullable List<@Nullable String> getSlots() {
+    return slots;
+  }
+
+  /**
+   * A nested array: `items` at depth two. Each level decodes elementwise, so a bad element is
+   * reported at its own two-dimensional index (`grid[1][0]`).
+   */
+  public @Nullable List<List<Long>> getGrid() {
+    return grid;
+  }
+
+  /**
+   * A nested array of numbers used to prove recursive finite-number validation and two-dimensional
+   * indexed aggregation.
+   */
+  public @Nullable List<List<Double>> getNumberGrid() {
+    return numberGrid;
+  }
+
+  /** A list of scalar URI values; every element keeps its format assertion. */
+  public @Nullable List<String> getLinks() {
+    return links;
+  }
+
+  /** A list of referenced models, converted and validated elementwise. */
+  public @Nullable List<Address> getAddresses() {
+    return addresses;
+  }
+
+  public @Nullable AddressBook getAddressBook() {
+    return addressBook;
+  }
+
+  /** Materialized calendar dates in an array. */
+  public @Nullable List<LocalDate> getDates() {
+    return dates;
+  }
+
+  public @Nullable DateIndex getDateIndex() {
+    return dateIndex;
+  }
+
+  /** Materialized base64 byte strings in an array. */
+  public @Nullable List<byte[]> getBlobs() {
+    return blobs;
+  }
+
+  public @Nullable BlobIndex getBlobIndex() {
+    return blobIndex;
+  }
+
+  public @Nullable Metrics getMetrics() {
+    return metrics;
+  }
+
+  /** A finite number branch or a non-empty string branch. */
+  public @Nullable MetricOrLabel getMetricOrLabel() {
+    return metricOrLabel;
+  }
+
+  /**
+   * A union whose array branch contains referenced models, proving that branch conversion uses the
+   * ordinary recursive array mapper.
+   */
+  public @Nullable AddressListOrLabel getAddressListOrLabel() {
+    return addressListOrLabel;
+  }
+
+  public @Nullable ShowcaseLocation getLocation() {
+    return location;
+  }
+
+  /**
+   * A nullable inline object. The nullability wrapper emits no type of its own, so the object
+   * inside it takes the property's name — `ShowcaseAudit`, the same name it would take written
+   * plainly: adding or removing nullability never renames the type.
+   */
+  public @Nullable ShowcaseAudit getAudit() {
+    return audit;
+  }
+
+  /**
+   * A list whose element is an inline object, named after its position (`ShowcaseRowsItem`) exactly
+   * as an inline element *union* is.
+   */
+  public @Nullable List<ShowcaseRowsItem> getRows() {
+    return rows;
+  }
+
+  public @Nullable ShowcaseLedger getLedgerJava() {
+    return ledgerJava;
+  }
+
+  public @Nullable ShowcaseMetadata getMetadata() {
+    return metadata;
+  }
+
+  public @Nullable Quotas getQuotas() {
+    return quotas;
+  }
+
+  public @Nullable Tokens getTokens() {
+    return tokens;
+  }
+
+  public @Nullable Nicknames getNicknames() {
+    return nicknames;
+  }
+
+  public @Nullable Choices getChoices() {
+    return choices;
+  }
+
+  public @Nullable Extras getExtras() {
+    return extras;
+  }
+
+  public @Nullable Shape getShape() {
+    return shape;
+  }
+
+  public @Nullable Note getNote() {
+    return note;
+  }
+
+  public @Nullable Address getAddress() {
+    return address;
+  }
+
+  public @Nullable Labels getLabels() {
+    return labels;
+  }
+
+  public @Nullable Settings getSettings() {
+    return settings;
+  }
+
+  public @Nullable Attributes getAttributes() {
+    return attributes;
+  }
+
+  public @Nullable ContactJava getContact() {
+    return contact;
+  }
+
+  /**
+   * Optional and nullable **integer**, with bounds on the non-null branch. The nullability wrapper
+   * carries no `type` of its own, so an emitter that reads the wrapper rather than the branch loses
+   * both the element type and every constraint on it. Go emits `*int64`, TS `number | null`, Python
+   * `int | None`, Java `@Nullable Long`, and `1 &lt;= v &lt;= 10` is enforced in all four, in both
+   * directions.
+   */
+  public @Nullable Long getNullableCount() {
+    return nullableCount;
+  }
+
+  /** Optional and nullable number with a divisor on the non-null branch. */
+  public @Nullable Double getNullableRatio() {
+    return nullableRatio;
+  }
+
+  /** Optional and nullable boolean. */
+  public @Nullable Boolean getNullableFlag() {
+    return nullableFlag;
+  }
+
+  /**
+   * Optional and nullable **array**, with element and count constraints on the non-null branch.
+   * Optional + nullable, so the Go field stays `[]string` and a wire `null` decodes to a nil slice.
+   */
+  public @Nullable List<String> getNullableTags() {
+    return nullableTags;
+  }
+
+  /**
+   * Optional and nullable **closed value set** — the closed type survives the nullability wrapper,
+   * so an unknown string is a Violation rather than an accepted value.
+   */
+  public @Nullable NullableMode getNullableMode() {
+    return nullableMode;
+  }
+
+  /**
+   * An integer `contains` matcher over number elements: the matcher's own predicate decides a
+   * match, and the +/-(2^53-1) integer cap applies to it in every language.
+   */
+  public @Nullable List<Double> getIntegralMeasurements() {
+    return integralMeasurements;
+  }
+
+  /**
+   * A number-field divisor. Divisibility is IEEE `fmod` over the stored binary64 value, not exact
+   * decimal arithmetic, so all four agree at magnitudes where the shortest decimal spelling and the
+   * stored double diverge.
+   */
+  public @Nullable Double getByFive() {
+    return byFive;
+  }
+
+  /**
+   * A pattern containing a bare dot, normalized to an explicit negated class so the four regex
+   * engines agree on line terminators (`&#92;r`, U+0085, U+2028, U+2029), which their native `.`
+   * does not.
+   */
+  public @Nullable String getWildcard() {
+    return wildcard;
+  }
+
+  /** Ends with a quote " */
+  public @Nullable String getQuoted() {
+    return quoted;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (!(other instanceof Showcase)) {
+      return false;
+    }
+    Showcase that = (Showcase) other;
+    return Objects.equals(this.kind, that.kind)
+        && Objects.equals(this.revision, that.revision)
+        && Objects.equals(this.enabled, that.enabled)
+        && Objects.equals(this.status, that.status)
+        && Objects.equals(this.tier, that.tier)
+        && Objects.equals(this.scale, that.scale)
+        && Objects.equals(this.name, that.name)
+        && this.count == that.count
+        && this.active == that.active
+        && Objects.equals(this.nickname, that.nickname)
+        && Objects.equals(this.code, that.code)
+        && Objects.equals(this.sku, that.sku)
+        && Objects.equals(this.phrase, that.phrase)
+        && Objects.equals(this.requestId, that.requestId)
+        && Objects.equals(this.contactEmail, that.contactEmail)
+        && Objects.equals(this.host, that.host)
+        && Objects.equals(this.homepage, that.homepage)
+        && Objects.equals(this.gateway, that.gateway)
+        && java.util.Arrays.equals(this.blob, that.blob)
+        && java.util.Arrays.equals(this.urlBlob, that.urlBlob)
+        && Objects.equals(this.retries, that.retries)
+        && Objects.equals(this.verbose, that.verbose)
+        && Objects.equals(this.greeting, that.greeting)
+        && Objects.equals(this.debug, that.debug)
+        && Objects.equals(this.legacyIdJava, that.legacyIdJava)
+        && Objects.equals(this.middleName, that.middleName)
+        && Objects.equals(this.category, that.category)
+        && Objects.equals(this.priority, that.priority)
+        && Objects.equals(this.level, that.level)
+        && Objects.equals(this.ratio, that.ratio)
+        && Objects.equals(this.score, that.score)
+        && Objects.equals(this.step, that.step)
+        && Objects.equals(this.tags, that.tags)
+        && Objects.equals(this.aliases, that.aliases)
+        && Objects.equals(this.roles, that.roles)
+        && Objects.equals(this.idOrName, that.idOrName)
+        && Objects.equals(this.mode, that.mode)
+        && Objects.equals(this.payload, that.payload)
+        && Objects.equals(this.detail, that.detail)
+        && Objects.equals(this.shapeOrName, that.shapeOrName)
+        && Objects.equals(this.measurements, that.measurements)
+        && Objects.equals(this.shapes, that.shapes)
+        && Objects.equals(this.segments, that.segments)
+        && Objects.equals(this.slots, that.slots)
+        && Objects.equals(this.grid, that.grid)
+        && Objects.equals(this.numberGrid, that.numberGrid)
+        && Objects.equals(this.links, that.links)
+        && Objects.equals(this.addresses, that.addresses)
+        && Objects.equals(this.addressBook, that.addressBook)
+        && Objects.equals(this.dates, that.dates)
+        && Objects.equals(this.dateIndex, that.dateIndex)
+        && Base64Support.listEquals(this.blobs, that.blobs)
+        && Objects.equals(this.blobIndex, that.blobIndex)
+        && Objects.equals(this.metrics, that.metrics)
+        && Objects.equals(this.metricOrLabel, that.metricOrLabel)
+        && Objects.equals(this.addressListOrLabel, that.addressListOrLabel)
+        && Objects.equals(this.location, that.location)
+        && Objects.equals(this.audit, that.audit)
+        && Objects.equals(this.rows, that.rows)
+        && Objects.equals(this.ledgerJava, that.ledgerJava)
+        && Objects.equals(this.metadata, that.metadata)
+        && Objects.equals(this.quotas, that.quotas)
+        && Objects.equals(this.tokens, that.tokens)
+        && Objects.equals(this.nicknames, that.nicknames)
+        && Objects.equals(this.choices, that.choices)
+        && Objects.equals(this.extras, that.extras)
+        && Objects.equals(this.shape, that.shape)
+        && Objects.equals(this.note, that.note)
+        && Objects.equals(this.address, that.address)
+        && Objects.equals(this.labels, that.labels)
+        && Objects.equals(this.settings, that.settings)
+        && Objects.equals(this.attributes, that.attributes)
+        && Objects.equals(this.contact, that.contact)
+        && Objects.equals(this.nullableCount, that.nullableCount)
+        && Objects.equals(this.nullableRatio, that.nullableRatio)
+        && Objects.equals(this.nullableFlag, that.nullableFlag)
+        && Objects.equals(this.nullableTags, that.nullableTags)
+        && Objects.equals(this.nullableMode, that.nullableMode)
+        && Objects.equals(this.integralMeasurements, that.integralMeasurements)
+        && Objects.equals(this.byFive, that.byFive)
+        && Objects.equals(this.wildcard, that.wildcard)
+        && Objects.equals(this.quoted, that.quoted);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        kind,
+        revision,
+        enabled,
+        status,
+        tier,
+        scale,
+        name,
+        count,
+        active,
+        nickname,
+        code,
+        sku,
+        phrase,
+        requestId,
+        contactEmail,
+        host,
+        homepage,
+        gateway,
+        java.util.Arrays.hashCode(blob),
+        java.util.Arrays.hashCode(urlBlob),
+        retries,
+        verbose,
+        greeting,
+        debug,
+        legacyIdJava,
+        middleName,
+        category,
+        priority,
+        level,
+        ratio,
+        score,
+        step,
+        tags,
+        aliases,
+        roles,
+        idOrName,
+        mode,
+        payload,
+        detail,
+        shapeOrName,
+        measurements,
+        shapes,
+        segments,
+        slots,
+        grid,
+        numberGrid,
+        links,
+        addresses,
+        addressBook,
+        dates,
+        dateIndex,
+        Base64Support.listHashCode(blobs),
+        blobIndex,
+        metrics,
+        metricOrLabel,
+        addressListOrLabel,
+        location,
+        audit,
+        rows,
+        ledgerJava,
+        metadata,
+        quotas,
+        tokens,
+        nicknames,
+        choices,
+        extras,
+        shape,
+        note,
+        address,
+        labels,
+        settings,
+        attributes,
+        contact,
+        nullableCount,
+        nullableRatio,
+        nullableFlag,
+        nullableTags,
+        nullableMode,
+        integralMeasurements,
+        byFive,
+        wildcard,
+        quoted);
+  }
+
+  @Override
+  public String toString() {
+    return "Showcase{"
+        + "kind="
+        + kind
+        + ", revision="
+        + revision
+        + ", enabled="
+        + enabled
+        + ", status="
+        + status
+        + ", tier="
+        + tier
+        + ", scale="
+        + scale
+        + ", name="
+        + name
+        + ", count="
+        + count
+        + ", active="
+        + active
+        + ", nickname="
+        + nickname
+        + ", code="
+        + code
+        + ", sku="
+        + sku
+        + ", phrase="
+        + phrase
+        + ", requestId="
+        + requestId
+        + ", contactEmail="
+        + contactEmail
+        + ", host="
+        + host
+        + ", homepage="
+        + homepage
+        + ", gateway="
+        + gateway
+        + ", blob="
+        + java.util.Arrays.toString(blob)
+        + ", urlBlob="
+        + java.util.Arrays.toString(urlBlob)
+        + ", retries="
+        + retries
+        + ", verbose="
+        + verbose
+        + ", greeting="
+        + greeting
+        + ", debug="
+        + debug
+        + ", legacyIdJava="
+        + legacyIdJava
+        + ", middleName="
+        + middleName
+        + ", category="
+        + category
+        + ", priority="
+        + priority
+        + ", level="
+        + level
+        + ", ratio="
+        + ratio
+        + ", score="
+        + score
+        + ", step="
+        + step
+        + ", tags="
+        + tags
+        + ", aliases="
+        + aliases
+        + ", roles="
+        + roles
+        + ", idOrName="
+        + idOrName
+        + ", mode="
+        + mode
+        + ", payload="
+        + payload
+        + ", detail="
+        + detail
+        + ", shapeOrName="
+        + shapeOrName
+        + ", measurements="
+        + measurements
+        + ", shapes="
+        + shapes
+        + ", segments="
+        + segments
+        + ", slots="
+        + slots
+        + ", grid="
+        + grid
+        + ", numberGrid="
+        + numberGrid
+        + ", links="
+        + links
+        + ", addresses="
+        + addresses
+        + ", addressBook="
+        + addressBook
+        + ", dates="
+        + dates
+        + ", dateIndex="
+        + dateIndex
+        + ", blobs="
+        + Base64Support.listToString(blobs)
+        + ", blobIndex="
+        + blobIndex
+        + ", metrics="
+        + metrics
+        + ", metricOrLabel="
+        + metricOrLabel
+        + ", addressListOrLabel="
+        + addressListOrLabel
+        + ", location="
+        + location
+        + ", audit="
+        + audit
+        + ", rows="
+        + rows
+        + ", ledgerJava="
+        + ledgerJava
+        + ", metadata="
+        + metadata
+        + ", quotas="
+        + quotas
+        + ", tokens="
+        + tokens
+        + ", nicknames="
+        + nicknames
+        + ", choices="
+        + choices
+        + ", extras="
+        + extras
+        + ", shape="
+        + shape
+        + ", note="
+        + note
+        + ", address="
+        + address
+        + ", labels="
+        + labels
+        + ", settings="
+        + settings
+        + ", attributes="
+        + attributes
+        + ", contact="
+        + contact
+        + ", nullableCount="
+        + nullableCount
+        + ", nullableRatio="
+        + nullableRatio
+        + ", nullableFlag="
+        + nullableFlag
+        + ", nullableTags="
+        + nullableTags
+        + ", nullableMode="
+        + nullableMode
+        + ", integralMeasurements="
+        + integralMeasurements
+        + ", byFive="
+        + byFive
+        + ", wildcard="
+        + wildcard
+        + ", quoted="
+        + quoted
+        + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Showcase> {
+    @Override
+    public void serialize(Showcase value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.kind == null) {
+        violations.add(new Violation("kind", "required"));
+      }
+      if (value.revision == null) {
+        violations.add(new Violation("revision", "required"));
+      }
+      if (value.enabled == null) {
+        violations.add(new Violation("enabled", "required"));
+      }
+      if (value.status == null) {
+        violations.add(new Violation("status", "required"));
+      }
+      if (value.tier == null) {
+        violations.add(new Violation("tier", "required"));
+      }
+      if (value.scale == null) {
+        violations.add(new Violation("scale", "required"));
+      }
+      if (value.name == null) {
+        violations.add(new Violation("name", "required"));
+      } else {
+        int length = value.name.codePointCount(0, value.name.length());
+        if (length < 1) {
+          violations.add(new Violation("name", "must have length >= 1, got " + length));
+        }
+        if (length > 64) {
+          violations.add(new Violation("name", "must have length <= 64, got " + length));
+        }
+      }
+      {
+        if (value.count < -SpecNumbers.INTEGER_CAP || value.count > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("count", "exceeds \u00b1(2^53-1) integer cap"));
+        }
+      }
+      if (value.nickname != null) {
+        int length = value.nickname.codePointCount(0, value.nickname.length());
+        if (length > 12) {
+          violations.add(new Violation("nickname", "must have length <= 12, got " + length));
+        }
+      }
+      if (value.code != null) {
+        int length = value.code.codePointCount(0, value.code.length());
+        if (length < 2) {
+          violations.add(new Violation("code", "must have length >= 2, got " + length));
+        }
+        if (length > 5) {
+          violations.add(new Violation("code", "must have length <= 5, got " + length));
+        }
+      }
+      if (value.sku != null) {
+        if (!SKU_PATTERN.matcher(value.sku).find()) {
+          violations.add(
+              new Violation(
+                  "sku", "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + value.sku));
+        }
+      }
+      if (value.phrase != null) {
+        if (!PHRASE_PATTERN.matcher(value.phrase).find()) {
+          violations.add(
+              new Violation(
+                  "phrase",
+                  "must match pattern "
+                      + "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\\z"
+                      + ", got "
+                      + value.phrase));
+        }
+      }
+      if (value.requestId != null) {
+        if (!REQUEST_ID_FORMAT.matcher(value.requestId).find()) {
+          violations.add(
+              new Violation("requestId", "must be a valid uuid, got " + value.requestId));
+        }
+      }
+      if (value.contactEmail != null) {
+        if (value.contactEmail.codePointCount(0, value.contactEmail.length()) > 254
+            || !CONTACT_EMAIL_FORMAT.matcher(value.contactEmail).find()) {
+          violations.add(
+              new Violation("contactEmail", "must be a valid email, got " + value.contactEmail));
+        }
+      }
+      if (value.host != null) {
+        if (value.host.codePointCount(0, value.host.length()) > 253
+            || !HOST_FORMAT.matcher(value.host).find()) {
+          violations.add(new Violation("host", "must be a valid hostname, got " + value.host));
+        }
+      }
+      if (value.homepage != null) {
+        if (!HOMEPAGE_FORMAT.matcher(value.homepage).find()) {
+          violations.add(new Violation("homepage", "must be a valid uri, got " + value.homepage));
+        }
+      }
+      if (value.gateway != null) {
+        if (!GATEWAY_FORMAT.matcher(value.gateway).find()) {
+          violations.add(new Violation("gateway", "must be a valid ipv4, got " + value.gateway));
+        }
+      }
+      if (value.retries != null) {
+        if (value.retries < -SpecNumbers.INTEGER_CAP || value.retries > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("retries", "exceeds \u00b1(2^53-1) integer cap"));
+        }
+      }
+      if (value.priority != null) {
+        if (value.priority < -SpecNumbers.INTEGER_CAP || value.priority > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("priority", "exceeds \u00b1(2^53-1) integer cap"));
+        }
+        if (value.priority < 1L) {
+          violations.add(new Violation("priority", "must be >= 1, got " + value.priority));
+        }
+        if (value.priority > 10L) {
+          violations.add(new Violation("priority", "must be <= 10, got " + value.priority));
+        }
+      }
+      if (value.level != null) {
+        if (value.level < -SpecNumbers.INTEGER_CAP || value.level > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("level", "exceeds \u00b1(2^53-1) integer cap"));
+        }
+        if (value.level <= 0L) {
+          violations.add(new Violation("level", "must be > 0, got " + value.level));
+        }
+      }
+      if (value.ratio != null) {
+        if (!Double.isFinite(value.ratio)) {
+          violations.add(new Violation("ratio", "must be a finite number, got " + value.ratio));
+        }
+        if (value.ratio < 5.0) {
+          violations.add(new Violation("ratio", "must be >= 5, got " + value.ratio));
+        }
+        if (value.ratio % 5.0 != 0) {
+          violations.add(new Violation("ratio", "must be a multiple of 5, got " + value.ratio));
+        }
+      }
+      if (value.score != null) {
+        if (!Double.isFinite(value.score)) {
+          violations.add(new Violation("score", "must be a finite number, got " + value.score));
+        }
+      }
+      if (value.step != null) {
+        if (value.step < -SpecNumbers.INTEGER_CAP || value.step > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("step", "exceeds \u00b1(2^53-1) integer cap"));
+        }
+        if (value.step % 3L != 0) {
+          violations.add(new Violation("step", "must be a multiple of 3, got " + value.step));
+        }
+      }
+      if (value.tags != null) {
+        for (int validationIndex0 = 0; validationIndex0 < value.tags.size(); validationIndex0++) {
+          String validationValue0 = value.tags.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation("tags" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
+        }
+        if (value.tags.size() < 1) {
+          violations.add(
+              new Violation("tags", "must have at least 1 items, got " + value.tags.size()));
+        }
+        if (value.tags.size() > 5) {
+          violations.add(
+              new Violation("tags", "must have at most 5 items, got " + value.tags.size()));
+        }
+      }
+      if (value.aliases != null) {
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.aliases.size();
+            validationIndex0++) {
+          String validationValue0 = value.aliases.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "aliases" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
+        }
+        java.util.Map<Object, Integer> seen = new java.util.HashMap<>();
+        for (int index = 0; index < value.aliases.size(); index++) {
+          Object element = value.aliases.get(index);
+          Integer priorIndex = seen.get(element);
+          if (priorIndex != null) {
+            violations.add(
+                new Violation(
+                    "aliases",
+                    "duplicate items: element at index " + index + " equals index " + priorIndex));
+          } else {
+            seen.put(element, index);
+          }
+        }
+      }
+      if (value.roles != null) {
+        for (int validationIndex0 = 0; validationIndex0 < value.roles.size(); validationIndex0++) {
+          String validationValue0 = value.roles.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation("roles" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
+        }
+        int matchCount = 0;
+        for (String element : value.roles) {
+          if (element != null && (true) && ("admin".equals(element))) {
+            matchCount++;
+          }
+        }
+        if (matchCount < 1) {
+          violations.add(
+              new Violation("roles", "too few matching items: at least 1, got " + matchCount));
+        }
+        if (matchCount > 2) {
+          violations.add(
+              new Violation("roles", "too many matching items: at most 2, got " + matchCount));
+        }
+      }
+      if (value.idOrName != null) {
+        IdOrName.validate(value.idOrName, "idOrName", violations);
+      }
+      if (value.mode != null) {
+        Mode.validate(value.mode, "mode", violations);
+      }
+      if (value.shapeOrName != null) {
+        ShapeOrName.validate(value.shapeOrName, "shapeOrName", violations);
+      }
+      if (value.measurements != null) {
+        Measurements.validate(value.measurements, "measurements", violations);
+      }
+      if (value.shapes != null) {
+        for (int validationIndex0 = 0; validationIndex0 < value.shapes.size(); validationIndex0++) {
+          Shape validationValue0 = value.shapes.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "shapes" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
+        }
+      }
+      if (value.segments != null) {
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.segments.size();
+            validationIndex0++) {
+          ShowcaseSegmentsItem validationValue0 = value.segments.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "segments" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
+        }
+        for (int index = 0; index < value.segments.size(); index++) {
+          ShowcaseSegmentsItem.validate(
+              value.segments.get(index), "segments" + "[" + index + "]", violations);
+        }
+      }
+      if (value.slots != null) {
+        for (int validationIndex0 = 0; validationIndex0 < value.slots.size(); validationIndex0++) {
+          String validationValue0 = value.slots.get(validationIndex0);
+          if (validationValue0 == null) {
+            continue;
+          } else {
+            int nestedLength = validationValue0.codePointCount(0, validationValue0.length());
+            if (nestedLength < 2) {
+              violations.add(
+                  new Violation(
+                      "slots" + "[" + validationIndex0 + "]",
+                      "must have length >= 2, got " + nestedLength));
+            }
+          }
+        }
+      }
+      if (value.grid != null) {
+        for (int integerCapIndex0 = 0; integerCapIndex0 < value.grid.size(); integerCapIndex0++) {
+          List<Long> integerCapValue0 = value.grid.get(integerCapIndex0);
+          if (integerCapValue0 != null) {
+            for (int integerCapIndex1 = 0;
+                integerCapIndex1 < integerCapValue0.size();
+                integerCapIndex1++) {
+              Long integerCapValue1 = integerCapValue0.get(integerCapIndex1);
+              if (integerCapValue1 != null) {
+                if (integerCapValue1 < -SpecNumbers.INTEGER_CAP
+                    || integerCapValue1 > SpecNumbers.INTEGER_CAP) {
+                  violations.add(
+                      new Violation(
+                          "grid" + "[" + integerCapIndex0 + "]" + "[" + integerCapIndex1 + "]",
+                          "exceeds \u00b1(2^53-1) integer cap"));
+                }
+              }
+            }
+          }
+        }
+        for (int validationIndex0 = 0; validationIndex0 < value.grid.size(); validationIndex0++) {
+          List<Long> validationValue0 = value.grid.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation("grid" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+            for (int validationIndex1 = 0;
+                validationIndex1 < validationValue0.size();
+                validationIndex1++) {
+              Long validationValue1 = validationValue0.get(validationIndex1);
+              if (validationValue1 == null) {
+                violations.add(
+                    new Violation(
+                        "grid" + "[" + validationIndex0 + "]" + "[" + validationIndex1 + "]",
+                        "explicit null not allowed"));
+              } else {
+              }
+            }
+          }
+        }
+      }
+      if (value.numberGrid != null) {
+        for (int finiteIndex0 = 0; finiteIndex0 < value.numberGrid.size(); finiteIndex0++) {
+          List<Double> finiteValue0 = value.numberGrid.get(finiteIndex0);
+          if (finiteValue0 != null) {
+            for (int finiteIndex1 = 0; finiteIndex1 < finiteValue0.size(); finiteIndex1++) {
+              Double finiteValue1 = finiteValue0.get(finiteIndex1);
+              if (finiteValue1 != null) {
+                if (!Double.isFinite(finiteValue1)) {
+                  violations.add(
+                      new Violation(
+                          "numberGrid" + "[" + finiteIndex0 + "]" + "[" + finiteIndex1 + "]",
+                          "must be a finite number, got " + finiteValue1));
+                }
+              }
+            }
+          }
+        }
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.numberGrid.size();
+            validationIndex0++) {
+          List<Double> validationValue0 = value.numberGrid.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "numberGrid" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+            for (int validationIndex1 = 0;
+                validationIndex1 < validationValue0.size();
+                validationIndex1++) {
+              Double validationValue1 = validationValue0.get(validationIndex1);
+              if (validationValue1 == null) {
+                violations.add(
+                    new Violation(
+                        "numberGrid" + "[" + validationIndex0 + "]" + "[" + validationIndex1 + "]",
+                        "explicit null not allowed"));
+              } else {
+              }
+            }
+          }
+        }
+      }
+      if (value.links != null) {
+        for (int validationIndex0 = 0; validationIndex0 < value.links.size(); validationIndex0++) {
+          String validationValue0 = value.links.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation("links" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+            if (!java.util.regex.Pattern.compile(
+                    "^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z")
+                .matcher(validationValue0)
+                .find()) {
+              violations.add(
+                  new Violation(
+                      "links" + "[" + validationIndex0 + "]",
+                      "must be a valid uri, got " + validationValue0));
+            }
+          }
+        }
+      }
+      if (value.addresses != null) {
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.addresses.size();
+            validationIndex0++) {
+          Address validationValue0 = value.addresses.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "addresses" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
+        }
+      }
+      if (value.dates != null) {
+        for (int temporalIndex0 = 0; temporalIndex0 < value.dates.size(); temporalIndex0++) {
+          LocalDate temporalValue0 = value.dates.get(temporalIndex0);
+          if (temporalValue0 != null) {
+            TemporalSupport.checkDate(
+                temporalValue0, "dates" + "[" + temporalIndex0 + "]", violations);
+          }
+        }
+        for (int validationIndex0 = 0; validationIndex0 < value.dates.size(); validationIndex0++) {
+          LocalDate validationValue0 = value.dates.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation("dates" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+            String nestedWire1 = TemporalSupport.formatDate(validationValue0);
+          }
+        }
+      }
+      if (value.blobs != null) {
+        for (int validationIndex0 = 0; validationIndex0 < value.blobs.size(); validationIndex0++) {
+          byte[] validationValue0 = value.blobs.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation("blobs" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+            String nestedWire1 = Base64Support.formatBase64(validationValue0);
+          }
+        }
+      }
+      if (value.metricOrLabel != null) {
+        MetricOrLabel.validate(value.metricOrLabel, "metricOrLabel", violations);
+      }
+      if (value.addressListOrLabel != null) {
+        AddressListOrLabel.validate(value.addressListOrLabel, "addressListOrLabel", violations);
+      }
+      if (value.rows != null) {
+        for (int validationIndex0 = 0; validationIndex0 < value.rows.size(); validationIndex0++) {
+          ShowcaseRowsItem validationValue0 = value.rows.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation("rows" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
+        }
+      }
+      if (value.nullableCount != null) {
+        if (value.nullableCount < -SpecNumbers.INTEGER_CAP
+            || value.nullableCount > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("nullableCount", "exceeds \u00b1(2^53-1) integer cap"));
+        }
+        if (value.nullableCount < 1L) {
+          violations.add(
+              new Violation("nullableCount", "must be >= 1, got " + value.nullableCount));
+        }
+        if (value.nullableCount > 10L) {
+          violations.add(
+              new Violation("nullableCount", "must be <= 10, got " + value.nullableCount));
+        }
+      }
+      if (value.nullableRatio != null) {
+        if (!Double.isFinite(value.nullableRatio)) {
+          violations.add(
+              new Violation(
+                  "nullableRatio", "must be a finite number, got " + value.nullableRatio));
+        }
+        if (value.nullableRatio % 2.0 != 0) {
+          violations.add(
+              new Violation(
+                  "nullableRatio", "must be a multiple of 2, got " + value.nullableRatio));
+        }
+      }
+      if (value.nullableTags != null) {
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.nullableTags.size();
+            validationIndex0++) {
+          String validationValue0 = value.nullableTags.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "nullableTags" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
+        }
+        if (value.nullableTags.size() < 1) {
+          violations.add(
+              new Violation(
+                  "nullableTags", "must have at least 1 items, got " + value.nullableTags.size()));
+        }
+        java.util.Map<Object, Integer> seen = new java.util.HashMap<>();
+        for (int index = 0; index < value.nullableTags.size(); index++) {
+          Object element = value.nullableTags.get(index);
+          Integer priorIndex = seen.get(element);
+          if (priorIndex != null) {
+            violations.add(
+                new Violation(
+                    "nullableTags",
+                    "duplicate items: element at index " + index + " equals index " + priorIndex));
+          } else {
+            seen.put(element, index);
+          }
+        }
+      }
+      if (value.integralMeasurements != null) {
+        for (int finiteIndex0 = 0;
+            finiteIndex0 < value.integralMeasurements.size();
+            finiteIndex0++) {
+          Double finiteValue0 = value.integralMeasurements.get(finiteIndex0);
+          if (finiteValue0 != null) {
+            if (!Double.isFinite(finiteValue0)) {
+              violations.add(
+                  new Violation(
+                      "integralMeasurements" + "[" + finiteIndex0 + "]",
+                      "must be a finite number, got " + finiteValue0));
+            }
+          }
+        }
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.integralMeasurements.size();
+            validationIndex0++) {
+          Double validationValue0 = value.integralMeasurements.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "integralMeasurements" + "[" + validationIndex0 + "]",
+                    "explicit null not allowed"));
+          } else {
+          }
+        }
+        int matchCount = 0;
+        for (Double element : value.integralMeasurements) {
+          if (element != null
+              && (Double.isFinite(element)
+                  && element == Math.rint(element)
+                  && element >= -(double) SpecNumbers.INTEGER_CAP
+                  && element <= (double) SpecNumbers.INTEGER_CAP)
+              && (true)) {
+            matchCount++;
+          }
+        }
+        if (matchCount < 1) {
+          violations.add(
+              new Violation("integralMeasurements", "no element matches the required schema"));
+        }
+      }
+      if (value.byFive != null) {
+        if (!Double.isFinite(value.byFive)) {
+          violations.add(new Violation("byFive", "must be a finite number, got " + value.byFive));
+        }
+        if (value.byFive % 5.0 != 0) {
+          violations.add(new Violation("byFive", "must be a multiple of 5, got " + value.byFive));
+        }
+      }
+      if (value.wildcard != null) {
+        if (!WILDCARD_PATTERN.matcher(value.wildcard).find()) {
+          violations.add(
+              new Violation(
+                  "wildcard", "must match pattern " + "a[^\\n]b" + ", got " + value.wildcard));
+        }
+      }
+      gen.writeStartObject();
+      if (value.kind != null) {
+        gen.writeStringField("kind", value.kind.getValue());
+      }
+      if (value.revision != null) {
+        gen.writeNumberField("revision", value.revision.getValue());
+      }
+      if (value.enabled != null) {
+        gen.writeBooleanField("enabled", value.enabled.getValue());
+      }
+      if (value.status != null) {
+        gen.writeStringField("status", value.status.getValue());
+      }
+      if (value.tier != null) {
+        gen.writeNumberField("tier", value.tier.getValue());
+      }
+      if (value.scale != null) {
+        gen.writeNumberField("scale", value.scale.getValue());
+      }
+      if (value.name != null) {
+        gen.writeStringField("name", value.name);
+      }
+      gen.writeNumberField("count", value.count);
+
+      gen.writeBooleanField("active", value.active);
+
+      if (value.nickname != null) {
+        gen.writeStringField("nickname", value.nickname);
+      }
+      if (value.code != null) {
+        gen.writeStringField("code", value.code);
+      }
+      if (value.sku != null) {
+        gen.writeStringField("sku", value.sku);
+      }
+      if (value.phrase != null) {
+        gen.writeStringField("phrase", value.phrase);
+      }
+      if (value.requestId != null) {
+        gen.writeStringField("requestId", value.requestId);
+      }
+      if (value.contactEmail != null) {
+        gen.writeStringField("contactEmail", value.contactEmail);
+      }
+      if (value.host != null) {
+        gen.writeStringField("host", value.host);
+      }
+      if (value.homepage != null) {
+        gen.writeStringField("homepage", value.homepage);
+      }
+      if (value.gateway != null) {
+        gen.writeStringField("gateway", value.gateway);
+      }
+      if (value.blob != null) {
+        gen.writeStringField("blob", Base64Support.formatBase64(value.blob));
+      }
+      if (value.urlBlob != null) {
+        gen.writeStringField("urlBlob", Base64Support.formatBase64Url(value.urlBlob));
+      }
+      if (value.retries != null) {
+        gen.writeNumberField("retries", value.retries);
+      }
+      if (value.verbose != null) {
+        gen.writeBooleanField("verbose", value.verbose);
+      }
+      if (value.greeting != null) {
+        gen.writeStringField("greeting", value.greeting);
+      }
+      if (value.debug != null) {
+        gen.writeBooleanField("debug", value.debug);
+      }
+      if (value.legacyIdJava != null) {
+        gen.writeStringField("legacyId", value.legacyIdJava);
+      }
+      if (value.middleName != null) {
+        gen.writeStringField("middleName", value.middleName);
+      }
+      if (value.category != null) {
+        gen.writeStringField("category", value.category);
+      } else {
+        gen.writeNullField("category");
+      }
+      if (value.priority != null) {
+        gen.writeNumberField("priority", value.priority);
+      }
+      if (value.level != null) {
+        gen.writeNumberField("level", value.level);
+      }
+      if (value.ratio != null) {
+        gen.writeNumberField("ratio", value.ratio);
+      }
+      if (value.score != null) {
+        gen.writeNumberField("score", value.score);
+      }
+      if (value.step != null) {
+        gen.writeNumberField("step", value.step);
+      }
+      if (value.tags != null) {
+        gen.writeFieldName("tags");
+        serializers.defaultSerializeValue(value.tags, gen);
+      }
+      if (value.aliases != null) {
+        gen.writeFieldName("aliases");
+        serializers.defaultSerializeValue(value.aliases, gen);
+      }
+      if (value.roles != null) {
+        gen.writeFieldName("roles");
+        serializers.defaultSerializeValue(value.roles, gen);
+      }
+      if (value.idOrName != null) {
+        gen.writeFieldName("idOrName");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.idOrName, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("idOrName"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.mode != null) {
+        gen.writeFieldName("mode");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.mode, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("mode"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.payload != null) {
+        gen.writeFieldName("payload");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.payload, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("payload"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.detail != null) {
+        gen.writeFieldName("detail");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.detail, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("detail"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.shapeOrName != null) {
+        gen.writeFieldName("shapeOrName");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.shapeOrName, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("shapeOrName"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.measurements != null) {
+        gen.writeFieldName("measurements");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.measurements, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("measurements"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.shapes != null) {
+        gen.writeFieldName("shapes");
+        gen.writeStartArray();
+        for (int nestedIndex0 = 0; nestedIndex0 < value.shapes.size(); nestedIndex0++) {
+          Shape nestedElement0 = value.shapes.get(nestedIndex0);
+          if (nestedElement0 == null) {
+            gen.writeNull();
+          } else {
+            com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 =
+                new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+            try {
+              serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
+              nestedBuffer1.serialize(gen);
+            } catch (ApplicationFailure nested1) {
+              if (!"PayloadValidationError".equals(nested1.getType())
+                  || nested1.getDetails().getSize() == 0) {
+                throw nested1;
+              }
+              // The locally-created failure retains the original list as its first detail.
+              // This unchecked cast is cheap and performs no serialization.
+              @SuppressWarnings("unchecked")
+              List<Violation> nestedViolations1 =
+                  (List<Violation>) nested1.getDetails().get(0, List.class);
+              for (Violation nestedViolation1 : nestedViolations1) {
+                violations.add(
+                    nestedViolation1.withPathPrefix("shapes" + "[" + nestedIndex0 + "]"));
+              }
+              gen.writeNull();
+            }
+          }
+        }
+        gen.writeEndArray();
+      }
+      if (value.segments != null) {
+        gen.writeFieldName("segments");
+        gen.writeStartArray();
+        for (int nestedIndex0 = 0; nestedIndex0 < value.segments.size(); nestedIndex0++) {
+          ShowcaseSegmentsItem nestedElement0 = value.segments.get(nestedIndex0);
+          if (nestedElement0 == null) {
+            gen.writeNull();
+          } else {
+            com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 =
+                new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+            try {
+              serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
+              nestedBuffer1.serialize(gen);
+            } catch (ApplicationFailure nested1) {
+              if (!"PayloadValidationError".equals(nested1.getType())
+                  || nested1.getDetails().getSize() == 0) {
+                throw nested1;
+              }
+              // The locally-created failure retains the original list as its first detail.
+              // This unchecked cast is cheap and performs no serialization.
+              @SuppressWarnings("unchecked")
+              List<Violation> nestedViolations1 =
+                  (List<Violation>) nested1.getDetails().get(0, List.class);
+              for (Violation nestedViolation1 : nestedViolations1) {
+                violations.add(
+                    nestedViolation1.withPathPrefix("segments" + "[" + nestedIndex0 + "]"));
+              }
+              gen.writeNull();
+            }
+          }
+        }
+        gen.writeEndArray();
+      }
+      if (value.slots != null) {
+        gen.writeFieldName("slots");
+        serializers.defaultSerializeValue(value.slots, gen);
+      }
+      if (value.grid != null) {
+        gen.writeFieldName("grid");
+        serializers.defaultSerializeValue(value.grid, gen);
+      }
+      if (value.numberGrid != null) {
+        gen.writeFieldName("numberGrid");
+        serializers.defaultSerializeValue(value.numberGrid, gen);
+      }
+      if (value.links != null) {
+        gen.writeFieldName("links");
+        serializers.defaultSerializeValue(value.links, gen);
+      }
+      if (value.addresses != null) {
+        gen.writeFieldName("addresses");
+        gen.writeStartArray();
+        for (int nestedIndex0 = 0; nestedIndex0 < value.addresses.size(); nestedIndex0++) {
+          Address nestedElement0 = value.addresses.get(nestedIndex0);
+          if (nestedElement0 == null) {
+            gen.writeNull();
+          } else {
+            com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 =
+                new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+            try {
+              serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
+              nestedBuffer1.serialize(gen);
+            } catch (ApplicationFailure nested1) {
+              if (!"PayloadValidationError".equals(nested1.getType())
+                  || nested1.getDetails().getSize() == 0) {
+                throw nested1;
+              }
+              // The locally-created failure retains the original list as its first detail.
+              // This unchecked cast is cheap and performs no serialization.
+              @SuppressWarnings("unchecked")
+              List<Violation> nestedViolations1 =
+                  (List<Violation>) nested1.getDetails().get(0, List.class);
+              for (Violation nestedViolation1 : nestedViolations1) {
+                violations.add(
+                    nestedViolation1.withPathPrefix("addresses" + "[" + nestedIndex0 + "]"));
+              }
+              gen.writeNull();
+            }
+          }
+        }
+        gen.writeEndArray();
+      }
+      if (value.addressBook != null) {
+        gen.writeFieldName("addressBook");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.addressBook, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("addressBook"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.dates != null) {
+        gen.writeFieldName("dates");
+        gen.writeStartArray();
+        for (int wireIndex0 = 0; wireIndex0 < value.dates.size(); wireIndex0++) {
+          @Nullable LocalDate wireElement0 = value.dates.get(wireIndex0);
+          if (wireElement0 == null) {
+            gen.writeNull();
+          } else {
+            gen.writeString(TemporalSupport.formatDate(wireElement0));
+          }
+        }
+        gen.writeEndArray();
+      }
+      if (value.dateIndex != null) {
+        gen.writeFieldName("dateIndex");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.dateIndex, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("dateIndex"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.blobs != null) {
+        gen.writeFieldName("blobs");
+        gen.writeStartArray();
+        for (int wireIndex0 = 0; wireIndex0 < value.blobs.size(); wireIndex0++) {
+          byte @Nullable [] wireElement0 = value.blobs.get(wireIndex0);
+          if (wireElement0 == null) {
+            gen.writeNull();
+          } else {
+            gen.writeString(Base64Support.formatBase64(wireElement0));
+          }
+        }
+        gen.writeEndArray();
+      }
+      if (value.blobIndex != null) {
+        gen.writeFieldName("blobIndex");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.blobIndex, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("blobIndex"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.metrics != null) {
+        gen.writeFieldName("metrics");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.metrics, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("metrics"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.metricOrLabel != null) {
+        gen.writeFieldName("metricOrLabel");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.metricOrLabel, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("metricOrLabel"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.addressListOrLabel != null) {
+        gen.writeFieldName("addressListOrLabel");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.addressListOrLabel, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("addressListOrLabel"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.location != null) {
+        gen.writeFieldName("location");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.location, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("location"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.audit != null) {
+        gen.writeFieldName("audit");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.audit, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("audit"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.rows != null) {
+        gen.writeFieldName("rows");
+        gen.writeStartArray();
+        for (int nestedIndex0 = 0; nestedIndex0 < value.rows.size(); nestedIndex0++) {
+          ShowcaseRowsItem nestedElement0 = value.rows.get(nestedIndex0);
+          if (nestedElement0 == null) {
+            gen.writeNull();
+          } else {
+            com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 =
+                new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+            try {
+              serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
+              nestedBuffer1.serialize(gen);
+            } catch (ApplicationFailure nested1) {
+              if (!"PayloadValidationError".equals(nested1.getType())
+                  || nested1.getDetails().getSize() == 0) {
+                throw nested1;
+              }
+              // The locally-created failure retains the original list as its first detail.
+              // This unchecked cast is cheap and performs no serialization.
+              @SuppressWarnings("unchecked")
+              List<Violation> nestedViolations1 =
+                  (List<Violation>) nested1.getDetails().get(0, List.class);
+              for (Violation nestedViolation1 : nestedViolations1) {
+                violations.add(nestedViolation1.withPathPrefix("rows" + "[" + nestedIndex0 + "]"));
+              }
+              gen.writeNull();
+            }
+          }
+        }
+        gen.writeEndArray();
+      }
+      if (value.ledgerJava != null) {
+        gen.writeFieldName("ledger");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.ledgerJava, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("ledger"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.metadata != null) {
+        gen.writeFieldName("metadata");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.metadata, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("metadata"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.quotas != null) {
+        gen.writeFieldName("quotas");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.quotas, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("quotas"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.tokens != null) {
+        gen.writeFieldName("tokens");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.tokens, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("tokens"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.nicknames != null) {
+        gen.writeFieldName("nicknames");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.nicknames, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("nicknames"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.choices != null) {
+        gen.writeFieldName("choices");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.choices, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("choices"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.extras != null) {
+        gen.writeFieldName("extras");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.extras, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("extras"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.shape != null) {
+        gen.writeFieldName("shape");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.shape, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("shape"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.note != null) {
+        gen.writeFieldName("note");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.note, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("note"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.address != null) {
+        gen.writeFieldName("address");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.address, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("address"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.labels != null) {
+        gen.writeFieldName("labels");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.labels, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("labels"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.settings != null) {
+        gen.writeFieldName("settings");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.settings, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("settings"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.attributes != null) {
+        gen.writeFieldName("attributes");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.attributes, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("attributes"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.contact != null) {
+        gen.writeFieldName("contact");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.contact, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("contact"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.nullableCount != null) {
+        gen.writeNumberField("nullableCount", value.nullableCount);
+      }
+      if (value.nullableRatio != null) {
+        gen.writeNumberField("nullableRatio", value.nullableRatio);
+      }
+      if (value.nullableFlag != null) {
+        gen.writeBooleanField("nullableFlag", value.nullableFlag);
+      }
+      if (value.nullableTags != null) {
+        gen.writeFieldName("nullableTags");
+        serializers.defaultSerializeValue(value.nullableTags, gen);
+      }
+      if (value.nullableMode != null) {
+        gen.writeStringField("nullableMode", value.nullableMode.getValue());
+      }
+      if (value.integralMeasurements != null) {
+        gen.writeFieldName("integralMeasurements");
+        serializers.defaultSerializeValue(value.integralMeasurements, gen);
+      }
+      if (value.byFive != null) {
+        gen.writeNumberField("byFive", value.byFive);
+      }
+      if (value.wildcard != null) {
+        gen.writeStringField("wildcard", value.wildcard);
+      }
+      if (value.quoted != null) {
+        gen.writeStringField("quoted", value.quoted);
+      }
+      gen.writeEndObject();
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      pending.serialize(target);
+    }
+  }
+
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Showcase> {
+    @Override
+    public Showcase deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "active":
+          case "address":
+          case "addressBook":
+          case "addressListOrLabel":
+          case "addresses":
+          case "aliases":
+          case "attributes":
+          case "audit":
+          case "blob":
+          case "blobIndex":
+          case "blobs":
+          case "byFive":
+          case "category":
+          case "choices":
+          case "code":
+          case "contact":
+          case "contactEmail":
+          case "count":
+          case "dateIndex":
+          case "dates":
+          case "debug":
+          case "detail":
+          case "enabled":
+          case "extras":
+          case "gateway":
+          case "greeting":
+          case "grid":
+          case "homepage":
+          case "host":
+          case "idOrName":
+          case "integralMeasurements":
+          case "kind":
+          case "labels":
+          case "ledger":
+          case "legacyId":
+          case "level":
+          case "links":
+          case "location":
+          case "measurements":
+          case "metadata":
+          case "metricOrLabel":
+          case "metrics":
+          case "middleName":
+          case "mode":
+          case "name":
+          case "nickname":
+          case "nicknames":
+          case "note":
+          case "nullableCount":
+          case "nullableFlag":
+          case "nullableMode":
+          case "nullableRatio":
+          case "nullableTags":
+          case "numberGrid":
+          case "payload":
+          case "phrase":
+          case "priority":
+          case "quotas":
+          case "quoted":
+          case "ratio":
+          case "requestId":
+          case "retries":
+          case "revision":
+          case "roles":
+          case "rows":
+          case "scale":
+          case "score":
+          case "segments":
+          case "settings":
+          case "shape":
+          case "shapeOrName":
+          case "shapes":
+          case "sku":
+          case "slots":
+          case "status":
+          case "step":
+          case "tags":
+          case "tier":
+          case "tokens":
+          case "urlBlob":
+          case "verbose":
+          case "wildcard":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
+        }
+      }
+      Kind kind = null;
+      {
+        JsonNode field = node.get("kind");
+        if (field == null) {
+          violations.add(new Violation("kind", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("kind", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("kind", "expected string"));
+          } else {
+            String kindValue = field.textValue();
+            if ("showcase".equals(kindValue)) {
+              kind = Kind.SHOWCASE;
+            } else {
+              violations.add(new Violation("kind", "must equal \"showcase\""));
+            }
+          }
+        }
+      }
+      Revision revision = null;
+      {
+        JsonNode field = node.get("revision");
+        if (field == null) {
+          violations.add(new Violation("revision", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("revision", "explicit null not allowed"));
+        } else {
+          Long revisionValue = SpecNumbers.specLong(field, "revision", violations);
+          if (revisionValue != null) {
+            if (revisionValue == 1L) {
+              revision = Revision.REVISION_JAVA;
+            } else {
+              violations.add(new Violation("revision", "must equal 1"));
+            }
+          }
+        }
+      }
+      Enabled enabled = null;
+      {
+        JsonNode field = node.get("enabled");
+        if (field == null) {
+          violations.add(new Violation("enabled", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("enabled", "explicit null not allowed"));
+        } else {
+          if (!field.isBoolean()) {
+            violations.add(new Violation("enabled", "expected boolean"));
+          } else {
+            boolean enabledValue = field.booleanValue();
+            if (enabledValue == true) {
+              enabled = Enabled.TRUE;
+            } else {
+              violations.add(new Violation("enabled", "must equal true"));
+            }
+          }
+        }
+      }
+      Status status = null;
+      {
+        JsonNode field = node.get("status");
+        if (field == null) {
+          violations.add(new Violation("status", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("status", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("status", "expected string"));
+          } else {
+            String statusValue = field.textValue();
+            if ("active".equals(statusValue)) {
+              status = Status.ACTIVE_JAVA;
+            } else if ("inactive".equals(statusValue)) {
+              status = Status.INACTIVE;
+            } else if ("pending".equals(statusValue)) {
+              status = Status.PENDING;
+            } else {
+              violations.add(
+                  new Violation(
+                      "status",
+                      "must be one of [\"active\", \"inactive\", \"pending\"], got "
+                          + statusValue));
+            }
+          }
+        }
+      }
+      Tier tier = null;
+      {
+        JsonNode field = node.get("tier");
+        if (field == null) {
+          violations.add(new Violation("tier", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("tier", "explicit null not allowed"));
+        } else {
+          Long tierValue = SpecNumbers.specLong(field, "tier", violations);
+          if (tierValue != null) {
+            if (tierValue == 1L) {
+              tier = Tier.V_1;
+            } else if (tierValue == 2L) {
+              tier = Tier.V_2;
+            } else if (tierValue == 3L) {
+              tier = Tier.V_3;
+            } else {
+              violations.add(new Violation("tier", "must be one of [1, 2, 3], got " + tierValue));
+            }
+          }
+        }
+      }
+      Scale scale = null;
+      {
+        JsonNode field = node.get("scale");
+        if (field == null) {
+          violations.add(new Violation("scale", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("scale", "explicit null not allowed"));
+        } else {
+          Double scaleValue = SpecNumbers.specDouble(field, "scale", violations);
+          if (scaleValue != null) {
+            if (scaleValue == 1.5) {
+              scale = Scale.V_1_5;
+            } else if (scaleValue == 2.5) {
+              scale = Scale.V_2_5;
+            } else {
+              violations.add(
+                  new Violation("scale", "must be one of [1.5, 2.5], got " + scaleValue));
+            }
+          }
+        }
+      }
+      String name = null;
+      {
+        JsonNode field = node.get("name");
+        if (field == null) {
+          violations.add(new Violation("name", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("name", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("name", "expected string"));
+          } else {
+            name = field.textValue();
+            int length = name.codePointCount(0, name.length());
+            if (length < 1) {
+              violations.add(new Violation("name", "must have length >= 1, got " + length));
+            }
+            if (length > 64) {
+              violations.add(new Violation("name", "must have length <= 64, got " + length));
+            }
+          }
+        }
+      }
+      long count = 0L;
+      {
+        JsonNode field = node.get("count");
+        if (field == null) {
+          violations.add(new Violation("count", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("count", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "count", violations);
+          if (numberValue != null) {
+            count = numberValue;
+          }
+        }
+      }
+      boolean active = false;
+      {
+        JsonNode field = node.get("active");
+        if (field == null) {
+          violations.add(new Violation("active", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("active", "explicit null not allowed"));
+        } else {
+          if (!field.isBoolean()) {
+            violations.add(new Violation("active", "expected boolean"));
+          } else {
+            active = field.booleanValue();
+          }
+        }
+      }
+      String nickname = null;
+      {
+        JsonNode field = node.get("nickname");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("nickname", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("nickname", "expected string"));
+          } else {
+            nickname = field.textValue();
+            int length = nickname.codePointCount(0, nickname.length());
+            if (length > 12) {
+              violations.add(new Violation("nickname", "must have length <= 12, got " + length));
+            }
+          }
+        }
+      }
+      String code = null;
+      {
+        JsonNode field = node.get("code");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("code", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("code", "expected string"));
+          } else {
+            code = field.textValue();
+            int length = code.codePointCount(0, code.length());
+            if (length < 2) {
+              violations.add(new Violation("code", "must have length >= 2, got " + length));
+            }
+            if (length > 5) {
+              violations.add(new Violation("code", "must have length <= 5, got " + length));
+            }
+          }
+        }
+      }
+      String sku = null;
+      {
+        JsonNode field = node.get("sku");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("sku", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("sku", "expected string"));
+          } else {
+            sku = field.textValue();
+            if (!SKU_PATTERN.matcher(sku).find()) {
+              violations.add(
+                  new Violation("sku", "must match pattern " + "^[A-Z]{2,4}\\z" + ", got " + sku));
+            }
+          }
+        }
+      }
+      String phrase = null;
+      {
+        JsonNode field = node.get("phrase");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("phrase", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("phrase", "expected string"));
+          } else {
+            phrase = field.textValue();
+            if (!PHRASE_PATTERN.matcher(phrase).find()) {
+              violations.add(
+                  new Violation(
+                      "phrase",
+                      "must match pattern "
+                          + "^[^\\t\\n\\x0B\\f\\r ]+[\\t\\n\\x0B\\f\\r ][^\\t\\n\\x0B\\f\\r ]+\\z"
+                          + ", got "
+                          + phrase));
+            }
+          }
+        }
+      }
+      String requestId = null;
+      {
+        JsonNode field = node.get("requestId");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("requestId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("requestId", "expected string"));
+          } else {
+            requestId = field.textValue();
+            if (!REQUEST_ID_FORMAT.matcher(requestId).find()) {
+              violations.add(new Violation("requestId", "must be a valid uuid, got " + requestId));
+            }
+          }
+        }
+      }
+      String contactEmail = null;
+      {
+        JsonNode field = node.get("contactEmail");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("contactEmail", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("contactEmail", "expected string"));
+          } else {
+            contactEmail = field.textValue();
+            if (contactEmail.codePointCount(0, contactEmail.length()) > 254
+                || !CONTACT_EMAIL_FORMAT.matcher(contactEmail).find()) {
+              violations.add(
+                  new Violation("contactEmail", "must be a valid email, got " + contactEmail));
+            }
+          }
+        }
+      }
+      String host = null;
+      {
+        JsonNode field = node.get("host");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("host", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("host", "expected string"));
+          } else {
+            host = field.textValue();
+            if (host.codePointCount(0, host.length()) > 253 || !HOST_FORMAT.matcher(host).find()) {
+              violations.add(new Violation("host", "must be a valid hostname, got " + host));
+            }
+          }
+        }
+      }
+      String homepage = null;
+      {
+        JsonNode field = node.get("homepage");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("homepage", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("homepage", "expected string"));
+          } else {
+            homepage = field.textValue();
+            if (!HOMEPAGE_FORMAT.matcher(homepage).find()) {
+              violations.add(new Violation("homepage", "must be a valid uri, got " + homepage));
+            }
+          }
+        }
+      }
+      String gateway = null;
+      {
+        JsonNode field = node.get("gateway");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("gateway", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("gateway", "expected string"));
+          } else {
+            gateway = field.textValue();
+            if (!GATEWAY_FORMAT.matcher(gateway).find()) {
+              violations.add(new Violation("gateway", "must be a valid ipv4, got " + gateway));
+            }
+          }
+        }
+      }
+      byte[] blob = null;
+      {
+        JsonNode field = node.get("blob");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("blob", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("blob", "expected string"));
+          } else {
+            blob = Base64Support.parseBase64(field.textValue(), "blob", violations);
+          }
+        }
+      }
+      byte[] urlBlob = null;
+      {
+        JsonNode field = node.get("urlBlob");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("urlBlob", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("urlBlob", "expected string"));
+          } else {
+            urlBlob = Base64Support.parseBase64Url(field.textValue(), "urlBlob", violations);
+          }
+        }
+      }
+      Long retries = null;
+      {
+        JsonNode field = node.get("retries");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("retries", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "retries", violations);
+          if (numberValue != null) {
+            retries = numberValue;
+          }
+        }
+      }
+      Boolean verbose = null;
+      {
+        JsonNode field = node.get("verbose");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("verbose", "explicit null not allowed"));
+        } else {
+          if (!field.isBoolean()) {
+            violations.add(new Violation("verbose", "expected boolean"));
+          } else {
+            verbose = field.booleanValue();
+          }
+        }
+      }
+      String greeting = null;
+      {
+        JsonNode field = node.get("greeting");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("greeting", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("greeting", "expected string"));
+          } else {
+            greeting = field.textValue();
+          }
+        }
+      }
+      Boolean debug = null;
+      {
+        JsonNode field = node.get("debug");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("debug", "explicit null not allowed"));
+        } else {
+          if (!field.isBoolean()) {
+            violations.add(new Violation("debug", "expected boolean"));
+          } else {
+            debug = field.booleanValue();
+          }
+        }
+      }
+      String legacyIdJava = null;
+      {
+        JsonNode field = node.get("legacyId");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("legacyId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("legacyId", "expected string"));
+          } else {
+            legacyIdJava = field.textValue();
+          }
+        }
+      }
+      String middleName = null;
+      {
+        JsonNode field = node.get("middleName");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("middleName", "expected string"));
+          } else {
+            middleName = field.textValue();
+          }
+        }
+      }
+      String category = null;
+      {
+        JsonNode field = node.get("category");
+        if (field == null) {
+          violations.add(new Violation("category", "required"));
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("category", "expected string"));
+          } else {
+            category = field.textValue();
+          }
+        }
+      }
+      Long priority = null;
+      {
+        JsonNode field = node.get("priority");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("priority", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "priority", violations);
+          if (numberValue != null) {
+            priority = numberValue;
+            if (numberValue < 1L) {
+              violations.add(new Violation("priority", "must be >= 1, got " + numberValue));
+            }
+            if (numberValue > 10L) {
+              violations.add(new Violation("priority", "must be <= 10, got " + numberValue));
+            }
+          }
+        }
+      }
+      Long level = null;
+      {
+        JsonNode field = node.get("level");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("level", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "level", violations);
+          if (numberValue != null) {
+            level = numberValue;
+            if (numberValue <= 0L) {
+              violations.add(new Violation("level", "must be > 0, got " + numberValue));
+            }
+          }
+        }
+      }
+      Double ratio = null;
+      {
+        JsonNode field = node.get("ratio");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("ratio", "explicit null not allowed"));
+        } else {
+          Double numberValue = SpecNumbers.specDouble(field, "ratio", violations);
+          if (numberValue != null) {
+            ratio = numberValue;
+            if (numberValue < 5.0) {
+              violations.add(new Violation("ratio", "must be >= 5, got " + numberValue));
+            }
+            if (numberValue % 5.0 != 0) {
+              violations.add(new Violation("ratio", "must be a multiple of 5, got " + numberValue));
+            }
+          }
+        }
+      }
+      Double score = null;
+      {
+        JsonNode field = node.get("score");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("score", "explicit null not allowed"));
+        } else {
+          Double numberValue = SpecNumbers.specDouble(field, "score", violations);
+          if (numberValue != null) {
+            score = numberValue;
+          }
+        }
+      }
+      Long step = null;
+      {
+        JsonNode field = node.get("step");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("step", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "step", violations);
+          if (numberValue != null) {
+            step = numberValue;
+            if (numberValue % 3L != 0) {
+              violations.add(new Violation("step", "must be a multiple of 3, got " + numberValue));
+            }
+          }
+        }
+      }
+      List<String> tags = null;
+      {
+        JsonNode field = node.get("tags");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("tags", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("tags", "expected array"));
+          } else {
+            List<String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "tags" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                items.add(parsed);
+              }
+            }
+            tags = items;
+            if (field.size() < 1) {
+              violations.add(
+                  new Violation("tags", "must have at least 1 items, got " + field.size()));
+            }
+            if (field.size() > 5) {
+              violations.add(
+                  new Violation("tags", "must have at most 5 items, got " + field.size()));
+            }
+          }
+        }
+      }
+      List<String> aliases = null;
+      {
+        JsonNode field = node.get("aliases");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("aliases", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("aliases", "expected array"));
+          } else {
+            List<String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "aliases" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                items.add(parsed);
+              }
+            }
+            aliases = items;
+            java.util.Map<Object, Integer> rawSeen = new java.util.HashMap<>();
+            for (int rawIndex = 0; rawIndex < field.size(); rawIndex++) {
+              Object rawKey = SpecNumbers.valueKey(field.get(rawIndex));
+              Integer priorIndex = rawSeen.get(rawKey);
+              if (priorIndex != null) {
+                violations.add(
+                    new Violation(
+                        "aliases",
+                        "duplicate items: element at index "
+                            + rawIndex
+                            + " equals index "
+                            + priorIndex));
+              } else {
+                rawSeen.put(rawKey, rawIndex);
+              }
+            }
+          }
+        }
+      }
+      List<String> roles = null;
+      {
+        JsonNode field = node.get("roles");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("roles", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("roles", "expected array"));
+          } else {
+            List<String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "roles" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                items.add(parsed);
+              }
+            }
+            roles = items;
+            int rawMatchCount = 0;
+            for (JsonNode rawElement : field) {
+              if (rawElement.isTextual() && ("admin".equals(rawElement.textValue()))) {
+                rawMatchCount++;
+              }
+            }
+            if (rawMatchCount < 1) {
+              violations.add(
+                  new Violation(
+                      "roles", "too few matching items: at least 1, got " + rawMatchCount));
+            }
+            if (rawMatchCount > 2) {
+              violations.add(
+                  new Violation(
+                      "roles", "too many matching items: at most 2, got " + rawMatchCount));
+            }
+          }
+        }
+      }
+      IdOrName idOrName = null;
+      {
+        JsonNode field = node.get("idOrName");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("idOrName", "explicit null not allowed"));
+        } else {
+          idOrName = IdOrName.fromNode(field, "idOrName", violations, context);
+        }
+      }
+      Mode mode = null;
+      {
+        JsonNode field = node.get("mode");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("mode", "explicit null not allowed"));
+        } else {
+          mode = Mode.fromNode(field, "mode", violations, context);
+        }
+      }
+      Payload payload = null;
+      {
+        JsonNode field = node.get("payload");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("payload", "explicit null not allowed"));
+        } else {
+          payload = Payload.fromNode(field, "payload", violations, context);
+        }
+      }
+      Detail detail = null;
+      {
+        JsonNode field = node.get("detail");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("detail", "explicit null not allowed"));
+        } else {
+          detail = Detail.fromNode(field, "detail", violations, context);
+        }
+      }
+      ShapeOrName shapeOrName = null;
+      {
+        JsonNode field = node.get("shapeOrName");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("shapeOrName", "explicit null not allowed"));
+        } else {
+          shapeOrName = ShapeOrName.fromNode(field, "shapeOrName", violations, context);
+        }
+      }
+      Measurements measurements = null;
+      {
+        JsonNode field = node.get("measurements");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("measurements", "explicit null not allowed"));
+        } else {
+          measurements = Measurements.fromNode(field, "measurements", violations, context);
+        }
+      }
+      List<Shape> shapes = null;
+      {
+        JsonNode field = node.get("shapes");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("shapes", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("shapes", "expected array"));
+          } else {
+            List<Shape> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "shapes" + "[" + index + "]";
+              Shape parsedItems = Shape.fromNode(element, elementPath, violations, context);
+              if (parsedItems != null) {
+                items.add(parsedItems);
+              }
+            }
+            shapes = items;
+          }
+        }
+      }
+      List<ShowcaseSegmentsItem> segments = null;
+      {
+        JsonNode field = node.get("segments");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("segments", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("segments", "expected array"));
+          } else {
+            List<ShowcaseSegmentsItem> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "segments" + "[" + index + "]";
+              ShowcaseSegmentsItem parsedItems =
+                  ShowcaseSegmentsItem.fromNode(element, elementPath, violations, context);
+              if (parsedItems != null) {
+                items.add(parsedItems);
+              }
+            }
+            segments = items;
+          }
+        }
+      }
+      List<@Nullable String> slots = null;
+      {
+        JsonNode field = node.get("slots");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("slots", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("slots", "expected array"));
+          } else {
+            List<@Nullable String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "slots" + "[" + index + "]";
+              if (element.isNull()) {
+                items.add(null);
+                continue;
+              }
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                int nestedLength = parsed.codePointCount(0, parsed.length());
+                if (nestedLength < 2) {
+                  violations.add(
+                      new Violation(elementPath, "must have length >= 2, got " + nestedLength));
+                }
+                items.add(parsed);
+              }
+            }
+            slots = items;
+          }
+        }
+      }
+      List<List<Long>> grid = null;
+      {
+        JsonNode field = node.get("grid");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("grid", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("grid", "expected array"));
+          } else {
+            List<List<Long>> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "grid" + "[" + index + "]";
+              if (!element.isArray()) {
+                violations.add(new Violation(elementPath, "expected array"));
+              } else {
+                List<Long> items1 = new ArrayList<>();
+                for (int index1 = 0; index1 < element.size(); index1++) {
+                  JsonNode element1 = element.get(index1);
+                  String path1 = elementPath + "[" + index1 + "]";
+                  Long parsed = SpecNumbers.specLong(element1, path1, violations);
+                  if (parsed != null) {
+                    items1.add(parsed);
+                  }
+                }
+                items.add(items1);
+              }
+            }
+            grid = items;
+          }
+        }
+      }
+      List<List<Double>> numberGrid = null;
+      {
+        JsonNode field = node.get("numberGrid");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("numberGrid", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("numberGrid", "expected array"));
+          } else {
+            List<List<Double>> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "numberGrid" + "[" + index + "]";
+              if (!element.isArray()) {
+                violations.add(new Violation(elementPath, "expected array"));
+              } else {
+                List<Double> items1 = new ArrayList<>();
+                for (int index1 = 0; index1 < element.size(); index1++) {
+                  JsonNode element1 = element.get(index1);
+                  String path1 = elementPath + "[" + index1 + "]";
+                  Double parsed = SpecNumbers.specDouble(element1, path1, violations);
+                  if (parsed != null) {
+                    items1.add(parsed);
+                  }
+                }
+                items.add(items1);
+              }
+            }
+            numberGrid = items;
+          }
+        }
+      }
+      List<String> links = null;
+      {
+        JsonNode field = node.get("links");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("links", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("links", "expected array"));
+          } else {
+            List<String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "links" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                if (!java.util.regex.Pattern.compile(
+                        "^(?:[A-Za-z][A-Za-z0-9+.-]*:(?://(?:(?:[A-Za-z0-9._~!$&'()*+,;=:-]|%[0-9A-Fa-f][0-9A-Fa-f])*@)?(?:(?:\\[(?:([0-9a-fA-F]{1,4}:){6}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|::([0-9a-fA-F]{1,4}:){5}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){4}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,1}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){3}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:){2}([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:)([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])))|(([0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})?::[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4})?::)\\]|\\[v[0-9A-Fa-f]+\\.[A-Za-z0-9._~!$&'()*+,;=:-]+\\])|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f][0-9A-Fa-f])*)(?::[0-9]*)?(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*|/(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])+(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])*)*)?(?:\\?(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?(?:#(?:(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f][0-9A-Fa-f])|[/?])*)?)\\z")
+                    .matcher(parsed)
+                    .find()) {
+                  violations.add(new Violation(elementPath, "must be a valid uri, got " + parsed));
+                }
+                items.add(parsed);
+              }
+            }
+            links = items;
+          }
+        }
+      }
+      List<Address> addresses = null;
+      {
+        JsonNode field = node.get("addresses");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("addresses", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("addresses", "expected array"));
+          } else {
+            List<Address> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "addresses" + "[" + index + "]";
+              try {
+                items.add(context.readTreeAsValue(element, Address.class));
+              } catch (ApplicationFailure nested) {
+                if (!"PayloadValidationError".equals(nested.getType())
+                    || nested.getDetails().getSize() == 0) {
+                  throw nested;
+                }
+                // The locally-created failure retains the original list as its first detail.
+                // This unchecked cast is cheap and performs no serialization.
+                @SuppressWarnings("unchecked")
+                List<Violation> nestedViolations =
+                    (List<Violation>) nested.getDetails().get(0, List.class);
+                for (Violation violation : nestedViolations) {
+                  violations.add(violation.withPathPrefix(elementPath));
+                }
+              } catch (IOException nested) {
+                violations.add(new Violation(elementPath, nested.getMessage()));
+              }
+            }
+            addresses = items;
+          }
+        }
+      }
+      AddressBook addressBook = null;
+      {
+        JsonNode field = node.get("addressBook");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("addressBook", "explicit null not allowed"));
+        } else {
+          try {
+            addressBook = context.readTreeAsValue(field, AddressBook.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("addressBook"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("addressBook", nested.getMessage()));
+          }
+        }
+      }
+      List<LocalDate> dates = null;
+      {
+        JsonNode field = node.get("dates");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("dates", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("dates", "expected array"));
+          } else {
+            List<LocalDate> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "dates" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                LocalDate parsed =
+                    TemporalSupport.parseDate(element.textValue(), elementPath, violations);
+                if (parsed != null) {
+                  items.add(parsed);
+                }
+              }
+            }
+            dates = items;
+          }
+        }
+      }
+      DateIndex dateIndex = null;
+      {
+        JsonNode field = node.get("dateIndex");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("dateIndex", "explicit null not allowed"));
+        } else {
+          try {
+            dateIndex = context.readTreeAsValue(field, DateIndex.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("dateIndex"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("dateIndex", nested.getMessage()));
+          }
+        }
+      }
+      List<byte[]> blobs = null;
+      {
+        JsonNode field = node.get("blobs");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("blobs", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("blobs", "expected array"));
+          } else {
+            List<byte[]> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "blobs" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                byte[] parsed =
+                    Base64Support.parseBase64(element.textValue(), elementPath, violations);
+                if (parsed != null) {
+                  items.add(parsed);
+                }
+              }
+            }
+            blobs = items;
+          }
+        }
+      }
+      BlobIndex blobIndex = null;
+      {
+        JsonNode field = node.get("blobIndex");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("blobIndex", "explicit null not allowed"));
+        } else {
+          try {
+            blobIndex = context.readTreeAsValue(field, BlobIndex.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("blobIndex"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("blobIndex", nested.getMessage()));
+          }
+        }
+      }
+      Metrics metrics = null;
+      {
+        JsonNode field = node.get("metrics");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("metrics", "explicit null not allowed"));
+        } else {
+          try {
+            metrics = context.readTreeAsValue(field, Metrics.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("metrics"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("metrics", nested.getMessage()));
+          }
+        }
+      }
+      MetricOrLabel metricOrLabel = null;
+      {
+        JsonNode field = node.get("metricOrLabel");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("metricOrLabel", "explicit null not allowed"));
+        } else {
+          metricOrLabel = MetricOrLabel.fromNode(field, "metricOrLabel", violations, context);
+        }
+      }
+      AddressListOrLabel addressListOrLabel = null;
+      {
+        JsonNode field = node.get("addressListOrLabel");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("addressListOrLabel", "explicit null not allowed"));
+        } else {
+          addressListOrLabel =
+              AddressListOrLabel.fromNode(field, "addressListOrLabel", violations, context);
+        }
+      }
+      ShowcaseLocation location = null;
+      {
+        JsonNode field = node.get("location");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("location", "explicit null not allowed"));
+        } else {
+          try {
+            location = context.readTreeAsValue(field, ShowcaseLocation.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("location"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("location", nested.getMessage()));
+          }
+        }
+      }
+      ShowcaseAudit audit = null;
+      {
+        JsonNode field = node.get("audit");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          try {
+            audit = context.readTreeAsValue(field, ShowcaseAudit.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("audit"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("audit", nested.getMessage()));
+          }
+        }
+      }
+      List<ShowcaseRowsItem> rows = null;
+      {
+        JsonNode field = node.get("rows");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("rows", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("rows", "expected array"));
+          } else {
+            List<ShowcaseRowsItem> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "rows" + "[" + index + "]";
+              try {
+                items.add(context.readTreeAsValue(element, ShowcaseRowsItem.class));
+              } catch (ApplicationFailure nested) {
+                if (!"PayloadValidationError".equals(nested.getType())
+                    || nested.getDetails().getSize() == 0) {
+                  throw nested;
+                }
+                // The locally-created failure retains the original list as its first detail.
+                // This unchecked cast is cheap and performs no serialization.
+                @SuppressWarnings("unchecked")
+                List<Violation> nestedViolations =
+                    (List<Violation>) nested.getDetails().get(0, List.class);
+                for (Violation violation : nestedViolations) {
+                  violations.add(violation.withPathPrefix(elementPath));
+                }
+              } catch (IOException nested) {
+                violations.add(new Violation(elementPath, nested.getMessage()));
+              }
+            }
+            rows = items;
+          }
+        }
+      }
+      ShowcaseLedger ledgerJava = null;
+      {
+        JsonNode field = node.get("ledger");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("ledger", "explicit null not allowed"));
+        } else {
+          try {
+            ledgerJava = context.readTreeAsValue(field, ShowcaseLedger.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("ledger"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("ledger", nested.getMessage()));
+          }
+        }
+      }
+      ShowcaseMetadata metadata = null;
+      {
+        JsonNode field = node.get("metadata");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("metadata", "explicit null not allowed"));
+        } else {
+          try {
+            metadata = context.readTreeAsValue(field, ShowcaseMetadata.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("metadata"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("metadata", nested.getMessage()));
+          }
+        }
+      }
+      Quotas quotas = null;
+      {
+        JsonNode field = node.get("quotas");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("quotas", "explicit null not allowed"));
+        } else {
+          try {
+            quotas = context.readTreeAsValue(field, Quotas.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("quotas"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("quotas", nested.getMessage()));
+          }
+        }
+      }
+      Tokens tokens = null;
+      {
+        JsonNode field = node.get("tokens");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("tokens", "explicit null not allowed"));
+        } else {
+          try {
+            tokens = context.readTreeAsValue(field, Tokens.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("tokens"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("tokens", nested.getMessage()));
+          }
+        }
+      }
+      Nicknames nicknames = null;
+      {
+        JsonNode field = node.get("nicknames");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("nicknames", "explicit null not allowed"));
+        } else {
+          try {
+            nicknames = context.readTreeAsValue(field, Nicknames.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("nicknames"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("nicknames", nested.getMessage()));
+          }
+        }
+      }
+      Choices choices = null;
+      {
+        JsonNode field = node.get("choices");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("choices", "explicit null not allowed"));
+        } else {
+          try {
+            choices = context.readTreeAsValue(field, Choices.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("choices"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("choices", nested.getMessage()));
+          }
+        }
+      }
+      Extras extras = null;
+      {
+        JsonNode field = node.get("extras");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("extras", "explicit null not allowed"));
+        } else {
+          try {
+            extras = context.readTreeAsValue(field, Extras.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("extras"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("extras", nested.getMessage()));
+          }
+        }
+      }
+      Shape shape = null;
+      {
+        JsonNode field = node.get("shape");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("shape", "explicit null not allowed"));
+        } else {
+          shape = Shape.fromNode(field, "shape", violations, context);
+        }
+      }
+      Note note = null;
+      {
+        JsonNode field = node.get("note");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("note", "explicit null not allowed"));
+        } else {
+          note = Note.fromNode(field, "note", violations, context);
+        }
+      }
+      Address address = null;
+      {
+        JsonNode field = node.get("address");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("address", "explicit null not allowed"));
+        } else {
+          try {
+            address = context.readTreeAsValue(field, Address.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("address"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("address", nested.getMessage()));
+          }
+        }
+      }
+      Labels labels = null;
+      {
+        JsonNode field = node.get("labels");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("labels", "explicit null not allowed"));
+        } else {
+          try {
+            labels = context.readTreeAsValue(field, Labels.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("labels"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("labels", nested.getMessage()));
+          }
+        }
+      }
+      Settings settings = null;
+      {
+        JsonNode field = node.get("settings");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("settings", "explicit null not allowed"));
+        } else {
+          try {
+            settings = context.readTreeAsValue(field, Settings.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("settings"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("settings", nested.getMessage()));
+          }
+        }
+      }
+      Attributes attributes = null;
+      {
+        JsonNode field = node.get("attributes");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("attributes", "explicit null not allowed"));
+        } else {
+          try {
+            attributes = context.readTreeAsValue(field, Attributes.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("attributes"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("attributes", nested.getMessage()));
+          }
+        }
+      }
+      ContactJava contact = null;
+      {
+        JsonNode field = node.get("contact");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("contact", "explicit null not allowed"));
+        } else {
+          try {
+            contact = context.readTreeAsValue(field, ContactJava.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("contact"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("contact", nested.getMessage()));
+          }
+        }
+      }
+      Long nullableCount = null;
+      {
+        JsonNode field = node.get("nullableCount");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "nullableCount", violations);
+          if (numberValue != null) {
+            nullableCount = numberValue;
+            if (numberValue < 1L) {
+              violations.add(new Violation("nullableCount", "must be >= 1, got " + numberValue));
+            }
+            if (numberValue > 10L) {
+              violations.add(new Violation("nullableCount", "must be <= 10, got " + numberValue));
+            }
+          }
+        }
+      }
+      Double nullableRatio = null;
+      {
+        JsonNode field = node.get("nullableRatio");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          Double numberValue = SpecNumbers.specDouble(field, "nullableRatio", violations);
+          if (numberValue != null) {
+            nullableRatio = numberValue;
+            if (numberValue % 2.0 != 0) {
+              violations.add(
+                  new Violation("nullableRatio", "must be a multiple of 2, got " + numberValue));
+            }
+          }
+        }
+      }
+      Boolean nullableFlag = null;
+      {
+        JsonNode field = node.get("nullableFlag");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isBoolean()) {
+            violations.add(new Violation("nullableFlag", "expected boolean"));
+          } else {
+            nullableFlag = field.booleanValue();
+          }
+        }
+      }
+      List<String> nullableTags = null;
+      {
+        JsonNode field = node.get("nullableTags");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("nullableTags", "expected array"));
+          } else {
+            List<String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "nullableTags" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                items.add(parsed);
+              }
+            }
+            nullableTags = items;
+            if (field.size() < 1) {
+              violations.add(
+                  new Violation("nullableTags", "must have at least 1 items, got " + field.size()));
+            }
+            java.util.Map<Object, Integer> rawSeen = new java.util.HashMap<>();
+            for (int rawIndex = 0; rawIndex < field.size(); rawIndex++) {
+              Object rawKey = SpecNumbers.valueKey(field.get(rawIndex));
+              Integer priorIndex = rawSeen.get(rawKey);
+              if (priorIndex != null) {
+                violations.add(
+                    new Violation(
+                        "nullableTags",
+                        "duplicate items: element at index "
+                            + rawIndex
+                            + " equals index "
+                            + priorIndex));
+              } else {
+                rawSeen.put(rawKey, rawIndex);
+              }
+            }
+          }
+        }
+      }
+      NullableMode nullableMode = null;
+      {
+        JsonNode field = node.get("nullableMode");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("nullableMode", "expected string"));
+          } else {
+            String nullableModeValue = field.textValue();
+            if ("auto".equals(nullableModeValue)) {
+              nullableMode = NullableMode.AUTO;
+            } else if ("manual".equals(nullableModeValue)) {
+              nullableMode = NullableMode.MANUAL;
+            } else {
+              violations.add(
+                  new Violation(
+                      "nullableMode",
+                      "must be one of [\"auto\", \"manual\"], got " + nullableModeValue));
+            }
+          }
+        }
+      }
+      List<Double> integralMeasurements = null;
+      {
+        JsonNode field = node.get("integralMeasurements");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("integralMeasurements", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("integralMeasurements", "expected array"));
+          } else {
+            List<Double> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "integralMeasurements" + "[" + index + "]";
+              Double parsed = SpecNumbers.specDouble(element, elementPath, violations);
+              if (parsed != null) {
+                items.add(parsed);
+              }
+            }
+            integralMeasurements = items;
+            int rawMatchCount = 0;
+            for (JsonNode rawElement : field) {
+              if (SpecNumbers.isSpecLong(rawElement) && (true)) {
+                rawMatchCount++;
+              }
+            }
+            if (rawMatchCount < 1) {
+              violations.add(
+                  new Violation("integralMeasurements", "no element matches the required schema"));
+            }
+          }
+        }
+      }
+      Double byFive = null;
+      {
+        JsonNode field = node.get("byFive");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("byFive", "explicit null not allowed"));
+        } else {
+          Double numberValue = SpecNumbers.specDouble(field, "byFive", violations);
+          if (numberValue != null) {
+            byFive = numberValue;
+            if (numberValue % 5.0 != 0) {
+              violations.add(
+                  new Violation("byFive", "must be a multiple of 5, got " + numberValue));
+            }
+          }
+        }
+      }
+      String wildcard = null;
+      {
+        JsonNode field = node.get("wildcard");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("wildcard", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("wildcard", "expected string"));
+          } else {
+            wildcard = field.textValue();
+            if (!WILDCARD_PATTERN.matcher(wildcard).find()) {
+              violations.add(
+                  new Violation(
+                      "wildcard", "must match pattern " + "a[^\\n]b" + ", got " + wildcard));
+            }
+          }
+        }
+      }
+      String quoted = null;
+      {
+        JsonNode field = node.get("quoted");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("quoted", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("quoted", "expected string"));
+          } else {
+            quoted = field.textValue();
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Showcase(
+          kind,
+          revision,
+          enabled,
+          status,
+          tier,
+          scale,
+          name,
+          count,
+          active,
+          nickname,
+          code,
+          sku,
+          phrase,
+          requestId,
+          contactEmail,
+          host,
+          homepage,
+          gateway,
+          blob,
+          urlBlob,
+          retries,
+          verbose,
+          greeting,
+          debug,
+          legacyIdJava,
+          middleName,
+          category,
+          priority,
+          level,
+          ratio,
+          score,
+          step,
+          tags,
+          aliases,
+          roles,
+          idOrName,
+          mode,
+          payload,
+          detail,
+          shapeOrName,
+          measurements,
+          shapes,
+          segments,
+          slots,
+          grid,
+          numberGrid,
+          links,
+          addresses,
+          addressBook,
+          dates,
+          dateIndex,
+          blobs,
+          blobIndex,
+          metrics,
+          metricOrLabel,
+          addressListOrLabel,
+          location,
+          audit,
+          rows,
+          ledgerJava,
+          metadata,
+          quotas,
+          tokens,
+          nicknames,
+          choices,
+          extras,
+          shape,
+          note,
+          address,
+          labels,
+          settings,
+          attributes,
+          contact,
+          nullableCount,
+          nullableRatio,
+          nullableFlag,
+          nullableTags,
+          nullableMode,
+          integralMeasurements,
+          byFive,
+          wildcard,
+          quoted);
+    }
+  }
 }

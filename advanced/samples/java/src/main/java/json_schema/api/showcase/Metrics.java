@@ -18,111 +18,122 @@ import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A typed map of finite numbers.
- */
+/** A typed map of finite numbers. */
 @JsonSerialize(using = Metrics.Serializer.class)
 @JsonDeserialize(using = Metrics.Deserializer.class)
 public final class Metrics {
-    private final Map<String, Double> additionalProperties;
+  private final Map<String, Double> additionalProperties;
 
-    public Metrics(Map<String, Double> additionalProperties) {
-        this.additionalProperties = additionalProperties;
+  public Metrics(Map<String, Double> additionalProperties) {
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Map<String, Double> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public Map<String, Double> getAdditionalProperties() {
-        return additionalProperties;
+    if (!(other instanceof Metrics)) {
+      return false;
     }
+    return Objects.equals(this.additionalProperties, ((Metrics) other).additionalProperties);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "Metrics{" + "additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Metrics> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Metrics value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.additionalProperties == null) {
+        violations.add(new Violation("", "expected object"));
+      } else {
+        for (Map.Entry<String, Double> entry : value.additionalProperties.entrySet()) {
+          if (entry.getValue() == null) {
+            violations.add(
+                new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
+            continue;
+          }
+          if (!Double.isFinite(entry.getValue())) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()),
+                    "must be a finite number, got " + entry.getValue()));
+          }
         }
-        if (!(other instanceof Metrics)) {
-            return false;
-        }
-        return Objects.equals(this.additionalProperties, ((Metrics) other).additionalProperties);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      for (Map.Entry<String, Double> entry : value.additionalProperties.entrySet()) {
+        gen.writeNumberField(entry.getKey(), entry.getValue());
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Metrics> {
     @Override
-    public int hashCode() {
-        return Objects.hash(additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "Metrics{"
-            + "additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Metrics> {
-        @Override
-        public void serialize(Metrics value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.additionalProperties == null) {
-                violations.add(new Violation("", "expected object"));
-            } else {
-                for (Map.Entry<String, Double> entry : value.additionalProperties.entrySet()) {
-                    if (entry.getValue() == null) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
-                        continue;
-                    }
-                    if (!Double.isFinite(entry.getValue())) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must be a finite number, got " + entry.getValue()));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            for (Map.Entry<String, Double> entry : value.additionalProperties.entrySet()) {
-                gen.writeNumberField(entry.getKey(), entry.getValue());
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public Metrics deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, Double> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        JsonNode element = node.get(key);
+        if (element.isNull()) {
+          violations.add(new Violation(path, "explicit null not allowed"));
+          continue;
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Metrics> {
-        @Override
-        public Metrics deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, Double> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                JsonNode element = node.get(key);
-                if (element.isNull()) {
-                    violations.add(new Violation(path, "explicit null not allowed"));
-                    continue;
-                }
-                Double value = SpecNumbers.specDouble(element, path, violations);
-                if (value != null) {
-                    if (!Double.isFinite(value)) {
-                        violations.add(new Violation(path, "must be a finite number, got " + value));
-                    }
-                    additionalProperties.put(key, value);
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Metrics(additionalProperties);
+        Double value = SpecNumbers.specDouble(element, path, violations);
+        if (value != null) {
+          if (!Double.isFinite(value)) {
+            violations.add(new Violation(path, "must be a finite number, got " + value));
+          }
+          additionalProperties.put(key, value);
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Metrics(additionalProperties);
     }
+  }
 }

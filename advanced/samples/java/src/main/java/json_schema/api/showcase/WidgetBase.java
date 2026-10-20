@@ -19,165 +19,180 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A base object folded into Widget via allOf. It stays its own type; Widget copies its
- * fields rather than referencing or subtyping it.
+ * A base object folded into Widget via allOf. It stays its own type; Widget copies its fields
+ * rather than referencing or subtyping it.
  */
 @JsonSerialize(using = WidgetBase.Serializer.class)
 @JsonDeserialize(using = WidgetBase.Deserializer.class)
 public final class WidgetBase {
-    private final String id;
-    private final @Nullable String kind;
-    private final Map<String, JsonNode> additionalProperties;
+  private final String id;
+  private final @Nullable String kind;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public WidgetBase(String id, @Nullable String kind, Map<String, JsonNode> additionalProperties) {
-        this.id = id;
-        this.kind = kind;
-        this.additionalProperties = additionalProperties;
+  public WidgetBase(String id, @Nullable String kind, Map<String, JsonNode> additionalProperties) {
+    this.id = id;
+    this.kind = kind;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public String getId() {
+    return id;
+  }
+
+  public @Nullable String getKind() {
+    return kind;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getId() {
-        return id;
+    if (!(other instanceof WidgetBase)) {
+      return false;
     }
+    WidgetBase that = (WidgetBase) other;
+    return Objects.equals(this.id, that.id)
+        && Objects.equals(this.kind, that.kind)
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
-    public @Nullable String getKind() {
-        return kind;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(id, kind, additionalProperties);
+  }
 
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
-    }
+  @Override
+  public String toString() {
+    return "WidgetBase{"
+        + "id="
+        + id
+        + ", kind="
+        + kind
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
 
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<WidgetBase> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(WidgetBase value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.id == null) {
+        violations.add(new Violation("id", "required"));
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.id != null) {
+        wireKeys.add("id");
+      }
+      if (value.kind != null) {
+        wireKeys.add("kind");
+      }
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
         }
-        if (!(other instanceof WidgetBase)) {
-            return false;
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.id != null) {
+        gen.writeStringField("id", value.id);
+      }
+      if (value.kind != null) {
+        gen.writeStringField("kind", value.kind);
+      }
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
         }
-        WidgetBase that = (WidgetBase) other;
-        return Objects.equals(this.id, that.id)
-            && Objects.equals(this.kind, that.kind)
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<WidgetBase> {
     @Override
-    public int hashCode() {
-        return Objects.hash(id, kind, additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "WidgetBase{"
-            + "id=" + id
-            + ", kind=" + kind
-            + ", additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<WidgetBase> {
-        @Override
-        public void serialize(WidgetBase value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.id == null) {
-                violations.add(new Violation("id", "required"));
-            }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.id != null) {
-                wireKeys.add("id");
-            }
-            if (value.kind != null) {
-                wireKeys.add("kind");
-            }
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.id != null) {
-                gen.writeStringField("id", value.id);
-            }
-            if (value.kind != null) {
-                gen.writeStringField("kind", value.kind);
-            }
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public WidgetBase deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "id":
+          case "kind":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<WidgetBase> {
-        @Override
-        public WidgetBase deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "id":
-                    case "kind":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            String id = null;
-            {
-                JsonNode field = node.get("id");
-                if (field == null) {
-                    violations.add(new Violation("id", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("id", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("id", "expected string"));
-                    } else {
-                        id = field.textValue();
-                    }
-                }
-            }
-            String kind = null;
-            {
-                JsonNode field = node.get("kind");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("kind", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("kind", "expected string"));
-                    } else {
-                        kind = field.textValue();
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new WidgetBase(id, kind, additionalProperties);
+      }
+      String id = null;
+      {
+        JsonNode field = node.get("id");
+        if (field == null) {
+          violations.add(new Violation("id", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("id", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("id", "expected string"));
+          } else {
+            id = field.textValue();
+          }
         }
+      }
+      String kind = null;
+      {
+        JsonNode field = node.get("kind");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("kind", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("kind", "expected string"));
+          } else {
+            kind = field.textValue();
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new WidgetBase(id, kind, additionalProperties);
     }
+  }
 }

@@ -460,7 +460,7 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
         },
         descriptor_paths: vec![repo_root.join("advanced/samples/descriptors/temporal_api.bin")],
         output_path: output_path.clone(),
-        format: false,
+        format: language == Language::Java,
         java_package_name: (language == Language::Java)
             .then(|| example_directory_name(language, example_id)),
         ts_date_time_types: Default::default(),
@@ -524,7 +524,7 @@ fn build_json_example_variant(
             support_package: None,
             descriptor_paths: Vec::new(),
             output_path: output_path.clone(),
-            format: false,
+            format: language == Language::Java,
             java_package_name: (language == Language::Java)
                 .then(|| json_example_java_package(&dir_name, mode)),
             ts_date_time_types,

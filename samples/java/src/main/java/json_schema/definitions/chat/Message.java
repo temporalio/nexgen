@@ -14,267 +14,272 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A chat message.
- */
+/** A chat message. */
 @JsonSerialize(using = Message.Serializer.class)
 @JsonDeserialize(using = Message.Deserializer.class)
 public final class Message {
-    public static final class Kind {
-        public static final Kind TEXT = new Kind("text");
+  public static final class Kind {
+    public static final Kind TEXT = new Kind("text");
 
-        private final String value;
+    private final String value;
 
-        private Kind(String value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static @Nullable Kind fromString(String value) {
-            if (value == null) {
-                return null;
-            }
-            if ("text".equals(value)) {
-                return TEXT;
-            }
-            throw new IllegalArgumentException("must equal \"text\", got \"" + value + "\"");
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Kind)) {
-                return false;
-            }
-            Kind that = (Kind) other;
-            return Objects.equals(this.value, that.value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Kind[" + value + "]";
-        }
+    private Kind(String value) {
+      this.value = value;
     }
 
-    private final Kind kind;
-    private final String body;
-    private final @Nullable String replyToId;
-    private final @Nullable Long priority;
-
-    public Message(Kind kind, String body, @Nullable String replyToId, @Nullable Long priority) {
-        this.kind = kind;
-        this.body = body;
-        this.replyToId = replyToId;
-        this.priority = priority;
+    @JsonCreator
+    public static @Nullable Kind fromString(String value) {
+      if (value == null) {
+        return null;
+      }
+      if ("text".equals(value)) {
+        return TEXT;
+      }
+      throw new IllegalArgumentException("must equal \"text\", got \"" + value + "\"");
     }
 
-    /**
-     * Discriminator; always "text".
-     */
-    public Kind getKind() {
-        return kind;
-    }
-
-    public String getBody() {
-        return body;
-    }
-
-    /**
-     * Id of the message this replies to, if any.
-     */
-    public @Nullable String getReplyToId() {
-        return replyToId;
-    }
-
-    /**
-     * Delivery priority.
-     */
-    public @Nullable Long getPriority() {
-        return priority;
-    }
-
-    public long getPriorityOrDefault() {
-        return priority != null ? priority : 0L;
+    @JsonValue
+    public String getValue() {
+      return value;
     }
 
     @Override
     public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof Message)) {
-            return false;
-        }
-        Message that = (Message) other;
-        return Objects.equals(this.kind, that.kind)
-            && Objects.equals(this.body, that.body)
-            && Objects.equals(this.replyToId, that.replyToId)
-            && Objects.equals(this.priority, that.priority);
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Kind)) {
+        return false;
+      }
+      Kind that = (Kind) other;
+      return Objects.equals(this.value, that.value);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(kind, body, replyToId, priority);
+      return Objects.hash(value);
     }
 
     @Override
     public String toString() {
-        return "Message{"
-            + "kind=" + kind
-            + ", body=" + body
-            + ", replyToId=" + replyToId
-            + ", priority=" + priority
-            + "}";
+      return "Kind[" + value + "]";
     }
+  }
 
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Message> {
-        @Override
-        public void serialize(Message value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.kind == null) {
-                violations.add(new Violation("kind", "required"));
-            }
-            if (value.body == null) {
-                violations.add(new Violation("body", "required"));
-            }
-            if (value.priority != null) {
-                if (value.priority < -SpecNumbers.INTEGER_CAP || value.priority > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("priority", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.kind != null) {
-                gen.writeStringField("kind", value.kind.getValue());
-            }
-            if (value.body != null) {
-                gen.writeStringField("body", value.body);
-            }
-            if (value.replyToId != null) {
-                gen.writeStringField("replyToId", value.replyToId);
-            }
-            if (value.priority != null) {
-                gen.writeNumberField("priority", value.priority);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
-        }
-    }
+  private final Kind kind;
+  private final String body;
+  private final @Nullable String replyToId;
+  private final @Nullable Long priority;
 
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Message> {
-        @Override
-        public Message deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "body":
-                    case "kind":
-                    case "priority":
-                    case "replyToId":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            Kind kind = null;
-            {
-                JsonNode field = node.get("kind");
-                if (field == null) {
-                    violations.add(new Violation("kind", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("kind", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("kind", "expected string"));
-                    } else {
-                        String kindValue = field.textValue();
-                        if ("text".equals(kindValue)) {
-                            kind = Kind.TEXT;
-                        } else {
-                            violations.add(new Violation("kind", "must equal \"text\""));
-                        }
-                    }
-                }
-            }
-            String body = null;
-            {
-                JsonNode field = node.get("body");
-                if (field == null) {
-                    violations.add(new Violation("body", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("body", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("body", "expected string"));
-                    } else {
-                        body = field.textValue();
-                    }
-                }
-            }
-            String replyToId = null;
-            {
-                JsonNode field = node.get("replyToId");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("replyToId", "expected string"));
-                    } else {
-                        replyToId = field.textValue();
-                    }
-                }
-            }
-            Long priority = null;
-            {
-                JsonNode field = node.get("priority");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("priority", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "priority", violations);
-                    if (numberValue != null) {
-                        priority = numberValue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Message(kind, body, replyToId, priority);
-        }
+  public Message(Kind kind, String body, @Nullable String replyToId, @Nullable Long priority) {
+    this.kind = kind;
+    this.body = body;
+    this.replyToId = replyToId;
+    this.priority = priority;
+  }
+
+  /** Discriminator; always "text". */
+  public Kind getKind() {
+    return kind;
+  }
+
+  public String getBody() {
+    return body;
+  }
+
+  /** Id of the message this replies to, if any. */
+  public @Nullable String getReplyToId() {
+    return replyToId;
+  }
+
+  /** Delivery priority. */
+  public @Nullable Long getPriority() {
+    return priority;
+  }
+
+  public long getPriorityOrDefault() {
+    return priority != null ? priority : 0L;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
+    if (!(other instanceof Message)) {
+      return false;
+    }
+    Message that = (Message) other;
+    return Objects.equals(this.kind, that.kind)
+        && Objects.equals(this.body, that.body)
+        && Objects.equals(this.replyToId, that.replyToId)
+        && Objects.equals(this.priority, that.priority);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(kind, body, replyToId, priority);
+  }
+
+  @Override
+  public String toString() {
+    return "Message{"
+        + "kind="
+        + kind
+        + ", body="
+        + body
+        + ", replyToId="
+        + replyToId
+        + ", priority="
+        + priority
+        + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Message> {
+    @Override
+    public void serialize(Message value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.kind == null) {
+        violations.add(new Violation("kind", "required"));
+      }
+      if (value.body == null) {
+        violations.add(new Violation("body", "required"));
+      }
+      if (value.priority != null) {
+        if (value.priority < -SpecNumbers.INTEGER_CAP || value.priority > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("priority", "exceeds \u00b1(2^53-1) integer cap"));
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.kind != null) {
+        gen.writeStringField("kind", value.kind.getValue());
+      }
+      if (value.body != null) {
+        gen.writeStringField("body", value.body);
+      }
+      if (value.replyToId != null) {
+        gen.writeStringField("replyToId", value.replyToId);
+      }
+      if (value.priority != null) {
+        gen.writeNumberField("priority", value.priority);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
+    }
+  }
+
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Message> {
+    @Override
+    public Message deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "body":
+          case "kind":
+          case "priority":
+          case "replyToId":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
+        }
+      }
+      Kind kind = null;
+      {
+        JsonNode field = node.get("kind");
+        if (field == null) {
+          violations.add(new Violation("kind", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("kind", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("kind", "expected string"));
+          } else {
+            String kindValue = field.textValue();
+            if ("text".equals(kindValue)) {
+              kind = Kind.TEXT;
+            } else {
+              violations.add(new Violation("kind", "must equal \"text\""));
+            }
+          }
+        }
+      }
+      String body = null;
+      {
+        JsonNode field = node.get("body");
+        if (field == null) {
+          violations.add(new Violation("body", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("body", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("body", "expected string"));
+          } else {
+            body = field.textValue();
+          }
+        }
+      }
+      String replyToId = null;
+      {
+        JsonNode field = node.get("replyToId");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("replyToId", "expected string"));
+          } else {
+            replyToId = field.textValue();
+          }
+        }
+      }
+      Long priority = null;
+      {
+        JsonNode field = node.get("priority");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("priority", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "priority", violations);
+          if (numberValue != null) {
+            priority = numberValue;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Message(kind, body, replyToId, priority);
+    }
+  }
 }

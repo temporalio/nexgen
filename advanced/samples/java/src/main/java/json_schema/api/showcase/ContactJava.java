@@ -19,217 +19,244 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Contact details with a conditional requirement and a member-count bound: a shipping
- * street requires a shipping zip (dependentRequired), and the object must carry 1 to 3
- * members (minProperties/maxProperties on a declared-property object). Also exercises
- * the type-level `x-&lt;lang&gt;-name` override (the Stage 4 escape hatch): the emitted
- * type is renamed to the derived name plus a per-language suffix (Go `ContactGo`, TS
- * `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its declaration and at every
- * `$ref`, while the wire `$ref` name stays `Contact`.
+ * Contact details with a conditional requirement and a member-count bound: a shipping street
+ * requires a shipping zip (dependentRequired), and the object must carry 1 to 3 members
+ * (minProperties/maxProperties on a declared-property object). Also exercises the type-level
+ * `x-&lt;lang&gt;-name` override (the Stage 4 escape hatch): the emitted type is renamed to the
+ * derived name plus a per-language suffix (Go `ContactGo`, TS `ContactTs`, Python `ContactPy`, Java
+ * `ContactJava`) at its declaration and at every `$ref`, while the wire `$ref` name stays
+ * `Contact`.
  */
 @JsonSerialize(using = ContactJava.Serializer.class)
 @JsonDeserialize(using = ContactJava.Deserializer.class)
 public final class ContactJava {
-    private final @Nullable String email;
-    private final @Nullable String shippingStreet;
-    private final @Nullable String shippingZip;
-    private final Map<String, JsonNode> additionalProperties;
+  private final @Nullable String email;
+  private final @Nullable String shippingStreet;
+  private final @Nullable String shippingZip;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public ContactJava(@Nullable String email, @Nullable String shippingStreet, @Nullable String shippingZip, Map<String, JsonNode> additionalProperties) {
-        this.email = email;
-        this.shippingStreet = shippingStreet;
-        this.shippingZip = shippingZip;
-        this.additionalProperties = additionalProperties;
+  public ContactJava(
+      @Nullable String email,
+      @Nullable String shippingStreet,
+      @Nullable String shippingZip,
+      Map<String, JsonNode> additionalProperties) {
+    this.email = email;
+    this.shippingStreet = shippingStreet;
+    this.shippingZip = shippingZip;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public @Nullable String getEmail() {
+    return email;
+  }
+
+  public @Nullable String getShippingStreet() {
+    return shippingStreet;
+  }
+
+  public @Nullable String getShippingZip() {
+    return shippingZip;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public @Nullable String getEmail() {
-        return email;
+    if (!(other instanceof ContactJava)) {
+      return false;
     }
+    ContactJava that = (ContactJava) other;
+    return Objects.equals(this.email, that.email)
+        && Objects.equals(this.shippingStreet, that.shippingStreet)
+        && Objects.equals(this.shippingZip, that.shippingZip)
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
-    public @Nullable String getShippingStreet() {
-        return shippingStreet;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(email, shippingStreet, shippingZip, additionalProperties);
+  }
 
-    public @Nullable String getShippingZip() {
-        return shippingZip;
-    }
+  @Override
+  public String toString() {
+    return "ContactJava{"
+        + "email="
+        + email
+        + ", shippingStreet="
+        + shippingStreet
+        + ", shippingZip="
+        + shippingZip
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
 
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
-    }
-
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<ContactJava> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(ContactJava value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.email != null) {
+        wireKeys.add("email");
+      }
+      if (value.shippingStreet != null) {
+        wireKeys.add("shippingStreet");
+      }
+      if (value.shippingZip != null) {
+        wireKeys.add("shippingZip");
+      }
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
         }
-        if (!(other instanceof ContactJava)) {
-            return false;
+      }
+      if (wireKeys.size() < 1) {
+        violations.add(
+            new Violation("", "must have at least 1 properties, got " + wireKeys.size()));
+      }
+      if (wireKeys.size() > 3) {
+        violations.add(new Violation("", "must have at most 3 properties, got " + wireKeys.size()));
+      }
+      if (wireKeys.contains("shippingStreet")) {
+        if (!(wireKeys.contains("shippingZip"))) {
+          violations.add(
+              new Violation(
+                  "shippingZip",
+                  "property \"shippingZip\" is required when \"shippingStreet\" is present"));
         }
-        ContactJava that = (ContactJava) other;
-        return Objects.equals(this.email, that.email)
-            && Objects.equals(this.shippingStreet, that.shippingStreet)
-            && Objects.equals(this.shippingZip, that.shippingZip)
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.email != null) {
+        gen.writeStringField("email", value.email);
+      }
+      if (value.shippingStreet != null) {
+        gen.writeStringField("shippingStreet", value.shippingStreet);
+      }
+      if (value.shippingZip != null) {
+        gen.writeStringField("shippingZip", value.shippingZip);
+      }
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<ContactJava> {
     @Override
-    public int hashCode() {
-        return Objects.hash(email, shippingStreet, shippingZip, additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "ContactJava{"
-            + "email=" + email
-            + ", shippingStreet=" + shippingStreet
-            + ", shippingZip=" + shippingZip
-            + ", additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<ContactJava> {
-        @Override
-        public void serialize(ContactJava value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.email != null) {
-                wireKeys.add("email");
-            }
-            if (value.shippingStreet != null) {
-                wireKeys.add("shippingStreet");
-            }
-            if (value.shippingZip != null) {
-                wireKeys.add("shippingZip");
-            }
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (wireKeys.size() < 1) {
-                violations.add(new Violation("", "must have at least 1 properties, got " + wireKeys.size()));
-            }
-            if (wireKeys.size() > 3) {
-                violations.add(new Violation("", "must have at most 3 properties, got " + wireKeys.size()));
-            }
-            if (wireKeys.contains("shippingStreet")) {
-                if (!(wireKeys.contains("shippingZip"))) {
-                    violations.add(new Violation("shippingZip", "property \"shippingZip\" is required when \"shippingStreet\" is present"));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.email != null) {
-                gen.writeStringField("email", value.email);
-            }
-            if (value.shippingStreet != null) {
-                gen.writeStringField("shippingStreet", value.shippingStreet);
-            }
-            if (value.shippingZip != null) {
-                gen.writeStringField("shippingZip", value.shippingZip);
-            }
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public ContactJava deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "email":
+          case "shippingStreet":
+          case "shippingZip":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<ContactJava> {
-        @Override
-        public ContactJava deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "email":
-                    case "shippingStreet":
-                    case "shippingZip":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            String email = null;
-            {
-                JsonNode field = node.get("email");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("email", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("email", "expected string"));
-                    } else {
-                        email = field.textValue();
-                    }
-                }
-            }
-            String shippingStreet = null;
-            {
-                JsonNode field = node.get("shippingStreet");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("shippingStreet", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("shippingStreet", "expected string"));
-                    } else {
-                        shippingStreet = field.textValue();
-                    }
-                }
-            }
-            String shippingZip = null;
-            {
-                JsonNode field = node.get("shippingZip");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("shippingZip", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("shippingZip", "expected string"));
-                    } else {
-                        shippingZip = field.textValue();
-                    }
-                }
-            }
-            if (node.size() < 1) {
-                violations.add(new Violation("", "must have at least 1 properties, got " + node.size()));
-            }
-            if (node.size() > 3) {
-                violations.add(new Violation("", "must have at most 3 properties, got " + node.size()));
-            }
-            if (node.has("shippingStreet")) {
-                if (!node.has("shippingZip")) {
-                    violations.add(new Violation("shippingZip", "property \"shippingZip\" is required when \"shippingStreet\" is present"));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new ContactJava(email, shippingStreet, shippingZip, additionalProperties);
+      }
+      String email = null;
+      {
+        JsonNode field = node.get("email");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("email", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("email", "expected string"));
+          } else {
+            email = field.textValue();
+          }
         }
+      }
+      String shippingStreet = null;
+      {
+        JsonNode field = node.get("shippingStreet");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("shippingStreet", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("shippingStreet", "expected string"));
+          } else {
+            shippingStreet = field.textValue();
+          }
+        }
+      }
+      String shippingZip = null;
+      {
+        JsonNode field = node.get("shippingZip");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("shippingZip", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("shippingZip", "expected string"));
+          } else {
+            shippingZip = field.textValue();
+          }
+        }
+      }
+      if (node.size() < 1) {
+        violations.add(new Violation("", "must have at least 1 properties, got " + node.size()));
+      }
+      if (node.size() > 3) {
+        violations.add(new Violation("", "must have at most 3 properties, got " + node.size()));
+      }
+      if (node.has("shippingStreet")) {
+        if (!node.has("shippingZip")) {
+          violations.add(
+              new Violation(
+                  "shippingZip",
+                  "property \"shippingZip\" is required when \"shippingStreet\" is present"));
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new ContactJava(email, shippingStreet, shippingZip, additionalProperties);
     }
+  }
 }

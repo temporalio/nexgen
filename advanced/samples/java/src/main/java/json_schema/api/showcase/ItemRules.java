@@ -12,169 +12,192 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Closed array elements are enforced before the array-level predicates, so indexed
- * violations precede minItems and uniqueItems deterministically.
+ * Closed array elements are enforced before the array-level predicates, so indexed violations
+ * precede minItems and uniqueItems deterministically.
  */
 @JsonSerialize(using = ItemRules.Serializer.class)
 @JsonDeserialize(using = ItemRules.Deserializer.class)
 public final class ItemRules {
-    private final List<String> values;
+  private final List<String> values;
 
-    public ItemRules(List<String> values) {
-        this.values = values;
+  public ItemRules(List<String> values) {
+    this.values = values;
+  }
+
+  public List<String> getValues() {
+    return values;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public List<String> getValues() {
-        return values;
+    if (!(other instanceof ItemRules)) {
+      return false;
     }
+    ItemRules that = (ItemRules) other;
+    return Objects.equals(this.values, that.values);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(values);
+  }
+
+  @Override
+  public String toString() {
+    return "ItemRules{" + "values=" + values + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<ItemRules> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(ItemRules value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.values == null) {
+        violations.add(new Violation("values", "required"));
+      } else {
+        for (int validationIndex0 = 0; validationIndex0 < value.values.size(); validationIndex0++) {
+          String validationValue0 = value.values.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "values" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+            if (!("fixed".equals(validationValue0))) {
+              violations.add(
+                  new Violation(
+                      "values" + "[" + validationIndex0 + "]",
+                      "must equal \"fixed\", got " + validationValue0));
+            }
+          }
         }
-        if (!(other instanceof ItemRules)) {
-            return false;
+        if (value.values.size() < 3) {
+          violations.add(
+              new Violation("values", "must have at least 3 items, got " + value.values.size()));
         }
-        ItemRules that = (ItemRules) other;
-        return Objects.equals(this.values, that.values);
+        java.util.Map<Object, Integer> seen = new java.util.HashMap<>();
+        for (int index = 0; index < value.values.size(); index++) {
+          Object element = value.values.get(index);
+          Integer priorIndex = seen.get(element);
+          if (priorIndex != null) {
+            violations.add(
+                new Violation(
+                    "values",
+                    "duplicate items: element at index " + index + " equals index " + priorIndex));
+          } else {
+            seen.put(element, index);
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.values != null) {
+        gen.writeFieldName("values");
+        serializers.defaultSerializeValue(value.values, gen);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<ItemRules> {
     @Override
-    public int hashCode() {
-        return Objects.hash(values);
-    }
-
-    @Override
-    public String toString() {
-        return "ItemRules{"
-            + "values=" + values
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<ItemRules> {
-        @Override
-        public void serialize(ItemRules value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.values == null) {
-                violations.add(new Violation("values", "required"));
-            } else {
-                for (int validationIndex0 = 0; validationIndex0 < value.values.size(); validationIndex0++) {
-                    String validationValue0 = value.values.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("values" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                        if (!("fixed".equals(validationValue0))) {
-                            violations.add(new Violation("values" + "[" + validationIndex0 + "]", "must equal \"fixed\", got " + validationValue0));
-                        }
-                    }
-                }
-                if (value.values.size() < 3) {
-                    violations.add(new Violation("values", "must have at least 3 items, got " + value.values.size()));
-                }
-                java.util.Map<Object, Integer> seen = new java.util.HashMap<>();
-                for (int index = 0; index < value.values.size(); index++) {
-                    Object element = value.values.get(index);
-                    Integer priorIndex = seen.get(element);
-                    if (priorIndex != null) {
-                        violations.add(new Violation("values", "duplicate items: element at index " + index + " equals index " + priorIndex));
-                    } else {
-                        seen.put(element, index);
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.values != null) {
-                gen.writeFieldName("values");
-                serializers.defaultSerializeValue(value.values, gen);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public ItemRules deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "values":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<ItemRules> {
-        @Override
-        public ItemRules deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "values":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
+      }
+      List<String> values = null;
+      {
+        JsonNode field = node.get("values");
+        if (field == null) {
+          violations.add(new Violation("values", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("values", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("values", "expected array"));
+          } else {
+            List<String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "values" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                if (!("fixed".equals(parsed))) {
+                  violations.add(new Violation(elementPath, "must equal \"fixed\", got " + parsed));
                 }
+                items.add(parsed);
+              }
             }
-            List<String> values = null;
-            {
-                JsonNode field = node.get("values");
-                if (field == null) {
-                    violations.add(new Violation("values", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("values", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("values", "expected array"));
-                    } else {
-                        List<String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "values" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                if (!("fixed".equals(parsed))) {
-                                    violations.add(new Violation(elementPath, "must equal \"fixed\", got " + parsed));
-                                }
-                                items.add(parsed);
-                            }
-                        }
-                        values = items;
-                        if (field.size() < 3) {
-                            violations.add(new Violation("values", "must have at least 3 items, got " + field.size()));
-                        }
-                        java.util.Map<Object, Integer> rawSeen = new java.util.HashMap<>();
-                        for (int rawIndex = 0; rawIndex < field.size(); rawIndex++) {
-                            Object rawKey = SpecNumbers.valueKey(field.get(rawIndex));
-                            Integer priorIndex = rawSeen.get(rawKey);
-                            if (priorIndex != null) {
-                                violations.add(new Violation("values", "duplicate items: element at index " + rawIndex + " equals index " + priorIndex));
-                            } else {
-                                rawSeen.put(rawKey, rawIndex);
-                            }
-                        }
-                    }
-                }
+            values = items;
+            if (field.size() < 3) {
+              violations.add(
+                  new Violation("values", "must have at least 3 items, got " + field.size()));
             }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
+            java.util.Map<Object, Integer> rawSeen = new java.util.HashMap<>();
+            for (int rawIndex = 0; rawIndex < field.size(); rawIndex++) {
+              Object rawKey = SpecNumbers.valueKey(field.get(rawIndex));
+              Integer priorIndex = rawSeen.get(rawKey);
+              if (priorIndex != null) {
+                violations.add(
+                    new Violation(
+                        "values",
+                        "duplicate items: element at index "
+                            + rawIndex
+                            + " equals index "
+                            + priorIndex));
+              } else {
+                rawSeen.put(rawKey, rawIndex);
+              }
             }
-            return new ItemRules(values);
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new ItemRules(values);
     }
+  }
 }

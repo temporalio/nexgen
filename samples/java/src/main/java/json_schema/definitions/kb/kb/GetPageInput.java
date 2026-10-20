@@ -12,9 +12,7 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import json_schema.definitions.kb.SpecNumbers;
 import json_schema.definitions.kb.Violation;
@@ -23,104 +21,113 @@ import org.jspecify.annotations.Nullable;
 @JsonSerialize(using = GetPageInput.Serializer.class)
 @JsonDeserialize(using = GetPageInput.Deserializer.class)
 public final class GetPageInput {
-    private final String pageId;
+  private final String pageId;
 
-    public GetPageInput(String pageId) {
-        this.pageId = pageId;
+  public GetPageInput(String pageId) {
+    this.pageId = pageId;
+  }
+
+  public String getPageId() {
+    return pageId;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getPageId() {
-        return pageId;
+    if (!(other instanceof GetPageInput)) {
+      return false;
     }
+    GetPageInput that = (GetPageInput) other;
+    return Objects.equals(this.pageId, that.pageId);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(pageId);
+  }
+
+  @Override
+  public String toString() {
+    return "GetPageInput{" + "pageId=" + pageId + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<GetPageInput> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof GetPageInput)) {
-            return false;
-        }
-        GetPageInput that = (GetPageInput) other;
-        return Objects.equals(this.pageId, that.pageId);
+    public void serialize(GetPageInput value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.pageId == null) {
+        violations.add(new Violation("pageId", "required"));
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.pageId != null) {
+        gen.writeStringField("pageId", value.pageId);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<GetPageInput> {
     @Override
-    public int hashCode() {
-        return Objects.hash(pageId);
-    }
-
-    @Override
-    public String toString() {
-        return "GetPageInput{"
-            + "pageId=" + pageId
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<GetPageInput> {
-        @Override
-        public void serialize(GetPageInput value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.pageId == null) {
-                violations.add(new Violation("pageId", "required"));
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.pageId != null) {
-                gen.writeStringField("pageId", value.pageId);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public GetPageInput deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "pageId":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<GetPageInput> {
-        @Override
-        public GetPageInput deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "pageId":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String pageId = null;
-            {
-                JsonNode field = node.get("pageId");
-                if (field == null) {
-                    violations.add(new Violation("pageId", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("pageId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("pageId", "expected string"));
-                    } else {
-                        pageId = field.textValue();
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new GetPageInput(pageId);
+      }
+      String pageId = null;
+      {
+        JsonNode field = node.get("pageId");
+        if (field == null) {
+          violations.add(new Violation("pageId", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("pageId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("pageId", "expected string"));
+          } else {
+            pageId = field.textValue();
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new GetPageInput(pageId);
     }
+  }
 }

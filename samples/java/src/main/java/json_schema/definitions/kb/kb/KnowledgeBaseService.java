@@ -7,26 +7,18 @@ import json_schema.definitions.kb.content.block.Block;
 import json_schema.definitions.kb.content.page.Page;
 import json_schema.definitions.kb.tree.category.Category;
 
-/**
- * Fetch and update pages, blocks, and the category tree.
- */
+/** Fetch and update pages, blocks, and the category tree. */
 @Service(name = "example.kb.v1.KnowledgeBaseService")
 public interface KnowledgeBaseService {
-    /**
-     * Fetch a page by id.
-     */
-    @Operation(name = "GetPage")
-    Page getPage(GetPageInput input);
+  /** Fetch a page by id. */
+  @Operation(name = "GetPage")
+  Page getPage(GetPageInput input);
 
-    /**
-     * Create or update a content block.
-     */
-    @Operation(name = "PutBlock")
-    PutBlockOutput putBlock(Block input);
+  /** Create or update a content block. */
+  @Operation(name = "PutBlock")
+  PutBlockOutput putBlock(Block input);
 
-    /**
-     * Fetch the category tree rooted at a category.
-     */
-    @Operation(name = "GetCategoryTree")
-    Category getCategoryTree(GetCategoryTreeInput input);
+  /** Fetch the category tree rooted at a category. */
+  @Operation(name = "GetCategoryTree")
+  Category getCategoryTree(GetCategoryTreeInput input);
 }

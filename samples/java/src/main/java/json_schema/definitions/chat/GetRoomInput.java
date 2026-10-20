@@ -12,113 +12,120 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 @JsonSerialize(using = GetRoomInput.Serializer.class)
 @JsonDeserialize(using = GetRoomInput.Deserializer.class)
 public final class GetRoomInput {
-    private final String roomId;
+  private final String roomId;
 
-    public GetRoomInput(String roomId) {
-        this.roomId = roomId;
+  public GetRoomInput(String roomId) {
+    this.roomId = roomId;
+  }
+
+  public String getRoomId() {
+    return roomId;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getRoomId() {
-        return roomId;
+    if (!(other instanceof GetRoomInput)) {
+      return false;
     }
+    GetRoomInput that = (GetRoomInput) other;
+    return Objects.equals(this.roomId, that.roomId);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(roomId);
+  }
+
+  @Override
+  public String toString() {
+    return "GetRoomInput{" + "roomId=" + roomId + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<GetRoomInput> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof GetRoomInput)) {
-            return false;
-        }
-        GetRoomInput that = (GetRoomInput) other;
-        return Objects.equals(this.roomId, that.roomId);
+    public void serialize(GetRoomInput value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.roomId == null) {
+        violations.add(new Violation("roomId", "required"));
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.roomId != null) {
+        gen.writeStringField("roomId", value.roomId);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<GetRoomInput> {
     @Override
-    public int hashCode() {
-        return Objects.hash(roomId);
-    }
-
-    @Override
-    public String toString() {
-        return "GetRoomInput{"
-            + "roomId=" + roomId
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<GetRoomInput> {
-        @Override
-        public void serialize(GetRoomInput value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.roomId == null) {
-                violations.add(new Violation("roomId", "required"));
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.roomId != null) {
-                gen.writeStringField("roomId", value.roomId);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public GetRoomInput deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "roomId":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<GetRoomInput> {
-        @Override
-        public GetRoomInput deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "roomId":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String roomId = null;
-            {
-                JsonNode field = node.get("roomId");
-                if (field == null) {
-                    violations.add(new Violation("roomId", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("roomId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("roomId", "expected string"));
-                    } else {
-                        roomId = field.textValue();
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new GetRoomInput(roomId);
+      }
+      String roomId = null;
+      {
+        JsonNode field = node.get("roomId");
+        if (field == null) {
+          violations.add(new Violation("roomId", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("roomId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("roomId", "expected string"));
+          } else {
+            roomId = field.textValue();
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new GetRoomInput(roomId);
     }
+  }
 }

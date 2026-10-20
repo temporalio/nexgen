@@ -12,142 +12,145 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A closed object; unknown members are rejected.
- */
+/** A closed object; unknown members are rejected. */
 @JsonSerialize(using = Settings.Serializer.class)
 @JsonDeserialize(using = Settings.Deserializer.class)
 public final class Settings {
-    private final @Nullable String theme;
-    private final @Nullable Long fontSize;
+  private final @Nullable String theme;
+  private final @Nullable Long fontSize;
 
-    public Settings(@Nullable String theme, @Nullable Long fontSize) {
-        this.theme = theme;
-        this.fontSize = fontSize;
+  public Settings(@Nullable String theme, @Nullable Long fontSize) {
+    this.theme = theme;
+    this.fontSize = fontSize;
+  }
+
+  public @Nullable String getTheme() {
+    return theme;
+  }
+
+  public @Nullable Long getFontSize() {
+    return fontSize;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public @Nullable String getTheme() {
-        return theme;
+    if (!(other instanceof Settings)) {
+      return false;
     }
+    Settings that = (Settings) other;
+    return Objects.equals(this.theme, that.theme) && Objects.equals(this.fontSize, that.fontSize);
+  }
 
-    public @Nullable Long getFontSize() {
-        return fontSize;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(theme, fontSize);
+  }
 
+  @Override
+  public String toString() {
+    return "Settings{" + "theme=" + theme + ", fontSize=" + fontSize + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Settings> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Settings value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.fontSize != null) {
+        if (value.fontSize < -SpecNumbers.INTEGER_CAP || value.fontSize > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("fontSize", "exceeds \u00b1(2^53-1) integer cap"));
         }
-        if (!(other instanceof Settings)) {
-            return false;
-        }
-        Settings that = (Settings) other;
-        return Objects.equals(this.theme, that.theme)
-            && Objects.equals(this.fontSize, that.fontSize);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.theme != null) {
+        gen.writeStringField("theme", value.theme);
+      }
+      if (value.fontSize != null) {
+        gen.writeNumberField("fontSize", value.fontSize);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Settings> {
     @Override
-    public int hashCode() {
-        return Objects.hash(theme, fontSize);
-    }
-
-    @Override
-    public String toString() {
-        return "Settings{"
-            + "theme=" + theme
-            + ", fontSize=" + fontSize
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Settings> {
-        @Override
-        public void serialize(Settings value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.fontSize != null) {
-                if (value.fontSize < -SpecNumbers.INTEGER_CAP || value.fontSize > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("fontSize", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.theme != null) {
-                gen.writeStringField("theme", value.theme);
-            }
-            if (value.fontSize != null) {
-                gen.writeNumberField("fontSize", value.fontSize);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public Settings deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "fontSize":
+          case "theme":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Settings> {
-        @Override
-        public Settings deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "fontSize":
-                    case "theme":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String theme = null;
-            {
-                JsonNode field = node.get("theme");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("theme", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("theme", "expected string"));
-                    } else {
-                        theme = field.textValue();
-                    }
-                }
-            }
-            Long fontSize = null;
-            {
-                JsonNode field = node.get("fontSize");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("fontSize", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "fontSize", violations);
-                    if (numberValue != null) {
-                        fontSize = numberValue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Settings(theme, fontSize);
+      }
+      String theme = null;
+      {
+        JsonNode field = node.get("theme");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("theme", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("theme", "expected string"));
+          } else {
+            theme = field.textValue();
+          }
         }
+      }
+      Long fontSize = null;
+      {
+        JsonNode field = node.get("fontSize");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("fontSize", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "fontSize", violations);
+          if (numberValue != null) {
+            fontSize = numberValue;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Settings(theme, fontSize);
     }
+  }
 }
