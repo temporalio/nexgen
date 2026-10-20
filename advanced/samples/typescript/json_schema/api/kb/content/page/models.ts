@@ -6,17 +6,6 @@ import * as __nexgenDefinitions from "../../definitions";
 import { blockTransferTypeConverter } from "../block/models";
 import type { Block } from "../block/models";
 
-export function requiredField<T>(
-  value: T | null | undefined,
-  owner: string,
-  field: string,
-): T {
-  if (value == null) {
-    throw new Error(`missing required field ${owner}.${field}`);
-  }
-  return value;
-}
-
 /**
  * A page. One half of the Page <-> Block cross-file cycle. Because the cycle spans two
  * input files, Page and Block hoist together into Python's _recursive.py; the

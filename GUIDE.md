@@ -218,6 +218,10 @@ code calls `support.workflowNamespace()`. Include both the support module and
 generated output in your project. Run the project's TypeScript type checker (the
 sample uses `npm run typecheck`).
 
+Validation helpers such as `requiredField` are generated privately in each
+module that needs them. They are not exported and do not belong in your support
+module.
+
 ### .NET
 
 Pass the C# **namespace**, not a source path or assembly name:

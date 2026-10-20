@@ -4,17 +4,6 @@ import type { TransferTypeConverter } from "nexus-rpc";
 import { createPayloadValidationError } from "@temporalio/common";
 import * as __nexgenDefinitions from "../definitions";
 
-export function requiredField<T>(
-  value: T | null | undefined,
-  owner: string,
-  field: string,
-): T {
-  if (value == null) {
-    throw new Error(`missing required field ${owner}.${field}`);
-  }
-  return value;
-}
-
 export interface GetCategoryTreeInput {
   rootId: string;
 }

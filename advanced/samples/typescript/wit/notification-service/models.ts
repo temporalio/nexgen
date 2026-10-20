@@ -3,7 +3,7 @@
 import type { temporal } from "@temporalio/proto";
 import * as support from "../../support/temporal_model_converters";
 
-export function requiredField<T>(
+function requiredField<T>(
   value: T | null | undefined,
   owner: string,
   field: string,

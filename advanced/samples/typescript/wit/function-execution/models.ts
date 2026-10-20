@@ -3,17 +3,6 @@
 import type { temporal } from "@temporalio/proto";
 import * as support from "../../support/temporal_model_converters";
 
-export function requiredField<T>(
-  value: T | null | undefined,
-  owner: string,
-  field: string,
-): T {
-  if (value == null) {
-    throw new Error(`missing required field ${owner}.${field}`);
-  }
-  return value;
-}
-
 function requestArgsFromPayloads(
   payloads: temporal.api.common.v1.IPayloads | null | undefined,
 ): unknown[] | undefined {

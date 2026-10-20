@@ -3515,6 +3515,14 @@ fn contains_identifier(source: &str, identifier: &str) -> bool {
 }
 
 fn contains_qualified_identifier(source: &str, identifier: &str) -> bool {
+    contains_unqualified_identifier_followed_by(source, identifier, '.')
+}
+
+fn contains_unqualified_identifier_followed_by(
+    source: &str,
+    identifier: &str,
+    following: char,
+) -> bool {
     let chars = source.char_indices().collect::<Vec<_>>();
     let mut index = 0;
     while index < chars.len() {
@@ -3569,7 +3577,7 @@ fn contains_qualified_identifier(source: &str, identifier: &str) -> bool {
             while after < chars.len() && chars[after].1.is_whitespace() {
                 after += 1;
             }
-            if after < chars.len() && chars[after].1 == '.' {
+            if after < chars.len() && chars[after].1 == following {
                 return true;
             }
         }
@@ -4090,9 +4098,6 @@ fn render_models_module(
     let mode = crate::nexgen_config::current().mode;
     let mut body = String::new();
 
-    if mode == GenerationMode::NativeApi {
-        render_required_field(&mut body, true);
-    }
     let uses_function_payload_helpers = mode == GenerationMode::NativeApi
         && models.iter().any(|model| {
             model.fields.iter().any(|field| {
@@ -4151,6 +4156,7 @@ fn render_models_module(
         body.push('\n');
         body.push_str(&model_fragments.body);
     }
+    let body = with_private_required_field(body);
     let mut imports = String::new();
     let mut generated_value_imports = Vec::new();
     if crate::nexgen_config::current().system_nexus
@@ -4480,6 +4486,7 @@ fn render_operation_module(
     let mut body = String::new();
     render_operation_input_alias(&mut body, service, operation);
     render_operation_function(&mut body, service, operation);
+    let body = with_private_required_field(body);
     let mut imports = String::new();
     render_typescript_namespace_imports(
         &mut imports,
@@ -4493,7 +4500,6 @@ fn render_operation_module(
     );
     render_value_imports(&mut imports, "../services", &[service.attr_name.clone()]);
     let mut model_values = model_to_wire_function_names(models);
-    model_values.push("requiredField".to_string());
     model_values.sort();
     model_values.dedup();
     render_value_imports(
@@ -4648,10 +4654,18 @@ fn model_to_wire_function_names(models: &[&RenderedModel]) -> Vec<String> {
         .collect()
 }
 
-fn render_required_field(output: &mut String, exported: bool) {
-    if exported {
-        output.push_str("export ");
+fn with_private_required_field(body: String) -> String {
+    if !contains_unqualified_identifier_followed_by(&body, "requiredField", '(') {
+        return body;
     }
+    let mut output = String::new();
+    render_required_field(&mut output);
+    output.push('\n');
+    output.push_str(&body);
+    output
+}
+
+fn render_required_field(output: &mut String) {
     output.push_str("function requiredField<T>(\n");
     output.push_str("  value: T | null | undefined,\n");
     output.push_str("  owner: string,\n");
@@ -6631,6 +6645,25 @@ mod tests {
     use crate::nexgen_config::{NexgenConfig, current, scope};
     use crate::planning::PlannedType;
     use crate::spec::IntSpec;
+
+    #[test]
+    fn helper_calls_ignore_prose_literals_and_qualified_calls() {
+        let uses_helper = |source: &str| {
+            super::contains_unqualified_identifier_followed_by(source, "requiredField", '(')
+        };
+        assert!(uses_helper(
+            "return requiredField (value, 'Owner', 'field');"
+        ));
+        for source in [
+            "// requiredField(value)\nconst value = 1;",
+            "/** Call requiredField(value) here. */",
+            "const message = 'requiredField(value)';",
+            "const message = `requiredField(value)`;",
+            "support.requiredField(value);",
+        ] {
+            assert!(!uses_helper(source), "{source}");
+        }
+    }
 
     #[test]
     fn requirement_imports_are_structural() {
