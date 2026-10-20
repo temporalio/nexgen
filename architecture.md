@@ -134,9 +134,12 @@ The Java renderer receives the existing descriptor index directly for protobuf
 accessor names, collection shapes, and numeric widths. It emits typed protobuf
 getters/setters and ordinary Java collection conversions. Runtime requirements
 are tracked locally during Java rendering; only referenced helpers and value
-types are emitted. Converter scoping belongs to SDK internals; generated
-transfer converters obtain the active converter through the configured support
-class. This adds no planning metadata or compiler pass.
+types are emitted. Embedded payload carriers remain serialized in Java models,
+including generic protobuf fields and oneof cases. The renderer uses the planned
+wire bindings to select those carrier types before rendering its local model
+view. Transfer conversion is structural and requires no DataConverter or scoped
+state; API code owns serialization and typed decoding. This adds no planning
+metadata or compiler pass.
 
 System Nexus generation also emits `system-nexus-roots.txt`. Its entries come
 from the protobuf transfer types of operation inputs and outputs, including

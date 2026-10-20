@@ -31,17 +31,14 @@ public final class CancelWorkflowResponse {
     }
   }
 
-  public io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse toProto(
-      io.temporal.common.converter.DataConverter converter) {
+  public io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse toProto() {
     io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse.Builder proto =
         io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse.newBuilder();
     return proto.build();
   }
 
   public static CancelWorkflowResponse fromProto(
-      io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse proto,
-      io.temporal.common.converter.DataConverter converter,
-      java.lang.reflect.Type modelType) {
+      io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse proto) {
     Builder builder = CancelWorkflowResponse.newBuilder();
     return builder.build();
   }
@@ -53,18 +50,14 @@ public final class CancelWorkflowResponse {
     }
 
     public Object toTransferType(CancelWorkflowResponse value) {
-      return value == null
-          ? null
-          : value.toProto(support.TemporalModelConverters.currentDataConverter());
+      return value == null ? null : value.toProto();
     }
 
     public CancelWorkflowResponse fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
           : fromProto(
-              (io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse) value,
-              support.TemporalModelConverters.currentDataConverter(),
-              valueType);
+              (io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse) value);
     }
   }
 }

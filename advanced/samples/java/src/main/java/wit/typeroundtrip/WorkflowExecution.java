@@ -63,8 +63,7 @@ public final class WorkflowExecution {
     }
   }
 
-  public io.temporal.api.common.v1.WorkflowExecution toProto(
-      io.temporal.common.converter.DataConverter converter) {
+  public io.temporal.api.common.v1.WorkflowExecution toProto() {
     io.temporal.api.common.v1.WorkflowExecution.Builder proto =
         io.temporal.api.common.v1.WorkflowExecution.newBuilder();
     if (this.workflowId != null) proto.setWorkflowId((this.workflowId));
@@ -72,10 +71,7 @@ public final class WorkflowExecution {
     return proto.build();
   }
 
-  public static WorkflowExecution fromProto(
-      io.temporal.api.common.v1.WorkflowExecution proto,
-      io.temporal.common.converter.DataConverter converter,
-      java.lang.reflect.Type modelType) {
+  public static WorkflowExecution fromProto(io.temporal.api.common.v1.WorkflowExecution proto) {
     Builder builder = WorkflowExecution.newBuilder();
     builder.setWorkflowId(proto.getWorkflowId());
     builder.setRunId(proto.getRunId());
@@ -89,18 +85,11 @@ public final class WorkflowExecution {
     }
 
     public Object toTransferType(WorkflowExecution value) {
-      return value == null
-          ? null
-          : value.toProto(support.TemporalModelConverters.currentDataConverter());
+      return value == null ? null : value.toProto();
     }
 
     public WorkflowExecution fromTransferType(Object value, java.lang.reflect.Type valueType) {
-      return value == null
-          ? null
-          : fromProto(
-              (io.temporal.api.common.v1.WorkflowExecution) value,
-              support.TemporalModelConverters.currentDataConverter(),
-              valueType);
+      return value == null ? null : fromProto((io.temporal.api.common.v1.WorkflowExecution) value);
     }
   }
 }

@@ -32,17 +32,14 @@ public final class OnCompleteResponse {
     }
   }
 
-  public io.temporal.api.notificationservice.v1.OnCompleteResponse toProto(
-      io.temporal.common.converter.DataConverter converter) {
+  public io.temporal.api.notificationservice.v1.OnCompleteResponse toProto() {
     io.temporal.api.notificationservice.v1.OnCompleteResponse.Builder proto =
         io.temporal.api.notificationservice.v1.OnCompleteResponse.newBuilder();
     return proto.build();
   }
 
   public static OnCompleteResponse fromProto(
-      io.temporal.api.notificationservice.v1.OnCompleteResponse proto,
-      io.temporal.common.converter.DataConverter converter,
-      java.lang.reflect.Type modelType) {
+      io.temporal.api.notificationservice.v1.OnCompleteResponse proto) {
     Builder builder = OnCompleteResponse.newBuilder();
     return builder.build();
   }
@@ -54,18 +51,13 @@ public final class OnCompleteResponse {
     }
 
     public Object toTransferType(OnCompleteResponse value) {
-      return value == null
-          ? null
-          : value.toProto(support.TemporalModelConverters.currentDataConverter());
+      return value == null ? null : value.toProto();
     }
 
     public OnCompleteResponse fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto(
-              (io.temporal.api.notificationservice.v1.OnCompleteResponse) value,
-              support.TemporalModelConverters.currentDataConverter(),
-              valueType);
+          : fromProto((io.temporal.api.notificationservice.v1.OnCompleteResponse) value);
     }
   }
 }

@@ -63,8 +63,7 @@ public final class TaskQueuePartition {
     }
   }
 
-  public io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata toProto(
-      io.temporal.common.converter.DataConverter converter) {
+  public io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata toProto() {
     io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata.Builder proto =
         io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata.newBuilder();
     if (this.key != null) proto.setKey((this.key));
@@ -73,9 +72,7 @@ public final class TaskQueuePartition {
   }
 
   public static TaskQueuePartition fromProto(
-      io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata proto,
-      io.temporal.common.converter.DataConverter converter,
-      java.lang.reflect.Type modelType) {
+      io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata proto) {
     Builder builder = TaskQueuePartition.newBuilder();
     builder.setKey(proto.getKey());
     builder.setOwnerHostName(proto.getOwnerHostName());
@@ -89,18 +86,13 @@ public final class TaskQueuePartition {
     }
 
     public Object toTransferType(TaskQueuePartition value) {
-      return value == null
-          ? null
-          : value.toProto(support.TemporalModelConverters.currentDataConverter());
+      return value == null ? null : value.toProto();
     }
 
     public TaskQueuePartition fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto(
-              (io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata) value,
-              support.TemporalModelConverters.currentDataConverter(),
-              valueType);
+          : fromProto((io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata) value);
     }
   }
 }

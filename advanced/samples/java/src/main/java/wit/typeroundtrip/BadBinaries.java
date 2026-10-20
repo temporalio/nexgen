@@ -49,8 +49,7 @@ public final class BadBinaries {
     }
   }
 
-  public io.temporal.api.namespace.v1.BadBinaries toProto(
-      io.temporal.common.converter.DataConverter converter) {
+  public io.temporal.api.namespace.v1.BadBinaries toProto() {
     io.temporal.api.namespace.v1.BadBinaries.Builder proto =
         io.temporal.api.namespace.v1.BadBinaries.newBuilder();
     if (this.binaries != null)
@@ -59,16 +58,12 @@ public final class BadBinaries {
               .entrySet().stream()
                   .collect(
                       java.util.LinkedHashMap::new,
-                      (map1, entry0) ->
-                          map1.put((entry0.getKey()), (entry0.getValue()).toProto(converter)),
+                      (map1, entry0) -> map1.put((entry0.getKey()), (entry0.getValue()).toProto()),
                       java.util.Map::putAll));
     return proto.build();
   }
 
-  public static BadBinaries fromProto(
-      io.temporal.api.namespace.v1.BadBinaries proto,
-      io.temporal.common.converter.DataConverter converter,
-      java.lang.reflect.Type modelType) {
+  public static BadBinaries fromProto(io.temporal.api.namespace.v1.BadBinaries proto) {
     Builder builder = BadBinaries.newBuilder();
     builder.setBinaries(
         (proto.getBinariesMap())
@@ -78,8 +73,7 @@ public final class BadBinaries {
                     (map3, entry2) ->
                         map3.put(
                             entry2.getKey(),
-                            wit.typeroundtrip.BadBinary.fromProto(
-                                entry2.getValue(), converter, wit.typeroundtrip.BadBinary.class)),
+                            wit.typeroundtrip.BadBinary.fromProto(entry2.getValue())),
                     java.util.Map::putAll));
     return builder.build();
   }
@@ -91,18 +85,11 @@ public final class BadBinaries {
     }
 
     public Object toTransferType(BadBinaries value) {
-      return value == null
-          ? null
-          : value.toProto(support.TemporalModelConverters.currentDataConverter());
+      return value == null ? null : value.toProto();
     }
 
     public BadBinaries fromTransferType(Object value, java.lang.reflect.Type valueType) {
-      return value == null
-          ? null
-          : fromProto(
-              (io.temporal.api.namespace.v1.BadBinaries) value,
-              support.TemporalModelConverters.currentDataConverter(),
-              valueType);
+      return value == null ? null : fromProto((io.temporal.api.namespace.v1.BadBinaries) value);
     }
   }
 }

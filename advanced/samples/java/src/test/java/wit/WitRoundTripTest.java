@@ -2,7 +2,10 @@ package wit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.protobuf.ByteString;
+import io.temporal.api.common.v1.Payload;
+import io.temporal.api.common.v1.Payloads;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.common.converter.DefaultDataConverter;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -11,40 +14,52 @@ import wit.protooneof.*;
 import wit.typeshowcase.*;
 
 class WitRoundTripTest {
-  @Test void nestedGenericsRetainTheirConcretePayloadTypes() {
-    PayloadBackedEnvelope<String, List<Integer>> model = PayloadBackedEnvelope.<String, List<Integer>>newBuilder()
-        .setProvider(PayloadBackedOutput.<String>newBuilder().setDetails("output").build())
-        .setScaler(PayloadBackedContext.<List<Integer>>newBuilder().setDetails(Arrays.asList(1, 2)).build()).build();
-    java.lang.reflect.Type type = new TypeReference<PayloadBackedEnvelope<String, List<Integer>>>() {}.getType();
-    PayloadBackedEnvelope<String, List<Integer>> decoded = PayloadBackedEnvelope.fromProto(model.toProto(DefaultDataConverter.STANDARD_INSTANCE), DefaultDataConverter.STANDARD_INSTANCE, type);
-    assertEquals("output", decoded.getProvider().getDetails());
-    assertEquals(Arrays.asList(1, 2), decoded.getScaler().getDetails());
-    assertInstanceOf(Integer.class, decoded.getScaler().getDetails().get(0));
+  private static Payload opaquePayload(String value) {
+    return Payload.newBuilder().putMetadata("encoding", ByteString.copyFromUtf8("unknown/custom"))
+        .setData(ByteString.copyFromUtf8(value)).build();
+  }
+
+  @Test void nestedProtoModelsPreserveOpaquePayloadsWithoutTypeHints() {
+    Payload output = opaquePayload("output");
+    Payload context = opaquePayload("context");
+    PayloadBackedEnvelope model = PayloadBackedEnvelope.newBuilder()
+        .setProvider(PayloadBackedOutput.newBuilder().setDetails(output).build())
+        .setScaler(PayloadBackedContext.newBuilder().setDetails(context).build()).build();
+    PayloadBackedEnvelope decoded = PayloadBackedEnvelope.fromProto(model.toProto());
+    assertEquals(output, decoded.getProvider().getDetails());
+    assertEquals(context, decoded.getScaler().getDetails());
   }
 
   @Test void protobufOneofsSelectAndDecodeTheCorrectCase() {
-    Outcome<String> model = Outcome.<String>newBuilder().setValue(OutcomeValue.success("success")).build();
-    Outcome<String> decoded = Outcome.fromProto(model.toProto(DefaultDataConverter.STANDARD_INSTANCE), DefaultDataConverter.STANDARD_INSTANCE, new TypeReference<Outcome<String>>() {}.getType());
+    Payloads success = Payloads.newBuilder().addPayloads(opaquePayload("packed-success")).build();
+    Outcome model = Outcome.newBuilder().setValue(OutcomeValue.success(success)).build();
+    Outcome decoded = Outcome.fromProto(model.toProto());
     assertEquals(OutcomeValue.Tag.SUCCESS, decoded.getValue().getTag());
-    assertEquals("success", decoded.getValue().getValue());
+    assertEquals(success, decoded.getValue().getValue());
     PauseActivityRequest request = PauseActivityRequest.newBuilder().setActivity(ActivitySelection.type("activity")).build();
-    assertEquals(ActivitySelection.Tag.TYPE, PauseActivityRequest.fromProto(request.toProto(DefaultDataConverter.STANDARD_INSTANCE), DefaultDataConverter.STANDARD_INSTANCE, PauseActivityRequest.class).getActivity().getTag());
+    assertEquals(ActivitySelection.Tag.TYPE, PauseActivityRequest.fromProto(request.toProto()).getActivity().getTag());
   }
 
-  @Test void genericListValueIsOnePayloadRatherThanASequenceOfArguments() {
-    Outcome<List<Integer>> model = Outcome.<List<Integer>>newBuilder().setValue(OutcomeValue.success(Arrays.asList(1, 2))).build();
-    Outcome<List<Integer>> decoded = Outcome.fromProto(model.toProto(DefaultDataConverter.STANDARD_INSTANCE), DefaultDataConverter.STANDARD_INSTANCE, new TypeReference<Outcome<List<Integer>>>() {}.getType());
-    assertEquals(Arrays.asList(1, 2), decoded.getValue().getValue());
+  @Test void embeddedFailuresPreserveDetailsAndEncodedAttributes() {
+    Payloads details = Payloads.newBuilder().addPayloads(opaquePayload("packed-details")).build();
+    Failure failure = Failure.newBuilder().setMessage("opaque")
+        .setEncodedAttributes(opaquePayload("attributes"))
+        .setApplicationFailureInfo(io.temporal.api.failure.v1.ApplicationFailureInfo.newBuilder().setDetails(details))
+        .setCause(Failure.newBuilder().setEncodedAttributes(opaquePayload("cause"))).build();
+    Outcome model = Outcome.newBuilder().setValue(OutcomeValue.failure(failure)).build();
+    assertEquals(failure, Outcome.fromProto(model.toProto()).getValue().getValue());
+    wit.typeroundtrip.FailureContainer container = wit.typeroundtrip.FailureContainer.newBuilder().setFailure(failure).build();
+    assertEquals(failure, wit.typeroundtrip.FailureContainer.fromProto(container.toProto()).getFailure());
   }
 
   @Test void copyBuildersPreserveNestedFieldsWhenSettingFlattenedValues() {
     wit.workflowservice.SignalWithStartWorkflowRequest original = wit.workflowservice.SignalWithStartWorkflowRequest.newBuilder()
-        .setNamespace("namespace").setId("original").setStaticSummary("summary").build();
-    wit.workflowservice.SignalWithStartWorkflowRequest copy = original.toBuilder().setId("copy").setStaticDetails("details").build();
+        .setNamespace("namespace").setId("original").setStaticSummary(opaquePayload("summary")).build();
+    wit.workflowservice.SignalWithStartWorkflowRequest copy = original.toBuilder().setId("copy").setStaticDetails(opaquePayload("details")).build();
     assertEquals("original", original.getId());
     assertEquals("copy", copy.getId());
-    assertEquals("summary", copy.getUserMetadata().getStaticSummary());
-    assertEquals("details", copy.getUserMetadata().getStaticDetails());
+    assertEquals(opaquePayload("summary"), copy.getUserMetadata().getStaticSummary());
+    assertEquals(opaquePayload("details"), copy.getUserMetadata().getStaticDetails());
   }
 
   @Test void functionReferencesSupportTypedCallbacksAndNames() {

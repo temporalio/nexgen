@@ -3,99 +3,81 @@ package wit.protogeneric;
 
 @io.temporal.common.converter.TransferTypeConvertible(PayloadBackedEnvelope.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class PayloadBackedEnvelope<OutputT, ContextT> {
-  private final wit.protogeneric.PayloadBackedOutput<OutputT> provider;
-  private final wit.protogeneric.PayloadBackedContext<ContextT> scaler;
+public final class PayloadBackedEnvelope {
+  private final wit.protogeneric.PayloadBackedOutput provider;
+  private final wit.protogeneric.PayloadBackedContext scaler;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public PayloadBackedEnvelope(
       @com.fasterxml.jackson.annotation.JsonProperty("provider")
-          wit.protogeneric.PayloadBackedOutput<OutputT> provider,
+          wit.protogeneric.PayloadBackedOutput provider,
       @com.fasterxml.jackson.annotation.JsonProperty("scaler")
-          wit.protogeneric.PayloadBackedContext<ContextT> scaler) {
+          wit.protogeneric.PayloadBackedContext scaler) {
     this.provider = provider;
     this.scaler = scaler;
   }
 
-  public wit.protogeneric.PayloadBackedOutput<OutputT> getProvider() {
+  public wit.protogeneric.PayloadBackedOutput getProvider() {
     return provider;
   }
 
-  public wit.protogeneric.PayloadBackedContext<ContextT> getScaler() {
+  public wit.protogeneric.PayloadBackedContext getScaler() {
     return scaler;
   }
 
-  public Builder<OutputT, ContextT> toBuilder() {
+  public Builder toBuilder() {
     return newBuilder(this);
   }
 
-  public static <OutputT, ContextT> Builder<OutputT, ContextT> newBuilder(
-      PayloadBackedEnvelope<OutputT, ContextT> value) {
-    return new Builder<OutputT, ContextT>(value);
+  public static Builder newBuilder(PayloadBackedEnvelope value) {
+    return new Builder(value);
   }
 
-  public static <OutputT, ContextT> Builder<OutputT, ContextT> newBuilder() {
-    return new Builder<OutputT, ContextT>();
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
-  public static final class Builder<OutputT, ContextT> {
+  public static final class Builder {
     private Builder() {}
 
-    private Builder(PayloadBackedEnvelope<OutputT, ContextT> value) {
+    private Builder(PayloadBackedEnvelope value) {
       if (value == null) return;
       this.provider = value.provider;
       this.scaler = value.scaler;
     }
 
-    private wit.protogeneric.PayloadBackedOutput<OutputT> provider = null;
+    private wit.protogeneric.PayloadBackedOutput provider = null;
 
-    public Builder<OutputT, ContextT> setProvider(
-        wit.protogeneric.PayloadBackedOutput<OutputT> value) {
+    public Builder setProvider(wit.protogeneric.PayloadBackedOutput value) {
       this.provider = value;
       return this;
     }
 
-    private wit.protogeneric.PayloadBackedContext<ContextT> scaler = null;
+    private wit.protogeneric.PayloadBackedContext scaler = null;
 
-    public Builder<OutputT, ContextT> setScaler(
-        wit.protogeneric.PayloadBackedContext<ContextT> value) {
+    public Builder setScaler(wit.protogeneric.PayloadBackedContext value) {
       this.scaler = value;
       return this;
     }
 
-    public PayloadBackedEnvelope<OutputT, ContextT> build() {
-      return new PayloadBackedEnvelope<OutputT, ContextT>(provider, scaler);
+    public PayloadBackedEnvelope build() {
+      return new PayloadBackedEnvelope(provider, scaler);
     }
   }
 
-  public io.temporal.api.compute.v1.ComputeConfigScalingGroup toProto(
-      io.temporal.common.converter.DataConverter converter) {
+  public io.temporal.api.compute.v1.ComputeConfigScalingGroup toProto() {
     io.temporal.api.compute.v1.ComputeConfigScalingGroup.Builder proto =
         io.temporal.api.compute.v1.ComputeConfigScalingGroup.newBuilder();
-    if (this.provider != null) proto.setProvider((this.provider).toProto(converter));
-    if (this.scaler != null) proto.setScaler((this.scaler).toProto(converter));
+    if (this.provider != null) proto.setProvider((this.provider).toProto());
+    if (this.scaler != null) proto.setScaler((this.scaler).toProto());
     return proto.build();
   }
 
-  public static <OutputT, ContextT> PayloadBackedEnvelope<OutputT, ContextT> fromProto(
-      io.temporal.api.compute.v1.ComputeConfigScalingGroup proto,
-      io.temporal.common.converter.DataConverter converter,
-      java.lang.reflect.Type modelType) {
-    Builder<OutputT, ContextT> builder = PayloadBackedEnvelope.<OutputT, ContextT>newBuilder();
-    builder.setProvider(
-        wit.protogeneric.PayloadBackedOutput.fromProto(
-            proto.getProvider(),
-            converter,
-            wit.protogeneric.NexgenRuntime.parameterized(
-                wit.protogeneric.PayloadBackedOutput.class,
-                wit.protogeneric.NexgenRuntime.argument(modelType, 0))));
-    builder.setScaler(
-        wit.protogeneric.PayloadBackedContext.fromProto(
-            proto.getScaler(),
-            converter,
-            wit.protogeneric.NexgenRuntime.parameterized(
-                wit.protogeneric.PayloadBackedContext.class,
-                wit.protogeneric.NexgenRuntime.argument(modelType, 1))));
+  public static PayloadBackedEnvelope fromProto(
+      io.temporal.api.compute.v1.ComputeConfigScalingGroup proto) {
+    Builder builder = PayloadBackedEnvelope.newBuilder();
+    builder.setProvider(wit.protogeneric.PayloadBackedOutput.fromProto(proto.getProvider()));
+    builder.setScaler(wit.protogeneric.PayloadBackedContext.fromProto(proto.getScaler()));
     return builder.build();
   }
 
@@ -106,18 +88,13 @@ public final class PayloadBackedEnvelope<OutputT, ContextT> {
     }
 
     public Object toTransferType(PayloadBackedEnvelope value) {
-      return value == null
-          ? null
-          : value.toProto(support.TemporalModelConverters.currentDataConverter());
+      return value == null ? null : value.toProto();
     }
 
     public PayloadBackedEnvelope fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto(
-              (io.temporal.api.compute.v1.ComputeConfigScalingGroup) value,
-              support.TemporalModelConverters.currentDataConverter(),
-              valueType);
+          : fromProto((io.temporal.api.compute.v1.ComputeConfigScalingGroup) value);
     }
   }
 }

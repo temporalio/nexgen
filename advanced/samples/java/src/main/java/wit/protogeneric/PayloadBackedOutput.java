@@ -3,71 +3,62 @@ package wit.protogeneric;
 
 @io.temporal.common.converter.TransferTypeConvertible(PayloadBackedOutput.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class PayloadBackedOutput<OutputT> {
-  private final OutputT details;
+public final class PayloadBackedOutput {
+  private final io.temporal.api.common.v1.Payload details;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public PayloadBackedOutput(
-      @com.fasterxml.jackson.annotation.JsonProperty("details") OutputT details) {
+      @com.fasterxml.jackson.annotation.JsonProperty("details")
+          io.temporal.api.common.v1.Payload details) {
     this.details = details;
   }
 
-  public OutputT getDetails() {
+  public io.temporal.api.common.v1.Payload getDetails() {
     return details;
   }
 
-  public Builder<OutputT> toBuilder() {
+  public Builder toBuilder() {
     return newBuilder(this);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder(PayloadBackedOutput<OutputT> value) {
-    return new Builder<OutputT>(value);
+  public static Builder newBuilder(PayloadBackedOutput value) {
+    return new Builder(value);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder() {
-    return new Builder<OutputT>();
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
-  public static final class Builder<OutputT> {
+  public static final class Builder {
     private Builder() {}
 
-    private Builder(PayloadBackedOutput<OutputT> value) {
+    private Builder(PayloadBackedOutput value) {
       if (value == null) return;
       this.details = value.details;
     }
 
-    private OutputT details = null;
+    private io.temporal.api.common.v1.Payload details = null;
 
-    public Builder<OutputT> setDetails(OutputT value) {
+    public Builder setDetails(io.temporal.api.common.v1.Payload value) {
       this.details = value;
       return this;
     }
 
-    public PayloadBackedOutput<OutputT> build() {
-      return new PayloadBackedOutput<OutputT>(details);
+    public PayloadBackedOutput build() {
+      return new PayloadBackedOutput(details);
     }
   }
 
-  public io.temporal.api.compute.v1.ComputeProvider toProto(
-      io.temporal.common.converter.DataConverter converter) {
+  public io.temporal.api.compute.v1.ComputeProvider toProto() {
     io.temporal.api.compute.v1.ComputeProvider.Builder proto =
         io.temporal.api.compute.v1.ComputeProvider.newBuilder();
-    if (this.details != null) proto.setDetails(converter.toPayload((this.details)).get());
+    if (this.details != null) proto.setDetails((this.details));
     return proto.build();
   }
 
-  public static <OutputT> PayloadBackedOutput<OutputT> fromProto(
-      io.temporal.api.compute.v1.ComputeProvider proto,
-      io.temporal.common.converter.DataConverter converter,
-      java.lang.reflect.Type modelType) {
-    Builder<OutputT> builder = PayloadBackedOutput.<OutputT>newBuilder();
-    builder.setDetails(
-        (OutputT)
-            converter.fromPayload(
-                proto.getDetails(),
-                wit.protogeneric.NexgenRuntime.rawType(
-                    wit.protogeneric.NexgenRuntime.argument(modelType, 0)),
-                wit.protogeneric.NexgenRuntime.argument(modelType, 0)));
+  public static PayloadBackedOutput fromProto(io.temporal.api.compute.v1.ComputeProvider proto) {
+    Builder builder = PayloadBackedOutput.newBuilder();
+    builder.setDetails(proto.getDetails());
     return builder.build();
   }
 
@@ -78,18 +69,11 @@ public final class PayloadBackedOutput<OutputT> {
     }
 
     public Object toTransferType(PayloadBackedOutput value) {
-      return value == null
-          ? null
-          : value.toProto(support.TemporalModelConverters.currentDataConverter());
+      return value == null ? null : value.toProto();
     }
 
     public PayloadBackedOutput fromTransferType(Object value, java.lang.reflect.Type valueType) {
-      return value == null
-          ? null
-          : fromProto(
-              (io.temporal.api.compute.v1.ComputeProvider) value,
-              support.TemporalModelConverters.currentDataConverter(),
-              valueType);
+      return value == null ? null : fromProto((io.temporal.api.compute.v1.ComputeProvider) value);
     }
   }
 }
