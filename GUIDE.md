@@ -1676,8 +1676,8 @@ Cannot be combined with `@nexus.default`.
 
 ### @nexus.default
 
-**Placement:** Record field (whose type is a WIT enum or a protobuf-enum alias)
-**Syntax:** `@nexus.default "<enum-case-name>"`
+**Placement:** Record field **Syntax:** `@nexus.default "<enum-case-name>"` or
+`@nexus.default go="<expression>"`
 
 Sets a default value for an enum field, making it optional in the generated API.
 For a protobuf-enum alias, the case name is validated against the descriptor.
@@ -1694,6 +1694,34 @@ id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = (
     temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE
 )
 ```
+
+For Go operation input fields, `go="<expression>"` supplies an overridable
+expression default, including for non-enum fields:
+
+```wit
+/// @nexus.default go="workflow.GetInfo(ctx).TaskQueueName"
+task-queue: task-queue,
+```
+
+The Go backend evaluates the expression only when the input field is absent,
+inside the operation function with `ctx` and `request` in scope. This applies to
+both native and proto-backed operation inputs, not standalone model construction
+or decoding. The expression must return the field's API value type and follow
+Temporal workflow determinism rules. Use symbols already imported by the
+generated package, or prefix the expression with an explicit import path and
+colon, such as `go="strings:strings.ToUpper(\"default\")"`. Unlike
+`@nexus.source`, nexgen does not add a support-package prefix.
+
+Go's existing options conventions still apply: a scalar option's zero value
+represents omission. For example, an empty `TaskQueue` uses the expression
+default, while a nonempty value overrides it. Internally, the request retains a
+pointer to distinguish absence from a supplied value. Expression defaults
+require a nilable internal field representation.
+
+The `go` expression does not affect other target languages. You can combine an
+enum-case default with `go="<expression>"`; Go uses the expression and other
+languages use the enum case. Expression defaults are currently supported only
+for Go and cannot be combined with function fields.
 
 Cannot be combined with `@nexus.source`.
 

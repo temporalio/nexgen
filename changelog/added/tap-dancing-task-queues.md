@@ -1,0 +1,1 @@
+Go WIT operation inputs support overridable `@nexus.default go="<expression>"` defaults evaluated at the call site. The advanced workflow service sample defaults its task queue to the calling workflow's task queue.

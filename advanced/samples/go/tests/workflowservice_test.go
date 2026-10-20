@@ -116,7 +116,7 @@ func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
 	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
 		var response ws.SignalWithStartWorkflowResponse
 		err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("minimal"), TaskQueue: s.taskQueue},
+			ws.SignalWithStartWorkflowOptions{ID: s.targetID("minimal")},
 			"wake-up", "signal-value", emptyArgsWorkflow,
 		).Get(ctx, &response)
 		return response.RunID, err
@@ -127,6 +127,29 @@ func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
 	var result string
 	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("minimal"), *runID).Get(s.ctx, &result))
 	s.Equal("signal-value", result)
+}
+
+func (s *WorkflowServiceIntegrationSuite) TestTaskQueueOverride() {
+	targetQueue := s.taskQueue + "/override"
+	var runID *string
+	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
+		var response ws.SignalWithStartWorkflowResponse
+		err := ws.SignalWithStartWorkflow(ctx,
+			ws.SignalWithStartWorkflowOptions{ID: s.targetID("override"), TaskQueue: targetQueue},
+			"wake-up", "override-value", emptyArgsWorkflow,
+		).Get(ctx, &response)
+		return response.RunID, err
+	}, &runID)
+
+	w := worker.New(s.client, targetQueue, worker.Options{})
+	w.RegisterWorkflow(emptyArgsWorkflow)
+	s.Require().NoError(w.Start())
+	s.T().Cleanup(w.Stop)
+
+	s.Require().NotNil(runID)
+	var result string
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("override"), *runID).Get(s.ctx, &result))
+	s.Equal("override-value", result)
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
@@ -324,7 +347,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 		GetWorkflow() string
 		GetArgs() []any
 		GetID() string
-		GetTaskQueue() string
+		GetTaskQueue() *string
 		GetSignal() string
 		GetSignalArgs() []any
 		GetNamespace() string
@@ -334,7 +357,8 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	s.Equal("singleArgWorkflow", request.GetWorkflow())
 	s.Equal([]any{"workflow-input"}, request.GetArgs())
 	s.Equal(s.targetID("target"), request.GetID())
-	s.Equal(s.taskQueue, request.GetTaskQueue())
+	s.Require().NotNil(request.GetTaskQueue())
+	s.Equal(s.taskQueue, *request.GetTaskQueue())
 	s.Equal("wake-up", request.GetSignal())
 	s.Equal([]any{"signal-value"}, request.GetSignalArgs())
 	s.Equal("default", request.GetNamespace())

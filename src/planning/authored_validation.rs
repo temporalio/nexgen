@@ -670,14 +670,12 @@ fn validate_authored_field_types(
             field,
             descriptors,
         )?;
-        if let Some(default) = &field_spec.default_value {
-            validate_default_enum_case(
-                message_name,
-                field_name,
-                &default.enum_case,
-                field,
-                descriptors,
-            )?;
+        if let Some(case_name) = field_spec
+            .default_value
+            .as_ref()
+            .and_then(|default| default.enum_case())
+        {
+            validate_default_enum_case(message_name, field_name, case_name, field, descriptors)?;
         }
     }
 

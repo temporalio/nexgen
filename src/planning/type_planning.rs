@@ -478,12 +478,15 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
         let mut data =
             proto::planned_record_field_data(&record, field_name, self.planner).unwrap_or_default();
         if let Some(field) = record.fields.get(field_name)
-            && let Some(default) = &field.default_value
+            && let Some(case_name) = field
+                .default_value
+                .as_ref()
+                .and_then(|default| default.enum_case())
         {
             data.default_enum_value = self.planner.resolve_default_enum_value(
                 self.source_spec,
                 &field.field_type,
-                &default.enum_case,
+                case_name,
             );
         }
         data
