@@ -96,7 +96,9 @@ public final class Outcome<OutputT> {
     }
 
     public Object toTransferType(Outcome value) {
-      return value == null ? null : value.toProto(wit.protooneof.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public Outcome fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -104,7 +106,7 @@ public final class Outcome<OutputT> {
           ? null
           : fromProto(
               (io.temporal.api.update.v1.Outcome) value,
-              wit.protooneof.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

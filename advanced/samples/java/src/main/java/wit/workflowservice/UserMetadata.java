@@ -108,7 +108,7 @@ public final class UserMetadata {
     public Object toTransferType(UserMetadata value) {
       return value == null
           ? null
-          : value.toProto(wit.workflowservice.NexgenRuntime.dataConverter());
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public UserMetadata fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -116,7 +116,7 @@ public final class UserMetadata {
           ? null
           : fromProto(
               (io.temporal.api.sdk.v1.UserMetadata) value,
-              wit.workflowservice.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

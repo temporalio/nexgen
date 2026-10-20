@@ -6,28 +6,6 @@ package wit.notificationservice;
 public final class NexgenRuntime {
   private NexgenRuntime() {}
 
-  private static final ThreadLocal<io.temporal.common.converter.DataConverter> CONVERTER =
-      new ThreadLocal<>();
-
-  public static io.temporal.common.converter.DataConverter dataConverter() {
-    io.temporal.common.converter.DataConverter value = CONVERTER.get();
-    return value == null
-        ? io.temporal.common.converter.DefaultDataConverter.STANDARD_INSTANCE
-        : value;
-  }
-
-  public static <T> T withDataConverter(
-      io.temporal.common.converter.DataConverter converter, java.util.function.Supplier<T> action) {
-    io.temporal.common.converter.DataConverter previous = CONVERTER.get();
-    CONVERTER.set(converter);
-    try {
-      return action.get();
-    } finally {
-      if (previous == null) CONVERTER.remove();
-      else CONVERTER.set(previous);
-    }
-  }
-
   public static java.lang.reflect.Type argument(java.lang.reflect.Type type, int index) {
     return type instanceof java.lang.reflect.ParameterizedType
         ? ((java.lang.reflect.ParameterizedType) type).getActualTypeArguments()[index]

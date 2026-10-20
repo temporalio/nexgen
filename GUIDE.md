@@ -1978,6 +1978,9 @@ Records use constructors, getters, and builders. Enums are Java enums, flags are
 generated classes. Generic arguments propagate through nested records and
 protobuf payload carriers. Protobuf-backed models declare a Temporal transfer
 converter and expose `toProto` and `fromProto` methods for explicit conversion.
+Transfer converters obtain the active `DataConverter` by calling
+`currentDataConverter()` on the configured support class. The SDK owns converter
+scoping; system Nexus conversion fails when no user converter context is active.
 
 Use `java`, `java-from`, and `java-to` on `@nexus.type` for native SDK mappings.
 Conversion helpers receive the active `DataConverter` followed by the value.

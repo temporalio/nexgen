@@ -78,7 +78,9 @@ public final class PayloadBackedContext<ContextT> {
     }
 
     public Object toTransferType(PayloadBackedContext value) {
-      return value == null ? null : value.toProto(wit.protogeneric.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public PayloadBackedContext fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -86,7 +88,7 @@ public final class PayloadBackedContext<ContextT> {
           ? null
           : fromProto(
               (io.temporal.api.compute.v1.ComputeScaler) value,
-              wit.protogeneric.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

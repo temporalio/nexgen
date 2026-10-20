@@ -106,7 +106,9 @@ public final class PayloadBackedEnvelope<OutputT, ContextT> {
     }
 
     public Object toTransferType(PayloadBackedEnvelope value) {
-      return value == null ? null : value.toProto(wit.protogeneric.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public PayloadBackedEnvelope fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -114,7 +116,7 @@ public final class PayloadBackedEnvelope<OutputT, ContextT> {
           ? null
           : fromProto(
               (io.temporal.api.compute.v1.ComputeConfigScalingGroup) value,
-              wit.protogeneric.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

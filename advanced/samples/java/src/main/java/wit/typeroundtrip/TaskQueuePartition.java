@@ -89,7 +89,9 @@ public final class TaskQueuePartition {
     }
 
     public Object toTransferType(TaskQueuePartition value) {
-      return value == null ? null : value.toProto(wit.typeroundtrip.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public TaskQueuePartition fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -97,7 +99,7 @@ public final class TaskQueuePartition {
           ? null
           : fromProto(
               (io.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata) value,
-              wit.typeroundtrip.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

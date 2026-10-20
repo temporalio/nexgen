@@ -157,7 +157,9 @@ public final class StartWorkflowRequest {
     }
 
     public Object toTransferType(StartWorkflowRequest value) {
-      return value == null ? null : value.toProto(wit.startworkflow.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public StartWorkflowRequest fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -165,7 +167,7 @@ public final class StartWorkflowRequest {
           ? null
           : fromProto(
               (io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest) value,
-              wit.startworkflow.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

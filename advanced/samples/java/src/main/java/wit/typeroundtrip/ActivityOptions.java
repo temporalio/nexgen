@@ -143,7 +143,9 @@ public final class ActivityOptions {
     }
 
     public Object toTransferType(ActivityOptions value) {
-      return value == null ? null : value.toProto(wit.typeroundtrip.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public ActivityOptions fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -151,7 +153,7 @@ public final class ActivityOptions {
           ? null
           : fromProto(
               (io.temporal.api.activity.v1.ActivityOptions) value,
-              wit.typeroundtrip.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

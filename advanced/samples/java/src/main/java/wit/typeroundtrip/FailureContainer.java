@@ -75,7 +75,9 @@ public final class FailureContainer {
     }
 
     public Object toTransferType(FailureContainer value) {
-      return value == null ? null : value.toProto(wit.typeroundtrip.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public FailureContainer fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -83,7 +85,7 @@ public final class FailureContainer {
           ? null
           : fromProto(
               (io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes) value,
-              wit.typeroundtrip.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }
