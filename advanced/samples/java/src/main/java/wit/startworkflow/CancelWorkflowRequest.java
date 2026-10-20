@@ -113,7 +113,9 @@ public final class CancelWorkflowRequest {
     }
 
     public Object toTransferType(CancelWorkflowRequest value) {
-      return value == null ? null : value.toProto(wit.startworkflow.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public CancelWorkflowRequest fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -121,7 +123,7 @@ public final class CancelWorkflowRequest {
           ? null
           : fromProto(
               (io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest) value,
-              wit.startworkflow.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

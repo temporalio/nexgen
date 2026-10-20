@@ -56,7 +56,7 @@ public final class OnCompleteResponse {
     public Object toTransferType(OnCompleteResponse value) {
       return value == null
           ? null
-          : value.toProto(wit.notificationservice.NexgenRuntime.dataConverter());
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public OnCompleteResponse fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -64,7 +64,7 @@ public final class OnCompleteResponse {
           ? null
           : fromProto(
               (io.temporal.api.notificationservice.v1.OnCompleteResponse) value,
-              wit.notificationservice.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

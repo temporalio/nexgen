@@ -800,8 +800,7 @@ impl Context<'_> {
         proto: &PlannedProtoTypeInfo,
     ) -> String {
         let p = proto_name(proto);
-        self.need(RuntimeFeature::Converter);
-        let rt = self.runtime();
+        let converter = self.helper("currentDataConverter()");
         let mut out = format!(
             "  public {p} toProto(io.temporal.common.converter.DataConverter converter) {{\n    {p}.Builder proto = {p}.newBuilder();\n"
         );
@@ -940,7 +939,7 @@ impl Context<'_> {
                 }
             }
         }
-        writeln!(out, "    return builder.build();\n  }}\n  public static final class Converter implements io.temporal.common.converter.TransferTypeConverter<{name}> {{\n    public java.lang.reflect.Type getTransferType(java.lang.reflect.Type valueType) {{ return {p}.class; }}\n    public Object toTransferType({name} value) {{ return value == null ? null : value.toProto({rt}.dataConverter()); }}\n    public {name} fromTransferType(Object value, java.lang.reflect.Type valueType) {{ return value == null ? null : fromProto(({p}) value, {rt}.dataConverter(), valueType); }}\n  }}").unwrap();
+        writeln!(out, "    return builder.build();\n  }}\n  public static final class Converter implements io.temporal.common.converter.TransferTypeConverter<{name}> {{\n    public java.lang.reflect.Type getTransferType(java.lang.reflect.Type valueType) {{ return {p}.class; }}\n    public Object toTransferType({name} value) {{ return value == null ? null : value.toProto({converter}); }}\n    public {name} fromTransferType(Object value, java.lang.reflect.Type valueType) {{ return value == null ? null : fromProto(({p}) value, {converter}, valueType); }}\n  }}").unwrap();
         out
     }
     fn to_wire(
@@ -1847,7 +1846,6 @@ impl Context<'_> {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum RuntimeFeature {
-    Converter,
     Parameterized,
     Argument,
     RawType,
@@ -1874,7 +1872,6 @@ fn java_runtime(needs: &RuntimeNeeds) -> String {
     );
     for feature in &needs.features {
         out.push_str(match feature {
-            RuntimeFeature::Converter => JAVA_CONVERTER,
             RuntimeFeature::Parameterized => JAVA_PARAMETERIZED,
             RuntimeFeature::Argument => JAVA_ARGUMENT,
             RuntimeFeature::RawType => JAVA_RAW_TYPE,
@@ -1915,19 +1912,6 @@ fn java_runtime(needs: &RuntimeNeeds) -> String {
     out.push_str("}\n");
     out
 }
-
-const JAVA_CONVERTER: &str = r###"  private static final ThreadLocal<io.temporal.common.converter.DataConverter> CONVERTER = new ThreadLocal<>();
-  public static io.temporal.common.converter.DataConverter dataConverter() {
-    io.temporal.common.converter.DataConverter value = CONVERTER.get();
-    return value == null ? io.temporal.common.converter.DefaultDataConverter.STANDARD_INSTANCE : value;
-  }
-  public static <T> T withDataConverter(io.temporal.common.converter.DataConverter converter, java.util.function.Supplier<T> action) {
-    io.temporal.common.converter.DataConverter previous = CONVERTER.get();
-    CONVERTER.set(converter);
-    try { return action.get(); }
-    finally { if (previous == null) CONVERTER.remove(); else CONVERTER.set(previous); }
-  }
-"###;
 
 const JAVA_PARAMETERIZED: &str = r###"  public static java.lang.reflect.Type parameterized(final Class<?> raw, final java.lang.reflect.Type... arguments) {
     return new java.lang.reflect.ParameterizedType() {

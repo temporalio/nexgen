@@ -130,9 +130,11 @@ fn runtime_contains_only_features_used_by_the_generated_bindings() {
     let temp = generate("workflow-service", GenerationMode::NativeApi, true);
     let output = temp.path().join("generated");
     let runtime = fs::read_to_string(output.join("NexgenRuntime.java")).unwrap();
-    assert!(runtime.contains("withDataConverter"));
     assert!(runtime.contains("decodeSequence"));
     for unused in [
+        "ThreadLocal",
+        "withDataConverter",
+        "DefaultDataConverter",
         "FunctionReference",
         "class Result",
         "interface Flag",
@@ -151,6 +153,7 @@ fn runtime_contains_only_features_used_by_the_generated_bindings() {
     let request = fs::read_to_string(output.join("SignalWithStartWorkflowRequest.java")).unwrap();
     assert!(request.contains("proto.setWorkflowId("));
     assert!(request.contains("proto.getWorkflowId()"));
+    assert!(request.contains("support.TemporalModelConverters.currentDataConverter()"));
     let json = generate("user-service", GenerationMode::NativeApi, false);
     assert!(!json.path().join("generated/NexgenRuntime.java").exists());
 }

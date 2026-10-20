@@ -169,7 +169,9 @@ public final class PauseActivityRequest {
     }
 
     public Object toTransferType(PauseActivityRequest value) {
-      return value == null ? null : value.toProto(wit.protooneof.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public PauseActivityRequest fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -177,7 +179,7 @@ public final class PauseActivityRequest {
           ? null
           : fromProto(
               (io.temporal.api.workflowservice.v1.PauseActivityRequest) value,
-              wit.protooneof.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

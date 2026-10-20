@@ -89,7 +89,9 @@ public final class BadBinary {
     }
 
     public Object toTransferType(BadBinary value) {
-      return value == null ? null : value.toProto(wit.typeroundtrip.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public BadBinary fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -97,7 +99,7 @@ public final class BadBinary {
           ? null
           : fromProto(
               (io.temporal.api.namespace.v1.BadBinaryInfo) value,
-              wit.typeroundtrip.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

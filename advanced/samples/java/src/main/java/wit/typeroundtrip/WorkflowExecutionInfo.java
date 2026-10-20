@@ -97,7 +97,9 @@ public final class WorkflowExecutionInfo {
     }
 
     public Object toTransferType(WorkflowExecutionInfo value) {
-      return value == null ? null : value.toProto(wit.typeroundtrip.NexgenRuntime.dataConverter());
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public WorkflowExecutionInfo fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -105,7 +107,7 @@ public final class WorkflowExecutionInfo {
           ? null
           : fromProto(
               (io.temporal.api.workflow.v1.WorkflowExecutionInfo) value,
-              wit.typeroundtrip.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

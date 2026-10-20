@@ -592,7 +592,7 @@ public final class SignalWithStartWorkflowRequest {
     public Object toTransferType(SignalWithStartWorkflowRequest value) {
       return value == null
           ? null
-          : value.toProto(wit.workflowservice.NexgenRuntime.dataConverter());
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public SignalWithStartWorkflowRequest fromTransferType(
@@ -601,7 +601,7 @@ public final class SignalWithStartWorkflowRequest {
           ? null
           : fromProto(
               (io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest) value,
-              wit.workflowservice.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

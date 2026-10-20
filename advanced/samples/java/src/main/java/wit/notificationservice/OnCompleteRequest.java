@@ -126,7 +126,7 @@ public final class OnCompleteRequest<OutputT, SourceContextT> {
     public Object toTransferType(OnCompleteRequest value) {
       return value == null
           ? null
-          : value.toProto(wit.notificationservice.NexgenRuntime.dataConverter());
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public OnCompleteRequest fromTransferType(Object value, java.lang.reflect.Type valueType) {
@@ -134,7 +134,7 @@ public final class OnCompleteRequest<OutputT, SourceContextT> {
           ? null
           : fromProto(
               (io.temporal.api.notificationservice.v1.OnCompleteRequest) value,
-              wit.notificationservice.NexgenRuntime.dataConverter(),
+              support.TemporalModelConverters.currentDataConverter(),
               valueType);
     }
   }

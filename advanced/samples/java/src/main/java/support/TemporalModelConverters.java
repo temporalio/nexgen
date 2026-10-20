@@ -17,6 +17,10 @@ import java.util.Map;
 public final class TemporalModelConverters {
   private TemporalModelConverters() {}
 
+  public static DataConverter currentDataConverter() {
+    return io.temporal.internal.nexus.system.TemporalModelConverters.currentDataConverter();
+  }
+
   public static String workflowNamespace() {
     return Workflow.getInfo().getNamespace();
   }
