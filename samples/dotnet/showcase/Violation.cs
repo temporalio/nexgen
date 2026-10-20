@@ -14,12 +14,12 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// The path of the member <paramref name="key"/> under <paramref name="parent"/>.
         /// </summary>
-        public static string Member(string parent, string key) => Join(parent, Segment(key));
+        internal static string Member(string parent, string key) => Join(parent, Segment(key));
 
         /// <summary>
         /// Appends an already-encoded member segment to <paramref name="parent"/>.
         /// </summary>
-        public static string Join(string parent, string segment)
+        internal static string Join(string parent, string segment)
         {
             if (parent.Length == 0)
             {
@@ -31,14 +31,14 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// The path of the array element <paramref name="index"/> under <paramref name="parent"/>.
         /// </summary>
-        public static string Index(string parent, int index) =>
+        internal static string Index(string parent, int index) =>
             parent + "[" + index.ToString(global::System.Globalization.CultureInfo.InvariantCulture) + "]";
 
         /// <summary>
         /// Encodes one member key: identifier-like keys as-is, every other key
         /// bracket-quoted so dots, brackets, quotes and backslashes stay unambiguous.
         /// </summary>
-        public static string Segment(string key)
+        internal static string Segment(string key)
         {
             if (IsIdentifier(key))
             {
@@ -67,7 +67,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// The non-retryable <c>PayloadValidationError</c> application failure
         /// carrying <paramref name="violations"/> as its first detail.
         /// </summary>
-        public static global::System.Exception Failure(global::System.Collections.Generic.IReadOnlyList<Violation> violations) =>
+        internal static global::System.Exception Failure(global::System.Collections.Generic.IReadOnlyList<Violation> violations) =>
             global::Temporalio.Converters.PayloadValidationError.CreateException(violations);
 
         /// <inheritdoc/>

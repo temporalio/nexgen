@@ -9,7 +9,7 @@ namespace Nexgen.JsonSchema.Showcase
     /// compare by content, numbers mathematically (signed zero folded).
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-    public static class ValueEquality
+    internal static class ValueEquality
     {
         /// <summary>
         /// The dictionary key standing in for a null element.

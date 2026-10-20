@@ -72,7 +72,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Address"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Address>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Address>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -303,7 +303,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="AddressBook"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<AddressBook>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<AddressBook>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -445,7 +445,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Attributes"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Attributes>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Attributes>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -633,7 +633,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="BlobIndex"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<BlobIndex>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<BlobIndex>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -782,7 +782,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Choices"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Choices>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Choices>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -897,7 +897,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ChoicesValue"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ChoicesValue>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ChoicesValue>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -1070,7 +1070,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Circle"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Circle>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Circle>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -1292,7 +1292,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ContactCs"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ContactCs>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ContactCs>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -1544,7 +1544,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="DateIndex"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<DateIndex>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<DateIndex>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -1683,7 +1683,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Extras"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Extras>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Extras>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -1819,7 +1819,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ItemRules"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ItemRules>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ItemRules>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -2050,7 +2050,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Labels"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Labels>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Labels>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -2250,7 +2250,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="LinkNote"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<LinkNote>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<LinkNote>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -2474,7 +2474,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Metrics"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Metrics>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Metrics>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -2608,7 +2608,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Nicknames"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Nicknames>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Nicknames>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -2733,7 +2733,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Note"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Note>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Note>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -2860,7 +2860,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Quotas"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Quotas>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Quotas>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -3025,7 +3025,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Settings"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Settings>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Settings>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -3164,7 +3164,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Shape"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Shape>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Shape>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -3554,7 +3554,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// <summary>
             /// Converts <see cref="IdOrNameUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
-            public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<IdOrNameUnion>
+            internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<IdOrNameUnion>
             {
                 /// <inheritdoc/>
                 public override bool HandleNull => true;
@@ -3736,7 +3736,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// <summary>
             /// Converts <see cref="ModeUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
-            public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ModeUnion>
+            internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ModeUnion>
             {
                 /// <inheritdoc/>
                 public override bool HandleNull => true;
@@ -3898,7 +3898,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// <summary>
             /// Converts <see cref="PayloadUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
-            public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<PayloadUnion>
+            internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<PayloadUnion>
             {
                 /// <inheritdoc/>
                 public override bool HandleNull => true;
@@ -4027,7 +4027,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// <summary>
             /// Converts <see cref="DetailUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
-            public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<DetailUnion>
+            internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<DetailUnion>
             {
                 /// <inheritdoc/>
                 public override bool HandleNull => true;
@@ -4160,7 +4160,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// <summary>
             /// Converts <see cref="ShapeOrNameUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
-            public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShapeOrNameUnion>
+            internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShapeOrNameUnion>
             {
                 /// <inheritdoc/>
                 public override bool HandleNull => true;
@@ -4374,7 +4374,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// <summary>
             /// Converts <see cref="MeasurementsUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
-            public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<MeasurementsUnion>
+            internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<MeasurementsUnion>
             {
                 /// <inheritdoc/>
                 public override bool HandleNull => true;
@@ -4590,7 +4590,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// <summary>
             /// Converts <see cref="MetricOrLabelUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
-            public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<MetricOrLabelUnion>
+            internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<MetricOrLabelUnion>
             {
                 /// <inheritdoc/>
                 public override bool HandleNull => true;
@@ -4780,7 +4780,7 @@ namespace Nexgen.JsonSchema.Showcase
             /// <summary>
             /// Converts <see cref="AddressListOrLabelUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
-            public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<AddressListOrLabelUnion>
+            internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<AddressListOrLabelUnion>
             {
                 /// <inheritdoc/>
                 public override bool HandleNull => true;
@@ -5558,7 +5558,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Showcase"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Showcase>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Showcase>
         {
             private static readonly global::System.Text.RegularExpressions.Regex SkuPattern = new("^[A-Z]{2,4}\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             private static readonly global::System.Text.RegularExpressions.Regex PhrasePattern = new("^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+[\\t\\n\\x0B\\f\\r ](?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|(?![\\uD800-\\uDBFF][\\uDC00-\\uDFFF])(?<![\\uD800-\\uDBFF])[^\\t\\n\\x0B\\f\\r ])+\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
@@ -9078,7 +9078,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseAudit"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseAudit>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseAudit>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -9274,7 +9274,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseDetailObject"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseDetailObject>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseDetailObject>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -9486,7 +9486,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseLedger"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseLedger>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseLedger>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -9635,7 +9635,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseLedgerValue"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseLedgerValue>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseLedgerValue>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -9816,7 +9816,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseLocation"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseLocation>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseLocation>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -10043,7 +10043,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseLocationGeo"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseLocationGeo>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseLocationGeo>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -10243,7 +10243,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseMetadata"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseMetadata>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseMetadata>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -10386,7 +10386,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseRowsItem"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseRowsItem>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseRowsItem>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -10620,7 +10620,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="ShowcaseSegmentsItem"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseSegmentsItem>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<ShowcaseSegmentsItem>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -10751,7 +10751,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="GetShowcaseInput"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<GetShowcaseInput>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<GetShowcaseInput>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -10938,7 +10938,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Square"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Square>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Square>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -11185,7 +11185,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="TextNote"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<TextNote>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<TextNote>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -11409,7 +11409,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Tokens"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Tokens>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Tokens>
         {
             private static readonly global::System.Text.RegularExpressions.Regex ValuePattern = new("^[a-z]+\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
@@ -11611,7 +11611,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="Widget"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Widget>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Widget>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -11907,7 +11907,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Converts <see cref="WidgetBase"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<WidgetBase>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<WidgetBase>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;

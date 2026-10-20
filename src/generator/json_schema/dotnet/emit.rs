@@ -217,7 +217,7 @@ fn render_object_body(
 
     // The converter.
     out.push_str(&format!(
-        "    /// <summary>\n    /// Converts <see cref=\"{name}\"/> to and from JSON, enforcing the schema in both directions.\n    /// </summary>\n    public sealed class Converter : {JSON_CONVERTER}<{name}>\n    {{\n",
+        "    /// <summary>\n    /// Converts <see cref=\"{name}\"/> to and from JSON, enforcing the schema in both directions.\n    /// </summary>\n    internal sealed class Converter : {JSON_CONVERTER}<{name}>\n    {{\n",
         name = model.name
     ));
     let mut statics = String::new();
@@ -1102,7 +1102,7 @@ fn render_typed_map_body(out: &mut String, model: &ObjectModel, additional: &Typ
     ));
     render_equality(out, model.name, &["AdditionalProperties".to_string()]);
     out.push_str(&format!(
-        "    /// <summary>\n    /// Converts <see cref=\"{name}\"/> to and from JSON, enforcing the schema in both directions.\n    /// </summary>\n    public sealed class Converter : {JSON_CONVERTER}<{name}>\n    {{\n",
+        "    /// <summary>\n    /// Converts <see cref=\"{name}\"/> to and from JSON, enforcing the schema in both directions.\n    /// </summary>\n    internal sealed class Converter : {JSON_CONVERTER}<{name}>\n    {{\n",
         name = model.name
     ));
     let mut statics = String::new();
@@ -1426,7 +1426,7 @@ fn json_equals_literal(node: &str, value: &Value) -> String {
 fn render_union_converter(out: &mut String, union: &CsUnion) {
     let name = &union.interface;
     out.push_str(&format!(
-        "/// <summary>\n/// Converts <see cref=\"{name}\"/> to and from JSON, enforcing the schema in both directions.\n/// </summary>\npublic sealed class Converter : {JSON_CONVERTER}<{name}>\n{{\n"
+        "/// <summary>\n/// Converts <see cref=\"{name}\"/> to and from JSON, enforcing the schema in both directions.\n/// </summary>\ninternal sealed class Converter : {JSON_CONVERTER}<{name}>\n{{\n"
     ));
     let mut entry = String::new();
     render_converter_entry_points(&mut entry, name, union.nullable);

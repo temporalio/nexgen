@@ -51,7 +51,7 @@ namespace Nexgen.JsonSchema.Chat
         /// <summary>
         /// Converts <see cref="GetRoomInput"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<GetRoomInput>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<GetRoomInput>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -192,7 +192,7 @@ namespace Nexgen.JsonSchema.Chat
         /// <summary>
         /// Converts <see cref="Labels"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Labels>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Labels>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -404,7 +404,7 @@ namespace Nexgen.JsonSchema.Chat
         /// <summary>
         /// Converts <see cref="Message"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Message>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Message>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -673,7 +673,7 @@ namespace Nexgen.JsonSchema.Chat
         /// <summary>
         /// Converts <see cref="Room"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Room>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Room>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -1021,7 +1021,7 @@ namespace Nexgen.JsonSchema.Chat
         /// <summary>
         /// Converts <see cref="SendMessageInput"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<SendMessageInput>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<SendMessageInput>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -1194,7 +1194,7 @@ namespace Nexgen.JsonSchema.Chat
         /// <summary>
         /// Converts <see cref="SendMessageOutput"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<SendMessageOutput>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<SendMessageOutput>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;

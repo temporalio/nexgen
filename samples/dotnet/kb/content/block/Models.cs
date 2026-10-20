@@ -80,7 +80,7 @@ namespace Nexgen.JsonSchema.Kb.Content.Block
         /// <summary>
         /// Converts <see cref="Block"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Block>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Block>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -341,7 +341,7 @@ namespace Nexgen.JsonSchema.Kb.Content.Block
         /// <summary>
         /// Converts <see cref="BlockStyle"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<BlockStyle>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<BlockStyle>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;

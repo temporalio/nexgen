@@ -116,7 +116,7 @@ namespace Nexgen.JsonSchema.Temporal
         /// <summary>
         /// Converts <see cref="Temporal"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Temporal>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Temporal>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;

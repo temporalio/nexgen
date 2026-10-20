@@ -9,7 +9,7 @@ namespace Nexgen.JsonSchema.Showcase
     /// pinned regex is the validity oracle; decoding runs only after it passes.
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-    public static class Base64Support
+    internal static class Base64Support
     {
         private static readonly global::System.Text.RegularExpressions.Regex Base64 = new("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
         private static readonly global::System.Text.RegularExpressions.Regex Base64Url = new("^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);

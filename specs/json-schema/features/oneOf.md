@@ -641,7 +641,7 @@ public interface Foo
     public sealed class FooString : Foo { public FooString(string value) { … } public string Value { get; } }
     public sealed class FooArray : Foo { public FooArray(IReadOnlyList<double> value) { … } public IReadOnlyList<double> Value { get; } }
 
-    public sealed class Converter : JsonConverter<Foo>
+    internal sealed class Converter : JsonConverter<Foo>
     {
         // Reads one JsonElement into a member, or records a Violation and returns null.
         internal static Foo? Parse(JsonElement node, string path, List<Violation> violations) { … }

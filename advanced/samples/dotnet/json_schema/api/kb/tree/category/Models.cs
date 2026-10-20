@@ -65,7 +65,7 @@ namespace Nexgen.JsonSchema.Kb.Tree.Category
         /// <summary>
         /// Converts <see cref="Category"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Category>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Category>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -305,7 +305,7 @@ namespace Nexgen.JsonSchema.Kb.Tree.Category
         /// <summary>
         /// Converts <see cref="Palette"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Palette>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Palette>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;

@@ -8,7 +8,7 @@ namespace Nexgen.JsonSchema.Showcase
     /// Shared materialized-temporal parse, format and representability helpers.
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-    public static class TemporalSupport
+    internal static class TemporalSupport
     {
         private static readonly global::System.Text.RegularExpressions.Regex DateTimePattern = new("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?([Zz]|[+-]((0[0-9]|1[0-3]):[0-5][0-9]|14:00))\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
         private static readonly global::System.Text.RegularExpressions.Regex DatePattern = new("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);

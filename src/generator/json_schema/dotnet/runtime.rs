@@ -108,12 +108,12 @@ public sealed record Violation(string Path, string Reason)
     /// <summary>
     /// The path of the member <paramref name="key"/> under <paramref name="parent"/>.
     /// </summary>
-    public static string Member(string parent, string key) => Join(parent, Segment(key));
+    internal static string Member(string parent, string key) => Join(parent, Segment(key));
 
     /// <summary>
     /// Appends an already-encoded member segment to <paramref name="parent"/>.
     /// </summary>
-    public static string Join(string parent, string segment)
+    internal static string Join(string parent, string segment)
     {
         if (parent.Length == 0)
         {
@@ -125,14 +125,14 @@ public sealed record Violation(string Path, string Reason)
     /// <summary>
     /// The path of the array element <paramref name="index"/> under <paramref name="parent"/>.
     /// </summary>
-    public static string Index(string parent, int index) =>
+    internal static string Index(string parent, int index) =>
         parent + "[" + index.ToString(global::System.Globalization.CultureInfo.InvariantCulture) + "]";
 
     /// <summary>
     /// Encodes one member key: identifier-like keys as-is, every other key
     /// bracket-quoted so dots, brackets, quotes and backslashes stay unambiguous.
     /// </summary>
-    public static string Segment(string key)
+    internal static string Segment(string key)
     {
         if (IsIdentifier(key))
         {
@@ -161,7 +161,7 @@ public sealed record Violation(string Path, string Reason)
     /// The non-retryable <c>PayloadValidationError</c> application failure
     /// carrying <paramref name="violations"/> as its first detail.
     /// </summary>
-    public static global::System.Exception Failure(global::System.Collections.Generic.IReadOnlyList<Violation> violations) =>
+    internal static global::System.Exception Failure(global::System.Collections.Generic.IReadOnlyList<Violation> violations) =>
         global::Temporalio.Converters.PayloadValidationError.CreateException(violations);
 
     /// <inheritdoc/>
@@ -174,7 +174,7 @@ const SPEC_JSON: &str = r#"
 /// Shared JSON reading helpers enforcing the JSON Schema numeric semantics.
 /// </summary>
 {generated}
-public static class SpecJson
+internal static class SpecJson
 {
     /// <summary>
     /// The largest integer magnitude every target can carry exactly: 2^53 - 1.
@@ -425,7 +425,7 @@ const VALUE_EQUALITY: &str = r#"
 /// compare by content, numbers mathematically (signed zero folded).
 /// </summary>
 {generated}
-public static class ValueEquality
+internal static class ValueEquality
 {
     /// <summary>
     /// The dictionary key standing in for a null element.
@@ -550,7 +550,7 @@ const TEMPORAL_SUPPORT: &str = r#"
 /// Shared materialized-temporal parse, format and representability helpers.
 /// </summary>
 {generated}
-public static class TemporalSupport
+internal static class TemporalSupport
 {
     private static readonly global::System.Text.RegularExpressions.Regex DateTimePattern = new({date_time}, global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
     private static readonly global::System.Text.RegularExpressions.Regex DatePattern = new({date}, global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
@@ -872,7 +872,7 @@ const BASE64_SUPPORT: &str = r#"
 /// pinned regex is the validity oracle; decoding runs only after it passes.
 /// </summary>
 {generated}
-public static class Base64Support
+internal static class Base64Support
 {
     private static readonly global::System.Text.RegularExpressions.Regex Base64 = new({base64}, global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
     private static readonly global::System.Text.RegularExpressions.Regex Base64Url = new({base64url}, global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);

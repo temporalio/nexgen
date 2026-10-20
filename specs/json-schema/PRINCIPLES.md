@@ -664,6 +664,12 @@ encoding cannot introduce a new name collision.
 The C# backend follows the Java backend's structure (collecting per-model
 deserializer, spec-strict primitive parse, validate-then-write) in C# idiom.
 
+Generated code that exists only to support other generated code is `internal`:
+the runtime helper classes `SpecJson`, `ValueEquality`, `TemporalSupport`, and
+`Base64Support`, each model's nested `Converter`, and `Violation`'s path and
+failure helpers. The `Violation` record itself stays `public` because it is the
+detail payload a caller reads from a validation failure.
+
 The generated runtime type names `Violation`, `SpecJson`, `ValueEquality`,
 `TemporalSupport`, and `Base64Support` are reserved in every C# module scope.
 They are not reserved as member names: generated model code spells them through
@@ -717,7 +723,7 @@ reserved in every model member scope and closed-value constant scope.
    for object branches, by the discriminator (see [[oneOf]]).
 4. **One class-level converter per model (P11/P12; the analog of Java §5).**
    Each model carries `[JsonConverter(typeof(<Model>.Converter))]` and a nested
-   `public sealed class Converter : JsonConverter<<Model>>`, which
+   `internal sealed class Converter : JsonConverter<<Model>>`, which
    `System.Text.Json` honors on the stock `DataConverter.Default` with no user
    wiring (P3). Because the converter writes every member name itself, a user's
    `JsonSerializerOptions` naming policy cannot rename wire keys. The converter
