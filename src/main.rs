@@ -82,9 +82,8 @@ struct SupportPackageGenerateArgs {
 struct DotnetGenerateArgs {
     #[command(flatten)]
     common: SupportPackageGenerateArgs,
-    /// The root namespace for generated JSON Schema types. Each input module's
-    /// types live in a namespace below it. Defaults to `Nexgen.Generated`, or to
-    /// a namespace derived from the service for a single input file.
+    /// The root namespace for generated types (required for JSON Schema).
+    /// Each input module's types live in a namespace below it.
     #[arg(long = "namespace")]
     namespace: Option<String>,
 }

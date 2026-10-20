@@ -342,6 +342,11 @@ pub enum Error {
     JavaPackageNameMissing,
 
     #[error(
+        "C# code generation from JSON Schema requires `--namespace`, the root namespace for the generated types (for example `--namespace Acme.Payments.Contracts`)"
+    )]
+    DotnetNamespaceMissing,
+
+    #[error(
         "`--package-name {package_name}` must end with the output directory name `{output_dir_name}`, but its last segment is `{last_segment}`; point `--output` at a directory named `{last_segment}` or change the package's last segment to `{output_dir_name}`"
     )]
     JavaPackageNameMismatch {

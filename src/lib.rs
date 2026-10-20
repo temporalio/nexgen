@@ -63,7 +63,8 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
         });
     }
 
-    if parser::is_wit_input(&request.input_paths)?
+    let wit_input = parser::is_wit_input(&request.input_paths)?;
+    if wit_input
         && matches!(
             request.language,
             Language::Dotnet | Language::Go | Language::Python | Language::TypeScript
@@ -73,6 +74,18 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
         return Err(error::Error::MissingSupportPackage {
             language: request.language,
         });
+    }
+
+    // WIT input names its own C# namespace; JSON Schema input has none, and a
+    // guessed default would move every type whenever the input set changed.
+    if !wit_input
+        && request.language == Language::Dotnet
+        && request
+            .dotnet_namespace
+            .as_deref()
+            .is_none_or(str::is_empty)
+    {
+        return Err(error::Error::DotnetNamespaceMissing);
     }
 
     let tree = parser::load_api_spec_tree_for_language_with_inputs(
@@ -399,6 +412,22 @@ mod tests {
     }
 
     #[test]
+    fn json_schema_csharp_requires_a_namespace() {
+        let input =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples/schemas/chat.nexusrpc.yaml");
+        for namespace in [None, Some(String::new())] {
+            let mut request = java_request("/tmp/example", None);
+            request.language = Language::Dotnet;
+            request.input_paths = vec![input.clone()];
+            request.dotnet_namespace = namespace;
+            assert!(matches!(
+                generate_to_file(&request).unwrap_err(),
+                crate::error::Error::DotnetNamespaceMissing
+            ));
+        }
+    }
+
+    #[test]
     fn json_schema_does_not_require_a_support_package() {
         let temp = tempfile::tempdir().unwrap();
         let input =
@@ -413,6 +442,7 @@ mod tests {
             request.language = language;
             request.input_paths = vec![input.clone()];
             request.output_path = temp.path().join(language.as_str());
+            request.dotnet_namespace = Some("Example.Chat".to_string());
             generate_to_file(&request).unwrap();
             assert!(request.output_path.exists());
         }

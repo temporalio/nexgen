@@ -133,6 +133,10 @@ Its final dot-separated segment must match the output directory name. A
 contains generated classes; class-less intermediate directories are not Java
 packages and receive no file.
 
+For C#, in both layouts, the root namespace is the required `--namespace`, as
+Java requires `--package-name`. C# does not tie namespaces to directories, so it
+has no output-directory rule.
+
 ## The shared `definitions` file
 
 Holds the schema-independent runtime, defined once per package
@@ -325,7 +329,7 @@ namespace, because two of them re-aggregate:
   is **P15**'s, and a name synthesized beside a type has no narrower scope than
   the type itself.
 - **Java and C#** give each module its own sub-package/namespace
-  (`com.example.api.content.page`, `Nexgen.Generated.Content.Page`) and emit no
+  (`com.example.api.content.page`, `Example.Api.Content.Page`) and emit no
   aggregating barrel, so two input files may each declare a `Page` and stay
   unambiguous. Their scope really is the module.
 

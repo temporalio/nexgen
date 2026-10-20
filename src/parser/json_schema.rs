@@ -8898,7 +8898,7 @@ pub(crate) fn build_name_manifest(
     //   import runs last, which is exactly the silent incorrectness P7 forbids.
     // - **Java and .NET** resolve per module: each module lands in its own
     //   sub-package/namespace (`com.example.api.content.page`,
-    //   `Nexgen.Generated.Content.Page`) and neither emits an aggregating barrel,
+    //   `Example.Api.Content.Page`) and neither emits an aggregating barrel,
     //   so the same type name in two modules is two distinct qualified names.
     //
     // A module with services but no models still has a scope, so its service

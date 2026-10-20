@@ -48,7 +48,7 @@ fn generate_sample(example: &str, mode: GenerationMode) -> (PathBuf, Output) {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
-        dotnet_namespace: None,
+        dotnet_namespace: Some(format!("Nexgen.JsonSchema.{example}")),
     })
     .unwrap();
     let files = Output(read_cs_files(&output_path));
@@ -188,52 +188,44 @@ fn csharp_cli_generates_json_schema_without_a_support_package() {
     let root = project_root();
     let temp = unique_output_path("dotnet-json-cli");
     let run = |args: &[&str], output: &Path| {
-        let result = Command::new(env!("CARGO_BIN_EXE_nexgen"))
+        Command::new(env!("CARGO_BIN_EXE_nexgen"))
             .arg("dotnet")
             .args(args)
             .arg("--output")
             .arg(output)
             .output()
-            .unwrap();
-        assert!(
-            result.status.success(),
-            "stderr: {}",
-            String::from_utf8_lossy(&result.stderr)
-        );
-        read_cs_files(output)
+            .unwrap()
     };
     let chat = common::json_input_path(&root, "chat");
     let chat = chat.to_str().unwrap();
 
-    // No `--support-package` is needed: the runtime is generated alongside.
-    let derived = run(&[chat], &temp.join("derived"));
-    assert!(derived.contains_key(Path::new("Violation.cs")));
-    // A single input with a service derives its root namespace from it.
-    assert_has(
-        &derived[Path::new("Models.cs")],
-        &["namespace Nexgen.ChatService\n"],
+    // No `--support-package` is needed: the runtime is generated alongside,
+    // in the root namespace `--namespace` names.
+    let named = temp.join("named");
+    let result = run(&[chat, "--namespace", "Acme.Chat"], &named);
+    assert!(
+        result.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
     );
-
-    let named = run(&[chat, "--namespace", "Acme.Chat"], &temp.join("named"));
+    let named = read_cs_files(&named);
     assert_has(&named[Path::new("Models.cs")], &["namespace Acme.Chat\n"]);
     assert_has(
         &named[Path::new("Violation.cs")],
         &["namespace Acme.Chat\n"],
     );
 
-    // Without a service, the default root namespace.
-    let models_only = temp.join("models.yaml");
-    fs::create_dir_all(&temp).unwrap();
-    fs::write(
-        &models_only,
-        "type: object\nproperties:\n  a: { type: string }\n",
-    )
-    .unwrap();
-    let generated = run(&[models_only.to_str().unwrap()], &temp.join("generated"));
-    assert_has(
-        &generated[Path::new("Models.cs")],
-        &["namespace Nexgen.Generated\n"],
+    // Like Java's `--package-name`, the root namespace is required: there is
+    // no default to guess, which would move every type whenever the input set
+    // changed.
+    let result = run(&[chat], &temp.join("missing"));
+    assert!(!result.status.success());
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("requires `--namespace`"),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
     );
+    assert!(!temp.join("missing").exists());
     fs::remove_dir_all(temp).unwrap();
 }
 

@@ -818,16 +818,17 @@ model member scope and closed-value constant scope.
     a member named `other`. A test harvests every such identifier from the
     generated showcase and overrides a member to each.
 13. **One namespace per module (P14).** Each input file's module is one
-    namespace: the root module's is `--namespace` (or, for a single input, one
-    derived from its service, else `Nexgen.Generated`) and every other module's
-    is that root plus the module path in PascalCase. Each module emits
-    `Models.cs` (and `Services.cs` when it declares services); the runtime types
-    are emitted once, in the root namespace, as `Violation.cs`, `SpecJson.cs`,
-    `ValueEquality.cs`, and — when used — `TemporalSupport.cs` and
-    `Base64Support.cs`, and every model file names them fully qualified
-    (`global::<root namespace>.Violation`). Generated code spells framework
-    types `global::`-qualified too, so no schema type name can shadow them. The
-    generator emits formatted C# directly; no external formatter runs.
+    namespace: the root module's is the required `--namespace` (as Java requires
+    `--package-name`; a guessed default would move every type whenever the input
+    set changed) and every other module's is that root plus the module path in
+    PascalCase. Each module emits `Models.cs` (and `Services.cs` when it
+    declares services); the runtime types are emitted once, in the root
+    namespace, as `Violation.cs`, `SpecJson.cs`, `ValueEquality.cs`, and — when
+    used — `TemporalSupport.cs` and `Base64Support.cs`, and every model file
+    names them fully qualified (`global::<root namespace>.Violation`). Generated
+    code spells framework types `global::`-qualified too, so no schema type name
+    can shadow them. The generator emits formatted C# directly; no external
+    formatter runs.
 14. **Services are `public` NexusRpc interfaces.** Each service is a
     `[NexusService(fqn)]` `public interface I<Name>` with one
     `[NexusOperation(wire)]` method per operation (see [[services]]). It is
