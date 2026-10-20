@@ -4,94 +4,116 @@ package wit.notificationservice;
 /** A notification that reports that a source operation completed. */
 @io.temporal.common.converter.TransferTypeConvertible(OnCompleteRequest.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class OnCompleteRequest {
+public final class OnCompleteRequest<OutputT, SourceContextT> {
   /** The successful output or failure of the source operation. */
-  private final wit.notificationservice.OnCompleteRequestResult result;
+  private final wit.notificationservice.OnCompleteRequestResult<OutputT> result;
 
   /** User-supplied data associated with the source invocation. */
-  private final io.temporal.api.common.v1.Payload sourceContext;
+  private final SourceContextT sourceContext;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public OnCompleteRequest(
       @com.fasterxml.jackson.annotation.JsonProperty("result")
-          wit.notificationservice.OnCompleteRequestResult result,
+          wit.notificationservice.OnCompleteRequestResult<OutputT> result,
       @com.fasterxml.jackson.annotation.JsonProperty("sourceContext")
-          io.temporal.api.common.v1.Payload sourceContext) {
+          SourceContextT sourceContext) {
     this.result = result;
     this.sourceContext = sourceContext;
   }
 
-  public wit.notificationservice.OnCompleteRequestResult getResult() {
+  public wit.notificationservice.OnCompleteRequestResult<OutputT> getResult() {
     return result;
   }
 
-  public io.temporal.api.common.v1.Payload getSourceContext() {
+  public SourceContextT getSourceContext() {
     return sourceContext;
   }
 
-  public Builder toBuilder() {
+  public Builder<OutputT, SourceContextT> toBuilder() {
     return newBuilder(this);
   }
 
-  public static Builder newBuilder(OnCompleteRequest value) {
-    return new Builder(value);
+  public static <OutputT, SourceContextT> Builder<OutputT, SourceContextT> newBuilder(
+      OnCompleteRequest<OutputT, SourceContextT> value) {
+    return new Builder<OutputT, SourceContextT>(value);
   }
 
-  public static Builder newBuilder() {
-    return new Builder();
+  public static <OutputT, SourceContextT> Builder<OutputT, SourceContextT> newBuilder() {
+    return new Builder<OutputT, SourceContextT>();
   }
 
-  public static final class Builder {
+  public static final class Builder<OutputT, SourceContextT> {
     private Builder() {}
 
-    private Builder(OnCompleteRequest value) {
+    private Builder(OnCompleteRequest<OutputT, SourceContextT> value) {
       if (value == null) return;
       this.result = value.result;
       this.sourceContext = value.sourceContext;
     }
 
-    private wit.notificationservice.OnCompleteRequestResult result = null;
+    private wit.notificationservice.OnCompleteRequestResult<OutputT> result = null;
 
-    public Builder setResult(wit.notificationservice.OnCompleteRequestResult value) {
+    public Builder<OutputT, SourceContextT> setResult(
+        wit.notificationservice.OnCompleteRequestResult<OutputT> value) {
       this.result = value;
       return this;
     }
 
-    private io.temporal.api.common.v1.Payload sourceContext = null;
+    private SourceContextT sourceContext = null;
 
-    public Builder setSourceContext(io.temporal.api.common.v1.Payload value) {
+    public Builder<OutputT, SourceContextT> setSourceContext(SourceContextT value) {
       this.sourceContext = value;
       return this;
     }
 
-    public OnCompleteRequest build() {
-      return new OnCompleteRequest(result, sourceContext);
+    public OnCompleteRequest<OutputT, SourceContextT> build() {
+      return new OnCompleteRequest<OutputT, SourceContextT>(result, sourceContext);
     }
   }
 
-  public io.temporal.api.notificationservice.v1.OnCompleteRequest toProto() {
+  public io.temporal.api.notificationservice.v1.OnCompleteRequest toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.notificationservice.v1.OnCompleteRequest.Builder proto =
         io.temporal.api.notificationservice.v1.OnCompleteRequest.newBuilder();
     if (this.result != null) {
       if (this.result.getTag() == wit.notificationservice.OnCompleteRequestResult.Tag.SUCCESS)
-        proto.setSuccess(((io.temporal.api.common.v1.Payload) this.result.getValue()));
+        proto.setSuccess(converter.toPayload(((OutputT) this.result.getValue())).get());
       if (this.result.getTag() == wit.notificationservice.OnCompleteRequestResult.Tag.FAILURE)
-        proto.setFailure(((io.temporal.api.failure.v1.Failure) this.result.getValue()));
+        proto.setFailure(
+            support.TemporalModelConverters.failureToProto(
+                converter, ((RuntimeException) this.result.getValue())));
     }
-    if (this.sourceContext != null) proto.setSourceContext((this.sourceContext));
+    if (this.sourceContext != null)
+      proto.setSourceContext(converter.toPayload((this.sourceContext)).get());
     return proto.build();
   }
 
-  public static OnCompleteRequest fromProto(
-      io.temporal.api.notificationservice.v1.OnCompleteRequest proto) {
-    Builder builder = OnCompleteRequest.newBuilder();
+  public static <OutputT, SourceContextT> OnCompleteRequest<OutputT, SourceContextT> fromProto(
+      io.temporal.api.notificationservice.v1.OnCompleteRequest proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
+    Builder<OutputT, SourceContextT> builder =
+        OnCompleteRequest.<OutputT, SourceContextT>newBuilder();
     if (proto.hasSuccess())
       builder.setResult(
-          wit.notificationservice.OnCompleteRequestResult.success(proto.getSuccess()));
+          wit.notificationservice.OnCompleteRequestResult.success(
+              (OutputT)
+                  converter.fromPayload(
+                      proto.getSuccess(),
+                      wit.notificationservice.NexgenRuntime.rawType(
+                          wit.notificationservice.NexgenRuntime.argument(modelType, 0)),
+                      wit.notificationservice.NexgenRuntime.argument(modelType, 0))));
     if (proto.hasFailure())
       builder.setResult(
-          wit.notificationservice.OnCompleteRequestResult.failure(proto.getFailure()));
-    builder.setSourceContext(proto.getSourceContext());
+          wit.notificationservice.OnCompleteRequestResult.failure(
+              support.TemporalModelConverters.failureFromProto(converter, proto.getFailure())));
+    builder.setSourceContext(
+        (SourceContextT)
+            converter.fromPayload(
+                proto.getSourceContext(),
+                wit.notificationservice.NexgenRuntime.rawType(
+                    wit.notificationservice.NexgenRuntime.argument(modelType, 1)),
+                wit.notificationservice.NexgenRuntime.argument(modelType, 1)));
     return builder.build();
   }
 
@@ -102,13 +124,18 @@ public final class OnCompleteRequest {
     }
 
     public Object toTransferType(OnCompleteRequest value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public OnCompleteRequest fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto((io.temporal.api.notificationservice.v1.OnCompleteRequest) value);
+          : fromProto(
+              (io.temporal.api.notificationservice.v1.OnCompleteRequest) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }

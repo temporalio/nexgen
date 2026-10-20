@@ -50,25 +50,31 @@ public final class TaskQueuePartitions {
     }
   }
 
-  public io.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse toProto() {
+  public io.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse.Builder proto =
         io.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse.newBuilder();
     if (this.workflowTaskQueuePartitions != null)
       proto.addAllWorkflowTaskQueuePartitions(
           (this.workflowTaskQueuePartitions)
               .stream()
-                  .map(item4 -> (item4).toProto())
+                  .map(item4 -> (item4).toProto(converter))
                   .collect(java.util.stream.Collectors.toList()));
     return proto.build();
   }
 
   public static TaskQueuePartitions fromProto(
-      io.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse proto) {
+      io.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
     Builder builder = TaskQueuePartitions.newBuilder();
     builder.setWorkflowTaskQueuePartitions(
         (proto.getWorkflowTaskQueuePartitionsList())
             .stream()
-                .map(item5 -> wit.typeroundtrip.TaskQueuePartition.fromProto(item5))
+                .map(
+                    item5 ->
+                        wit.typeroundtrip.TaskQueuePartition.fromProto(
+                            item5, converter, wit.typeroundtrip.TaskQueuePartition.class))
                 .collect(java.util.stream.Collectors.toList()));
     return builder.build();
   }
@@ -80,13 +86,18 @@ public final class TaskQueuePartitions {
     }
 
     public Object toTransferType(TaskQueuePartitions value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public TaskQueuePartitions fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto((io.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse) value);
+          : fromProto(
+              (io.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }

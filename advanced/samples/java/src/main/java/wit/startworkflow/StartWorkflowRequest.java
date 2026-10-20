@@ -114,31 +114,38 @@ public final class StartWorkflowRequest {
     }
   }
 
-  public io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest toProto() {
+  public io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest.Builder proto =
         io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest.newBuilder();
     if (this.workflow != null)
-      proto.setWorkflowType(support.TemporalModelConverters.workflowTypeToProto((this.workflow)));
+      proto.setWorkflowType(
+          support.TemporalModelConverters.workflowTypeToProto(converter, (this.workflow)));
     if (this.workflowId != null) proto.setWorkflowId((this.workflowId));
     if (this.taskQueue != null)
-      proto.setTaskQueue(support.TemporalModelConverters.taskQueueToProto((this.taskQueue)));
+      proto.setTaskQueue(
+          support.TemporalModelConverters.taskQueueToProto(converter, (this.taskQueue)));
     if (this.workflowStartDelay != null)
       proto.setWorkflowStartDelay(
-          support.TemporalModelConverters.durationToProto((this.workflowStartDelay)));
+          support.TemporalModelConverters.durationToProto(converter, (this.workflowStartDelay)));
     if (this.namespace != null) proto.setNamespace((this.namespace));
     return proto.build();
   }
 
   public static StartWorkflowRequest fromProto(
-      io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest proto) {
+      io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
     Builder builder = StartWorkflowRequest.newBuilder();
     builder.setWorkflow(
-        support.TemporalModelConverters.workflowTypeFromProto(proto.getWorkflowType()));
+        support.TemporalModelConverters.workflowTypeFromProto(converter, proto.getWorkflowType()));
     builder.setWorkflowId(proto.getWorkflowId());
-    builder.setTaskQueue(support.TemporalModelConverters.taskQueueFromProto(proto.getTaskQueue()));
+    builder.setTaskQueue(
+        support.TemporalModelConverters.taskQueueFromProto(converter, proto.getTaskQueue()));
     if (proto.hasWorkflowStartDelay())
       builder.setWorkflowStartDelay(
-          support.TemporalModelConverters.durationFromProto(proto.getWorkflowStartDelay()));
+          support.TemporalModelConverters.durationFromProto(
+              converter, proto.getWorkflowStartDelay()));
     builder.setNamespace(proto.getNamespace());
     return builder.build();
   }
@@ -150,13 +157,18 @@ public final class StartWorkflowRequest {
     }
 
     public Object toTransferType(StartWorkflowRequest value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public StartWorkflowRequest fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto((io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest) value);
+          : fromProto(
+              (io.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }

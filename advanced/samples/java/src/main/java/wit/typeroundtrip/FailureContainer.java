@@ -4,16 +4,15 @@ package wit.typeroundtrip;
 @io.temporal.common.converter.TransferTypeConvertible(FailureContainer.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class FailureContainer {
-  private final io.temporal.api.failure.v1.Failure failure;
+  private final RuntimeException failure;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public FailureContainer(
-      @com.fasterxml.jackson.annotation.JsonProperty("failure")
-          io.temporal.api.failure.v1.Failure failure) {
+      @com.fasterxml.jackson.annotation.JsonProperty("failure") RuntimeException failure) {
     this.failure = failure;
   }
 
-  public io.temporal.api.failure.v1.Failure getFailure() {
+  public RuntimeException getFailure() {
     return failure;
   }
 
@@ -37,9 +36,9 @@ public final class FailureContainer {
       this.failure = value.failure;
     }
 
-    private io.temporal.api.failure.v1.Failure failure = null;
+    private RuntimeException failure = null;
 
-    public Builder setFailure(io.temporal.api.failure.v1.Failure value) {
+    public Builder setFailure(RuntimeException value) {
       this.failure = value;
       return this;
     }
@@ -49,17 +48,23 @@ public final class FailureContainer {
     }
   }
 
-  public io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes toProto() {
+  public io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes.Builder proto =
         io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes.newBuilder();
-    if (this.failure != null) proto.setFailure((this.failure));
+    if (this.failure != null)
+      proto.setFailure(support.TemporalModelConverters.failureToProto(converter, (this.failure)));
     return proto.build();
   }
 
   public static FailureContainer fromProto(
-      io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes proto) {
+      io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
     Builder builder = FailureContainer.newBuilder();
-    if (proto.hasFailure()) builder.setFailure(proto.getFailure());
+    if (proto.hasFailure())
+      builder.setFailure(
+          support.TemporalModelConverters.failureFromProto(converter, proto.getFailure()));
     return builder.build();
   }
 
@@ -70,13 +75,18 @@ public final class FailureContainer {
     }
 
     public Object toTransferType(FailureContainer value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public FailureContainer fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto((io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes) value);
+          : fromProto(
+              (io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }

@@ -125,11 +125,12 @@ public final class PauseActivityRequest {
     }
   }
 
-  public io.temporal.api.workflowservice.v1.PauseActivityRequest toProto() {
+  public io.temporal.api.workflowservice.v1.PauseActivityRequest toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.workflowservice.v1.PauseActivityRequest.Builder proto =
         io.temporal.api.workflowservice.v1.PauseActivityRequest.newBuilder();
     if (this.namespace != null) proto.setNamespace((this.namespace));
-    if (this.execution != null) proto.setExecution((this.execution).toProto());
+    if (this.execution != null) proto.setExecution((this.execution).toProto(converter));
     if (this.identity != null) proto.setIdentity((this.identity));
     if (this.activity != null) {
       if (this.activity.getTag() == wit.protooneof.ActivitySelection.Tag.ID)
@@ -143,11 +144,15 @@ public final class PauseActivityRequest {
   }
 
   public static PauseActivityRequest fromProto(
-      io.temporal.api.workflowservice.v1.PauseActivityRequest proto) {
+      io.temporal.api.workflowservice.v1.PauseActivityRequest proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
     Builder builder = PauseActivityRequest.newBuilder();
     builder.setNamespace(proto.getNamespace());
     if (proto.hasExecution())
-      builder.setExecution(wit.protooneof.WorkflowExecution.fromProto(proto.getExecution()));
+      builder.setExecution(
+          wit.protooneof.WorkflowExecution.fromProto(
+              proto.getExecution(), converter, wit.protooneof.WorkflowExecution.class));
     builder.setIdentity(proto.getIdentity());
     if (proto.hasId()) builder.setActivity(wit.protooneof.ActivitySelection.id(proto.getId()));
     if (proto.hasType())
@@ -164,13 +169,18 @@ public final class PauseActivityRequest {
     }
 
     public Object toTransferType(PauseActivityRequest value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public PauseActivityRequest fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
-          : fromProto((io.temporal.api.workflowservice.v1.PauseActivityRequest) value);
+          : fromProto(
+              (io.temporal.api.workflowservice.v1.PauseActivityRequest) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }

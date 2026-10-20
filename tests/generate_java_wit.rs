@@ -126,24 +126,34 @@ fn every_wit_fixture_generates_in_both_modes() {
 }
 
 #[test]
-fn proto_models_preserve_payloads_without_converter_runtime() {
+fn runtime_contains_only_features_used_by_the_generated_bindings() {
     let temp = generate("workflow-service", GenerationMode::NativeApi, true);
     let output = temp.path().join("generated");
-    assert!(!output.join("NexgenRuntime.java").exists());
+    let runtime = fs::read_to_string(output.join("NexgenRuntime.java")).unwrap();
+    assert!(runtime.contains("decodeSequence"));
+    for unused in [
+        "ThreadLocal",
+        "withDataConverter",
+        "DefaultDataConverter",
+        "FunctionReference",
+        "class Result",
+        "interface Flag",
+        "parameterized",
+        "argument(",
+        "getField(",
+        "setField(",
+        "mapValues",
+        "protoMap",
+    ] {
+        assert!(
+            !runtime.contains(unused),
+            "unneeded runtime feature: {unused}"
+        );
+    }
     let request = fs::read_to_string(output.join("SignalWithStartWorkflowRequest.java")).unwrap();
     assert!(request.contains("proto.setWorkflowId("));
     assert!(request.contains("proto.getWorkflowId()"));
-    assert!(request.contains("io.temporal.api.common.v1.Payloads args"));
-    assert!(request.contains("io.temporal.api.common.v1.Memo memo"));
-    assert!(request.contains("io.temporal.api.common.v1.Header headers"));
-    assert!(!request.contains("DataConverter"));
-    assert!(!request.contains("List<Object>"));
-    let generic = generate("proto-generic", GenerationMode::NativeApi, false);
-    let model =
-        fs::read_to_string(generic.path().join("generated/PayloadBackedOutput.java")).unwrap();
-    assert!(model.contains("io.temporal.api.common.v1.Payload details"));
-    assert!(!model.contains("class PayloadBackedOutput<"));
-    assert!(!model.contains("DataConverter"));
+    assert!(request.contains("support.TemporalModelConverters.currentDataConverter()"));
     let json = generate("user-service", GenerationMode::NativeApi, false);
     assert!(!json.path().join("generated/NexgenRuntime.java").exists());
 }

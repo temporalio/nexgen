@@ -63,7 +63,8 @@ public final class BadBinary {
     }
   }
 
-  public io.temporal.api.namespace.v1.BadBinaryInfo toProto() {
+  public io.temporal.api.namespace.v1.BadBinaryInfo toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.namespace.v1.BadBinaryInfo.Builder proto =
         io.temporal.api.namespace.v1.BadBinaryInfo.newBuilder();
     if (this.reason != null) proto.setReason((this.reason));
@@ -71,7 +72,10 @@ public final class BadBinary {
     return proto.build();
   }
 
-  public static BadBinary fromProto(io.temporal.api.namespace.v1.BadBinaryInfo proto) {
+  public static BadBinary fromProto(
+      io.temporal.api.namespace.v1.BadBinaryInfo proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
     Builder builder = BadBinary.newBuilder();
     builder.setReason(proto.getReason());
     builder.setOperator(proto.getOperator());
@@ -85,11 +89,18 @@ public final class BadBinary {
     }
 
     public Object toTransferType(BadBinary value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public BadBinary fromTransferType(Object value, java.lang.reflect.Type valueType) {
-      return value == null ? null : fromProto((io.temporal.api.namespace.v1.BadBinaryInfo) value);
+      return value == null
+          ? null
+          : fromProto(
+              (io.temporal.api.namespace.v1.BadBinaryInfo) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }
