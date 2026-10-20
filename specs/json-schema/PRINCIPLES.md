@@ -708,19 +708,28 @@ reserved in every model member scope and closed-value constant scope.
    `JsonElement`s by content (through the runtime `ValueEquality`), so a value
    equals its own round trip. A model synthesizes, in its own member scope, a
    nested closed-value class `<Member>Value` per `const`/`enum` member, a nested
-   interface `<Member>Union` per inline `oneOf` member, and a computed
-   `<Member>OrDefault` per optional member with a scalar `default`. Value
-   constants are PascalCase tokens of the value (`Active`, `V1_5`, `VNeg3`,
-   `True`), renamed by `x-cs-const-name` / `x-cs-enum-names`. Construction is
-   unchecked (P12).
+   interface `<Member>Union` (and its `<Member>Union<Kind>` wrappers) per inline
+   `oneOf` member, and a computed `<Member>OrDefault` per optional member with a
+   scalar `default`. The `Value` and `Union` suffixes are required rather than
+   stylistic: a C# type keeps its properties and nested types in one declaration
+   space, so the nested type of property `Kind` cannot itself be named `Kind`
+   (CS0102). Java reaches members through `getKind()` and so can name the nested
+   type `Kind` directly. A named `$defs` type has no property beside it and
+   keeps its own name (`Foo`), so the suffix marks exactly the types synthesized
+   from a member. Value constants are PascalCase tokens of the value (`Active`,
+   `V1_5`, `VNeg3`, `True`), renamed by `x-cs-const-name` / `x-cs-enum-names`.
+   Construction is unchecked (P12).
 3. **Unions are interfaces.** A `oneOf` model is a `public interface` whose
    object branches are the member models (which implement it) and whose scalar
-   and array branches are nested wrapper classes `<Union>String`,
-   `<Union>Integer`, `<Union>Number`, `<Union>Boolean`, `<Union>Array` holding a
-   `Value` (`<Union>Object` holds a free-form object's members). A model may be
-   a member of several unions, which is why an interface is used rather than a
-   base record. The union's converter selects the branch by JSON value kind and,
-   for object branches, by the discriminator (see [[oneOf]]).
+   and array branches are wrapper classes `<Union>String`, `<Union>Integer`,
+   `<Union>Number`, `<Union>Boolean`, `<Union>Array` holding a `Value`
+   (`<Union>Object` holds a free-form object's members). As in Java, a named
+   union nests its wrappers in the interface (`Foo.FooString`), and an inline
+   union declares them beside its interface in the declaring model
+   (`Showcase.DetailUnionString`). A model may be a member of several unions,
+   which is why an interface is used rather than a base record. The union's
+   converter selects the branch by JSON value kind and, for object branches, by
+   the discriminator (see [[oneOf]]).
 4. **One class-level converter per model (P11/P12; the analog of Java §5).**
    Each model carries `[JsonConverter(typeof(<Model>.Converter))]` and a nested
    `internal sealed class Converter : JsonConverter<<Model>>`, which

@@ -253,6 +253,11 @@ namespace.
 | TypeScript | none — the type is the inline literal `"user"`                     | —                                                       |
 | Python     | none — the type is the inline `Literal["user"]`                    | —                                                       |
 
+C# cannot follow Java and name the class `Kind`: a C# type keeps its properties
+and nested types in one declaration space, so the class nested beside property
+`Kind` cannot share its name (CS0102; see **PRINCIPLES C# §2**). The `Value`
+suffix resolves that for every closed-value member.
+
 Per **P15** every synthesized name enters the **same per-scope namespace** as
 the declared names and as one another; the generator runs a single collision
 pass (after case-mapping) and **rejects at load** with a fix-it diagnostic on
