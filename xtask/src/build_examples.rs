@@ -59,7 +59,11 @@ pub fn build_examples(request: &BuildExamplesRequest) -> Result<()> {
             let wit_request = request_for_languages(request, |language| {
                 matches!(
                     language,
-                    Language::Dotnet | Language::Python | Language::TypeScript | Language::Go
+                    Language::Dotnet
+                        | Language::Python
+                        | Language::TypeScript
+                        | Language::Go
+                        | Language::Java
                 )
             });
             let json_request = request_for_languages(request, |language| {
@@ -128,6 +132,7 @@ fn available_wit_example_ids(
     let languages = if request.languages.is_empty() {
         vec![
             Language::Dotnet,
+            Language::Java,
             Language::Python,
             Language::TypeScript,
             Language::Go,
@@ -177,6 +182,7 @@ fn build_wit_examples(request: &BuildExamplesRequest) -> Result<()> {
     let languages = if use_default_languages {
         vec![
             Language::Dotnet,
+            Language::Java,
             Language::Python,
             Language::TypeScript,
             Language::Go,
@@ -462,7 +468,7 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
         output_path: output_path.clone(),
         format: language == Language::Java,
         java_package_name: (language == Language::Java)
-            .then(|| example_directory_name(language, example_id)),
+            .then(|| format!("wit.{}", example_directory_name(language, example_id))),
         ts_date_time_types: Default::default(),
     };
     generate_to_file(&generate_request)?;
@@ -571,7 +577,7 @@ fn sample_support_package(
             );
             Some(relative.to_string_lossy().replace('\\', "/"))
         }
-        Language::Java => None,
+        Language::Java => Some("support.TemporalModelConverters".into()),
         _ => None,
     }
 }
@@ -619,6 +625,9 @@ fn example_output_path(root: &Path, language: Language, id: &str) -> PathBuf {
     let root = advanced_language_root(root, language);
     match language {
         Language::Go => root.join(example_directory_name(language, id)),
+        Language::Java => root
+            .join("src/main/java/wit")
+            .join(example_directory_name(language, id)),
         _ => root.join("wit").join(example_directory_name(language, id)),
     }
 }
@@ -657,7 +666,7 @@ fn json_example_java_package(name: &str, mode: GenerationMode) -> String {
 }
 fn example_directory_name(language: Language, id: &str) -> String {
     match language {
-        Language::Go => id
+        Language::Go | Language::Java => id
             .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
             .collect::<String>()

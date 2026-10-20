@@ -1,17 +1,23 @@
+//! Rendering of native language-neutral models and protobuf-backed APIs for Java.
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write;
 use std::path::PathBuf;
 
-use heck::ToLowerCamelCase;
-
-use crate::error::{Error, Result};
+use self::java_string_literal as literal;
+use crate::error::Result;
 use crate::generator::json_schema::java as java_json;
-use crate::generator::json_schema::java::JavaContext;
 use crate::generator::{
     GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GeneratedOutputLayout,
 };
-use crate::planning::{PlannedFamily, PlannedJsonType};
-use crate::spec::{ApiSpecLeaf, ApiSpecNode};
-use crate::spec::{ExternalTypeSpec, ModulePath, ServiceSpec, TypeSpec};
+use crate::planning::{
+    PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
+    PlannedWireFieldBinding,
+};
+use crate::spec::*;
+use heck::{ToLowerCamelCase, ToShoutySnakeCase, ToUpperCamelCase};
+use prost_types::field_descriptor_proto::Type as ProtoType;
+use prost_types::{DescriptorProto, FieldDescriptorProto};
 
 pub(crate) mod format;
 
@@ -19,171 +25,28 @@ const DEFAULT_PACKAGE: &str = "generated";
 const JAVA_FORMAT_LINE_LENGTH: usize = 88;
 
 pub(crate) fn generate(
-    tree: &crate::spec::ApiSpecTree<PlannedFamily>,
+    tree: &ApiSpecTree<PlannedFamily>,
+    descriptors: &crate::descriptors::DescriptorIndex,
     base_package: Option<&str>,
+    support_package: Option<&str>,
 ) -> Result<GeneratedFiles> {
-    let base_package = base_package.unwrap_or(DEFAULT_PACKAGE);
-    let root_package = base_package;
-
-    let mut leaves = Vec::new();
-    collect_leaves(&tree.root, &mut leaves);
-    for leaf in &leaves {
-        if let Some((_, record)) = leaf
-            .spec
-            .records()
-            .find(|(_, record)| record.data.proto.is_some())
-        {
-            return Err(Error::UnsupportedJavaProtoModel {
-                message: record
-                    .data
-                    .proto
-                    .as_ref()
-                    .expect("checked above")
-                    .full_name
-                    .clone(),
-            });
-        }
+    let package = base_package.unwrap_or(DEFAULT_PACKAGE);
+    if java_json::can_generate(tree, support_package) {
+        java_json::generate(tree, package)
+    } else {
+        generate_api(tree, descriptors, package, support_package.unwrap_or(""))
     }
-
-    // Every JSON model keyed by its canonical `full_name`, so a `oneOf` union
-    // def can resolve its `$ref` object members' schemas + discriminants, and
-    // bare-ref aliases can collapse to the class-owning target.
-    let mut all_models: BTreeMap<String, PlannedJsonType> = BTreeMap::new();
-    for leaf in &leaves {
-        for (_, binding) in leaf.spec.external_types() {
-            if let Some(json_type) = binding.json_model() {
-                all_models.insert(json_type.full_name.clone(), json_type.clone());
-            }
-        }
-    }
-
-    // Registry from each model's canonical `full_name` (the string that appears
-    // in planned `$ref` values) to its Java (package, class). Alias keys point
-    // directly at their final target because Java emits no alias declaration.
-    let mut registry: BTreeMap<String, (String, String)> = BTreeMap::new();
-    let root_module = ModulePath::default();
-    for (full_name, json_type) in &all_models {
-        let target = java_json::resolve_bare_ref_alias(json_type, &all_models);
-        let module = target.module_path.as_ref().unwrap_or(&root_module);
-        registry.insert(
-            full_name.clone(),
-            (
-                JavaContext::package_for_module(base_package, &module.0),
-                target.model_name.clone(),
-            ),
-        );
-    }
-
-    let mut files = GeneratedFileMap::default();
-    let mut packages: BTreeSet<Vec<String>> = BTreeSet::new();
-    packages.insert(Vec::new());
-
-    for leaf in &leaves {
-        let module = &leaf.module_path;
-        packages.insert(module.0.clone());
-        let module_dir = module.to_path_buf();
-
-        for (_, binding) in leaf.spec.external_types() {
-            let Some(json_type) = binding.json_model() else {
-                continue;
-            };
-            if java_json::resolve_bare_ref_alias(json_type, &all_models).full_name
-                != json_type.full_name
-            {
-                continue;
-            }
-            let contents = java_json::render_model_file(
-                json_type,
-                base_package,
-                module,
-                root_package,
-                &registry,
-                &all_models,
-            )?;
-            let path = module_dir.join(format!("{}.java", json_type.model_name));
-            files.insert(
-                path,
-                contents,
-                GeneratedFileOrigin::type_declaration(
-                    crate::language::Language::Java,
-                    &leaf.source_path,
-                    &json_type.full_name,
-                ),
-            )?;
-        }
-
-        for service in &leaf.spec.services {
-            let contents = render_service_file(service, module, base_package, &all_models)?;
-            let service_ident = service.code_name.value().unwrap_or(&service.name);
-            let path = module_dir.join(format!("{service_ident}.java"));
-            files.insert(
-                path,
-                contents,
-                GeneratedFileOrigin::service_declaration(
-                    crate::language::Language::Java,
-                    &leaf.source_path,
-                    &service.name,
-                ),
-            )?;
-        }
-    }
-
-    // Runtime classes live once at the package root.
-    files.insert(
-        PathBuf::from("Violation.java"),
-        java_json::render_violation_file(root_package),
-        GeneratedFileOrigin::fixed("generated Java runtime class `Violation`"),
-    )?;
-    files.insert(
-        PathBuf::from("SpecNumbers.java"),
-        java_json::render_spec_numbers_file(root_package),
-        GeneratedFileOrigin::fixed("generated Java runtime class `SpecNumbers`"),
-    )?;
-    // The materialized-temporal runtime is emitted only when a model uses a
-    // temporal `format`, so non-temporal packages stay lean.
-    if all_models.values().any(java_json::model_uses_temporal) {
-        files.insert(
-            PathBuf::from("TemporalSupport.java"),
-            java_json::render_temporal_support_file(root_package),
-            GeneratedFileOrigin::fixed("generated Java runtime class `TemporalSupport`"),
-        )?;
-    }
-    // The materialized-contentEncoding runtime is emitted only when a model uses
-    // a `contentEncoding`, so non-bytes packages stay lean.
-    if all_models
-        .values()
-        .any(java_json::model_uses_content_encoding)
-    {
-        files.insert(
-            PathBuf::from("Base64Support.java"),
-            java_json::render_base64_support_file(root_package),
-            GeneratedFileOrigin::fixed("generated Java runtime class `Base64Support`"),
-        )?;
-    }
-
-    // A `package-info.java` marking each emitted package `@NullMarked`.
-    for module in &packages {
-        let package = JavaContext::package_for_module(base_package, module);
-        let mut path = PathBuf::new();
-        for segment in module {
-            path.push(segment);
-        }
-        path.push("package-info.java");
-        files.insert(
-            path,
-            java_json::render_package_info(&package),
-            GeneratedFileOrigin::fixed(format!("generated Java package metadata for `{package}`")),
-        )?;
-    }
-
-    Ok(GeneratedFiles {
-        layout: GeneratedOutputLayout::Directory,
-        files: files.into_files(),
-        warnings: Vec::new(),
-    })
 }
 
-fn collect_leaves<'a>(
+fn package_for_module(base_package: &str, module: &[String]) -> String {
+    if module.is_empty() {
+        base_package.to_string()
+    } else {
+        format!("{base_package}.{}", module.join("."))
+    }
+}
+
+pub(in crate::generator) fn collect_leaves<'a>(
     node: &'a ApiSpecNode<PlannedFamily>,
     leaves: &mut Vec<&'a ApiSpecLeaf<PlannedFamily>>,
 ) {
@@ -197,175 +60,1941 @@ fn collect_leaves<'a>(
     }
 }
 
-fn render_service_file(
-    service: &ServiceSpec<PlannedFamily>,
-    module: &ModulePath,
-    base_package: &str,
-    all_models: &BTreeMap<String, PlannedJsonType>,
-) -> Result<String> {
-    let package = JavaContext::package_for_module(base_package, &module.0);
+type Record = RecordSpec<PlannedFamily>;
 
-    let mut imports: BTreeSet<String> = BTreeSet::new();
-    imports.insert("io.nexusrpc.Operation".to_string());
-    imports.insert("io.nexusrpc.Service".to_string());
-
-    // Java permits the same simple model name in separate packages. If one
-    // service refers to both, importing both would make the generated method
-    // signatures ambiguous, so spell those particular references with their
-    // qualified names. Unique foreign types retain the customary import.
-    let mut io_packages_by_class: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for operation in &service.operations {
-        for ty in [operation.input.as_ref(), operation.output.as_ref()]
-            .into_iter()
-            .flatten()
-        {
-            if let Some((pkg, class)) = io_type(Some(ty), module, base_package, all_models) {
-                io_packages_by_class.entry(class).or_default().insert(pkg);
-            }
+fn generate_api(
+    tree: &ApiSpecTree<PlannedFamily>,
+    descriptors: &crate::descriptors::DescriptorIndex,
+    package: &str,
+    support: &str,
+) -> Result<GeneratedFiles> {
+    let mut leaves = Vec::new();
+    collect_leaves(&tree.root, &mut leaves);
+    let mut names = BTreeMap::new();
+    for leaf in &leaves {
+        let pkg = package_for_module(package, &leaf.module_path.0);
+        for (key, entry) in &leaf.spec.types {
+            let name = match &entry.declaration {
+                TypeDeclSpec::Record(v) => &v.name,
+                TypeDeclSpec::Enum(v) => &v.name,
+                TypeDeclSpec::Flags(v) => &v.name,
+                TypeDeclSpec::Variant(v) => &v.name,
+                TypeDeclSpec::External(_) => continue,
+            };
+            names.insert(key.clone(), format!("{pkg}.{}", name.to_upper_camel_case()));
         }
     }
-    let ambiguous_io_classes = io_packages_by_class
-        .iter()
-        .filter(|(_, packages)| packages.len() > 1)
-        .map(|(class, _)| class.clone())
-        .collect::<BTreeSet<_>>();
-
-    let mut body = String::new();
-    render_service_javadoc(
-        &mut body,
-        service.doc.value(),
-        service.deprecated,
-        "service",
-    );
-    body.push_str(&format!(
-        "@Service(name = {})\n{}public interface {} {{\n",
-        java_string_literal(&service.wire_name),
-        if service.deprecated {
-            "@Deprecated\n"
-        } else {
-            ""
-        },
-        service.code_name.value().unwrap_or(&service.name)
-    ));
-
-    for (index, operation) in service.operations.iter().enumerate() {
-        if index > 0 {
-            body.push('\n');
+    let mut files = GeneratedFileMap::default();
+    let runtime = RefCell::new(RuntimeNeeds::default());
+    let variables = Cell::new(0);
+    for leaf in &leaves {
+        let pkg = package_for_module(package, &leaf.module_path.0);
+        let mut resolved_spec = leaf.spec.clone();
+        for peer in &leaves {
+            for (name, entry) in &peer.spec.types {
+                resolved_spec
+                    .types
+                    .entry(name.clone())
+                    .or_insert_with(|| entry.clone());
+            }
         }
-        render_service_javadoc_indented(
-            &mut body,
-            operation.doc.value(),
-            operation.deprecated,
-            "operation",
-        );
-        body.push_str(&format!(
-            "    @Operation(name = {})\n",
-            java_string_literal(&operation.wire_name)
-        ));
-        if operation.deprecated {
-            body.push_str("    @Deprecated\n");
+        let ctx = Context {
+            spec: &resolved_spec,
+            package: &pkg,
+            root: package,
+            support,
+            names: &names,
+            runtime_needs: &runtime,
+            variables: &variables,
+            descriptors,
+        };
+        let mut insert = |name: &str, body: String| -> Result<()> {
+            files.insert(
+                leaf.module_path.to_path_buf().join(format!("{name}.java")),
+                format!(
+                    "// Generated by nexgen v{}. DO NOT EDIT!\npackage {pkg};\n\n{body}",
+                    env!("CARGO_PKG_VERSION")
+                ),
+                GeneratedFileOrigin::input_module(
+                    crate::language::Language::Java,
+                    &leaf.source_path,
+                ),
+            )
+        };
+        for entry in leaf.spec.types.values() {
+            match &entry.declaration {
+                TypeDeclSpec::Record(record) => {
+                    insert(&record.name.to_upper_camel_case(), ctx.record(record))?
+                }
+                TypeDeclSpec::Enum(enumeration) => {
+                    let values = enumeration
+                        .values
+                        .iter()
+                        .map(|v| {
+                            format!(
+                                "@com.fasterxml.jackson.annotation.JsonProperty({}) {}({}, {})",
+                                literal(&v.wire_name),
+                                v.name.to_shouty_snake_case(),
+                                v.number,
+                                literal(&v.wire_name.to_shouty_snake_case())
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",\n  ");
+                    let n = enumeration.name.to_upper_camel_case();
+                    insert(
+                        &n,
+                        format!(
+                            "public enum {n} {{\n  {values};\n  private final int number;\n  private final String wireName;\n  {n}(int number, String wireName) {{ this.number = number; this.wireName = wireName; }}\n  public int getNumber() {{ return number; }}\n  public String getWireName() {{ return wireName; }}\n  public static {n} fromWireName(String name) {{ for ({n} value : values()) if (name.equals(value.wireName) || name.endsWith(\"_\" + value.wireName)) return value; throw new IllegalArgumentException(\"Unknown enum value: \" + name); }}\n  public static {n} fromNumber(int number) {{ for ({n} value : values()) if (value.number == number) return value; throw new IllegalArgumentException(\"Unknown {n} number: \" + number); }}\n}}\n"
+                        ),
+                    )?;
+                }
+                TypeDeclSpec::Flags(flags) => {
+                    let n = flags.name.to_upper_camel_case();
+                    let values = flags
+                        .flags
+                        .iter()
+                        .map(|f| format!("{}(1L << {})", f.name.to_shouty_snake_case(), f.bit))
+                        .collect::<Vec<_>>()
+                        .join(",\n  ");
+                    insert(
+                        &n,
+                        format!(
+                            "public enum {n} {{\n  {values};\n  public final long bit;\n  {n}(long bit) {{ this.bit = bit; }}\n  public long getBit() {{ return bit; }}\n}}\n"
+                        ),
+                    )?;
+                }
+                TypeDeclSpec::Variant(variant) => {
+                    insert(&variant.name.to_upper_camel_case(), ctx.variant(variant))?
+                }
+                TypeDeclSpec::External(_) => (),
+            }
         }
-
-        let output = io_type(operation.output.as_ref(), module, base_package, all_models);
-        let input = io_type(operation.input.as_ref(), module, base_package, all_models);
-        let return_type = match &output {
-            Some((pkg, class)) => {
-                if ambiguous_io_classes.contains(class) {
-                    format!("{pkg}.{class}")
-                } else {
-                    if pkg != &package {
-                        imports.insert(format!("{pkg}.{class}"));
+        for service in &leaf.spec.services {
+            let n = service
+                .code_name
+                .value()
+                .unwrap_or(&service.name)
+                .to_upper_camel_case();
+            insert(&n, ctx.service(service, &n))?;
+            if crate::nexgen_config::current().mode == crate::generator::GenerationMode::NativeApi {
+                insert(&operations_class(service), ctx.operations(service))?;
+            }
+            for resource in &service.resources {
+                insert(
+                    &resource.data.type_name.to_upper_camel_case(),
+                    ctx.resource(service, &resource.data),
+                )?;
+            }
+        }
+        if crate::nexgen_config::current().system_nexus && !leaf.spec.services.is_empty() {
+            insert("SystemNexusWorkflowOutboundInterceptor", ctx.interceptors())?;
+            insert("SystemNexusOperations", ctx.registry())?;
+        }
+    }
+    if crate::nexgen_config::current().system_nexus {
+        let mut roots = BTreeSet::new();
+        for leaf in &leaves {
+            for service in &leaf.spec.services {
+                for operation in &service.operations {
+                    for ty in [operation.input.as_ref(), operation.output.as_ref()]
+                        .into_iter()
+                        .flatten()
+                    {
+                        match ty.without_option() {
+                            TypeSpec::Record(record) => {
+                                if let Some(info) = leaf
+                                    .spec
+                                    .record(&record.full_name)
+                                    .and_then(|r| r.data.proto.as_ref())
+                                {
+                                    roots.insert(info.full_name.clone());
+                                }
+                            }
+                            TypeSpec::External(ExternalTypeSpec::Proto(
+                                PlannedProtoType::Message(message),
+                            )) => {
+                                roots.insert(message.proto.full_name.clone());
+                            }
+                            _ => (),
+                        }
                     }
-                    class.clone()
                 }
             }
-            None => "void".to_string(),
-        };
-        let method = operation
-            .code_name
-            .value()
+        }
+        files.insert(
+            PathBuf::from("system-nexus-roots.txt"),
+            roots.into_iter().map(|root| format!("{root}\n")).collect(),
+            GeneratedFileOrigin::fixed("system Nexus operation roots"),
+        )?;
+    }
+    if !runtime.borrow().is_empty() {
+        files.insert(
+            PathBuf::from("NexgenRuntime.java"),
+            format!(
+                "// Generated by nexgen. DO NOT EDIT!\npackage {package};\n{}",
+                java_runtime(&runtime.borrow())
+            ),
+            GeneratedFileOrigin::fixed("Java WIT runtime"),
+        )?;
+    }
+    Ok(GeneratedFiles {
+        layout: GeneratedOutputLayout::Directory,
+        files: files.into_files(),
+        warnings: Vec::new(),
+    })
+}
+
+struct Context<'a> {
+    spec: &'a PlannedSpec,
+    package: &'a str,
+    root: &'a str,
+    support: &'a str,
+    names: &'a BTreeMap<String, String>,
+    runtime_needs: &'a RefCell<RuntimeNeeds>,
+    variables: &'a Cell<usize>,
+    descriptors: &'a crate::descriptors::DescriptorIndex,
+}
+
+fn ident(name: &str) -> String {
+    let n = name.to_lower_camel_case();
+    match n.as_str() {
+        "class" | "interface" | "enum" | "default" | "public" | "private" | "protected"
+        | "static" | "final" | "void" | "new" | "return" | "switch" | "case" | "instanceof"
+        | "this" | "super" | "throw" | "throws" | "try" | "catch" | "finally" | "package"
+        | "import" | "extends" | "implements" | "native" | "synchronized" | "volatile"
+        | "transient" | "abstract" | "assert" | "boolean" | "byte" | "char" | "short" | "int"
+        | "long" | "float" | "double" | "const" | "goto" | "if" | "else" | "while" | "do"
+        | "for" | "break" | "continue" | "true" | "false" | "null" => format!("{n}_"),
+        _ => n,
+    }
+}
+
+fn operations_class(service: &ServiceSpec<PlannedFamily>) -> String {
+    service
+        .operations_class
+        .value()
+        .map(str::to_owned)
+        .unwrap_or_else(|| {
+            format!(
+                "{}Operations",
+                service
+                    .code_name
+                    .value()
+                    .unwrap_or(&service.name)
+                    .to_upper_camel_case()
+            )
+        })
+}
+
+fn proto_name(info: &PlannedProtoTypeInfo) -> String {
+    if let Some(reference) = info.reference.value().filter(|r| *r != info.full_name) {
+        return reference.to_string();
+    }
+    let relative = crate::planning::relative_descriptor_name(&info.full_name, &info.package);
+    let options = info.file_options.as_ref();
+    let package = options
+        .and_then(|o| o.java_package.as_deref())
+        .unwrap_or(&info.package);
+    if options.is_some_and(|o| o.java_multiple_files.unwrap_or(false)) {
+        return format!("{package}.{relative}");
+    }
+    let outer = options
+        .and_then(|o| o.java_outer_classname.clone())
+        .unwrap_or_else(|| {
+            info.file_name
+                .as_deref()
+                .unwrap_or("message.proto")
+                .rsplit('/')
+                .next()
+                .unwrap()
+                .trim_end_matches(".proto")
+                .to_upper_camel_case()
+        });
+    format!("{package}.{outer}.{relative}")
+}
+
+#[derive(Clone, Copy)]
+struct WireField<'a> {
+    field: &'a FieldDescriptorProto,
+    message: &'a DescriptorProto,
+}
+
+// Match protoc's Java naming, including digit boundaries, reserved inherited
+// methods, and repeated-field Count/List accessor collisions.
+fn proto_field_name(field: &FieldDescriptorProto) -> String {
+    let name = if field.r#type == Some(ProtoType::Group as i32) {
+        field
+            .type_name
+            .as_deref()
+            .unwrap_or_default()
+            .rsplit('.')
+            .next()
+            .unwrap_or_default()
+    } else {
+        field.name.as_deref().unwrap_or_default()
+    };
+    let mut result = String::new();
+    let mut upper = true;
+    for ch in name.chars() {
+        if ch.is_ascii_alphabetic() {
+            result.push(if upper { ch.to_ascii_uppercase() } else { ch });
+            upper = false;
+        } else if ch.is_ascii_digit() {
+            result.push(ch);
+            upper = true;
+        } else {
+            upper = true;
+        }
+    }
+    if matches!(
+        result.as_str(),
+        "Class"
+            | "DefaultInstanceForType"
+            | "ParserForType"
+            | "SerializedSize"
+            | "AllFields"
+            | "DescriptorForType"
+            | "InitializationErrorString"
+            | "UnknownFields"
+            | "CachedSize"
+    ) {
+        result.push('_');
+    }
+    result
+}
+
+impl WireField<'_> {
+    fn repeated(self) -> bool {
+        self.field.label == Some(prost_types::field_descriptor_proto::Label::Repeated as i32)
+    }
+    fn name(self) -> String {
+        let name = proto_field_name(self.field);
+        let collision = self.message.field.iter().any(|other| {
+            if other.number == self.field.number {
+                return false;
+            }
+            let other_name = proto_field_name(other);
+            let other_repeated = WireField {
+                field: other,
+                message: self.message,
+            }
+            .repeated();
+            name == other_name
+                || (self.repeated()
+                    && !other_repeated
+                    && (other_name == format!("{name}Count")
+                        || other_name == format!("{name}List")))
+                || (!self.repeated()
+                    && other_repeated
+                    && (name == format!("{other_name}Count")
+                        || name == format!("{other_name}List")))
+        });
+        if collision {
+            format!("{name}{}", self.field.number.unwrap_or_default())
+        } else {
+            name
+        }
+    }
+}
+
+impl Context<'_> {
+    fn proto_field(&self, proto: &PlannedProtoTypeInfo, name: &str) -> WireField<'_> {
+        let message = &self
+            .descriptors
+            .message(&proto.full_name)
+            .expect("planned protobuf message")
+            .descriptor;
+        WireField {
+            field: message
+                .field
+                .iter()
+                .find(|f| f.name.as_deref() == Some(name))
+                .expect("planned protobuf field"),
+            message,
+        }
+    }
+    fn map_field<'a>(&'a self, field: WireField<'a>, name: &str) -> WireField<'a> {
+        let message = &self
+            .descriptors
+            .message(
+                field
+                    .field
+                    .type_name
+                    .as_deref()
+                    .expect("map entry type")
+                    .trim_start_matches('.'),
+            )
+            .expect("map entry message")
+            .descriptor;
+        WireField {
+            field: message
+                .field
+                .iter()
+                .find(|f| f.name.as_deref() == Some(name))
+                .expect("map entry field"),
+            message,
+        }
+    }
+    fn need(&self, feature: RuntimeFeature) {
+        self.runtime_needs.borrow_mut().features.insert(feature);
+    }
+    fn variable(&self, prefix: &str) -> String {
+        let index = self.variables.get();
+        self.variables.set(index + 1);
+        format!("{prefix}{index}")
+    }
+    fn runtime(&self) -> String {
+        format!("{}.NexgenRuntime", self.root)
+    }
+    fn named(&self, full: &str, fallback: &str) -> String {
+        self.names
+            .get(full)
+            .cloned()
+            .unwrap_or_else(|| format!("{}.{}", self.package, fallback.to_upper_camel_case()))
+    }
+    fn type_args(&self, params: &[TypeParameterUsage]) -> String {
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<{}>",
+                params
+                    .iter()
+                    .map(|p| p.parameter.name.to_upper_camel_case())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+    }
+    fn ty(&self, ty: &PlannedType) -> String {
+        match ty {
+            TypeSpec::Bool => "Boolean".into(),
+            TypeSpec::Int(IntSpec::I32) => "Integer".into(),
+            TypeSpec::Int(IntSpec::I64) => "Long".into(),
+            TypeSpec::Float => "Double".into(),
+            TypeSpec::String => "String".into(),
+            TypeSpec::Bytes => "byte[]".into(),
+            TypeSpec::Option(inner) => self.ty(inner),
+            TypeSpec::List(inner) => format!("java.util.List<{}>", self.ty(inner)),
+            TypeSpec::Map(k, v) => format!("java.util.Map<{}, {}>", self.ty(k), self.ty(v)),
+            TypeSpec::Tuple(items) => {
+                self.runtime_needs.borrow_mut().tuples.insert(items.len());
+                if items.is_empty() {
+                    return format!("{}.Tuple0", self.runtime());
+                }
+                format!(
+                    "{}.Tuple{}<{}>",
+                    self.runtime(),
+                    items.len(),
+                    items
+                        .iter()
+                        .map(|t| self.ty(t))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            TypeSpec::Result { ok, err } => {
+                self.need(RuntimeFeature::Result);
+                format!(
+                    "{}.Result<{}, {}>",
+                    self.runtime(),
+                    ok.as_ref().map(|t| self.ty(t)).unwrap_or("Void".into()),
+                    err.as_ref().map(|t| self.ty(t)).unwrap_or("Void".into())
+                )
+            }
+            TypeSpec::TypeParameter(p) => p.name.to_upper_camel_case(),
+            TypeSpec::Record(r) => format!(
+                "{}{}",
+                self.named(&r.full_name, &r.model_name),
+                self.type_args(&self.spec.record_type_parameters(&r.full_name))
+            ),
+            TypeSpec::Enum(e) => self.named(&e.full_name, &e.name),
+            TypeSpec::Flags(f) => {
+                format!("java.util.EnumSet<{}>", self.named(&f.full_name, &f.name))
+            }
+            TypeSpec::Variant(v) => format!(
+                "{}{}",
+                self.named(&v.full_name, &v.name),
+                self.type_args(&self.spec.variant_type_parameters(&v.full_name))
+            ),
+            TypeSpec::Resource(r) => self.named(&r.type_name, &r.type_name),
+            TypeSpec::External(ExternalTypeSpec::Alias(a)) => a
+                .type_name
+                .value()
+                .map(str::to_string)
+                .unwrap_or_else(|| self.ty(&a.target)),
+            TypeSpec::External(ExternalTypeSpec::Proto(p)) => match p {
+                PlannedProtoType::Message(m) => m
+                    .replacement
+                    .as_ref()
+                    .and_then(|r| r.type_name.value())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| {
+                        m.authored_type
+                            .as_ref()
+                            .map(|t| self.ty(t))
+                            .unwrap_or_else(|| proto_name(&m.proto))
+                    }),
+                PlannedProtoType::Enum(e) => e
+                    .replacement
+                    .as_ref()
+                    .and_then(|r| r.type_name.value())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| proto_name(&e.proto)),
+            },
+            TypeSpec::External(ExternalTypeSpec::Json(j)) => j.model_name.clone(),
+        }
+    }
+    fn field_ty(&self, field: &RecordFieldSpec<PlannedFamily>) -> String {
+        if field.function.is_some() && field.data.wire_binding.is_none() {
+            let callable = format!("{}Function", field.name.to_upper_camel_case());
+            if let Some(alternate) = field
+                .function
+                .as_ref()
+                .and_then(|f| f.alternate_type.as_ref())
+            {
+                self.need(RuntimeFeature::FunctionReference);
+                return format!(
+                    "{}.FunctionReference<{callable}, {}>",
+                    self.runtime(),
+                    self.ty(alternate)
+                );
+            }
+            return callable;
+        }
+        field
+            .annotation
+            .as_ref()
+            .and_then(|v| v.value())
             .map(str::to_string)
-            .unwrap_or_else(|| operation.name.to_lower_camel_case());
-        match &input {
-            Some((pkg, class)) => {
-                let parameter_type = if ambiguous_io_classes.contains(class) {
-                    format!("{pkg}.{class}")
-                } else {
-                    if pkg != &package {
-                        imports.insert(format!("{pkg}.{class}"));
+            .unwrap_or_else(|| self.ty(&field.field_type))
+    }
+    fn helper(&self, expression: &str) -> String {
+        if self.support.is_empty() {
+            expression.into()
+        } else {
+            format!("{}.{expression}", self.support)
+        }
+    }
+    fn record(&self, record: &Record) -> String {
+        let name = record.name.to_upper_camel_case();
+        let params = self.spec.record_type_parameters(&record.full_name);
+        let args = self.type_args(&params);
+        let fields = record
+            .fields
+            .values()
+            .filter(|f| {
+                matches!(
+                    f.visibility,
+                    RecordFieldVisibility::Public
+                        | RecordFieldVisibility::ApiOmitted
+                        | RecordFieldVisibility::Sourced { .. }
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut out = String::new();
+        render_java_doc_comment(&mut out, "", record.doc.value(), &[]);
+        if record.data.proto.is_some() {
+            writeln!(
+                out,
+                "@io.temporal.common.converter.TransferTypeConvertible({name}.Converter.class)"
+            )
+            .unwrap();
+        }
+        writeln!(
+            out,
+            "@SuppressWarnings({{\"unchecked\", \"rawtypes\"}})\npublic final class {name}{args} {{"
+        )
+        .unwrap();
+        for f in &fields {
+            if let Some(function) = &f.function {
+                if f.data.wire_binding.is_none() {
+                    let result = match &function.result {
+                        FunctionResultSpec::Authored(ty) => self.ty(ty),
+                        FunctionResultSpec::Annotation(text) => {
+                            text.value().unwrap_or("Object").to_string()
+                        }
+                    };
+                    let arguments = match &function.args {
+                        FunctionArgsSpec::Fixed(args) => args
+                            .iter()
+                            .map(|a| format!("{} {}", self.ty(&a.field_type), ident(&a.name)))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        FunctionArgsSpec::Varargs { prefix, .. } => prefix
+                            .iter()
+                            .map(|arg| format!("{} {}", self.ty(&arg.field_type), ident(&arg.name)))
+                            .chain(std::iter::once("Object... args".into()))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    };
+                    writeln!(out, "  @FunctionalInterface public interface {}Function {{ {result} apply({arguments}); }}", f.name.to_upper_camel_case()).unwrap();
+                }
+            }
+            if let Some(doc) = f.doc.as_ref().and_then(|v| v.value()) {
+                render_java_doc_comment(&mut out, "  ", Some(doc), &[]);
+            }
+            writeln!(
+                out,
+                "  private final {} {};",
+                self.field_ty(f),
+                ident(&f.name)
+            )
+            .unwrap();
+        }
+        writeln!(
+            out,
+            "  @com.fasterxml.jackson.annotation.JsonCreator\n  public {name}({}) {{",
+            fields
+                .iter()
+                .map(|f| format!(
+                    "@com.fasterxml.jackson.annotation.JsonProperty({}) {} {}",
+                    literal(&ident(&f.name)),
+                    self.field_ty(f),
+                    ident(&f.name)
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+        .unwrap();
+        for f in &fields {
+            let n = ident(&f.name);
+            writeln!(out, "    this.{n} = {n};").unwrap();
+        }
+        writeln!(out, "  }}").unwrap();
+        for f in &fields {
+            writeln!(
+                out,
+                "  public {} get{}() {{ return {}; }}",
+                self.field_ty(f),
+                f.name.to_upper_camel_case(),
+                ident(&f.name)
+            )
+            .unwrap();
+        }
+        writeln!(out, "  public Builder{args} toBuilder() {{ return newBuilder(this); }}\n  public static {args} Builder{args} newBuilder({name}{args} value) {{ return new Builder{args}(value); }}\n  public static {args} Builder{args} newBuilder() {{ return new Builder{args}(); }}\n  public static final class Builder{args} {{\n    private Builder() {{}}\n    private Builder({name}{args} value) {{\n      if (value == null) return;").unwrap();
+        for f in &fields {
+            writeln!(
+                out,
+                "      this.{} = value.{};",
+                ident(&f.name),
+                ident(&f.name)
+            )
+            .unwrap();
+        }
+        out.push_str("    }\n");
+        for f in &fields {
+            let default = if matches!(f.visibility, RecordFieldVisibility::Sourced { .. })
+                || (f.function.is_some() && f.data.wire_binding.is_none())
+            {
+                "null".into()
+            } else if let Some(v) = &f.data.default_enum_value {
+                format!(
+                    "{}.{}({})",
+                    self.field_ty(f),
+                    if matches!(f.field_type.without_option(), TypeSpec::Enum(_)) {
+                        "fromNumber"
+                    } else {
+                        "forNumber"
+                    },
+                    v.number
+                )
+            } else if !f.required || matches!(f.field_type, TypeSpec::Option(_)) {
+                "null".into()
+            } else {
+                match f.field_type {
+                    TypeSpec::String => "\"\"".into(),
+                    TypeSpec::Bool => "false".into(),
+                    TypeSpec::Int(IntSpec::I32) => "0".into(),
+                    TypeSpec::Int(IntSpec::I64) => "0L".into(),
+                    TypeSpec::List(_) => "java.util.Collections.emptyList()".into(),
+                    TypeSpec::Map(_, _) => "java.util.Collections.emptyMap()".into(),
+                    _ => "null".into(),
+                }
+            };
+            writeln!(
+                out,
+                "    private {} {} = {default};",
+                self.field_ty(f),
+                ident(&f.name)
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "    public Builder{args} set{}({} value) {{ this.{} = value; return this; }}",
+                f.name.to_upper_camel_case(),
+                self.field_ty(f),
+                ident(&f.name)
+            )
+            .unwrap();
+        }
+        for field in &fields {
+            if field.data.wire_binding.is_none() {
+                if let Some(alternate) = field
+                    .function
+                    .as_ref()
+                    .and_then(|f| f.alternate_type.as_ref())
+                {
+                    let callable = format!("{}Function", field.name.to_upper_camel_case());
+                    let rt = self.runtime();
+                    writeln!(out, "    public Builder{args} set{}Call({callable} value) {{ this.{} = {rt}.FunctionReference.callable(value); return this; }}", field.name.to_upper_camel_case(), ident(&field.name)).unwrap();
+                    writeln!(out, "    public Builder{args} set{}Name({} value) {{ this.{} = {rt}.FunctionReference.named(value); return this; }}", field.name.to_upper_camel_case(), self.ty(alternate), ident(&field.name)).unwrap();
+                }
+            }
+        }
+        for field in &fields {
+            if let TypeSpec::Record(record_type) = field.field_type.without_option() {
+                if let Some(nested) = self
+                    .spec
+                    .record(&record_type.full_name)
+                    .filter(|r| r.flatten_in_api)
+                {
+                    for nested_field in nested
+                        .fields
+                        .values()
+                        .filter(|f| matches!(f.visibility, RecordFieldVisibility::Public))
+                    {
+                        let annotation = nested_field
+                            .flattened_annotation
+                            .as_ref()
+                            .and_then(|v| v.value())
+                            .map(str::to_string)
+                            .unwrap_or_else(|| self.field_ty(nested_field));
+                        let nested_name = self.named(&nested.full_name, &nested.name);
+                        writeln!(out, "    public Builder{args} set{}({annotation} value) {{ this.{} = {nested_name}.newBuilder(this.{}).set{}(value).build(); return this; }}", nested_field.name.to_upper_camel_case(), ident(&field.name), ident(&field.name), nested_field.name.to_upper_camel_case()).unwrap();
                     }
-                    class.clone()
+                }
+            }
+        }
+        writeln!(
+            out,
+            "    public {name}{args} build() {{ return new {name}{args}({}); }}\n  }}",
+            fields
+                .iter()
+                .map(|f| match &f.visibility {
+                    RecordFieldVisibility::Sourced { source_expr } => format!(
+                        "{} == null ? {} : {}",
+                        ident(&f.name),
+                        self.helper(source_expr),
+                        ident(&f.name)
+                    ),
+                    _ => ident(&f.name),
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+        .unwrap();
+        if let Some(proto) = &record.data.proto {
+            out.push_str(&self.proto_record(record, &name, &args, &params, proto));
+        }
+        out.push_str("}\n");
+        out
+    }
+    fn proto_record(
+        &self,
+        record: &Record,
+        name: &str,
+        args: &str,
+        params: &[TypeParameterUsage],
+        proto: &PlannedProtoTypeInfo,
+    ) -> String {
+        let p = proto_name(proto);
+        self.need(RuntimeFeature::Converter);
+        let rt = self.runtime();
+        let mut out = format!(
+            "  public {p} toProto(io.temporal.common.converter.DataConverter converter) {{\n    {p}.Builder proto = {p}.newBuilder();\n"
+        );
+        for f in record.fields.values() {
+            if matches!(f.visibility, RecordFieldVisibility::Omitted) {
+                continue;
+            }
+            let value = match &f.visibility {
+                RecordFieldVisibility::Sourced { .. } => format!("this.{}", ident(&f.name)),
+                _ => format!("this.{}", ident(&f.name)),
+            };
+            match &f.data.wire_binding {
+                Some(PlannedWireFieldBinding::Value {
+                    wire_name,
+                    wire_type,
+                }) => {
+                    let field = self.proto_field(proto, wire_name);
+                    let expr = self.to_wire(&f.field_type, wire_type, &value, field);
+                    let method = match wire_type.without_option() {
+                        TypeSpec::Map(_, _) => "putAll",
+                        TypeSpec::List(_) => "addAll",
+                        _ => "set",
+                    };
+                    writeln!(
+                        out,
+                        "    if ({value} != null) proto.{method}{}({expr});",
+                        field.name()
+                    )
+                    .unwrap();
+                }
+                Some(PlannedWireFieldBinding::VariantMembers { members, .. }) => {
+                    writeln!(out, "    if ({value} != null) {{").unwrap();
+                    if let TypeSpec::Variant(v) = f.field_type.without_option() {
+                        if let Some(variant) = self.spec.variant(&v.full_name) {
+                            for case in &variant.cases {
+                                if let Some(member) =
+                                    members.iter().find(|m| m.wire_name == case.wire_name)
+                                {
+                                    let payload = case
+                                        .payload
+                                        .as_ref()
+                                        .map(|ty| {
+                                            self.to_wire(
+                                                ty,
+                                                &member.wire_type,
+                                                &format!("({}) {value}.getValue()", self.ty(ty)),
+                                                self.proto_field(proto, &member.wire_name),
+                                            )
+                                        })
+                                        .unwrap_or("true".into());
+                                    writeln!(out, "      if ({value}.getTag() == {}.Tag.{}) proto.set{}({payload});", self.ty(&f.field_type).split('<').next().unwrap(), case.name.to_shouty_snake_case(), self.proto_field(proto, &member.wire_name).name()).unwrap();
+                                }
+                            }
+                        }
+                    }
+                    out.push_str("    }\n");
+                }
+                None => (),
+            }
+        }
+        out.push_str("    return proto.build();\n  }\n");
+        writeln!(out, "  public static {args} {name}{args} fromProto({p} proto, io.temporal.common.converter.DataConverter converter, java.lang.reflect.Type modelType) {{\n    Builder{args} builder = {name}.{args}newBuilder();").unwrap();
+        for f in record.fields.values().filter(|f| {
+            matches!(
+                f.visibility,
+                RecordFieldVisibility::Public
+                    | RecordFieldVisibility::ApiOmitted
+                    | RecordFieldVisibility::Sourced { .. }
+            )
+        }) {
+            if let Some(PlannedWireFieldBinding::Value {
+                wire_name,
+                wire_type,
+            }) = &f.data.wire_binding
+            {
+                let field = self.proto_field(proto, wire_name);
+                let suffix = match wire_type.without_option() {
+                    TypeSpec::Map(_, _) => "Map",
+                    TypeSpec::List(_) => "List",
+                    _ => "",
                 };
-                body.push_str(&format!(
-                    "    {return_type} {method}({parameter_type} input);\n"
-                ));
+                let value = format!("proto.get{}{suffix}()", field.name());
+                let expr = self.from_wire(&f.field_type, wire_type, &value, params, field);
+                let condition = if !f.required && f.data.has_presence.unwrap_or(false) {
+                    if field.repeated() {
+                        format!("if (proto.get{}Count() > 0) ", field.name())
+                    } else {
+                        format!("if (proto.has{}()) ", field.name())
+                    }
+                } else {
+                    String::new()
+                };
+                writeln!(
+                    out,
+                    "    {condition}builder.set{}({expr});",
+                    f.name.to_upper_camel_case()
+                )
+                .unwrap();
             }
-            None => {
-                body.push_str(&format!("    {return_type} {method}();\n"));
+            if let Some(PlannedWireFieldBinding::VariantMembers { members, .. }) =
+                &f.data.wire_binding
+            {
+                if let TypeSpec::Variant(v) = f.field_type.without_option() {
+                    if let Some(variant) = self.spec.variant(&v.full_name) {
+                        for case in &variant.cases {
+                            if let Some(m) = members.iter().find(|m| m.wire_name == case.wire_name)
+                            {
+                                let payload = case
+                                    .payload
+                                    .as_ref()
+                                    .map(|ty| {
+                                        self.from_wire(
+                                            ty,
+                                            &m.wire_type,
+                                            &format!(
+                                                "proto.get{}()",
+                                                self.proto_field(proto, &m.wire_name).name()
+                                            ),
+                                            params,
+                                            self.proto_field(proto, &m.wire_name),
+                                        )
+                                    })
+                                    .unwrap_or_default();
+                                writeln!(
+                                    out,
+                                    "    if (proto.has{}()) builder.set{}({}.{}({payload}));",
+                                    self.proto_field(proto, &m.wire_name).name(),
+                                    f.name.to_upper_camel_case(),
+                                    self.named(&v.full_name, &v.name),
+                                    ident(&case.name)
+                                )
+                                .unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        writeln!(out, "    return builder.build();\n  }}\n  public static final class Converter implements io.temporal.common.converter.TransferTypeConverter<{name}> {{\n    public java.lang.reflect.Type getTransferType(java.lang.reflect.Type valueType) {{ return {p}.class; }}\n    public Object toTransferType({name} value) {{ return value == null ? null : value.toProto({rt}.dataConverter()); }}\n    public {name} fromTransferType(Object value, java.lang.reflect.Type valueType) {{ return value == null ? null : fromProto(({p}) value, {rt}.dataConverter(), valueType); }}\n  }}").unwrap();
+        out
+    }
+    fn to_wire(
+        &self,
+        ty: &PlannedType,
+        wire: &PlannedType,
+        value: &str,
+        field: WireField<'_>,
+    ) -> String {
+        let value = format!("({value})");
+        let expression = match ty.without_option() {
+            TypeSpec::Record(_) => format!("{value}.toProto(converter)"),
+            TypeSpec::Enum(_) => format!("{}.forNumber({value}.getNumber())", self.wire_type(wire)),
+            TypeSpec::Flags(flags) => format!(
+                "{value}.stream().mapToLong({}::getBit).reduce(0L, (left, right) -> left | right)",
+                self.named(&flags.full_name, &flags.name)
+            ),
+            TypeSpec::Bytes => format!("com.google.protobuf.ByteString.copyFrom({value})"),
+            TypeSpec::List(inner) => {
+                if let TypeSpec::List(w) = wire.without_option() {
+                    let item = self.variable("item");
+                    let converted = self.to_wire(inner, w, &item, field);
+                    if converted == item || converted == format!("({item})") {
+                        value.clone()
+                    } else {
+                        format!(
+                            "{value}.stream().map({item} -> {converted}).collect(java.util.stream.Collectors.toList())"
+                        )
+                    }
+                } else {
+                    self.carrier_to_wire(ty, wire, &value)
+                }
+            }
+            TypeSpec::Map(k, v) => {
+                if let TypeSpec::Map(wk, wv) = wire.without_option() {
+                    let entry = self.variable("entry");
+                    let key = self.to_wire(
+                        k,
+                        wk,
+                        &format!("{entry}.getKey()"),
+                        self.map_field(field, "key"),
+                    );
+                    let value_expr = self.to_wire(
+                        v,
+                        wv,
+                        &format!("{entry}.getValue()"),
+                        self.map_field(field, "value"),
+                    );
+                    self.map_expression(&value, &entry, &key, &value_expr)
+                } else {
+                    self.carrier_to_wire(ty, wire, &value)
+                }
+            }
+            TypeSpec::TypeParameter(_) => self.carrier_to_wire(ty, wire, &value),
+            TypeSpec::External(ExternalTypeSpec::Alias(a)) if a.type_name.value().is_none() => {
+                self.to_wire(&a.target, wire, &value, field)
+            }
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => {
+                if let Some(helper) = m.replacement.as_ref().and_then(|r| r.to_proto.value()) {
+                    format!("{}(converter, {value})", self.helper(helper))
+                } else if m.proto.full_name.ends_with(".Payload") {
+                    format!("converter.toPayload({value}).get()")
+                } else if m.proto.full_name.ends_with(".Payloads") {
+                    format!(
+                        "converter.toPayloads({value}.toArray()).orElse(io.temporal.api.common.v1.Payloads.getDefaultInstance())"
+                    )
+                } else if m.replacement.is_some() {
+                    format!(
+                        "{}(converter, {value})",
+                        self.helper(&format!("{}ToProto", m.model_name.to_lower_camel_case()))
+                    )
+                } else {
+                    value
+                }
+            }
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(e))) => {
+                if e.replacement.is_some() {
+                    format!("{}.forNumber({value}.getNumber())", self.wire_type(wire))
+                } else {
+                    value
+                }
+            }
+            _ => match wire.without_option() {
+                TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => m
+                    .replacement
+                    .as_ref()
+                    .and_then(|r| r.to_proto.value())
+                    .map(|helper| format!("{}(converter, {value})", self.helper(helper)))
+                    .unwrap_or(value),
+                _ => value,
+            },
+        };
+        let numeric = match wire.without_option() {
+            TypeSpec::Int(IntSpec::I32)
+                if !matches!(ty.without_option(), TypeSpec::Int(IntSpec::I32)) =>
+            {
+                Some("intValue")
+            }
+            TypeSpec::Int(IntSpec::I64)
+                if !matches!(ty.without_option(), TypeSpec::Int(IntSpec::I64)) =>
+            {
+                Some("longValue")
+            }
+            TypeSpec::Float => Some(if field.field.r#type == Some(ProtoType::Float as i32) {
+                "floatValue"
+            } else {
+                "doubleValue"
+            }),
+            _ => None,
+        };
+        numeric
+            .map(|method| format!("((Number) ({expression})).{method}()"))
+            .unwrap_or(expression)
+    }
+    fn map_expression(&self, values: &str, entry: &str, key: &str, value: &str) -> String {
+        let map = self.variable("map");
+        format!(
+            "{values}.entrySet().stream().collect(java.util.LinkedHashMap::new, ({map}, {entry}) -> {map}.put({key}, {value}), java.util.Map::putAll)"
+        )
+    }
+    fn carrier_to_wire(&self, _ty: &PlannedType, wire: &PlannedType, value: &str) -> String {
+        match wire.without_option() {
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m)))
+                if m.proto.full_name.ends_with(".Payloads") =>
+            {
+                format!(
+                    "converter.toPayloads({value}).orElse(io.temporal.api.common.v1.Payloads.getDefaultInstance())"
+                )
+            }
+            _ => format!("converter.toPayload({value}).get()"),
+        }
+    }
+    fn reflect_type(&self, ty: &PlannedType, params: &[TypeParameterUsage]) -> String {
+        let rt = self.runtime();
+        match ty.without_option() {
+            TypeSpec::TypeParameter(p) => {
+                self.need(RuntimeFeature::Argument);
+                format!(
+                    "{rt}.argument(modelType, {})",
+                    params
+                        .iter()
+                        .position(|v| v.parameter.full_name == p.full_name)
+                        .unwrap_or(0)
+                )
+            }
+            TypeSpec::Record(r) => {
+                let parameters = self.spec.record_type_parameters(&r.full_name);
+                let raw = self.named(&r.full_name, &r.model_name);
+                if parameters.is_empty() {
+                    format!("{raw}.class")
+                } else {
+                    self.need(RuntimeFeature::Parameterized);
+                    format!(
+                        "{rt}.parameterized({raw}.class, {})",
+                        parameters
+                            .iter()
+                            .map(|p| self.reflect_type(
+                                &TypeSpec::TypeParameter(p.parameter.clone()),
+                                params
+                            ))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                }
+            }
+            TypeSpec::List(inner) => {
+                self.need(RuntimeFeature::Parameterized);
+                format!(
+                    "{rt}.parameterized(java.util.List.class, {})",
+                    self.reflect_type(inner, params)
+                )
+            }
+            TypeSpec::Map(k, v) => {
+                self.need(RuntimeFeature::Parameterized);
+                format!(
+                    "{rt}.parameterized(java.util.Map.class, {}, {})",
+                    self.reflect_type(k, params),
+                    self.reflect_type(v, params)
+                )
+            }
+            _ => {
+                let t = self.ty(ty);
+                if t.contains('<') {
+                    format!(
+                        "new com.fasterxml.jackson.core.type.TypeReference<{t}>() {{}}.getType()"
+                    )
+                } else {
+                    format!("{t}.class")
+                }
             }
         }
     }
-    body.push_str("}\n");
-
-    let mut output = String::new();
-    output.push_str(java_json::GENERATED_HEADER);
-    output.push_str(&format!("package {package};\n\n"));
-    for import in &imports {
-        output.push_str(&format!("import {import};\n"));
-    }
-    output.push('\n');
-    output.push_str(&body);
-    Ok(output)
-}
-
-fn io_type(
-    ty: Option<&TypeSpec<PlannedFamily>>,
-    module: &ModulePath,
-    base_package: &str,
-    all_models: &BTreeMap<String, PlannedJsonType>,
-) -> Option<(String, String)> {
-    let ty = ty?;
-    match ty.without_option() {
-        TypeSpec::External(ExternalTypeSpec::Json(json_type)) => {
-            let json_type = java_json::resolve_bare_ref_alias(json_type, all_models);
-            let target = json_type.module_path.as_ref().unwrap_or(module);
-            Some((
-                JavaContext::package_for_module(base_package, &target.0),
-                json_type.model_name.clone(),
-            ))
+    fn raw_type(&self, ty: &PlannedType, params: &[TypeParameterUsage]) -> String {
+        if matches!(ty.without_option(), TypeSpec::TypeParameter(_)) {
+            self.need(RuntimeFeature::RawType);
+            format!(
+                "{}.rawType({})",
+                self.runtime(),
+                self.reflect_type(ty, params)
+            )
+        } else {
+            format!("{}.class", self.ty(ty).split('<').next().unwrap())
         }
-        _ => None,
+    }
+    fn decode_payload(
+        &self,
+        ty: &PlannedType,
+        wire: &PlannedType,
+        value: &str,
+        params: &[TypeParameterUsage],
+    ) -> String {
+        let t = self.ty(ty);
+        let raw = self.raw_type(ty, params);
+        let generic = self.reflect_type(ty, params);
+        if matches!(wire.without_option(), TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) if m.proto.full_name.ends_with(".Payloads"))
+        {
+            format!(
+                "({t}) converter.fromPayloads(0, java.util.Optional.of({value}), {raw}, {generic})"
+            )
+        } else {
+            format!("({t}) converter.fromPayload({value}, {raw}, {generic})")
+        }
+    }
+    fn decode_sequence(
+        &self,
+        ty: &PlannedType,
+        value: &str,
+        params: &[TypeParameterUsage],
+    ) -> String {
+        self.need(RuntimeFeature::Sequence);
+        let element = match ty.without_option() {
+            TypeSpec::List(inner) => Some(inner.as_ref()),
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => {
+                match m.authored_type.as_deref() {
+                    Some(TypeSpec::List(inner)) => Some(inner.as_ref()),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        let (raw, generic) = if let Some(element) = element {
+            (
+                self.raw_type(element, params),
+                self.reflect_type(element, params),
+            )
+        } else {
+            // The ordinary SDK payloads mapping is a raw or Object-valued list.
+            let t = self.ty(ty);
+            let element = t
+                .strip_prefix("java.util.List<")
+                .and_then(|t| t.strip_suffix('>'))
+                .unwrap_or("Object");
+            let raw = format!("{}.class", element.split('<').next().unwrap());
+            let generic = if element.contains('<') {
+                format!(
+                    "new com.fasterxml.jackson.core.type.TypeReference<{element}>() {{}}.getType()"
+                )
+            } else {
+                raw.clone()
+            };
+            (raw, generic)
+        };
+        format!(
+            "({}) (Object) {}.decodeSequence({value}, converter, {raw}, {generic})",
+            self.ty(ty),
+            self.runtime()
+        )
+    }
+    fn from_wire(
+        &self,
+        ty: &PlannedType,
+        wire: &PlannedType,
+        value: &str,
+        params: &[TypeParameterUsage],
+        field: WireField<'_>,
+    ) -> String {
+        let t = self.ty(ty);
+        match ty.without_option() {
+            TypeSpec::String | TypeSpec::Bool => value.into(),
+            TypeSpec::Record(_) => format!(
+                "{}.fromProto({value}, converter, {})",
+                t.split('<').next().unwrap(),
+                self.reflect_type(ty, params)
+            ),
+            TypeSpec::Enum(_) => format!("{t}.fromNumber(({value}).getNumber())"),
+            TypeSpec::Flags(flags) => {
+                let name = self.named(&flags.full_name, &flags.name);
+                let item = self.variable("flag");
+                format!(
+                    "java.util.Arrays.stream({name}.values()).filter({item} -> (((Number) {value}).longValue() & {item}.getBit()) != 0).collect(java.util.stream.Collectors.toCollection(() -> java.util.EnumSet.noneOf({name}.class)))"
+                )
+            }
+            TypeSpec::Bytes => format!("({value}).toByteArray()"),
+            TypeSpec::Float => format!("(double) ({value})"),
+            TypeSpec::Int(IntSpec::I32)
+                if matches!(wire.without_option(), TypeSpec::Int(IntSpec::I32)) =>
+            {
+                value.into()
+            }
+            TypeSpec::Int(IntSpec::I64)
+                if matches!(wire.without_option(), TypeSpec::Int(IntSpec::I64)) =>
+            {
+                value.into()
+            }
+            TypeSpec::Int(IntSpec::I32) => format!("(int) ({value})"),
+            TypeSpec::Int(IntSpec::I64) => format!("(long) ({value})"),
+            TypeSpec::List(inner) => {
+                if let TypeSpec::List(w) = wire.without_option() {
+                    let item = self.variable("item");
+                    let converted = self.from_wire(inner, w, &item, params, field);
+                    if converted == item {
+                        format!("new java.util.ArrayList<>({value})")
+                    } else {
+                        format!(
+                            "({value}).stream().map({item} -> {converted}).collect(java.util.stream.Collectors.toList())"
+                        )
+                    }
+                } else {
+                    self.decode_sequence(ty, value, params)
+                }
+            }
+            TypeSpec::Map(k, v) => {
+                if let TypeSpec::Map(wk, wv) = wire.without_option() {
+                    let entry = self.variable("entry");
+                    let key = self.from_wire(
+                        k,
+                        wk,
+                        &format!("{entry}.getKey()"),
+                        params,
+                        self.map_field(field, "key"),
+                    );
+                    let val = self.from_wire(
+                        v,
+                        wv,
+                        &format!("{entry}.getValue()"),
+                        params,
+                        self.map_field(field, "value"),
+                    );
+                    self.map_expression(&format!("({value})"), &entry, &key, &val)
+                } else {
+                    format!("({t}) {value}")
+                }
+            }
+            TypeSpec::TypeParameter(_) => self.decode_payload(ty, wire, value, params),
+            TypeSpec::External(ExternalTypeSpec::Alias(a)) if a.type_name.value().is_none() => {
+                self.from_wire(&a.target, wire, value, params, field)
+            }
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => {
+                if let Some(helper) = m.replacement.as_ref().and_then(|r| r.from_proto.value()) {
+                    format!("{}(converter, {value})", self.helper(helper))
+                } else if m.proto.full_name.ends_with(".Payloads") {
+                    self.decode_sequence(ty, value, params)
+                } else if m.proto.full_name.ends_with(".Payload") {
+                    self.decode_payload(ty, wire, value, params)
+                } else if m.replacement.is_some() {
+                    format!(
+                        "{}(converter, {value})",
+                        self.helper(&format!("{}FromProto", m.model_name.to_lower_camel_case()))
+                    )
+                } else {
+                    format!("({t}) {value}")
+                }
+            }
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(e))) => {
+                if e.replacement.is_some() {
+                    format!("{t}.forNumber(({value}).getNumber())")
+                } else {
+                    value.into()
+                }
+            }
+            _ => match wire.without_option() {
+                TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => m
+                    .replacement
+                    .as_ref()
+                    .and_then(|r| r.from_proto.value())
+                    .map(|helper| format!("{}(converter, {value})", self.helper(helper)))
+                    .unwrap_or_else(|| format!("({t}) {value}")),
+                _ => format!("({t}) {value}"),
+            },
+        }
+    }
+    fn wire_type(&self, ty: &PlannedType) -> String {
+        match ty.without_option() {
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m))) => {
+                proto_name(&m.proto)
+            }
+            _ => self.ty(ty),
+        }
+    }
+    fn jackson_type(&self, ty: &PlannedType, params: &[TypeParameterUsage]) -> String {
+        match ty.without_option() {
+            TypeSpec::TypeParameter(p) => format!(
+                "modelType.containedTypeOrUnknown({})",
+                params
+                    .iter()
+                    .position(|v| v.parameter.full_name == p.full_name)
+                    .unwrap_or(0)
+            ),
+            TypeSpec::Record(r) => {
+                let args = self.spec.record_type_parameters(&r.full_name);
+                let raw = self.named(&r.full_name, &r.model_name);
+                if args.is_empty() {
+                    format!("context.constructType({raw}.class)")
+                } else {
+                    format!(
+                        "context.getTypeFactory().constructParametricType({raw}.class, {})",
+                        args.iter()
+                            .map(|p| self.jackson_type(
+                                &TypeSpec::TypeParameter(p.parameter.clone()),
+                                params
+                            ))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                }
+            }
+            TypeSpec::List(inner) => format!(
+                "context.getTypeFactory().constructCollectionType(java.util.List.class, {})",
+                self.jackson_type(inner, params)
+            ),
+            TypeSpec::Map(k, v) => format!(
+                "context.getTypeFactory().constructMapType(java.util.Map.class, {}, {})",
+                self.jackson_type(k, params),
+                self.jackson_type(v, params)
+            ),
+            _ => format!("context.constructType({})", self.reflect_type(ty, params)),
+        }
+    }
+    fn variant(&self, v: &VariantSpec<PlannedFamily>) -> String {
+        let n = v.name.to_upper_camel_case();
+        let params = self.spec.variant_type_parameters(&v.full_name);
+        let args = self.type_args(&params);
+        let tags = v
+            .cases
+            .iter()
+            .map(|c| {
+                format!(
+                    "@com.fasterxml.jackson.annotation.JsonProperty({}) {}",
+                    literal(&c.wire_name),
+                    c.name.to_shouty_snake_case()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut out = format!(
+            "@com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = {n}.Deserializer.class)\npublic final class {n}{args} {{\n  public enum Tag {{ {tags} }}\n  private final Tag tag;\n  private final Object value;\n  private {n}(Tag tag, Object value) {{ this.tag = tag; this.value = value; }}\n  public Tag getTag() {{ return tag; }}\n  public Object getValue() {{ return value; }}\n"
+        );
+        for case in &v.cases {
+            let parameter = case
+                .payload
+                .as_ref()
+                .map(|t| format!("{} value", self.ty(t)))
+                .unwrap_or_default();
+            let value = if case.payload.is_some() {
+                "value"
+            } else {
+                "null"
+            };
+            writeln!(out, "  public static {args} {n}{args} {}({parameter}) {{ return new {n}{args}(Tag.{}, {value}); }}", ident(&case.name), case.name.to_shouty_snake_case()).unwrap();
+        }
+        writeln!(out, "  public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<{n}> implements com.fasterxml.jackson.databind.deser.ContextualDeserializer {{\n    private final com.fasterxml.jackson.databind.JavaType modelType;\n    public Deserializer() {{ this(null); }}\n    private Deserializer(com.fasterxml.jackson.databind.JavaType modelType) {{ this.modelType = modelType; }}\n    public com.fasterxml.jackson.databind.JsonDeserializer<?> createContextual(com.fasterxml.jackson.databind.DeserializationContext context, com.fasterxml.jackson.databind.BeanProperty property) {{ return new Deserializer(context.getContextualType()); }}\n    public {n} deserialize(com.fasterxml.jackson.core.JsonParser parser, com.fasterxml.jackson.databind.DeserializationContext context) throws java.io.IOException {{\n      com.fasterxml.jackson.databind.JsonNode node = parser.getCodec().readTree(parser);\n      switch (node.get(\"tag\").asText()) {{").unwrap();
+        for case in &v.cases {
+            let value = case
+                .payload
+                .as_ref()
+                .map(|ty| {
+                    format!(
+                        "context.readTreeAsValue(node.get(\"value\"), {})",
+                        self.jackson_type(ty, &params)
+                    )
+                })
+                .unwrap_or_default();
+            writeln!(
+                out,
+                "        case {}: return {n}.{}({value});",
+                literal(&case.wire_name),
+                ident(&case.name)
+            )
+            .unwrap();
+        }
+        out.push_str("        default: throw new java.io.IOException(\"Unknown variant tag: \" + node.get(\"tag\"));\n      }\n    }\n  }\n}\n");
+        out
+    }
+    fn service(&self, service: &ServiceSpec<PlannedFamily>, name: &str) -> String {
+        let mut out = format!(
+            "@io.nexusrpc.Service(name = {})\npublic interface {name} {{\n",
+            literal(&service.wire_name)
+        );
+        for op in &service.operations {
+            let mut params = BTreeSet::new();
+            for ty in [op.input.as_ref(), op.output.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                for p in self.spec.type_parameters(ty) {
+                    params.insert(p.parameter.name.to_upper_camel_case());
+                }
+            }
+            let generic = if params.is_empty() {
+                String::new()
+            } else {
+                format!("<{}> ", params.into_iter().collect::<Vec<_>>().join(", "))
+            };
+            let input = op
+                .input
+                .as_ref()
+                .map(|t| format!("{} request", self.ty(t)))
+                .unwrap_or_default();
+            let output = op
+                .output
+                .as_ref()
+                .map(|t| self.ty(t))
+                .unwrap_or("void".into());
+            writeln!(
+                out,
+                "  @io.nexusrpc.Operation(name = {})\n  {generic}{output} {}({input});",
+                literal(&op.wire_name),
+                ident(&op.name)
+            )
+            .unwrap();
+        }
+        out.push_str("}\n");
+        out
+    }
+    fn request_plan(&self, plan: &crate::planning::RequestPlan) -> String {
+        use crate::planning::{RequestPlan, RequestPlanSource};
+        match plan {
+            RequestPlan::Source(RequestPlanSource::ResourceField(field)) => {
+                format!("this.{}", ident(field))
+            }
+            RequestPlan::Source(RequestPlanSource::MethodParam(field)) => ident(field),
+            RequestPlan::Construct {
+                message_name,
+                fields,
+            } => {
+                let name = self
+                    .spec
+                    .record(message_name)
+                    .or_else(|| {
+                        self.spec
+                            .records()
+                            .map(|(_, record)| record)
+                            .find(|record| {
+                                record
+                                    .data
+                                    .proto
+                                    .as_ref()
+                                    .is_some_and(|proto| proto.full_name == *message_name)
+                            })
+                    })
+                    .map(|r| self.named(&r.full_name, &r.name))
+                    .unwrap_or_else(|| message_name.to_upper_camel_case());
+                format!(
+                    "{name}.newBuilder(){}.build()",
+                    fields
+                        .iter()
+                        .map(|f| format!(
+                            ".set{}({})",
+                            f.field_name.to_upper_camel_case(),
+                            self.request_plan(&f.value)
+                        ))
+                        .collect::<String>()
+                )
+            }
+        }
+    }
+    fn resource(
+        &self,
+        service: &ServiceSpec<PlannedFamily>,
+        resource: &crate::planning::PlannedResource,
+    ) -> String {
+        let n = resource.type_name.to_upper_camel_case();
+        let needs_endpoint = service.endpoint.is_none();
+        let mut out = format!("public final class {n} {{\n");
+        for f in &resource.fields {
+            writeln!(
+                out,
+                "  private final {} {};\n  public {} get{}() {{ return {}; }}",
+                self.ty(&f.kind),
+                ident(&f.name),
+                self.ty(&f.kind),
+                f.name.to_upper_camel_case(),
+                ident(&f.name)
+            )
+            .unwrap();
+        }
+        if needs_endpoint {
+            out.push_str("  private final String endpoint;\n");
+        }
+        let mut ctor = resource
+            .fields
+            .iter()
+            .map(|f| {
+                format!(
+                    "@com.fasterxml.jackson.annotation.JsonProperty({}) {} {}",
+                    literal(&ident(&f.name)),
+                    self.ty(&f.kind),
+                    ident(&f.name)
+                )
+            })
+            .collect::<Vec<_>>();
+        if needs_endpoint {
+            ctor.push(
+                "@com.fasterxml.jackson.annotation.JsonProperty(\"endpoint\") String endpoint"
+                    .into(),
+            );
+        }
+        writeln!(
+            out,
+            "  @com.fasterxml.jackson.annotation.JsonCreator\n  public {n}({}) {{",
+            ctor.join(", ")
+        )
+        .unwrap();
+        for f in &resource.fields {
+            writeln!(out, "    this.{} = {};", ident(&f.name), ident(&f.name)).unwrap();
+        }
+        if needs_endpoint {
+            out.push_str("    this.endpoint = endpoint;\n");
+        }
+        out.push_str("  }\n");
+        if needs_endpoint {
+            writeln!(
+                out,
+                "  public {n} withEndpoint(String endpoint) {{ return new {n}({}); }}",
+                resource
+                    .fields
+                    .iter()
+                    .map(|f| format!("this.{}", ident(&f.name)))
+                    .chain(std::iter::once("endpoint".into()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+            .unwrap();
+        }
+        for method in resource.methods.iter().filter(|_| {
+            crate::nexgen_config::current().mode == crate::generator::GenerationMode::NativeApi
+        }) {
+            let return_ty = method
+                .result
+                .as_ref()
+                .map(|r| match &r.kind {
+                    crate::planning::PlannedResourceMethodResultKind::Resource { type_name } => {
+                        type_name.to_upper_camel_case()
+                    }
+                    crate::planning::PlannedResourceMethodResultKind::Value(ty) => self.ty(ty),
+                })
+                .unwrap_or("void".into());
+            let args = method
+                .params
+                .iter()
+                .map(|f| {
+                    format!(
+                        "@com.fasterxml.jackson.annotation.JsonProperty({}) {} {}",
+                        literal(&ident(&f.name)),
+                        self.ty(&f.kind),
+                        ident(&f.name)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            writeln!(
+                out,
+                "  public {return_ty} {}({args}) {{",
+                ident(&method.name)
+            )
+            .unwrap();
+            match &method.binding {
+                crate::planning::PlannedResourceMethodBindingSpec::Operation {
+                    operation_name,
+                    request_plan,
+                    ..
+                } => {
+                    let prefix = if needs_endpoint { "endpoint, " } else { "" };
+                    let call = format!(
+                        "{}.{}({prefix}{})",
+                        operations_class(service),
+                        ident(operation_name),
+                        self.request_plan(request_plan)
+                    );
+                    writeln!(
+                        out,
+                        "    {}{call};",
+                        if return_ty == "void" { "" } else { "return " }
+                    )
+                    .unwrap();
+                }
+                crate::planning::PlannedResourceMethodBindingSpec::Stub => {
+                    out.push_str("    throw new UnsupportedOperationException(\"No operation is bound to this resource method\");\n");
+                }
+            }
+            out.push_str("  }\n");
+        }
+        out.push_str("}\n");
+        out
+    }
+    fn interceptors(&self) -> String {
+        let mut out = String::from(
+            "/** Generated typed system Nexus hooks. */\npublic interface SystemNexusWorkflowOutboundInterceptor {\n  <R> io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<R> executeNexusOperation(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<R> input);\n",
+        );
+        for service in &self.spec.services {
+            for op in &service.operations {
+                let output = op
+                    .output
+                    .as_ref()
+                    .map(|t| self.ty(t))
+                    .unwrap_or("Void".into());
+                let generic_args = op
+                    .output
+                    .as_ref()
+                    .map(|t| self.type_args(&self.spec.type_parameters(t)))
+                    .unwrap_or_default();
+                let generic = if generic_args.is_empty() {
+                    String::new()
+                } else {
+                    format!("{generic_args} ")
+                };
+                writeln!(out, "  default {generic} io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<{output}> execute{}(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<{output}> input) {{ return executeNexusOperation(input); }}", op.name.to_upper_camel_case()).unwrap();
+            }
+        }
+        out.push_str("  abstract class Base implements SystemNexusWorkflowOutboundInterceptor {\n    protected abstract SystemNexusWorkflowOutboundInterceptor nextSystemNexusInterceptor();\n");
+        for service in &self.spec.services {
+            for op in &service.operations {
+                let output = op
+                    .output
+                    .as_ref()
+                    .map(|t| self.ty(t))
+                    .unwrap_or("Void".into());
+                let generic_args = op
+                    .output
+                    .as_ref()
+                    .map(|t| self.type_args(&self.spec.type_parameters(t)))
+                    .unwrap_or_default();
+                let generic = if generic_args.is_empty() {
+                    String::new()
+                } else {
+                    format!("{generic_args} ")
+                };
+                writeln!(out, "    @Override public {generic} io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<{output}> execute{}(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<{output}> input) {{ return nextSystemNexusInterceptor().execute{}(input); }}", op.name.to_upper_camel_case(), op.name.to_upper_camel_case()).unwrap();
+            }
+        }
+        out.push_str("  }\n}\n");
+        out
+    }
+    fn registry(&self) -> String {
+        let mut out = String::from(
+            "/** Generated operation dispatch and serialization context acquisition. */\n@SuppressWarnings({\"unchecked\", \"rawtypes\"})\npublic final class SystemNexusOperations {\n  private SystemNexusOperations() {}\n  public static <R> io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<R> execute(SystemNexusWorkflowOutboundInterceptor interceptor, io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<R> input) {\n",
+        );
+        for service in &self.spec.services {
+            for op in &service.operations {
+                writeln!(out, "    if ({}.equals(input.getService()) && {}.equals(input.getOperation())) return (io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<R>) interceptor.execute{}((io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput) input);", literal(&service.wire_name), literal(&op.wire_name), op.name.to_upper_camel_case()).unwrap();
+            }
+        }
+        out.push_str("    throw new IllegalArgumentException(\"Unsupported system Nexus operation: \" + input.getService() + \"/\" + input.getOperation());\n  }\n  public static io.temporal.payload.context.SerializationContext serializationContext(String service, String operation, Object request) {\n");
+        for service in &self.spec.services {
+            for op in &service.operations {
+                if let (Some(helper), Some(input)) =
+                    (op.serialization_context.value(), op.input.as_ref())
+                {
+                    writeln!(out, "    if ({}.equals(service) && {}.equals(operation)) return {}(({}) request);", literal(&service.wire_name), literal(&op.wire_name), self.helper(helper), self.ty(input).split('<').next().unwrap()).unwrap();
+                }
+            }
+        }
+        out.push_str("    return null;\n  }\n}\n");
+        out
+    }
+    fn operations(&self, service: &ServiceSpec<PlannedFamily>) -> String {
+        let name = operations_class(service);
+        let (modifier, visibility) = if service.operations_class.value().is_some() {
+            ("abstract", "protected")
+        } else {
+            ("final", "private")
+        };
+        let mut out = format!(
+            "@SuppressWarnings({{\"unchecked\", \"rawtypes\"}})\npublic {modifier} class {name} {{\n  {visibility} {name}() {{}}\n"
+        );
+        for op in &service.operations {
+            let input = op
+                .input
+                .as_ref()
+                .map(|t| self.ty(t))
+                .unwrap_or("Void".into());
+            let output = op
+                .output
+                .as_ref()
+                .map(|t| self.ty(t))
+                .unwrap_or("Void".into());
+            let raw_output = output.split('<').next().unwrap();
+            let output_type_parameter = if op
+                .output
+                .as_ref()
+                .is_some_and(|ty| !self.spec.type_parameters(ty).is_empty())
+            {
+                ", java.lang.reflect.Type resultType"
+            } else {
+                ""
+            };
+            let output_type_expression = if output_type_parameter.is_empty() {
+                format!("{raw_output}.class")
+            } else {
+                "resultType".into()
+            };
+            let mut params = BTreeSet::new();
+            for ty in [op.input.as_ref(), op.output.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                for p in self.spec.type_parameters(ty) {
+                    params.insert(p.parameter.name.to_upper_camel_case());
+                }
+            }
+            let generic = if params.is_empty() {
+                String::new()
+            } else {
+                format!("<{}> ", params.into_iter().collect::<Vec<_>>().join(", "))
+            };
+            let method = ident(&op.name);
+            let endpoint = literal(service.endpoint.as_deref().unwrap_or(""));
+            let resource_result = op
+                .data
+                .output_resource_return
+                .as_ref()
+                .map(|r| r.resource_type_name.to_upper_camel_case());
+            let result_ty = op
+                .output_transform
+                .as_ref()
+                .and_then(|t| t.type_name.value())
+                .or(resource_result.as_deref())
+                .unwrap_or(if op.output.is_none() { "void" } else { &output });
+            let resource_transform = op.data.output_resource_return.as_ref().map(|resource| {
+                let mut values = resource
+                    .bindings
+                    .iter()
+                    .map(|binding| match &binding.source {
+                        crate::planning::ResolvedResourceBindingSource::RequestField {
+                            field_name,
+                            ..
+                        } => format!("request.get{}()", field_name.to_upper_camel_case()),
+                        crate::planning::ResolvedResourceBindingSource::ResultField {
+                            field_name,
+                            ..
+                        } => format!("result.get{}()", field_name.to_upper_camel_case()),
+                    })
+                    .collect::<Vec<_>>();
+                if service.endpoint.is_none() {
+                    values.push("endpoint".into());
+                }
+                format!(
+                    "new {}({})",
+                    resource.resource_type_name.to_upper_camel_case(),
+                    values.join(", ")
+                )
+            });
+            let direct_resource_transform = if service.endpoint.is_none()
+                && matches!(op.output.as_ref(), Some(TypeSpec::Resource(_)))
+            {
+                Some("result.withEndpoint(endpoint)")
+            } else {
+                None
+            };
+            let transform = op
+                .output_transform
+                .as_ref()
+                .and_then(|t| t.transform.value())
+                .or(resource_transform.as_deref())
+                .or(direct_resource_transform)
+                .unwrap_or("result");
+            let endpoint = if service.endpoint.is_some() {
+                endpoint
+            } else {
+                "endpoint".into()
+            };
+            let mut method_parameters = Vec::new();
+            if service.endpoint.is_none() {
+                method_parameters.push("String endpoint".into());
+            }
+            let request_parameter = if op.input.is_some() {
+                format!("{input} request")
+            } else {
+                String::new()
+            };
+            if !request_parameter.is_empty() {
+                method_parameters.push(request_parameter.clone());
+            }
+            if !output_type_parameter.is_empty() {
+                method_parameters.push("java.lang.reflect.Type resultType".into());
+            }
+            let method_parameters = method_parameters.join(", ");
+            let argument = if op.input.is_some() {
+                "request"
+            } else {
+                "null"
+            };
+            let result_statement = if result_ty == "void" {
+                "return;".into()
+            } else {
+                format!("return {transform};")
+            };
+            writeln!(out, "  public static {generic}{result_ty} {method}({method_parameters}) {{\n    {output} result = ({output}) io.temporal.workflow.Workflow.newUntypedNexusServiceStub({}, io.temporal.workflow.NexusServiceOptions.newBuilder().setEndpoint({endpoint}).build()).execute({}, {raw_output}.class, {output_type_expression}, {argument});\n    {result_statement}\n  }}", literal(&service.wire_name), literal(&op.wire_name)).unwrap();
+        }
+        out.push_str("}\n");
+        out
     }
 }
 
-fn render_service_javadoc(output: &mut String, doc: Option<&str>, deprecated: bool, kind: &str) {
-    let tags = if deprecated {
-        vec![(
-            "@deprecated".to_string(),
-            format!("This {kind} is deprecated."),
-        )]
-    } else {
-        Vec::new()
-    };
-    render_java_doc_comment(output, "", doc, &tags);
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum RuntimeFeature {
+    Converter,
+    Parameterized,
+    Argument,
+    RawType,
+    Sequence,
+    FunctionReference,
+    Result,
 }
 
-fn render_service_javadoc_indented(
-    output: &mut String,
-    doc: Option<&str>,
-    deprecated: bool,
-    kind: &str,
-) {
-    let tags = if deprecated {
-        vec![(
-            "@deprecated".to_string(),
-            format!("This {kind} is deprecated."),
-        )]
-    } else {
-        Vec::new()
-    };
-    render_java_doc_comment(output, "    ", doc, &tags);
+#[derive(Default)]
+struct RuntimeNeeds {
+    features: BTreeSet<RuntimeFeature>,
+    tuples: BTreeSet<usize>,
 }
+
+impl RuntimeNeeds {
+    fn is_empty(&self) -> bool {
+        self.features.is_empty() && self.tuples.is_empty()
+    }
+}
+
+fn java_runtime(needs: &RuntimeNeeds) -> String {
+    let mut out = String::from(
+        "/** Shared conversion helpers used by these generated models. */\n@SuppressWarnings({\"unchecked\", \"rawtypes\"})\npublic final class NexgenRuntime {\n  private NexgenRuntime() {}\n",
+    );
+    for feature in &needs.features {
+        out.push_str(match feature {
+            RuntimeFeature::Converter => JAVA_CONVERTER,
+            RuntimeFeature::Parameterized => JAVA_PARAMETERIZED,
+            RuntimeFeature::Argument => JAVA_ARGUMENT,
+            RuntimeFeature::RawType => JAVA_RAW_TYPE,
+            RuntimeFeature::Sequence => JAVA_SEQUENCE,
+            RuntimeFeature::FunctionReference => JAVA_FUNCTION_REFERENCE,
+            RuntimeFeature::Result => JAVA_RESULT,
+        });
+    }
+    for arity in needs.tuples.iter().copied() {
+        let parameters = (0..arity).map(|i| format!("T{i}")).collect::<Vec<_>>();
+        let generic = if arity == 0 {
+            String::new()
+        } else {
+            format!("<{}>", parameters.join(", "))
+        };
+        writeln!(out, "  public static final class Tuple{arity}{generic} {{").unwrap();
+        for i in 0..arity {
+            writeln!(out, "    public final T{i} item{i};").unwrap();
+        }
+        writeln!(
+            out,
+            "    @com.fasterxml.jackson.annotation.JsonCreator\n    public Tuple{arity}({}) {{",
+            parameters
+                .iter()
+                .enumerate()
+                .map(|(i, t)| format!(
+                    "@com.fasterxml.jackson.annotation.JsonProperty(\"item{i}\") {t} item{i}"
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+        .unwrap();
+        for i in 0..arity {
+            writeln!(out, "      this.item{i} = item{i};").unwrap();
+        }
+        out.push_str("    }\n  }\n");
+    }
+    out.push_str("}\n");
+    out
+}
+
+const JAVA_CONVERTER: &str = r###"  private static final ThreadLocal<io.temporal.common.converter.DataConverter> CONVERTER = new ThreadLocal<>();
+  public static io.temporal.common.converter.DataConverter dataConverter() {
+    io.temporal.common.converter.DataConverter value = CONVERTER.get();
+    return value == null ? io.temporal.common.converter.DefaultDataConverter.STANDARD_INSTANCE : value;
+  }
+  public static <T> T withDataConverter(io.temporal.common.converter.DataConverter converter, java.util.function.Supplier<T> action) {
+    io.temporal.common.converter.DataConverter previous = CONVERTER.get();
+    CONVERTER.set(converter);
+    try { return action.get(); }
+    finally { if (previous == null) CONVERTER.remove(); else CONVERTER.set(previous); }
+  }
+"###;
+
+const JAVA_PARAMETERIZED: &str = r###"  public static java.lang.reflect.Type parameterized(final Class<?> raw, final java.lang.reflect.Type... arguments) {
+    return new java.lang.reflect.ParameterizedType() {
+      public java.lang.reflect.Type getRawType() { return raw; }
+      public java.lang.reflect.Type getOwnerType() { return raw.getDeclaringClass(); }
+      public java.lang.reflect.Type[] getActualTypeArguments() { return arguments.clone(); }
+    };
+  }
+"###;
+
+const JAVA_ARGUMENT: &str = r###"  public static java.lang.reflect.Type argument(java.lang.reflect.Type type, int index) {
+    return type instanceof java.lang.reflect.ParameterizedType ? ((java.lang.reflect.ParameterizedType) type).getActualTypeArguments()[index] : Object.class;
+  }
+"###;
+
+const JAVA_RAW_TYPE: &str = r###"  public static Class<?> rawType(java.lang.reflect.Type type) {
+    return type instanceof Class ? (Class<?>) type : type instanceof java.lang.reflect.ParameterizedType ? (Class<?>) ((java.lang.reflect.ParameterizedType) type).getRawType() : Object.class;
+  }
+"###;
+
+const JAVA_SEQUENCE: &str = r###"  public static <T> java.util.List<T> decodeSequence(io.temporal.api.common.v1.Payloads payloads, io.temporal.common.converter.DataConverter converter, Class<T> elementClass, java.lang.reflect.Type elementType) {
+    java.util.List<T> result = new java.util.ArrayList<>();
+    for (io.temporal.api.common.v1.Payload payload : payloads.getPayloadsList()) result.add(converter.fromPayload(payload, elementClass, elementType));
+    return result;
+  }
+"###;
+
+const JAVA_FUNCTION_REFERENCE: &str = r###"  public static final class FunctionReference<F, N> {
+    private final F callable; private final N name;
+    private FunctionReference(F callable, N name) { this.callable = callable; this.name = name; }
+    public static <F, N> FunctionReference<F, N> callable(F value) { return new FunctionReference<>(java.util.Objects.requireNonNull(value), null); }
+    public static <F, N> FunctionReference<F, N> named(N value) { return new FunctionReference<>(null, java.util.Objects.requireNonNull(value)); }
+    public boolean isNamed() { return name != null; }
+    public F getCallable() { return callable; }
+    public N getName() { return name; }
+  }
+"###;
+
+const JAVA_RESULT: &str = r###"  @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = Result.Deserializer.class)
+  public static final class Result<O, E> {
+    private final boolean ok; private final Object value;
+    private Result(boolean ok, Object value) { this.ok = ok; this.value = value; }
+    public static <O, E> Result<O, E> ok(O value) { return new Result<>(true, value); }
+    public static <O, E> Result<O, E> err(E value) { return new Result<>(false, value); }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isOk() { return ok; }
+    public String getTag() { return ok ? "ok" : "err"; }
+    public Object getValue() { return value; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public O getOk() { if (!ok) throw new IllegalStateException("Error result"); return (O) value; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public E getErr() { if (ok) throw new IllegalStateException("Success result"); return (E) value; }
+    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Result> implements com.fasterxml.jackson.databind.deser.ContextualDeserializer {
+      private final com.fasterxml.jackson.databind.JavaType type;
+      public Deserializer() { this(null); }
+      private Deserializer(com.fasterxml.jackson.databind.JavaType type) { this.type = type; }
+      public com.fasterxml.jackson.databind.JsonDeserializer<?> createContextual(com.fasterxml.jackson.databind.DeserializationContext context, com.fasterxml.jackson.databind.BeanProperty property) { return new Deserializer(context.getContextualType()); }
+      public Result deserialize(com.fasterxml.jackson.core.JsonParser parser, com.fasterxml.jackson.databind.DeserializationContext context) throws java.io.IOException {
+        com.fasterxml.jackson.databind.JsonNode node = parser.getCodec().readTree(parser);
+        String tag = node.get("tag").asText();
+        if (!"ok".equals(tag) && !"err".equals(tag)) throw new java.io.IOException("Unknown result tag: " + tag);
+        boolean ok = "ok".equals(tag);
+        Object value = context.readTreeAsValue(node.get("value"), type.containedTypeOrUnknown(ok ? 0 : 1));
+        return new Result(ok, value);
+      }
+    }
+  }"###;
 
 pub(in crate::generator) fn render_java_doc_comment(
     output: &mut String,

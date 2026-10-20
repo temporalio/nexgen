@@ -466,13 +466,19 @@ pub(crate) fn generate_files_for_tree_with_mode_and_options(
 pub(crate) fn generate_files_from_planned_tree(
     language: Language,
     tree: &ApiSpecTree<PlannedFamily>,
+    descriptors: &DescriptorIndex,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     let mode = crate::nexgen_config::current().mode;
     let mut generated = match language {
         Language::Dotnet => dotnet::generate(tree, options.support_package.as_deref()),
         Language::Go => generate_go_tree(tree, options),
-        Language::Java => java::generate(tree, options.java_package_root.as_deref()),
+        Language::Java => java::generate(
+            tree,
+            descriptors,
+            options.java_package_root.as_deref(),
+            options.support_package.as_deref(),
+        ),
         Language::Python => {
             python::generate(tree, options.support_package.as_deref().unwrap_or(""))
         }

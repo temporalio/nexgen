@@ -8,6 +8,7 @@ of `@nexus` directives.
 ## Contents
 
 - [Quick Start](#quick-start)
+- [Java WIT generation](#java-wit-generation)
 - [Integrating a Support Package](#integrating-a-support-package)
 - [Type Mappings](#type-mappings)
   - [Records](#records)
@@ -92,11 +93,11 @@ directive selects the .NET namespace or Go import path, and .NET otherwise uses
 
 ## Integrating a Support Package
 
-For **WIT** generation in Go, Python, TypeScript, and .NET, pass one
+For **WIT** generation in Go, Java, Python, TypeScript, and .NET, pass one
 `--support-package` value on the language subcommand, even if that particular
 input does not use support helpers. It identifies code
 **you maintain in your project**; nexgen neither reads it nor copies it into the
-output. Java does not consume user support, and JSON Schema generation does not
+output. Java names a user-owned helper class. JSON Schema generation does not
 require this option (its generated JSON runtime helpers are unrelated).
 
 The package must be importable when the generated code is compiled or run.
@@ -2003,3 +2004,45 @@ records, and type parameters backed by the supported Payload/Payloads carriers
 are preserved. Linked records are validated but not edited; missing fields there
 must be fixed in the dependency package. Reconciliation completes before the
 output is written, and rerunning it on complete WIT leaves the model unchanged.
+
+## Java WIT generation
+
+Java WIT output targets Java 8. Pass `--package-name` and `--support-package`;
+the latter names a user-owned Java class containing conversion and context
+helpers. `--native-api` emits operation wrappers and resource methods, and
+`--system-nexus` additionally emits interceptor hooks, context acquisition, and
+an operation-root manifest for SDK payload visitor generation.
+
+Set `@nexus.operations-class java="WorkflowOperations"` on an interface to emit
+an abstract operations class with a protected constructor. An SDK facade can
+extend it once to expose every generated static operation, including operations
+added later. Use `--package-name io.temporal.workflow` to put the models and
+operations in the SDK's workflow package. The generated request builders are the
+public API; no handwritten options class or operation wrapper is required.
+
+Records use constructors, getters, and builders. Enums are Java enums, flags are
+`EnumSet` values, variants and results are tagged values, and tuples use
+generated classes. Generic arguments propagate through nested records and
+protobuf payload carriers. Protobuf-backed models declare a Temporal transfer
+converter and expose `toProto` and `fromProto` methods for explicit conversion.
+
+Use `java`, `java-from`, and `java-to` on `@nexus.type` for native SDK mappings.
+Conversion helpers receive the active `DataConverter` followed by the value.
+Sourced-field helpers remain ordinary calls relative to the support class, while
+serialization-context helpers receive the generated operation request.
+
+`NexgenRuntime` is generated Java runtime code. It is separate from the
+user-owned class selected by `--support-package`; the Rust Java backend emits
+only the shared helpers and value types these bindings use. Bindings requiring
+none do not include a runtime class. Protobuf conversion uses generated Java
+getters/setters directly, without a field-reflection helper layer.
+
+Until the Java SDK transfer-converter API is released, build the matching SDK
+checkout and set `TEMPORAL_JAVA_SDK_DIR` when running the advanced Java samples.
+
+Generic Java operation results accept a `java.lang.reflect.Type` argument so the
+runtime can preserve their type arguments. Use a Jackson `TypeReference` or an
+equivalent reified type. Model builders provide copy construction and flattened
+setters; named function alternatives have `set…Name` and `set…Call` setters
+alongside the explicit function-reference value.
+

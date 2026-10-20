@@ -5,10 +5,10 @@ system_nexus = true
 system_nexus = true
 
 [proto-generic]
-languages = ["python", "dotnet", "typescript"]
+languages = ["python", "dotnet", "typescript", "java"]
 
 [proto-oneof]
-languages = ["python", "dotnet", "typescript"]
+languages = ["python", "dotnet", "typescript", "java"]
 
 [notification-service]
-languages = ["python", "dotnet", "typescript"]
+languages = ["python", "dotnet", "typescript", "java"]
