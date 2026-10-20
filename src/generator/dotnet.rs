@@ -38,6 +38,18 @@ const GENERATED_CODE_ATTRIBUTE: &str = "[GeneratedCode(\"nexgen\", null)]";
 /// has a deprecation, so the comment explains why it is there.
 pub(in crate::generator) const OBSOLETE_WARNING_PRAGMA: &str = "// Generated code refers to deprecated ([Obsolete]) declarations it also\n// generates; keep those references from raising CS0618.\n#pragma warning disable CS0618\n\n";
 
+/// The access modifier of a generated `[NexusService]` contract interface.
+/// With `--native-api` the generated `*Client` wrapper is the API callers use,
+/// so the contract stays `internal`; without it the contract is the API, which
+/// handlers and callers in other assemblies must be able to name.
+fn service_interface_visibility(include_native_api: bool) -> &'static str {
+    if include_native_api {
+        "internal"
+    } else {
+        "public"
+    }
+}
+
 /// The `[Obsolete]` attribute for a deprecated declaration of `kind` (type,
 /// field, service, or operation), carrying the generic reason every target
 /// with a message slot uses. The authored rationale stays in the doc comment.
@@ -198,7 +210,8 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("[NexusService(");
             output.push_str(&csharp_string_literal(&service.wire_name));
             output.push_str(")]\n");
-            output.push_str("public interface I");
+            output.push_str(service_interface_visibility(include_native_api));
+            output.push_str(" interface I");
             output.push_str(&csharp_service_ident(service));
             output.push_str("\n{\n");
             for operation in &service.operations {

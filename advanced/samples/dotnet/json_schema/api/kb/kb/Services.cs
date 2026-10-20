@@ -20,7 +20,7 @@ namespace Nexgen.JsonSchema.Kb.Kb
     /// </summary>
     [GeneratedCode("nexgen", null)]
     [NexusService("example.kb.v1.KnowledgeBaseService")]
-    public interface IKnowledgeBaseService
+    internal interface IKnowledgeBaseService
     {
         /// <summary>
         /// Fetch a page by id.

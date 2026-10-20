@@ -17,7 +17,7 @@ namespace Nexgen.JsonSchema.Chat
     /// </summary>
     [GeneratedCode("nexgen", null)]
     [NexusService("example.chat.v1.ChatService")]
-    public interface IChatService
+    internal interface IChatService
     {
         /// <summary>
         /// Post a message to a room.

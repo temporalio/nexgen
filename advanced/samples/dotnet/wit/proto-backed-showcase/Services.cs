@@ -15,7 +15,7 @@ namespace Nexgen.ProtoBackedShowcaseService
 
     [GeneratedCode("nexgen", null)]
     [NexusService("ProtoBackedShowcaseService")]
-    public interface IProtoBackedShowcaseService
+    internal interface IProtoBackedShowcaseService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("ActivityOptionsOperation")]

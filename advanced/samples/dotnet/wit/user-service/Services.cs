@@ -15,7 +15,7 @@ namespace Nexgen.UserService
 
     [GeneratedCode("nexgen", null)]
     [NexusService("UserService")]
-    public interface IUserService
+    internal interface IUserService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("GetUser")]

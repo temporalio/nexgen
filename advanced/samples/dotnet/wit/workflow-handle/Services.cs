@@ -15,7 +15,7 @@ namespace Temporalio.Workflows
 
     [GeneratedCode("nexgen", null)]
     [NexusService("WorkflowHandleService")]
-    public interface IWorkflowHandleService
+    internal interface IWorkflowHandleService
     {
         /// <summary>
         /// Start a Workflow through System Nexus and get a handle to it.
