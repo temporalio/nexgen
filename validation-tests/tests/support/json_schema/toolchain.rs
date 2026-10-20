@@ -1019,7 +1019,8 @@ pub fn dotnet() -> Command {
 }
 
 /// A project compiling every generated case directory under `root` (minus
-/// `excluded`) with the runtime the generated code targets.
+/// `excluded`) with the runtime the generated code targets. It compiles for
+/// net8.0, the generated code's floor, and runs on the newest installed runtime.
 pub fn csharp_project(
     excluded: &BTreeSet<String>,
     warnings_as_errors: bool,
@@ -1031,7 +1032,7 @@ pub fn csharp_project(
         removes.push_str(&format!(";{dir}/**"));
     }
     format!(
-        "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <OutputType>{output_type}</OutputType>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>{warnings_as_errors}</TreatWarningsAsErrors>\n    <AssemblyName>Conformance</AssemblyName>\n  </PropertyGroup>\n  <ItemGroup>\n    <Compile Remove=\"{removes}\" />\n  </ItemGroup>\n  <ItemGroup>\n    <PackageReference Include=\"Temporalio\" Version=\"1.19.0\" />\n  </ItemGroup>\n</Project>\n"
+        "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <OutputType>{output_type}</OutputType>\n    <TargetFramework>net8.0</TargetFramework>\n    <RollForward>LatestMajor</RollForward>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>{warnings_as_errors}</TreatWarningsAsErrors>\n    <AssemblyName>Conformance</AssemblyName>\n  </PropertyGroup>\n  <ItemGroup>\n    <Compile Remove=\"{removes}\" />\n  </ItemGroup>\n  <ItemGroup>\n    <PackageReference Include=\"Temporalio\" Version=\"1.19.0\" />\n  </ItemGroup>\n</Project>\n"
     )
 }
 
