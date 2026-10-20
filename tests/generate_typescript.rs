@@ -745,9 +745,11 @@ fn typescript_renders_required_fields_and_custom_message_types() {
     ));
     assert!(rendered.contains("support.taskQueueFromProto("));
     assert!(rendered.contains("support.taskQueueToProto("));
-    assert!(rendered.contains(
-        "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest | undefined {"
-    ));
+    assert!(
+        rendered.contains(
+            "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest {"
+        )
+    );
     assert!(rendered.contains("const result = await handle.result();"));
     assert!(rendered.contains("return workflow.getExternalWorkflowHandle("));
     assert!(rendered.contains("request.id"));

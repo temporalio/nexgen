@@ -867,32 +867,39 @@ export interface ActivityOptions {
     retryPolicy: common.RetryPolicy;
 }
 
-export const ActivityOptions = {
-    fromProto(proto: temporal.api.activity.v1.IActivityOptions | null | undefined) {
-        if (proto == null) return undefined;
-        return {
-            taskQueue: proto.taskQueue == null ? undefined
-                : taskQueueFromProto(proto.taskQueue),
-            retryPolicy: requiredField(
-                retryPolicyFromProto(requiredField(proto.retryPolicy, ...)), ...
-            ),
-        };
-    },
-    toProto(model: ActivityOptions | null | undefined) {
-        if (model == null) return undefined;
-        return {
-            taskQueue: model.taskQueue == null ? undefined
-                : taskQueueToProto(model.taskQueue),
-            retryPolicy: retryPolicyToProto(model.retryPolicy),
-        };
-    },
-};
+function activityOptionsFromProto(
+    proto: temporal.api.activity.v1.IActivityOptions,
+): ActivityOptions {
+    return {
+        taskQueue: proto.taskQueue == null ? undefined
+            : taskQueueFromProto(proto.taskQueue),
+        retryPolicy: requiredField(
+            retryPolicyFromProto(requiredField(proto.retryPolicy, ...)), ...
+        ),
+    };
+}
+
+function activityOptionsToProto(
+    model: ActivityOptions,
+): temporal.api.activity.v1.IActivityOptions {
+    return {
+        taskQueue: model.taskQueue == null ? undefined
+            : taskQueueToProto(model.taskQueue),
+        retryPolicy: retryPolicyToProto(model.retryPolicy),
+    };
+}
 ```
 
 Required fields are validated in `from_proto` -- missing required proto fields
 raise a `ValueError` (Python) or throw an `Error` (TypeScript). .NET output
 requires `Temporalio` 1.18.0 or newer, or 1.19.0 or newer for generic
 proto-backed models.
+
+Generated TypeScript message-conversion helpers take non-null inputs and return
+non-null outputs. Callers guard optional fields before conversion and validate
+required wire fields before passing them to a helper. Required results from
+authored support converters are still validated; those converters retain their
+own nullable contracts.
 
 ### Sourced Fields
 
@@ -1483,6 +1490,11 @@ infer it. Unknown discriminator values and missing selected member values throw
 an `Error`, as does encoding an invalid variant tag. Model-only modules export
 their model types and transfer converters from `index.ts` without emitting an
 empty service.
+
+Generated TypeScript oneof switches use `satisfies never` in their default
+branches. Adding an unhandled case to the SDK discriminator or the generated
+variant is therefore a compile-time error. Runtime errors still protect against
+invalid values passed from JavaScript.
 
 Other targets reject a reachable model containing a oneof they cannot convert.
 Unreachable declarations and omitted oneofs remain valid.

@@ -6,6 +6,8 @@ import * as nexus from "nexus-rpc";
 
 import type { ActivityOptions, FailureContainer } from "../wit/type-roundtrip/index.ts";
 import { typeRoundtripService } from "../wit/type-roundtrip/services.ts";
+import { activityOptionsTransferTypeConverter } from "../wit/type-roundtrip/models.ts";
+import * as support from "../support/temporal_model_converters.ts";
 import {
   failureFromProto,
   failureToProto,
@@ -64,6 +66,20 @@ describe("type-roundtrip generated output", () => {
     expect(activityOptions.taskQueue).toBe("demo-task-queue");
     expect(activityOptions.retryPolicy.maximumAttempts).toBe(3);
     expect(activityOptions.priority?.priorityKey).toBe(1);
+  });
+
+  test("still validates values returned by authored converters", () => {
+    const converter = vi.spyOn(support, "retryPolicyFromProto").mockReturnValueOnce(
+      // Exercise an authored converter that violates its declared return type.
+      undefined as unknown as common.RetryPolicy,
+    );
+    try {
+      expect(() =>
+        activityOptionsTransferTypeConverter.fromTransferType({ retryPolicy: {} }),
+      ).toThrow("missing required field ActivityOptions.retryPolicy");
+    } finally {
+      converter.mockRestore();
+    }
   });
 
   test("uses the SDK failure converter for encoded attributes", () => {

@@ -141,6 +141,18 @@ describe("proto-oneof generated models", () => {
     expect(pauseConverter.fromTransferType(message)).toEqual(model);
   });
 
+  it.each([null, undefined])(
+    "handles an absent optional nested message (%s) at the caller",
+    (execution) => {
+      const model = { ...pauseRequest(), execution: undefined };
+      const wire = pauseConverter.toTransferType(model);
+      expect(wire.execution).toBeUndefined();
+      expect(
+        pauseConverter.fromTransferType({ ...wire, execution }).execution,
+      ).toBeUndefined();
+    },
+  );
+
   it("preserves an empty scalar and follows the explicit discriminator", () => {
     const model: PauseActivityRequest = {
       ...pauseRequest(),

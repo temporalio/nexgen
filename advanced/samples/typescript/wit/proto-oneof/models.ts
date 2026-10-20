@@ -27,11 +27,8 @@ export interface Outcome<OutputT> {
 }
 
 function outcomeFromProto<OutputT>(
-  proto: temporal.api.update.v1.IOutcome | null | undefined,
-): Outcome<OutputT> | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.update.v1.IOutcome,
+): Outcome<OutputT> {
   let result: OutcomeValue<OutputT>;
   switch (proto.value) {
     case "success":
@@ -53,6 +50,7 @@ function outcomeFromProto<OutputT>(
     case undefined:
       throw new Error("missing required field Outcome.value");
     default:
+      proto.value satisfies never;
       throw new Error("invalid oneof discriminator for Outcome.value");
   }
   return {
@@ -61,11 +59,8 @@ function outcomeFromProto<OutputT>(
 }
 
 function outcomeToProto<OutputT>(
-  model: Outcome<OutputT> | null | undefined,
-): temporal.api.update.v1.IOutcome | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: Outcome<OutputT>,
+): temporal.api.update.v1.IOutcome {
   const proto: temporal.api.update.v1.IOutcome = {};
   const result = requiredField(model.value, "Outcome", "value");
   switch (result.tag) {
@@ -78,6 +73,7 @@ function outcomeToProto<OutputT>(
       proto.failure = support.failureToProto(result.value);
       break;
     default:
+      result satisfies never;
       throw new Error("invalid oneof tag for Outcome.value");
   }
   return proto;
@@ -85,11 +81,11 @@ function outcomeToProto<OutputT>(
 
 export const outcomeTransferTypeConverter = {
   fromTransferType<OutputT>(value: temporal.api.update.v1.IOutcome): Outcome<OutputT> {
-    return outcomeFromProto<OutputT>(value)!;
+    return outcomeFromProto<OutputT>(value);
   },
 
   toTransferType<OutputT>(value: Outcome<OutputT>): temporal.api.update.v1.IOutcome {
-    return outcomeToProto(value) ?? {};
+    return outcomeToProto(value);
   },
 };
 export interface PauseActivityRequest {
@@ -102,11 +98,8 @@ export interface PauseActivityRequest {
 }
 
 function pauseActivityRequestFromProto(
-  proto: temporal.api.workflowservice.v1.IPauseActivityRequest | null | undefined,
-): PauseActivityRequest | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.workflowservice.v1.IPauseActivityRequest,
+): PauseActivityRequest {
   let result3: ActivitySelection | undefined;
   switch (proto.activity) {
     case "id":
@@ -125,6 +118,7 @@ function pauseActivityRequestFromProto(
       result3 = undefined;
       break;
     default:
+      proto.activity satisfies never;
       throw new Error("invalid oneof discriminator for PauseActivityRequest.activity");
   }
   return {
@@ -155,17 +149,12 @@ function pauseActivityRequestFromProto(
 }
 
 function pauseActivityRequestToProto(
-  model: PauseActivityRequest | null | undefined,
-): temporal.api.workflowservice.v1.IPauseActivityRequest | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: PauseActivityRequest,
+): temporal.api.workflowservice.v1.IPauseActivityRequest {
   const proto: temporal.api.workflowservice.v1.IPauseActivityRequest = {};
   proto.namespace = requiredField(model.namespace, "PauseActivityRequest", "namespace");
   proto.execution =
-    model.execution == null
-      ? undefined
-      : (workflowExecutionToProto(model.execution) ?? {});
+    model.execution == null ? undefined : workflowExecutionToProto(model.execution);
   proto.identity = requiredField(model.identity, "PauseActivityRequest", "identity");
   const result3 = model.activity;
   if (result3 != null) {
@@ -179,6 +168,7 @@ function pauseActivityRequestToProto(
         proto.type = result3.value;
         break;
       default:
+        result3 satisfies never;
         throw new Error("invalid oneof tag for PauseActivityRequest.activity");
     }
   }
@@ -191,13 +181,13 @@ export const pauseActivityRequestTransferTypeConverter = {
   fromTransferType(
     value: temporal.api.workflowservice.v1.IPauseActivityRequest,
   ): PauseActivityRequest {
-    return pauseActivityRequestFromProto(value)!;
+    return pauseActivityRequestFromProto(value);
   },
 
   toTransferType(
     value: PauseActivityRequest,
   ): temporal.api.workflowservice.v1.IPauseActivityRequest {
-    return pauseActivityRequestToProto(value) ?? {};
+    return pauseActivityRequestToProto(value);
   },
 };
 export interface WorkflowExecution {
@@ -206,11 +196,8 @@ export interface WorkflowExecution {
 }
 
 function workflowExecutionFromProto(
-  proto: temporal.api.common.v1.IWorkflowExecution | null | undefined,
-): WorkflowExecution | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.common.v1.IWorkflowExecution,
+): WorkflowExecution {
   return {
     workflowId: requiredField(
       proto.workflowId === "" ? undefined : proto.workflowId,
@@ -226,11 +213,8 @@ function workflowExecutionFromProto(
 }
 
 function workflowExecutionToProto(
-  model: WorkflowExecution | null | undefined,
-): temporal.api.common.v1.IWorkflowExecution | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: WorkflowExecution,
+): temporal.api.common.v1.IWorkflowExecution {
   return {
     workflowId: requiredField(model.workflowId, "WorkflowExecution", "workflowId"),
     runId: requiredField(model.runId, "WorkflowExecution", "runId"),
@@ -241,10 +225,10 @@ export const workflowExecutionTransferTypeConverter = {
   fromTransferType(
     value: temporal.api.common.v1.IWorkflowExecution,
   ): WorkflowExecution {
-    return workflowExecutionFromProto(value)!;
+    return workflowExecutionFromProto(value);
   },
 
   toTransferType(value: WorkflowExecution): temporal.api.common.v1.IWorkflowExecution {
-    return workflowExecutionToProto(value) ?? {};
+    return workflowExecutionToProto(value);
   },
 };

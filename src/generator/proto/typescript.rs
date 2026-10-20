@@ -327,7 +327,8 @@ fn render_oneof_from_proto(output: &mut String, owner: &str, oneof: &OneofField<
         ));
     }
     output.push_str(&format!(
-        "    default:\n      throw new Error(\"invalid oneof discriminator for {owner}.{field}\");\n  }}\n"
+        "    default:\n      proto.{} satisfies never;\n      throw new Error(\"invalid oneof discriminator for {owner}.{field}\");\n  }}\n",
+        oneof.wire_group,
     ));
 }
 
@@ -359,7 +360,7 @@ fn render_oneof_to_proto(output: &mut String, owner: &str, oneof: &OneofField<'_
         ));
     }
     output.push_str(&format!(
-        "{indent}  default:\n{indent}    throw new Error(\"invalid oneof tag for {owner}.{field}\");\n{indent}}}\n"
+        "{indent}  default:\n{indent}    {name} satisfies never;\n{indent}    throw new Error(\"invalid oneof tag for {owner}.{field}\");\n{indent}}}\n"
     ));
     if !oneof.required {
         output.push_str("  }\n");
@@ -418,7 +419,7 @@ fn render_model_transfer_type_converter(
     ));
     output.push_str(" {\n    return ");
     output.push_str(&names.from_wire);
-    output.push_str(&format!("{}(value)!;\n  }},\n\n", type_arguments(model)));
+    output.push_str(&format!("{}(value);\n  }},\n\n", type_arguments(model)));
     render_converter_method_start(output, "  toTransferType", model);
     output.push_str("  value: ");
     output.push_str(&generic_model_annotation(
@@ -429,7 +430,7 @@ fn render_model_transfer_type_converter(
     output.push_str(&proto_type);
     output.push_str(" {\n    return ");
     output.push_str(&names.to_wire);
-    output.push_str("(value) ?? {};\n  },\n};");
+    output.push_str("(value);\n  },\n};");
 }
 
 fn type_arguments(model: &RenderedModel) -> String {
@@ -608,10 +609,8 @@ fn generated_wire_conversion(
     Some(WireValueConversion {
         annotation: model_name.clone(),
         from_wire: format!("{from_wire_function_name}({{wire}})"),
-        to_wire: format!("{to_wire_function_name}({{value}}) ?? {{}}"),
-        function_name_to_wire: Some(format!(
-            "{to_wire_function_name}({{ name: {{name}} }}) ?? {{}}"
-        )),
+        to_wire: format!("{to_wire_function_name}({{value}})"),
+        function_name_to_wire: Some(format!("{to_wire_function_name}({{ name: {{name}} }})")),
         wire_function_names: Some(WireFunctionNames {
             from_wire: from_wire_function_name,
             to_wire: to_wire_function_name,
@@ -694,9 +693,6 @@ fn render_model_to_proto_function(
         output.push_str("function ");
         output.push_str(function_name);
         output.push_str("(\n");
-        output.push_str("  model: ");
-        output.push_str(&model.name);
-        output.push_str(" | null | undefined,\n");
     } else {
         render_named_generic_function_start(
             output,
@@ -704,19 +700,16 @@ fn render_model_to_proto_function(
             &model.type_parameters,
             0,
         );
-        output.push_str("  model: ");
-        output.push_str(&generic_model_annotation(
-            &model.name,
-            &model.type_parameters,
-        ));
-        output.push_str(" | null | undefined,\n");
     }
+    output.push_str("  model: ");
+    output.push_str(&generic_model_annotation(
+        &model.name,
+        &model.type_parameters,
+    ));
+    output.push_str(",\n");
     output.push_str("): ");
     output.push_str(&wire_annotation);
-    output.push_str(" | undefined {\n");
-    output.push_str("  if (model == null) {\n");
-    output.push_str("    return undefined;\n");
-    output.push_str("  }\n");
+    output.push_str(" {\n");
     if fields
         .iter()
         .any(|field| matches!(field, ModelWireField::Oneof(_)))
@@ -778,9 +771,6 @@ fn render_model_from_proto_function(
         output.push_str("function ");
         output.push_str(function_name);
         output.push_str("(\n");
-        output.push_str("  proto: ");
-        output.push_str(&wire_annotation);
-        output.push_str(" | null | undefined,\n");
     } else {
         render_named_generic_function_start(
             output,
@@ -788,19 +778,16 @@ fn render_model_from_proto_function(
             &model.type_parameters,
             0,
         );
-        output.push_str("  proto: ");
-        output.push_str(&wire_annotation);
-        output.push_str(" | null | undefined,\n");
     }
+    output.push_str("  proto: ");
+    output.push_str(&wire_annotation);
+    output.push_str(",\n");
     output.push_str("): ");
     output.push_str(&generic_model_annotation(
         &model.name,
         &model.type_parameters,
     ));
-    output.push_str(" | undefined {\n");
-    output.push_str("  if (proto == null) {\n");
-    output.push_str("    return undefined;\n");
-    output.push_str("  }\n");
+    output.push_str(" {\n");
     if model.fields.is_empty() && model.sourced_fields.is_empty() {
         output.push_str("  return {};\n");
     } else {

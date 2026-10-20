@@ -49,14 +49,8 @@ export interface SignalWithStartWorkflowResponse {
 }
 
 function signalWithStartWorkflowResponseFromProto(
-  proto:
-    | temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse
-    | null
-    | undefined,
-): SignalWithStartWorkflowResponse | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse,
+): SignalWithStartWorkflowResponse {
   return {
     runId: proto.runId ?? undefined,
     started: proto.started ?? undefined,
@@ -64,13 +58,8 @@ function signalWithStartWorkflowResponseFromProto(
 }
 
 function signalWithStartWorkflowResponseToProto(
-  model: SignalWithStartWorkflowResponse | null | undefined,
-):
-  | temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse
-  | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: SignalWithStartWorkflowResponse,
+): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse {
   return {
     runId: model.runId,
     started: model.started,
@@ -81,13 +70,13 @@ export const signalWithStartWorkflowResponseTransferTypeConverter = {
   fromTransferType(
     value: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse,
   ): SignalWithStartWorkflowResponse {
-    return signalWithStartWorkflowResponseFromProto(value)!;
+    return signalWithStartWorkflowResponseFromProto(value);
   },
 
   toTransferType(
     value: SignalWithStartWorkflowResponse,
   ): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse {
-    return signalWithStartWorkflowResponseToProto(value) ?? {};
+    return signalWithStartWorkflowResponseToProto(value);
   },
 };
 export type ReplaceSignalWithStartWorkflowRequest<Base, New> = Omit<
@@ -284,14 +273,8 @@ function signalWithStartWorkflowRequestFromProto<
     ? Args
     : never,
 >(
-  proto:
-    | temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest
-    | null
-    | undefined,
-): SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs> | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest,
+): SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs> {
   return {
     workflow: requiredField(
       support.workflowTypeFromProto(
@@ -404,16 +387,8 @@ function signalWithStartWorkflowRequestToProto<
     ? Args
     : never,
 >(
-  model:
-    | SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs>
-    | null
-    | undefined,
-):
-  | temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest
-  | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs>,
+): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest {
   return {
     workflowType: support.workflowTypeToProto(
       requiredField(model.workflow, "SignalWithStartWorkflowRequest", "workflow"),
@@ -499,7 +474,7 @@ export const signalWithStartWorkflowRequestTransferTypeConverter = {
   ): SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs> {
     return signalWithStartWorkflowRequestFromProto<WorkflowFn, SignalValue, SignalArgs>(
       value,
-    )!;
+    );
   },
 
   toTransferType<
@@ -516,7 +491,7 @@ export const signalWithStartWorkflowRequestTransferTypeConverter = {
   >(
     value: SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs>,
   ): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest {
-    return signalWithStartWorkflowRequestToProto(value) ?? {};
+    return signalWithStartWorkflowRequestToProto(value);
   },
 };
 /**
@@ -536,12 +511,7 @@ export interface UserMetadata {
   staticDetails?: common.Payload;
 }
 
-function userMetadataFromProto(
-  proto: temporal.api.sdk.v1.IUserMetadata | null | undefined,
-): UserMetadata | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+function userMetadataFromProto(proto: temporal.api.sdk.v1.IUserMetadata): UserMetadata {
   return {
     staticSummary:
       proto.summary == null ? undefined : support.payloadFromProto(proto.summary),
@@ -550,12 +520,7 @@ function userMetadataFromProto(
   };
 }
 
-function userMetadataToProto(
-  model: UserMetadata | null | undefined,
-): temporal.api.sdk.v1.IUserMetadata | undefined {
-  if (model == null) {
-    return undefined;
-  }
+function userMetadataToProto(model: UserMetadata): temporal.api.sdk.v1.IUserMetadata {
   return {
     summary:
       model.staticSummary == null
@@ -570,10 +535,10 @@ function userMetadataToProto(
 
 export const userMetadataTransferTypeConverter = {
   fromTransferType(value: temporal.api.sdk.v1.IUserMetadata): UserMetadata {
-    return userMetadataFromProto(value)!;
+    return userMetadataFromProto(value);
   },
 
   toTransferType(value: UserMetadata): temporal.api.sdk.v1.IUserMetadata {
-    return userMetadataToProto(value) ?? {};
+    return userMetadataToProto(value);
   },
 };

@@ -1601,14 +1601,21 @@ fn resolve_typescript_value_type(
 
 fn repeated_from_wire_expr(resolved_type: &ResolvedFieldType, wire_value_expr: &str) -> String {
     match resolved_type.kind {
-        ResolvedFieldKind::Message => format!(
-            "{wire_value_expr}?.map((value: any) => {}!)",
-            resolved_type
+        ResolvedFieldKind::Message => {
+            let conversion = resolved_type
                 .wire_conversion
                 .as_ref()
-                .expect("message conversion should be present")
-                .from_wire_expr("value")
-        ),
+                .expect("message conversion should be present");
+            let suffix = if conversion.wire_function_names.is_some() {
+                ""
+            } else {
+                "!"
+            };
+            format!(
+                "{wire_value_expr}?.map((value: any) => {}{suffix})",
+                conversion.from_wire_expr("value")
+            )
+        }
         ResolvedFieldKind::Enum => format!(
             "{wire_value_expr}?.map((value: any) => {})",
             enum_from_wire_expr(resolved_type, "value")
@@ -1695,15 +1702,19 @@ fn required_from_wire_expr(
         required_field_expr(&wire_value_expr, owner_name, generated_field_name);
 
     match resolved_type.kind {
-        ResolvedFieldKind::Message => required_field_expr(
-            &resolved_type
+        ResolvedFieldKind::Message => {
+            let conversion = resolved_type
                 .wire_conversion
                 .as_ref()
-                .expect("message conversion should be present")
-                .from_wire_expr(&required_wire_expr),
-            owner_name,
-            generated_field_name,
-        ),
+                .expect("message conversion should be present");
+            let decoded = conversion.from_wire_expr(&required_wire_expr);
+            if conversion.wire_function_names.is_some() {
+                decoded
+            } else {
+                // Authored converters can still return a missing value.
+                required_field_expr(&decoded, owner_name, generated_field_name)
+            }
+        }
         ResolvedFieldKind::Enum => required_field_expr(
             &enum_from_wire_expr(resolved_type, &required_wire_expr),
             owner_name,
@@ -6943,7 +6954,7 @@ mod tests {
         assert!(output.contains("support.taskQueueFromProto("));
         assert!(output.contains("support.taskQueueToProto("));
         assert!(output.contains(
-            "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest | undefined {"
+            "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest {"
         ));
         assert!(output.contains("headers?: common.Headers;"));
         assert!(!output.contains("export interface Header"));

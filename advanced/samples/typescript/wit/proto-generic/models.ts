@@ -19,11 +19,8 @@ export interface PayloadBackedContext<ContextT> {
 }
 
 function payloadBackedContextFromProto<ContextT>(
-  proto: temporal.api.compute.v1.IComputeScaler | null | undefined,
-): PayloadBackedContext<ContextT> | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.compute.v1.IComputeScaler,
+): PayloadBackedContext<ContextT> {
   return {
     details: support.payloadToValue<ContextT>(
       requiredField(proto.details, "PayloadBackedContext", "details"),
@@ -32,11 +29,8 @@ function payloadBackedContextFromProto<ContextT>(
 }
 
 function payloadBackedContextToProto<ContextT>(
-  model: PayloadBackedContext<ContextT> | null | undefined,
-): temporal.api.compute.v1.IComputeScaler | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: PayloadBackedContext<ContextT>,
+): temporal.api.compute.v1.IComputeScaler {
   return {
     details: support.valueToPayload(model.details),
   };
@@ -46,13 +40,13 @@ export const payloadBackedContextTransferTypeConverter = {
   fromTransferType<ContextT>(
     value: temporal.api.compute.v1.IComputeScaler,
   ): PayloadBackedContext<ContextT> {
-    return payloadBackedContextFromProto<ContextT>(value)!;
+    return payloadBackedContextFromProto<ContextT>(value);
   },
 
   toTransferType<ContextT>(
     value: PayloadBackedContext<ContextT>,
   ): temporal.api.compute.v1.IComputeScaler {
-    return payloadBackedContextToProto(value) ?? {};
+    return payloadBackedContextToProto(value);
   },
 };
 export interface PayloadBackedEnvelope<OutputT, ContextT> {
@@ -61,44 +55,28 @@ export interface PayloadBackedEnvelope<OutputT, ContextT> {
 }
 
 function payloadBackedEnvelopeFromProto<OutputT, ContextT>(
-  proto: temporal.api.compute.v1.IComputeConfigScalingGroup | null | undefined,
-): PayloadBackedEnvelope<OutputT, ContextT> | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.compute.v1.IComputeConfigScalingGroup,
+): PayloadBackedEnvelope<OutputT, ContextT> {
   return {
-    provider: requiredField(
-      payloadBackedOutputFromProto(
-        requiredField(proto.provider, "PayloadBackedEnvelope", "provider"),
-      ),
-      "PayloadBackedEnvelope",
-      "provider",
+    provider: payloadBackedOutputFromProto(
+      requiredField(proto.provider, "PayloadBackedEnvelope", "provider"),
     ),
-    scaler: requiredField(
-      payloadBackedContextFromProto(
-        requiredField(proto.scaler, "PayloadBackedEnvelope", "scaler"),
-      ),
-      "PayloadBackedEnvelope",
-      "scaler",
+    scaler: payloadBackedContextFromProto(
+      requiredField(proto.scaler, "PayloadBackedEnvelope", "scaler"),
     ),
   };
 }
 
 function payloadBackedEnvelopeToProto<OutputT, ContextT>(
-  model: PayloadBackedEnvelope<OutputT, ContextT> | null | undefined,
-): temporal.api.compute.v1.IComputeConfigScalingGroup | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: PayloadBackedEnvelope<OutputT, ContextT>,
+): temporal.api.compute.v1.IComputeConfigScalingGroup {
   return {
-    provider:
-      payloadBackedOutputToProto(
-        requiredField(model.provider, "PayloadBackedEnvelope", "provider"),
-      ) ?? {},
-    scaler:
-      payloadBackedContextToProto(
-        requiredField(model.scaler, "PayloadBackedEnvelope", "scaler"),
-      ) ?? {},
+    provider: payloadBackedOutputToProto(
+      requiredField(model.provider, "PayloadBackedEnvelope", "provider"),
+    ),
+    scaler: payloadBackedContextToProto(
+      requiredField(model.scaler, "PayloadBackedEnvelope", "scaler"),
+    ),
   };
 }
 
@@ -106,13 +84,13 @@ export const payloadBackedEnvelopeTransferTypeConverter = {
   fromTransferType<OutputT, ContextT>(
     value: temporal.api.compute.v1.IComputeConfigScalingGroup,
   ): PayloadBackedEnvelope<OutputT, ContextT> {
-    return payloadBackedEnvelopeFromProto<OutputT, ContextT>(value)!;
+    return payloadBackedEnvelopeFromProto<OutputT, ContextT>(value);
   },
 
   toTransferType<OutputT, ContextT>(
     value: PayloadBackedEnvelope<OutputT, ContextT>,
   ): temporal.api.compute.v1.IComputeConfigScalingGroup {
-    return payloadBackedEnvelopeToProto(value) ?? {};
+    return payloadBackedEnvelopeToProto(value);
   },
 };
 export interface PayloadBackedOutput<OutputT> {
@@ -120,11 +98,8 @@ export interface PayloadBackedOutput<OutputT> {
 }
 
 function payloadBackedOutputFromProto<OutputT>(
-  proto: temporal.api.compute.v1.IComputeProvider | null | undefined,
-): PayloadBackedOutput<OutputT> | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.compute.v1.IComputeProvider,
+): PayloadBackedOutput<OutputT> {
   return {
     details: support.payloadToValue<OutputT>(
       requiredField(proto.details, "PayloadBackedOutput", "details"),
@@ -133,11 +108,8 @@ function payloadBackedOutputFromProto<OutputT>(
 }
 
 function payloadBackedOutputToProto<OutputT>(
-  model: PayloadBackedOutput<OutputT> | null | undefined,
-): temporal.api.compute.v1.IComputeProvider | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: PayloadBackedOutput<OutputT>,
+): temporal.api.compute.v1.IComputeProvider {
   return {
     details: support.valueToPayload(model.details),
   };
@@ -147,12 +119,12 @@ export const payloadBackedOutputTransferTypeConverter = {
   fromTransferType<OutputT>(
     value: temporal.api.compute.v1.IComputeProvider,
   ): PayloadBackedOutput<OutputT> {
-    return payloadBackedOutputFromProto<OutputT>(value)!;
+    return payloadBackedOutputFromProto<OutputT>(value);
   },
 
   toTransferType<OutputT>(
     value: PayloadBackedOutput<OutputT>,
   ): temporal.api.compute.v1.IComputeProvider {
-    return payloadBackedOutputToProto(value) ?? {};
+    return payloadBackedOutputToProto(value);
   },
 };

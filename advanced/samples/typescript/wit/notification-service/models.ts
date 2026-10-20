@@ -45,11 +45,8 @@ export interface OnCompleteRequest<OutputT, SourceContextT> {
 }
 
 function onCompleteRequestFromProto<OutputT, SourceContextT>(
-  proto: temporal.api.notificationservice.v1.IOnCompleteRequest | null | undefined,
-): OnCompleteRequest<OutputT, SourceContextT> | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.notificationservice.v1.IOnCompleteRequest,
+): OnCompleteRequest<OutputT, SourceContextT> {
   let result: OnCompleteRequestResult<OutputT>;
   switch (proto.result) {
     case "success":
@@ -71,6 +68,7 @@ function onCompleteRequestFromProto<OutputT, SourceContextT>(
     case undefined:
       throw new Error("missing required field OnCompleteRequest.result");
     default:
+      proto.result satisfies never;
       throw new Error("invalid oneof discriminator for OnCompleteRequest.result");
   }
   return {
@@ -82,11 +80,8 @@ function onCompleteRequestFromProto<OutputT, SourceContextT>(
 }
 
 function onCompleteRequestToProto<OutputT, SourceContextT>(
-  model: OnCompleteRequest<OutputT, SourceContextT> | null | undefined,
-): temporal.api.notificationservice.v1.IOnCompleteRequest | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: OnCompleteRequest<OutputT, SourceContextT>,
+): temporal.api.notificationservice.v1.IOnCompleteRequest {
   const proto: temporal.api.notificationservice.v1.IOnCompleteRequest = {};
   const result = requiredField(model.result, "OnCompleteRequest", "result");
   switch (result.tag) {
@@ -99,6 +94,7 @@ function onCompleteRequestToProto<OutputT, SourceContextT>(
       proto.failure = support.failureToProto(result.value);
       break;
     default:
+      result satisfies never;
       throw new Error("invalid oneof tag for OnCompleteRequest.result");
   }
   proto.sourceContext = support.valueToPayload(model.sourceContext);
@@ -109,13 +105,13 @@ export const onCompleteRequestTransferTypeConverter = {
   fromTransferType<OutputT, SourceContextT>(
     value: temporal.api.notificationservice.v1.IOnCompleteRequest,
   ): OnCompleteRequest<OutputT, SourceContextT> {
-    return onCompleteRequestFromProto<OutputT, SourceContextT>(value)!;
+    return onCompleteRequestFromProto<OutputT, SourceContextT>(value);
   },
 
   toTransferType<OutputT, SourceContextT>(
     value: OnCompleteRequest<OutputT, SourceContextT>,
   ): temporal.api.notificationservice.v1.IOnCompleteRequest {
-    return onCompleteRequestToProto(value) ?? {};
+    return onCompleteRequestToProto(value);
   },
 };
 /**
@@ -124,20 +120,14 @@ export const onCompleteRequestTransferTypeConverter = {
 export type OnCompleteResponse = Record<string, never>;
 
 function onCompleteResponseFromProto(
-  proto: temporal.api.notificationservice.v1.IOnCompleteResponse | null | undefined,
-): OnCompleteResponse | undefined {
-  if (proto == null) {
-    return undefined;
-  }
+  proto: temporal.api.notificationservice.v1.IOnCompleteResponse,
+): OnCompleteResponse {
   return {};
 }
 
 function onCompleteResponseToProto(
-  model: OnCompleteResponse | null | undefined,
-): temporal.api.notificationservice.v1.IOnCompleteResponse | undefined {
-  if (model == null) {
-    return undefined;
-  }
+  model: OnCompleteResponse,
+): temporal.api.notificationservice.v1.IOnCompleteResponse {
   return {};
 }
 
@@ -145,12 +135,12 @@ export const onCompleteResponseTransferTypeConverter = {
   fromTransferType(
     value: temporal.api.notificationservice.v1.IOnCompleteResponse,
   ): OnCompleteResponse {
-    return onCompleteResponseFromProto(value)!;
+    return onCompleteResponseFromProto(value);
   },
 
   toTransferType(
     value: OnCompleteResponse,
   ): temporal.api.notificationservice.v1.IOnCompleteResponse {
-    return onCompleteResponseToProto(value) ?? {};
+    return onCompleteResponseToProto(value);
   },
 };
