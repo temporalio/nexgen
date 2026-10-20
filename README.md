@@ -110,11 +110,9 @@ Options:
       --date-time-types <REPR>    TypeScript only: in-memory type for materialized
                                   temporal `format` fields (date-time/date/time/
                                   duration) — string | date | temporal [default: string]
-      --namespace <NS>            C# only: root namespace for the generated
-                                  types; each input module's types live in a
-                                  namespace below it. Defaults to
-                                  Nexgen.Generated, or to a namespace derived
-                                  from the service for a single input file.
+      --namespace <NS>            C# only (required): root namespace for the
+                                  generated types, e.g. Example.Chat; each input
+                                  module's types live in a namespace below it.
   -h, --help                      Print help
   -V, --version                   Print version
 ```
@@ -131,10 +129,10 @@ generated ones. Generated files are overwritten in place, which also means a
 file from an earlier run whose definition has since been renamed or removed
 stays behind until you delete it.
 
-Generate C#, Go, TypeScript, and Python:
+Generate Go, TypeScript, and Python:
 
 ```bash
-for lang in dotnet go typescript python; do
+for lang in go typescript python; do
   nexgen "$lang" samples/schemas/showcase.nexusrpc.yaml --output "./gen/$lang"
 done
 ```
@@ -147,7 +145,8 @@ nexgen java samples/schemas/showcase.nexusrpc.yaml \
   --output ./gen/com/example/showcase --package-name com.example.showcase
 ```
 
-C# derives its root namespace from the input unless you pass `--namespace`:
+C# requires `--namespace`, the root namespace for the generated types; each
+input module's types live in a namespace below it:
 
 ```bash
 nexgen dotnet samples/schemas/showcase.nexusrpc.yaml \

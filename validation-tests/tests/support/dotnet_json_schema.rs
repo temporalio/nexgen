@@ -24,7 +24,7 @@ use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
 use crate::support::common;
-use crate::support::csharp_json_case::{JsonCase, assert_has, assert_lacks};
+use crate::support::csharp_json_case::{JsonCase, NAMESPACE, assert_has, assert_lacks};
 
 fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -368,7 +368,7 @@ fn csharp_json_examples_build_in_both_modes() {
                 format: false,
                 java_package_name: None,
                 ts_date_time_types: Default::default(),
-                dotnet_namespace: None,
+                dotnet_namespace: Some(NAMESPACE.to_string()),
             })
             .unwrap();
             case.build();
@@ -3174,7 +3174,11 @@ fn csharp_json_overrides_may_spell_any_generated_local() {
                 &format!("type: object\nproperties:\n  a: {{ type: string, x-cs-name: {name} }}\n"),
             );
             probe
-                .try_generate(&["probe.yaml"], GenerationMode::DefinitionsOnly, None)
+                .try_generate(
+                    &["probe.yaml"],
+                    GenerationMode::DefinitionsOnly,
+                    Some(NAMESPACE),
+                )
                 .is_ok()
         })
         .collect();
