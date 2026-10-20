@@ -42,13 +42,13 @@ Rationale (citing [[PRINCIPLES.md]]):
     rejected, `1e300` accepted for divisor `2`).
   - **Fractional divisor → no defensible answer.** `fmod` treats the stored
     doubles literally, so `0.3 % 0.1 == 0.09999999999999998` and
-    `1.1 % 0.1 == 2.77e-17` — i.e. Go/Java/JS/Python all *reject* `0.3` against
-    `multipleOf: 0.1`, which is not what an author writing `multipleOf: 0.1`
-    means. The alternative — a **tolerant** divisibility check, of the kind
-    several validation libraries ship — *accepts* `0.3`, `1.1` and `0.2`, but
-    the tolerance is unspecified and per-library, so any target left on raw
-    `fmod` then disagrees. Neither branch is reconcilable without imposing a
-    shared decimal algorithm on every target.
+    `1.1 % 0.1 == 2.77e-17` — i.e. C#/Go/Java/JS/Python all *reject* `0.3`
+    against `multipleOf: 0.1`, which is not what an author writing
+    `multipleOf: 0.1` means. The alternative — a **tolerant** divisibility
+    check, of the kind several validation libraries ship — *accepts* `0.3`,
+    `1.1` and `0.2`, but the tolerance is unspecified and per-library, so any
+    target left on raw `fmod` then disagrees. Neither branch is reconcilable
+    without imposing a shared decimal algorithm on every target.
 - **P4 (minimal runtime deps).** A correct fractional check needs decimal
   scaling / big-decimal arithmetic; TypeScript and Go have no native decimal
   type, so we would have to ship one (P4 tension) *and* re-implement it

@@ -171,8 +171,8 @@ uniform whether or not a given instance carried extras.
 A declared [[properties]] member literally named `additionalProperties` collides
 with the generated catch-all member in **all five languages** — **Go**
 (`AdditionalProperties`), **Java** (`additionalProperties`), **TS**
-(`additionalProperties`), **Python** (`additional_properties`) → reject at load
-time with a diagnostic.
+(`additionalProperties`), **Python** (`additional_properties`), **C#**
+(`AdditionalProperties`) → reject at load time with a diagnostic.
 
 ### Why `json.RawMessage`, not `any`, for Go untyped extras
 
