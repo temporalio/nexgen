@@ -29,7 +29,18 @@ const GENERATED_HEADER: &str = concat!(
     ". DO NOT EDIT!"
 );
 const GENERATED_CODE_ATTRIBUTE: &str = "[GeneratedCode(\"nexgen\", null)]";
-const OBSOLETE_ATTRIBUTE: &str = "[global::System.Obsolete]";
+/// Disables the obsolete-member warning in a generated file that refers to its
+/// own deprecated declarations: a converter reads and writes a deprecated
+/// member, and a signature names a deprecated type. Emitted only when the run
+/// has a deprecation, so the comment explains why it is there.
+pub(in crate::generator) const OBSOLETE_WARNING_PRAGMA: &str = "// Generated code refers to deprecated ([Obsolete]) declarations it also\n// generates; keep those references from raising CS0618.\n#pragma warning disable CS0618\n\n";
+
+/// The `[Obsolete]` attribute for a deprecated declaration of `kind` (type,
+/// field, service, or operation), carrying the generic reason every target
+/// with a message slot uses. The authored rationale stays in the doc comment.
+pub(in crate::generator) fn obsolete_attribute(kind: &str) -> String {
+    format!("[global::System.Obsolete(\"This {kind} is deprecated.\")]")
+}
 const EXPERIMENTAL_WARNING: &str =
     "WARNING: This API is experimental and may change in the future.";
 
@@ -173,7 +184,7 @@ impl<'a> ApiPlanner<'a> {
                     .any(|operation| operation.deprecated)
         }) || self.external_models.has_deprecated_models();
         if has_deprecations {
-            output.push_str("#pragma warning disable CS0612, CS0618\n\n");
+            output.push_str(OBSOLETE_WARNING_PRAGMA);
         }
         for service in &self.api_plan.services {
             render_xml_summary(
@@ -185,7 +196,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(GENERATED_CODE_ATTRIBUTE);
             output.push('\n');
             if service.deprecated {
-                output.push_str(OBSOLETE_ATTRIBUTE);
+                output.push_str(&obsolete_attribute("service"));
                 output.push('\n');
             }
             output.push_str("[NexusService(");
@@ -265,7 +276,7 @@ impl<'a> ApiPlanner<'a> {
         output.push('\n');
         if operation.deprecated {
             output.push_str("    ");
-            output.push_str(OBSOLETE_ATTRIBUTE);
+            output.push_str(&obsolete_attribute("operation"));
             output.push('\n');
         }
         output.push_str("    [NexusOperation(");
@@ -436,7 +447,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
         if service.deprecated {
-            output.push_str(OBSOLETE_ATTRIBUTE);
+            output.push_str(&obsolete_attribute("service"));
             output.push('\n');
         }
         output.push_str("public class ");
@@ -871,7 +882,7 @@ impl<'a> ApiPlanner<'a> {
         output.push('\n');
         if operation.deprecated {
             output.push_str("    ");
-            output.push_str(OBSOLETE_ATTRIBUTE);
+            output.push_str(&obsolete_attribute("operation"));
             output.push('\n');
         }
         output.push_str("    ");
@@ -1063,7 +1074,7 @@ impl<'a> ApiPlanner<'a> {
         output.push('\n');
         if operation.deprecated {
             output.push_str("    ");
-            output.push_str(OBSOLETE_ATTRIBUTE);
+            output.push_str(&obsolete_attribute("operation"));
             output.push('\n');
         }
         output.push_str("    ");

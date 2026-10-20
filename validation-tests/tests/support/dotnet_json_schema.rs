@@ -869,7 +869,7 @@ $defs:
     assert_has(
         output.file("Models.cs"),
         &[
-            "    /// <summary>\n    /// UNION TITLE\n    /// <para/>\n    /// UNION BODY\n    /// </summary>\n    [global::System.Obsolete]\n",
+            "    /// <summary>\n    /// UNION TITLE\n    /// <para/>\n    /// UNION BODY\n    /// </summary>\n    [global::System.Obsolete(\"This type is deprecated.\")]\n",
             "    public interface U\n",
         ],
     );
@@ -912,7 +912,7 @@ fn csharp_json_presence_nullability_and_defaults() {
             "public string? OptionalNullable { get; init; }",
             "IReadOnlyList<string?>? NullableItems { get; init; }",
             // A default is read through `OrDefault`; the member keeps presence.
-            "[global::System.Obsolete]\n        public string? Salutation { get; init; }",
+            "[global::System.Obsolete(\"This field is deprecated.\")]\n        public string? Salutation { get; init; }",
             "public string SalutationOrDefault => this.Salutation ?? \"hello\";",
             "public long RetriesOrDefault => this.Retries ?? 3L;",
         ],
@@ -923,10 +923,10 @@ Check.Equal<long?>(null, minimal.RequiredNullable, "required nullable");
 // Defaults apply on read, never on the wire.
 Check.Equal<long?>(null, minimal.Retries, "unset default");
 Check.Equal(3L, minimal.RetriesOrDefault, "default");
-#pragma warning disable CS0612
+#pragma warning disable CS0618
 Check.Equal("hello", minimal.SalutationOrDefault, "renamed default");
 Check.RoundTrip<Model>("{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"greeting\":\"hi\",\"retries\":3}");
-#pragma warning restore CS0612
+#pragma warning restore CS0618
 // Optional+nullable collapses an explicit null to absence in memory.
 Check.RoundTrip<Model>(
     "{\"requiredPlain\":\"a\",\"requiredNullable\":1,\"optionalNullable\":null}",
@@ -2971,27 +2971,27 @@ fn csharp_json_services_render_docs_deprecation_and_one_sided_io() {
             &[
                 // The service is documented and deprecated; overrides rename
                 // the C# identifiers and keep the wire names.
-                "    /// <summary>\n    /// Legacy API.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    [global::System.Obsolete]\n    [NexusService(\"example.legacy.v1.Legacy\")]\n    public interface ILegacyCs\n",
-                "        /// Ping the service.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        [global::System.Obsolete]\n        [NexusOperation(\"Ping\")]\n        void PingCs();\n",
+                "    /// <summary>\n    /// Legacy API.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    [global::System.Obsolete(\"This service is deprecated.\")]\n    [NexusService(\"example.legacy.v1.Legacy\")]\n    public interface ILegacyCs\n",
+                "        /// Ping the service.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        [global::System.Obsolete(\"This operation is deprecated.\")]\n        [NexusOperation(\"Ping\")]\n        void PingCs();\n",
                 // An absent input is a no-arg method; an absent output is `void`.
                 "void Submit(Input request);",
                 "Input Fetch();",
                 "OldJob Archive(OldJob request);",
                 // The file's own references to deprecated types stay quiet.
-                "#pragma warning disable CS0612, CS0618",
+                "#pragma warning disable CS0618",
             ],
         );
         if native {
             assert_has(
                 services,
                 &[
-                    "[global::System.Obsolete]\n    public class LegacyCsClient",
-                    "[global::System.Obsolete]\n        public async Task PingCsAsync()",
+                    "[global::System.Obsolete(\"This service is deprecated.\")]\n    public class LegacyCsClient",
+                    "[global::System.Obsolete(\"This operation is deprecated.\")]\n        public async Task PingCsAsync()",
                     "public async Task<Input> FetchAsync()",
                 ],
             );
         }
-        // Builds with warnings as errors: no CS0612/CS0618 from generated code.
+        // Builds with warnings as errors: no CS0618 from generated code.
         case.build();
     }
 }
@@ -3035,7 +3035,7 @@ $defs:
             "/// Second paragraph with &lt;c&gt;code&lt;/c&gt; &amp; ampersand.",
             "/// &lt;/summary&gt;&lt;summary&gt;",
             // A member's title, description and deprecation share one block.
-            "/// Legacy id\n        /// <para/>\n        /// Use `id` instead; 1 &lt; 2 &gt; 0.\n        /// </summary>\n        [global::System.Obsolete]\n        public string? Legacy { get; init; }",
+            "/// Legacy id\n        /// <para/>\n        /// Use `id` instead; 1 &lt; 2 &gt; 0.\n        /// </summary>\n        [global::System.Obsolete(\"This field is deprecated.\")]\n        public string? Legacy { get; init; }",
         ],
     );
     assert_has(

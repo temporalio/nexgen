@@ -166,7 +166,7 @@ Per-language marker (the meat — a native construct, not just comment text):
 | TypeScript | a bare JSDoc `@deprecated` tag in the `/** … */` block                                                                                                                                                             | Editors and language services strike through or suggest at call sites; `tsc` emits no deprecation diagnostic.                                                                                                                                    |
 | Python     | PEP 702 `@deprecated("…", category=None)` (`typing_extensions` backport) on a generated type/service; fields and operation attributes use `Annotated[T, deprecated("…", category=None)]` as documentation metadata | Type/service decorators are recognized by PEP 702-aware checkers. Field and operation attribute metadata is not a PEP 702 warning construct. `category=None` suppresses access-time `DeprecationWarning`.                                        |
 | Java       | the `@Deprecated` annotation on the type / getter / method, paired with a Javadoc `@deprecated This <kind> is deprecated.` tag                                                                                     | `javac` warns at every use; IDEs strike-through; `javadoc` renders the tag text in the "Deprecated." block and `deprecated-list.html`.                                                                                                           |
-| C#         | `[Obsolete]` on the type or property, beside its `<summary>`                                                                                                                                                       | the compiler warns (CS0612/CS0618) at every use and IDEs strike through; generated model files suppress the warning for their own references.                                                                                                    |
+| C#         | `[Obsolete("This <kind> is deprecated.")]` on the type or property, beside its `<summary>` (generic reason — see below)                                                                                            | the compiler warns (CS0618) at every use and IDEs strike through; a generated file that refers to its own deprecated declarations suppresses the warning with a commented `#pragma`, emitted only when the run has a deprecation.                |
 
 The marker attaches to a declaration that already exists; no new identifier is
 synthesized for it, in any position — including beside a `$ref`, where the
@@ -206,6 +206,9 @@ operation, already known from the placement:
   `Annotated[T, deprecated("This field is deprecated.", category=None)]` on a
   field. (`category=None` is what keeps the marker static-only — see Type
   mapping.)
+- **C#** — `[Obsolete]` takes an optional message, which the compiler reports at
+  every use (CS0618) and IDEs show on hover:
+  `[Obsolete("This field is deprecated.")]`.
 
 The rationale the author actually wrote still travels with the symbol, in the
 doc-comment body, for every target — adjacent to the marker in Go, TypeScript

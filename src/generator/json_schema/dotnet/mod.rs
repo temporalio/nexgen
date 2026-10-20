@@ -24,7 +24,7 @@ use std::rc::Rc;
 
 use crate::error::Result;
 use crate::generator::ExternalModelBackend;
-use crate::generator::dotnet::WireValueConversion;
+use crate::generator::dotnet::{OBSOLETE_WARNING_PRAGMA, WireValueConversion};
 use crate::generator::json_schema::bare_ref_target;
 use crate::language::Language;
 use crate::parser::{ManifestModel, build_name_manifest};
@@ -99,6 +99,10 @@ pub(crate) const CONVERTER_MEMBERS: &[&str] = &[
 /// (P15). The overridden `Equals`, `GetHashCode` and `ToString` are reserved as
 /// generated members instead.
 pub(crate) const OBJECT_MEMBERS: &[&str] = &["GetType", "MemberwiseClone", "ReferenceEquals"];
+
+fn is_deprecated(schema: &serde_json::Value) -> bool {
+    schema.get("deprecated") == Some(&serde_json::Value::Bool(true))
+}
 
 /// A C# string literal, escaping everything a regular literal cannot hold.
 pub(in crate::generator) fn cs_string(value: &str) -> String {
@@ -274,7 +278,21 @@ impl ModelBackend {
         self.tree
             .models
             .values()
-            .any(|model| model.schema.get("deprecated") == Some(&serde_json::Value::Bool(true)))
+            .any(|model| is_deprecated(&model.schema))
+    }
+
+    /// Whether any model or model property in the run is deprecated. A model
+    /// file refers to a deprecated member in its own converter and to a
+    /// deprecated type from any module, so this is decided for the whole run.
+    fn has_deprecations(&self) -> bool {
+        self.tree.models.values().any(|model| {
+            is_deprecated(&model.schema)
+                || model
+                    .schema
+                    .get("properties")
+                    .and_then(serde_json::Value::as_object)
+                    .is_some_and(|properties| properties.values().any(is_deprecated))
+        })
     }
 
     fn type_name(&self, json_type: &PlannedJsonType) -> String {
@@ -382,7 +400,10 @@ impl ExternalModelBackend<PlannedJsonType> for ModelBackend {
                 .borrow_mut()
                 .clone_from(&self.tree.runtime_namespace)
         });
-        let mut body = String::from("#pragma warning disable CS0612, CS0618\n\n");
+        let mut body = String::new();
+        if self.has_deprecations() {
+            body.push_str(OBSOLETE_WARNING_PRAGMA);
+        }
         for (index, model) in self.models.iter().enumerate() {
             if index > 0 {
                 body.push('\n');
