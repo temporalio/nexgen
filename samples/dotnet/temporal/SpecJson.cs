@@ -8,7 +8,7 @@ namespace Nexgen.JsonSchema.Temporal
     /// Shared JSON reading helpers enforcing the JSON Schema numeric semantics.
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-    public static class SpecJson
+    internal static class SpecJson
     {
         /// <summary>
         /// The largest integer magnitude every target can carry exactly: 2^53 - 1.

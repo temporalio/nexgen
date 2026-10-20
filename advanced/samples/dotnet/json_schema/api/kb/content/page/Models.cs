@@ -73,7 +73,7 @@ namespace Nexgen.JsonSchema.Kb.Content.Page
         /// <summary>
         /// Converts <see cref="Page"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Page>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<Page>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -352,7 +352,7 @@ namespace Nexgen.JsonSchema.Kb.Content.Page
         /// <summary>
         /// Converts <see cref="PageMeta"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<PageMeta>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<PageMeta>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;

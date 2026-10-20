@@ -54,7 +54,7 @@ namespace Nexgen.JsonSchema.Kb.Kb
         /// <summary>
         /// Converts <see cref="GetCategoryTreeInput"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<GetCategoryTreeInput>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<GetCategoryTreeInput>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -195,7 +195,7 @@ namespace Nexgen.JsonSchema.Kb.Kb
         /// <summary>
         /// Converts <see cref="GetPageInput"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<GetPageInput>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<GetPageInput>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
@@ -343,7 +343,7 @@ namespace Nexgen.JsonSchema.Kb.Kb
         /// <summary>
         /// Converts <see cref="PutBlockOutput"/> to and from JSON, enforcing the schema in both directions.
         /// </summary>
-        public sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<PutBlockOutput>
+        internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<PutBlockOutput>
         {
             /// <inheritdoc/>
             public override bool HandleNull => true;
