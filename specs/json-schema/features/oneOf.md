@@ -659,10 +659,23 @@ type: a model through its own converter, a wrapper by writing its `Value`.
 
 A **property-level** union is the same interface nested in the declaring model
 as `<Member>Union` (`Showcase.DetailUnion`), so it cannot collide with the
-member's own property name; its structured branches are top-level records that
-name it through the declaring type:
+member's own property name. As in Java, its wrappers are declared beside the
+interface in the declaring model rather than inside it, so a call site names
+`Showcase.DetailUnionString` instead of repeating the interface name
+(`Showcase.DetailUnion.DetailUnionString`). The wrappers therefore share the
+model's member scope, and a member spelled like one is a P15 collision. Its
+structured branches are top-level records that name the interface through the
+declaring type:
 
 ```csharp
+public sealed record Showcase
+{
+    public interface DetailUnion { /* Converter */ }
+    public sealed class DetailUnionString : DetailUnion { … }
+
+    public DetailUnion? Detail { get; init; }
+}
+
 public sealed record ShowcaseDetailObject : Showcase.DetailUnion { … }
 ```
 

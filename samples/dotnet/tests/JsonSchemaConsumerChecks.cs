@@ -39,7 +39,7 @@ namespace Nexgen.DotNetExamples.Tests
                 ("score", minimal with { Score = double.NaN }),
                 ("measurements[0]", minimal with
                 {
-                    Measurements = new Showcase.Showcase.MeasurementsUnion.MeasurementsUnionArray(new List<double> { double.NegativeInfinity }),
+                    Measurements = new Showcase.Showcase.MeasurementsUnionArray(new List<double> { double.NegativeInfinity }),
                 }),
                 ("numberGrid[0][1]", minimal with
                 {
@@ -54,7 +54,7 @@ namespace Nexgen.DotNetExamples.Tests
                 }),
                 ("metricOrLabel", minimal with
                 {
-                    MetricOrLabel = new Showcase.Showcase.MetricOrLabelUnion.MetricOrLabelUnionNumber(double.PositiveInfinity),
+                    MetricOrLabel = new Showcase.Showcase.MetricOrLabelUnionNumber(double.PositiveInfinity),
                 }),
             };
             foreach (var (path, invalid) in cases)

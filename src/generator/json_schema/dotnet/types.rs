@@ -297,8 +297,9 @@ pub(crate) fn default_accessor_name(member: &str) -> String {
 
 #[derive(Debug, Clone)]
 pub(super) struct UnionVariant {
-    /// The C# type of this branch: a wrapper nested in the interface, a member
-    /// model, or the owned free-form object wrapper.
+    /// The C# type of this branch: a wrapper (nested in a named union's
+    /// interface, or beside an inline union's interface in the declaring
+    /// model), a member model, or the owned free-form object wrapper.
     pub(super) class: String,
     pub(super) is_object: bool,
     /// The underlying value a wrapper holds; `None` for a model member.
