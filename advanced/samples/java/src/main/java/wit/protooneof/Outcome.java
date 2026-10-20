@@ -3,69 +3,89 @@ package wit.protooneof;
 
 @io.temporal.common.converter.TransferTypeConvertible(Outcome.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class Outcome {
-  private final wit.protooneof.OutcomeValue value;
+public final class Outcome<OutputT> {
+  private final wit.protooneof.OutcomeValue<OutputT> value;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public Outcome(
-      @com.fasterxml.jackson.annotation.JsonProperty("value") wit.protooneof.OutcomeValue value) {
+      @com.fasterxml.jackson.annotation.JsonProperty("value")
+          wit.protooneof.OutcomeValue<OutputT> value) {
     this.value = value;
   }
 
-  public wit.protooneof.OutcomeValue getValue() {
+  public wit.protooneof.OutcomeValue<OutputT> getValue() {
     return value;
   }
 
-  public Builder toBuilder() {
+  public Builder<OutputT> toBuilder() {
     return newBuilder(this);
   }
 
-  public static Builder newBuilder(Outcome value) {
-    return new Builder(value);
+  public static <OutputT> Builder<OutputT> newBuilder(Outcome<OutputT> value) {
+    return new Builder<OutputT>(value);
   }
 
-  public static Builder newBuilder() {
-    return new Builder();
+  public static <OutputT> Builder<OutputT> newBuilder() {
+    return new Builder<OutputT>();
   }
 
-  public static final class Builder {
+  public static final class Builder<OutputT> {
     private Builder() {}
 
-    private Builder(Outcome value) {
+    private Builder(Outcome<OutputT> value) {
       if (value == null) return;
       this.value = value.value;
     }
 
-    private wit.protooneof.OutcomeValue value = null;
+    private wit.protooneof.OutcomeValue<OutputT> value = null;
 
-    public Builder setValue(wit.protooneof.OutcomeValue value) {
+    public Builder<OutputT> setValue(wit.protooneof.OutcomeValue<OutputT> value) {
       this.value = value;
       return this;
     }
 
-    public Outcome build() {
-      return new Outcome(value);
+    public Outcome<OutputT> build() {
+      return new Outcome<OutputT>(value);
     }
   }
 
-  public io.temporal.api.update.v1.Outcome toProto() {
+  public io.temporal.api.update.v1.Outcome toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.update.v1.Outcome.Builder proto =
         io.temporal.api.update.v1.Outcome.newBuilder();
     if (this.value != null) {
       if (this.value.getTag() == wit.protooneof.OutcomeValue.Tag.SUCCESS)
-        proto.setSuccess(((io.temporal.api.common.v1.Payloads) this.value.getValue()));
+        proto.setSuccess(
+            converter
+                .toPayloads(((OutputT) this.value.getValue()))
+                .orElse(io.temporal.api.common.v1.Payloads.getDefaultInstance()));
       if (this.value.getTag() == wit.protooneof.OutcomeValue.Tag.FAILURE)
-        proto.setFailure(((io.temporal.api.failure.v1.Failure) this.value.getValue()));
+        proto.setFailure(
+            support.TemporalModelConverters.failureToProto(
+                converter, ((RuntimeException) this.value.getValue())));
     }
     return proto.build();
   }
 
-  public static Outcome fromProto(io.temporal.api.update.v1.Outcome proto) {
-    Builder builder = Outcome.newBuilder();
+  public static <OutputT> Outcome<OutputT> fromProto(
+      io.temporal.api.update.v1.Outcome proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
+    Builder<OutputT> builder = Outcome.<OutputT>newBuilder();
     if (proto.hasSuccess())
-      builder.setValue(wit.protooneof.OutcomeValue.success(proto.getSuccess()));
+      builder.setValue(
+          wit.protooneof.OutcomeValue.success(
+              (OutputT)
+                  converter.fromPayloads(
+                      0,
+                      java.util.Optional.of(proto.getSuccess()),
+                      wit.protooneof.NexgenRuntime.rawType(
+                          wit.protooneof.NexgenRuntime.argument(modelType, 0)),
+                      wit.protooneof.NexgenRuntime.argument(modelType, 0))));
     if (proto.hasFailure())
-      builder.setValue(wit.protooneof.OutcomeValue.failure(proto.getFailure()));
+      builder.setValue(
+          wit.protooneof.OutcomeValue.failure(
+              support.TemporalModelConverters.failureFromProto(converter, proto.getFailure())));
     return builder.build();
   }
 
@@ -76,11 +96,18 @@ public final class Outcome {
     }
 
     public Object toTransferType(Outcome value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public Outcome fromTransferType(Object value, java.lang.reflect.Type valueType) {
-      return value == null ? null : fromProto((io.temporal.api.update.v1.Outcome) value);
+      return value == null
+          ? null
+          : fromProto(
+              (io.temporal.api.update.v1.Outcome) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }

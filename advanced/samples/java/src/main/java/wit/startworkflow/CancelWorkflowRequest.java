@@ -82,22 +82,26 @@ public final class CancelWorkflowRequest {
     }
   }
 
-  public io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest toProto() {
+  public io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest.Builder proto =
         io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest.newBuilder();
     if (this.namespace != null) proto.setNamespace((this.namespace));
     if (this.workflowExecution != null)
-      proto.setWorkflowExecution((this.workflowExecution).toProto());
+      proto.setWorkflowExecution((this.workflowExecution).toProto(converter));
     if (this.reason != null) proto.setReason((this.reason));
     return proto.build();
   }
 
   public static CancelWorkflowRequest fromProto(
-      io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest proto) {
+      io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
     Builder builder = CancelWorkflowRequest.newBuilder();
     builder.setNamespace(proto.getNamespace());
     builder.setWorkflowExecution(
-        wit.startworkflow.WorkflowExecution.fromProto(proto.getWorkflowExecution()));
+        wit.startworkflow.WorkflowExecution.fromProto(
+            proto.getWorkflowExecution(), converter, wit.startworkflow.WorkflowExecution.class));
     builder.setReason(proto.getReason());
     return builder.build();
   }
@@ -109,14 +113,18 @@ public final class CancelWorkflowRequest {
     }
 
     public Object toTransferType(CancelWorkflowRequest value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public CancelWorkflowRequest fromTransferType(Object value, java.lang.reflect.Type valueType) {
       return value == null
           ? null
           : fromProto(
-              (io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest) value);
+              (io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }

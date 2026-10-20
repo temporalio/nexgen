@@ -3,7 +3,7 @@ package wit.notificationservice;
 
 @com.fasterxml.jackson.databind.annotation.JsonDeserialize(
     using = OnCompleteRequestResult.Deserializer.class)
-public final class OnCompleteRequestResult {
+public final class OnCompleteRequestResult<OutputT> {
   public enum Tag {
     @com.fasterxml.jackson.annotation.JsonProperty("success")
     SUCCESS,
@@ -27,12 +27,12 @@ public final class OnCompleteRequestResult {
     return value;
   }
 
-  public static OnCompleteRequestResult success(io.temporal.api.common.v1.Payload value) {
-    return new OnCompleteRequestResult(Tag.SUCCESS, value);
+  public static <OutputT> OnCompleteRequestResult<OutputT> success(OutputT value) {
+    return new OnCompleteRequestResult<OutputT>(Tag.SUCCESS, value);
   }
 
-  public static OnCompleteRequestResult failure(io.temporal.api.failure.v1.Failure value) {
-    return new OnCompleteRequestResult(Tag.FAILURE, value);
+  public static <OutputT> OnCompleteRequestResult<OutputT> failure(RuntimeException value) {
+    return new OnCompleteRequestResult<OutputT>(Tag.FAILURE, value);
   }
 
   public static final class Deserializer
@@ -62,14 +62,11 @@ public final class OnCompleteRequestResult {
       switch (node.get("tag").asText()) {
         case "success":
           return OnCompleteRequestResult.success(
-              context.readTreeAsValue(
-                  node.get("value"),
-                  context.constructType(io.temporal.api.common.v1.Payload.class)));
+              context.readTreeAsValue(node.get("value"), modelType.containedTypeOrUnknown(0)));
         case "failure":
           return OnCompleteRequestResult.failure(
               context.readTreeAsValue(
-                  node.get("value"),
-                  context.constructType(io.temporal.api.failure.v1.Failure.class)));
+                  node.get("value"), context.constructType(RuntimeException.class)));
         default:
           throw new java.io.IOException("Unknown variant tag: " + node.get("tag"));
       }

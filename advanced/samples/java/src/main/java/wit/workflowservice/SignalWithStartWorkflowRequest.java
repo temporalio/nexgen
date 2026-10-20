@@ -9,7 +9,7 @@ public final class SignalWithStartWorkflowRequest {
   private final String workflow;
 
   /** Arguments for the workflow. */
-  private final io.temporal.api.common.v1.Payloads args;
+  private final java.util.List<Object> args;
 
   /** Unique identifier for the workflow execution. Must be nonempty. */
   private final String id;
@@ -20,7 +20,7 @@ public final class SignalWithStartWorkflowRequest {
   private final String signal;
 
   /** Arguments for the signal. */
-  private final io.temporal.api.common.v1.Payloads signalArgs;
+  private final java.util.List<Object> signalArgs;
 
   /**
    * Total workflow execution timeout, including retries and continue-as-new. Defaults to unlimited.
@@ -50,10 +50,10 @@ public final class SignalWithStartWorkflowRequest {
   private final String cronSchedule;
 
   /** Memo for the workflow. */
-  private final io.temporal.api.common.v1.Memo memo;
+  private final java.util.Map<String, Object> memo;
 
   /** Typed search attributes for the workflow. */
-  private final io.temporal.api.common.v1.SearchAttributes searchAttributes;
+  private final io.temporal.common.SearchAttributes searchAttributes;
 
   /** Priority of the workflow execution. */
   private final io.temporal.common.Priority priority;
@@ -71,18 +71,17 @@ public final class SignalWithStartWorkflowRequest {
   private final String namespace;
 
   /** Headers for the request. */
-  private final io.temporal.api.common.v1.Header headers;
+  private final java.util.Map<String, io.temporal.api.common.v1.Payload> headers;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public SignalWithStartWorkflowRequest(
       @com.fasterxml.jackson.annotation.JsonProperty("workflow") String workflow,
-      @com.fasterxml.jackson.annotation.JsonProperty("args")
-          io.temporal.api.common.v1.Payloads args,
+      @com.fasterxml.jackson.annotation.JsonProperty("args") java.util.List<Object> args,
       @com.fasterxml.jackson.annotation.JsonProperty("id") String id,
       @com.fasterxml.jackson.annotation.JsonProperty("taskQueue") String taskQueue,
       @com.fasterxml.jackson.annotation.JsonProperty("signal") String signal,
       @com.fasterxml.jackson.annotation.JsonProperty("signalArgs")
-          io.temporal.api.common.v1.Payloads signalArgs,
+          java.util.List<Object> signalArgs,
       @com.fasterxml.jackson.annotation.JsonProperty("executionTimeout")
           java.time.Duration executionTimeout,
       @com.fasterxml.jackson.annotation.JsonProperty("runTimeout") java.time.Duration runTimeout,
@@ -94,9 +93,9 @@ public final class SignalWithStartWorkflowRequest {
       @com.fasterxml.jackson.annotation.JsonProperty("retryPolicy")
           io.temporal.common.RetryOptions retryPolicy,
       @com.fasterxml.jackson.annotation.JsonProperty("cronSchedule") String cronSchedule,
-      @com.fasterxml.jackson.annotation.JsonProperty("memo") io.temporal.api.common.v1.Memo memo,
+      @com.fasterxml.jackson.annotation.JsonProperty("memo") java.util.Map<String, Object> memo,
       @com.fasterxml.jackson.annotation.JsonProperty("searchAttributes")
-          io.temporal.api.common.v1.SearchAttributes searchAttributes,
+          io.temporal.common.SearchAttributes searchAttributes,
       @com.fasterxml.jackson.annotation.JsonProperty("priority")
           io.temporal.common.Priority priority,
       @com.fasterxml.jackson.annotation.JsonProperty("versioningOverride")
@@ -106,7 +105,7 @@ public final class SignalWithStartWorkflowRequest {
           wit.workflowservice.UserMetadata userMetadata,
       @com.fasterxml.jackson.annotation.JsonProperty("namespace") String namespace,
       @com.fasterxml.jackson.annotation.JsonProperty("headers")
-          io.temporal.api.common.v1.Header headers) {
+          java.util.Map<String, io.temporal.api.common.v1.Payload> headers) {
     this.workflow = workflow;
     this.args = args;
     this.id = id;
@@ -134,7 +133,7 @@ public final class SignalWithStartWorkflowRequest {
     return workflow;
   }
 
-  public io.temporal.api.common.v1.Payloads getArgs() {
+  public java.util.List<Object> getArgs() {
     return args;
   }
 
@@ -150,7 +149,7 @@ public final class SignalWithStartWorkflowRequest {
     return signal;
   }
 
-  public io.temporal.api.common.v1.Payloads getSignalArgs() {
+  public java.util.List<Object> getSignalArgs() {
     return signalArgs;
   }
 
@@ -182,11 +181,11 @@ public final class SignalWithStartWorkflowRequest {
     return cronSchedule;
   }
 
-  public io.temporal.api.common.v1.Memo getMemo() {
+  public java.util.Map<String, Object> getMemo() {
     return memo;
   }
 
-  public io.temporal.api.common.v1.SearchAttributes getSearchAttributes() {
+  public io.temporal.common.SearchAttributes getSearchAttributes() {
     return searchAttributes;
   }
 
@@ -210,7 +209,7 @@ public final class SignalWithStartWorkflowRequest {
     return namespace;
   }
 
-  public io.temporal.api.common.v1.Header getHeaders() {
+  public java.util.Map<String, io.temporal.api.common.v1.Payload> getHeaders() {
     return headers;
   }
 
@@ -261,9 +260,9 @@ public final class SignalWithStartWorkflowRequest {
       return this;
     }
 
-    private io.temporal.api.common.v1.Payloads args = null;
+    private java.util.List<Object> args = null;
 
-    public Builder setArgs(io.temporal.api.common.v1.Payloads value) {
+    public Builder setArgs(java.util.List<Object> value) {
       this.args = value;
       return this;
     }
@@ -289,9 +288,9 @@ public final class SignalWithStartWorkflowRequest {
       return this;
     }
 
-    private io.temporal.api.common.v1.Payloads signalArgs = null;
+    private java.util.List<Object> signalArgs = null;
 
-    public Builder setSignalArgs(io.temporal.api.common.v1.Payloads value) {
+    public Builder setSignalArgs(java.util.List<Object> value) {
       this.signalArgs = value;
       return this;
     }
@@ -346,16 +345,16 @@ public final class SignalWithStartWorkflowRequest {
       return this;
     }
 
-    private io.temporal.api.common.v1.Memo memo = null;
+    private java.util.Map<String, Object> memo = null;
 
-    public Builder setMemo(io.temporal.api.common.v1.Memo value) {
+    public Builder setMemo(java.util.Map<String, Object> value) {
       this.memo = value;
       return this;
     }
 
-    private io.temporal.api.common.v1.SearchAttributes searchAttributes = null;
+    private io.temporal.common.SearchAttributes searchAttributes = null;
 
-    public Builder setSearchAttributes(io.temporal.api.common.v1.SearchAttributes value) {
+    public Builder setSearchAttributes(io.temporal.common.SearchAttributes value) {
       this.searchAttributes = value;
       return this;
     }
@@ -395,14 +394,14 @@ public final class SignalWithStartWorkflowRequest {
       return this;
     }
 
-    private io.temporal.api.common.v1.Header headers = null;
+    private java.util.Map<String, io.temporal.api.common.v1.Payload> headers = null;
 
-    public Builder setHeaders(io.temporal.api.common.v1.Header value) {
+    public Builder setHeaders(java.util.Map<String, io.temporal.api.common.v1.Payload> value) {
       this.headers = value;
       return this;
     }
 
-    public Builder setStaticSummary(io.temporal.api.common.v1.Payload value) {
+    public Builder setStaticSummary(Object value) {
       this.userMetadata =
           wit.workflowservice.UserMetadata.newBuilder(this.userMetadata)
               .setStaticSummary(value)
@@ -410,7 +409,7 @@ public final class SignalWithStartWorkflowRequest {
       return this;
     }
 
-    public Builder setStaticDetails(io.temporal.api.common.v1.Payload value) {
+    public Builder setStaticDetails(Object value) {
       this.userMetadata =
           wit.workflowservice.UserMetadata.newBuilder(this.userMetadata)
               .setStaticDetails(value)
@@ -444,26 +443,37 @@ public final class SignalWithStartWorkflowRequest {
     }
   }
 
-  public io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest toProto() {
+  public io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest.Builder proto =
         io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest.newBuilder();
     if (this.workflow != null)
-      proto.setWorkflowType(support.TemporalModelConverters.workflowTypeToProto((this.workflow)));
-    if (this.args != null) proto.setInput((this.args));
+      proto.setWorkflowType(
+          support.TemporalModelConverters.workflowTypeToProto(converter, (this.workflow)));
+    if (this.args != null)
+      proto.setInput(
+          converter
+              .toPayloads((this.args).toArray())
+              .orElse(io.temporal.api.common.v1.Payloads.getDefaultInstance()));
     if (this.id != null) proto.setWorkflowId((this.id));
     if (this.taskQueue != null)
-      proto.setTaskQueue(support.TemporalModelConverters.taskQueueToProto((this.taskQueue)));
+      proto.setTaskQueue(
+          support.TemporalModelConverters.taskQueueToProto(converter, (this.taskQueue)));
     if (this.signal != null) proto.setSignalName((this.signal));
-    if (this.signalArgs != null) proto.setSignalInput((this.signalArgs));
+    if (this.signalArgs != null)
+      proto.setSignalInput(
+          converter
+              .toPayloads((this.signalArgs).toArray())
+              .orElse(io.temporal.api.common.v1.Payloads.getDefaultInstance()));
     if (this.executionTimeout != null)
       proto.setWorkflowExecutionTimeout(
-          support.TemporalModelConverters.durationToProto((this.executionTimeout)));
+          support.TemporalModelConverters.durationToProto(converter, (this.executionTimeout)));
     if (this.runTimeout != null)
       proto.setWorkflowRunTimeout(
-          support.TemporalModelConverters.durationToProto((this.runTimeout)));
+          support.TemporalModelConverters.durationToProto(converter, (this.runTimeout)));
     if (this.taskTimeout != null)
       proto.setWorkflowTaskTimeout(
-          support.TemporalModelConverters.durationToProto((this.taskTimeout)));
+          support.TemporalModelConverters.durationToProto(converter, (this.taskTimeout)));
     if (this.idReusePolicy != null)
       proto.setWorkflowIdReusePolicy(
           io.temporal.api.enums.v1.WorkflowIdReusePolicy.forNumber(
@@ -473,43 +483,67 @@ public final class SignalWithStartWorkflowRequest {
           io.temporal.api.enums.v1.WorkflowIdConflictPolicy.forNumber(
               (this.idConflictPolicy).getNumber()));
     if (this.retryPolicy != null)
-      proto.setRetryPolicy(support.TemporalModelConverters.retryPolicyToProto((this.retryPolicy)));
+      proto.setRetryPolicy(
+          support.TemporalModelConverters.retryPolicyToProto(converter, (this.retryPolicy)));
     if (this.cronSchedule != null) proto.setCronSchedule((this.cronSchedule));
-    if (this.memo != null) proto.setMemo((this.memo));
-    if (this.searchAttributes != null) proto.setSearchAttributes((this.searchAttributes));
+    if (this.memo != null)
+      proto.setMemo(support.TemporalModelConverters.memoToProto(converter, (this.memo)));
+    if (this.searchAttributes != null)
+      proto.setSearchAttributes(
+          support.TemporalModelConverters.searchAttributesToProto(
+              converter, (this.searchAttributes)));
     if (this.priority != null)
-      proto.setPriority(support.TemporalModelConverters.priorityToProto((this.priority)));
+      proto.setPriority(
+          support.TemporalModelConverters.priorityToProto(converter, (this.priority)));
     if (this.versioningOverride != null)
       proto.setVersioningOverride(
-          support.TemporalModelConverters.versioningOverrideToProto((this.versioningOverride)));
+          support.TemporalModelConverters.versioningOverrideToProto(
+              converter, (this.versioningOverride)));
     if (this.startDelay != null)
       proto.setWorkflowStartDelay(
-          support.TemporalModelConverters.durationToProto((this.startDelay)));
-    if (this.userMetadata != null) proto.setUserMetadata((this.userMetadata).toProto());
+          support.TemporalModelConverters.durationToProto(converter, (this.startDelay)));
+    if (this.userMetadata != null) proto.setUserMetadata((this.userMetadata).toProto(converter));
     if (this.namespace != null) proto.setNamespace((this.namespace));
-    if (this.headers != null) proto.setHeader((this.headers));
+    if (this.headers != null)
+      proto.setHeader(support.TemporalModelConverters.headerToProto(converter, (this.headers)));
     return proto.build();
   }
 
   public static SignalWithStartWorkflowRequest fromProto(
-      io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest proto) {
+      io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
     Builder builder = SignalWithStartWorkflowRequest.newBuilder();
     builder.setWorkflow(
-        support.TemporalModelConverters.workflowTypeFromProto(proto.getWorkflowType()));
-    if (proto.hasInput()) builder.setArgs(proto.getInput());
+        support.TemporalModelConverters.workflowTypeFromProto(converter, proto.getWorkflowType()));
+    if (proto.hasInput())
+      builder.setArgs(
+          (java.util.List<Object>)
+              (Object)
+                  wit.workflowservice.NexgenRuntime.decodeSequence(
+                      proto.getInput(), converter, Object.class, Object.class));
     builder.setId(proto.getWorkflowId());
-    builder.setTaskQueue(support.TemporalModelConverters.taskQueueFromProto(proto.getTaskQueue()));
+    builder.setTaskQueue(
+        support.TemporalModelConverters.taskQueueFromProto(converter, proto.getTaskQueue()));
     builder.setSignal(proto.getSignalName());
-    if (proto.hasSignalInput()) builder.setSignalArgs(proto.getSignalInput());
+    if (proto.hasSignalInput())
+      builder.setSignalArgs(
+          (java.util.List<Object>)
+              (Object)
+                  wit.workflowservice.NexgenRuntime.decodeSequence(
+                      proto.getSignalInput(), converter, Object.class, Object.class));
     if (proto.hasWorkflowExecutionTimeout())
       builder.setExecutionTimeout(
-          support.TemporalModelConverters.durationFromProto(proto.getWorkflowExecutionTimeout()));
+          support.TemporalModelConverters.durationFromProto(
+              converter, proto.getWorkflowExecutionTimeout()));
     if (proto.hasWorkflowRunTimeout())
       builder.setRunTimeout(
-          support.TemporalModelConverters.durationFromProto(proto.getWorkflowRunTimeout()));
+          support.TemporalModelConverters.durationFromProto(
+              converter, proto.getWorkflowRunTimeout()));
     if (proto.hasWorkflowTaskTimeout())
       builder.setTaskTimeout(
-          support.TemporalModelConverters.durationFromProto(proto.getWorkflowTaskTimeout()));
+          support.TemporalModelConverters.durationFromProto(
+              converter, proto.getWorkflowTaskTimeout()));
     builder.setIdReusePolicy(
         io.temporal.api.enums.v1.WorkflowIdReusePolicy.forNumber(
             (proto.getWorkflowIdReusePolicy()).getNumber()));
@@ -518,23 +552,33 @@ public final class SignalWithStartWorkflowRequest {
             (proto.getWorkflowIdConflictPolicy()).getNumber()));
     if (proto.hasRetryPolicy())
       builder.setRetryPolicy(
-          support.TemporalModelConverters.retryPolicyFromProto(proto.getRetryPolicy()));
+          support.TemporalModelConverters.retryPolicyFromProto(converter, proto.getRetryPolicy()));
     builder.setCronSchedule(proto.getCronSchedule());
-    if (proto.hasMemo()) builder.setMemo(proto.getMemo());
-    if (proto.hasSearchAttributes()) builder.setSearchAttributes(proto.getSearchAttributes());
+    if (proto.hasMemo())
+      builder.setMemo(support.TemporalModelConverters.memoFromProto(converter, proto.getMemo()));
+    if (proto.hasSearchAttributes())
+      builder.setSearchAttributes(
+          support.TemporalModelConverters.searchAttributesFromProto(
+              converter, proto.getSearchAttributes()));
     if (proto.hasPriority())
-      builder.setPriority(support.TemporalModelConverters.priorityFromProto(proto.getPriority()));
+      builder.setPriority(
+          support.TemporalModelConverters.priorityFromProto(converter, proto.getPriority()));
     if (proto.hasVersioningOverride())
       builder.setVersioningOverride(
           support.TemporalModelConverters.versioningOverrideFromProto(
-              proto.getVersioningOverride()));
+              converter, proto.getVersioningOverride()));
     if (proto.hasWorkflowStartDelay())
       builder.setStartDelay(
-          support.TemporalModelConverters.durationFromProto(proto.getWorkflowStartDelay()));
+          support.TemporalModelConverters.durationFromProto(
+              converter, proto.getWorkflowStartDelay()));
     if (proto.hasUserMetadata())
-      builder.setUserMetadata(wit.workflowservice.UserMetadata.fromProto(proto.getUserMetadata()));
+      builder.setUserMetadata(
+          wit.workflowservice.UserMetadata.fromProto(
+              proto.getUserMetadata(), converter, wit.workflowservice.UserMetadata.class));
     builder.setNamespace(proto.getNamespace());
-    if (proto.hasHeader()) builder.setHeaders(proto.getHeader());
+    if (proto.hasHeader())
+      builder.setHeaders(
+          support.TemporalModelConverters.headerFromProto(converter, proto.getHeader()));
     return builder.build();
   }
 
@@ -546,7 +590,9 @@ public final class SignalWithStartWorkflowRequest {
     }
 
     public Object toTransferType(SignalWithStartWorkflowRequest value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public SignalWithStartWorkflowRequest fromTransferType(
@@ -554,7 +600,9 @@ public final class SignalWithStartWorkflowRequest {
       return value == null
           ? null
           : fromProto(
-              (io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest) value);
+              (io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }

@@ -96,33 +96,43 @@ public final class ActivityOptions {
     }
   }
 
-  public io.temporal.api.activity.v1.ActivityOptions toProto() {
+  public io.temporal.api.activity.v1.ActivityOptions toProto(
+      io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.activity.v1.ActivityOptions.Builder proto =
         io.temporal.api.activity.v1.ActivityOptions.newBuilder();
     if (this.taskQueue != null)
-      proto.setTaskQueue(support.TemporalModelConverters.taskQueueToProto((this.taskQueue)));
+      proto.setTaskQueue(
+          support.TemporalModelConverters.taskQueueToProto(converter, (this.taskQueue)));
     if (this.retryPolicy != null)
-      proto.setRetryPolicy(support.TemporalModelConverters.retryPolicyToProto((this.retryPolicy)));
+      proto.setRetryPolicy(
+          support.TemporalModelConverters.retryPolicyToProto(converter, (this.retryPolicy)));
     if (this.scheduleToCloseTimeout != null)
       proto.setScheduleToCloseTimeout(
-          support.TemporalModelConverters.durationToProto((this.scheduleToCloseTimeout)));
+          support.TemporalModelConverters.durationToProto(
+              converter, (this.scheduleToCloseTimeout)));
     if (this.priority != null)
-      proto.setPriority(support.TemporalModelConverters.priorityToProto((this.priority)));
+      proto.setPriority(
+          support.TemporalModelConverters.priorityToProto(converter, (this.priority)));
     return proto.build();
   }
 
-  public static ActivityOptions fromProto(io.temporal.api.activity.v1.ActivityOptions proto) {
+  public static ActivityOptions fromProto(
+      io.temporal.api.activity.v1.ActivityOptions proto,
+      io.temporal.common.converter.DataConverter converter,
+      java.lang.reflect.Type modelType) {
     Builder builder = ActivityOptions.newBuilder();
     if (proto.hasTaskQueue())
       builder.setTaskQueue(
-          support.TemporalModelConverters.taskQueueFromProto(proto.getTaskQueue()));
+          support.TemporalModelConverters.taskQueueFromProto(converter, proto.getTaskQueue()));
     builder.setRetryPolicy(
-        support.TemporalModelConverters.retryPolicyFromProto(proto.getRetryPolicy()));
+        support.TemporalModelConverters.retryPolicyFromProto(converter, proto.getRetryPolicy()));
     if (proto.hasScheduleToCloseTimeout())
       builder.setScheduleToCloseTimeout(
-          support.TemporalModelConverters.durationFromProto(proto.getScheduleToCloseTimeout()));
+          support.TemporalModelConverters.durationFromProto(
+              converter, proto.getScheduleToCloseTimeout()));
     if (proto.hasPriority())
-      builder.setPriority(support.TemporalModelConverters.priorityFromProto(proto.getPriority()));
+      builder.setPriority(
+          support.TemporalModelConverters.priorityFromProto(converter, proto.getPriority()));
     return builder.build();
   }
 
@@ -133,11 +143,18 @@ public final class ActivityOptions {
     }
 
     public Object toTransferType(ActivityOptions value) {
-      return value == null ? null : value.toProto();
+      return value == null
+          ? null
+          : value.toProto(support.TemporalModelConverters.currentDataConverter());
     }
 
     public ActivityOptions fromTransferType(Object value, java.lang.reflect.Type valueType) {
-      return value == null ? null : fromProto((io.temporal.api.activity.v1.ActivityOptions) value);
+      return value == null
+          ? null
+          : fromProto(
+              (io.temporal.api.activity.v1.ActivityOptions) value,
+              support.TemporalModelConverters.currentDataConverter(),
+              valueType);
     }
   }
 }
