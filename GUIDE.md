@@ -998,9 +998,10 @@ async def signal_with_start_workflow(
 ```
 
 In the snippet above, notice that the entire `user-metadata` field is `None` if
-all its constituent fields are `None`. This is the behavior in Python and
-Typescript, but not in Go; in Go we implement flattening with value embedding,
-so `user-metadata` is never nil.
+all its constituent fields are `None`. Python, TypeScript, .NET, and Go all omit
+the optional nested record when none of its fields are supplied. Go uses nil
+pointers internally for wire presence, but its public options use
+default-punning: empty strings mean omitted.
 
 ### Output Transforms
 
@@ -1885,20 +1886,26 @@ record user-metadata {
 
 Only supported on record types.
 
-In Go, `@nexus.flatten-in-api` is rendered as value embedding in the generated
+In Go, `@nexus.flatten-in-api` promotes the record's fields into the generated
 operation options struct. For a parent request with
-`user-metadata: option<user-metadata>`, the options struct embeds
-`UserMetadata`, so callers can set fields through the embedded value:
+`user-metadata: option<user-metadata>` and string flattened-type overrides, the
+options struct exposes `StaticSummary string` and `StaticDetails string`:
 
 ```go
 opts := SomeOperationOptions{}
 opts.StaticSummary = "Nightly sync"
 ```
 
-This differs from the nil-collapse behavior shown in
-[Flattened Records](#flattened-records): because the Go options struct contains
-an embedded zero-value record, generated Go cannot distinguish "omitted" from
-"present with zero-value fields".
+As described in [Flattened Records](#flattened-records), the generated helper
+leaves the nested metadata nil when both strings are empty. Each nonempty option
+populates its corresponding payload; an empty option remains absent from the
+nested protobuf message. This follows Go's default-punning convention, so the
+public options cannot distinguish an omitted string from an explicitly empty
+string.
+
+The containing record is an unexported implementation type in Go unless another
+public signature exposes it, such as an operation result or a non-flattened
+input field. Types referenced by the promoted fields remain public as needed.
 
 ---
 

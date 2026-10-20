@@ -39,7 +39,7 @@ type signalWithStartWorkflowRequest struct {
 	Priority                 *temporal.Priority
 	VersioningOverride       client.VersioningOverride
 	StartDelay               *time.Duration
-	UserMetadata             *UserMetadata
+	UserMetadata             *userMetadata
 	Headers                  map[string]any
 	Namespace                string
 }
@@ -116,7 +116,7 @@ func (m signalWithStartWorkflowRequest) GetStartDelay() *time.Duration {
 	return m.StartDelay
 }
 
-func (m signalWithStartWorkflowRequest) GetUserMetadata() *UserMetadata {
+func (m signalWithStartWorkflowRequest) GetUserMetadata() *userMetadata {
 	return m.UserMetadata
 }
 
@@ -368,7 +368,7 @@ func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusCon
 		out.StartDelay = converted
 	}
 	if proto.GetUserMetadata() != nil {
-		out.UserMetadata = new(UserMetadata)
+		out.UserMetadata = new(userMetadata)
 		if err := userMetadataFromProto(cfg, proto.GetUserMetadata(), out.UserMetadata); err != nil {
 			return err
 		}
@@ -391,6 +391,69 @@ func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.Transfe
 	)
 }
 
+type userMetadata struct {
+	StaticSummary *string
+	StaticDetails *string
+}
+
+func (m userMetadata) GetStaticSummary() *string {
+	return m.StaticSummary
+}
+
+func (m userMetadata) GetStaticDetails() *string {
+	return m.StaticDetails
+}
+
+func userMetadataToProto(cfg *commonconverter.SystemNexusConfig, m *userMetadata) (*sdk.UserMetadata, error) {
+	message := &sdk.UserMetadata{}
+	if m.StaticSummary != nil {
+		{
+			converted, err := support.PayloadToProto(cfg.DataConverter, (*m.StaticSummary))
+			if err != nil {
+				return nil, err
+			}
+			message.Summary = converted
+		}
+	}
+	if m.StaticDetails != nil {
+		{
+			converted, err := support.PayloadToProto(cfg.DataConverter, (*m.StaticDetails))
+			if err != nil {
+				return nil, err
+			}
+			message.Details = converted
+		}
+	}
+	return message, nil
+}
+
+func userMetadataFromProto(cfg *commonconverter.SystemNexusConfig, proto *sdk.UserMetadata, out *userMetadata) error {
+	*out = userMetadata{}
+	if proto.GetSummary() != nil {
+		converted, err := support.PayloadFromProto(cfg.DataConverter, proto.GetSummary())
+		if err != nil {
+			return err
+		}
+		typed, ok := converted.(string)
+		if !ok {
+			return fmt.Errorf("nexgen decoded field StaticSummary has unexpected type %T", converted)
+		}
+		out.StaticSummary = &typed
+	}
+	if proto.GetDetails() != nil {
+		converted, err := support.PayloadFromProto(cfg.DataConverter, proto.GetDetails())
+		if err != nil {
+			return err
+		}
+		typed, ok := converted.(string)
+		if !ok {
+			return fmt.Errorf("nexgen decoded field StaticDetails has unexpected type %T", converted)
+		}
+		out.StaticDetails = &typed
+	}
+	return nil
+}
+
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
@@ -410,74 +473,6 @@ func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkfl
 }
 
 // --- Operations (public API) ---
-
-type UserMetadata struct {
-	// StaticSummary - Single-line fixed summary for the workflow execution that may appear
-	// in UI and CLI. This can be in single-line Temporal Markdown format.
-	//
-	// Optional.
-	StaticSummary string
-	// StaticDetails - General fixed details for the workflow execution that may appear in
-	// UI and CLI. This can be in Temporal Markdown format and can span multiple lines.
-	// This value is fixed on the workflow execution and cannot be updated.
-	//
-	// Optional.
-	StaticDetails string
-}
-
-func (m UserMetadata) GetStaticSummary() string {
-	return m.StaticSummary
-}
-
-func (m UserMetadata) GetStaticDetails() string {
-	return m.StaticDetails
-}
-
-func userMetadataToProto(cfg *commonconverter.SystemNexusConfig, m *UserMetadata) (*sdk.UserMetadata, error) {
-	message := &sdk.UserMetadata{}
-	{
-		converted, err := support.PayloadToProto(cfg.DataConverter, m.StaticSummary)
-		if err != nil {
-			return nil, err
-		}
-		message.Summary = converted
-	}
-	{
-		converted, err := support.PayloadToProto(cfg.DataConverter, m.StaticDetails)
-		if err != nil {
-			return nil, err
-		}
-		message.Details = converted
-	}
-	return message, nil
-}
-
-func userMetadataFromProto(cfg *commonconverter.SystemNexusConfig, proto *sdk.UserMetadata, out *UserMetadata) error {
-	*out = UserMetadata{}
-	if proto.GetSummary() != nil {
-		converted, err := support.PayloadFromProto(cfg.DataConverter, proto.GetSummary())
-		if err != nil {
-			return err
-		}
-		typed, ok := converted.(string)
-		if !ok {
-			return fmt.Errorf("nexgen decoded field StaticSummary has unexpected type %T", converted)
-		}
-		out.StaticSummary = typed
-	}
-	if proto.GetDetails() != nil {
-		converted, err := support.PayloadFromProto(cfg.DataConverter, proto.GetDetails())
-		if err != nil {
-			return err
-		}
-		typed, ok := converted.(string)
-		if !ok {
-			return fmt.Errorf("nexgen decoded field StaticDetails has unexpected type %T", converted)
-		}
-		out.StaticDetails = typed
-	}
-	return nil
-}
 
 type SignalWithStartWorkflowResponse struct {
 	// RunID - Run ID of the started workflow.
@@ -593,10 +588,17 @@ type SignalWithStartWorkflowOptions struct {
 	//
 	// Optional.
 	StartDelay time.Duration
-	// UserMetadata - Static metadata for the workflow execution.
+	// StaticSummary - Single-line fixed summary for the workflow execution that may appear
+	// in UI and CLI. This can be in single-line Temporal Markdown format.
 	//
 	// Optional.
-	UserMetadata
+	StaticSummary string
+	// StaticDetails - General fixed details for the workflow execution that may appear in
+	// UI and CLI. This can be in Temporal Markdown format and can span multiple lines.
+	// This value is fixed on the workflow execution and cannot be updated.
+	//
+	// Optional.
+	StaticDetails string
 }
 
 // Signal a workflow, starting it first if needed.
@@ -643,6 +645,16 @@ func SignalWithStartWorkflow(
 	if opts.StartDelay != 0 {
 		startDelay = &opts.StartDelay
 	}
+	var userMetadataValue *userMetadata
+	if opts.StaticSummary != "" || opts.StaticDetails != "" {
+		userMetadataValue = &userMetadata{}
+		if opts.StaticSummary != "" {
+			userMetadataValue.StaticSummary = &opts.StaticSummary
+		}
+		if opts.StaticDetails != "" {
+			userMetadataValue.StaticDetails = &opts.StaticDetails
+		}
+	}
 	workflowName := support.WorkflowFunctionName(ctx, workflow)
 	return signalWithStartWorkflow(ctx, signalWithStartWorkflowRequest{
 		Workflow:                 workflowName,
@@ -663,7 +675,7 @@ func SignalWithStartWorkflow(
 		Priority:                 opts.Priority,
 		VersioningOverride:       opts.VersioningOverride,
 		StartDelay:               startDelay,
-		UserMetadata:             &opts.UserMetadata,
+		UserMetadata:             userMetadataValue,
 	})
 }
 

@@ -108,6 +108,8 @@ pub(in crate::generator) struct ModelBackend {
     support_package: Option<String>,
     imports: RefCell<GoImportCollector>,
     proto_models: BTreeMap<String, PlannedTypeInfo>,
+    /// Final local type identifiers, populated after Go visibility is applied.
+    model_names: BTreeMap<String, String>,
     wire_models: RefCell<BTreeMap<String, RenderedModelWire>>,
     /// Models that appear as a top-level Nexus operation input or output, and
     /// therefore need a [`converter.TransferTypeConverter`] so the SDK performs
@@ -149,6 +151,7 @@ impl ModelBackend {
             support_package,
             imports: RefCell::new(imports),
             proto_models: BTreeMap::new(),
+            model_names: BTreeMap::new(),
             wire_models: RefCell::new(BTreeMap::new()),
             transfer_models: RefCell::new(BTreeSet::new()),
         }
@@ -156,6 +159,16 @@ impl ModelBackend {
 
     pub(in crate::generator) fn imports(&self) -> Ref<'_, GoImportCollector> {
         self.imports.borrow()
+    }
+
+    fn model_name(&self, message: &PlannedMessageType) -> String {
+        match self.model_names.get(&message.info.full_name) {
+            Some(name) => {
+                let (_, arguments) = split_go_type_decl_name(&message.model_name);
+                format!("{name}{arguments}")
+            }
+            None => message.model_name.clone(),
+        }
     }
 
     fn register_support_import(&self) {
@@ -333,7 +346,7 @@ impl ExternalModelBackend<PlannedValueType> for ModelBackend {
                 if let Some(authored_type) = &message.authored_type {
                     return Some(go_authored_type_annotation(authored_type));
                 }
-                Some(message.model_name.clone())
+                Some(self.model_name(message))
             }
             _ => None,
         }
@@ -577,7 +590,7 @@ fn go_message_conversion(
             from_proto: Box::new(move |expr, out| {
                 format!("{from_proto}({from_config}{expr}, {out})")
             }),
-            decoded_model_type: Some(message.model_name.clone()),
+            decoded_model_type: Some(backend.model_name(message)),
             to_proto: Box::new(move |expr| format!("{to_proto}({config_arg}{expr})")),
             fallible: true,
             to_proto_takes_pointer: true,
@@ -835,10 +848,17 @@ impl ModelBackend {
     /// visibility is applied so conversion logic can reference final model
     /// names without threading backend state through type resolution.
     pub(in crate::generator) fn populate_model_wire_conversions(
-        &self,
+        &mut self,
         api_plan: &PlannedSpec,
         models: &IndexMap<String, RenderedModel>,
     ) -> Result<()> {
+        self.model_names = models
+            .iter()
+            .map(|(key, model)| {
+                let (name, _) = split_go_type_decl_name(&model.name);
+                (key.clone(), name.to_string())
+            })
+            .collect();
         let full_names: Vec<String> = models.keys().cloned().collect();
         for full_name in full_names {
             let Some(proto_info) = self.model_proto_info(&full_name) else {
@@ -1771,14 +1791,35 @@ fn build_field_conversion(
                 go_value_conversion(value, api_plan, backend, &backend.package, Some("cfg"))?;
             let field_is_pointer = native_go_type.starts_with('*');
             let default_expr = default_enum_proto_expr(field, backend)?;
-            let to_lines = singular_to_proto_lines(
-                &conversion,
-                &receiver,
-                &proto_field,
-                field_is_pointer,
-                default_expr.as_deref(),
-                "return nil, err",
-            );
+            let flattened_type = field
+                .flattened_annotation_override
+                .as_ref()
+                .and_then(|annotation| annotation.value());
+            // Payload converters accept any; pass the pointed-to API value,
+            // and preserve nil as an absent payload rather than encoding it.
+            let to_lines = if flattened_type.is_some() && field_is_pointer {
+                let lines = singular_to_proto_lines(
+                    &conversion,
+                    &format!("(*{receiver})"),
+                    &proto_field,
+                    false,
+                    default_expr.as_deref(),
+                    "return nil, err",
+                );
+                std::iter::once(format!("if {receiver} != nil {{"))
+                    .chain(lines.into_iter().map(|line| format!("\t{line}")))
+                    .chain(std::iter::once("}".to_string()))
+                    .collect()
+            } else {
+                singular_to_proto_lines(
+                    &conversion,
+                    &receiver,
+                    &proto_field,
+                    field_is_pointer,
+                    default_expr.as_deref(),
+                    "return nil, err",
+                )
+            };
             let mut from_lines = singular_from_proto_lines(
                 &conversion,
                 &proto_field,
@@ -1786,13 +1827,12 @@ fn build_field_conversion(
                 field_is_pointer,
                 "return err",
             );
-            if field
-                .flattened_annotation_override
-                .as_ref()
-                .and_then(|annotation| annotation.value())
-                .is_some()
-                && !conversion.from_proto_returns_pointer
-            {
+            if flattened_type.is_some() && !conversion.from_proto_returns_pointer {
+                let decoded_type = if field_is_pointer {
+                    native_go_type.trim_start_matches('*')
+                } else {
+                    native_go_type
+                };
                 from_lines = vec![
                     format!("if proto.Get{proto_field}() != nil {{"),
                     format!(
@@ -1802,13 +1842,16 @@ fn build_field_conversion(
                     "\tif err != nil {".to_string(),
                     "\t\treturn err".to_string(),
                     "\t}".to_string(),
-                    format!("\ttyped, ok := converted.({native_go_type})"),
+                    format!("\ttyped, ok := converted.({decoded_type})"),
                     "\tif !ok {".to_string(),
                     format!(
                         "\t\treturn fmt.Errorf(\"nexgen decoded field {go_field} has unexpected type %T\", converted)"
                     ),
                     "\t}".to_string(),
-                    format!("\tout.{go_field} = typed"),
+                    format!(
+                        "\tout.{go_field} = {}typed",
+                        if field_is_pointer { "&" } else { "" }
+                    ),
                     "}".to_string(),
                 ];
             }

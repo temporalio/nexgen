@@ -10,10 +10,12 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	common "go.temporal.io/api/common/v1"
+	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/internal"
+	commonconverter "go.temporal.io/sdk/internal/common/converter"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
@@ -268,6 +270,73 @@ func (i *captureNexusInputOutbound) ExecuteNexusOperation(ctx workflow.Context, 
 	return i.Next.ExecuteNexusOperation(ctx, input)
 }
 
+func (s *WorkflowServiceIntegrationSuite) TestFlattenedMetadataPresence() {
+	for _, tc := range []struct {
+		name    string
+		summary string
+		details string
+	}{
+		{name: "omitted"},
+		{name: "summary only", summary: "summary"},
+		{name: "details only", details: "details"},
+		{name: "both", summary: "summary", details: "details"},
+	} {
+		s.Run(tc.name, func() {
+			capture := &captureNexusInputInterceptor{}
+			s.interceptors = []interceptor.WorkerInterceptor{capture}
+			var result string
+			s.runWorkflow(func(ctx workflow.Context) (string, error) {
+				err := ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{
+					ID:            s.targetID("target"),
+					TaskQueue:     s.taskQueue,
+					StaticSummary: tc.summary,
+					StaticDetails: tc.details,
+				}, "wake-up", "signal", singleArgWorkflow, "input").Get(ctx, nil)
+				return "caller-result", err
+			}, &result)
+			s.Require().Equal("caller-result", result)
+			s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("target"), "").Get(s.ctx, nil))
+
+			capture.mu.Lock()
+			calls := append([]interceptor.ExecuteNexusOperationInput(nil), capture.calls...)
+			capture.mu.Unlock()
+			s.Require().Len(calls, 1)
+
+			// Exercise the generated transfer converter, not just the native
+			// request: absent strings must not become encoded empty payloads.
+			dc := commonconverter.WithSystemNexusDataConverter(
+				commonconverter.MakeTransferAware(converter.GetDefaultDataConverter()),
+				converter.GetDefaultDataConverter(),
+			)
+			payload, err := dc.ToPayload(calls[0].Input)
+			s.Require().NoError(err)
+			var wire workflowservicepb.SignalWithStartWorkflowExecutionRequest
+			s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(payload, &wire))
+			if tc.summary == "" && tc.details == "" {
+				s.Nil(wire.UserMetadata)
+				return
+			}
+			s.Require().NotNil(wire.UserMetadata)
+			for _, field := range []struct {
+				want    string
+				payload *common.Payload
+			}{
+				{tc.summary, wire.UserMetadata.Summary},
+				{tc.details, wire.UserMetadata.Details},
+			} {
+				if field.want == "" {
+					s.Nil(field.payload)
+					continue
+				}
+				s.Require().NotNil(field.payload)
+				var value string
+				s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(field.payload, &value))
+				s.Equal(field.want, value)
+			}
+		})
+	}
+}
+
 func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationRegistry() {
 	// Signalwithstart's arguments will be recorded into outgoingValues, along with
 	// their serialization context.
@@ -297,10 +366,8 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 				Memo: map[string]any{
 					"memo-key": "target-memo",
 				},
-				UserMetadata: ws.UserMetadata{
-					StaticSummary: "target-summary",
-					StaticDetails: "target-details",
-				},
+				StaticSummary: "target-summary",
+				StaticDetails: "target-details",
 			},
 			"wake-up", "signal-value", singleArgWorkflow, "workflow-input",
 		).Get(ctx, nil)

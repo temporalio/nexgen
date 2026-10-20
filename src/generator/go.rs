@@ -1483,9 +1483,42 @@ impl<'a> ApiPlanner<'a> {
                         }
                         _ => None,
                     };
-                    let embed_in_options = !planned_field.required
+                    let flatten_in_options = !planned_field.required
                         && field_kind_is_flattened_message(&planned_field.kind, self.api_plan);
-                    let default_punning_zero = (!planned_field.required && !embed_in_options)
+                    let flattened_fields = if flatten_in_options {
+                        let PlannedFieldKind::Singular(PlannedValueType::Message(message)) =
+                            &planned_field.kind
+                        else {
+                            unreachable!()
+                        };
+                        let record = record_for_message(self.api_plan, message)
+                            .expect("flattened message should have a record");
+                        Some(
+                            self.models[&message.info.full_name]
+                                .fields
+                                .iter()
+                                .zip(record.public_fields())
+                                .map(|(field, (name, spec))| {
+                                    let planned =
+                                        self::planned_field(record, name, spec, self.api_plan);
+                                    RenderedFlattenedField {
+                                        field: field.clone(),
+                                        default_punning_zero: (!field.required)
+                                            .then(|| {
+                                                public_default_punning_zero_for_field(
+                                                    &planned.kind,
+                                                    &field.go_type,
+                                                )
+                                            })
+                                            .flatten(),
+                                    }
+                                })
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    };
+                    let default_punning_zero = (!planned_field.required && !flatten_in_options)
                         .then(|| {
                             public_default_punning_zero_for_field(
                                 &planned_field.kind,
@@ -1505,14 +1538,18 @@ impl<'a> ApiPlanner<'a> {
                     Some(RenderedUnpackedParam {
                         field_name: field.name.clone(),
                         doc: field.doc.clone(),
-                        param_name: go_unexported_name(&field.name),
+                        param_name: if flatten_in_options {
+                            format!("{}Value", go_unexported_name(&field.name))
+                        } else {
+                            go_unexported_name(&field.name)
+                        },
                         go_type: field.go_type.clone(),
                         public_go_type,
                         default_punning_zero,
                         function,
                         function_args,
                         required: field.required,
-                        embed_in_options,
+                        flattened_fields,
                     })
                 })
                 .collect()
@@ -1873,7 +1910,15 @@ impl<'a> ApiPlanner<'a> {
             .map(|annotation| self.package.go_type_expr(annotation));
 
         let go_type = if let Some(annotated) = annotated_go_type {
-            annotated
+            if !field.required
+                && field.flattened_annotation_override.is_some()
+                && !annotated.starts_with('*')
+                && !go_type_is_nilable(&annotated)
+            {
+                format!("*{annotated}")
+            } else {
+                annotated
+            }
         } else {
             match &field.kind {
                 PlannedFieldKind::Map { key, value } => {
@@ -2229,9 +2274,31 @@ struct RenderedUnpackedParam {
     /// Whether this parameter is required (positional argument) or optional
     /// (placed in the options struct).
     required: bool,
-    /// Whether this optional parameter should be embedded as a value in the
-    /// generated options struct because its model is marked `flatten-in-api`.
-    embed_in_options: bool,
+    /// Fields promoted into the options struct for a `flatten-in-api` record.
+    /// Their presence determines whether the optional nested request is built.
+    flattened_fields: Option<Vec<RenderedFlattenedField>>,
+}
+
+/// A promoted field retains the internal type and the same default-punning
+/// policy as an ordinary operation option.
+#[derive(Debug)]
+struct RenderedFlattenedField {
+    field: RenderedField,
+    default_punning_zero: Option<String>,
+}
+
+impl RenderedFlattenedField {
+    fn presence_condition(&self) -> String {
+        if let Some(zero) = &self.default_punning_zero {
+            format!("opts.{} != {zero}", self.field.name)
+        } else if self.field.required
+            || (!self.field.go_type.starts_with('*') && !go_type_is_nilable(&self.field.go_type))
+        {
+            "true".to_string()
+        } else {
+            format!("opts.{} != nil", self.field.name)
+        }
+    }
 }
 
 /// A WIT enum rendered as a Go `type <Name> int32` with associated constants.
@@ -2314,7 +2381,7 @@ pub(in crate::generator) struct RenderedModel {
 }
 
 /// A single field of a [`RenderedModel`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(in crate::generator) struct RenderedField {
     /// Exported Go field name in UpperCamelCase (e.g. `"UserId"`, `"First"`).
     pub(in crate::generator) name: String,
@@ -2503,10 +2570,25 @@ impl GoVisibilityMarker<'_> {
             && let Some(planned_model) = record_for_message(self.api_plan, &input)
         {
             for (_, field) in planned_model.public_fields() {
-                self.mark_operation_field_kind(
-                    &planned_field_kind(&field.field_type, self.api_plan),
-                    field.name.as_str(),
-                );
+                let kind = planned_field_kind(&field.field_type, self.api_plan);
+                if !field.required && field_kind_is_flattened_message(&kind, self.api_plan) {
+                    let PlannedFieldKind::Singular(PlannedValueType::Message(message)) = &kind
+                    else {
+                        unreachable!()
+                    };
+                    // Options expose the children, not the containing model.
+                    // Other public uses can still mark that model normally.
+                    let record = record_for_message(self.api_plan, message)
+                        .expect("flattened message should have a record");
+                    for (_, child) in record.public_fields() {
+                        self.mark_operation_field_kind(
+                            &planned_field_kind(&child.field_type, self.api_plan),
+                            child.name.as_str(),
+                        );
+                    }
+                } else {
+                    self.mark_operation_field_kind(&kind, field.name.as_str());
+                }
             }
         }
 
@@ -2705,6 +2787,13 @@ fn apply_go_visibility(
             if let Some(params) = &mut operation.unpacked_input {
                 for param in params {
                     param.go_type = visibility.rewrite_go_expr(&param.go_type);
+                    param.public_go_type = visibility.rewrite_go_expr(&param.public_go_type);
+                    if let Some(fields) = &mut param.flattened_fields {
+                        for flattened in fields {
+                            flattened.field.go_type =
+                                visibility.rewrite_go_expr(&flattened.field.go_type);
+                        }
+                    }
                 }
             }
         }
@@ -4419,7 +4508,7 @@ fn render_resource_methods(
                         function: primary.function.clone(),
                         function_args: None,
                         required: true,
-                        embed_in_options: false,
+                        flattened_fields: None,
                     };
                     render_function_name_inline_assignment(output, &synthetic, package);
                     name_var
@@ -4714,6 +4803,25 @@ fn render_options_struct(
     render_go_model_type_parameter_declaration(output, &operation.model_type_parameters);
     output.push_str(" struct {\n");
     for param in params.iter().filter(|p| param_belongs_in_options(p)) {
+        if let Some(fields) = &param.flattened_fields {
+            for flattened in fields {
+                let field = &flattened.field;
+                render_field_doc_comment(
+                    output,
+                    "\t",
+                    &field.name,
+                    field.doc.as_deref(),
+                    field.required,
+                );
+                let public_type = if flattened.default_punning_zero.is_some() {
+                    field.go_type.trim_start_matches('*')
+                } else {
+                    &field.go_type
+                };
+                output.push_str(&format!("\t{} {}\n", field.name, public_type));
+            }
+            continue;
+        }
         render_field_doc_comment(
             output,
             "\t",
@@ -4722,13 +4830,9 @@ fn render_options_struct(
             param.required,
         );
         output.push('\t');
-        if param.embed_in_options {
-            output.push_str(param.public_go_type.trim_start_matches('*'));
-        } else {
-            output.push_str(&param.field_name);
-            output.push(' ');
-            output.push_str(&param.public_go_type);
-        }
+        output.push_str(&param.field_name);
+        output.push(' ');
+        output.push_str(&param.public_go_type);
         output.push('\n');
     }
     output.push_str("}\n");
@@ -5292,7 +5396,7 @@ fn render_convenience_wrapper(
     // Function body -- build the request as a multi-line struct literal,
     // sourcing required fields from positional args and optional fields from
     // opts.
-    render_public_default_punning_locals(output, params);
+    render_public_input_locals(output, params);
     render_function_name_inlining(output, params, package);
     output.push_str("\treturn ");
     output.push_str(&operation.func_name);
@@ -5319,12 +5423,8 @@ fn render_convenience_wrapper(
             output.push_str(&function_name_local_var_for_params(param, params));
         } else if param.function_args.is_some() {
             output.push_str(&param.param_name);
-        } else if param.default_punning_zero.is_some() {
+        } else if param.default_punning_zero.is_some() || param.flattened_fields.is_some() {
             output.push_str(&param.param_name);
-        } else if param.embed_in_options {
-            output.push('&');
-            output.push_str("opts.");
-            output.push_str(&param.field_name);
         } else {
             output.push_str("opts.");
             output.push_str(&param.field_name);
@@ -5392,11 +5492,46 @@ fn wrapper_param_signature(
     }
 }
 
-fn render_public_default_punning_locals(output: &mut String, params: &[RenderedUnpackedParam]) {
+fn render_public_input_locals(output: &mut String, params: &[RenderedUnpackedParam]) {
     for param in params
         .iter()
         .filter(|param| param_belongs_in_options(param))
     {
+        if let Some(fields) = &param.flattened_fields {
+            output.push_str(&format!("\tvar {} {}\n", param.param_name, param.go_type));
+            let conditions = fields
+                .iter()
+                .map(RenderedFlattenedField::presence_condition)
+                .collect::<Vec<_>>();
+            let condition = if conditions.is_empty() {
+                "false".to_string()
+            } else {
+                conditions.join(" || ")
+            };
+            output.push_str(&format!(
+                "\tif {condition} {{\n\t\t{} = &{}{{}}\n",
+                param.param_name,
+                param.go_type.trim_start_matches('*')
+            ));
+            for flattened in fields {
+                let field = &flattened.field;
+                if flattened.default_punning_zero.is_some() {
+                    output.push_str(&format!(
+                        "\t\tif {} {{\n\t\t\t{}.{} = &opts.{}\n\t\t}}\n",
+                        flattened.presence_condition(),
+                        param.param_name,
+                        field.name,
+                        field.name
+                    ));
+                } else {
+                    output.push_str(&format!(
+                        "\t\t{}.{} = opts.{}\n",
+                        param.param_name, field.name, field.name
+                    ));
+                }
+            }
+            output.push_str("\t}\n");
+        }
         if let Some(zero) = &param.default_punning_zero {
             output.push_str("\tvar ");
             output.push_str(&param.param_name);
