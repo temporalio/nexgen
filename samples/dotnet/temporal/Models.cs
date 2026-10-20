@@ -11,8 +11,6 @@ using System.Text.Json.Serialization;
 namespace Nexgen.JsonSchema.Temporal
 {
 
-    #pragma warning disable CS0612, CS0618
-
     /// <summary>
     /// Temporal
     /// <para/>

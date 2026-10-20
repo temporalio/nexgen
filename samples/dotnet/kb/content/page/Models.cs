@@ -12,8 +12,6 @@ using Nexgen.JsonSchema.Kb.Content.Block;
 namespace Nexgen.JsonSchema.Kb.Content.Page
 {
 
-    #pragma warning disable CS0612, CS0618
-
     /// <summary>
     /// A page. One half of the Page &lt;-&gt; Block cross-file cycle. Because the cycle spans two input files, Page and Block hoist together into Python's _recursive.py; the non-cyclic PageMeta helper stays in this module.
     /// </summary>

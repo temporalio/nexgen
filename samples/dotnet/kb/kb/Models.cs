@@ -14,8 +14,6 @@ using Nexgen.JsonSchema.Kb.Tree.Category;
 namespace Nexgen.JsonSchema.Kb.Kb
 {
 
-    #pragma warning disable CS0612, CS0618
-
     /// <summary>
     /// The GetCategoryTreeInput model.
     /// </summary>

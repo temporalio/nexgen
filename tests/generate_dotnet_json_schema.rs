@@ -67,8 +67,11 @@ fn csharp_json_examples_render_expected_language_features() {
                 "public string? Greeting { get; init; }",
                 "public string GreetingOrDefault => this.Greeting ?? \"hello\";",
                 "public bool DebugOrDefault => this.Debug ?? false;",
-                // `deprecated` and `title`.
-                "[global::System.Obsolete]",
+                // `deprecated` carries the generic reason, and the file
+                // explains the warning it suppresses for its own references.
+                "[global::System.Obsolete(\"This field is deprecated.\")]",
+                "// generates; keep those references from raising CS0618.\n    #pragma warning disable CS0618\n",
+                // `title`.
                 "Retry budget",
                 // `x-cs-name` renames the member and keeps the wire key.
                 "public string? LegacyIdCs { get; init; }",
@@ -285,6 +288,8 @@ fn csharp_json_title_leads_the_summary() {
         ],
     );
     assert_lacks(models, &["RegisteredUser"]);
+    // Nothing is deprecated, so nothing needs the obsolete-warning pragma.
+    assert_lacks(models, &["#pragma", "Obsolete"]);
 }
 
 /// An annotation the loader accepts and drops leaves the C# output exactly as

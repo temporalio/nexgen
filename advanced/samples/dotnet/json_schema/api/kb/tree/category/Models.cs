@@ -11,8 +11,6 @@ using System.Text.Json.Serialization;
 namespace Nexgen.JsonSchema.Kb.Tree.Category
 {
 
-    #pragma warning disable CS0612, CS0618
-
     /// <summary>
     /// A node in a self-recursive category tree. The root of this file is itself a type (pure JSON Schema file), named Category from the basename.
     /// </summary>

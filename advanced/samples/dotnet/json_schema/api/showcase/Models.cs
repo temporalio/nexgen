@@ -11,7 +11,9 @@ using System.Text.Json.Serialization;
 namespace Nexgen.JsonSchema.Showcase
 {
 
-    #pragma warning disable CS0612, CS0618
+    // Generated code refers to deprecated ([Obsolete]) declarations it also
+    // generates; keep those references from raising CS0618.
+    #pragma warning disable CS0618
 
     /// <summary>
     /// A nested object, open to forward-compatible extension.
@@ -5067,7 +5069,7 @@ namespace Nexgen.JsonSchema.Showcase
         /// <summary>
         /// Deprecated legacy identifier; prefer `requestId`. Exercises the native deprecation marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702 @deprecated, C# [Obsolete]). Also exercises the property-level `x-&lt;lang&gt;-name` override (the Stage 4 escape hatch): the emitted member identifier is renamed to the derived name plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`, Java `legacyIdJava`, C# `LegacyIdCs`) while the wire name stays `legacyId` (json tag / alias / @JsonProperty).
         /// </summary>
-        [global::System.Obsolete]
+        [global::System.Obsolete("This field is deprecated.")]
         public string? LegacyIdCs { get; init; }
 
         /// <summary>

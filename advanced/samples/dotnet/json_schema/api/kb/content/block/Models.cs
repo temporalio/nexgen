@@ -12,8 +12,6 @@ using Nexgen.JsonSchema.Kb.Content.Page;
 namespace Nexgen.JsonSchema.Kb.Content.Block
 {
 
-    #pragma warning disable CS0612, CS0618
-
     /// <summary>
     /// A content block. The other half of the Page &lt;-&gt; Block cross-file cycle. The `page` back-reference is optional + nullable, which terminates the cycle so it is satisfiable.
     /// </summary>

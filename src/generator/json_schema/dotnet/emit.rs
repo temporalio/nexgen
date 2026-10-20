@@ -24,6 +24,7 @@ use super::types::{
     default_accessor_name,
 };
 use super::{GENERATED_CODE_ATTRIBUTE, cs_string};
+use crate::generator::dotnet::obsolete_attribute;
 
 const JSON_CONVERTER: &str = "global::System.Text.Json.Serialization.JsonConverter";
 const UTF8_JSON_READER: &str = "global::System.Text.Json.Utf8JsonReader";
@@ -58,7 +59,7 @@ pub(super) fn doc_comment(
     indent: &str,
     doc: Option<&str>,
     fallback: &str,
-    deprecated: bool,
+    deprecated: Option<&str>,
 ) {
     let doc = match doc.map(str::trim).filter(|doc| !doc.is_empty()) {
         Some(authored) => xml_escape(authored),
@@ -76,8 +77,8 @@ pub(super) fn doc_comment(
         }
         out.push_str(&format!("{indent}/// </summary>\n"));
     }
-    if deprecated {
-        out.push_str(&format!("{indent}[global::System.Obsolete]\n"));
+    if let Some(kind) = deprecated {
+        out.push_str(&format!("{indent}{}\n", obsolete_attribute(kind)));
     }
 }
 
@@ -99,7 +100,7 @@ pub(super) fn render_object(out: &mut String, model: &ObjectModel, kind: &ModelK
         super::schema::compose_doc(schema.title.as_deref(), schema.description.as_deref())
             .as_deref(),
         &format!("The {} model.", model.name),
-        schema.deprecated == Some(true),
+        (schema.deprecated == Some(true)).then_some("type"),
     );
     out.push_str(&format!("{GENERATED_CODE_ATTRIBUTE}\n"));
     out.push_str(&format!(
@@ -167,7 +168,7 @@ fn render_object_body(
             "    ",
             field.doc.as_deref(),
             &format!("The <c>{}</c> member.", xml_escape(&field.json_name)),
-            field.deprecated,
+            field.deprecated.then_some("field"),
         );
         let required = if field.required { "required " } else { "" };
         out.push_str(&format!(
@@ -201,7 +202,7 @@ fn render_object_body(
             field.name
         ));
         if field.deprecated {
-            out.push_str("    [global::System.Obsolete]\n");
+            out.push_str(&format!("    {}\n", obsolete_attribute("field")));
         }
         out.push_str(&format!(
             "    public {ty} {} => this.{} ?? {expr};\n\n",
@@ -1329,7 +1330,7 @@ pub(super) fn render_union_interface(
                 "The {name} union: one of {}.",
                 xml_escape(&union.admissible())
             ),
-            schema.deprecated == Some(true),
+            (schema.deprecated == Some(true)).then_some("type"),
         );
     } else {
         out.push_str(&format!(
