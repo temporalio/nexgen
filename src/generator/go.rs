@@ -3674,17 +3674,6 @@ fn render_file(
                         package,
                         visibility,
                     );
-                    if unary_primary_varargs_function_param(params).is_some() {
-                        output.push('\n');
-                        render_typed_convenience_wrapper(
-                            &mut output,
-                            service,
-                            operation,
-                            params,
-                            package,
-                            visibility,
-                        );
-                    }
                 } else {
                     // External input type — generate a simple forwarding wrapper
                     output.push('\n');
@@ -4789,22 +4778,10 @@ fn required_function_type_parameters(
         .collect()
 }
 
-fn typed_wrapper_type_parameter_names(primary: &RenderedUnpackedParam) -> (String, String) {
-    let function = primary.function.as_ref().unwrap();
-    (
-        format!("{}Arg", primary.field_name),
-        function
-            .result_type_parameter
-            .clone()
-            .unwrap_or_else(|| format!("{}Result", primary.field_name)),
-    )
-}
-
-// Planning and both wrapper renderers share the complete declaration namespace.
+// Planning and rendering share the complete declaration namespace.
 fn wrapper_type_parameters(
     operation: &RenderedOperation<'_>,
     params: &[RenderedUnpackedParam],
-    typed_primary: Option<&RenderedUnpackedParam>,
     package: &GoPackageContext,
     visibility: &GoVisibility,
 ) -> Vec<(String, String)> {
@@ -4816,10 +4793,6 @@ fn wrapper_type_parameters(
     declarations.extend(required_function_type_parameters(
         params, package, visibility,
     ));
-    if let Some(primary) = typed_primary {
-        let (arg, result) = typed_wrapper_type_parameter_names(primary);
-        declarations.extend([(arg, "any".to_string()), (result, "any".to_string())]);
-    }
     declarations
 }
 
@@ -4829,31 +4802,23 @@ fn validate_wrapper_type_parameters(
     package: &GoPackageContext,
     visibility: &GoVisibility,
 ) -> Result<()> {
-    let typed_primary = unary_primary_varargs_function_param(params);
-    for primary in std::iter::once(None).chain(typed_primary.map(Some)) {
-        let mut occupied = BTreeMap::new();
-        for (index, (name, _)) in
-            wrapper_type_parameters(operation, params, primary, package, visibility)
-                .into_iter()
-                .enumerate()
-        {
-            let source = if index < operation.model_type_parameters.len() {
-                format!("model type parameter `{name}`")
-            } else {
-                format!("generated type parameter `{name}`")
-            };
-            if let Some(previous) = occupied.insert(name.clone(), source) {
-                return Err(Error::UnsupportedGoType {
-                    context: format!(
-                        "operation `{}`{} wrapper",
-                        operation.name,
-                        if primary.is_some() { " Typed" } else { "" }
-                    ),
-                    reason: format!(
-                        "{previous} collides with generated reserved name `{name}` in the Go generic parameter namespace"
-                    ),
-                });
-            }
+    let mut occupied = BTreeMap::new();
+    for (index, (name, _)) in wrapper_type_parameters(operation, params, package, visibility)
+        .into_iter()
+        .enumerate()
+    {
+        let source = if index < operation.model_type_parameters.len() {
+            format!("model type parameter `{name}`")
+        } else {
+            format!("generated type parameter `{name}`")
+        };
+        if let Some(previous) = occupied.insert(name.clone(), source) {
+            return Err(Error::UnsupportedGoType {
+                context: format!("operation `{}` wrapper", operation.name),
+                reason: format!(
+                    "{previous} collides with generated reserved name `{name}` in the Go generic parameter namespace"
+                ),
+            });
         }
     }
     Ok(())
@@ -5252,7 +5217,7 @@ fn render_convenience_wrapper(
     visibility: &GoVisibility,
 ) {
     let exported_name = go_field_name(operation.name);
-    let type_params = wrapper_type_parameters(operation, params, None, package, visibility);
+    let type_params = wrapper_type_parameters(operation, params, package, visibility);
 
     let positional_params = ordered_positional_params(params);
     let input_docs = wrapper_input_docs(positional_params.iter().copied());
@@ -5449,150 +5414,6 @@ fn render_public_default_punning_locals(output: &mut String, params: &[RenderedU
             output.push_str("\n\t}\n");
         }
     }
-}
-
-fn render_operation_params(
-    output: &mut String,
-    signature_params: &[(String, String)],
-    package: &GoPackageContext,
-) {
-    let multiline_signature = signature_params.len() + 1 > 3;
-    if multiline_signature {
-        output.push_str("(\n\tctx ");
-        output.push_str(&package.workflow_context_type());
-        output.push_str(",\n");
-        for (name, ty) in signature_params {
-            output.push('\t');
-            output.push_str(name);
-            output.push(' ');
-            output.push_str(ty);
-            output.push_str(",\n");
-        }
-        output.push(')');
-    } else {
-        output.push_str("(ctx ");
-        output.push_str(&package.workflow_context_type());
-        for (name, ty) in signature_params {
-            output.push_str(", ");
-            output.push_str(name);
-            output.push(' ');
-            output.push_str(ty);
-        }
-        output.push(')');
-    }
-}
-
-fn render_typed_convenience_wrapper(
-    output: &mut String,
-    _service: &RenderedService<'_>,
-    operation: &RenderedOperation<'_>,
-    params: &[RenderedUnpackedParam],
-    package: &GoPackageContext,
-    visibility: &GoVisibility,
-) {
-    let primary = unary_primary_varargs_function_param(params)
-        .expect("typed wrapper requires a unary-capable primary function");
-    let function = primary.function.as_ref().unwrap();
-    let exported_name = format!("{}Typed", go_field_name(operation.name));
-    let options_name = format!("{}Options", go_field_name(operation.name));
-    let (arg_type, result_type) = typed_wrapper_type_parameter_names(primary);
-    let mut signature = vec![(
-        "opts".to_string(),
-        go_generic_reference(&options_name, &operation.model_type_parameters, false),
-    )];
-    let positional = ordered_positional_params(params);
-    let type_params =
-        wrapper_type_parameters(operation, params, Some(primary), package, visibility);
-    for (index, param) in positional.iter().enumerate() {
-        if param.field_name == primary.field_name {
-            let mut args = match &function.args {
-                FunctionArgsSpec::Varargs { prefix, .. } => prefix
-                    .iter()
-                    .map(|arg| go_authored_function_type_expr(&arg.field_type, package, visibility))
-                    .collect::<Vec<_>>(),
-                FunctionArgsSpec::Fixed(_) => Vec::new(),
-            };
-            args.push(arg_type.clone());
-            signature.push((
-                param.param_name.clone(),
-                format!("func({}) {result_type}", args.join(", ")),
-            ));
-            signature.push(("arg".to_string(), arg_type.clone()));
-        } else if param.function_args.as_ref() == Some(function) {
-            continue;
-        } else {
-            signature.push(wrapper_param_signature(
-                param,
-                params,
-                index + 1 == positional.len(),
-                package,
-                visibility,
-            ));
-        }
-    }
-    render_operation_doc_comment(
-        output,
-        operation,
-        &wrapper_input_docs(ordered_positional_params(params)),
-    );
-    output.push_str("func ");
-    output.push_str(&exported_name);
-    output.push('[');
-    output.push_str(
-        &type_params
-            .iter()
-            .map(|(name, constraint)| format!("{name} {constraint}"))
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
-    output.push(']');
-    render_operation_params(output, &signature, package);
-    output.push(' ');
-    render_operation_wrapper_return_type(output, package);
-    output.push_str(" {\n");
-    render_public_default_punning_locals(output, params);
-    render_function_name_inlining(output, params, package);
-    output.push_str("\treturn ");
-    output.push_str(&operation.func_name);
-    output.push_str("(ctx, ");
-    output.push_str(&operation.input_type);
-    output.push_str("{\n");
-    for param in params {
-        output.push_str("\t\t");
-        output.push_str(&param.field_name);
-        output.push_str(": ");
-        if param.field_name == primary.field_name {
-            output.push_str(&function_name_local_var_for_params(param, params));
-        } else if param.function_args.as_ref() == Some(function) {
-            output.push_str(&format!("{}{{arg}}", param.go_type));
-        } else if param
-            .function
-            .as_ref()
-            .is_some_and(function_value_is_string)
-        {
-            output.push_str(&param.param_name);
-        } else if has_explicit_args(param) {
-            output.push_str(&format!(
-                "{}{{{}}}",
-                param.go_type,
-                singular_args_public_param_name(param)
-            ));
-        } else if param.function.is_some() {
-            output.push_str(&function_name_local_var_for_params(param, params));
-        } else if param.function_args.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.default_punning_zero.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.embed_in_options {
-            output.push_str("&opts.");
-            output.push_str(&param.field_name);
-        } else {
-            output.push_str("opts.");
-            output.push_str(&param.field_name);
-        }
-        output.push_str(",\n");
-    }
-    output.push_str("\t})\n}\n");
 }
 
 /// Renders an exported forwarding wrapper for operations whose input type is

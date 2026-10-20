@@ -731,30 +731,6 @@ fn go_explicit_descriptors_control_signal_api_and_packing_independent_of_wire_na
 }
 
 #[test]
-fn go_signature_signal_input_uses_callable_fallback_and_secondary_generic_in_typed_wrapper() {
-    let rendered =
-        render_go_descriptor_fixture(&go_descriptor_fixture("", "signal-input")).unwrap();
-    assert!(
-        rendered.contains("SignalF interface{ ~string | func(...any) string }"),
-        "{rendered}"
-    );
-    assert!(
-        rendered
-            .contains("\tsignal SignalF,\n\tsignalArgs []any,\n\tworkflow any,\n\targs ...any,"),
-        "{rendered}"
-    );
-    let typed = rendered.split("func ExecuteTyped[").nth(1).unwrap();
-    assert!(typed.contains("SignalF interface{ ~string | func(...any) string }"));
-    assert!(typed.contains("\tsignal SignalF,\n\tsignalArgs []any,"));
-    assert!(typed.contains("\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"));
-    assert!(typed.contains("reflect.ValueOf(signal)"));
-    assert!(typed.contains("\t\tSignal: signalName,"));
-    assert!(typed.contains("\t\tSignalArgs: signalArgs,"));
-    assert!(typed.contains("\t\tArgs: []any{arg},"));
-    compile_go_descriptor_fixture(&rendered);
-}
-
-#[test]
 fn go_primary_variadic_group_is_last_and_secondary_groups_keep_authored_order() {
     let wit = go_descriptor_fixture("", "signal-input")
         .replace(
@@ -783,16 +759,9 @@ fn go_primary_variadic_group_is_last_and_secondary_groups_keep_authored_order() 
         ),
         "{rendered}"
     );
-    let typed = rendered.split("func ExecuteTyped[").nth(1).unwrap();
-    assert!(typed.contains("OtherF interface{ ~string | func(...any) string }"));
-    assert!(
-        typed.contains(
-            "\tsignal SignalF,\n\tsignalArgs []any,\n\tother OtherF,\n\totherArgs []any,\n\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"
-        ),
-        "{typed}"
-    );
-    assert!(typed.contains("reflect.ValueOf(other)"));
-    assert!(typed.contains("\t\tOtherArgs: otherArgs,"));
+    assert!(rendered.contains("OtherF interface{ ~string | func(...any) string }"));
+    assert!(rendered.contains("reflect.ValueOf(other)"));
+    assert!(rendered.contains("\t\tOtherArgs: otherArgs,"));
     compile_go_descriptor_fixture(&rendered);
 
     // Swap only the secondary groups. Their relative ordering must follow the
@@ -833,7 +802,6 @@ fn go_final_secondary_signature_args_are_variadic_without_primary_signature_vara
             )),
             "{name}:\n{rendered}"
         );
-        assert!(!rendered.contains("func ExecuteTyped["), "{rendered}");
         assert!(rendered.contains("\t\tSignalArgs: signalArgs,"));
         compile_go_descriptor_fixture(&rendered);
     }
@@ -871,41 +839,24 @@ interface service {
   run: func(request: request);
 }
 "#;
-    for (authored, reserved, wrapper) in [
-        ("workflow-arg", "WorkflowArg", "Typed"),
-        ("workflow-result", "WorkflowResult", "Typed"),
-        ("workflow-f", "WorkflowF", ""),
-    ] {
-        let mut wit = fixture.replace("workflow-arg", authored);
-        if reserved == "WorkflowF" {
-            wit = wit.replace("primary=true", "primary=false");
+    let wit = fixture
+        .replace("workflow-arg", "workflow-f")
+        .replace("primary=true", "primary=false");
+    let error = render_go_descriptor_fixture(&wit).unwrap_err();
+    match error.downcast_ref::<nexgen::error::Error>().unwrap() {
+        nexgen::error::Error::UnsupportedGoType { context, reason } => {
+            assert!(context.to_lowercase().contains("run"), "{error}");
+            assert!(
+                reason.contains("model type parameter `WorkflowF`"),
+                "{error}"
+            );
+            assert!(
+                reason.contains("generated reserved name `WorkflowF`"),
+                "{error}"
+            );
         }
-        let error = render_go_descriptor_fixture(&wit).unwrap_err();
-        match error.downcast_ref::<nexgen::error::Error>().unwrap() {
-            nexgen::error::Error::UnsupportedGoType { context, reason } => {
-                assert!(context.to_lowercase().contains("run"), "{error}");
-                assert!(context.contains(wrapper), "{error}");
-                assert!(
-                    reason.contains(&format!("model type parameter `{reserved}`")),
-                    "{error}"
-                );
-                assert!(
-                    reason.contains(&format!("generated reserved name `{reserved}`")),
-                    "{error}"
-                );
-            }
-            other => panic!("expected early UnsupportedGoType, got {other:?}"),
-        }
+        other => panic!("expected early UnsupportedGoType, got {other:?}"),
     }
-    // Noncolliding model names keep the generated names, and the whole fixture
-    // compiles: rejection is about the wrapper namespace, not generic models.
-    let valid = fixture.replace("workflow-arg", "context-t");
-    let rendered = render_go_descriptor_fixture(&valid).unwrap();
-    assert!(
-        rendered.contains("func RunTyped[ContextT any, WorkflowArg any, WorkflowResult any]"),
-        "{rendered}"
-    );
-    compile_go_descriptor_fixture(&rendered);
 }
 
 #[test]

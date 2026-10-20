@@ -1391,8 +1391,7 @@ and one opaque payload, packed into the wire argument list. Without an override,
 Go groups each reference with its signature-derived arguments, preserves the
 other groups' authored order, and places primary variadic arguments last. Only a
 final argument list uses `...T`; other lists use `[]T`. An explicit primary
-descriptor replaces signature-derived typing, so no additional `Typed` wrapper
-is emitted.
+descriptor replaces signature-derived typing.
 
 `@nexus.function-args` options:
 

@@ -810,32 +810,6 @@ fn go_rejects_descriptors_on_fixed_argument_functions_with_go_diagnostic() {
 }
 
 #[test]
-fn go_rejects_collisions_between_generated_wrapper_type_parameters() {
-    let fixture = go_descriptor_fixture("", "signal-input");
-    for reserved in ["WorkflowArg", "SignalF"] {
-        let wit = fixture.replace(
-            "result-type-parameter=\"WorkflowResult\"",
-            &format!("result-type-parameter=\"{reserved}\""),
-        );
-        let error = render_go_descriptor_fixture(&wit).unwrap_err();
-        match error.downcast_ref::<nexgen::error::Error>().unwrap() {
-            nexgen::error::Error::UnsupportedGoType { context, reason } => {
-                assert!(context.contains("Typed"), "{error}");
-                assert!(
-                    reason.contains(&format!("generated type parameter `{reserved}`")),
-                    "{error}"
-                );
-                assert!(
-                    reason.contains(&format!("generated reserved name `{reserved}`")),
-                    "{error}"
-                );
-            }
-            other => panic!("expected early UnsupportedGoType, got {other:?}"),
-        }
-    }
-}
-
-#[test]
 fn go_temporal_function_constraints_use_workflow_context_prefix() {
     let root = project_root();
     let rendered = generate_to_string_with_system_nexus(
@@ -847,11 +821,6 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
     .unwrap();
 
     assert!(rendered.contains("func SignalWithStartWorkflow("));
-    assert!(
-        rendered
-            .contains("func SignalWithStartWorkflowTyped[WorkflowArg any, WorkflowResult any](")
-    );
-    assert!(rendered.contains("\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"));
     assert!(!rendered.contains("func SignalWithStartWorkflowWithArgs("));
     assert!(!rendered.contains("SignalF interface"));
     assert!(rendered.contains("\topts SignalWithStartWorkflowOptions,\n"));
@@ -874,7 +843,7 @@ fn go_temporal_function_constraints_use_workflow_context_prefix() {
         rendered
             .matches("workflowName := support.WorkflowFunctionName(ctx, workflow)")
             .count(),
-        2
+        1
     );
     assert!(rendered.contains(
         "c := internal.NewSystemNexusClient(\"temporal.api.workflowservice.v1.WorkflowService\")"
