@@ -12,150 +12,153 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import json_schema.definitions.kb.SpecNumbers;
 import json_schema.definitions.kb.Violation;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Non-cyclic helper; stays in the content_block module. All members optional.
- */
+/** Non-cyclic helper; stays in the content_block module. All members optional. */
 @JsonSerialize(using = BlockStyle.Serializer.class)
 @JsonDeserialize(using = BlockStyle.Deserializer.class)
 public final class BlockStyle {
-    private final @Nullable Boolean bold;
-    private final @Nullable Long indent;
+  private final @Nullable Boolean bold;
+  private final @Nullable Long indent;
 
-    public BlockStyle(@Nullable Boolean bold, @Nullable Long indent) {
-        this.bold = bold;
-        this.indent = indent;
+  public BlockStyle(@Nullable Boolean bold, @Nullable Long indent) {
+    this.bold = bold;
+    this.indent = indent;
+  }
+
+  public @Nullable Boolean getBold() {
+    return bold;
+  }
+
+  public @Nullable Long getIndent() {
+    return indent;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public @Nullable Boolean getBold() {
-        return bold;
+    if (!(other instanceof BlockStyle)) {
+      return false;
     }
+    BlockStyle that = (BlockStyle) other;
+    return Objects.equals(this.bold, that.bold) && Objects.equals(this.indent, that.indent);
+  }
 
-    public @Nullable Long getIndent() {
-        return indent;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(bold, indent);
+  }
 
+  @Override
+  public String toString() {
+    return "BlockStyle{" + "bold=" + bold + ", indent=" + indent + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<BlockStyle> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(BlockStyle value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.indent != null) {
+        if (value.indent < -SpecNumbers.INTEGER_CAP || value.indent > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("indent", "exceeds \u00b1(2^53-1) integer cap"));
         }
-        if (!(other instanceof BlockStyle)) {
-            return false;
+        if (value.indent < 0L) {
+          violations.add(new Violation("indent", "must be >= 0, got " + value.indent));
         }
-        BlockStyle that = (BlockStyle) other;
-        return Objects.equals(this.bold, that.bold)
-            && Objects.equals(this.indent, that.indent);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.bold != null) {
+        gen.writeBooleanField("bold", value.bold);
+      }
+      if (value.indent != null) {
+        gen.writeNumberField("indent", value.indent);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<BlockStyle> {
     @Override
-    public int hashCode() {
-        return Objects.hash(bold, indent);
-    }
-
-    @Override
-    public String toString() {
-        return "BlockStyle{"
-            + "bold=" + bold
-            + ", indent=" + indent
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<BlockStyle> {
-        @Override
-        public void serialize(BlockStyle value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.indent != null) {
-                if (value.indent < -SpecNumbers.INTEGER_CAP || value.indent > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("indent", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-                if (value.indent < 0L) {
-                    violations.add(new Violation("indent", "must be >= 0, got " + value.indent));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.bold != null) {
-                gen.writeBooleanField("bold", value.bold);
-            }
-            if (value.indent != null) {
-                gen.writeNumberField("indent", value.indent);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public BlockStyle deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "bold":
+          case "indent":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<BlockStyle> {
-        @Override
-        public BlockStyle deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "bold":
-                    case "indent":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            Boolean bold = null;
-            {
-                JsonNode field = node.get("bold");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("bold", "explicit null not allowed"));
-                } else {
-                    if (!field.isBoolean()) {
-                        violations.add(new Violation("bold", "expected boolean"));
-                    } else {
-                        bold = field.booleanValue();
-                    }
-                }
-            }
-            Long indent = null;
-            {
-                JsonNode field = node.get("indent");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("indent", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "indent", violations);
-                    if (numberValue != null) {
-                        indent = numberValue;
-                        if (numberValue < 0L) {
-                            violations.add(new Violation("indent", "must be >= 0, got " + numberValue));
-                        }
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new BlockStyle(bold, indent);
+      }
+      Boolean bold = null;
+      {
+        JsonNode field = node.get("bold");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("bold", "explicit null not allowed"));
+        } else {
+          if (!field.isBoolean()) {
+            violations.add(new Violation("bold", "expected boolean"));
+          } else {
+            bold = field.booleanValue();
+          }
         }
+      }
+      Long indent = null;
+      {
+        JsonNode field = node.get("indent");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("indent", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "indent", violations);
+          if (numberValue != null) {
+            indent = numberValue;
+            if (numberValue < 0L) {
+              violations.add(new Violation("indent", "must be >= 0, got " + numberValue));
+            }
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new BlockStyle(bold, indent);
     }
+  }
 }

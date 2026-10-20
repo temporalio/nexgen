@@ -18,138 +18,153 @@ import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A typed map of referenced Address models.
- */
+/** A typed map of referenced Address models. */
 @JsonSerialize(using = AddressBook.Serializer.class)
 @JsonDeserialize(using = AddressBook.Deserializer.class)
 public final class AddressBook {
-    private final Map<String, Address> additionalProperties;
+  private final Map<String, Address> additionalProperties;
 
-    public AddressBook(Map<String, Address> additionalProperties) {
-        this.additionalProperties = additionalProperties;
+  public AddressBook(Map<String, Address> additionalProperties) {
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Map<String, Address> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public Map<String, Address> getAdditionalProperties() {
-        return additionalProperties;
+    if (!(other instanceof AddressBook)) {
+      return false;
     }
+    return Objects.equals(this.additionalProperties, ((AddressBook) other).additionalProperties);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "AddressBook{" + "additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<AddressBook> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(AddressBook value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.additionalProperties == null) {
+        violations.add(new Violation("", "expected object"));
+      } else {
+        for (Map.Entry<String, Address> entry : value.additionalProperties.entrySet()) {
+          if (entry.getValue() == null) {
+            violations.add(
+                new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
+            continue;
+          }
         }
-        if (!(other instanceof AddressBook)) {
-            return false;
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      for (Map.Entry<String, Address> entry : value.additionalProperties.entrySet()) {
+        gen.writeFieldName(entry.getKey());
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(entry.getValue(), nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix(Violation.memberPath(entry.getKey())));
+          }
+          gen.writeNull();
         }
-        return Objects.equals(this.additionalProperties, ((AddressBook) other).additionalProperties);
+      }
+      gen.writeEndObject();
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<AddressBook> {
     @Override
-    public int hashCode() {
-        return Objects.hash(additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "AddressBook{"
-            + "additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<AddressBook> {
-        @Override
-        public void serialize(AddressBook value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.additionalProperties == null) {
-                violations.add(new Violation("", "expected object"));
-            } else {
-                for (Map.Entry<String, Address> entry : value.additionalProperties.entrySet()) {
-                    if (entry.getValue() == null) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
-                        continue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            for (Map.Entry<String, Address> entry : value.additionalProperties.entrySet()) {
-                gen.writeFieldName(entry.getKey());
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(entry.getValue(), nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix(Violation.memberPath(entry.getKey())));
-                    }
-                    gen.writeNull();
-                }
-            }
-            gen.writeEndObject();
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            pending.serialize(target);
+    public AddressBook deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, Address> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        JsonNode element = node.get(key);
+        if (element.isNull()) {
+          violations.add(new Violation(path, "explicit null not allowed"));
+          continue;
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<AddressBook> {
-        @Override
-        public AddressBook deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, Address> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                JsonNode element = node.get(key);
-                if (element.isNull()) {
-                    violations.add(new Violation(path, "explicit null not allowed"));
-                    continue;
-                }
-                try {
-                    additionalProperties.put(key, context.readTreeAsValue(element, Address.class));
-                } catch (ApplicationFailure nested) {
-                    if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                        throw nested;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                    for (Violation violation : nestedViolations) {
-                        violations.add(violation.withPathPrefix(path));
-                    }
-                } catch (IOException nested) {
-                    violations.add(new Violation(path, nested.getMessage()));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new AddressBook(additionalProperties);
+        try {
+          additionalProperties.put(key, context.readTreeAsValue(element, Address.class));
+        } catch (ApplicationFailure nested) {
+          if (!"PayloadValidationError".equals(nested.getType())
+              || nested.getDetails().getSize() == 0) {
+            throw nested;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations =
+              (List<Violation>) nested.getDetails().get(0, List.class);
+          for (Violation violation : nestedViolations) {
+            violations.add(violation.withPathPrefix(path));
+          }
+        } catch (IOException nested) {
+          violations.add(new Violation(path, nested.getMessage()));
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new AddressBook(additionalProperties);
     }
+  }
 }

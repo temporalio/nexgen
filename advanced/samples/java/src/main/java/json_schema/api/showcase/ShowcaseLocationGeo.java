@@ -21,163 +21,180 @@ import org.jspecify.annotations.Nullable;
 @JsonSerialize(using = ShowcaseLocationGeo.Serializer.class)
 @JsonDeserialize(using = ShowcaseLocationGeo.Deserializer.class)
 public final class ShowcaseLocationGeo {
-    private final @Nullable Double lat;
-    private final @Nullable Double lon;
-    private final Map<String, JsonNode> additionalProperties;
+  private final @Nullable Double lat;
+  private final @Nullable Double lon;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public ShowcaseLocationGeo(@Nullable Double lat, @Nullable Double lon, Map<String, JsonNode> additionalProperties) {
-        this.lat = lat;
-        this.lon = lon;
-        this.additionalProperties = additionalProperties;
+  public ShowcaseLocationGeo(
+      @Nullable Double lat, @Nullable Double lon, Map<String, JsonNode> additionalProperties) {
+    this.lat = lat;
+    this.lon = lon;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public @Nullable Double getLat() {
+    return lat;
+  }
+
+  public @Nullable Double getLon() {
+    return lon;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public @Nullable Double getLat() {
-        return lat;
+    if (!(other instanceof ShowcaseLocationGeo)) {
+      return false;
     }
+    ShowcaseLocationGeo that = (ShowcaseLocationGeo) other;
+    return Objects.equals(this.lat, that.lat)
+        && Objects.equals(this.lon, that.lon)
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
-    public @Nullable Double getLon() {
-        return lon;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(lat, lon, additionalProperties);
+  }
 
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
-    }
+  @Override
+  public String toString() {
+    return "ShowcaseLocationGeo{"
+        + "lat="
+        + lat
+        + ", lon="
+        + lon
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
 
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseLocationGeo> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(
+        ShowcaseLocationGeo value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.lat != null) {
+        if (!Double.isFinite(value.lat)) {
+          violations.add(new Violation("lat", "must be a finite number, got " + value.lat));
         }
-        if (!(other instanceof ShowcaseLocationGeo)) {
-            return false;
+      }
+      if (value.lon != null) {
+        if (!Double.isFinite(value.lon)) {
+          violations.add(new Violation("lon", "must be a finite number, got " + value.lon));
         }
-        ShowcaseLocationGeo that = (ShowcaseLocationGeo) other;
-        return Objects.equals(this.lat, that.lat)
-            && Objects.equals(this.lon, that.lon)
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.lat != null) {
+        wireKeys.add("lat");
+      }
+      if (value.lon != null) {
+        wireKeys.add("lon");
+      }
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.lat != null) {
+        gen.writeNumberField("lat", value.lat);
+      }
+      if (value.lon != null) {
+        gen.writeNumberField("lon", value.lon);
+      }
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseLocationGeo> {
     @Override
-    public int hashCode() {
-        return Objects.hash(lat, lon, additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "ShowcaseLocationGeo{"
-            + "lat=" + lat
-            + ", lon=" + lon
-            + ", additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseLocationGeo> {
-        @Override
-        public void serialize(ShowcaseLocationGeo value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.lat != null) {
-                if (!Double.isFinite(value.lat)) {
-                    violations.add(new Violation("lat", "must be a finite number, got " + value.lat));
-                }
-            }
-            if (value.lon != null) {
-                if (!Double.isFinite(value.lon)) {
-                    violations.add(new Violation("lon", "must be a finite number, got " + value.lon));
-                }
-            }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.lat != null) {
-                wireKeys.add("lat");
-            }
-            if (value.lon != null) {
-                wireKeys.add("lon");
-            }
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.lat != null) {
-                gen.writeNumberField("lat", value.lat);
-            }
-            if (value.lon != null) {
-                gen.writeNumberField("lon", value.lon);
-            }
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public ShowcaseLocationGeo deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "lat":
+          case "lon":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseLocationGeo> {
-        @Override
-        public ShowcaseLocationGeo deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "lat":
-                    case "lon":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            Double lat = null;
-            {
-                JsonNode field = node.get("lat");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("lat", "explicit null not allowed"));
-                } else {
-                    Double numberValue = SpecNumbers.specDouble(field, "lat", violations);
-                    if (numberValue != null) {
-                        lat = numberValue;
-                    }
-                }
-            }
-            Double lon = null;
-            {
-                JsonNode field = node.get("lon");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("lon", "explicit null not allowed"));
-                } else {
-                    Double numberValue = SpecNumbers.specDouble(field, "lon", violations);
-                    if (numberValue != null) {
-                        lon = numberValue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new ShowcaseLocationGeo(lat, lon, additionalProperties);
+      }
+      Double lat = null;
+      {
+        JsonNode field = node.get("lat");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("lat", "explicit null not allowed"));
+        } else {
+          Double numberValue = SpecNumbers.specDouble(field, "lat", violations);
+          if (numberValue != null) {
+            lat = numberValue;
+          }
         }
+      }
+      Double lon = null;
+      {
+        JsonNode field = node.get("lon");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("lon", "explicit null not allowed"));
+        } else {
+          Double numberValue = SpecNumbers.specDouble(field, "lon", violations);
+          if (numberValue != null) {
+            lon = numberValue;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new ShowcaseLocationGeo(lat, lon, additionalProperties);
     }
+  }
 }

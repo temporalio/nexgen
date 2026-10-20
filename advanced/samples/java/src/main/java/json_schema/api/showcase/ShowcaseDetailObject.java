@@ -21,168 +21,185 @@ import org.jspecify.annotations.Nullable;
 @JsonSerialize(using = ShowcaseDetailObject.Serializer.class)
 @JsonDeserialize(using = ShowcaseDetailObject.Deserializer.class)
 public final class ShowcaseDetailObject implements Showcase.Detail {
-    private final String code;
-    private final @Nullable String hint;
-    private final Map<String, JsonNode> additionalProperties;
+  private final String code;
+  private final @Nullable String hint;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public ShowcaseDetailObject(String code, @Nullable String hint, Map<String, JsonNode> additionalProperties) {
-        this.code = code;
-        this.hint = hint;
-        this.additionalProperties = additionalProperties;
+  public ShowcaseDetailObject(
+      String code, @Nullable String hint, Map<String, JsonNode> additionalProperties) {
+    this.code = code;
+    this.hint = hint;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public String getCode() {
+    return code;
+  }
+
+  public @Nullable String getHint() {
+    return hint;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getCode() {
-        return code;
+    if (!(other instanceof ShowcaseDetailObject)) {
+      return false;
     }
+    ShowcaseDetailObject that = (ShowcaseDetailObject) other;
+    return Objects.equals(this.code, that.code)
+        && Objects.equals(this.hint, that.hint)
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
-    public @Nullable String getHint() {
-        return hint;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(code, hint, additionalProperties);
+  }
 
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
-    }
+  @Override
+  public String toString() {
+    return "ShowcaseDetailObject{"
+        + "code="
+        + code
+        + ", hint="
+        + hint
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
 
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseDetailObject> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(
+        ShowcaseDetailObject value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.code == null) {
+        violations.add(new Violation("code", "required"));
+      } else {
+        int length = value.code.codePointCount(0, value.code.length());
+        if (length < 1) {
+          violations.add(new Violation("code", "must have length >= 1, got " + length));
         }
-        if (!(other instanceof ShowcaseDetailObject)) {
-            return false;
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.code != null) {
+        wireKeys.add("code");
+      }
+      if (value.hint != null) {
+        wireKeys.add("hint");
+      }
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
         }
-        ShowcaseDetailObject that = (ShowcaseDetailObject) other;
-        return Objects.equals(this.code, that.code)
-            && Objects.equals(this.hint, that.hint)
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.code != null) {
+        gen.writeStringField("code", value.code);
+      }
+      if (value.hint != null) {
+        gen.writeStringField("hint", value.hint);
+      }
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseDetailObject> {
     @Override
-    public int hashCode() {
-        return Objects.hash(code, hint, additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "ShowcaseDetailObject{"
-            + "code=" + code
-            + ", hint=" + hint
-            + ", additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseDetailObject> {
-        @Override
-        public void serialize(ShowcaseDetailObject value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.code == null) {
-                violations.add(new Violation("code", "required"));
-            } else {
-                int length = value.code.codePointCount(0, value.code.length());
-                if (length < 1) {
-                    violations.add(new Violation("code", "must have length >= 1, got " + length));
-                }
-            }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.code != null) {
-                wireKeys.add("code");
-            }
-            if (value.hint != null) {
-                wireKeys.add("hint");
-            }
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.code != null) {
-                gen.writeStringField("code", value.code);
-            }
-            if (value.hint != null) {
-                gen.writeStringField("hint", value.hint);
-            }
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public ShowcaseDetailObject deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "code":
+          case "hint":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseDetailObject> {
-        @Override
-        public ShowcaseDetailObject deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
+      }
+      String code = null;
+      {
+        JsonNode field = node.get("code");
+        if (field == null) {
+          violations.add(new Violation("code", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("code", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("code", "expected string"));
+          } else {
+            code = field.textValue();
+            int length = code.codePointCount(0, code.length());
+            if (length < 1) {
+              violations.add(new Violation("code", "must have length >= 1, got " + length));
             }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "code":
-                    case "hint":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            String code = null;
-            {
-                JsonNode field = node.get("code");
-                if (field == null) {
-                    violations.add(new Violation("code", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("code", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("code", "expected string"));
-                    } else {
-                        code = field.textValue();
-                        int length = code.codePointCount(0, code.length());
-                        if (length < 1) {
-                            violations.add(new Violation("code", "must have length >= 1, got " + length));
-                        }
-                    }
-                }
-            }
-            String hint = null;
-            {
-                JsonNode field = node.get("hint");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("hint", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("hint", "expected string"));
-                    } else {
-                        hint = field.textValue();
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new ShowcaseDetailObject(code, hint, additionalProperties);
+          }
         }
+      }
+      String hint = null;
+      {
+        JsonNode field = node.get("hint");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("hint", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("hint", "expected string"));
+          } else {
+            hint = field.textValue();
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new ShowcaseDetailObject(code, hint, additionalProperties);
     }
+  }
 }

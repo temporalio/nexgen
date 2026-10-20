@@ -15,424 +15,458 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Temporal
  *
- * Root object materializing the four RFC 3339 temporal formats as native typed fields:
- * date-time (offset &amp; sub-second precision preserved), date, time (offset preserved
- * when present), and duration (time-only, canonicalized). Covers required, optional,
- * and nullable members of each.
+ * <p>Root object materializing the four RFC 3339 temporal formats as native typed fields: date-time
+ * (offset &amp; sub-second precision preserved), date, time (offset preserved when present), and
+ * duration (time-only, canonicalized). Covers required, optional, and nullable members of each.
  */
 @JsonSerialize(using = Temporal.Serializer.class)
 @JsonDeserialize(using = Temporal.Deserializer.class)
 public final class Temporal {
-    private final OffsetDateTime createdAt;
-    private final LocalDate birthday;
-    private final String alarm;
-    private final Duration timeout;
-    private final @Nullable OffsetDateTime updatedAt;
-    private final @Nullable LocalDate expiresOn;
-    private final @Nullable String reminder;
-    private final @Nullable Duration retryDelay;
-    private final @Nullable OffsetDateTime deletedAt;
-    private final @Nullable LocalDate archivedOn;
+  private final OffsetDateTime createdAt;
+  private final LocalDate birthday;
+  private final String alarm;
+  private final Duration timeout;
+  private final @Nullable OffsetDateTime updatedAt;
+  private final @Nullable LocalDate expiresOn;
+  private final @Nullable String reminder;
+  private final @Nullable Duration retryDelay;
+  private final @Nullable OffsetDateTime deletedAt;
+  private final @Nullable LocalDate archivedOn;
 
-    public Temporal(OffsetDateTime createdAt, LocalDate birthday, String alarm, Duration timeout, @Nullable OffsetDateTime updatedAt, @Nullable LocalDate expiresOn, @Nullable String reminder, @Nullable Duration retryDelay, @Nullable OffsetDateTime deletedAt, @Nullable LocalDate archivedOn) {
-        this.createdAt = createdAt;
-        this.birthday = birthday;
-        this.alarm = alarm;
-        this.timeout = timeout;
-        this.updatedAt = updatedAt;
-        this.expiresOn = expiresOn;
-        this.reminder = reminder;
-        this.retryDelay = retryDelay;
-        this.deletedAt = deletedAt;
-        this.archivedOn = archivedOn;
+  public Temporal(
+      OffsetDateTime createdAt,
+      LocalDate birthday,
+      String alarm,
+      Duration timeout,
+      @Nullable OffsetDateTime updatedAt,
+      @Nullable LocalDate expiresOn,
+      @Nullable String reminder,
+      @Nullable Duration retryDelay,
+      @Nullable OffsetDateTime deletedAt,
+      @Nullable LocalDate archivedOn) {
+    this.createdAt = createdAt;
+    this.birthday = birthday;
+    this.alarm = alarm;
+    this.timeout = timeout;
+    this.updatedAt = updatedAt;
+    this.expiresOn = expiresOn;
+    this.reminder = reminder;
+    this.retryDelay = retryDelay;
+    this.deletedAt = deletedAt;
+    this.archivedOn = archivedOn;
+  }
+
+  /**
+   * Required event timestamp; materialized date-time (offset required, sub-second precision &amp;
+   * offset preserved on round-trip).
+   */
+  public OffsetDateTime getCreatedAt() {
+    return createdAt;
+  }
+
+  /** Required calendar date; materialized date (YYYY-MM-DD, lossless). */
+  public LocalDate getBirthday() {
+    return birthday;
+  }
+
+  /**
+   * Required wall-clock time; materialized time (offset preserved when present, otherwise
+   * offset-less).
+   */
+  public String getAlarm() {
+    return alarm;
+  }
+
+  /**
+   * Required time-only duration; materialized duration, canonicalized to PT…H…M…S (e.g. PT90M →
+   * PT1H30M).
+   */
+  public Duration getTimeout() {
+    return timeout;
+  }
+
+  /** Optional date-time. */
+  public @Nullable OffsetDateTime getUpdatedAt() {
+    return updatedAt;
+  }
+
+  /** Optional date. */
+  public @Nullable LocalDate getExpiresOn() {
+    return expiresOn;
+  }
+
+  /** Optional time. */
+  public @Nullable String getReminder() {
+    return reminder;
+  }
+
+  /** Optional duration. */
+  public @Nullable Duration getRetryDelay() {
+    return retryDelay;
+  }
+
+  /** Optional and nullable date-time (may be absent or explicitly null). */
+  public @Nullable OffsetDateTime getDeletedAt() {
+    return deletedAt;
+  }
+
+  /** Optional and nullable date. */
+  public @Nullable LocalDate getArchivedOn() {
+    return archivedOn;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    /**
-     * Required event timestamp; materialized date-time (offset required, sub-second
-     * precision &amp; offset preserved on round-trip).
-     */
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
+    if (!(other instanceof Temporal)) {
+      return false;
     }
+    Temporal that = (Temporal) other;
+    return Objects.equals(this.createdAt, that.createdAt)
+        && Objects.equals(this.birthday, that.birthday)
+        && Objects.equals(this.alarm, that.alarm)
+        && Objects.equals(this.timeout, that.timeout)
+        && Objects.equals(this.updatedAt, that.updatedAt)
+        && Objects.equals(this.expiresOn, that.expiresOn)
+        && Objects.equals(this.reminder, that.reminder)
+        && Objects.equals(this.retryDelay, that.retryDelay)
+        && Objects.equals(this.deletedAt, that.deletedAt)
+        && Objects.equals(this.archivedOn, that.archivedOn);
+  }
 
-    /**
-     * Required calendar date; materialized date (YYYY-MM-DD, lossless).
-     */
-    public LocalDate getBirthday() {
-        return birthday;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        createdAt,
+        birthday,
+        alarm,
+        timeout,
+        updatedAt,
+        expiresOn,
+        reminder,
+        retryDelay,
+        deletedAt,
+        archivedOn);
+  }
 
-    /**
-     * Required wall-clock time; materialized time (offset preserved when present,
-     * otherwise offset-less).
-     */
-    public String getAlarm() {
-        return alarm;
-    }
+  @Override
+  public String toString() {
+    return "Temporal{"
+        + "createdAt="
+        + createdAt
+        + ", birthday="
+        + birthday
+        + ", alarm="
+        + alarm
+        + ", timeout="
+        + timeout
+        + ", updatedAt="
+        + updatedAt
+        + ", expiresOn="
+        + expiresOn
+        + ", reminder="
+        + reminder
+        + ", retryDelay="
+        + retryDelay
+        + ", deletedAt="
+        + deletedAt
+        + ", archivedOn="
+        + archivedOn
+        + "}";
+  }
 
-    /**
-     * Required time-only duration; materialized duration, canonicalized to PT…H…M…S
-     * (e.g. PT90M → PT1H30M).
-     */
-    public Duration getTimeout() {
-        return timeout;
-    }
-
-    /**
-     * Optional date-time.
-     */
-    public @Nullable OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    /**
-     * Optional date.
-     */
-    public @Nullable LocalDate getExpiresOn() {
-        return expiresOn;
-    }
-
-    /**
-     * Optional time.
-     */
-    public @Nullable String getReminder() {
-        return reminder;
-    }
-
-    /**
-     * Optional duration.
-     */
-    public @Nullable Duration getRetryDelay() {
-        return retryDelay;
-    }
-
-    /**
-     * Optional and nullable date-time (may be absent or explicitly null).
-     */
-    public @Nullable OffsetDateTime getDeletedAt() {
-        return deletedAt;
-    }
-
-    /**
-     * Optional and nullable date.
-     */
-    public @Nullable LocalDate getArchivedOn() {
-        return archivedOn;
-    }
-
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Temporal> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof Temporal)) {
-            return false;
-        }
-        Temporal that = (Temporal) other;
-        return Objects.equals(this.createdAt, that.createdAt)
-            && Objects.equals(this.birthday, that.birthday)
-            && Objects.equals(this.alarm, that.alarm)
-            && Objects.equals(this.timeout, that.timeout)
-            && Objects.equals(this.updatedAt, that.updatedAt)
-            && Objects.equals(this.expiresOn, that.expiresOn)
-            && Objects.equals(this.reminder, that.reminder)
-            && Objects.equals(this.retryDelay, that.retryDelay)
-            && Objects.equals(this.deletedAt, that.deletedAt)
-            && Objects.equals(this.archivedOn, that.archivedOn);
+    public void serialize(Temporal value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.createdAt == null) {
+        violations.add(new Violation("createdAt", "required"));
+      } else {
+        TemporalSupport.checkDateTime(value.createdAt, "createdAt", violations);
+      }
+      if (value.birthday == null) {
+        violations.add(new Violation("birthday", "required"));
+      } else {
+        TemporalSupport.checkDate(value.birthday, "birthday", violations);
+      }
+      if (value.alarm == null) {
+        violations.add(new Violation("alarm", "required"));
+      } else {
+        TemporalSupport.checkTime(value.alarm, "alarm", violations);
+      }
+      if (value.timeout == null) {
+        violations.add(new Violation("timeout", "required"));
+      } else {
+        TemporalSupport.checkDuration(value.timeout, "timeout", violations);
+      }
+      if (value.updatedAt != null) {
+        TemporalSupport.checkDateTime(value.updatedAt, "updatedAt", violations);
+      }
+      if (value.expiresOn != null) {
+        TemporalSupport.checkDate(value.expiresOn, "expiresOn", violations);
+      }
+      if (value.reminder != null) {
+        TemporalSupport.checkTime(value.reminder, "reminder", violations);
+      }
+      if (value.retryDelay != null) {
+        TemporalSupport.checkDuration(value.retryDelay, "retryDelay", violations);
+      }
+      if (value.deletedAt != null) {
+        TemporalSupport.checkDateTime(value.deletedAt, "deletedAt", violations);
+      }
+      if (value.archivedOn != null) {
+        TemporalSupport.checkDate(value.archivedOn, "archivedOn", violations);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.createdAt != null) {
+        gen.writeStringField("createdAt", TemporalSupport.formatDateTime(value.createdAt));
+      }
+      if (value.birthday != null) {
+        gen.writeStringField("birthday", TemporalSupport.formatDate(value.birthday));
+      }
+      if (value.alarm != null) {
+        gen.writeStringField("alarm", TemporalSupport.formatTime(value.alarm));
+      }
+      if (value.timeout != null) {
+        gen.writeStringField("timeout", TemporalSupport.formatDuration(value.timeout));
+      }
+      if (value.updatedAt != null) {
+        gen.writeStringField("updatedAt", TemporalSupport.formatDateTime(value.updatedAt));
+      }
+      if (value.expiresOn != null) {
+        gen.writeStringField("expiresOn", TemporalSupport.formatDate(value.expiresOn));
+      }
+      if (value.reminder != null) {
+        gen.writeStringField("reminder", TemporalSupport.formatTime(value.reminder));
+      }
+      if (value.retryDelay != null) {
+        gen.writeStringField("retryDelay", TemporalSupport.formatDuration(value.retryDelay));
+      }
+      if (value.deletedAt != null) {
+        gen.writeStringField("deletedAt", TemporalSupport.formatDateTime(value.deletedAt));
+      }
+      if (value.archivedOn != null) {
+        gen.writeStringField("archivedOn", TemporalSupport.formatDate(value.archivedOn));
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Temporal> {
     @Override
-    public int hashCode() {
-        return Objects.hash(createdAt, birthday, alarm, timeout, updatedAt, expiresOn, reminder, retryDelay, deletedAt, archivedOn);
-    }
-
-    @Override
-    public String toString() {
-        return "Temporal{"
-            + "createdAt=" + createdAt
-            + ", birthday=" + birthday
-            + ", alarm=" + alarm
-            + ", timeout=" + timeout
-            + ", updatedAt=" + updatedAt
-            + ", expiresOn=" + expiresOn
-            + ", reminder=" + reminder
-            + ", retryDelay=" + retryDelay
-            + ", deletedAt=" + deletedAt
-            + ", archivedOn=" + archivedOn
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Temporal> {
-        @Override
-        public void serialize(Temporal value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.createdAt == null) {
-                violations.add(new Violation("createdAt", "required"));
-            } else {
-                TemporalSupport.checkDateTime(value.createdAt, "createdAt", violations);
-            }
-            if (value.birthday == null) {
-                violations.add(new Violation("birthday", "required"));
-            } else {
-                TemporalSupport.checkDate(value.birthday, "birthday", violations);
-            }
-            if (value.alarm == null) {
-                violations.add(new Violation("alarm", "required"));
-            } else {
-                TemporalSupport.checkTime(value.alarm, "alarm", violations);
-            }
-            if (value.timeout == null) {
-                violations.add(new Violation("timeout", "required"));
-            } else {
-                TemporalSupport.checkDuration(value.timeout, "timeout", violations);
-            }
-            if (value.updatedAt != null) {
-                TemporalSupport.checkDateTime(value.updatedAt, "updatedAt", violations);
-            }
-            if (value.expiresOn != null) {
-                TemporalSupport.checkDate(value.expiresOn, "expiresOn", violations);
-            }
-            if (value.reminder != null) {
-                TemporalSupport.checkTime(value.reminder, "reminder", violations);
-            }
-            if (value.retryDelay != null) {
-                TemporalSupport.checkDuration(value.retryDelay, "retryDelay", violations);
-            }
-            if (value.deletedAt != null) {
-                TemporalSupport.checkDateTime(value.deletedAt, "deletedAt", violations);
-            }
-            if (value.archivedOn != null) {
-                TemporalSupport.checkDate(value.archivedOn, "archivedOn", violations);
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.createdAt != null) {
-                gen.writeStringField("createdAt", TemporalSupport.formatDateTime(value.createdAt));
-            }
-            if (value.birthday != null) {
-                gen.writeStringField("birthday", TemporalSupport.formatDate(value.birthday));
-            }
-            if (value.alarm != null) {
-                gen.writeStringField("alarm", TemporalSupport.formatTime(value.alarm));
-            }
-            if (value.timeout != null) {
-                gen.writeStringField("timeout", TemporalSupport.formatDuration(value.timeout));
-            }
-            if (value.updatedAt != null) {
-                gen.writeStringField("updatedAt", TemporalSupport.formatDateTime(value.updatedAt));
-            }
-            if (value.expiresOn != null) {
-                gen.writeStringField("expiresOn", TemporalSupport.formatDate(value.expiresOn));
-            }
-            if (value.reminder != null) {
-                gen.writeStringField("reminder", TemporalSupport.formatTime(value.reminder));
-            }
-            if (value.retryDelay != null) {
-                gen.writeStringField("retryDelay", TemporalSupport.formatDuration(value.retryDelay));
-            }
-            if (value.deletedAt != null) {
-                gen.writeStringField("deletedAt", TemporalSupport.formatDateTime(value.deletedAt));
-            }
-            if (value.archivedOn != null) {
-                gen.writeStringField("archivedOn", TemporalSupport.formatDate(value.archivedOn));
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public Temporal deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "alarm":
+          case "archivedOn":
+          case "birthday":
+          case "createdAt":
+          case "deletedAt":
+          case "expiresOn":
+          case "reminder":
+          case "retryDelay":
+          case "timeout":
+          case "updatedAt":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Temporal> {
-        @Override
-        public Temporal deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "alarm":
-                    case "archivedOn":
-                    case "birthday":
-                    case "createdAt":
-                    case "deletedAt":
-                    case "expiresOn":
-                    case "reminder":
-                    case "retryDelay":
-                    case "timeout":
-                    case "updatedAt":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            OffsetDateTime createdAt = null;
-            {
-                JsonNode field = node.get("createdAt");
-                if (field == null) {
-                    violations.add(new Violation("createdAt", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("createdAt", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("createdAt", "expected string"));
-                    } else {
-                        createdAt = TemporalSupport.parseDateTime(field.textValue(), "createdAt", violations);
-                    }
-                }
-            }
-            LocalDate birthday = null;
-            {
-                JsonNode field = node.get("birthday");
-                if (field == null) {
-                    violations.add(new Violation("birthday", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("birthday", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("birthday", "expected string"));
-                    } else {
-                        birthday = TemporalSupport.parseDate(field.textValue(), "birthday", violations);
-                    }
-                }
-            }
-            String alarm = null;
-            {
-                JsonNode field = node.get("alarm");
-                if (field == null) {
-                    violations.add(new Violation("alarm", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("alarm", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("alarm", "expected string"));
-                    } else {
-                        alarm = TemporalSupport.parseTime(field.textValue(), "alarm", violations);
-                    }
-                }
-            }
-            Duration timeout = null;
-            {
-                JsonNode field = node.get("timeout");
-                if (field == null) {
-                    violations.add(new Violation("timeout", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("timeout", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("timeout", "expected string"));
-                    } else {
-                        timeout = TemporalSupport.parseDuration(field.textValue(), "timeout", violations);
-                    }
-                }
-            }
-            OffsetDateTime updatedAt = null;
-            {
-                JsonNode field = node.get("updatedAt");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("updatedAt", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("updatedAt", "expected string"));
-                    } else {
-                        updatedAt = TemporalSupport.parseDateTime(field.textValue(), "updatedAt", violations);
-                    }
-                }
-            }
-            LocalDate expiresOn = null;
-            {
-                JsonNode field = node.get("expiresOn");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("expiresOn", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("expiresOn", "expected string"));
-                    } else {
-                        expiresOn = TemporalSupport.parseDate(field.textValue(), "expiresOn", violations);
-                    }
-                }
-            }
-            String reminder = null;
-            {
-                JsonNode field = node.get("reminder");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("reminder", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("reminder", "expected string"));
-                    } else {
-                        reminder = TemporalSupport.parseTime(field.textValue(), "reminder", violations);
-                    }
-                }
-            }
-            Duration retryDelay = null;
-            {
-                JsonNode field = node.get("retryDelay");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("retryDelay", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("retryDelay", "expected string"));
-                    } else {
-                        retryDelay = TemporalSupport.parseDuration(field.textValue(), "retryDelay", violations);
-                    }
-                }
-            }
-            OffsetDateTime deletedAt = null;
-            {
-                JsonNode field = node.get("deletedAt");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("deletedAt", "expected string"));
-                    } else {
-                        deletedAt = TemporalSupport.parseDateTime(field.textValue(), "deletedAt", violations);
-                    }
-                }
-            }
-            LocalDate archivedOn = null;
-            {
-                JsonNode field = node.get("archivedOn");
-                if (field == null) {
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("archivedOn", "expected string"));
-                    } else {
-                        archivedOn = TemporalSupport.parseDate(field.textValue(), "archivedOn", violations);
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Temporal(createdAt, birthday, alarm, timeout, updatedAt, expiresOn, reminder, retryDelay, deletedAt, archivedOn);
+      }
+      OffsetDateTime createdAt = null;
+      {
+        JsonNode field = node.get("createdAt");
+        if (field == null) {
+          violations.add(new Violation("createdAt", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("createdAt", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("createdAt", "expected string"));
+          } else {
+            createdAt = TemporalSupport.parseDateTime(field.textValue(), "createdAt", violations);
+          }
         }
+      }
+      LocalDate birthday = null;
+      {
+        JsonNode field = node.get("birthday");
+        if (field == null) {
+          violations.add(new Violation("birthday", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("birthday", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("birthday", "expected string"));
+          } else {
+            birthday = TemporalSupport.parseDate(field.textValue(), "birthday", violations);
+          }
+        }
+      }
+      String alarm = null;
+      {
+        JsonNode field = node.get("alarm");
+        if (field == null) {
+          violations.add(new Violation("alarm", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("alarm", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("alarm", "expected string"));
+          } else {
+            alarm = TemporalSupport.parseTime(field.textValue(), "alarm", violations);
+          }
+        }
+      }
+      Duration timeout = null;
+      {
+        JsonNode field = node.get("timeout");
+        if (field == null) {
+          violations.add(new Violation("timeout", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("timeout", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("timeout", "expected string"));
+          } else {
+            timeout = TemporalSupport.parseDuration(field.textValue(), "timeout", violations);
+          }
+        }
+      }
+      OffsetDateTime updatedAt = null;
+      {
+        JsonNode field = node.get("updatedAt");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("updatedAt", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("updatedAt", "expected string"));
+          } else {
+            updatedAt = TemporalSupport.parseDateTime(field.textValue(), "updatedAt", violations);
+          }
+        }
+      }
+      LocalDate expiresOn = null;
+      {
+        JsonNode field = node.get("expiresOn");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("expiresOn", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("expiresOn", "expected string"));
+          } else {
+            expiresOn = TemporalSupport.parseDate(field.textValue(), "expiresOn", violations);
+          }
+        }
+      }
+      String reminder = null;
+      {
+        JsonNode field = node.get("reminder");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("reminder", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("reminder", "expected string"));
+          } else {
+            reminder = TemporalSupport.parseTime(field.textValue(), "reminder", violations);
+          }
+        }
+      }
+      Duration retryDelay = null;
+      {
+        JsonNode field = node.get("retryDelay");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("retryDelay", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("retryDelay", "expected string"));
+          } else {
+            retryDelay = TemporalSupport.parseDuration(field.textValue(), "retryDelay", violations);
+          }
+        }
+      }
+      OffsetDateTime deletedAt = null;
+      {
+        JsonNode field = node.get("deletedAt");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("deletedAt", "expected string"));
+          } else {
+            deletedAt = TemporalSupport.parseDateTime(field.textValue(), "deletedAt", violations);
+          }
+        }
+      }
+      LocalDate archivedOn = null;
+      {
+        JsonNode field = node.get("archivedOn");
+        if (field == null) {
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("archivedOn", "expected string"));
+          } else {
+            archivedOn = TemporalSupport.parseDate(field.textValue(), "archivedOn", violations);
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Temporal(
+          createdAt,
+          birthday,
+          alarm,
+          timeout,
+          updatedAt,
+          expiresOn,
+          reminder,
+          retryDelay,
+          deletedAt,
+          archivedOn);
     }
+  }
 }

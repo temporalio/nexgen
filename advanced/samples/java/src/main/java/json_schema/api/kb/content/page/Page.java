@@ -12,9 +12,7 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import json_schema.api.kb.SpecNumbers;
 import json_schema.api.kb.Violation;
@@ -22,285 +20,311 @@ import json_schema.api.kb.content.block.Block;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A page. One half of the Page &lt;-&gt; Block cross-file cycle. Because the cycle
- * spans two input files, Page and Block hoist together into Python's _recursive.py; the
- * non-cyclic PageMeta helper stays in this module.
+ * A page. One half of the Page &lt;-&gt; Block cross-file cycle. Because the cycle spans two input
+ * files, Page and Block hoist together into Python's _recursive.py; the non-cyclic PageMeta helper
+ * stays in this module.
  */
 @JsonSerialize(using = Page.Serializer.class)
 @JsonDeserialize(using = Page.Deserializer.class)
 public final class Page {
-    private final String pageId;
-    private final String title;
-    private final PageMeta meta;
-    private final @Nullable List<Block> blocks;
+  private final String pageId;
+  private final String title;
+  private final PageMeta meta;
+  private final @Nullable List<Block> blocks;
 
-    public Page(String pageId, String title, PageMeta meta, @Nullable List<Block> blocks) {
-        this.pageId = pageId;
-        this.title = title;
-        this.meta = meta;
-        this.blocks = blocks;
+  public Page(String pageId, String title, PageMeta meta, @Nullable List<Block> blocks) {
+    this.pageId = pageId;
+    this.title = title;
+    this.meta = meta;
+    this.blocks = blocks;
+  }
+
+  public String getPageId() {
+    return pageId;
+  }
+
+  public String getTitle() {
+    return title;
+  }
+
+  public PageMeta getMeta() {
+    return meta;
+  }
+
+  /**
+   * Ordered content blocks. Cross-file `$ref` to block.json (same directory); the array is the
+   * terminating edge of the cycle.
+   */
+  public @Nullable List<Block> getBlocks() {
+    return blocks;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getPageId() {
-        return pageId;
+    if (!(other instanceof Page)) {
+      return false;
     }
+    Page that = (Page) other;
+    return Objects.equals(this.pageId, that.pageId)
+        && Objects.equals(this.title, that.title)
+        && Objects.equals(this.meta, that.meta)
+        && Objects.equals(this.blocks, that.blocks);
+  }
 
-    public String getTitle() {
-        return title;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(pageId, title, meta, blocks);
+  }
 
-    public PageMeta getMeta() {
-        return meta;
-    }
+  @Override
+  public String toString() {
+    return "Page{"
+        + "pageId="
+        + pageId
+        + ", title="
+        + title
+        + ", meta="
+        + meta
+        + ", blocks="
+        + blocks
+        + "}";
+  }
 
-    /**
-     * Ordered content blocks. Cross-file `$ref` to block.json (same directory); the
-     * array is the terminating edge of the cycle.
-     */
-    public @Nullable List<Block> getBlocks() {
-        return blocks;
-    }
-
+  public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Page> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Page value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.pageId == null) {
+        violations.add(new Violation("pageId", "required"));
+      }
+      if (value.title == null) {
+        violations.add(new Violation("title", "required"));
+      }
+      if (value.meta == null) {
+        violations.add(new Violation("meta", "required"));
+      }
+      if (value.blocks != null) {
+        for (int validationIndex0 = 0; validationIndex0 < value.blocks.size(); validationIndex0++) {
+          Block validationValue0 = value.blocks.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "blocks" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
         }
-        if (!(other instanceof Page)) {
-            return false;
+      }
+      gen.writeStartObject();
+      if (value.pageId != null) {
+        gen.writeStringField("pageId", value.pageId);
+      }
+      if (value.title != null) {
+        gen.writeStringField("title", value.title);
+      }
+      if (value.meta != null) {
+        gen.writeFieldName("meta");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.meta, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("meta"));
+          }
+          gen.writeNull();
         }
-        Page that = (Page) other;
-        return Objects.equals(this.pageId, that.pageId)
-            && Objects.equals(this.title, that.title)
-            && Objects.equals(this.meta, that.meta)
-            && Objects.equals(this.blocks, that.blocks);
+      }
+      if (value.blocks != null) {
+        gen.writeFieldName("blocks");
+        gen.writeStartArray();
+        for (int nestedIndex0 = 0; nestedIndex0 < value.blocks.size(); nestedIndex0++) {
+          Block nestedElement0 = value.blocks.get(nestedIndex0);
+          if (nestedElement0 == null) {
+            gen.writeNull();
+          } else {
+            com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 =
+                new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+            try {
+              serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
+              nestedBuffer1.serialize(gen);
+            } catch (ApplicationFailure nested1) {
+              if (!"PayloadValidationError".equals(nested1.getType())
+                  || nested1.getDetails().getSize() == 0) {
+                throw nested1;
+              }
+              // The locally-created failure retains the original list as its first detail.
+              // This unchecked cast is cheap and performs no serialization.
+              @SuppressWarnings("unchecked")
+              List<Violation> nestedViolations1 =
+                  (List<Violation>) nested1.getDetails().get(0, List.class);
+              for (Violation nestedViolation1 : nestedViolations1) {
+                violations.add(
+                    nestedViolation1.withPathPrefix("blocks" + "[" + nestedIndex0 + "]"));
+              }
+              gen.writeNull();
+            }
+          }
+        }
+        gen.writeEndArray();
+      }
+      gen.writeEndObject();
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Page> {
     @Override
-    public int hashCode() {
-        return Objects.hash(pageId, title, meta, blocks);
-    }
-
-    @Override
-    public String toString() {
-        return "Page{"
-            + "pageId=" + pageId
-            + ", title=" + title
-            + ", meta=" + meta
-            + ", blocks=" + blocks
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Page> {
-        @Override
-        public void serialize(Page value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.pageId == null) {
-                violations.add(new Violation("pageId", "required"));
-            }
-            if (value.title == null) {
-                violations.add(new Violation("title", "required"));
-            }
-            if (value.meta == null) {
-                violations.add(new Violation("meta", "required"));
-            }
-            if (value.blocks != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.blocks.size(); validationIndex0++) {
-                    Block validationValue0 = value.blocks.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("blocks" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-            }
-            gen.writeStartObject();
-            if (value.pageId != null) {
-                gen.writeStringField("pageId", value.pageId);
-            }
-            if (value.title != null) {
-                gen.writeStringField("title", value.title);
-            }
-            if (value.meta != null) {
-                gen.writeFieldName("meta");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.meta, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("meta"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.blocks != null) {
-                gen.writeFieldName("blocks");
-                gen.writeStartArray();
-                for (int nestedIndex0 = 0; nestedIndex0 < value.blocks.size(); nestedIndex0++) {
-                    Block nestedElement0 = value.blocks.get(nestedIndex0);
-                    if (nestedElement0 == null) {
-                        gen.writeNull();
-                    } else {
-                        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                        try {
-                            serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
-                            nestedBuffer1.serialize(gen);
-                        } catch (ApplicationFailure nested1) {
-                            if (!"PayloadValidationError".equals(nested1.getType()) || nested1.getDetails().getSize() == 0) {
-                                throw nested1;
-                            }
-                            // The locally-created failure retains the original list as its first detail.
-                            // This unchecked cast is cheap and performs no serialization.
-                            @SuppressWarnings("unchecked")
-                            List<Violation> nestedViolations1 = (List<Violation>) nested1.getDetails().get(0, List.class);
-                            for (Violation nestedViolation1 : nestedViolations1) {
-                                violations.add(nestedViolation1.withPathPrefix("blocks" + "[" + nestedIndex0 + "]"));
-                            }
-                            gen.writeNull();
-                        }
-                    }
-                }
-                gen.writeEndArray();
-            }
-            gen.writeEndObject();
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            pending.serialize(target);
+    public Page deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "blocks":
+          case "meta":
+          case "pageId":
+          case "title":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Page> {
-        @Override
-        public Page deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "blocks":
-                    case "meta":
-                    case "pageId":
-                    case "title":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String pageId = null;
-            {
-                JsonNode field = node.get("pageId");
-                if (field == null) {
-                    violations.add(new Violation("pageId", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("pageId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("pageId", "expected string"));
-                    } else {
-                        pageId = field.textValue();
-                    }
-                }
-            }
-            String title = null;
-            {
-                JsonNode field = node.get("title");
-                if (field == null) {
-                    violations.add(new Violation("title", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("title", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("title", "expected string"));
-                    } else {
-                        title = field.textValue();
-                    }
-                }
-            }
-            PageMeta meta = null;
-            {
-                JsonNode field = node.get("meta");
-                if (field == null) {
-                    violations.add(new Violation("meta", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("meta", "explicit null not allowed"));
-                } else {
-                    try {
-                        meta = context.readTreeAsValue(field, PageMeta.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("meta"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("meta", nested.getMessage()));
-                    }
-                }
-            }
-            List<Block> blocks = null;
-            {
-                JsonNode field = node.get("blocks");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("blocks", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("blocks", "expected array"));
-                    } else {
-                        List<Block> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "blocks" + "[" + index + "]";
-                            try {
-                                items.add(context.readTreeAsValue(element, Block.class));
-                            } catch (ApplicationFailure nested) {
-                                if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                                    throw nested;
-                                }
-                                // The locally-created failure retains the original list as its first detail.
-                                // This unchecked cast is cheap and performs no serialization.
-                                @SuppressWarnings("unchecked")
-                                List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                                for (Violation violation : nestedViolations) {
-                                    violations.add(violation.withPathPrefix(elementPath));
-                                }
-                            } catch (IOException nested) {
-                                violations.add(new Violation(elementPath, nested.getMessage()));
-                            }
-                        }
-                        blocks = items;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Page(pageId, title, meta, blocks);
+      }
+      String pageId = null;
+      {
+        JsonNode field = node.get("pageId");
+        if (field == null) {
+          violations.add(new Violation("pageId", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("pageId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("pageId", "expected string"));
+          } else {
+            pageId = field.textValue();
+          }
         }
+      }
+      String title = null;
+      {
+        JsonNode field = node.get("title");
+        if (field == null) {
+          violations.add(new Violation("title", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("title", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("title", "expected string"));
+          } else {
+            title = field.textValue();
+          }
+        }
+      }
+      PageMeta meta = null;
+      {
+        JsonNode field = node.get("meta");
+        if (field == null) {
+          violations.add(new Violation("meta", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("meta", "explicit null not allowed"));
+        } else {
+          try {
+            meta = context.readTreeAsValue(field, PageMeta.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("meta"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("meta", nested.getMessage()));
+          }
+        }
+      }
+      List<Block> blocks = null;
+      {
+        JsonNode field = node.get("blocks");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("blocks", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("blocks", "expected array"));
+          } else {
+            List<Block> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "blocks" + "[" + index + "]";
+              try {
+                items.add(context.readTreeAsValue(element, Block.class));
+              } catch (ApplicationFailure nested) {
+                if (!"PayloadValidationError".equals(nested.getType())
+                    || nested.getDetails().getSize() == 0) {
+                  throw nested;
+                }
+                // The locally-created failure retains the original list as its first detail.
+                // This unchecked cast is cheap and performs no serialization.
+                @SuppressWarnings("unchecked")
+                List<Violation> nestedViolations =
+                    (List<Violation>) nested.getDetails().get(0, List.class);
+                for (Violation violation : nestedViolations) {
+                  violations.add(violation.withPathPrefix(elementPath));
+                }
+              } catch (IOException nested) {
+                violations.add(new Violation(elementPath, nested.getMessage()));
+              }
+            }
+            blocks = items;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Page(pageId, title, meta, blocks);
     }
+  }
 }

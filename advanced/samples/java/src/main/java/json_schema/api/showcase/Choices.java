@@ -19,128 +19,144 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A map whose *member* type is a union written inline in `additionalProperties`. Like
- * an element union it has no name of its own, so it is named after its position —
- * `ChoicesValue` — and moved into `$defs`; each member then decodes through that
- * union's selector, with the member key carrying into the violation path.
+ * A map whose *member* type is a union written inline in `additionalProperties`. Like an element
+ * union it has no name of its own, so it is named after its position — `ChoicesValue` — and moved
+ * into `$defs`; each member then decodes through that union's selector, with the member key
+ * carrying into the violation path.
  */
 @JsonSerialize(using = Choices.Serializer.class)
 @JsonDeserialize(using = Choices.Deserializer.class)
 public final class Choices {
-    private final Map<String, ChoicesValue> additionalProperties;
+  private final Map<String, ChoicesValue> additionalProperties;
 
-    public Choices(Map<String, ChoicesValue> additionalProperties) {
-        this.additionalProperties = additionalProperties;
+  public Choices(Map<String, ChoicesValue> additionalProperties) {
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Map<String, ChoicesValue> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public Map<String, ChoicesValue> getAdditionalProperties() {
-        return additionalProperties;
+    if (!(other instanceof Choices)) {
+      return false;
     }
+    return Objects.equals(this.additionalProperties, ((Choices) other).additionalProperties);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "Choices{" + "additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Choices> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Choices value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.additionalProperties == null) {
+        violations.add(new Violation("", "expected object"));
+      } else {
+        for (Map.Entry<String, ChoicesValue> entry : value.additionalProperties.entrySet()) {
+          if (entry.getValue() == null) {
+            violations.add(
+                new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
+            continue;
+          }
         }
-        if (!(other instanceof Choices)) {
-            return false;
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      for (Map.Entry<String, ChoicesValue> entry : value.additionalProperties.entrySet()) {
+        gen.writeFieldName(entry.getKey());
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(entry.getValue(), nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix(Violation.memberPath(entry.getKey())));
+          }
+          gen.writeNull();
         }
-        return Objects.equals(this.additionalProperties, ((Choices) other).additionalProperties);
+      }
+      gen.writeEndObject();
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Choices> {
     @Override
-    public int hashCode() {
-        return Objects.hash(additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "Choices{"
-            + "additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Choices> {
-        @Override
-        public void serialize(Choices value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.additionalProperties == null) {
-                violations.add(new Violation("", "expected object"));
-            } else {
-                for (Map.Entry<String, ChoicesValue> entry : value.additionalProperties.entrySet()) {
-                    if (entry.getValue() == null) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
-                        continue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            for (Map.Entry<String, ChoicesValue> entry : value.additionalProperties.entrySet()) {
-                gen.writeFieldName(entry.getKey());
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(entry.getValue(), nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix(Violation.memberPath(entry.getKey())));
-                    }
-                    gen.writeNull();
-                }
-            }
-            gen.writeEndObject();
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            pending.serialize(target);
+    public Choices deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, ChoicesValue> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        JsonNode element = node.get(key);
+        if (element.isNull()) {
+          violations.add(new Violation(path, "explicit null not allowed"));
+          continue;
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Choices> {
-        @Override
-        public Choices deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, ChoicesValue> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                JsonNode element = node.get(key);
-                if (element.isNull()) {
-                    violations.add(new Violation(path, "explicit null not allowed"));
-                    continue;
-                }
-                ChoicesValue parsedAdditionalProperties = ChoicesValue.fromNode(element, path, violations, context);
-                if (parsedAdditionalProperties != null) {
-                    additionalProperties.put(key, parsedAdditionalProperties);
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Choices(additionalProperties);
+        ChoicesValue parsedAdditionalProperties =
+            ChoicesValue.fromNode(element, path, violations, context);
+        if (parsedAdditionalProperties != null) {
+          additionalProperties.put(key, parsedAdditionalProperties);
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Choices(additionalProperties);
     }
+  }
 }

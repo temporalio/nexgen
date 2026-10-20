@@ -12,174 +12,182 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Request to post a message.
- */
+/** Request to post a message. */
 @JsonSerialize(using = SendMessageInput.Serializer.class)
 @JsonDeserialize(using = SendMessageInput.Deserializer.class)
 public final class SendMessageInput {
-    private final String roomId;
-    private final Message message;
+  private final String roomId;
+  private final Message message;
 
-    public SendMessageInput(String roomId, Message message) {
-        this.roomId = roomId;
-        this.message = message;
+  public SendMessageInput(String roomId, Message message) {
+    this.roomId = roomId;
+    this.message = message;
+  }
+
+  public String getRoomId() {
+    return roomId;
+  }
+
+  public Message getMessage() {
+    return message;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getRoomId() {
-        return roomId;
+    if (!(other instanceof SendMessageInput)) {
+      return false;
     }
+    SendMessageInput that = (SendMessageInput) other;
+    return Objects.equals(this.roomId, that.roomId) && Objects.equals(this.message, that.message);
+  }
 
-    public Message getMessage() {
-        return message;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(roomId, message);
+  }
 
+  @Override
+  public String toString() {
+    return "SendMessageInput{" + "roomId=" + roomId + ", message=" + message + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<SendMessageInput> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(SendMessageInput value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.roomId == null) {
+        violations.add(new Violation("roomId", "required"));
+      }
+      if (value.message == null) {
+        violations.add(new Violation("message", "required"));
+      }
+      gen.writeStartObject();
+      if (value.roomId != null) {
+        gen.writeStringField("roomId", value.roomId);
+      }
+      if (value.message != null) {
+        gen.writeFieldName("message");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.message, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("message"));
+          }
+          gen.writeNull();
         }
-        if (!(other instanceof SendMessageInput)) {
-            return false;
-        }
-        SendMessageInput that = (SendMessageInput) other;
-        return Objects.equals(this.roomId, that.roomId)
-            && Objects.equals(this.message, that.message);
+      }
+      gen.writeEndObject();
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<SendMessageInput> {
     @Override
-    public int hashCode() {
-        return Objects.hash(roomId, message);
-    }
-
-    @Override
-    public String toString() {
-        return "SendMessageInput{"
-            + "roomId=" + roomId
-            + ", message=" + message
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<SendMessageInput> {
-        @Override
-        public void serialize(SendMessageInput value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.roomId == null) {
-                violations.add(new Violation("roomId", "required"));
-            }
-            if (value.message == null) {
-                violations.add(new Violation("message", "required"));
-            }
-            gen.writeStartObject();
-            if (value.roomId != null) {
-                gen.writeStringField("roomId", value.roomId);
-            }
-            if (value.message != null) {
-                gen.writeFieldName("message");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.message, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("message"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            gen.writeEndObject();
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            pending.serialize(target);
+    public SendMessageInput deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "message":
+          case "roomId":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<SendMessageInput> {
-        @Override
-        public SendMessageInput deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "message":
-                    case "roomId":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String roomId = null;
-            {
-                JsonNode field = node.get("roomId");
-                if (field == null) {
-                    violations.add(new Violation("roomId", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("roomId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("roomId", "expected string"));
-                    } else {
-                        roomId = field.textValue();
-                    }
-                }
-            }
-            Message message = null;
-            {
-                JsonNode field = node.get("message");
-                if (field == null) {
-                    violations.add(new Violation("message", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("message", "explicit null not allowed"));
-                } else {
-                    try {
-                        message = context.readTreeAsValue(field, Message.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("message"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("message", nested.getMessage()));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new SendMessageInput(roomId, message);
+      }
+      String roomId = null;
+      {
+        JsonNode field = node.get("roomId");
+        if (field == null) {
+          violations.add(new Violation("roomId", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("roomId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("roomId", "expected string"));
+          } else {
+            roomId = field.textValue();
+          }
         }
+      }
+      Message message = null;
+      {
+        JsonNode field = node.get("message");
+        if (field == null) {
+          violations.add(new Violation("message", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("message", "explicit null not allowed"));
+        } else {
+          try {
+            message = context.readTreeAsValue(field, Message.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("message"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("message", nested.getMessage()));
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new SendMessageInput(roomId, message);
     }
+  }
 }

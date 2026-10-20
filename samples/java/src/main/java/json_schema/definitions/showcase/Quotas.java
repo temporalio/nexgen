@@ -19,131 +19,151 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A typed map whose members carry their own constraints: every member is a non-negative
- * multiple of 5, at most 100. A member is held to exactly what a declared field of that
- * type is held to, in both directions, with the offending member's key as the violation
- * path.
+ * A typed map whose members carry their own constraints: every member is a non-negative multiple of
+ * 5, at most 100. A member is held to exactly what a declared field of that type is held to, in
+ * both directions, with the offending member's key as the violation path.
  */
 @JsonSerialize(using = Quotas.Serializer.class)
 @JsonDeserialize(using = Quotas.Deserializer.class)
 public final class Quotas {
-    private final Map<String, Long> additionalProperties;
+  private final Map<String, Long> additionalProperties;
 
-    public Quotas(Map<String, Long> additionalProperties) {
-        this.additionalProperties = additionalProperties;
+  public Quotas(Map<String, Long> additionalProperties) {
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Map<String, Long> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public Map<String, Long> getAdditionalProperties() {
-        return additionalProperties;
+    if (!(other instanceof Quotas)) {
+      return false;
     }
+    return Objects.equals(this.additionalProperties, ((Quotas) other).additionalProperties);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "Quotas{" + "additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Quotas> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Quotas value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.additionalProperties == null) {
+        violations.add(new Violation("", "expected object"));
+      } else {
+        for (Map.Entry<String, Long> entry : value.additionalProperties.entrySet()) {
+          if (entry.getValue() == null) {
+            violations.add(
+                new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
+            continue;
+          }
+          if (entry.getValue() < -SpecNumbers.INTEGER_CAP
+              || entry.getValue() > SpecNumbers.INTEGER_CAP) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()), "exceeds \u00b1(2^53-1) integer cap"));
+          }
+          if (entry.getValue() < 0L) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()), "must be >= 0, got " + entry.getValue()));
+          }
+          if (entry.getValue() > 100L) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()),
+                    "must be <= 100, got " + entry.getValue()));
+          }
+          if (entry.getValue() % 5L != 0) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()),
+                    "must be a multiple of 5, got " + entry.getValue()));
+          }
         }
-        if (!(other instanceof Quotas)) {
-            return false;
-        }
-        return Objects.equals(this.additionalProperties, ((Quotas) other).additionalProperties);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      for (Map.Entry<String, Long> entry : value.additionalProperties.entrySet()) {
+        gen.writeNumberField(entry.getKey(), entry.getValue());
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Quotas> {
     @Override
-    public int hashCode() {
-        return Objects.hash(additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "Quotas{"
-            + "additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Quotas> {
-        @Override
-        public void serialize(Quotas value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.additionalProperties == null) {
-                violations.add(new Violation("", "expected object"));
-            } else {
-                for (Map.Entry<String, Long> entry : value.additionalProperties.entrySet()) {
-                    if (entry.getValue() == null) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
-                        continue;
-                    }
-                    if (entry.getValue() < -SpecNumbers.INTEGER_CAP || entry.getValue() > SpecNumbers.INTEGER_CAP) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "exceeds \u00b1(2^53-1) integer cap"));
-                    }
-                    if (entry.getValue() < 0L) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must be >= 0, got " + entry.getValue()));
-                    }
-                    if (entry.getValue() > 100L) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must be <= 100, got " + entry.getValue()));
-                    }
-                    if (entry.getValue() % 5L != 0) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must be a multiple of 5, got " + entry.getValue()));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            for (Map.Entry<String, Long> entry : value.additionalProperties.entrySet()) {
-                gen.writeNumberField(entry.getKey(), entry.getValue());
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public Quotas deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, Long> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        JsonNode element = node.get(key);
+        if (element.isNull()) {
+          violations.add(new Violation(path, "explicit null not allowed"));
+          continue;
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Quotas> {
-        @Override
-        public Quotas deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, Long> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                JsonNode element = node.get(key);
-                if (element.isNull()) {
-                    violations.add(new Violation(path, "explicit null not allowed"));
-                    continue;
-                }
-                Long parsed = SpecNumbers.specLong(element, path, violations);
-                if (parsed != null) {
-                    if (parsed < -SpecNumbers.INTEGER_CAP || parsed > SpecNumbers.INTEGER_CAP) {
-                        violations.add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
-                    }
-                    if (parsed < 0L) {
-                        violations.add(new Violation(path, "must be >= 0, got " + parsed));
-                    }
-                    if (parsed > 100L) {
-                        violations.add(new Violation(path, "must be <= 100, got " + parsed));
-                    }
-                    if (parsed % 5L != 0) {
-                        violations.add(new Violation(path, "must be a multiple of 5, got " + parsed));
-                    }
-                    additionalProperties.put(key, parsed);
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Quotas(additionalProperties);
+        Long parsed = SpecNumbers.specLong(element, path, violations);
+        if (parsed != null) {
+          if (parsed < -SpecNumbers.INTEGER_CAP || parsed > SpecNumbers.INTEGER_CAP) {
+            violations.add(new Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+          }
+          if (parsed < 0L) {
+            violations.add(new Violation(path, "must be >= 0, got " + parsed));
+          }
+          if (parsed > 100L) {
+            violations.add(new Violation(path, "must be <= 100, got " + parsed));
+          }
+          if (parsed % 5L != 0) {
+            violations.add(new Violation(path, "must be a multiple of 5, got " + parsed));
+          }
+          additionalProperties.put(key, parsed);
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Quotas(additionalProperties);
     }
+  }
 }

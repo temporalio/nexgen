@@ -19,206 +19,226 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * An object written **inline** on the property rather than in `$defs`. It is named
- * after the position it occupies — `ShowcaseLocation` — moved into `$defs`, and the
- * property becomes a `$ref` at it, so it emits as the ordinary named model an authored
- * definition would produce, member constraints and all. Its own nested inline object is
- * named against that name in turn (`ShowcaseLocationGeo`), so nesting needs no `$defs`
- * boilerplate at any depth.
+ * An object written **inline** on the property rather than in `$defs`. It is named after the
+ * position it occupies — `ShowcaseLocation` — moved into `$defs`, and the property becomes a `$ref`
+ * at it, so it emits as the ordinary named model an authored definition would produce, member
+ * constraints and all. Its own nested inline object is named against that name in turn
+ * (`ShowcaseLocationGeo`), so nesting needs no `$defs` boilerplate at any depth.
  */
 @JsonSerialize(using = ShowcaseLocation.Serializer.class)
 @JsonDeserialize(using = ShowcaseLocation.Deserializer.class)
 public final class ShowcaseLocation {
-    private final String city;
-    private final @Nullable ShowcaseLocationGeo geo;
-    private final Map<String, JsonNode> additionalProperties;
+  private final String city;
+  private final @Nullable ShowcaseLocationGeo geo;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public ShowcaseLocation(String city, @Nullable ShowcaseLocationGeo geo, Map<String, JsonNode> additionalProperties) {
-        this.city = city;
-        this.geo = geo;
-        this.additionalProperties = additionalProperties;
+  public ShowcaseLocation(
+      String city, @Nullable ShowcaseLocationGeo geo, Map<String, JsonNode> additionalProperties) {
+    this.city = city;
+    this.geo = geo;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public String getCity() {
+    return city;
+  }
+
+  public @Nullable ShowcaseLocationGeo getGeo() {
+    return geo;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getCity() {
-        return city;
+    if (!(other instanceof ShowcaseLocation)) {
+      return false;
     }
+    ShowcaseLocation that = (ShowcaseLocation) other;
+    return Objects.equals(this.city, that.city)
+        && Objects.equals(this.geo, that.geo)
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
-    public @Nullable ShowcaseLocationGeo getGeo() {
-        return geo;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(city, geo, additionalProperties);
+  }
 
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
-    }
+  @Override
+  public String toString() {
+    return "ShowcaseLocation{"
+        + "city="
+        + city
+        + ", geo="
+        + geo
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
 
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseLocation> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(ShowcaseLocation value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.city == null) {
+        violations.add(new Violation("city", "required"));
+      } else {
+        int length = value.city.codePointCount(0, value.city.length());
+        if (length < 1) {
+          violations.add(new Violation("city", "must have length >= 1, got " + length));
         }
-        if (!(other instanceof ShowcaseLocation)) {
-            return false;
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.city != null) {
+        wireKeys.add("city");
+      }
+      if (value.geo != null) {
+        wireKeys.add("geo");
+      }
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
         }
-        ShowcaseLocation that = (ShowcaseLocation) other;
-        return Objects.equals(this.city, that.city)
-            && Objects.equals(this.geo, that.geo)
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      }
+      gen.writeStartObject();
+      if (value.city != null) {
+        gen.writeStringField("city", value.city);
+      }
+      if (value.geo != null) {
+        gen.writeFieldName("geo");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.geo, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("geo"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseLocation> {
     @Override
-    public int hashCode() {
-        return Objects.hash(city, geo, additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "ShowcaseLocation{"
-            + "city=" + city
-            + ", geo=" + geo
-            + ", additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseLocation> {
-        @Override
-        public void serialize(ShowcaseLocation value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.city == null) {
-                violations.add(new Violation("city", "required"));
-            } else {
-                int length = value.city.codePointCount(0, value.city.length());
-                if (length < 1) {
-                    violations.add(new Violation("city", "must have length >= 1, got " + length));
-                }
-            }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.city != null) {
-                wireKeys.add("city");
-            }
-            if (value.geo != null) {
-                wireKeys.add("geo");
-            }
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            gen.writeStartObject();
-            if (value.city != null) {
-                gen.writeStringField("city", value.city);
-            }
-            if (value.geo != null) {
-                gen.writeFieldName("geo");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.geo, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("geo"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            pending.serialize(target);
+    public ShowcaseLocation deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "city":
+          case "geo":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseLocation> {
-        @Override
-        public ShowcaseLocation deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
+      }
+      String city = null;
+      {
+        JsonNode field = node.get("city");
+        if (field == null) {
+          violations.add(new Violation("city", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("city", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("city", "expected string"));
+          } else {
+            city = field.textValue();
+            int length = city.codePointCount(0, city.length());
+            if (length < 1) {
+              violations.add(new Violation("city", "must have length >= 1, got " + length));
             }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "city":
-                    case "geo":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            String city = null;
-            {
-                JsonNode field = node.get("city");
-                if (field == null) {
-                    violations.add(new Violation("city", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("city", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("city", "expected string"));
-                    } else {
-                        city = field.textValue();
-                        int length = city.codePointCount(0, city.length());
-                        if (length < 1) {
-                            violations.add(new Violation("city", "must have length >= 1, got " + length));
-                        }
-                    }
-                }
-            }
-            ShowcaseLocationGeo geo = null;
-            {
-                JsonNode field = node.get("geo");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("geo", "explicit null not allowed"));
-                } else {
-                    try {
-                        geo = context.readTreeAsValue(field, ShowcaseLocationGeo.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("geo"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("geo", nested.getMessage()));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new ShowcaseLocation(city, geo, additionalProperties);
+          }
         }
+      }
+      ShowcaseLocationGeo geo = null;
+      {
+        JsonNode field = node.get("geo");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("geo", "explicit null not allowed"));
+        } else {
+          try {
+            geo = context.readTreeAsValue(field, ShowcaseLocationGeo.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("geo"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("geo", nested.getMessage()));
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new ShowcaseLocation(city, geo, additionalProperties);
     }
+  }
 }

@@ -19,133 +19,158 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A string map with member-count and key-shape constraints: 1 to 3 entries, each key at
- * most 8 code points (minProperties/maxProperties/propertyNames on a map-shaped
- * object).
+ * A string map with member-count and key-shape constraints: 1 to 3 entries, each key at most 8 code
+ * points (minProperties/maxProperties/propertyNames on a map-shaped object).
  */
 @JsonSerialize(using = Attributes.Serializer.class)
 @JsonDeserialize(using = Attributes.Deserializer.class)
 public final class Attributes {
-    private final Map<String, String> additionalProperties;
+  private final Map<String, String> additionalProperties;
 
-    public Attributes(Map<String, String> additionalProperties) {
-        this.additionalProperties = additionalProperties;
+  public Attributes(Map<String, String> additionalProperties) {
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Map<String, String> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public Map<String, String> getAdditionalProperties() {
-        return additionalProperties;
+    if (!(other instanceof Attributes)) {
+      return false;
     }
+    return Objects.equals(this.additionalProperties, ((Attributes) other).additionalProperties);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "Attributes{" + "additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Attributes> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Attributes value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.additionalProperties == null) {
+        violations.add(new Violation("", "expected object"));
+      } else {
+        if (value.additionalProperties.size() < 1) {
+          violations.add(
+              new Violation(
+                  "", "must have at least 1 properties, got " + value.additionalProperties.size()));
         }
-        if (!(other instanceof Attributes)) {
-            return false;
+        if (value.additionalProperties.size() > 3) {
+          violations.add(
+              new Violation(
+                  "", "must have at most 3 properties, got " + value.additionalProperties.size()));
         }
-        return Objects.equals(this.additionalProperties, ((Attributes) other).additionalProperties);
+        for (String pnKey : value.additionalProperties.keySet()) {
+          int pnLength = pnKey.codePointCount(0, pnKey.length());
+          if (pnLength > 8) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(pnKey),
+                    "invalid property name \""
+                        + pnKey
+                        + "\": must have length <= 8, got "
+                        + pnLength));
+          }
+        }
+        for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
+          if (entry.getValue() == null) {
+            violations.add(
+                new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
+            continue;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
+        gen.writeStringField(entry.getKey(), entry.getValue());
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Attributes> {
     @Override
-    public int hashCode() {
-        return Objects.hash(additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "Attributes{"
-            + "additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Attributes> {
-        @Override
-        public void serialize(Attributes value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.additionalProperties == null) {
-                violations.add(new Violation("", "expected object"));
-            } else {
-                if (value.additionalProperties.size() < 1) {
-                    violations.add(new Violation("", "must have at least 1 properties, got " + value.additionalProperties.size()));
-                }
-                if (value.additionalProperties.size() > 3) {
-                    violations.add(new Violation("", "must have at most 3 properties, got " + value.additionalProperties.size()));
-                }
-                for (String pnKey : value.additionalProperties.keySet()) {
-                    int pnLength = pnKey.codePointCount(0, pnKey.length());
-                    if (pnLength > 8) {
-                        violations.add(new Violation(Violation.memberPath(pnKey), "invalid property name \"" + pnKey + "\": must have length <= 8, got " + pnLength));
-                    }
-                }
-                for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
-                    if (entry.getValue() == null) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "explicit null not allowed"));
-                        continue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            for (Map.Entry<String, String> entry : value.additionalProperties.entrySet()) {
-                gen.writeStringField(entry.getKey(), entry.getValue());
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public Attributes deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, String> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        JsonNode element = node.get(key);
+        if (element.isNull()) {
+          violations.add(new Violation(path, "explicit null not allowed"));
+          continue;
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Attributes> {
-        @Override
-        public Attributes deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, String> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                JsonNode element = node.get(key);
-                if (element.isNull()) {
-                    violations.add(new Violation(path, "explicit null not allowed"));
-                    continue;
-                }
-                if (!element.isTextual()) {
-                    violations.add(new Violation(path, "expected string value"));
-                } else {
-                    additionalProperties.put(key, element.textValue());
-                }
-            }
-            if (node.size() < 1) {
-                violations.add(new Violation("", "must have at least 1 properties, got " + node.size()));
-            }
-            if (node.size() > 3) {
-                violations.add(new Violation("", "must have at most 3 properties, got " + node.size()));
-            }
-            Iterator<String> propertyNameKeys = node.fieldNames();
-            while (propertyNameKeys.hasNext()) {
-                String pnKey = propertyNameKeys.next();
-                int pnLength = pnKey.codePointCount(0, pnKey.length());
-                if (pnLength > 8) {
-                    violations.add(new Violation(Violation.memberPath(pnKey), "invalid property name \"" + pnKey + "\": must have length <= 8, got " + pnLength));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Attributes(additionalProperties);
+        if (!element.isTextual()) {
+          violations.add(new Violation(path, "expected string value"));
+        } else {
+          additionalProperties.put(key, element.textValue());
         }
+      }
+      if (node.size() < 1) {
+        violations.add(new Violation("", "must have at least 1 properties, got " + node.size()));
+      }
+      if (node.size() > 3) {
+        violations.add(new Violation("", "must have at most 3 properties, got " + node.size()));
+      }
+      Iterator<String> propertyNameKeys = node.fieldNames();
+      while (propertyNameKeys.hasNext()) {
+        String pnKey = propertyNameKeys.next();
+        int pnLength = pnKey.codePointCount(0, pnKey.length());
+        if (pnLength > 8) {
+          violations.add(
+              new Violation(
+                  Violation.memberPath(pnKey),
+                  "invalid property name \""
+                      + pnKey
+                      + "\": must have length <= 8, got "
+                      + pnLength));
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Attributes(additionalProperties);
     }
+  }
 }

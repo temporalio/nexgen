@@ -84,6 +84,102 @@ mod format_tests {
     }
 
     #[test]
+    fn java_formats_only_emitted_files_and_propagates_errors() {
+        let root = project_root();
+        let temp = tempfile::tempdir().unwrap();
+        let output = temp.path().join("generated");
+        fs::create_dir(&output).unwrap();
+        let neighbor = output.join("UserCode.java");
+        fs::write(&neighbor, "handwritten, intentionally not valid Java").unwrap();
+        let manifest = output.join("notes.txt");
+        fs::write(&manifest, "leave alone").unwrap();
+        let java = temp.path().join("java");
+        fs::write(&java, "#!/bin/sh\nfor arg do\ncase \"$arg\" in *.java) printf '\\n// formatted by test\\n' >> \"$arg\" ;; esac\ndone\n").unwrap();
+        let mut permissions = fs::metadata(&java).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&java, permissions).unwrap();
+        let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
+        command
+            .env("PATH", formatter_path_env(temp.path()))
+            .env(
+                "NEXGEN_JAVA_FORMAT_JAR",
+                temp.path().join("formatter with spaces.jar"),
+            )
+            .args([
+                "java",
+                root.join("samples/schemas/chat.nexusrpc.yaml")
+                    .to_str()
+                    .unwrap(),
+                "--output",
+                output.to_str().unwrap(),
+                "--package-name",
+                "test.generated",
+                "--format",
+            ]);
+        assert!(command.status().unwrap().success());
+        assert!(
+            fs::read_to_string(output.join("Message.java"))
+                .unwrap()
+                .contains("// formatted by test")
+        );
+        assert_eq!(
+            fs::read_to_string(&neighbor).unwrap(),
+            "handwritten, intentionally not valid Java"
+        );
+        assert_eq!(fs::read_to_string(&manifest).unwrap(), "leave alone");
+
+        fs::write(java, "#!/bin/sh\nexit 23\n").unwrap();
+        let failure = command.output().unwrap();
+        assert!(!failure.status.success());
+        assert!(String::from_utf8_lossy(&failure.stderr).contains("failed for"));
+    }
+
+    #[test]
+    fn java_download_is_atomic_and_cached() {
+        let root = project_root();
+        let temp = tempfile::tempdir().unwrap();
+        let cache = temp.path().join("cache");
+        let curl = temp.path().join("curl");
+        let java = temp.path().join("java");
+        fs::write(&curl, "#!/bin/sh\nwhile [ $# -gt 0 ]; do\nif [ \"$1\" = --output ]; then shift; printf partial > \"$1\"; break; fi\nshift\ndone\nexit 7\n").unwrap();
+        fs::write(&java, "#!/bin/sh\nexit 0\n").unwrap();
+        for path in [&curl, &java] {
+            let mut permissions = fs::metadata(path).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(path, permissions).unwrap();
+        }
+        let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
+        command
+            .env("PATH", formatter_path_env(temp.path()))
+            .env_remove("NEXGEN_JAVA_FORMAT_JAR")
+            .env("XDG_CACHE_HOME", &cache)
+            .args([
+                "java",
+                root.join("samples/schemas/chat.nexusrpc.yaml")
+                    .to_str()
+                    .unwrap(),
+                "--output",
+                temp.path().join("generated").to_str().unwrap(),
+                "--package-name",
+                "test.generated",
+                "--format",
+            ]);
+        let jar = cache.join("nexgen/google-java-format-1.24.0-all-deps.jar");
+        assert!(!command.status().unwrap().success());
+        assert!(!jar.exists());
+        assert_eq!(fs::read_dir(cache.join("nexgen")).unwrap().count(), 0);
+
+        let script = fs::read_to_string(&curl)
+            .unwrap()
+            .replace("exit 7", "exit 0");
+        fs::write(&curl, script).unwrap();
+        assert!(command.status().unwrap().success());
+        assert!(jar.is_file());
+        fs::write(curl, "#!/bin/sh\nexit 99\n").unwrap();
+        assert!(command.status().unwrap().success());
+    }
+
+    #[test]
     fn cli_generates_and_formats_typescript_file() {
         let root = project_root();
         let temp_dir = unique_temp_dir("typescript-format");

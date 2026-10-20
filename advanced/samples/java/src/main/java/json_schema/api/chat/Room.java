@@ -18,308 +18,335 @@ import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A chat room. Open to forward-compatible extension.
- */
+/** A chat room. Open to forward-compatible extension. */
 @JsonSerialize(using = Room.Serializer.class)
 @JsonDeserialize(using = Room.Deserializer.class)
 public final class Room {
-    private final String roomId;
-    private final String displayName;
-    private final @Nullable String topic;
-    private final @Nullable List<String> members;
-    private final @Nullable Labels labels;
-    private final Map<String, JsonNode> additionalProperties;
+  private final String roomId;
+  private final String displayName;
+  private final @Nullable String topic;
+  private final @Nullable List<String> members;
+  private final @Nullable Labels labels;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public Room(String roomId, String displayName, @Nullable String topic, @Nullable List<String> members, @Nullable Labels labels, Map<String, JsonNode> additionalProperties) {
-        this.roomId = roomId;
-        this.displayName = displayName;
-        this.topic = topic;
-        this.members = members;
-        this.labels = labels;
-        this.additionalProperties = additionalProperties;
+  public Room(
+      String roomId,
+      String displayName,
+      @Nullable String topic,
+      @Nullable List<String> members,
+      @Nullable Labels labels,
+      Map<String, JsonNode> additionalProperties) {
+    this.roomId = roomId;
+    this.displayName = displayName;
+    this.topic = topic;
+    this.members = members;
+    this.labels = labels;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public String getRoomId() {
+    return roomId;
+  }
+
+  public String getDisplayName() {
+    return displayName;
+  }
+
+  /** Room topic; may be explicitly cleared to null. */
+  public @Nullable String getTopic() {
+    return topic;
+  }
+
+  public @Nullable List<String> getMembers() {
+    return members;
+  }
+
+  public @Nullable Labels getLabels() {
+    return labels;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getRoomId() {
-        return roomId;
+    if (!(other instanceof Room)) {
+      return false;
     }
+    Room that = (Room) other;
+    return Objects.equals(this.roomId, that.roomId)
+        && Objects.equals(this.displayName, that.displayName)
+        && Objects.equals(this.topic, that.topic)
+        && Objects.equals(this.members, that.members)
+        && Objects.equals(this.labels, that.labels)
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
-    public String getDisplayName() {
-        return displayName;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(roomId, displayName, topic, members, labels, additionalProperties);
+  }
 
-    /**
-     * Room topic; may be explicitly cleared to null.
-     */
-    public @Nullable String getTopic() {
-        return topic;
-    }
+  @Override
+  public String toString() {
+    return "Room{"
+        + "roomId="
+        + roomId
+        + ", displayName="
+        + displayName
+        + ", topic="
+        + topic
+        + ", members="
+        + members
+        + ", labels="
+        + labels
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
 
-    public @Nullable List<String> getMembers() {
-        return members;
-    }
-
-    public @Nullable Labels getLabels() {
-        return labels;
-    }
-
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
-    }
-
+  public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Room> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Room value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.roomId == null) {
+        violations.add(new Violation("roomId", "required"));
+      }
+      if (value.displayName == null) {
+        violations.add(new Violation("displayName", "required"));
+      }
+      if (value.members != null) {
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.members.size();
+            validationIndex0++) {
+          String validationValue0 = value.members.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "members" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
         }
-        if (!(other instanceof Room)) {
-            return false;
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.roomId != null) {
+        wireKeys.add("roomId");
+      }
+      if (value.displayName != null) {
+        wireKeys.add("displayName");
+      }
+      wireKeys.add("topic");
+      if (value.members != null) {
+        wireKeys.add("members");
+      }
+      if (value.labels != null) {
+        wireKeys.add("labels");
+      }
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
         }
-        Room that = (Room) other;
-        return Objects.equals(this.roomId, that.roomId)
-            && Objects.equals(this.displayName, that.displayName)
-            && Objects.equals(this.topic, that.topic)
-            && Objects.equals(this.members, that.members)
-            && Objects.equals(this.labels, that.labels)
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      }
+      gen.writeStartObject();
+      if (value.roomId != null) {
+        gen.writeStringField("roomId", value.roomId);
+      }
+      if (value.displayName != null) {
+        gen.writeStringField("displayName", value.displayName);
+      }
+      if (value.topic != null) {
+        gen.writeStringField("topic", value.topic);
+      } else {
+        gen.writeNullField("topic");
+      }
+      if (value.members != null) {
+        gen.writeFieldName("members");
+        serializers.defaultSerializeValue(value.members, gen);
+      }
+      if (value.labels != null) {
+        gen.writeFieldName("labels");
+        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 =
+            new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+        try {
+          serializers.defaultSerializeValue(value.labels, nestedBuffer0);
+          nestedBuffer0.serialize(gen);
+        } catch (ApplicationFailure nested0) {
+          if (!"PayloadValidationError".equals(nested0.getType())
+              || nested0.getDetails().getSize() == 0) {
+            throw nested0;
+          }
+          // The locally-created failure retains the original list as its first detail.
+          // This unchecked cast is cheap and performs no serialization.
+          @SuppressWarnings("unchecked")
+          List<Violation> nestedViolations0 =
+              (List<Violation>) nested0.getDetails().get(0, List.class);
+          for (Violation nestedViolation0 : nestedViolations0) {
+            violations.add(nestedViolation0.withPathPrefix("labels"));
+          }
+          gen.writeNull();
+        }
+      }
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Room> {
     @Override
-    public int hashCode() {
-        return Objects.hash(roomId, displayName, topic, members, labels, additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "Room{"
-            + "roomId=" + roomId
-            + ", displayName=" + displayName
-            + ", topic=" + topic
-            + ", members=" + members
-            + ", labels=" + labels
-            + ", additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Room> {
-        @Override
-        public void serialize(Room value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.roomId == null) {
-                violations.add(new Violation("roomId", "required"));
-            }
-            if (value.displayName == null) {
-                violations.add(new Violation("displayName", "required"));
-            }
-            if (value.members != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.members.size(); validationIndex0++) {
-                    String validationValue0 = value.members.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("members" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-            }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.roomId != null) {
-                wireKeys.add("roomId");
-            }
-            if (value.displayName != null) {
-                wireKeys.add("displayName");
-            }
-            wireKeys.add("topic");
-            if (value.members != null) {
-                wireKeys.add("members");
-            }
-            if (value.labels != null) {
-                wireKeys.add("labels");
-            }
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            gen.writeStartObject();
-            if (value.roomId != null) {
-                gen.writeStringField("roomId", value.roomId);
-            }
-            if (value.displayName != null) {
-                gen.writeStringField("displayName", value.displayName);
-            }
-            if (value.topic != null) {
-                gen.writeStringField("topic", value.topic);
-            } else {
-                gen.writeNullField("topic");
-            }
-            if (value.members != null) {
-                gen.writeFieldName("members");
-                serializers.defaultSerializeValue(value.members, gen);
-            }
-            if (value.labels != null) {
-                gen.writeFieldName("labels");
-                com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer0 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                try {
-                    serializers.defaultSerializeValue(value.labels, nestedBuffer0);
-                    nestedBuffer0.serialize(gen);
-                } catch (ApplicationFailure nested0) {
-                    if (!"PayloadValidationError".equals(nested0.getType()) || nested0.getDetails().getSize() == 0) {
-                        throw nested0;
-                    }
-                    // The locally-created failure retains the original list as its first detail.
-                    // This unchecked cast is cheap and performs no serialization.
-                    @SuppressWarnings("unchecked")
-                    List<Violation> nestedViolations0 = (List<Violation>) nested0.getDetails().get(0, List.class);
-                    for (Violation nestedViolation0 : nestedViolations0) {
-                        violations.add(nestedViolation0.withPathPrefix("labels"));
-                    }
-                    gen.writeNull();
-                }
-            }
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            pending.serialize(target);
+    public Room deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "displayName":
+          case "labels":
+          case "members":
+          case "roomId":
+          case "topic":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Room> {
-        @Override
-        public Room deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "displayName":
-                    case "labels":
-                    case "members":
-                    case "roomId":
-                    case "topic":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            String roomId = null;
-            {
-                JsonNode field = node.get("roomId");
-                if (field == null) {
-                    violations.add(new Violation("roomId", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("roomId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("roomId", "expected string"));
-                    } else {
-                        roomId = field.textValue();
-                    }
-                }
-            }
-            String displayName = null;
-            {
-                JsonNode field = node.get("displayName");
-                if (field == null) {
-                    violations.add(new Violation("displayName", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("displayName", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("displayName", "expected string"));
-                    } else {
-                        displayName = field.textValue();
-                    }
-                }
-            }
-            String topic = null;
-            {
-                JsonNode field = node.get("topic");
-                if (field == null) {
-                    violations.add(new Violation("topic", "required"));
-                } else if (field.isNull()) {
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("topic", "expected string"));
-                    } else {
-                        topic = field.textValue();
-                    }
-                }
-            }
-            List<String> members = null;
-            {
-                JsonNode field = node.get("members");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("members", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("members", "expected array"));
-                    } else {
-                        List<String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "members" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                items.add(parsed);
-                            }
-                        }
-                        members = items;
-                    }
-                }
-            }
-            Labels labels = null;
-            {
-                JsonNode field = node.get("labels");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("labels", "explicit null not allowed"));
-                } else {
-                    try {
-                        labels = context.readTreeAsValue(field, Labels.class);
-                    } catch (ApplicationFailure nested) {
-                        if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                            throw nested;
-                        }
-                        // The locally-created failure retains the original list as its first detail.
-                        // This unchecked cast is cheap and performs no serialization.
-                        @SuppressWarnings("unchecked")
-                        List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                        for (Violation violation : nestedViolations) {
-                            violations.add(violation.withPathPrefix("labels"));
-                        }
-                    } catch (IOException nested) {
-                        violations.add(new Violation("labels", nested.getMessage()));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Room(roomId, displayName, topic, members, labels, additionalProperties);
+      }
+      String roomId = null;
+      {
+        JsonNode field = node.get("roomId");
+        if (field == null) {
+          violations.add(new Violation("roomId", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("roomId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("roomId", "expected string"));
+          } else {
+            roomId = field.textValue();
+          }
         }
+      }
+      String displayName = null;
+      {
+        JsonNode field = node.get("displayName");
+        if (field == null) {
+          violations.add(new Violation("displayName", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("displayName", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("displayName", "expected string"));
+          } else {
+            displayName = field.textValue();
+          }
+        }
+      }
+      String topic = null;
+      {
+        JsonNode field = node.get("topic");
+        if (field == null) {
+          violations.add(new Violation("topic", "required"));
+        } else if (field.isNull()) {
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("topic", "expected string"));
+          } else {
+            topic = field.textValue();
+          }
+        }
+      }
+      List<String> members = null;
+      {
+        JsonNode field = node.get("members");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("members", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("members", "expected array"));
+          } else {
+            List<String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "members" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                items.add(parsed);
+              }
+            }
+            members = items;
+          }
+        }
+      }
+      Labels labels = null;
+      {
+        JsonNode field = node.get("labels");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("labels", "explicit null not allowed"));
+        } else {
+          try {
+            labels = context.readTreeAsValue(field, Labels.class);
+          } catch (ApplicationFailure nested) {
+            if (!"PayloadValidationError".equals(nested.getType())
+                || nested.getDetails().getSize() == 0) {
+              throw nested;
+            }
+            // The locally-created failure retains the original list as its first detail.
+            // This unchecked cast is cheap and performs no serialization.
+            @SuppressWarnings("unchecked")
+            List<Violation> nestedViolations =
+                (List<Violation>) nested.getDetails().get(0, List.class);
+            for (Violation violation : nestedViolations) {
+              violations.add(violation.withPathPrefix("labels"));
+            }
+          } catch (IOException nested) {
+            violations.add(new Violation("labels", nested.getMessage()));
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Room(roomId, displayName, topic, members, labels, additionalProperties);
     }
+  }
 }

@@ -20,220 +20,233 @@ import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A square branch of the Shape and shapeOrName tagged unions.
- */
+/** A square branch of the Shape and shapeOrName tagged unions. */
 @JsonSerialize(using = Square.Serializer.class)
 @JsonDeserialize(using = Square.Deserializer.class)
 public final class Square implements ChoicesValue, Shape, Showcase.ShapeOrName {
-    public static final class Kind {
-        public static final Kind SQUARE = new Kind("square");
+  public static final class Kind {
+    public static final Kind SQUARE = new Kind("square");
 
-        private final String value;
+    private final String value;
 
-        private Kind(String value) {
-            this.value = value;
-        }
-
-        @JsonCreator
-        public static @Nullable Kind fromString(String value) {
-            if (value == null) {
-                return null;
-            }
-            if ("square".equals(value)) {
-                return SQUARE;
-            }
-            throw new IllegalArgumentException("must equal \"square\", got \"" + value + "\"");
-        }
-
-        @JsonValue
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public boolean equals(@Nullable Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof Kind)) {
-                return false;
-            }
-            Kind that = (Kind) other;
-            return Objects.equals(this.value, that.value);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(value);
-        }
-
-        @Override
-        public String toString() {
-            return "Kind[" + value + "]";
-        }
+    private Kind(String value) {
+      this.value = value;
     }
 
-    private final Kind kind;
-    private final double side;
-    private final Map<String, JsonNode> additionalProperties;
-
-    public Square(Kind kind, double side, Map<String, JsonNode> additionalProperties) {
-        this.kind = kind;
-        this.side = side;
-        this.additionalProperties = additionalProperties;
+    @JsonCreator
+    public static @Nullable Kind fromString(String value) {
+      if (value == null) {
+        return null;
+      }
+      if ("square".equals(value)) {
+        return SQUARE;
+      }
+      throw new IllegalArgumentException("must equal \"square\", got \"" + value + "\"");
     }
 
-    public Kind getKind() {
-        return kind;
-    }
-
-    public double getSide() {
-        return side;
-    }
-
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
+    @JsonValue
+    public String getValue() {
+      return value;
     }
 
     @Override
     public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof Square)) {
-            return false;
-        }
-        Square that = (Square) other;
-        return Objects.equals(this.kind, that.kind)
-            && this.side == that.side
-            && Objects.equals(this.additionalProperties, that.additionalProperties);
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof Kind)) {
+        return false;
+      }
+      Kind that = (Kind) other;
+      return Objects.equals(this.value, that.value);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(kind, side, additionalProperties);
+      return Objects.hash(value);
     }
 
     @Override
     public String toString() {
-        return "Square{"
-            + "kind=" + kind
-            + ", side=" + side
-            + ", additionalProperties=" + additionalProperties
-            + "}";
+      return "Kind[" + value + "]";
     }
+  }
 
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Square> {
-        @Override
-        public void serialize(Square value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.kind == null) {
-                violations.add(new Violation("kind", "required"));
-            }
-            {
-                if (!Double.isFinite(value.side)) {
-                    violations.add(new Violation("side", "must be a finite number, got " + value.side));
-                }
-            }
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.kind != null) {
-                wireKeys.add("kind");
-            }
-            wireKeys.add("side");
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.kind != null) {
-                gen.writeStringField("kind", value.kind.getValue());
-            }
-            gen.writeNumberField("side", value.side);
+  private final Kind kind;
+  private final double side;
+  private final Map<String, JsonNode> additionalProperties;
 
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+  public Square(Kind kind, double side, Map<String, JsonNode> additionalProperties) {
+    this.kind = kind;
+    this.side = side;
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Kind getKind() {
+    return kind;
+  }
+
+  public double getSide() {
+    return side;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (!(other instanceof Square)) {
+      return false;
+    }
+    Square that = (Square) other;
+    return Objects.equals(this.kind, that.kind)
+        && this.side == that.side
+        && Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(kind, side, additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "Square{"
+        + "kind="
+        + kind
+        + ", side="
+        + side
+        + ", additionalProperties="
+        + additionalProperties
+        + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Square> {
+    @Override
+    public void serialize(Square value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.kind == null) {
+        violations.add(new Violation("kind", "required"));
+      }
+      {
+        if (!Double.isFinite(value.side)) {
+          violations.add(new Violation("side", "must be a finite number, got " + value.side));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Square> {
-        @Override
-        public Square deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "kind":
-                    case "side":
-                        break;
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            Kind kind = null;
-            {
-                JsonNode field = node.get("kind");
-                if (field == null) {
-                    violations.add(new Violation("kind", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("kind", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("kind", "expected string"));
-                    } else {
-                        String kindValue = field.textValue();
-                        if ("square".equals(kindValue)) {
-                            kind = Kind.SQUARE;
-                        } else {
-                            violations.add(new Violation("kind", "must equal \"square\""));
-                        }
-                    }
-                }
-            }
-            double side = 0.0;
-            {
-                JsonNode field = node.get("side");
-                if (field == null) {
-                    violations.add(new Violation("side", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("side", "explicit null not allowed"));
-                } else {
-                    Double numberValue = SpecNumbers.specDouble(field, "side", violations);
-                    if (numberValue != null) {
-                        side = numberValue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Square(kind, side, additionalProperties);
+      }
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.kind != null) {
+        wireKeys.add("kind");
+      }
+      wireKeys.add("side");
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.kind != null) {
+        gen.writeStringField("kind", value.kind.getValue());
+      }
+      gen.writeNumberField("side", value.side);
+
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
+        }
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
+
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Square> {
+    @Override
+    public Square deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "kind":
+          case "side":
+            break;
+          default:
+            additionalProperties.put(key, node.get(key));
+        }
+      }
+      Kind kind = null;
+      {
+        JsonNode field = node.get("kind");
+        if (field == null) {
+          violations.add(new Violation("kind", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("kind", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("kind", "expected string"));
+          } else {
+            String kindValue = field.textValue();
+            if ("square".equals(kindValue)) {
+              kind = Kind.SQUARE;
+            } else {
+              violations.add(new Violation("kind", "must equal \"square\""));
+            }
+          }
+        }
+      }
+      double side = 0.0;
+      {
+        JsonNode field = node.get("side");
+        if (field == null) {
+          violations.add(new Violation("side", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("side", "explicit null not allowed"));
+        } else {
+          Double numberValue = SpecNumbers.specDouble(field, "side", violations);
+          if (numberValue != null) {
+            side = numberValue;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Square(kind, side, additionalProperties);
+    }
+  }
 }

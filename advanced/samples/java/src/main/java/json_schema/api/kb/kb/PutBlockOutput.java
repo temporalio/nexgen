@@ -12,9 +12,7 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import json_schema.api.kb.SpecNumbers;
 import json_schema.api.kb.Violation;
@@ -23,134 +21,141 @@ import org.jspecify.annotations.Nullable;
 @JsonSerialize(using = PutBlockOutput.Serializer.class)
 @JsonDeserialize(using = PutBlockOutput.Deserializer.class)
 public final class PutBlockOutput {
-    private final String blockId;
-    private final long revision;
+  private final String blockId;
+  private final long revision;
 
-    public PutBlockOutput(String blockId, long revision) {
-        this.blockId = blockId;
-        this.revision = revision;
+  public PutBlockOutput(String blockId, long revision) {
+    this.blockId = blockId;
+    this.revision = revision;
+  }
+
+  public String getBlockId() {
+    return blockId;
+  }
+
+  public long getRevision() {
+    return revision;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getBlockId() {
-        return blockId;
+    if (!(other instanceof PutBlockOutput)) {
+      return false;
     }
+    PutBlockOutput that = (PutBlockOutput) other;
+    return Objects.equals(this.blockId, that.blockId) && this.revision == that.revision;
+  }
 
-    public long getRevision() {
-        return revision;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(blockId, revision);
+  }
 
+  @Override
+  public String toString() {
+    return "PutBlockOutput{" + "blockId=" + blockId + ", revision=" + revision + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<PutBlockOutput> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(PutBlockOutput value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.blockId == null) {
+        violations.add(new Violation("blockId", "required"));
+      }
+      {
+        if (value.revision < -SpecNumbers.INTEGER_CAP || value.revision > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("revision", "exceeds \u00b1(2^53-1) integer cap"));
         }
-        if (!(other instanceof PutBlockOutput)) {
-            return false;
-        }
-        PutBlockOutput that = (PutBlockOutput) other;
-        return Objects.equals(this.blockId, that.blockId)
-            && this.revision == that.revision;
-    }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.blockId != null) {
+        gen.writeStringField("blockId", value.blockId);
+      }
+      gen.writeNumberField("revision", value.revision);
 
+      gen.writeEndObject();
+      pending.serialize(target);
+    }
+  }
+
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<PutBlockOutput> {
     @Override
-    public int hashCode() {
-        return Objects.hash(blockId, revision);
-    }
-
-    @Override
-    public String toString() {
-        return "PutBlockOutput{"
-            + "blockId=" + blockId
-            + ", revision=" + revision
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<PutBlockOutput> {
-        @Override
-        public void serialize(PutBlockOutput value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.blockId == null) {
-                violations.add(new Violation("blockId", "required"));
-            }
-            {
-                if (value.revision < -SpecNumbers.INTEGER_CAP || value.revision > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("revision", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.blockId != null) {
-                gen.writeStringField("blockId", value.blockId);
-            }
-            gen.writeNumberField("revision", value.revision);
-
-            gen.writeEndObject();
-            pending.serialize(target);
+    public PutBlockOutput deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "blockId":
+          case "revision":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<PutBlockOutput> {
-        @Override
-        public PutBlockOutput deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "blockId":
-                    case "revision":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String blockId = null;
-            {
-                JsonNode field = node.get("blockId");
-                if (field == null) {
-                    violations.add(new Violation("blockId", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("blockId", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("blockId", "expected string"));
-                    } else {
-                        blockId = field.textValue();
-                    }
-                }
-            }
-            long revision = 0L;
-            {
-                JsonNode field = node.get("revision");
-                if (field == null) {
-                    violations.add(new Violation("revision", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("revision", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "revision", violations);
-                    if (numberValue != null) {
-                        revision = numberValue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new PutBlockOutput(blockId, revision);
+      }
+      String blockId = null;
+      {
+        JsonNode field = node.get("blockId");
+        if (field == null) {
+          violations.add(new Violation("blockId", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("blockId", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("blockId", "expected string"));
+          } else {
+            blockId = field.textValue();
+          }
         }
+      }
+      long revision = 0L;
+      {
+        JsonNode field = node.get("revision");
+        if (field == null) {
+          violations.add(new Violation("revision", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("revision", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "revision", violations);
+          if (numberValue != null) {
+            revision = numberValue;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new PutBlockOutput(blockId, revision);
     }
+  }
 }

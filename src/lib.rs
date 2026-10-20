@@ -97,7 +97,11 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
     write_generated_files(&request.output_path, &generated)?;
 
     if request.format {
-        format_generated_file(request.language, &request.output_path)?;
+        if request.language == Language::Java {
+            generator::java::format::format(&request.output_path, &generated)?;
+        } else {
+            format_generated_file(request.language, &request.output_path)?;
+        }
     }
 
     Ok(())
@@ -226,10 +230,6 @@ fn resolve_java_package(request: &GenerateRequest) -> Result<String> {
 }
 
 fn format_generated_file(language: Language, output_path: &Path) -> Result<()> {
-    if language == Language::Java {
-        // No formatter dependency is required for Java; skip formatting.
-        return Ok(());
-    }
     let (program, args) = formatter_command(language, output_path)?;
     let command = format_formatter_command(program, &args);
     let status = Command::new(program)

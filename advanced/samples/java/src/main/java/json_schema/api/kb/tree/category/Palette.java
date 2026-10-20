@@ -12,139 +12,150 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import json_schema.api.kb.SpecNumbers;
 import json_schema.api.kb.Violation;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A dead $def - defined but never referenced anywhere. Still generated and exported as
- * intended reusable API surface (see the $ref spec).
+ * A dead $def - defined but never referenced anywhere. Still generated and exported as intended
+ * reusable API surface (see the $ref spec).
  */
 @JsonSerialize(using = Palette.Serializer.class)
 @JsonDeserialize(using = Palette.Deserializer.class)
 public final class Palette {
-    private final List<String> swatches;
+  private final List<String> swatches;
 
-    public Palette(List<String> swatches) {
-        this.swatches = swatches;
+  public Palette(List<String> swatches) {
+    this.swatches = swatches;
+  }
+
+  public List<String> getSwatches() {
+    return swatches;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public List<String> getSwatches() {
-        return swatches;
+    if (!(other instanceof Palette)) {
+      return false;
     }
+    Palette that = (Palette) other;
+    return Objects.equals(this.swatches, that.swatches);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(swatches);
+  }
+
+  @Override
+  public String toString() {
+    return "Palette{" + "swatches=" + swatches + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Palette> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Palette value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.swatches == null) {
+        violations.add(new Violation("swatches", "required"));
+      } else {
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.swatches.size();
+            validationIndex0++) {
+          String validationValue0 = value.swatches.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "swatches" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
         }
-        if (!(other instanceof Palette)) {
-            return false;
-        }
-        Palette that = (Palette) other;
-        return Objects.equals(this.swatches, that.swatches);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.swatches != null) {
+        gen.writeFieldName("swatches");
+        serializers.defaultSerializeValue(value.swatches, gen);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Palette> {
     @Override
-    public int hashCode() {
-        return Objects.hash(swatches);
-    }
-
-    @Override
-    public String toString() {
-        return "Palette{"
-            + "swatches=" + swatches
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Palette> {
-        @Override
-        public void serialize(Palette value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.swatches == null) {
-                violations.add(new Violation("swatches", "required"));
-            } else {
-                for (int validationIndex0 = 0; validationIndex0 < value.swatches.size(); validationIndex0++) {
-                    String validationValue0 = value.swatches.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("swatches" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.swatches != null) {
-                gen.writeFieldName("swatches");
-                serializers.defaultSerializeValue(value.swatches, gen);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public Palette deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "swatches":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Palette> {
-        @Override
-        public Palette deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
+      }
+      List<String> swatches = null;
+      {
+        JsonNode field = node.get("swatches");
+        if (field == null) {
+          violations.add(new Violation("swatches", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("swatches", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("swatches", "expected array"));
+          } else {
+            List<String> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "swatches" + "[" + index + "]";
+              if (!element.isTextual()) {
+                violations.add(new Violation(elementPath, "expected string"));
+              } else {
+                String parsed = element.textValue();
+                items.add(parsed);
+              }
             }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "swatches":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            List<String> swatches = null;
-            {
-                JsonNode field = node.get("swatches");
-                if (field == null) {
-                    violations.add(new Violation("swatches", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("swatches", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("swatches", "expected array"));
-                    } else {
-                        List<String> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "swatches" + "[" + index + "]";
-                            if (!element.isTextual()) {
-                                violations.add(new Violation(elementPath, "expected string"));
-                            } else {
-                                String parsed = element.textValue();
-                                items.add(parsed);
-                            }
-                        }
-                        swatches = items;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Palette(swatches);
+            swatches = items;
+          }
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Palette(swatches);
     }
+  }
 }

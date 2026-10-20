@@ -19,119 +19,129 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A typed map of **nullable** members: a member may be an explicit null, which is kept
- * as a null member rather than dropped from the map, while a present member still
- * carries its own constraint.
+ * A typed map of **nullable** members: a member may be an explicit null, which is kept as a null
+ * member rather than dropped from the map, while a present member still carries its own constraint.
  */
 @JsonSerialize(using = Nicknames.Serializer.class)
 @JsonDeserialize(using = Nicknames.Deserializer.class)
 public final class Nicknames {
-    private final Map<String, @Nullable String> additionalProperties;
+  private final Map<String, @Nullable String> additionalProperties;
 
-    public Nicknames(Map<String, @Nullable String> additionalProperties) {
-        this.additionalProperties = additionalProperties;
+  public Nicknames(Map<String, @Nullable String> additionalProperties) {
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Map<String, @Nullable String> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public Map<String, @Nullable String> getAdditionalProperties() {
-        return additionalProperties;
+    if (!(other instanceof Nicknames)) {
+      return false;
     }
+    return Objects.equals(this.additionalProperties, ((Nicknames) other).additionalProperties);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "Nicknames{" + "additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Nicknames> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Nicknames value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.additionalProperties == null) {
+        violations.add(new Violation("", "expected object"));
+      } else {
+        for (Map.Entry<String, @Nullable String> entry : value.additionalProperties.entrySet()) {
+          if (entry.getValue() == null) {
+            continue;
+          }
+          int length = entry.getValue().codePointCount(0, entry.getValue().length());
+          if (length < 2) {
+            violations.add(
+                new Violation(
+                    Violation.memberPath(entry.getKey()), "must have length >= 2, got " + length));
+          }
         }
-        if (!(other instanceof Nicknames)) {
-            return false;
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      for (Map.Entry<String, @Nullable String> entry : value.additionalProperties.entrySet()) {
+        if (entry.getValue() == null) {
+          gen.writeNullField(entry.getKey());
+          continue;
         }
-        return Objects.equals(this.additionalProperties, ((Nicknames) other).additionalProperties);
+        gen.writeStringField(entry.getKey(), entry.getValue());
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Nicknames> {
     @Override
-    public int hashCode() {
-        return Objects.hash(additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "Nicknames{"
-            + "additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Nicknames> {
-        @Override
-        public void serialize(Nicknames value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.additionalProperties == null) {
-                violations.add(new Violation("", "expected object"));
-            } else {
-                for (Map.Entry<String, @Nullable String> entry : value.additionalProperties.entrySet()) {
-                    if (entry.getValue() == null) {
-                        continue;
-                    }
-                    int length = entry.getValue().codePointCount(0, entry.getValue().length());
-                    if (length < 2) {
-                        violations.add(new Violation(Violation.memberPath(entry.getKey()), "must have length >= 2, got " + length));
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            for (Map.Entry<String, @Nullable String> entry : value.additionalProperties.entrySet()) {
-                if (entry.getValue() == null) {
-                    gen.writeNullField(entry.getKey());
-                    continue;
-                }
-                gen.writeStringField(entry.getKey(), entry.getValue());
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public Nicknames deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, @Nullable String> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        JsonNode element = node.get(key);
+        if (element.isNull()) {
+          additionalProperties.put(key, null);
+          continue;
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Nicknames> {
-        @Override
-        public Nicknames deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, @Nullable String> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                JsonNode element = node.get(key);
-                if (element.isNull()) {
-                    additionalProperties.put(key, null);
-                    continue;
-                }
-                if (!element.isTextual()) {
-                    violations.add(new Violation(path, "expected string value"));
-                } else {
-                    String value = element.textValue();
-                    int length = value.codePointCount(0, value.length());
-                    if (length < 2) {
-                        violations.add(new Violation(path, "must have length >= 2, got " + length));
-                    }
-                    additionalProperties.put(key, value);
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Nicknames(additionalProperties);
+        if (!element.isTextual()) {
+          violations.add(new Violation(path, "expected string value"));
+        } else {
+          String value = element.textValue();
+          int length = value.codePointCount(0, value.length());
+          if (length < 2) {
+            violations.add(new Violation(path, "must have length >= 2, got " + length));
+          }
+          additionalProperties.put(key, value);
         }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Nicknames(additionalProperties);
     }
+  }
 }

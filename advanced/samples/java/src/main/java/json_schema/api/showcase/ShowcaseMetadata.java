@@ -19,110 +19,120 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A free-form object written inline. Even this is named (`ShowcaseMetadata`): every
- * object emits as a named aggregate holding its members in a catch-all, so adding
- * `properties` to it later only adds fields rather than changing the emitted type's
- * kind, and its member-count bound rides along with it.
+ * A free-form object written inline. Even this is named (`ShowcaseMetadata`): every object emits as
+ * a named aggregate holding its members in a catch-all, so adding `properties` to it later only
+ * adds fields rather than changing the emitted type's kind, and its member-count bound rides along
+ * with it.
  */
 @JsonSerialize(using = ShowcaseMetadata.Serializer.class)
 @JsonDeserialize(using = ShowcaseMetadata.Deserializer.class)
 public final class ShowcaseMetadata {
-    private final Map<String, JsonNode> additionalProperties;
+  private final Map<String, JsonNode> additionalProperties;
 
-    public ShowcaseMetadata(Map<String, JsonNode> additionalProperties) {
-        this.additionalProperties = additionalProperties;
+  public ShowcaseMetadata(Map<String, JsonNode> additionalProperties) {
+    this.additionalProperties = additionalProperties;
+  }
+
+  public Map<String, JsonNode> getAdditionalProperties() {
+    return additionalProperties;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public Map<String, JsonNode> getAdditionalProperties() {
-        return additionalProperties;
+    if (!(other instanceof ShowcaseMetadata)) {
+      return false;
     }
+    ShowcaseMetadata that = (ShowcaseMetadata) other;
+    return Objects.equals(this.additionalProperties, that.additionalProperties);
+  }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(additionalProperties);
+  }
+
+  @Override
+  public String toString() {
+    return "ShowcaseMetadata{" + "additionalProperties=" + additionalProperties + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseMetadata> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(ShowcaseMetadata value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
+      if (value.additionalProperties != null) {
+        for (String key : value.additionalProperties.keySet()) {
+          if (!wireKeys.add(key)) {
+            violations.add(
+                new Violation(Violation.memberPath(key), "declared property key collision"));
+          }
         }
-        if (!(other instanceof ShowcaseMetadata)) {
-            return false;
+      }
+      if (wireKeys.size() > 3) {
+        violations.add(new Violation("", "must have at most 3 properties, got " + wireKeys.size()));
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.additionalProperties != null) {
+        for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          gen.writeTree(entry.getValue());
         }
-        ShowcaseMetadata that = (ShowcaseMetadata) other;
-        return Objects.equals(this.additionalProperties, that.additionalProperties);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseMetadata> {
     @Override
-    public int hashCode() {
-        return Objects.hash(additionalProperties);
-    }
-
-    @Override
-    public String toString() {
-        return "ShowcaseMetadata{"
-            + "additionalProperties=" + additionalProperties
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<ShowcaseMetadata> {
-        @Override
-        public void serialize(ShowcaseMetadata value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            java.util.Set<String> wireKeys = new java.util.LinkedHashSet<>();
-            if (value.additionalProperties != null) {
-                for (String key : value.additionalProperties.keySet()) {
-                    if (!wireKeys.add(key)) {
-                        violations.add(new Violation(Violation.memberPath(key), "declared property key collision"));
-                    }
-                }
-            }
-            if (wireKeys.size() > 3) {
-                violations.add(new Violation("", "must have at most 3 properties, got " + wireKeys.size()));
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.additionalProperties != null) {
-                for (Map.Entry<String, JsonNode> entry : value.additionalProperties.entrySet()) {
-                    gen.writeFieldName(entry.getKey());
-                    gen.writeTree(entry.getValue());
-                }
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public ShowcaseMetadata deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          default:
+            additionalProperties.put(key, node.get(key));
         }
+      }
+      if (node.size() > 3) {
+        violations.add(new Violation("", "must have at most 3 properties, got " + node.size()));
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new ShowcaseMetadata(additionalProperties);
     }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<ShowcaseMetadata> {
-        @Override
-        public ShowcaseMetadata deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Map<String, JsonNode> additionalProperties = new LinkedHashMap<>();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    default:
-                        additionalProperties.put(key, node.get(key));
-                }
-            }
-            if (node.size() > 3) {
-                violations.add(new Violation("", "must have at most 3 properties, got " + node.size()));
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new ShowcaseMetadata(additionalProperties);
-        }
-    }
+  }
 }

@@ -12,149 +12,156 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import json_schema.api.kb.SpecNumbers;
 import json_schema.api.kb.Violation;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Non-cyclic helper. Referenced only by Page, references nothing recursive, so it stays
- * in the content_page module even though Page is hoisted.
+ * Non-cyclic helper. Referenced only by Page, references nothing recursive, so it stays in the
+ * content_page module even though Page is hoisted.
  */
 @JsonSerialize(using = PageMeta.Serializer.class)
 @JsonDeserialize(using = PageMeta.Deserializer.class)
 public final class PageMeta {
-    private final String author;
-    private final @Nullable Long wordCount;
+  private final String author;
+  private final @Nullable Long wordCount;
 
-    public PageMeta(String author, @Nullable Long wordCount) {
-        this.author = author;
-        this.wordCount = wordCount;
+  public PageMeta(String author, @Nullable Long wordCount) {
+    this.author = author;
+    this.wordCount = wordCount;
+  }
+
+  public String getAuthor() {
+    return author;
+  }
+
+  public @Nullable Long getWordCount() {
+    return wordCount;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getAuthor() {
-        return author;
+    if (!(other instanceof PageMeta)) {
+      return false;
     }
+    PageMeta that = (PageMeta) other;
+    return Objects.equals(this.author, that.author)
+        && Objects.equals(this.wordCount, that.wordCount);
+  }
 
-    public @Nullable Long getWordCount() {
-        return wordCount;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(author, wordCount);
+  }
 
+  @Override
+  public String toString() {
+    return "PageMeta{" + "author=" + author + ", wordCount=" + wordCount + "}";
+  }
+
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<PageMeta> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(PageMeta value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.author == null) {
+        violations.add(new Violation("author", "required"));
+      }
+      if (value.wordCount != null) {
+        if (value.wordCount < -SpecNumbers.INTEGER_CAP
+            || value.wordCount > SpecNumbers.INTEGER_CAP) {
+          violations.add(new Violation("wordCount", "exceeds \u00b1(2^53-1) integer cap"));
         }
-        if (!(other instanceof PageMeta)) {
-            return false;
-        }
-        PageMeta that = (PageMeta) other;
-        return Objects.equals(this.author, that.author)
-            && Objects.equals(this.wordCount, that.wordCount);
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      gen.writeStartObject();
+      if (value.author != null) {
+        gen.writeStringField("author", value.author);
+      }
+      if (value.wordCount != null) {
+        gen.writeNumberField("wordCount", value.wordCount);
+      }
+      gen.writeEndObject();
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<PageMeta> {
     @Override
-    public int hashCode() {
-        return Objects.hash(author, wordCount);
-    }
-
-    @Override
-    public String toString() {
-        return "PageMeta{"
-            + "author=" + author
-            + ", wordCount=" + wordCount
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<PageMeta> {
-        @Override
-        public void serialize(PageMeta value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.author == null) {
-                violations.add(new Violation("author", "required"));
-            }
-            if (value.wordCount != null) {
-                if (value.wordCount < -SpecNumbers.INTEGER_CAP || value.wordCount > SpecNumbers.INTEGER_CAP) {
-                    violations.add(new Violation("wordCount", "exceeds \u00b1(2^53-1) integer cap"));
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            gen.writeStartObject();
-            if (value.author != null) {
-                gen.writeStringField("author", value.author);
-            }
-            if (value.wordCount != null) {
-                gen.writeNumberField("wordCount", value.wordCount);
-            }
-            gen.writeEndObject();
-            pending.serialize(target);
+    public PageMeta deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "author":
+          case "wordCount":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<PageMeta> {
-        @Override
-        public PageMeta deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "author":
-                    case "wordCount":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String author = null;
-            {
-                JsonNode field = node.get("author");
-                if (field == null) {
-                    violations.add(new Violation("author", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("author", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("author", "expected string"));
-                    } else {
-                        author = field.textValue();
-                    }
-                }
-            }
-            Long wordCount = null;
-            {
-                JsonNode field = node.get("wordCount");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("wordCount", "explicit null not allowed"));
-                } else {
-                    Long numberValue = SpecNumbers.specLong(field, "wordCount", violations);
-                    if (numberValue != null) {
-                        wordCount = numberValue;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new PageMeta(author, wordCount);
+      }
+      String author = null;
+      {
+        JsonNode field = node.get("author");
+        if (field == null) {
+          violations.add(new Violation("author", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("author", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("author", "expected string"));
+          } else {
+            author = field.textValue();
+          }
         }
+      }
+      Long wordCount = null;
+      {
+        JsonNode field = node.get("wordCount");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("wordCount", "explicit null not allowed"));
+        } else {
+          Long numberValue = SpecNumbers.specLong(field, "wordCount", violations);
+          if (numberValue != null) {
+            wordCount = numberValue;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new PageMeta(author, wordCount);
     }
+  }
 }

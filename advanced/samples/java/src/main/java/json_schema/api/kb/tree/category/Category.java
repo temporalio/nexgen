@@ -12,235 +12,250 @@ import io.temporal.failure.ApplicationFailure;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import json_schema.api.kb.SpecNumbers;
 import json_schema.api.kb.Violation;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A node in a self-recursive category tree. The root of this file is itself a type
- * (pure JSON Schema file), named Category from the basename.
+ * A node in a self-recursive category tree. The root of this file is itself a type (pure JSON
+ * Schema file), named Category from the basename.
  */
 @JsonSerialize(using = Category.Serializer.class)
 @JsonDeserialize(using = Category.Deserializer.class)
 public final class Category {
-    private final String id;
-    private final String name;
-    private final @Nullable List<Category> children;
+  private final String id;
+  private final String name;
+  private final @Nullable List<Category> children;
 
-    public Category(String id, String name, @Nullable List<Category> children) {
-        this.id = id;
-        this.name = name;
-        this.children = children;
+  public Category(String id, String name, @Nullable List<Category> children) {
+    this.id = id;
+    this.name = name;
+    this.children = children;
+  }
+
+  public String getId() {
+    return id;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  /**
+   * Sub-categories. A within-file self-cycle via `$ref: '#'`; the possibly-empty array is the
+   * terminating edge, so it stays in this module.
+   */
+  public @Nullable List<Category> getChildren() {
+    return children;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
     }
-
-    public String getId() {
-        return id;
+    if (!(other instanceof Category)) {
+      return false;
     }
+    Category that = (Category) other;
+    return Objects.equals(this.id, that.id)
+        && Objects.equals(this.name, that.name)
+        && Objects.equals(this.children, that.children);
+  }
 
-    public String getName() {
-        return name;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(id, name, children);
+  }
 
-    /**
-     * Sub-categories. A within-file self-cycle via `$ref: '#'`; the possibly-empty
-     * array is the terminating edge, so it stays in this module.
-     */
-    public @Nullable List<Category> getChildren() {
-        return children;
-    }
+  @Override
+  public String toString() {
+    return "Category{" + "id=" + id + ", name=" + name + ", children=" + children + "}";
+  }
 
+  public static final class Serializer
+      extends com.fasterxml.jackson.databind.JsonSerializer<Category> {
     @Override
-    public boolean equals(@Nullable Object other) {
-        if (this == other) {
-            return true;
+    public void serialize(Category value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      JsonGenerator target = gen;
+      com.fasterxml.jackson.databind.util.TokenBuffer pending =
+          new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+      gen = pending;
+      List<Violation> violations = new ArrayList<>();
+      if (value.id == null) {
+        violations.add(new Violation("id", "required"));
+      }
+      if (value.name == null) {
+        violations.add(new Violation("name", "required"));
+      }
+      if (value.children != null) {
+        for (int validationIndex0 = 0;
+            validationIndex0 < value.children.size();
+            validationIndex0++) {
+          Category validationValue0 = value.children.get(validationIndex0);
+          if (validationValue0 == null) {
+            violations.add(
+                new Violation(
+                    "children" + "[" + validationIndex0 + "]", "explicit null not allowed"));
+          } else {
+          }
         }
-        if (!(other instanceof Category)) {
-            return false;
+      }
+      gen.writeStartObject();
+      if (value.id != null) {
+        gen.writeStringField("id", value.id);
+      }
+      if (value.name != null) {
+        gen.writeStringField("name", value.name);
+      }
+      if (value.children != null) {
+        gen.writeFieldName("children");
+        gen.writeStartArray();
+        for (int nestedIndex0 = 0; nestedIndex0 < value.children.size(); nestedIndex0++) {
+          Category nestedElement0 = value.children.get(nestedIndex0);
+          if (nestedElement0 == null) {
+            gen.writeNull();
+          } else {
+            com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 =
+                new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
+            try {
+              serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
+              nestedBuffer1.serialize(gen);
+            } catch (ApplicationFailure nested1) {
+              if (!"PayloadValidationError".equals(nested1.getType())
+                  || nested1.getDetails().getSize() == 0) {
+                throw nested1;
+              }
+              // The locally-created failure retains the original list as its first detail.
+              // This unchecked cast is cheap and performs no serialization.
+              @SuppressWarnings("unchecked")
+              List<Violation> nestedViolations1 =
+                  (List<Violation>) nested1.getDetails().get(0, List.class);
+              for (Violation nestedViolation1 : nestedViolations1) {
+                violations.add(
+                    nestedViolation1.withPathPrefix("children" + "[" + nestedIndex0 + "]"));
+              }
+              gen.writeNull();
+            }
+          }
         }
-        Category that = (Category) other;
-        return Objects.equals(this.id, that.id)
-            && Objects.equals(this.name, that.name)
-            && Objects.equals(this.children, that.children);
+        gen.writeEndArray();
+      }
+      gen.writeEndObject();
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      pending.serialize(target);
     }
+  }
 
+  public static final class Deserializer
+      extends com.fasterxml.jackson.databind.JsonDeserializer<Category> {
     @Override
-    public int hashCode() {
-        return Objects.hash(id, name, children);
-    }
-
-    @Override
-    public String toString() {
-        return "Category{"
-            + "id=" + id
-            + ", name=" + name
-            + ", children=" + children
-            + "}";
-    }
-
-    public static final class Serializer extends com.fasterxml.jackson.databind.JsonSerializer<Category> {
-        @Override
-        public void serialize(Category value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            JsonGenerator target = gen;
-            com.fasterxml.jackson.databind.util.TokenBuffer pending = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-            gen = pending;
-            List<Violation> violations = new ArrayList<>();
-            if (value.id == null) {
-                violations.add(new Violation("id", "required"));
-            }
-            if (value.name == null) {
-                violations.add(new Violation("name", "required"));
-            }
-            if (value.children != null) {
-                for (int validationIndex0 = 0; validationIndex0 < value.children.size(); validationIndex0++) {
-                    Category validationValue0 = value.children.get(validationIndex0);
-                    if (validationValue0 == null) {
-                        violations.add(new Violation("children" + "[" + validationIndex0 + "]", "explicit null not allowed"));
-                    } else {
-                    }
-                }
-            }
-            gen.writeStartObject();
-            if (value.id != null) {
-                gen.writeStringField("id", value.id);
-            }
-            if (value.name != null) {
-                gen.writeStringField("name", value.name);
-            }
-            if (value.children != null) {
-                gen.writeFieldName("children");
-                gen.writeStartArray();
-                for (int nestedIndex0 = 0; nestedIndex0 < value.children.size(); nestedIndex0++) {
-                    Category nestedElement0 = value.children.get(nestedIndex0);
-                    if (nestedElement0 == null) {
-                        gen.writeNull();
-                    } else {
-                        com.fasterxml.jackson.databind.util.TokenBuffer nestedBuffer1 = new com.fasterxml.jackson.databind.util.TokenBuffer(gen.getCodec(), false);
-                        try {
-                            serializers.defaultSerializeValue(nestedElement0, nestedBuffer1);
-                            nestedBuffer1.serialize(gen);
-                        } catch (ApplicationFailure nested1) {
-                            if (!"PayloadValidationError".equals(nested1.getType()) || nested1.getDetails().getSize() == 0) {
-                                throw nested1;
-                            }
-                            // The locally-created failure retains the original list as its first detail.
-                            // This unchecked cast is cheap and performs no serialization.
-                            @SuppressWarnings("unchecked")
-                            List<Violation> nestedViolations1 = (List<Violation>) nested1.getDetails().get(0, List.class);
-                            for (Violation nestedViolation1 : nestedViolations1) {
-                                violations.add(nestedViolation1.withPathPrefix("children" + "[" + nestedIndex0 + "]"));
-                            }
-                            gen.writeNull();
-                        }
-                    }
-                }
-                gen.writeEndArray();
-            }
-            gen.writeEndObject();
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            pending.serialize(target);
+    public Category deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = SpecNumbers.readExactTree(parser);
+      List<Violation> violations = new ArrayList<>();
+      if (node == null || !node.isObject()) {
+        violations.add(new Violation("", "expected object"));
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      Iterator<String> fieldNames = node.fieldNames();
+      while (fieldNames.hasNext()) {
+        String key = fieldNames.next();
+        String path = Violation.memberPath(key);
+        switch (key) {
+          case "children":
+          case "id":
+          case "name":
+            break;
+          default:
+            violations.add(new Violation(path, "unknown field"));
         }
-    }
-
-    public static final class Deserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Category> {
-        @Override
-        public Category deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            JsonNode node = SpecNumbers.readExactTree(parser);
-            List<Violation> violations = new ArrayList<>();
-            if (node == null || !node.isObject()) {
-                violations.add(new Violation("", "expected object"));
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String key = fieldNames.next();
-                String path = Violation.memberPath(key);
-                switch (key) {
-                    case "children":
-                    case "id":
-                    case "name":
-                        break;
-                    default:
-                        violations.add(new Violation(path, "unknown field"));
-                }
-            }
-            String id = null;
-            {
-                JsonNode field = node.get("id");
-                if (field == null) {
-                    violations.add(new Violation("id", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("id", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("id", "expected string"));
-                    } else {
-                        id = field.textValue();
-                    }
-                }
-            }
-            String name = null;
-            {
-                JsonNode field = node.get("name");
-                if (field == null) {
-                    violations.add(new Violation("name", "required"));
-                } else if (field.isNull()) {
-                    violations.add(new Violation("name", "explicit null not allowed"));
-                } else {
-                    if (!field.isTextual()) {
-                        violations.add(new Violation("name", "expected string"));
-                    } else {
-                        name = field.textValue();
-                    }
-                }
-            }
-            List<Category> children = null;
-            {
-                JsonNode field = node.get("children");
-                if (field == null) {
-                } else if (field.isNull()) {
-                    violations.add(new Violation("children", "explicit null not allowed"));
-                } else {
-                    if (!field.isArray()) {
-                        violations.add(new Violation("children", "expected array"));
-                    } else {
-                        List<Category> items = new ArrayList<>();
-                        for (int index = 0; index < field.size(); index++) {
-                            JsonNode element = field.get(index);
-                            String elementPath = "children" + "[" + index + "]";
-                            try {
-                                items.add(context.readTreeAsValue(element, Category.class));
-                            } catch (ApplicationFailure nested) {
-                                if (!"PayloadValidationError".equals(nested.getType()) || nested.getDetails().getSize() == 0) {
-                                    throw nested;
-                                }
-                                // The locally-created failure retains the original list as its first detail.
-                                // This unchecked cast is cheap and performs no serialization.
-                                @SuppressWarnings("unchecked")
-                                List<Violation> nestedViolations = (List<Violation>) nested.getDetails().get(0, List.class);
-                                for (Violation violation : nestedViolations) {
-                                    violations.add(violation.withPathPrefix(elementPath));
-                                }
-                            } catch (IOException nested) {
-                                violations.add(new Violation(elementPath, nested.getMessage()));
-                            }
-                        }
-                        children = items;
-                    }
-                }
-            }
-            if (!violations.isEmpty()) {
-                // TODO: Use PayloadValidationException.newPayloadValidationException once it is available in an SDK release.
-                throw ApplicationFailure.newNonRetryableFailure("Payload validation failed", "PayloadValidationError", violations);
-            }
-            return new Category(id, name, children);
+      }
+      String id = null;
+      {
+        JsonNode field = node.get("id");
+        if (field == null) {
+          violations.add(new Violation("id", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("id", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("id", "expected string"));
+          } else {
+            id = field.textValue();
+          }
         }
+      }
+      String name = null;
+      {
+        JsonNode field = node.get("name");
+        if (field == null) {
+          violations.add(new Violation("name", "required"));
+        } else if (field.isNull()) {
+          violations.add(new Violation("name", "explicit null not allowed"));
+        } else {
+          if (!field.isTextual()) {
+            violations.add(new Violation("name", "expected string"));
+          } else {
+            name = field.textValue();
+          }
+        }
+      }
+      List<Category> children = null;
+      {
+        JsonNode field = node.get("children");
+        if (field == null) {
+        } else if (field.isNull()) {
+          violations.add(new Violation("children", "explicit null not allowed"));
+        } else {
+          if (!field.isArray()) {
+            violations.add(new Violation("children", "expected array"));
+          } else {
+            List<Category> items = new ArrayList<>();
+            for (int index = 0; index < field.size(); index++) {
+              JsonNode element = field.get(index);
+              String elementPath = "children" + "[" + index + "]";
+              try {
+                items.add(context.readTreeAsValue(element, Category.class));
+              } catch (ApplicationFailure nested) {
+                if (!"PayloadValidationError".equals(nested.getType())
+                    || nested.getDetails().getSize() == 0) {
+                  throw nested;
+                }
+                // The locally-created failure retains the original list as its first detail.
+                // This unchecked cast is cheap and performs no serialization.
+                @SuppressWarnings("unchecked")
+                List<Violation> nestedViolations =
+                    (List<Violation>) nested.getDetails().get(0, List.class);
+                for (Violation violation : nestedViolations) {
+                  violations.add(violation.withPathPrefix(elementPath));
+                }
+              } catch (IOException nested) {
+                violations.add(new Violation(elementPath, nested.getMessage()));
+              }
+            }
+            children = items;
+          }
+        }
+      }
+      if (!violations.isEmpty()) {
+        // TODO: Use PayloadValidationException.newPayloadValidationException once it is available
+        // in an SDK release.
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Payload validation failed", "PayloadValidationError", violations);
+      }
+      return new Category(id, name, children);
     }
+  }
 }
