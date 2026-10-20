@@ -120,6 +120,8 @@ impl JsonCase {
         self.dotnet(Some(&source));
     }
 
+    /// Compiles for net8.0, the generated code's floor (.NET 8, C# 12), and
+    /// runs on the newest installed runtime.
     fn write_project(&self, executable: bool) {
         fs::write(
             self.root.join("Probe.csproj"),
@@ -127,7 +129,8 @@ impl JsonCase {
                 r#"<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>{}</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
