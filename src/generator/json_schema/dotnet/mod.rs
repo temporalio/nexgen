@@ -326,7 +326,7 @@ impl ModelBackend {
         if schema::is_union_schema(&schema)
             && let Some(union) = types::classify_union(&name, &schema, &context)
         {
-            emit::render_union_interface(out, &union, "", Some((&schema, &name)));
+            emit::render_union_interface(out, &union, "", Some((&schema, &name)), true);
             return Ok(());
         }
         let kind = types::resolve_model_kind(&schema, &context)?;

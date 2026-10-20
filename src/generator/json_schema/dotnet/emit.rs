@@ -145,7 +145,7 @@ fn render_object_body(
         if field.nested_union
             && let Some(union) = &field.union
         {
-            render_union_interface(out, union, "    ", None);
+            render_union_interface(out, union, "    ", None, false);
             out.push('\n');
         }
         if let CsType::ClosedValue { name, wire } = &field.ty {
@@ -1291,11 +1291,17 @@ fn default_expr(field: &FieldPlan, value: &Value) -> Option<String> {
 
 /// Renders a union interface (named, or nested in its declaring model at
 /// `indent`) with its wrapper classes and converter.
+///
+/// A named union nests its wrappers in the interface (`Foo.FooString`). An
+/// inline union's wrappers are siblings of the interface in the declaring model
+/// (`Showcase.DetailUnionString` beside `Showcase.DetailUnion`), as in Java, so
+/// call sites do not repeat the interface name.
 pub(super) fn render_union_interface(
     out: &mut String,
     union: &CsUnion,
     indent: &str,
     doc: Option<(&Schema, &str)>,
+    wrappers_inside: bool,
 ) {
     let inner = format!("{indent}    ");
     if let Some((schema, name)) = doc {
@@ -1321,8 +1327,8 @@ pub(super) fn render_union_interface(
         "{indent}[{JSON_CONVERTER}(typeof({}.Converter))]\n{indent}public interface {}\n{indent}{{\n",
         union.interface, union.interface
     ));
-    for variant in &union.variants {
-        if variant.underlying.is_some() || variant.owned_object {
+    if wrappers_inside {
+        for variant in wrapped_variants(union) {
             render_union_wrapper(out, union, variant, &inner);
             out.push('\n');
         }
@@ -1337,6 +1343,20 @@ pub(super) fn render_union_interface(
         }
     }
     out.push_str(&format!("{indent}}}\n"));
+    if !wrappers_inside {
+        for variant in wrapped_variants(union) {
+            out.push('\n');
+            render_union_wrapper(out, union, variant, indent);
+        }
+    }
+}
+
+/// The variants a union wraps in a class of its own: every non-model branch.
+fn wrapped_variants(union: &CsUnion) -> impl Iterator<Item = &UnionVariant> {
+    union
+        .variants
+        .iter()
+        .filter(|variant| variant.underlying.is_some() || variant.owned_object)
 }
 
 fn wrapper_value_type(variant: &UnionVariant) -> String {
@@ -1471,7 +1491,7 @@ fn render_union_converter(out: &mut String, union: &CsUnion) {
                     "{inner}if ({})\n{inner}{{\n",
                     json_equals_literal("discriminant", value)
                 ));
-                render_union_read_object(out, union, variant, &format!("{inner}    "));
+                render_union_read_object(out, variant, &format!("{inner}    "));
                 out.push_str(&format!("{inner}}}\n"));
             }
             out.push_str(&format!(
@@ -1480,7 +1500,7 @@ fn render_union_converter(out: &mut String, union: &CsUnion) {
                 cs_string(&format!(": expected one of [{}]", known.join(", ")))
             ));
         } else {
-            render_union_read_object(out, union, objects[0], &inner);
+            render_union_read_object(out, objects[0], &inner);
         }
         out.push_str(&format!("{indent}}}\n"));
     }
@@ -1561,16 +1581,11 @@ fn render_union_converter(out: &mut String, union: &CsUnion) {
     out.push_str(&format!("{indent}}}\n    }}\n}}\n"));
 }
 
-fn render_union_read_object(
-    out: &mut String,
-    union: &CsUnion,
-    variant: &UnionVariant,
-    indent: &str,
-) {
+fn render_union_read_object(out: &mut String, variant: &UnionVariant, indent: &str) {
     if variant.owned_object {
         out.push_str(&format!(
-            "{indent}return new {}.{}(NexgenRuntime::SpecJson.Members(node));\n",
-            union.interface, variant.class
+            "{indent}return new {}(NexgenRuntime::SpecJson.Members(node));\n",
+            variant.class
         ));
     } else {
         out.push_str(&format!(

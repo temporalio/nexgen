@@ -413,7 +413,7 @@ fn csharp_json_names_inline_object_union_branch() {
         r#"var object_ = Check.RoundTrip<Detail>("{\"payload\":{\"text\":\"hi\"}}");
 Check.True(object_.Payload is DetailPayloadObject { Text: "hi" }, "object branch");
 var text = Check.RoundTrip<Detail>("{\"payload\":\"plain\"}");
-Check.True(text.Payload is Detail.PayloadUnion.PayloadUnionString { Value: "plain" }, "string branch");
+Check.True(text.Payload is Detail.PayloadUnionString { Value: "plain" }, "string branch");
 Check.ParseFails<Detail>("{\"payload\":{\"text\":\"\"}}", "payload.text: must have length >= 1");
 Check.ParseFails<Detail>("{\"payload\":{}}", "payload.text: required");
 Check.ParseFails<Detail>("{\"payload\":5}", "payload: ");
@@ -461,13 +461,13 @@ Check.ParseFails<Bc>("{\"listOrName\":[]}", "listOrName: must have at least 1 it
 Check.ParseFails<Bc>("{\"listOrName\":[1,1.0]}", "listOrName: duplicate items");
 Check.ParseFails<Bc>("{\"listOrName\":\"other\"}", "listOrName: must be one of");
 // The serialize side runs the same predicates over the in-memory branch.
-Check.WriteFails(new Bc { Value = new Bc.ValueUnion.ValueUnionString("ab") }, "value: must have length >= 3");
-Check.WriteFails(new Bc { Value = new Bc.ValueUnion.ValueUnionInteger(0) }, "value: must be >= 1");
+Check.WriteFails(new Bc { Value = new Bc.ValueUnionString("ab") }, "value: must have length >= 3");
+Check.WriteFails(new Bc { Value = new Bc.ValueUnionInteger(0) }, "value: must be >= 1");
 Check.WriteFails(
-    new Bc { ListOrName = new Bc.ListOrNameUnion.ListOrNameUnionArray(new double[] { 2, 2 }) },
+    new Bc { ListOrName = new Bc.ListOrNameUnionArray(new double[] { 2, 2 }) },
     "listOrName: duplicate items");
 Check.WriteFails(
-    new Bc { ListOrName = new Bc.ListOrNameUnion.ListOrNameUnionString("other") },
+    new Bc { ListOrName = new Bc.ListOrNameUnionString("other") },
     "listOrName: must be one of");"#,
     );
 }
@@ -498,7 +498,7 @@ properties:
     assert_lacks(models, &["SerializerUnion", " Serializer {"]);
     case.run(
         r#"var parsed = Check.RoundTrip<RenamedUnion>("{\"serializer\":3}");
-Check.True(parsed.Payload is RenamedUnion.PayloadUnion.PayloadUnionInteger { Value: 3 }, "integer branch");"#,
+Check.True(parsed.Payload is RenamedUnion.PayloadUnionInteger { Value: 3 }, "integer branch");"#,
     );
 }
 
@@ -645,7 +645,7 @@ properties:
         &["Probe.Main", "Probe.Shapes"],
         r#"Check.True(Check.RoundTrip<Main>("{\"shape\":{\"kind\":\"circle\",\"r\":1}}").Shape is Circle, "circle");
 Check.True(Check.RoundTrip<Main>("{\"shape\":{\"kind\":\"square\",\"s\":2}}").Shape is Square, "square");
-Check.True(Check.RoundTrip<Main>("{\"shape\":\"free\"}").Shape is Main.ShapeUnion.ShapeUnionString, "string");
+Check.True(Check.RoundTrip<Main>("{\"shape\":\"free\"}").Shape is Main.ShapeUnionString, "string");
 Check.ParseFails<Main>("{\"shape\":{\"kind\":\"tri\"}}", "shape: ");"#,
     );
 }
@@ -810,14 +810,14 @@ $defs:
     case.run(
         r#"var parsed = Check.RoundTrip<Probe.Probe>(
     "{\"events\":[\"2024-01-02T03:04:05Z\"],\"blobs\":[\"AQI=\"],\"children\":[{\"name\":\"ab\"}]}");
-Check.True(parsed.Events is Probe.Probe.EventsUnion.EventsUnionArray { Value: [var at] } && at.Year == 2024, "events");
-Check.True(parsed.Blobs is Probe.Probe.BlobsUnion.BlobsUnionArray { Value: [[1, 2]] }, "blobs");
+Check.True(parsed.Events is Probe.Probe.EventsUnionArray { Value: [var at] } && at.Year == 2024, "events");
+Check.True(parsed.Blobs is Probe.Probe.BlobsUnionArray { Value: [[1, 2]] }, "blobs");
 Check.ParseFails<Probe.Probe>("{\"events\":[\"nope\"]}", "events[0]: must be a valid date-time");
 Check.ParseFails<Probe.Probe>("{\"events\":[]}", "events: must have at least 1 items");
 Check.ParseFails<Probe.Probe>("{\"blobs\":[\"*\"]}", "blobs[0]: ");
 Check.ParseFails<Probe.Probe>("{\"children\":[{\"name\":\"a\"}]}", "children[0].name: must have length >= 2");
 Check.WriteFails(
-    new Probe.Probe { Children = new Probe.Probe.ChildrenUnion.ChildrenUnionArray(new[] { new Child { Name = "a" } }) },
+    new Probe.Probe { Children = new Probe.Probe.ChildrenUnionArray(new[] { new Child { Name = "a" } }) },
     "children[0].name: must have length >= 2");"#,
     );
 }
@@ -1104,7 +1104,7 @@ $defs:
     {
         Scalar = double.NaN,
         Nested = new[] { new[] { 1.0, double.PositiveInfinity } },
-        Metric = new Finite.MetricUnion.MetricUnionNumber(double.NegativeInfinity),
+        Metric = new Finite.MetricUnionNumber(double.NegativeInfinity),
         Values = new Values { AdditionalProperties = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IReadOnlyList<double>> { ["k"] = new[] { double.NaN } } },
     },
     "scalar: must be a finite number",

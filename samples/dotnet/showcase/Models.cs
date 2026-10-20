@@ -3473,85 +3473,6 @@ namespace Nexgen.JsonSchema.Showcase
         public interface IdOrNameUnion
         {
             /// <summary>
-            /// The string member of <see cref="IdOrNameUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class IdOrNameUnionString : IdOrNameUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public IdOrNameUnionString(string value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public string Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
-                    if (length0 < 3)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must have length >= 3, got " + length0));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is IdOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "IdOrNameUnionString[" + this.Value + "]";
-            }
-
-            /// <summary>
-            /// The integer member of <see cref="IdOrNameUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class IdOrNameUnionInteger : IdOrNameUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public IdOrNameUnionInteger(long value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public long Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    if (Value < -NexgenRuntime::SpecJson.IntegerCap || Value > NexgenRuntime::SpecJson.IntegerCap)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
-                    }
-                    if (Value < 1L)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must be >= 1, got " + Value));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is IdOrNameUnionInteger other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "IdOrNameUnionInteger[" + this.Value + "]";
-            }
-
-            /// <summary>
             /// Converts <see cref="IdOrNameUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
             internal sealed class Converter : global::System.Text.Json.Serialization.JsonConverter<IdOrNameUnion>
@@ -3649,90 +3570,91 @@ namespace Nexgen.JsonSchema.Showcase
         }
 
         /// <summary>
+        /// The string member of <see cref="IdOrNameUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class IdOrNameUnionString : IdOrNameUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public IdOrNameUnionString(string value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public string Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
+                if (length0 < 3)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must have length >= 3, got " + length0));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is IdOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "IdOrNameUnionString[" + this.Value + "]";
+        }
+
+        /// <summary>
+        /// The integer member of <see cref="IdOrNameUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class IdOrNameUnionInteger : IdOrNameUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public IdOrNameUnionInteger(long value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public long Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                if (Value < -NexgenRuntime::SpecJson.IntegerCap || Value > NexgenRuntime::SpecJson.IntegerCap)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+                }
+                if (Value < 1L)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must be >= 1, got " + Value));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is IdOrNameUnionInteger other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "IdOrNameUnionInteger[" + this.Value + "]";
+        }
+
+        /// <summary>
         /// One of: string, integer.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
         [global::System.Text.Json.Serialization.JsonConverter(typeof(ModeUnion.Converter))]
         public interface ModeUnion
         {
-            /// <summary>
-            /// The string member of <see cref="ModeUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class ModeUnionString : ModeUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public ModeUnionString(string value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public string Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    if (!(string.Equals(Value, "auto", global::System.StringComparison.Ordinal)) && !(string.Equals(Value, "manual", global::System.StringComparison.Ordinal)))
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must be one of [\"auto\", \"manual\"], got " + Value));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ModeUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "ModeUnionString[" + this.Value + "]";
-            }
-
-            /// <summary>
-            /// The integer member of <see cref="ModeUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class ModeUnionInteger : ModeUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public ModeUnionInteger(long value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public long Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    if (Value < -NexgenRuntime::SpecJson.IntegerCap || Value > NexgenRuntime::SpecJson.IntegerCap)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
-                    }
-                    if (Value < 0L)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must be >= 0, got " + Value));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ModeUnionInteger other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "ModeUnionInteger[" + this.Value + "]";
-            }
-
             /// <summary>
             /// Converts <see cref="ModeUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
@@ -3831,70 +3753,90 @@ namespace Nexgen.JsonSchema.Showcase
         }
 
         /// <summary>
+        /// The string member of <see cref="ModeUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class ModeUnionString : ModeUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public ModeUnionString(string value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public string Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                if (!(string.Equals(Value, "auto", global::System.StringComparison.Ordinal)) && !(string.Equals(Value, "manual", global::System.StringComparison.Ordinal)))
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must be one of [\"auto\", \"manual\"], got " + Value));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is ModeUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "ModeUnionString[" + this.Value + "]";
+        }
+
+        /// <summary>
+        /// The integer member of <see cref="ModeUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class ModeUnionInteger : ModeUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public ModeUnionInteger(long value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public long Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                if (Value < -NexgenRuntime::SpecJson.IntegerCap || Value > NexgenRuntime::SpecJson.IntegerCap)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "exceeds \u00b1(2^53-1) integer cap"));
+                }
+                if (Value < 0L)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must be >= 0, got " + Value));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is ModeUnionInteger other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "ModeUnionInteger[" + this.Value + "]";
+        }
+
+        /// <summary>
         /// One of: object, string.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
         [global::System.Text.Json.Serialization.JsonConverter(typeof(PayloadUnion.Converter))]
         public interface PayloadUnion
         {
-            /// <summary>
-            /// The object member of <see cref="PayloadUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class PayloadUnionObject : PayloadUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public PayloadUnionObject(global::System.Collections.Generic.IReadOnlyDictionary<string, global::System.Text.Json.JsonElement> value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public global::System.Collections.Generic.IReadOnlyDictionary<string, global::System.Text.Json.JsonElement> Value { get; }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is PayloadUnionObject other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "PayloadUnionObject[" + this.Value + "]";
-            }
-
-            /// <summary>
-            /// The string member of <see cref="PayloadUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class PayloadUnionString : PayloadUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public PayloadUnionString(string value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public string Value { get; }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is PayloadUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "PayloadUnionString[" + this.Value + "]";
-            }
-
             /// <summary>
             /// Converts <see cref="PayloadUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
@@ -3937,7 +3879,7 @@ namespace Nexgen.JsonSchema.Showcase
                 {
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.Object)
                     {
-                        return new PayloadUnion.PayloadUnionObject(NexgenRuntime::SpecJson.Members(node));
+                        return new PayloadUnionObject(NexgenRuntime::SpecJson.Members(node));
                     }
                     if (node.ValueKind == global::System.Text.Json.JsonValueKind.String)
                     {
@@ -3989,41 +3931,70 @@ namespace Nexgen.JsonSchema.Showcase
         }
 
         /// <summary>
+        /// The object member of <see cref="PayloadUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class PayloadUnionObject : PayloadUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public PayloadUnionObject(global::System.Collections.Generic.IReadOnlyDictionary<string, global::System.Text.Json.JsonElement> value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public global::System.Collections.Generic.IReadOnlyDictionary<string, global::System.Text.Json.JsonElement> Value { get; }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is PayloadUnionObject other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "PayloadUnionObject[" + this.Value + "]";
+        }
+
+        /// <summary>
+        /// The string member of <see cref="PayloadUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class PayloadUnionString : PayloadUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public PayloadUnionString(string value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public string Value { get; }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is PayloadUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "PayloadUnionString[" + this.Value + "]";
+        }
+
+        /// <summary>
         /// One of: ShowcaseDetailObject, string.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
         [global::System.Text.Json.Serialization.JsonConverter(typeof(DetailUnion.Converter))]
         public interface DetailUnion
         {
-            /// <summary>
-            /// The string member of <see cref="DetailUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class DetailUnionString : DetailUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public DetailUnionString(string value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public string Value { get; }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is DetailUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "DetailUnionString[" + this.Value + "]";
-            }
-
             /// <summary>
             /// Converts <see cref="DetailUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
@@ -4113,50 +4084,41 @@ namespace Nexgen.JsonSchema.Showcase
         }
 
         /// <summary>
+        /// The string member of <see cref="DetailUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class DetailUnionString : DetailUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public DetailUnionString(string value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public string Value { get; }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is DetailUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "DetailUnionString[" + this.Value + "]";
+        }
+
+        /// <summary>
         /// One of: Circle, Square, string.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
         [global::System.Text.Json.Serialization.JsonConverter(typeof(ShapeOrNameUnion.Converter))]
         public interface ShapeOrNameUnion
         {
-            /// <summary>
-            /// The string member of <see cref="ShapeOrNameUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class ShapeOrNameUnionString : ShapeOrNameUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public ShapeOrNameUnionString(string value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public string Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
-                    if (length0 > 32)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must have length <= 32, got " + length0));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is ShapeOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "ShapeOrNameUnionString[" + this.Value + "]";
-            }
-
             /// <summary>
             /// Converts <see cref="ShapeOrNameUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
@@ -4268,109 +4230,50 @@ namespace Nexgen.JsonSchema.Showcase
         }
 
         /// <summary>
+        /// The string member of <see cref="ShapeOrNameUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class ShapeOrNameUnionString : ShapeOrNameUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public ShapeOrNameUnionString(string value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public string Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
+                if (length0 > 32)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must have length <= 32, got " + length0));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is ShapeOrNameUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "ShapeOrNameUnionString[" + this.Value + "]";
+        }
+
+        /// <summary>
         /// One of: array, string.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
         [global::System.Text.Json.Serialization.JsonConverter(typeof(MeasurementsUnion.Converter))]
         public interface MeasurementsUnion
         {
-            /// <summary>
-            /// The array member of <see cref="MeasurementsUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class MeasurementsUnionArray : MeasurementsUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public MeasurementsUnionArray(global::System.Collections.Generic.IReadOnlyList<double> value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public global::System.Collections.Generic.IReadOnlyList<double> Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    for (var index0 = 0; index0 < Value.Count; index0++)
-                    {
-                        var item0 = Value[index0];
-                        if (!double.IsFinite(item0))
-                        {
-                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(path, index0), "must be a finite number, got " + item0));
-                        }
-                    }
-                    if (Value.Count < 1)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 items, got " + Value.Count));
-                    }
-                    var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(NexgenRuntime::ValueEquality.Comparer);
-                    for (var uniqueIndex0 = 0; uniqueIndex0 < Value.Count; uniqueIndex0++)
-                    {
-                        var key = (object?)NexgenRuntime::SpecJson.NumberKey(Value[uniqueIndex0]) ?? NexgenRuntime::ValueEquality.NullKey;
-                        if (seen0.TryGetValue(key, out var priorIndex))
-                        {
-                            violations.Add(new NexgenRuntime::Violation(path, "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
-                        }
-                        else
-                        {
-                            seen0[key] = uniqueIndex0;
-                        }
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MeasurementsUnionArray other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "MeasurementsUnionArray[" + this.Value + "]";
-            }
-
-            /// <summary>
-            /// The string member of <see cref="MeasurementsUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class MeasurementsUnionString : MeasurementsUnion
-            {
-                private static readonly global::System.Text.RegularExpressions.Regex ValuePattern = new("^[a-z]+\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public MeasurementsUnionString(string value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public string Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    if (!ValuePattern.IsMatch(Value))
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + Value));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MeasurementsUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "MeasurementsUnionString[" + this.Value + "]";
-            }
-
             /// <summary>
             /// Converts <see cref="MeasurementsUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
@@ -4506,87 +4409,109 @@ namespace Nexgen.JsonSchema.Showcase
         }
 
         /// <summary>
+        /// The array member of <see cref="MeasurementsUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class MeasurementsUnionArray : MeasurementsUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public MeasurementsUnionArray(global::System.Collections.Generic.IReadOnlyList<double> value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public global::System.Collections.Generic.IReadOnlyList<double> Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                for (var index0 = 0; index0 < Value.Count; index0++)
+                {
+                    var item0 = Value[index0];
+                    if (!double.IsFinite(item0))
+                    {
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(path, index0), "must be a finite number, got " + item0));
+                    }
+                }
+                if (Value.Count < 1)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 items, got " + Value.Count));
+                }
+                var seen0 = new global::System.Collections.Generic.Dictionary<object, int>(NexgenRuntime::ValueEquality.Comparer);
+                for (var uniqueIndex0 = 0; uniqueIndex0 < Value.Count; uniqueIndex0++)
+                {
+                    var key = (object?)NexgenRuntime::SpecJson.NumberKey(Value[uniqueIndex0]) ?? NexgenRuntime::ValueEquality.NullKey;
+                    if (seen0.TryGetValue(key, out var priorIndex))
+                    {
+                        violations.Add(new NexgenRuntime::Violation(path, "duplicate items: element at index " + uniqueIndex0 + " equals index " + priorIndex));
+                    }
+                    else
+                    {
+                        seen0[key] = uniqueIndex0;
+                    }
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is MeasurementsUnionArray other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "MeasurementsUnionArray[" + this.Value + "]";
+        }
+
+        /// <summary>
+        /// The string member of <see cref="MeasurementsUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class MeasurementsUnionString : MeasurementsUnion
+        {
+            private static readonly global::System.Text.RegularExpressions.Regex ValuePattern = new("^[a-z]+\\z", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public MeasurementsUnionString(string value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public string Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                if (!ValuePattern.IsMatch(Value))
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must match pattern " + "^[a-z]+\\z" + ", got " + Value));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is MeasurementsUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "MeasurementsUnionString[" + this.Value + "]";
+        }
+
+        /// <summary>
         /// One of: number, string.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
         [global::System.Text.Json.Serialization.JsonConverter(typeof(MetricOrLabelUnion.Converter))]
         public interface MetricOrLabelUnion
         {
-            /// <summary>
-            /// The number member of <see cref="MetricOrLabelUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class MetricOrLabelUnionNumber : MetricOrLabelUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public MetricOrLabelUnionNumber(double value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public double Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    if (!double.IsFinite(Value))
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must be a finite number, got " + Value));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MetricOrLabelUnionNumber other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "MetricOrLabelUnionNumber[" + this.Value + "]";
-            }
-
-            /// <summary>
-            /// The string member of <see cref="MetricOrLabelUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class MetricOrLabelUnionString : MetricOrLabelUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public MetricOrLabelUnionString(string value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public string Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
-                    if (length0 < 1)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must have length >= 1, got " + length0));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is MetricOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "MetricOrLabelUnionString[" + this.Value + "]";
-            }
-
             /// <summary>
             /// Converts <see cref="MetricOrLabelUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
@@ -4685,98 +4610,87 @@ namespace Nexgen.JsonSchema.Showcase
         }
 
         /// <summary>
+        /// The number member of <see cref="MetricOrLabelUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class MetricOrLabelUnionNumber : MetricOrLabelUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public MetricOrLabelUnionNumber(double value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public double Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                if (!double.IsFinite(Value))
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must be a finite number, got " + Value));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is MetricOrLabelUnionNumber other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "MetricOrLabelUnionNumber[" + this.Value + "]";
+        }
+
+        /// <summary>
+        /// The string member of <see cref="MetricOrLabelUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class MetricOrLabelUnionString : MetricOrLabelUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public MetricOrLabelUnionString(string value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public string Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
+                if (length0 < 1)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must have length >= 1, got " + length0));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is MetricOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "MetricOrLabelUnionString[" + this.Value + "]";
+        }
+
+        /// <summary>
         /// One of: array, string.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
         [global::System.Text.Json.Serialization.JsonConverter(typeof(AddressListOrLabelUnion.Converter))]
         public interface AddressListOrLabelUnion
         {
-            /// <summary>
-            /// The array member of <see cref="AddressListOrLabelUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class AddressListOrLabelUnionArray : AddressListOrLabelUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public AddressListOrLabelUnionArray(global::System.Collections.Generic.IReadOnlyList<Address> value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public global::System.Collections.Generic.IReadOnlyList<Address> Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    for (var index0 = 0; index0 < Value.Count; index0++)
-                    {
-                        if (Value[index0] is { } item0)
-                        {
-                            Address.Converter.Validate(item0, NexgenRuntime::Violation.Index(path, index0), violations);
-                        }
-                        else
-                        {
-                            violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(path, index0), "explicit null not allowed"));
-                        }
-                    }
-                    if (Value.Count < 1)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 items, got " + Value.Count));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionArray other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "AddressListOrLabelUnionArray[" + this.Value + "]";
-            }
-
-            /// <summary>
-            /// The string member of <see cref="AddressListOrLabelUnion"/>.
-            /// </summary>
-            [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
-            public sealed class AddressListOrLabelUnionString : AddressListOrLabelUnion
-            {
-                /// <summary>
-                /// Wraps a member value.
-                /// </summary>
-                public AddressListOrLabelUnionString(string value)
-                {
-                    this.Value = value;
-                }
-
-                /// <summary>
-                /// The member value.
-                /// </summary>
-                public string Value { get; }
-
-                internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
-                {
-                    var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
-                    if (length0 < 1)
-                    {
-                        violations.Add(new NexgenRuntime::Violation(path, "must have length >= 1, got " + length0));
-                    }
-                }
-
-                /// <inheritdoc/>
-                public override bool Equals(object? obj) => obj is AddressListOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
-
-                /// <inheritdoc/>
-                public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
-
-                /// <inheritdoc/>
-                public override string ToString() => "AddressListOrLabelUnionString[" + this.Value + "]";
-            }
-
             /// <summary>
             /// Converts <see cref="AddressListOrLabelUnion"/> to and from JSON, enforcing the schema in both directions.
             /// </summary>
@@ -4901,6 +4815,92 @@ namespace Nexgen.JsonSchema.Showcase
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// The array member of <see cref="AddressListOrLabelUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class AddressListOrLabelUnionArray : AddressListOrLabelUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public AddressListOrLabelUnionArray(global::System.Collections.Generic.IReadOnlyList<Address> value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public global::System.Collections.Generic.IReadOnlyList<Address> Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                for (var index0 = 0; index0 < Value.Count; index0++)
+                {
+                    if (Value[index0] is { } item0)
+                    {
+                        Address.Converter.Validate(item0, NexgenRuntime::Violation.Index(path, index0), violations);
+                    }
+                    else
+                    {
+                        violations.Add(new NexgenRuntime::Violation(NexgenRuntime::Violation.Index(path, index0), "explicit null not allowed"));
+                    }
+                }
+                if (Value.Count < 1)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must have at least 1 items, got " + Value.Count));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is AddressListOrLabelUnionArray other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "AddressListOrLabelUnionArray[" + this.Value + "]";
+        }
+
+        /// <summary>
+        /// The string member of <see cref="AddressListOrLabelUnion"/>.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("nexgen", null)]
+        public sealed class AddressListOrLabelUnionString : AddressListOrLabelUnion
+        {
+            /// <summary>
+            /// Wraps a member value.
+            /// </summary>
+            public AddressListOrLabelUnionString(string value)
+            {
+                this.Value = value;
+            }
+
+            /// <summary>
+            /// The member value.
+            /// </summary>
+            public string Value { get; }
+
+            internal void Validate(string path, global::System.Collections.Generic.List<NexgenRuntime::Violation> violations)
+            {
+                var length0 = NexgenRuntime::SpecJson.CodePoints(Value);
+                if (length0 < 1)
+                {
+                    violations.Add(new NexgenRuntime::Violation(path, "must have length >= 1, got " + length0));
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is AddressListOrLabelUnionString other && NexgenRuntime::ValueEquality.Equal(this.Value, other.Value);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => NexgenRuntime::ValueEquality.Hash(this.Value);
+
+            /// <inheritdoc/>
+            public override string ToString() => "AddressListOrLabelUnionString[" + this.Value + "]";
         }
 
         /// <summary>

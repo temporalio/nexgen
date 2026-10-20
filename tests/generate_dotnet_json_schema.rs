@@ -238,6 +238,33 @@ fn csharp_cli_generates_json_schema_without_a_support_package() {
 // Annotations and keywords outside the subset
 // ---------------------------------------------------------------------------
 
+/// A named union nests its wrappers in the interface (`Foo.FooString`), while
+/// an inline union declares them beside its interface in the declaring model
+/// (`Holder.ChoiceUnionString`), so the interface name is not repeated.
+#[test]
+fn csharp_json_union_wrapper_placement() {
+    let case = JsonCase::new("union_wrappers");
+    case.write(
+        "holder.yaml",
+        "type: object\nproperties:\n  choice:\n    oneOf:\n      - { type: string }\n      - { type: integer }\n  foo: { $ref: '#/$defs/Foo' }\n$defs:\n  Foo:\n    oneOf:\n      - { type: string }\n      - { type: boolean }\n",
+    );
+    let output = case.generate(&["holder.yaml"]);
+    let models = output.file("Models.cs");
+    assert_has(
+        models,
+        &[
+            "        public interface ChoiceUnion\n        {\n            /// <summary>\n            /// Converts",
+            "        public sealed class ChoiceUnionString : ChoiceUnion\n",
+            "        public sealed class ChoiceUnionInteger : ChoiceUnion\n",
+            "    public interface Foo\n    {\n        /// <summary>\n        /// The string member of <see cref=\"Foo\"/>.\n        /// </summary>\n        [global::System.CodeDom.Compiler.GeneratedCode(\"nexgen\", null)]\n        public sealed class FooString : Foo\n",
+        ],
+    );
+    assert_lacks(
+        models,
+        &["            public sealed class ChoiceUnionString"],
+    );
+}
+
 /// A `title` is the first line of the `<summary>`, ahead of the description,
 /// and never names the type.
 #[test]

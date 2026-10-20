@@ -9684,10 +9684,11 @@ fn collect_java_nested_scope(
 /// A C# type keeps its properties, nested types and methods in one declaration
 /// space, so a model's scope holds its members together with every name the
 /// emitter synthesizes beside them: the nested closed-value class
-/// (`<Member>Value`), inline-union interface (`<Member>Union`) and default
-/// accessor (`<Member>OrDefault`), the catch-all `AdditionalProperties`, the
-/// nested `Converter`, the members a `record` synthesizes, and the runtime types
-/// the model body names by bare identifier. A member may also not share its
+/// (`<Member>Value`), inline-union interface (`<Member>Union`) and its sibling
+/// `<Member>Union<Kind>` wrappers, default accessor (`<Member>OrDefault`), the
+/// catch-all `AdditionalProperties`, the nested `Converter`, the members a
+/// `record` synthesizes, and the runtime types the model body names by bare
+/// identifier. A member may also not share its
 /// enclosing type's name (CS0542). Each closed-value class and union interface
 /// is a further scope of its own.
 fn collect_csharp_nested_scope(
@@ -9701,6 +9702,7 @@ fn collect_csharp_nested_scope(
             &format!("`{model_full_name}` union"),
             type_ident,
             schema,
+            true,
         );
     }
     let mut scope = Namespace::default();
@@ -9733,7 +9735,9 @@ fn collect_csharp_nested_scope(
                 interface.clone(),
                 format!("{origin} inline union interface"),
             )?;
-            collect_csharp_union_scope(&format!("{origin} inline union"), &interface, property)?;
+            let union_origin = format!("{origin} inline union");
+            insert_csharp_union_wrappers(&mut scope, &union_origin, &interface, property)?;
+            collect_csharp_union_scope(&union_origin, &interface, property, false)?;
             continue;
         }
         let shape = java_constraint_shape(property);
@@ -9843,7 +9847,12 @@ fn collect_csharp_nested_scope(
 
 /// A C# union interface's own scope: one wrapper class per non-`$ref` branch
 /// and the nested converter.
-fn collect_csharp_union_scope(origin: &str, interface: &str, schema: &Schema) -> Result<()> {
+fn collect_csharp_union_scope(
+    origin: &str,
+    interface: &str,
+    schema: &Schema,
+    wrappers_inside: bool,
+) -> Result<()> {
     let language = Language::Dotnet;
     let mut scope = Namespace::default();
     scope.insert(
@@ -9851,6 +9860,26 @@ fn collect_csharp_union_scope(origin: &str, interface: &str, schema: &Schema) ->
         interface.to_string(),
         format!("{origin} interface"),
     )?;
+    if wrappers_inside {
+        insert_csharp_union_wrappers(&mut scope, origin, interface, schema)?;
+    }
+    scope.insert(
+        language,
+        "Converter".to_string(),
+        "generated nested `Converter` class".to_string(),
+    )
+}
+
+/// Inserts the wrapper class the C# emitter synthesizes for each non-`$ref`
+/// branch (`<Union><Kind>`) into `scope`: the union interface's own scope for a
+/// named union, or the declaring model's scope for an inline union, whose
+/// wrappers are siblings of the interface.
+fn insert_csharp_union_wrappers(
+    scope: &mut Namespace,
+    origin: &str,
+    interface: &str,
+    schema: &Schema,
+) -> Result<()> {
     for branch in schema.one_of.iter().flatten() {
         if branch.reference.is_some() {
             continue;
@@ -9872,16 +9901,12 @@ fn collect_csharp_union_scope(origin: &str, interface: &str, schema: &Schema) ->
             continue;
         };
         scope.insert(
-            language,
+            Language::Dotnet,
             format!("{interface}{suffix}"),
             format!("{origin} `{suffix}` variant wrapper"),
         )?;
     }
-    scope.insert(
-        language,
-        "Converter".to_string(),
-        "generated nested `Converter` class".to_string(),
-    )
+    Ok(())
 }
 
 /// Whether the C# emitter materializes a string member (a temporal `format` or a
@@ -16723,6 +16748,36 @@ properties:
                 && error.contains("collision"),
             "{error}"
         );
+    }
+
+    /// C# declares an inline union's wrappers beside its interface in the
+    /// declaring model (`Model.ChoiceUnionString`), so a wrapper shares the
+    /// model's member scope.
+    #[test]
+    fn rejects_csharp_inline_union_wrapper_collisions() {
+        let wrapper_collision = r#"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  choice:
+    oneOf:
+      - { type: string }
+      - { type: integer }
+  choiceUnionString: { type: string }
+"#;
+        let error = reject_for(Language::Dotnet, wrapper_collision);
+        assert!(
+            error.contains("ChoiceUnionString")
+                && error.contains("variant wrapper")
+                && error.contains("collision"),
+            "{error}"
+        );
+        let renamed = wrapper_collision.replace(
+            "  choiceUnionString: { type: string }",
+            "  choiceUnionString: { type: string, x-cs-name: ChoiceLabel }",
+        );
+        parse_for(Language::Dotnet, &renamed)
+            .expect("x-cs-name moves the member off the wrapper's name");
     }
 
     /// Two members that recase alike are separated by an `x-go-name`, and the
