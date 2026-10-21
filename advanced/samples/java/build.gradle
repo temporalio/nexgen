@@ -39,6 +39,7 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
     useJUnitPlatform()
+    systemProperty 'nexgen.test.classpath', sourceSets.test.runtimeClasspath.asPath
 }
 
 // The descriptor fixture includes unreleased API messages. Generate only the

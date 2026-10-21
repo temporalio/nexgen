@@ -83,8 +83,7 @@ public final class OnCompleteRequest<OutputT, SourceContextT> {
             support.TemporalModelConverters.failureToProto(
                 converter, ((RuntimeException) this.result.getValue())));
     }
-    if (this.sourceContext != null)
-      proto.setSourceContext(converter.toPayload((this.sourceContext)).get());
+    proto.setSourceContext(converter.toPayload((this.sourceContext)).get());
     return proto.build();
   }
 

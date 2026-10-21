@@ -52,7 +52,7 @@ public final class PayloadBackedOutput<OutputT> {
       io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.compute.v1.ComputeProvider.Builder proto =
         io.temporal.api.compute.v1.ComputeProvider.newBuilder();
-    if (this.details != null) proto.setDetails(converter.toPayload((this.details)).get());
+    proto.setDetails(converter.toPayload((this.details)).get());
     return proto.build();
   }
 
