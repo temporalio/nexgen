@@ -24,7 +24,7 @@ type signalWithStartWorkflowRequest struct {
 	Workflow                 string
 	Args                     []any
 	ID                       string
-	TaskQueue                string
+	TaskQueue                *string
 	Signal                   string
 	SignalArgs               []any
 	WorkflowExecutionTimeout *time.Duration
@@ -56,7 +56,7 @@ func (m signalWithStartWorkflowRequest) GetID() string {
 	return m.ID
 }
 
-func (m signalWithStartWorkflowRequest) GetTaskQueue() string {
+func (m signalWithStartWorkflowRequest) GetTaskQueue() *string {
 	return m.TaskQueue
 }
 
@@ -146,7 +146,7 @@ func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfi
 	}
 	message.WorkflowId = m.ID
 	{
-		converted, err := support.TaskQueueToProto(cfg.DataConverter, &m.TaskQueue)
+		converted, err := support.TaskQueueToProto(cfg.DataConverter, m.TaskQueue)
 		if err != nil {
 			return nil, err
 		}
@@ -276,9 +276,7 @@ func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusCon
 		if err != nil {
 			return err
 		}
-		if converted != nil {
-			out.TaskQueue = *converted
-		}
+		out.TaskQueue = converted
 	}
 	out.Signal = proto.GetSignalName()
 	{
@@ -395,6 +393,10 @@ func (signalWithStartWorkflowRequest) TransferTypeConverter() (converter.Transfe
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
 	request.Namespace = support.WorkflowNamespace(ctx)
+	if request.TaskQueue == nil {
+		var value string = workflow.GetInfo(ctx).TaskQueueName
+		request.TaskQueue = &value
+	}
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -534,9 +536,10 @@ type SignalWithStartWorkflowOptions struct {
 	//
 	// Required.
 	ID string
-	// TaskQueue - Task queue to run the workflow on.
+	// TaskQueue - Task queue to run the workflow on. Defaults to the calling workflow's
+	// task queue.
 	//
-	// Required.
+	// Optional.
 	TaskQueue string
 	// WorkflowExecutionTimeout - Total workflow execution timeout, including retries and
 	// continue-as-new. Defaults to unlimited.
@@ -615,6 +618,10 @@ func SignalWithStartWorkflow(
 	workflow any,
 	args ...any,
 ) workflow.Future {
+	var taskQueue *string
+	if opts.TaskQueue != "" {
+		taskQueue = &opts.TaskQueue
+	}
 	var workflowExecutionTimeout *time.Duration
 	if opts.WorkflowExecutionTimeout != 0 {
 		workflowExecutionTimeout = &opts.WorkflowExecutionTimeout
@@ -648,7 +655,7 @@ func SignalWithStartWorkflow(
 		Workflow:                 workflowName,
 		Args:                     args,
 		ID:                       opts.ID,
-		TaskQueue:                opts.TaskQueue,
+		TaskQueue:                taskQueue,
 		Signal:                   signal,
 		SignalArgs:               []any{signalArg},
 		WorkflowExecutionTimeout: workflowExecutionTimeout,
@@ -683,6 +690,10 @@ func SignalWithStartWorkflowTyped[WorkflowArg any, WorkflowResult any](
 	workflow func(workflow.Context, WorkflowArg) WorkflowResult,
 	arg WorkflowArg,
 ) workflow.Future {
+	var taskQueue *string
+	if opts.TaskQueue != "" {
+		taskQueue = &opts.TaskQueue
+	}
 	var workflowExecutionTimeout *time.Duration
 	if opts.WorkflowExecutionTimeout != 0 {
 		workflowExecutionTimeout = &opts.WorkflowExecutionTimeout
@@ -716,7 +727,7 @@ func SignalWithStartWorkflowTyped[WorkflowArg any, WorkflowResult any](
 		Workflow:                 workflowName,
 		Args:                     []any{arg},
 		ID:                       opts.ID,
-		TaskQueue:                opts.TaskQueue,
+		TaskQueue:                taskQueue,
 		Signal:                   signal,
 		SignalArgs:               []any{signalArg},
 		WorkflowExecutionTimeout: workflowExecutionTimeout,

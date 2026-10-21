@@ -21,7 +21,7 @@ use crate::generator::go::{
     go_replacement_type_name, go_string_literal, go_unexported_name, new_nexus_client_expr,
     operation_output, planned_field, planned_field_kind, planned_message_type,
     public_default_punning_zero_for_field, record_for_message, record_for_model_key,
-    render_operation_future_adapter, render_operation_future_return_type,
+    render_input_defaults, render_operation_future_adapter, render_operation_future_return_type,
     resolve_resource_field_kind, split_go_type_decl_name,
 };
 
@@ -1136,6 +1136,7 @@ pub(in crate::generator) fn render_operation_function_proto(
         output.push_str(assignment);
         output.push('\n');
     }
+    render_input_defaults(output, operation);
 
     let input_arg = match binding.input_to_proto.as_deref() {
         Some(input_to_proto) => {
@@ -1897,7 +1898,11 @@ fn default_enum_proto_expr(
     field: &crate::generator::go::PlannedField,
     backend: &ModelBackend,
 ) -> GoConversionResult<Option<String>> {
-    let Some(default) = &field.default_value else {
+    let Some(case_name) = field
+        .default_value
+        .as_ref()
+        .and_then(|default| default.enum_case())
+    else {
         return Ok(None);
     };
     let PlannedFieldKind::Singular(value) = &field.kind else {
@@ -1906,7 +1911,7 @@ fn default_enum_proto_expr(
     let enum_value = field
         .default_enum_value
         .as_ref()
-        .ok_or_else(|| format!("default enum case `{}` was not resolved", default.enum_case))?;
+        .ok_or_else(|| format!("default enum case `{case_name}` was not resolved"))?;
     let proto_type = backend.value_proto_type(value)?;
     Ok(Some(format!("{proto_type}({})", enum_value.number)))
 }

@@ -2300,6 +2300,65 @@ interface workflow-service {
 }
 
 #[test]
+fn go_expression_default_is_applied_before_proto_conversion() {
+    let root = project_root();
+    let rendered = generate_to_string_with_inputs(
+        nexgen::language::Language::Go,
+        &example_input_paths(&root, "workflow-service"),
+        &[descriptor_path(&root)],
+    )
+    .unwrap();
+    assert!(rendered.contains(
+        "if request.TaskQueue == nil {\n\t\tvar value string = workflow.GetInfo(ctx).TaskQueueName\n\t\trequest.TaskQueue = &value\n\t}"
+    ));
+    assert!(rendered.contains("TaskQueue string"));
+    assert!(rendered.contains("if opts.TaskQueue != \"\" {"));
+    assert!(!rendered.contains("// TaskQueue - Required."));
+}
+
+#[test]
+fn go_expression_default_is_applied_to_native_operation_inputs() {
+    let temp_dir = unique_output_path("go-expression-default");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let wit_path = temp_dir.join("defaults.wit");
+    fs::write(
+        &wit_path,
+        r#"package temporal:defaults@1.0.0;
+world system { export service; }
+/// @nexus.endpoint "defaults"
+interface service {
+  record request {
+    /// @nexus.default go="workflow.GetInfo(ctx).TaskQueueName"
+    task-queue: string,
+    /// @nexus.default go="42"
+    count: s32,
+    /// @nexus.default go="strings:strings.ToUpper(\"default\")"
+    label: string,
+    /// @nexus.default go="\"https://example.com/default\""
+    url: string,
+    /// @nexus.default go="[]string{\"default\"}"
+    labels: list<string>,
+  }
+  execute: func(request: request);
+}
+"#,
+    )
+    .unwrap();
+    let rendered =
+        generate_to_string_with_inputs(nexgen::language::Language::Go, &[wit_path], &[]).unwrap();
+    assert!(rendered.contains("var value string = workflow.GetInfo(ctx).TaskQueueName"));
+    assert!(rendered.contains("if request.Count == nil {\n\t\tvar value int32 = 42"));
+    assert!(rendered.contains("request.Count = &value"));
+    assert!(rendered.contains("\"strings\""));
+    assert!(rendered.contains("var value string = strings.ToUpper(\"default\")"));
+    assert!(rendered.contains("var value string = \"https://example.com/default\""));
+    assert!(
+        rendered.contains("if request.Labels == nil {\n\t\trequest.Labels = []string{\"default\"}")
+    );
+    fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
 fn go_flatten_in_api_embeds_options_value() {
     let root = project_root();
     let rendered = generate_to_string_with_inputs(

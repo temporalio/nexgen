@@ -1518,6 +1518,56 @@ impl<'a> ApiPlanner<'a> {
                 .collect()
         });
 
+        let mut input_defaults = Vec::new();
+        if let Some(record) = record_for_message(self.api_plan, &input)
+            && let Some(model) = self.models.get(&input.info.full_name)
+        {
+            for (_, field) in record.model_fields() {
+                let Some(FieldDefaultSpec::Expression(expression)) = &field.default_value else {
+                    continue;
+                };
+                let name = go_field_name(&field.name);
+                let rendered = model
+                    .fields
+                    .iter()
+                    .find(|rendered| rendered.name == name)
+                    .expect("rendered input field");
+                if !rendered.go_type.starts_with('*') && !go_type_is_nilable(&rendered.go_type) {
+                    return Err(Error::InvalidWitDirective {
+                        path: PathBuf::from("<go-plan>"),
+                        context: format!("field `{}.{}`", record.full_name, field.name),
+                        directive: "@nexus.default".to_string(),
+                        reason: "expression defaults require a nilable internal Go field type"
+                            .to_string(),
+                    });
+                }
+                // Expressions are code, not type annotations: do not scan their
+                // string literals for package paths. Only an explicit leading
+                // `import/path:expression` supplies an import.
+                let expression = if let Some((path, _)) = expression.split_once(':')
+                    && !path.is_empty()
+                    && path
+                        .chars()
+                        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '/' | '-'))
+                {
+                    if !self.package.is_self_import(path) {
+                        self.imports.insert(path.to_string());
+                    }
+                    self.package.go_type_expr(expression)
+                } else {
+                    expression.clone()
+                };
+                let assignment = if let Some(value_type) = rendered.go_type.strip_prefix('*') {
+                    format!("var value {value_type} = {expression}\n\t\trequest.{name} = &value")
+                } else {
+                    format!("request.{name} = {expression}")
+                };
+                input_defaults.push(format!(
+                    "\tif request.{name} == nil {{\n\t\t{assignment}\n\t}}\n"
+                ));
+            }
+        }
+
         let serialization_context_expr = if crate::nexgen_config::current().system_nexus {
             operation.serialization_context.value()
         } else {
@@ -1541,6 +1591,7 @@ impl<'a> ApiPlanner<'a> {
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
             unpacked_input,
+            input_defaults,
             wire_binding: None,
         })
     }
@@ -2196,6 +2247,8 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// `None` when the input type is an external/replacement type that cannot
     /// be unpacked into individual arguments.
     unpacked_input: Option<Vec<RenderedUnpackedParam>>,
+    /// Conditional expression defaults evaluated with `ctx` at the call site.
+    input_defaults: Vec<String>,
     /// Wire serialization binding for the request/response, populated in a
     /// second pass when the backend can convert the input/output messages.
     /// When present, the operation function converts native values to/from
@@ -4561,6 +4614,15 @@ pub(in crate::generator) fn render_operation_future_return_type(
     output.push_str(&package.workflow_future_type());
 }
 
+pub(in crate::generator) fn render_input_defaults(
+    output: &mut String,
+    operation: &RenderedOperation<'_>,
+) {
+    for default in &operation.input_defaults {
+        output.push_str(default);
+    }
+}
+
 fn render_future_value_set(output: &mut String, value_expr: &str, value_is_pointer: bool) {
     if value_is_pointer {
         output.push_str("\t\tif ");
@@ -4666,6 +4728,7 @@ fn render_operation_function(
     output.push_str(") ");
     render_operation_future_return_type(output, package);
     output.push_str(" {\n");
+    render_input_defaults(output, operation);
     let endpoint = service
         .endpoint
         .as_deref()

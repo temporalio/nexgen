@@ -1236,8 +1236,14 @@ fn build_fields_from_record(
             resolve_authored_field_type_spec(resolve, &field.ty, path, &field_context)?,
             language,
         );
-        let field_default =
-            build_field_default(resolve, &field.ty, default_directive, path, &field_context)?;
+        let field_default = build_field_default(
+            resolve,
+            &field.ty,
+            default_directive,
+            path,
+            &field_context,
+            language,
+        )?;
         let required = !is_optional_type(resolve, &field.ty) && field_default.is_none();
         let source = build_source_call(&directives, path, &field_context, language)?;
         if let Some(api_omit_directive) = api_omit_directive {
@@ -1264,6 +1270,19 @@ fn build_fields_from_record(
             .map(directive_language_string);
         let function =
             build_function_field(resolve, owner, &directives, path, &field_context, language)?;
+
+        if matches!(field_default, Some(FieldDefaultSpec::Expression(_)))
+            && (source.is_some() || function.is_some())
+        {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: field_context,
+                directive: "@nexus.default".to_string(),
+                reason:
+                    "expression defaults cannot be combined with `@nexus.source` or function fields"
+                        .to_string(),
+            });
+        }
 
         if source.is_some() && function.is_some() {
             return Err(Error::ConflictingTypeOverrideFieldProperties {
@@ -1707,11 +1726,30 @@ fn build_field_default(
     directive: Option<&Directive>,
     path: &Path,
     context: &str,
+    language: Language,
 ) -> Result<Option<FieldDefaultSpec>> {
     let Some(directive) = directive else {
         return Ok(None);
     };
+    if language == Language::Go
+        && let Some(expression) = directive.value("go")
+    {
+        if expression.trim().is_empty() {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: context.to_string(),
+                directive: "@nexus.default".to_string(),
+                reason: "default expression cannot be empty".to_string(),
+            });
+        }
+        return Ok(Some(FieldDefaultSpec::Expression(
+            expression.trim().to_string(),
+        )));
+    }
     let Some(case_name) = directive.value("value") else {
+        if directive.value("go").is_some() {
+            return Ok(None);
+        }
         return Err(Error::InvalidWitDirective {
             path: path.to_path_buf(),
             context: context.to_string(),
@@ -1728,9 +1766,7 @@ fn build_field_default(
         });
     }
     validate_default_enum_case(resolve, ty, case_name, path, context)?;
-    Ok(Some(FieldDefaultSpec {
-        enum_case: case_name.to_string(),
-    }))
+    Ok(Some(FieldDefaultSpec::EnumCase(case_name.to_string())))
 }
 
 fn validate_default_enum_case(
@@ -3905,9 +3941,63 @@ interface workflow-service {
         assert_eq!(
             request
                 .field_default("workflow_id_reuse_policy")
-                .map(|default| default.enum_case.as_str()),
+                .and_then(|default| default.enum_case()),
             Some("allow-duplicate")
         );
+    }
+
+    #[test]
+    fn parses_go_expression_defaults_without_changing_other_languages() {
+        let wit = r#"
+package temporal:defaults@1.0.0;
+world system { export service; }
+interface service {
+  enum mode { automatic, manual }
+  record request {
+    /// @nexus.default go="workflow.GetInfo(ctx).TaskQueueName"
+    task-queue: string,
+    /// @nexus.default "automatic" go="ModeManual"
+    mode: mode,
+  }
+}
+"#;
+        let go = parse(Language::Go, wit);
+        let record = go.record("service.request").unwrap();
+        assert!(!record.field_required("task_queue"));
+        assert_eq!(
+            record.field_default("task_queue"),
+            Some(&crate::spec::FieldDefaultSpec::Expression(
+                "workflow.GetInfo(ctx).TaskQueueName".to_string()
+            ))
+        );
+        assert_eq!(
+            record.field_default("mode"),
+            Some(&crate::spec::FieldDefaultSpec::Expression(
+                "ModeManual".to_string()
+            ))
+        );
+        for language in [Language::Python, Language::TypeScript, Language::Dotnet] {
+            let spec = parse(language, wit);
+            let record = spec.record("service.request").unwrap();
+            assert!(record.field_required("task_queue"));
+            assert!(record.field_default("task_queue").is_none());
+            assert_eq!(
+                record
+                    .field_default("mode")
+                    .and_then(|default| default.enum_case()),
+                Some("automatic")
+            );
+        }
+        for directive in [
+            r#"@nexus.default go="   ""#,
+            "@nexus.default go=\"workflow.GetInfo(ctx).TaskQueueName\"\n    /// @nexus.source go=\"TaskQueue(ctx)\"",
+        ] {
+            let invalid = wit.replace(
+                r#"@nexus.default go="workflow.GetInfo(ctx).TaskQueueName""#,
+                directive,
+            );
+            assert!(parse_result(Language::Go, &invalid).is_err());
+        }
     }
 
     #[test]
@@ -4031,8 +4121,8 @@ interface workflow-service {
             crate::spec::RecordFieldVisibility::Public
         ));
         assert_eq!(
-            field.default_value.as_ref().unwrap().enum_case,
-            "allow-duplicate"
+            field.default_value.as_ref().unwrap().enum_case(),
+            Some("allow-duplicate")
         );
     }
 

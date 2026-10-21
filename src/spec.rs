@@ -1462,8 +1462,19 @@ impl<N: AsRef<str>> AsRef<str> for JsonModelSpec<N> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FieldDefaultSpec {
-    pub enum_case: String,
+pub enum FieldDefaultSpec {
+    EnumCase(String),
+    /// A target-language expression evaluated at an operation call site.
+    Expression(String),
+}
+
+impl FieldDefaultSpec {
+    pub fn enum_case(&self) -> Option<&str> {
+        match self {
+            Self::EnumCase(case) => Some(case),
+            Self::Expression(_) => None,
+        }
+    }
 }
 
 /// A WIT alias marked with `@nexus.type-parameter`.
