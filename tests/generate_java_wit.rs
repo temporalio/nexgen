@@ -103,12 +103,11 @@ fn operation_api_splits_required_arguments_from_generated_options() {
     let output = temp.path().join("generated");
     let operations = fs::read_to_string(output.join("WorkflowOperations.java")).unwrap();
     assert!(operations.contains(
-        "signalWithStartWorkflow(String workflow, String id, String taskQueue, String signal)"
+        "signalWithStartWorkflow(String workflow, Object[] args, String id, String taskQueue, String signal, Object[] signalArgs)"
     ));
-    assert!(
-        operations
-            .contains("String signal, test.generated.SignalWithStartWorkflowOptions options)")
-    );
+    assert!(operations.contains(
+        "String signal, Object[] signalArgs, test.generated.SignalWithStartWorkflowOptions options)"
+    ));
     assert!(!operations.contains(
         "public static io.temporal.workflow.ExternalWorkflowStub executeSignalWithStartWorkflow("
     ));
@@ -142,12 +141,12 @@ fn operation_api_splits_required_arguments_from_generated_options() {
         operations
             .contains("requestBuilder.setSignalArgs(java.util.Arrays.asList(capturedArguments))")
     );
-    assert!(operations.contains("signalArgs must be supplied through the bound call, not options"));
+    assert!(!operations.contains("must be supplied through the bound call, not options"));
+    assert!(operations.contains("requestBuilder.setArgs(java.util.Arrays.asList(java.util.Objects.requireNonNull(args, \"args\")))"));
+    assert!(operations.contains("requestBuilder.setSignalArgs(java.util.Arrays.asList(java.util.Objects.requireNonNull(signalArgs, \"signalArgs\")))"));
     assert!(!operations.contains("requestBuilder.setSignalInput("));
     let options = fs::read_to_string(output.join("SignalWithStartWorkflowOptions.java")).unwrap();
     for expected in [
-        "setArgs(Object... values)",
-        "setSignalArgs(Object... values)",
         "setStaticSummary(String value)",
         "setStaticDetails(String value)",
         "getDefaultInstance()",
@@ -160,6 +159,10 @@ fn operation_api_splits_required_arguments_from_generated_options() {
         );
     }
     for hidden in [
+        "getArgs()",
+        "getSignalArgs()",
+        "setArgs(",
+        "setSignalArgs(",
         "getWorkflow()",
         "getId()",
         "getTaskQueue()",

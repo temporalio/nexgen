@@ -2020,11 +2020,11 @@ added later. Use `--package-name io.temporal.workflow` to put the models and
 operations in the SDK's workflow package. Record-input operations take required
 fields as parameters and optional or defaulted fields through a generated
 `<Operation>Options` class. An overload omitting options uses defaults. Options
-have builders and copy builders; payload argument lists also accept varargs.
-Sourced and omitted fields stay out of the public arguments and options, while
-flattened records expose their fields directly. The operation constructs the
-request internally; no handwritten options class or operation wrapper is
-required.
+have builders and copy builders. Callable argument lists are explicit parameters
+in the name-based API and are excluded from options. Sourced and omitted fields
+stay out of the public arguments and options, while flattened records expose
+their fields directly. The operation constructs the request internally; no
+handwritten options class or operation wrapper is required.
 
 Protobuf-bound varargs function fields can specify `java-call-extractor` on
 `@nexus.function` to additionally generate typed overloads. Bound method
@@ -2036,9 +2036,9 @@ generic primary callables also have void-returning overloads. The SDK-owned
 extractor receives the bound method reference, a zero-argument invocation, and a
 `BiConsumer<String, Object[]>` receiving its resolved name and arguments. The
 generated method maps these arguments to the request's authored API field names.
-Typed calls reject argument lists also supplied in options. The name-based
-overload remains available. No operation names or composite-operation
-conventions are encoded in the Java renderer.
+The name-based overload takes an `Object[]` immediately after each callable's
+name. Neither overload exposes callable arguments in options. No operation names
+or composite-operation conventions are encoded in the Java renderer.
 
 Java fields can declare `@nexus.merge-from-function` to merge explicit values
 with metadata from a named callable, as described below. Relationships between

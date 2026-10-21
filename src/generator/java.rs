@@ -1847,6 +1847,11 @@ impl Context<'_> {
             return Ok(None);
         };
         let fields = self.operation_api_fields(model)?;
+        let argument_fields = callable_argument_fields(&fields, model);
+        let fields = fields
+            .into_iter()
+            .filter(|field| !argument_fields.contains(field.name.as_str()))
+            .collect::<Vec<_>>();
         let parameters = self.options_type_parameters(&fields);
         let fields = fields
             .into_iter()
@@ -1936,6 +1941,11 @@ impl Context<'_> {
             return Ok(String::new());
         };
         let fields = self.operation_api_fields(model)?;
+        let captured_arguments = callable_argument_fields(&fields, model);
+        let fields = fields
+            .into_iter()
+            .filter(|field| !captured_arguments.contains(field.name.as_str()))
+            .collect::<Vec<_>>();
         let required = fields
             .iter()
             .filter(|f| api_field_required(f))
@@ -1944,16 +1954,11 @@ impl Context<'_> {
             .iter()
             .filter(|f| !api_field_required(f))
             .collect::<Vec<_>>();
-        let captured_arguments = required
-            .iter()
-            .filter_map(|field| captured_function(field))
-            .flat_map(|function| &function.arg_fields)
-            .filter_map(|key| model.fields.get(key).map(|field| field.name.as_str()))
-            .collect::<BTreeSet<_>>();
         let mut names = required
             .iter()
             .map(|f| ident(&f.name))
             .collect::<BTreeSet<_>>();
+        names.extend(captured_arguments.iter().map(|name| ident(name)));
         names.extend(
             generic
                 .trim()
@@ -2098,6 +2103,11 @@ impl Context<'_> {
                     parameters.push(format!("{ty} {name}"));
                     arguments.push(name.clone());
                 }
+            } else if let Some(function) = captured_function(field).filter(|_| !typed) {
+                let argument = &model.fields[&function.arg_fields[0]];
+                let name = ident(&argument.name);
+                parameters.push(format!("Object[] {name}"));
+                arguments.push(name);
             }
         }
         if generic_output {
@@ -2158,6 +2168,11 @@ impl Context<'_> {
                 writeln!(out, "    {assignment}{extractor}({name}, () -> {name}.apply({args}), ({capture_name}, {capture_values}) -> {{ {builder}.set{}({capture_name}); {builder}.set{}(java.util.Arrays.asList({capture_values})); }});", field.name.to_upper_camel_case(), arguments.to_upper_camel_case()).unwrap();
                 continue;
             }
+            if let Some(function) = captured_function(field).filter(|_| !typed) {
+                let argument = &model.fields[&function.arg_fields[0]];
+                let name = ident(&argument.name);
+                writeln!(out, "    {builder}.set{}(java.util.Arrays.asList(java.util.Objects.requireNonNull({name}, {})));", argument.name.to_upper_camel_case(), literal(&name)).unwrap();
+            }
             writeln!(
                 out,
                 "    {builder}.set{}(java.util.Objects.requireNonNull({}, {}));",
@@ -2171,10 +2186,6 @@ impl Context<'_> {
             writeln!(out, "    if ({options} != null) {{").unwrap();
             for field in optional {
                 let name = field.name.to_upper_camel_case();
-                if typed && captured_arguments.contains(field.name.as_str()) {
-                    writeln!(out, "      if ({options}.get{name}() != null) throw new IllegalArgumentException({});", literal(&format!("{} must be supplied through the bound call, not options", ident(&field.name)))).unwrap();
-                    continue;
-                }
                 if typed && field.merge_from_function.is_some() {
                     continue;
                 }
@@ -2431,6 +2442,19 @@ fn captured_function(
             && matches!(function.args, FunctionArgsSpec::Varargs { .. })
             && field.data.wire_binding.is_some()
     })
+}
+
+fn callable_argument_fields<'a>(
+    fields: &[RecordFieldSpec<PlannedFamily>],
+    model: &'a RecordSpec<PlannedFamily>,
+) -> BTreeSet<&'a str> {
+    fields
+        .iter()
+        .filter(|field| api_field_required(field))
+        .filter_map(captured_function)
+        .flat_map(|function| &function.arg_fields)
+        .filter_map(|key| model.fields.get(key).map(|field| field.name.as_str()))
+        .collect()
 }
 
 fn request_operation_name(operation: &OperationSpec<PlannedFamily>) -> String {
