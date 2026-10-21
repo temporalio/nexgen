@@ -1875,6 +1875,53 @@ impl Context<'_> {
             self.render_record(&options, &parameters, true),
         )))
     }
+    fn function_result_type(&self, function: &FunctionFieldSpec<PlannedFamily>) -> String {
+        function
+            .result_type_parameter
+            .as_ref()
+            .map(|name| name.to_upper_camel_case())
+            .unwrap_or_else(|| match &function.result {
+                FunctionResultSpec::Authored(ty) => self.ty(ty),
+                FunctionResultSpec::Annotation(text) => {
+                    text.value().unwrap_or("Object").to_string()
+                }
+            })
+    }
+
+    fn bound_overloads(&self, model: &Record) -> Vec<BTreeMap<String, BoundFunctionShape>> {
+        let mut overloads = vec![BTreeMap::new()];
+        for (_, field) in model
+            .public_fields()
+            .filter(|(_, field)| api_field_required(field))
+        {
+            let Some(function) = captured_function(field) else {
+                continue;
+            };
+            let result = self.function_result_type(function);
+            let void = result == "void" || result == "Void";
+            let procedures: &[bool] = if void {
+                &[true]
+            } else if function.result_type_parameter.is_some() {
+                &[false, true]
+            } else {
+                &[false]
+            };
+            let max_arity = if function.primary { 6 } else { 1 };
+            let mut next = Vec::new();
+            for overload in &overloads {
+                for arity in 0..=max_arity {
+                    for &procedure in procedures {
+                        let mut shapes = overload.clone();
+                        shapes.insert(field.name.clone(), BoundFunctionShape { arity, procedure });
+                        next.push(shapes);
+                    }
+                }
+            }
+            overloads = next;
+        }
+        overloads
+    }
+
     fn public_operation(
         &self,
         service: &ServiceSpec<PlannedFamily>,
@@ -1882,8 +1929,9 @@ impl Context<'_> {
         generic: &str,
         result_type: &str,
         generic_output: bool,
-        typed: bool,
+        shapes: Option<&BTreeMap<String, BoundFunctionShape>>,
     ) -> Result<String> {
+        let typed = shapes.is_some();
         let Some(model) = self.operation_input_record(operation) else {
             return Ok(String::new());
         };
@@ -1914,7 +1962,6 @@ impl Context<'_> {
                 .split(',')
                 .map(|name| name.trim().to_string()),
         );
-        let interface = available_identifier("workflowInterface", &mut names);
         let endpoint = available_identifier("endpoint", &mut names);
         let result_parameter = available_identifier("resultType", &mut names);
         let options = available_identifier("options", &mut names);
@@ -1924,16 +1971,60 @@ impl Context<'_> {
         let capture_values = available_identifier("capturedArguments", &mut names);
         let mut parameters = Vec::new();
         let mut arguments = Vec::new();
-        // Callback extractors share a receiver type, so workflow and signal
-        // callbacks are checked against the same workflow interface.
-        let receiver = available_identifier("WorkflowInterface", &mut names);
+        let mut call_arguments = BTreeMap::new();
+        if let Some(shapes) = shapes {
+            for field in &required {
+                if let Some(shape) = shapes.get(&field.name) {
+                    call_arguments.insert(
+                        field.name.clone(),
+                        (1..=shape.arity)
+                            .map(|i| {
+                                let ty = available_identifier(
+                                    &format!("{}Arg{i}", field.name.to_upper_camel_case()),
+                                    &mut names,
+                                );
+                                let name = available_identifier(
+                                    &format!("{}Arg{i}", ident(&field.name)),
+                                    &mut names,
+                                );
+                                (ty, name)
+                            })
+                            .collect::<Vec<_>>(),
+                    );
+                }
+            }
+        }
         let generic = if typed {
-            parameters.push(format!("Class<{receiver}> {interface}"));
-            arguments.push(interface.clone());
-            if generic.is_empty() {
-                format!("<{receiver}> ")
+            let mut parameters = generic
+                .trim()
+                .trim_start_matches('<')
+                .trim_end_matches('>')
+                .split(',')
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .map(str::to_string)
+                .collect::<BTreeSet<_>>();
+            parameters.extend(
+                required
+                    .iter()
+                    .filter(|field| {
+                        shapes
+                            .unwrap()
+                            .get(&field.name)
+                            .is_some_and(|shape| !shape.procedure)
+                    })
+                    .filter_map(|field| captured_function(field))
+                    .filter_map(|function| function.result_type_parameter.as_ref())
+                    .map(|name| name.to_upper_camel_case()),
+            );
+            parameters.extend(call_arguments.values().flatten().map(|(ty, _)| ty.clone()));
+            if parameters.is_empty() {
+                String::new()
             } else {
-                generic.replacen('<', &format!("<{receiver}, "), 1)
+                format!(
+                    "<{}> ",
+                    parameters.into_iter().collect::<Vec<_>>().join(", ")
+                )
             }
         } else {
             generic.to_string()
@@ -1944,13 +2035,39 @@ impl Context<'_> {
         }
         for field in &required {
             let name = ident(&field.name);
-            let ty = if typed && captured_function(field).is_some() {
-                format!("io.temporal.workflow.Functions.Proc1<{receiver}>")
+            let function = captured_function(field).filter(|_| typed);
+            let ty = if let Some(function) = function {
+                let shape = shapes.unwrap()[&field.name];
+                let mut types = call_arguments[&field.name]
+                    .iter()
+                    .map(|(ty, _)| ty.clone())
+                    .collect::<Vec<_>>();
+                if !shape.procedure {
+                    types.push(self.function_result_type(function));
+                }
+                let suffix = if shape.arity == 0 {
+                    String::new()
+                } else {
+                    shape.arity.to_string()
+                };
+                let type_args = if types.is_empty() {
+                    String::new()
+                } else {
+                    format!("<{}>", types.join(", "))
+                };
+                let callable = if shape.procedure { "Proc" } else { "Func" };
+                format!("io.temporal.workflow.Functions.{callable}{suffix}{type_args}")
             } else {
                 self.field_ty(field)
             };
             parameters.push(format!("{ty} {name}"));
             arguments.push(name);
+            if let Some(args) = call_arguments.get(&field.name) {
+                for (ty, name) in args {
+                    parameters.push(format!("{ty} {name}"));
+                    arguments.push(name.clone());
+                }
+            }
         }
         if generic_output {
             parameters.push(format!("java.lang.reflect.Type {result_parameter}"));
@@ -1959,7 +2076,7 @@ impl Context<'_> {
         let method = ident(&operation.name);
         let mut out = String::new();
         let typed_doc = typed.then(|| format!(
-            "{}\n\nEach callback must invoke exactly one method on its receiver. Method names and arguments are captured without executing the call. Supply callback arguments through the callback, not options. The callback return value is discarded.",
+            "{}\n\nPass bound method references followed by their arguments. SDK-owned call extractors probe these invocations. Supply invocation arguments as parameters, not in options. Other required fields remain explicit; automatic merging of probed options is not defined.",
             operation.doc.value().unwrap_or_default(),
         ));
         let doc = typed_doc.as_deref().or(operation.doc.value());
@@ -1996,7 +2113,13 @@ impl Context<'_> {
             if let Some(function) = captured_function(field).filter(|_| typed) {
                 let extractor = self.helper(function.call_extractor.as_ref().unwrap());
                 let arguments = &model.fields[&function.arg_fields[0]].name;
-                writeln!(out, "    {extractor}({interface}, {}, ({capture_name}, {capture_values}) -> {{ {builder}.set{}({capture_name}); {builder}.set{}(java.util.Arrays.asList({capture_values})); }});", ident(&field.name), field.name.to_upper_camel_case(), arguments.to_upper_camel_case()).unwrap();
+                let name = ident(&field.name);
+                let args = call_arguments[&field.name]
+                    .iter()
+                    .map(|(_, name)| name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                writeln!(out, "    {extractor}({name}, () -> {name}.apply({args}), ({capture_name}, {capture_values}) -> {{ {builder}.set{}({capture_name}); {builder}.set{}(java.util.Arrays.asList({capture_values})); }});", field.name.to_upper_camel_case(), arguments.to_upper_camel_case()).unwrap();
                 continue;
             }
             writeln!(
@@ -2013,7 +2136,7 @@ impl Context<'_> {
             for field in optional {
                 let name = field.name.to_upper_camel_case();
                 if typed && captured_arguments.contains(field.name.as_str()) {
-                    writeln!(out, "      if ({options}.get{name}() != null) throw new IllegalArgumentException({});", literal(&format!("{} must be supplied through the typed callback, not options", ident(&field.name)))).unwrap();
+                    writeln!(out, "      if ({options}.get{name}() != null) throw new IllegalArgumentException({});", literal(&format!("{} must be supplied through the bound call, not options", ident(&field.name)))).unwrap();
                     continue;
                 }
                 writeln!(out, "      if ({options}.get{name}() != null) {builder}.set{name}({options}.get{name}());").unwrap();
@@ -2177,21 +2300,23 @@ impl Context<'_> {
                 &generic,
                 result_ty,
                 !output_type_parameter.is_empty(),
-                false,
+                None,
             )?);
             if self.operation_input_record(op).is_some_and(|model| {
                 model.public_fields().any(|(_, field)| {
                     api_field_required(field) && captured_function(field).is_some()
                 })
             }) {
-                out.push_str(&self.public_operation(
-                    service,
-                    op,
-                    &generic,
-                    result_ty,
-                    !output_type_parameter.is_empty(),
-                    true,
-                )?);
+                for shapes in self.bound_overloads(self.operation_input_record(op).unwrap()) {
+                    out.push_str(&self.public_operation(
+                        service,
+                        op,
+                        &generic,
+                        result_ty,
+                        !output_type_parameter.is_empty(),
+                        Some(&shapes),
+                    )?);
+                }
             }
             let visibility = if self.operation_input_record(op).is_some() {
                 ""
@@ -2203,6 +2328,12 @@ impl Context<'_> {
         out.push_str("}\n");
         Ok(out)
     }
+}
+
+#[derive(Clone, Copy)]
+struct BoundFunctionShape {
+    arity: usize,
+    procedure: bool,
 }
 
 fn api_field_required(field: &RecordFieldSpec<PlannedFamily>) -> bool {

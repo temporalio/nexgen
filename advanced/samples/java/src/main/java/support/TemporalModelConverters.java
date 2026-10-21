@@ -25,16 +25,16 @@ public final class TemporalModelConverters {
     return Workflow.getInfo().getNamespace();
   }
 
-  public static <T> void captureWorkflowCall(
-      Class<T> workflowInterface, io.temporal.workflow.Functions.Proc1<T> call,
+  public static void captureWorkflowCall(
+      Object method, io.temporal.workflow.Functions.Proc invocation,
       java.util.function.BiConsumer<String, Object[]> result) {
-    io.temporal.internal.nexus.system.TemporalModelConverters.captureWorkflowCall(workflowInterface, call, result);
+    io.temporal.internal.nexus.system.TemporalModelConverters.captureWorkflowCall(method, invocation, result);
   }
 
-  public static <T> void captureSignalCall(
-      Class<T> workflowInterface, io.temporal.workflow.Functions.Proc1<T> call,
+  public static void captureSignalCall(
+      Object method, io.temporal.workflow.Functions.Proc invocation,
       java.util.function.BiConsumer<String, Object[]> result) {
-    io.temporal.internal.nexus.system.TemporalModelConverters.captureSignalCall(workflowInterface, call, result);
+    io.temporal.internal.nexus.system.TemporalModelConverters.captureSignalCall(method, invocation, result);
   }
 
   public static WorkflowSerializationContext signalWithStartWorkflowSerializationContext(

@@ -113,9 +113,15 @@ fn operation_api_splits_required_arguments_from_generated_options() {
         "public static io.temporal.workflow.ExternalWorkflowStub executeSignalWithStartWorkflow("
     ));
     assert!(operations.contains("requestBuilder.setStaticSummary(options.getStaticSummary())"));
-    assert!(operations.contains("Class<WorkflowInterface> workflowInterface"));
-    assert!(operations.contains("Functions.Proc1<WorkflowInterface> workflow"));
-    assert!(operations.contains("Functions.Proc1<WorkflowInterface> signal"));
+    assert!(operations.contains("Functions.Func<WorkflowResult> workflow"));
+    assert!(operations.contains("Functions.Func6<WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5, WorkflowArg6, WorkflowResult> workflow"));
+    assert!(operations.contains("Functions.Proc6<WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5, WorkflowArg6> workflow"));
+    assert!(operations.contains("Functions.Proc1<SignalArg1> signal, SignalArg1 signalArg1"));
+    assert!(!operations.contains("Functions.Func7<"));
+    assert!(!operations.contains("Functions.Proc2<SignalArg"));
+    assert!(!operations.contains("FunctionCall"));
+    assert!(!operations.contains("Class<WorkflowInterface>"));
+    assert!(!output.join("FunctionCall.java").exists());
     assert!(operations.contains("support.TemporalModelConverters.captureWorkflowCall("));
     assert!(operations.contains("support.TemporalModelConverters.captureSignalCall("));
     assert!(
@@ -125,9 +131,7 @@ fn operation_api_splits_required_arguments_from_generated_options() {
         operations
             .contains("requestBuilder.setSignalArgs(java.util.Arrays.asList(capturedArguments))")
     );
-    assert!(
-        operations.contains("signalArgs must be supplied through the typed callback, not options")
-    );
+    assert!(operations.contains("signalArgs must be supplied through the bound call, not options"));
     assert!(!operations.contains("requestBuilder.setSignalInput("));
     let options = fs::read_to_string(output.join("SignalWithStartWorkflowOptions.java")).unwrap();
     for expected in [
@@ -202,6 +206,50 @@ fn every_wit_fixture_generates_in_both_modes() {
             );
         }
     }
+}
+
+#[test]
+fn bound_calls_follow_idl_names_without_operation_specific_policy() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let temp = tempfile::tempdir().unwrap();
+    let input = temp.path().join("dispatch.wit");
+    let source = fs::read_to_string(root.join("advanced/samples/inputs/workflow-service.wit"))
+        .unwrap()
+        .replace("signal-with-start-workflow", "dispatch")
+        .replace("workflow: workflow-function", "origin: workflow-function")
+        .replace("signal: signal-function", "destination: signal-function");
+    fs::write(&input, source).unwrap();
+    let output = temp.path().join("generated");
+    generate_to_file(&GenerateRequest {
+        config: NexgenConfig {
+            mode: GenerationMode::NativeApi,
+            system_nexus: false,
+        },
+        language: Language::Java,
+        input_paths: vec![input, root.join("advanced/samples/inputs/deps")],
+        descriptor_paths: vec![root.join("advanced/samples/descriptors/temporal_api.bin")],
+        support_package: Some("example.Support".into()),
+        java_package_name: Some("example.generated".into()),
+        output_path: output.clone(),
+        format: false,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let operations = fs::read_to_string(output.join("WorkflowOperations.java")).unwrap();
+    assert!(operations.contains(" dispatch("));
+    assert!(
+        operations
+            .contains("Functions.Func1<OriginArg1, WorkflowResult> origin, OriginArg1 originArg1")
+    );
+    assert!(
+        operations.contains(
+            "Functions.Proc1<DestinationArg1> destination, DestinationArg1 destinationArg1"
+        )
+    );
+    assert!(operations.contains("requestBuilder.setOrigin(capturedName)"));
+    assert!(operations.contains("requestBuilder.setDestination(capturedName)"));
+    assert!(!operations.contains("WithStartWorkflowOperation"));
+    assert!(!operations.contains("signalArg1"));
 }
 
 #[test]
