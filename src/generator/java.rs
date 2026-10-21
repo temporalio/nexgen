@@ -858,12 +858,20 @@ impl Context<'_> {
                         TypeSpec::List(_) => "addAll",
                         _ => "set",
                     };
-                    writeln!(
-                        out,
-                        "    if ({value} != null) proto.{method}{}({expr});",
-                        field.name()
-                    )
-                    .unwrap();
+                    // A required payload can contain a null user value. It still needs
+                    // the converter's null representation rather than an absent field.
+                    let required_payload = f.required
+                        && !matches!(f.field_type, TypeSpec::Option(_))
+                        && matches!(wire_type.without_option(), TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(m)))
+                            if m.proto.full_name == "temporal.api.common.v1.Payload"
+                                || (m.proto.full_name == "temporal.api.common.v1.Payloads"
+                                    && matches!(f.field_type.without_option(), TypeSpec::TypeParameter(_))));
+                    let guard = if required_payload {
+                        String::new()
+                    } else {
+                        format!("if ({value} != null) ")
+                    };
+                    writeln!(out, "    {guard}proto.{method}{}({expr});", field.name()).unwrap();
                 }
                 Some(PlannedWireFieldBinding::VariantMembers { members, .. }) => {
                     writeln!(out, "    if ({value} != null) {{").unwrap();

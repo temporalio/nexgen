@@ -11,6 +11,16 @@ import wit.protooneof.*;
 import wit.typeshowcase.*;
 
 class WitRoundTripTest {
+  @Test void requiredGenericPayloadRetainsNull() {
+    PayloadBackedOutput<Object> model = PayloadBackedOutput.<Object>newBuilder()
+        .setDetails(null).build();
+    io.temporal.api.compute.v1.ComputeProvider wire = model.toProto(DefaultDataConverter.STANDARD_INSTANCE);
+    assertTrue(wire.hasDetails());
+    assertEquals("binary/null", wire.getDetails().getMetadataOrThrow("encoding").toStringUtf8());
+    assertNull(PayloadBackedOutput.fromProto(wire, DefaultDataConverter.STANDARD_INSTANCE,
+        PayloadBackedOutput.class).getDetails());
+  }
+
   @Test void nestedGenericsRetainTheirConcretePayloadTypes() {
     PayloadBackedEnvelope<String, List<Integer>> model = PayloadBackedEnvelope.<String, List<Integer>>newBuilder()
         .setProvider(PayloadBackedOutput.<String>newBuilder().setDetails("output").build())

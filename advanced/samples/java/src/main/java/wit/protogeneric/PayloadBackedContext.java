@@ -52,7 +52,7 @@ public final class PayloadBackedContext<ContextT> {
       io.temporal.common.converter.DataConverter converter) {
     io.temporal.api.compute.v1.ComputeScaler.Builder proto =
         io.temporal.api.compute.v1.ComputeScaler.newBuilder();
-    if (this.details != null) proto.setDetails(converter.toPayload((this.details)).get());
+    proto.setDetails(converter.toPayload((this.details)).get());
     return proto.build();
   }
 

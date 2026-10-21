@@ -1999,6 +1999,9 @@ callable fields and specialized composite-call APIs remain undeclared. Required
 fields remain explicit. SDK hooks own bound-method validation, metadata, and
 probe scoping; no new planning pass or generated runtime scope is added.
 
+Required payload fields serialize null user values through the data converter.
+Optional fields with null values remain absent from the protobuf message.
+
 Records use constructors, getters, and builders. Enums are Java enums, flags are
 `EnumSet` values, variants and results are tagged values, and tuples use
 generated classes. Generic arguments propagate through nested records and
