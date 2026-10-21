@@ -313,6 +313,7 @@ mod tests {
                                 converter: None,
                                 name_extractor: None,
                                 call_extractor: None,
+                                call_metadata_type: None,
                                 result_type_parameter: None,
                                 type_descriptor: Some(FunctionTypeDescriptorSpec {
                                     value_type: text("Callback"),
@@ -320,6 +321,7 @@ mod tests {
                                 }),
                             }),
                             data: (),
+                            merge_from_function: None,
                         },
                     )]),
                     data: (),

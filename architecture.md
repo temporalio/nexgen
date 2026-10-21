@@ -136,9 +136,18 @@ metadata. The generator calls SDK-owned extractors to resolve names and
 arguments, then fills the same request builder. Probe state and method metadata
 remain in the SDK, outside the generated runtime. Existing function
 argument-field metadata maps wire keys to authored API names. The renderer has
-no workflow/start/signal-specific policy. Options mapping, merge precedence, and
-relationships between callable fields are not expressed by the IDL and remain
-deferred.
+no workflow/start/signal-specific policy. Java's `merge-from-function` field
+rule identifies the callable supplying metadata and a support merge helper. The
+WIT parser resolves authored field names and selects Java hooks, lowering only
+the reference/helper and callable metadata type into the shared model. Existing
+family mappings carry these declarations; there is no new pass or planned merge
+state. Raw WIT annotations are not available to or reparsed by generation.
+
+The Java renderer retains one extractor result per referenced function and emits
+merge calls after extraction, including when explicit options are null. Helpers
+own precedence and annotation semantics. Merging changes only typed request
+construction, not model rendering or transfer conversion. Other language output
+is unchanged. Relationships between callable fields remain undeclared.
 
 The Java backend renders native declarations and external protobuf bindings from
 `PlannedFamily`, alongside its existing JSON Schema renderer. Java-specific type

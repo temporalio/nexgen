@@ -25,16 +25,26 @@ public final class TemporalModelConverters {
     return Workflow.getInfo().getNamespace();
   }
 
-  public static void captureWorkflowCall(
+  public static io.temporal.internal.sync.ExternalWorkflowInvocationHandler.ProbeResult captureWorkflowCall(
       Object method, io.temporal.workflow.Functions.Proc invocation,
       java.util.function.BiConsumer<String, Object[]> result) {
-    io.temporal.internal.nexus.system.TemporalModelConverters.captureWorkflowCall(method, invocation, result);
+    return io.temporal.internal.nexus.system.TemporalModelConverters.captureWorkflowCall(method, invocation, result);
   }
 
   public static void captureSignalCall(
       Object method, io.temporal.workflow.Functions.Proc invocation,
       java.util.function.BiConsumer<String, Object[]> result) {
     io.temporal.internal.nexus.system.TemporalModelConverters.captureSignalCall(method, invocation, result);
+  }
+
+  public static RetryOptions mergeMethodRetry(
+      io.temporal.internal.sync.ExternalWorkflowInvocationHandler.ProbeResult call, RetryOptions explicit) {
+    return io.temporal.internal.nexus.system.TemporalModelConverters.mergeMethodRetry(call, explicit);
+  }
+
+  public static String mergeCronSchedule(
+      io.temporal.internal.sync.ExternalWorkflowInvocationHandler.ProbeResult call, String explicit) {
+    return io.temporal.internal.nexus.system.TemporalModelConverters.mergeCronSchedule(call, explicit);
   }
 
   public static WorkflowSerializationContext signalWithStartWorkflowSerializationContext(
