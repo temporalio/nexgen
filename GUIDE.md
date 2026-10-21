@@ -2027,15 +2027,25 @@ request internally; no handwritten options class or operation wrapper is
 required.
 
 Protobuf-bound varargs function fields can specify `java-call-extractor` on
-`@nexus.function` to additionally generate typed overloads. These take a shared
-`Class<T>` receiver interface and `Functions.Proc1<T>` callbacks instead of
-names. For example, signal-with-start accepts `w -> w.run(input)` and
-`w -> w.notifySignal(signal)`. The SDK-owned extractor receives the interface,
-callback, and a `BiConsumer<String, Object[]>` receiving the resolved name and
-arguments. The generated method maps these arguments to the request's authored
-API field names. Typed calls reject argument lists also supplied in options. The
-name-based overload remains available. This needs no new planning metadata or
-compiler pass; SDK hooks own method metadata lookup and invocation capture.
+`@nexus.function` to additionally generate typed overloads. Bound method
+references are followed directly by their arguments, using `Functions.FuncN` or
+`Functions.ProcN`. The primary callable supports zero through six arguments;
+other callable fields support zero or one. The name-based API covers other
+arities. Result parameters and result annotations come from IDL metadata;
+generic primary callables also have void-returning overloads. The SDK-owned
+extractor receives the bound method reference, a zero-argument invocation, and a
+`BiConsumer<String, Object[]>` receiving its resolved name and arguments. The
+generated method maps these arguments to the request's authored API field names.
+Typed calls reject argument lists also supplied in options. The name-based
+overload remains available. No operation names or composite-operation
+conventions are encoded in the Java renderer.
+
+The IDL does not describe how options acquired by probing a method map to
+request fields, which source takes precedence, or relationships between multiple
+callable fields. Automatic options merging and specialized composite-call APIs
+are deferred until that information is defined. Required fields remain explicit.
+SDK hooks own bound-method validation, metadata, and probe scoping; no new
+planning pass or generated runtime scope is added.
 
 Records use constructors, getters, and builders. Enums are Java enums, flags are
 `EnumSet` values, variants and results are tagged values, and tuples use

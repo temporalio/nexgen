@@ -128,12 +128,17 @@ options class. Public methods build the transfer request and call a
 package-private execution helper, also used by generated resource methods. This
 is Java rendering policy, with no additional planning pass or metadata.
 
-Function fields with call-extractor hooks also expose a typed overload using a
-shared receiver interface and invocation callbacks. The generator calls
-SDK-owned extractors to resolve annotated method names and arguments, then fills
-the same request builder. Capture state and workflow method metadata remain in
-the SDK, outside the generated runtime. Existing function argument-field
-metadata maps wire keys to their authored Java API names.
+Function fields with call-extractor hooks also expose a typed overload using
+bound method references followed directly by their arguments. The IDL's primary
+callable supports zero through six arguments; other callables support zero or
+one. Function result annotations and type parameters come from the existing IDL
+metadata. The generator calls SDK-owned extractors to resolve names and
+arguments, then fills the same request builder. Probe state and method metadata
+remain in the SDK, outside the generated runtime. Existing function
+argument-field metadata maps wire keys to authored API names. The renderer has
+no workflow/start/signal-specific policy. Options mapping, merge precedence, and
+relationships between callable fields are not expressed by the IDL and remain
+deferred.
 
 The Java backend renders native declarations and external protobuf bindings from
 `PlannedFamily`, alongside its existing JSON Schema renderer. Java-specific type
