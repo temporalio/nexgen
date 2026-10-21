@@ -124,6 +124,17 @@ fn operation_api_splits_required_arguments_from_generated_options() {
     assert!(!output.join("FunctionCall.java").exists());
     assert!(operations.contains("support.TemporalModelConverters.captureWorkflowCall("));
     assert!(operations.contains("support.TemporalModelConverters.captureSignalCall("));
+    assert!(operations.contains(
+        "ProbeResult workflowMetadata = support.TemporalModelConverters.captureWorkflowCall("
+    ));
+    assert!(operations.contains("requestBuilder.setRetryPolicy(support.TemporalModelConverters.mergeMethodRetry(workflowMetadata, options == null ? null : options.getRetryPolicy()))"));
+    assert!(operations.contains("requestBuilder.setCronSchedule(support.TemporalModelConverters.mergeCronSchedule(workflowMetadata, options == null ? null : options.getCronSchedule()))"));
+    let untyped = operations
+        .split("ProbeResult workflowMetadata")
+        .next()
+        .unwrap();
+    assert!(!untyped.contains("mergeMethodRetry("));
+    assert!(!untyped.contains("mergeCronSchedule("));
     assert!(
         operations.contains("requestBuilder.setArgs(java.util.Arrays.asList(capturedArguments))")
     );
@@ -217,6 +228,7 @@ fn bound_calls_follow_idl_names_without_operation_specific_policy() {
         .unwrap()
         .replace("signal-with-start-workflow", "dispatch")
         .replace("workflow: workflow-function", "origin: workflow-function")
+        .replace("function=\"workflow\"", "function=\"origin\"")
         .replace("signal: signal-function", "destination: signal-function");
     fs::write(&input, source).unwrap();
     let output = temp.path().join("generated");
@@ -248,8 +260,123 @@ fn bound_calls_follow_idl_names_without_operation_specific_policy() {
     );
     assert!(operations.contains("requestBuilder.setOrigin(capturedName)"));
     assert!(operations.contains("requestBuilder.setDestination(capturedName)"));
+    assert!(operations.contains("mergeMethodRetry(originMetadata,"));
+    assert!(operations.contains("mergeCronSchedule(originMetadata,"));
     assert!(!operations.contains("WithStartWorkflowOperation"));
     assert!(!operations.contains("signalArg1"));
+}
+
+#[test]
+fn function_merge_annotations_are_selected_only_for_java() {
+    use nexgen::parser::load_api_spec_from_wit_for_language_with_inputs;
+    use nexgen::spec::TypeDeclSpec;
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let paths = vec![
+        root.join("advanced/samples/inputs/workflow-service.wit"),
+        root.join("advanced/samples/inputs/deps"),
+    ];
+    for language in [
+        Language::Java,
+        Language::Python,
+        Language::TypeScript,
+        Language::Go,
+        Language::Dotnet,
+    ] {
+        let spec = load_api_spec_from_wit_for_language_with_inputs(language, &paths).unwrap();
+        let request = spec
+            .types
+            .values()
+            .find_map(|entry| match &entry.declaration {
+                TypeDeclSpec::Record(record) if record.fields.contains_key("retry_policy") => {
+                    Some(record)
+                }
+                _ => None,
+            })
+            .unwrap();
+        let rule = &request.fields["retry_policy"].merge_from_function;
+        assert_eq!(rule.is_some(), language == Language::Java);
+        if let Some(rule) = rule {
+            assert_eq!(rule.function, "workflow_type");
+            assert_eq!(rule.helper, "mergeMethodRetry");
+        }
+        assert_eq!(
+            request.fields["workflow_type"]
+                .function
+                .as_ref()
+                .unwrap()
+                .call_metadata_type
+                .is_some(),
+            language == Language::Java
+        );
+    }
+}
+
+#[test]
+fn invalid_function_merge_directives_report_actionable_errors() {
+    use nexgen::parser::load_api_spec_from_wit_for_language_with_inputs;
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let source =
+        fs::read_to_string(root.join("advanced/samples/inputs/workflow-service.wit")).unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let input = temp.path().join("service.wit");
+    for (from, to, expected) in [
+        (
+            "function=\"workflow\"",
+            "function=\"missing\"",
+            "unknown function field",
+        ),
+        (
+            "function=\"workflow\"",
+            "function=\"id\"",
+            "is not a function field",
+        ),
+        (
+            "function=\"workflow\"",
+            "function=\"\"",
+            "requires `function`",
+        ),
+        (
+            "java=\"mergeMethodRetry\"",
+            "java=\"bad helper()\"",
+            "valid `java` support helper",
+        ),
+        (
+            "java=\"mergeMethodRetry\"",
+            "java=\"mergeMethodRetry\" python=\"merge_retry\"",
+            "supports Java only",
+        ),
+    ] {
+        fs::write(&input, source.replace(from, to)).unwrap();
+        let error = load_api_spec_from_wit_for_language_with_inputs(
+            Language::Java,
+            &[input.clone(), root.join("advanced/samples/inputs/deps")],
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("merge-from-function") && error.contains(expected),
+            "{error}"
+        );
+    }
+    let minimal = r#"
+package example:merges;
+world system { export service; }
+interface service {
+  record request {
+    /// @nexus.function args-field="input" java-result="Void" java-call-extractor="probe"
+    target: string,
+    input: option<list<string>>,
+    /// @nexus.merge-from-function function="target" java="mergeValue"
+    value: option<string>,
+  }
+  run: func(request: request);
+}
+"#;
+    fs::write(&input, minimal).unwrap();
+    let error = load_api_spec_from_wit_for_language_with_inputs(Language::Java, &[input])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("call metadata type"), "{error}");
 }
 
 #[test]

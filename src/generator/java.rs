@@ -1969,6 +1969,37 @@ impl Context<'_> {
         let request = available_identifier("request", &mut names);
         let capture_name = available_identifier("capturedName", &mut names);
         let capture_values = available_identifier("capturedArguments", &mut names);
+        let mut merge_sources = BTreeMap::new();
+        if typed {
+            for field in &fields {
+                if let Some(rule) = &field.merge_from_function {
+                    let invalid = || {
+                        Error::InvalidFunctionMerge {
+                        type_name: model.full_name.clone(), field: field.name.clone(),
+                        reason: "source must be a directly probed callable with a declared metadata type".into(),
+                    }
+                    };
+                    let source = model.fields.get(&rule.function).ok_or_else(invalid)?;
+                    let function = captured_function(source).ok_or_else(invalid)?;
+                    let metadata_type = function.call_metadata_type.as_ref().ok_or_else(invalid)?;
+                    if !shapes.unwrap().contains_key(&source.name) {
+                        return Err(invalid());
+                    }
+                    merge_sources
+                        .entry(rule.function.clone())
+                        .or_insert_with(|| {
+                            (
+                                source.name.clone(),
+                                metadata_type.clone(),
+                                available_identifier(
+                                    &format!("{}Metadata", ident(&source.name)),
+                                    &mut names,
+                                ),
+                            )
+                        });
+                }
+            }
+        }
         let mut parameters = Vec::new();
         let mut arguments = Vec::new();
         let mut call_arguments = BTreeMap::new();
@@ -2076,7 +2107,7 @@ impl Context<'_> {
         let method = ident(&operation.name);
         let mut out = String::new();
         let typed_doc = typed.then(|| format!(
-            "{}\n\nPass bound method references followed by their arguments. SDK-owned call extractors probe these invocations. Supply invocation arguments as parameters, not in options. Other required fields remain explicit; automatic merging of probed options is not defined.",
+            "{}\n\nPass bound method references followed by their arguments. SDK-owned call extractors probe these invocations. Supply invocation arguments as parameters, not in options. Fields with declared merge-from-function hooks merge explicit values with the named callable's metadata. Other required fields remain explicit.",
             operation.doc.value().unwrap_or_default(),
         ));
         let doc = typed_doc.as_deref().or(operation.doc.value());
@@ -2119,7 +2150,12 @@ impl Context<'_> {
                     .map(|(_, name)| name.as_str())
                     .collect::<Vec<_>>()
                     .join(", ");
-                writeln!(out, "    {extractor}({name}, () -> {name}.apply({args}), ({capture_name}, {capture_values}) -> {{ {builder}.set{}({capture_name}); {builder}.set{}(java.util.Arrays.asList({capture_values})); }});", field.name.to_upper_camel_case(), arguments.to_upper_camel_case()).unwrap();
+                let assignment = merge_sources
+                    .values()
+                    .find(|(source, _, _)| source == &field.name)
+                    .map(|(_, ty, variable)| format!("{ty} {variable} = "))
+                    .unwrap_or_default();
+                writeln!(out, "    {assignment}{extractor}({name}, () -> {name}.apply({args}), ({capture_name}, {capture_values}) -> {{ {builder}.set{}({capture_name}); {builder}.set{}(java.util.Arrays.asList({capture_values})); }});", field.name.to_upper_camel_case(), arguments.to_upper_camel_case()).unwrap();
                 continue;
             }
             writeln!(
@@ -2139,9 +2175,34 @@ impl Context<'_> {
                     writeln!(out, "      if ({options}.get{name}() != null) throw new IllegalArgumentException({});", literal(&format!("{} must be supplied through the bound call, not options", ident(&field.name)))).unwrap();
                     continue;
                 }
+                if typed && field.merge_from_function.is_some() {
+                    continue;
+                }
                 writeln!(out, "      if ({options}.get{name}() != null) {builder}.set{name}({options}.get{name}());").unwrap();
             }
             out.push_str("    }\n");
+        }
+        if typed {
+            for field in &fields {
+                if let Some(rule) = &field.merge_from_function {
+                    let metadata = &merge_sources[&rule.function].2;
+                    let value = if api_field_required(field) {
+                        ident(&field.name)
+                    } else {
+                        format!(
+                            "{options} == null ? null : {options}.get{}()",
+                            field.name.to_upper_camel_case()
+                        )
+                    };
+                    let helper = self.helper(&rule.helper);
+                    writeln!(
+                        out,
+                        "    {builder}.set{}({helper}({metadata}, {value}));",
+                        field.name.to_upper_camel_case()
+                    )
+                    .unwrap();
+                }
+            }
         }
         writeln!(out, "    {input_type} {request} = {builder}.build();").unwrap();
         let mut arguments = Vec::new();
@@ -2173,6 +2234,24 @@ impl Context<'_> {
             "@SuppressWarnings({{\"unchecked\", \"rawtypes\"}})\npublic {modifier} class {name} {{\n  {visibility} {name}() {{}}\n"
         );
         for op in &service.operations {
+            if let Some(model) = self.operation_input_record(op) {
+                for (_, field) in model.public_fields() {
+                    if let Some(rule) = &field.merge_from_function {
+                        if model
+                            .fields
+                            .get(&rule.function)
+                            .and_then(captured_function)
+                            .is_none()
+                        {
+                            return Err(Error::InvalidFunctionMerge {
+                                type_name: model.full_name.clone(),
+                                field: field.name.clone(),
+                                reason: "source is not supported by bound-call generation".into(),
+                            });
+                        }
+                    }
+                }
+            }
             let input = op
                 .input
                 .as_ref()

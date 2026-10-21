@@ -1993,12 +1993,11 @@ Typed calls reject argument lists also supplied in options. The name-based
 overload remains available. No operation names or composite-operation
 conventions are encoded in the Java renderer.
 
-The IDL does not describe how options acquired by probing a method map to
-request fields, which source takes precedence, or relationships between multiple
-callable fields. Automatic options merging and specialized composite-call APIs
-are deferred until that information is defined. Required fields remain explicit.
-SDK hooks own bound-method validation, metadata, and probe scoping; no new
-planning pass or generated runtime scope is added.
+Java fields can declare `@nexus.merge-from-function` to merge explicit values
+with metadata from a named callable, as described below. Relationships between
+callable fields and specialized composite-call APIs remain undeclared. Required
+fields remain explicit. SDK hooks own bound-method validation, metadata, and
+probe scoping; no new planning pass or generated runtime scope is added.
 
 Records use constructors, getters, and builders. Enums are Java enums, flags are
 `EnumSet` values, variants and results are tagged values, and tuples use
@@ -2033,6 +2032,53 @@ runtime can preserve their type arguments. Use a Jackson `TypeReference` or an
 equivalent reified type. Model builders provide copy construction and flattened
 setters; named function alternatives have `set…Name` and `set…Call` setters
 alongside the explicit function-reference value.
+
+### @nexus.merge-from-function (Java only)
+
+Declare a merge on a public, non-function request field:
+
+```wit
+/// @nexus.merge-from-function function="workflow" java="mergeMethodRetry"
+retry-policy: option<retry-policy>,
+
+/// @nexus.merge-from-function function="workflow" java="mergeCronSchedule"
+cron-schedule: option<string>,
+```
+
+`function` names a callable field in the same record using its authored WIT
+name, independent of Java name overrides or protobuf field mappings. The source
+must be required and public, with a Java call extractor and metadata type:
+
+```wit
+/// @nexus.function
+///   signature="workflow-call"
+///   args-field="input"
+///   java-call-extractor="captureWorkflowCall"
+///   java-call-metadata-type="example.ProbeResult"
+type workflow-function = placeholder;
+```
+
+The extractor returns that metadata type while supplying the resolved name and
+arguments through its existing callback. Each typed operation probes the source
+once and retains its result for all referencing merge hooks. The selected
+support helper receives `(probeMetadata, explicitFieldValue)` and returns the
+final field value. It runs even when options or the field value are null. The
+helper owns precedence and defaults; the generator does not understand retry or
+scheduling.
+
+Merging occurs during typed API request construction, after callable extraction.
+Untyped calls, request builders, models, and transfer conversion remain
+unchanged. Only Java generation implements this directive; other languages
+ignore its Java hook. Other language keys are currently rejected. The parser
+validates references and lowers the selected rule into the shared model, which
+existing passes carry to generation; raw WIT directives are not reparsed by the
+generator.
+
+The Java SDK uses the original workflow method's `@MethodRetry` and
+`@CronSchedule` annotations. Retry merging follows
+`RetryOptions.merge(annotation, explicit)`; cron uses the annotation unless an
+explicit non-null value, including an empty string, overrides it. No synthesized
+`WorkflowOptions` is needed.
 
 ## Formatting Java Output
 

@@ -1137,6 +1137,7 @@ fn build_fields_from_record(
 )> {
     let mut authored_proto_fields = BTreeSet::new();
     let mut fields = indexmap::IndexMap::new();
+    let mut authored_field_keys = BTreeMap::new();
     for field in &record.fields {
         let field_context = format!("{context} field `{}`", field.name);
         let directives = parse_directives(field.docs.contents.as_deref(), path, &field_context)?;
@@ -1151,6 +1152,9 @@ fn build_fields_from_record(
             directive_value(&directives, "proto-field", path, &field_context, "value")?
                 .unwrap_or_else(|| field.name.to_snake_case());
         let function_directive = directive(&directives, "function", path, &field_context)?;
+        authored_field_keys.insert(field.name.clone(), proto_field_name.clone());
+        let merge_from_function =
+            build_merge_from_function(&directives, path, &field_context, language)?;
         let default_directive = directive(&directives, "default", path, &field_context)?;
         let flattened_function_type = if omit_directive.is_none() && function_directive.is_none() {
             find_flattened_function_type_spec(resolve, &field.ty, path, language)?
@@ -1186,8 +1190,14 @@ fn build_fields_from_record(
                 });
             }
 
-            for conflicting_directive in ["source", "type", "flattened-type", "function", "default"]
-            {
+            for conflicting_directive in [
+                "source",
+                "type",
+                "flattened-type",
+                "function",
+                "default",
+                "merge-from-function",
+            ] {
                 if directive(&directives, conflicting_directive, path, &field_context)?.is_some() {
                     return Err(Error::InvalidWitDirective {
                         path: path.to_path_buf(),
@@ -1223,6 +1233,7 @@ fn build_fields_from_record(
                     required: false,
                     visibility: RecordFieldVisibility::Omitted,
                     function: None,
+                    merge_from_function: None,
                     data: (),
                 },
             );
@@ -1294,6 +1305,7 @@ fn build_fields_from_record(
                         }
                     }),
                 function,
+                merge_from_function,
                 data: (),
             },
         );
@@ -1326,6 +1338,7 @@ fn build_fields_from_record(
                         required: arg_field.required,
                         visibility: RecordFieldVisibility::Public,
                         function: None,
+                        merge_from_function: None,
                         data: (),
                     },
                 );
@@ -1339,7 +1352,85 @@ fn build_fields_from_record(
         }
     }
 
+    let merges = fields
+        .iter()
+        .filter_map(|(key, field)| {
+            field
+                .merge_from_function
+                .clone()
+                .map(|rule| (key.clone(), rule))
+        })
+        .collect::<Vec<_>>();
+    for (key, mut rule) in merges {
+        let invalid = |reason: String| Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: format!("{context} field `{}`", fields[&key].name),
+            directive: "@nexus.merge-from-function".into(),
+            reason,
+        };
+        let source_key = authored_field_keys
+            .get(&rule.function)
+            .ok_or_else(|| invalid(format!("unknown function field `{}`", rule.function)))?;
+        let source = &fields[source_key];
+        let function = source
+            .function
+            .as_ref()
+            .ok_or_else(|| invalid(format!("`{}` is not a function field", rule.function)))?;
+        if source.visibility != RecordFieldVisibility::Public
+            || !source.required
+            || function.call_extractor.is_none()
+            || function.call_metadata_type.is_none()
+        {
+            return Err(invalid("function must be required and public, with a Java call extractor and call metadata type".into()));
+        }
+        let target = &fields[&key];
+        if target.visibility != RecordFieldVisibility::Public || target.function.is_some() {
+            return Err(invalid(
+                "merge target must be a public, non-function field".into(),
+            ));
+        }
+        rule.function = source_key.clone();
+        fields.get_mut(&key).unwrap().merge_from_function = Some(rule);
+    }
     Ok((doc, fields))
+}
+
+fn build_merge_from_function(
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+    language: Language,
+) -> Result<Option<FunctionMergeSpec>> {
+    let Some(rule) = directive(directives, "merge-from-function", path, context)? else {
+        return Ok(None);
+    };
+    let invalid = |reason: &str| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.into(),
+        directive: "@nexus.merge-from-function".into(),
+        reason: reason.into(),
+    };
+    let function = rule
+        .value("function")
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| invalid("requires `function` naming a callable field"))?;
+    let helper = rule
+        .value("java")
+        .filter(|helper| is_valid_support_helper_path(helper))
+        .ok_or_else(|| invalid("requires a valid `java` support helper"))?;
+    if rule
+        .args
+        .keys()
+        .any(|key| !matches!(key.as_str(), "function" | "java"))
+    {
+        return Err(invalid(
+            "only `function` and `java` are supported; merge-from-function currently supports Java only",
+        ));
+    }
+    Ok((language == Language::Java).then(|| FunctionMergeSpec {
+        function: function.into(),
+        helper: helper.into(),
+    }))
 }
 
 fn generated_function_arg_doc(
@@ -1970,6 +2061,7 @@ fn build_function_field(
         converter: directive_converter(directive, language),
         name_extractor: directive_function_name_extractor(directive, language, path, context)?,
         call_extractor: directive_function_call_extractor(directive, language, path, context)?,
+        call_metadata_type: directive_call_metadata_type(directive, language, path, context)?,
         result_type_parameter: directive_result_type_parameter(directive),
         type_descriptor: function_type_descriptor(directive, path, context)?,
     }))
@@ -2060,6 +2152,12 @@ fn build_function_field_for_type_alias(
                     context,
                 )?,
                 result_type_parameter: directive_result_type_parameter(function_directive),
+                call_metadata_type: directive_call_metadata_type(
+                    function_directive,
+                    language,
+                    path,
+                    context,
+                )?,
                 type_descriptor: function_type_descriptor(function_directive, path, context)?,
             },
         )));
@@ -3279,6 +3377,29 @@ fn directive_function_name_extractor(
         });
     }
     Ok(Some(extractor.to_string()))
+}
+
+fn directive_call_metadata_type(
+    directive: &Directive,
+    language: Language,
+    path: &Path,
+    context: &str,
+) -> Result<Option<String>> {
+    if language != Language::Java {
+        return Ok(None);
+    }
+    let Some(value) = directive.value("java-call-metadata-type") else {
+        return Ok(None);
+    };
+    if !is_valid_support_helper_path(value) {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.into(),
+            directive: "@nexus.function".into(),
+            reason: "java-call-metadata-type must be a qualified type name".into(),
+        });
+    }
+    Ok(Some(value.into()))
 }
 
 fn directive_function_call_extractor(

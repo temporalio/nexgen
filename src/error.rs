@@ -158,6 +158,13 @@ pub enum Error {
     #[error("Java code generation does not support protobuf-backed model `{message}`")]
     UnsupportedJavaProtoModel { message: String },
 
+    #[error("cannot generate function merge for `{type_name}.{field}`: {reason}")]
+    InvalidFunctionMerge {
+        type_name: String,
+        field: String,
+        reason: String,
+    },
+
     #[error("{language} support namespace `{namespace}` is not supported")]
     UnsupportedSupportNamespace {
         language: Language,
