@@ -2,7 +2,6 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use nexgen::language::Language;
 use nexgen::{GenerateRequest, generate_to_file};
@@ -25,15 +24,10 @@ interface callbacks {
 fn generate_python(wit: &str) -> Result<String, String> {
     let descriptors = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("advanced/samples/descriptors/temporal_api.bin");
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let temp_dir = std::env::temp_dir().join(format!("nexgen-wit-byte-lists-{unique}"));
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("system.wit");
+    let temp_dir = tempfile::tempdir().unwrap();
+    let input_path = temp_dir.path().join("system.wit");
     fs::write(&input_path, wit).unwrap();
-    let output_path = temp_dir.join("generated");
+    let output_path = temp_dir.path().join("generated");
     let result = generate_to_file(&GenerateRequest {
         config: Default::default(),
         language: Language::Python,
@@ -49,7 +43,6 @@ fn generate_python(wit: &str) -> Result<String, String> {
     if result.is_ok() {
         read_all(&output_path, &mut rendered);
     }
-    fs::remove_dir_all(temp_dir).unwrap();
     result.map(|_| rendered).map_err(|err| err.to_string())
 }
 
