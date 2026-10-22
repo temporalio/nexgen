@@ -1,4 +1,3 @@
-languages = ["python"]
 descriptors = "temporal"
 
 [error]
