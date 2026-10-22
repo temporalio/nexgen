@@ -1,0 +1,1 @@
+Proto-backed enum fields now retain their authored enum model through type planning, so reachable records keep and generate the enum even when its name differs from the protobuf type. Python, TypeScript, Go, and .NET use the generated enum and convert it at the protobuf boundary.

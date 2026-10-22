@@ -14,7 +14,7 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding, PlannedWireVariantMember, relative_descriptor_name,
 };
-use crate::spec::{ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
+use crate::spec::{EnumSpec, ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
 
 #[derive(Debug)]
 struct RenderedWireRead {
@@ -63,6 +63,7 @@ struct ProtoField {
 #[derive(Debug, Default)]
 pub(in crate::generator) struct ModelBackend {
     variant_names: BTreeSet<String>,
+    enum_fields: BTreeMap<String, ResolvedFieldType>,
 }
 
 impl ExternalModelBackend for ModelBackend {
@@ -71,6 +72,12 @@ impl ExternalModelBackend for ModelBackend {
 
     fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
         self.variant_names = oneof_variant_names(api_plan);
+        self.enum_fields = api_plan
+            .enums()
+            .filter_map(|(name, model)| {
+                generated_enum_field_type(model).map(|field| (name.to_string(), field))
+            })
+            .collect();
         Ok(())
     }
 
@@ -100,7 +107,8 @@ impl ExternalModelBackend for ModelBackend {
         model_type: &PlannedType,
         planned_record: Option<&RecordSpec<PlannedFamily>>,
     ) -> Option<WireValueConversion> {
-        enum_wire_conversion(model_type)
+        self.enum_field_type(model_type)
+            .and_then(|field| field.wire_conversion)
             .or_else(|| message_override_conversion(model_type))
             .or_else(|| {
                 planned_record.and_then(|record| generated_wire_conversion(model_type, record))
@@ -423,6 +431,9 @@ impl ModelBackend {
         &self,
         value_type: &PlannedType,
     ) -> Option<ResolvedFieldType> {
+        if let PlannedType::Enum(enumeration) = value_type {
+            return self.enum_fields.get(&enumeration.full_name).cloned();
+        }
         enum_field_type(value_type)
     }
 }
@@ -560,6 +571,27 @@ pub(in crate::generator) struct PythonProtoEnumValue {
 pub(in crate::generator) struct PythonProtoEnumConversion {
     pub(in crate::generator) from_proto: String,
     pub(in crate::generator) to_proto: String,
+}
+
+fn generated_enum_field_type(model: &EnumSpec<PlannedFamily>) -> Option<ResolvedFieldType> {
+    let PlannedProtoType::Enum(proto) = model.source.as_ref()?.proto_type()? else {
+        return None;
+    };
+    let reference = enum_python_ref(&proto.proto)?;
+    let mut imports = PythonImports::default();
+    imports.module_imports.insert(reference.module_path);
+    Some(ResolvedFieldType {
+        annotation: model.name.clone(),
+        imports,
+        kind: ResolvedFieldKind::Enum,
+        wire_conversion: Some(WireValueConversion {
+            annotation: model.name.clone(),
+            from_wire: format!("{}({{wire}})", model.name),
+            to_wire: format!("{}({{value}})", reference.type_ref),
+            imports: PythonImports::default(),
+            supports_unpacked_input: false,
+        }),
+    })
 }
 
 pub(in crate::generator) fn enum_value(value_type: &PlannedType) -> Option<PythonProtoEnumValue> {

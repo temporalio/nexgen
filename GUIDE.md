@@ -788,6 +788,12 @@ that converts between the public model and its protobuf transfer type. Generated
 callers continue to accept and return the public model; conversion is performed
 by the target SDK or generated operation helpers.
 
+An enum annotated with `@nexus.proto` likewise remains a generated public enum
+unless a type replacement selects an external model. Fields use the authored
+enum's name and members, even when its name differs from the protobuf enum's.
+Converters bridge the model and protobuf enum by number, and `@nexus.default`
+continues to name a WIT case.
+
 ### Transfer-Type Conversion
 
 ```wit

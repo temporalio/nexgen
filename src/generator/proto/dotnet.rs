@@ -10,8 +10,8 @@ use crate::planning::{
     PlannedType, PlannedWireFieldBinding, PlannedWireVariantMember,
 };
 use crate::spec::{
-    AliasTypeSpec, ExternalTypeSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
-    TypeReplacementSpec,
+    AliasTypeSpec, ExternalTypeSourceSpec, ExternalTypeSpec, RecordFieldSpec,
+    RecordFieldVisibility, RecordSpec, TypeReplacementSpec,
 };
 
 #[derive(Debug, Default)]
@@ -270,6 +270,15 @@ impl ModelBackend {
                 }
             }
             PlannedType::Resource(_) => source_expr.to_string(),
+            PlannedType::Enum(enumeration) => api_plan
+                .and_then(|spec| enum_proto(spec, &enumeration.full_name))
+                .map(|proto| {
+                    format!(
+                        "({}){source_expr}",
+                        dotnet_proto_type_name_for_info(&proto.proto)
+                    )
+                })
+                .unwrap_or_else(|| source_expr.to_string()),
             PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec {
                 target: fallback,
                 ..
@@ -1090,14 +1099,22 @@ fn value_from_wire_expr(
         PlannedType::Bytes => source_expr.to_string(),
         PlannedType::Enum(_)
         | PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => {
+            let converted = match value {
+                PlannedType::Enum(enumeration)
+                    if enum_proto(api_plan, &enumeration.full_name).is_some() =>
+                {
+                    format!("({}){source_expr}", csharp_type_name(&enumeration.name))
+                }
+                _ => source_expr.to_string(),
+            };
             if optional {
                 if has_presence == Some(true) {
-                    optional_presence_from_wire_expr(source_expr, source_expr)
+                    optional_presence_from_wire_expr(source_expr, &converted)
                 } else {
-                    format!("(int){source_expr} == 0 ? null : {source_expr}")
+                    format!("(int){source_expr} == 0 ? null : {converted}")
                 }
             } else {
-                source_expr.to_string()
+                converted
             }
         }
         PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(proto))) => {
@@ -1274,7 +1291,7 @@ fn render_field_to_proto_assignment(
             support_namespace,
         ));
         output.push_str(end);
-        if let Some(default_expr) = default_enum_proto_expr(field) {
+        if let Some(default_expr) = default_enum_proto_expr(field, api_plan) {
             output.push_str("        }\n        else\n        {\n            ");
             output.push_str(&target);
             output.push_str(" = ");
@@ -1349,7 +1366,24 @@ fn render_oneof_to_proto_assignment(
     output.push_str("        }\n");
 }
 
-fn default_enum_proto_expr(field: &RecordFieldSpec<PlannedFamily>) -> Option<String> {
+fn enum_proto<'a>(
+    api_plan: &'a PlannedSpec,
+    full_name: &str,
+) -> Option<&'a crate::planning::PlannedProtoEnumType> {
+    let source = api_plan.enum_decl(full_name)?.source.as_ref()?;
+    let ExternalTypeSourceSpec::Proto(source) = source else {
+        return None;
+    };
+    let PlannedProtoType::Enum(proto) = &source.proto else {
+        return None;
+    };
+    Some(proto)
+}
+
+fn default_enum_proto_expr(
+    field: &RecordFieldSpec<PlannedFamily>,
+    api_plan: &PlannedSpec,
+) -> Option<String> {
     field.default_value.as_ref()?;
     let enum_value = field
         .data
@@ -1357,6 +1391,16 @@ fn default_enum_proto_expr(field: &RecordFieldSpec<PlannedFamily>) -> Option<Str
         .as_ref()
         .expect("planned field default enum value should be resolved");
     let proto = match field.field_type.without_option() {
+        PlannedType::Enum(enumeration) => {
+            let proto = enum_proto(api_plan, &enumeration.full_name)?;
+            // The resolved member's number avoids both protobuf member-name conventions
+            // and a property hiding the model enum's name.
+            return Some(format!(
+                "({}){}",
+                dotnet_proto_type_name_for_info(&proto.proto),
+                enum_value.number
+            ));
+        }
         PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(proto))) => proto,
         PlannedType::External(ExternalTypeSpec::Alias(alias)) => {
             let PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(proto))) =

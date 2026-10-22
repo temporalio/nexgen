@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
 use heck::ToLowerCamelCase;
 use prost_types::FieldDescriptorProto;
@@ -16,16 +17,25 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding, relative_descriptor_name,
 };
-use crate::spec::{ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
+use crate::spec::{EnumSpec, ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
 
 #[derive(Debug, Default)]
-pub(in crate::generator) struct ModelBackend;
+pub(in crate::generator) struct ModelBackend {
+    enum_conversions: BTreeMap<String, WireValueConversion>,
+}
 
 impl ExternalModelBackend for ModelBackend {
     type ModelFragments = RenderedExternalModelFragments;
     type WireConversion = WireValueConversion;
 
-    fn prepare(&mut self, _api_plan: &PlannedSpec) -> Result<()> {
+    fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
+        self.enum_conversions = api_plan
+            .enums()
+            .filter_map(|(name, model)| {
+                generated_enum_wire_conversion(model)
+                    .map(|conversion| (name.to_string(), conversion))
+            })
+            .collect();
         Ok(())
     }
 
@@ -54,7 +64,14 @@ impl ExternalModelBackend for ModelBackend {
         model_type: &PlannedType,
         planned_record: Option<&RecordSpec<PlannedFamily>>,
     ) -> Option<WireValueConversion> {
-        enum_wire_conversion(model_type)
+        let native_enum = match model_type {
+            PlannedType::Enum(enumeration) => {
+                self.enum_conversions.get(&enumeration.full_name).cloned()
+            }
+            _ => None,
+        };
+        native_enum
+            .or_else(|| enum_wire_conversion(model_type))
             .or_else(|| message_override_conversion(model_type))
             .or_else(|| {
                 planned_record.and_then(|record| generated_wire_conversion(model_type, record))
@@ -639,6 +656,18 @@ pub(crate) fn field_name(field: &FieldDescriptorProto, explicit_name: Option<&st
             typescript_ident(name)
         }
     }
+}
+
+fn generated_enum_wire_conversion(model: &EnumSpec<PlannedFamily>) -> Option<WireValueConversion> {
+    model.source.as_ref()?.proto_type()?;
+    Some(WireValueConversion {
+        annotation: model.name.clone(),
+        from_wire: format!("{{wire}} as number as {}", model.name),
+        to_wire: "{value} as any".to_string(),
+        function_name_to_wire: None,
+        wire_function_names: None,
+        uses_rendered_model_annotation: true,
+    })
 }
 
 fn enum_wire_conversion(value_type: &PlannedType) -> Option<WireValueConversion> {

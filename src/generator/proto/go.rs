@@ -209,7 +209,7 @@ impl ModelBackend {
             PlannedValueType::Scalar(scalar) => Ok(go_scalar_type_expr(scalar).to_string()),
             PlannedValueType::Enum(enum_type) => {
                 let info = enum_type
-                    .info
+                    .wire_info
                     .as_ref()
                     .ok_or_else(|| "the enum has no proto descriptor info".to_string())?;
                 self.proto_type(info).ok_or_else(|| {
@@ -490,7 +490,7 @@ fn go_enum_conversion(
     };
 
     let info = enum_type
-        .info
+        .wire_info
         .as_ref()
         .ok_or_else(|| "the enum has no proto descriptor info".to_string())?;
     let proto_type = backend.proto_type(info).ok_or_else(|| {

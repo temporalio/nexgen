@@ -564,6 +564,13 @@ impl<'a> TypePlanningContext<'a> {
                 .find(|value| value.wire_name == case_name)
                 .cloned(),
             TypeSpec::External(ExternalTypeSpec::Proto(enum_name)) => {
+                if let Some(model) = source_spec.enum_for_proto(enum_name.as_str()) {
+                    return model
+                        .values
+                        .iter()
+                        .find(|value| value.wire_name == case_name)
+                        .cloned();
+                }
                 let enumeration = self.descriptors.enumeration(enum_name.as_str())?;
                 let expected = case_name.to_shouty_snake_case();
                 let value = enumeration.descriptor.value.iter().find(|value| {
@@ -1407,6 +1414,97 @@ mod tests {
     use crate::spec::{
         ExternalTypeSpec, ExternalVariantSourceSpec, LanguageStringSpec, ModulePath, ProtoOneofSpec,
     };
+
+    #[test]
+    fn proto_enum_model_identity_survives_planning_and_drives_reachability() {
+        let wit = r#"package test:enums;
+world system { export alerts; }
+/// @nexus.endpoint "alerts"
+interface alerts {
+  /// @nexus.proto "temporal.api.enums.v1.Severity"
+  enum alert-level {
+    severity-unspecified, severity-high, severity-medium, severity-low,
+  }
+  enum unused-level { unused }
+  /// @nexus.proto "temporal.api.version.v1.Alert"
+  record alert { message: string, severity: option<alert-level> }
+  raise: func(request: alert) -> alert;
+}
+"#;
+        let authored = crate::parser::parse_api_spec_from_wit_for_language(
+            Language::Python,
+            wit,
+            PathBuf::from("enum-models.wit"),
+        )
+        .unwrap();
+        let planned = plan_single_leaf(authored);
+        let record = planned
+            .records()
+            .map(|(_, record)| record)
+            .find(|record| record.name == "Alert")
+            .unwrap();
+        let field = &record.fields["severity"];
+        let TypeSpec::Enum(model) = &field.field_type else {
+            panic!(
+                "model field must be a native enum reference: {:?}",
+                field.field_type
+            );
+        };
+        assert_eq!(model.name, "AlertLevel");
+        let model_name = model.full_name.clone();
+        let Some(PlannedWireFieldBinding::Value { wire_type, .. }) = &field.data.wire_binding
+        else {
+            panic!("field must retain a separate wire binding");
+        };
+        assert!(matches!(wire_type,
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(proto)))
+                if proto.proto.full_name == "temporal.api.enums.v1.Severity"
+        ));
+        let tree = ApiSpecTree {
+            root: ApiSpecNode::Leaf(ApiSpecLeaf {
+                module_path: Default::default(),
+                source_root: Default::default(),
+                source_path: Default::default(),
+                spec: planned,
+            }),
+        };
+        let reachable = super::super::ReachabilityPass::new().apply(tree).unwrap();
+        let ApiSpecNode::Leaf(leaf) = reachable.root else {
+            panic!("single leaf");
+        };
+        assert!(leaf.spec.enum_decl(&model_name).is_some());
+        assert!(
+            !leaf
+                .spec
+                .enums()
+                .any(|(_, enumeration)| enumeration.name == "UnusedLevel")
+        );
+    }
+
+    #[test]
+    fn descriptor_only_proto_enum_remains_external() {
+        let spec = proto_operation_spec("temporal.api.common.v1.RetryPolicy");
+        let descriptors = DescriptorIndex::load(
+            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("advanced/samples/descriptors/temporal_api.bin"),
+        )
+        .unwrap();
+        let mut planner = TypePlanningContext::new(
+            super::super::select_spec(spec, Language::Python)
+                .map_names(SelectedToOperationLoweredMapper),
+            Default::default(),
+            &descriptors,
+        )
+        .unwrap();
+        let planned = proto::planned_value_type_from_authored_proto(
+            "temporal.api.enums.v1.Severity",
+            &mut planner,
+        );
+        assert!(matches!(
+            planned,
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_)))
+        ));
+    }
 
     #[test]
     fn descriptor_proto_refs_remain_external_models() {

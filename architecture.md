@@ -109,7 +109,12 @@ flowchart LR
   enum defaults on record fields. Defaults identify a member of a declared enum
   or a descriptor-backed enum, following aliases; language backends render that
   member using the API type's naming and conversion conventions rather than
-  resolving the authored case again.
+  resolving the authored case again. Protobuf messages and enums with native
+  model declarations resolve to ordinary record and enum references unless
+  replaced by an external type. The native declaration owns its protobuf source;
+  field wire bindings retain the separate protobuf type. Reachability and model
+  emission follow native model identity, while language-specific converters use
+  the wire metadata.
 - `ReachabilityPass` removes declarations outside the generated surface.
 - `EmittedNameResolutionPass` resolves final emitted JSON model identifiers. Its
   name manifest spans the whole tree, not one leaf: a `$ref` across input files

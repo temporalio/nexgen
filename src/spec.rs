@@ -447,6 +447,18 @@ where
     F: TypeFamily,
     F::Proto: AsRef<str>,
 {
+    pub fn enum_for_proto(&self, proto_name: &str) -> Option<&EnumSpec<F>> {
+        let proto_name = proto_name.trim_start_matches('.');
+        self.enums()
+            .map(|(_, enumeration)| enumeration)
+            .find(|enumeration| {
+                matches!(
+                    enumeration.source.as_ref().and_then(ExternalTypeSourceSpec::proto_type),
+                    Some(source_proto) if source_proto.as_ref() == proto_name
+                )
+            })
+    }
+
     pub fn record_for_proto(&self, proto_name: &str) -> Option<&RecordSpec<F>> {
         let proto_name = proto_name.trim_start_matches('.');
         self.types.values().find_map(|entry| {

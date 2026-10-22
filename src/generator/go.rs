@@ -176,6 +176,7 @@ pub(in crate::generator) enum PlannedScalarType {
 #[derive(Debug, Clone)]
 pub(in crate::generator) struct PlannedEnumType {
     pub(in crate::generator) info: Option<PlannedTypeInfo>,
+    pub(in crate::generator) wire_info: Option<PlannedTypeInfo>,
     pub(in crate::generator) name: Option<String>,
     pub(in crate::generator) replacement: Option<TypeReplacementSpec<PlannedFamily>>,
 }
@@ -448,6 +449,14 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
             .unwrap_or(PlannedValueType::Unknown),
         TypeSpec::Enum(enum_type) => PlannedValueType::Enum(PlannedEnumType {
             info: Some(local_type_info(&enum_type.full_name)),
+            wire_info: spec
+                .enum_decl(&enum_type.full_name)
+                .and_then(|enumeration| enumeration.source.as_ref())
+                .and_then(|source| source.proto_type())
+                .and_then(|proto| match proto {
+                    PlannedProtoType::Enum(proto) => Some(proto.proto.clone()),
+                    _ => None,
+                }),
             name: Some(enum_type.name.clone()),
             replacement: None,
         }),
@@ -472,6 +481,7 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
         TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(enum_type))) => {
             PlannedValueType::Enum(PlannedEnumType {
                 info: Some(enum_type.proto.clone()),
+                wire_info: Some(enum_type.proto.clone()),
                 name: Some(enum_type.name.clone()),
                 replacement: enum_type.replacement.clone(),
             })
@@ -2502,6 +2512,15 @@ fn compute_go_visibility(
         public_keys: BTreeSet::new(),
     };
 
+    // Model-only modules expose declarations directly, without an operation
+    // through which the visibility walk could discover them.
+    marker.public_keys.extend(
+        api_plan
+            .types
+            .iter()
+            .filter(|(_, entry)| entry.is_module_export())
+            .map(|(name, _)| name.clone()),
+    );
     for service in &api_plan.services {
         for operation in &service.operations {
             marker.mark_operation_public_surface(operation);

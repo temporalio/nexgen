@@ -381,7 +381,8 @@ impl PythonExternalModels {
 
     fn resolved_external_field_type(&self, value_type: &PlannedType) -> Option<ResolvedFieldType> {
         match value_type {
-            PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => {
+            PlannedType::Enum(_)
+            | PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => {
                 self.proto.enum_field_type(value_type)
             }
             PlannedType::External(ExternalTypeSpec::Json(_)) => {
@@ -1727,7 +1728,12 @@ impl<'a> ApiPlanner<'a> {
                 .default_enum_value
                 .as_ref()
                 .expect("planned field default enum value should be resolved");
-            let default_expr = enum_default_expr(&resolved_type, default_value);
+            let default_expr = if matches!(field.field_type.validation_type(), PlannedType::Enum(_))
+            {
+                format!("{}.{}", resolved_type.annotation, default_value.name)
+            } else {
+                enum_default_expr(&resolved_type, default_value)
+            };
             return Ok(RenderedField {
                 attr_name: attr_name.clone(),
                 annotation: python_field_annotation(
@@ -1895,12 +1901,14 @@ fn resolve_python_value_type(
             kind: ResolvedFieldKind::Scalar,
             wire_conversion: None,
         },
-        PlannedType::Enum(enum_type) => ResolvedFieldType {
-            annotation: enum_type.name.clone(),
-            imports: PythonImports::default(),
-            kind: ResolvedFieldKind::Enum,
-            wire_conversion: None,
-        },
+        PlannedType::Enum(enum_type) => external_models
+            .resolved_external_field_type(value_type)
+            .unwrap_or_else(|| ResolvedFieldType {
+                annotation: enum_type.name.clone(),
+                imports: PythonImports::default(),
+                kind: ResolvedFieldKind::Enum,
+                wire_conversion: None,
+            }),
         value_type @ PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => {
             external_models
                 .resolved_external_field_type(value_type)

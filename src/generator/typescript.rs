@@ -305,7 +305,9 @@ impl ExternalModelBackend for TypeScriptExternalModels {
             PlannedType::External(ExternalTypeSpec::Json(json_type)) => {
                 self.json.wire_conversion(json_type, planned_record)
             }
-            PlannedType::Record(_) => self.proto.wire_conversion(model_type, planned_record),
+            PlannedType::Record(_) | PlannedType::Enum(_) => {
+                self.proto.wire_conversion(model_type, planned_record)
+            }
             _ => None,
         }
     }
@@ -1432,7 +1434,7 @@ fn resolve_typescript_value_type(
             annotation: enum_type.name.clone(),
             kind: ResolvedFieldKind::Enum,
             requirements: TypeScriptRequirements::default(),
-            wire_conversion: None,
+            wire_conversion: external_models.wire_conversion(value_type, None),
         },
         PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => {
             ResolvedFieldType {
@@ -1952,7 +1954,11 @@ fn enum_default_expr(
             .value_namespace_imports
             .insert(namespace.to_string());
     }
-    let value_name = if resolved_type.wire_conversion.is_some() {
+    let value_name = if resolved_type
+        .wire_conversion
+        .as_ref()
+        .is_some_and(|conversion| !conversion.uses_rendered_model_annotation())
+    {
         enum_value.name.to_shouty_snake_case()
     } else {
         enum_value.name.clone()
