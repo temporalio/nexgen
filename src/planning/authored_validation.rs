@@ -93,6 +93,49 @@ fn validate_external_type_bindings(
         }
     }
 
+    for (_, model) in spec.enums() {
+        let Some(proto_name) = model
+            .source
+            .as_ref()
+            .and_then(ExternalTypeSourceSpec::proto_type)
+        else {
+            continue;
+        };
+        let Some(enumeration) = descriptors.enumeration(proto_name.as_str()) else {
+            if descriptors.file_count() == 0 {
+                continue;
+            }
+            return Err(Error::UnknownTypeOverride {
+                type_name: proto_name.as_str().to_string(),
+            });
+        };
+        let invalid = |reason| Error::InvalidProtoEnumBinding {
+            enumeration: enumeration.full_name.clone(),
+            reason,
+        };
+        let members = &enumeration.descriptor.value;
+        if model.values.len() != members.len() {
+            return Err(invalid(format!(
+                "authored enum `{}` declares {} cases, but protobuf declares {}; all cases must be declared in protobuf order",
+                model.full_name,
+                model.values.len(),
+                members.len(),
+            )));
+        }
+        for (value, member) in model.values.iter().zip(members) {
+            let expected = value.wire_name.to_shouty_snake_case();
+            if member.name() != expected || member.number() != value.number {
+                return Err(invalid(format!(
+                    "authored case `{}` has number {}, but the corresponding protobuf case is `{} = {}`; case names, order, and numbers must match exactly (reordered and sparse enums are not supported)",
+                    value.wire_name,
+                    value.number,
+                    member.name(),
+                    member.number(),
+                )));
+            }
+        }
+    }
+
     for (_, record) in spec.records() {
         let Some(proto_name) = record
             .source

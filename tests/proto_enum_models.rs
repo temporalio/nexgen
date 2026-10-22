@@ -3,8 +3,9 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
+use nexgen::descriptors::DescriptorIndex;
+use nexgen::error::Error;
 use nexgen::language::Language;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -35,25 +36,21 @@ interface alerts {
 "#;
 
 fn generate(language: Language, wit: &str) -> String {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!("nexgen-proto-enum-{language:?}-{unique}"));
-    fs::create_dir_all(&dir).unwrap();
-    let input = dir.join("input.wit");
+    try_generate(language, wit).unwrap()
+}
+
+fn try_generate(language: Language, wit: &str) -> Result<String, Error> {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("input.wit");
     fs::write(&input, wit).unwrap();
-    let output = dir.join("output");
+    let output = dir.path().join("output");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
             mode: nexgen::generator::GenerationMode::NativeApi,
             ..Default::default()
         },
         language,
-        input_paths: vec![
-            input,
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("advanced/samples/inputs/deps"),
-        ],
+        input_paths: vec![input],
         support_package: Some(
             match language {
                 Language::Go => "example.com/support",
@@ -70,8 +67,7 @@ fn generate(language: Language, wit: &str) -> String {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
-    })
-    .unwrap();
+    })?;
     fn read(path: &Path, result: &mut String) {
         if path.is_dir() {
             let mut entries = fs::read_dir(path)
@@ -88,8 +84,7 @@ fn generate(language: Language, wit: &str) -> String {
     }
     let mut result = String::new();
     read(&output, &mut result);
-    fs::remove_dir_all(dir).unwrap();
-    result
+    Ok(result)
 }
 
 #[test]
@@ -174,55 +169,93 @@ fn model_only_exports_also_render_the_enum() {
     }
 }
 
+fn assert_invalid_binding(wit: &str, enumeration: &str, expected_reason: &str) {
+    for language in [
+        Language::Python,
+        Language::TypeScript,
+        Language::Dotnet,
+        Language::Go,
+    ] {
+        let error = try_generate(language, wit).unwrap_err();
+        let Error::InvalidProtoEnumBinding {
+            enumeration: actual,
+            reason,
+        } = error
+        else {
+            panic!("unexpected error for {language:?}: {error}");
+        };
+        assert_eq!(actual, enumeration);
+        assert!(
+            reason.contains(expected_reason),
+            "unexpected diagnostic for {language:?}: {reason}"
+        );
+    }
+}
+
 #[test]
-fn sample_preserves_ordered_reordered_and_sparse_proto_numbers() {
-    let wit = fs::read_to_string(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("advanced/samples/inputs/proto-enums.wit"),
+fn rejects_reordered_cases() {
+    let wit = WIT.replace(
+        "severity-unspecified,\n    severity-high,\n    severity-medium,\n    severity-low,",
+        "severity-low,\n    severity-high,\n    severity-medium,\n    severity-unspecified,",
+    );
+    assert_invalid_binding(
+        &wit,
+        "temporal.api.enums.v1.Severity",
+        "authored case `severity-low` has number 0",
+    );
+}
+
+#[test]
+fn rejects_omitted_cases() {
+    let wit = WIT.replace("    severity-low,\n", "");
+    assert_invalid_binding(
+        &wit,
+        "temporal.api.enums.v1.Severity",
+        "declares 3 cases, but protobuf declares 4",
+    );
+}
+
+#[test]
+fn rejects_mismatched_case_names() {
+    let wit = WIT.replace("severity-low,", "severity-unknown,");
+    assert_invalid_binding(
+        &wit,
+        "temporal.api.enums.v1.Severity",
+        "corresponding protobuf case is `SEVERITY_LOW = 3`",
+    );
+}
+
+#[test]
+fn rejects_sparse_proto_numbers_even_with_all_cases_in_descriptor_order() {
+    let descriptors = DescriptorIndex::load(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("advanced/samples/descriptors/temporal_api.bin"),
     )
     .unwrap();
-    for (language, expected) in [
-        (
-            Language::Python,
-            vec![
-                "NamespaceStateRegistered = 1",
-                "SeverityLow = 3",
-                "CommandTypeProtocolMessage = 14",
-                "CommandTypeModifyWorkflowProperties = 16",
-            ],
-        ),
-        (
-            Language::TypeScript,
-            vec![
-                "NamespaceStateRegistered = 1",
-                "SeverityLow = 3",
-                "CommandTypeModifyWorkflowProperties = 16",
-                "as number as temporal.api.enums.v1.CommandType",
-            ],
-        ),
-        (
-            Language::Dotnet,
-            vec![
-                "NamespaceStateRegistered = 1",
-                "SeverityLow = 3",
-                "CommandTypeModifyWorkflowProperties = 16",
-                "proto.Severity = (Temporalio.Api.Enums.V1.Severity)3",
-                "proto.CommandType = (Temporalio.Api.Enums.V1.CommandType)16",
-            ],
-        ),
-        (
-            Language::Go,
-            vec![
-                "NamespaceStateNamespaceStateRegistered NamespaceState = 1",
-                "AlertLevelSeverityLow AlertLevel = 3",
-                "CommandTypeCommandTypeModifyWorkflowProperties CommandType = 16",
-                "message.Severity = enums.Severity(3)",
-                "message.CommandType = enums.CommandType(16)",
-            ],
-        ),
-    ] {
-        let output = generate(language, &wit);
-        for expected in expected {
-            assert!(output.contains(expected), "missing {expected}:\n{output}");
-        }
-    }
+    let enumeration = descriptors
+        .enumeration("temporal.api.enums.v1.CommandType")
+        .unwrap();
+    let cases = enumeration
+        .descriptor
+        .value
+        .iter()
+        .map(|member| member.name().to_lowercase().replace('_', "-"))
+        .collect::<Vec<_>>()
+        .join(",\n");
+    let wit = format!(
+        r#"package test:sparse-enum;
+world system {{ export models; }}
+interface models {{
+  /// @nexus.proto "temporal.api.enums.v1.CommandType"
+  enum command-type {{
+    {cases},
+  }}
+}}
+"#
+    );
+    assert_invalid_binding(
+        &wit,
+        "temporal.api.enums.v1.CommandType",
+        "authored case `command-type-modify-workflow-properties` has number 15",
+    );
 }

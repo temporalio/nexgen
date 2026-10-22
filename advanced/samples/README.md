@@ -88,22 +88,6 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
   [`typescript/wit/type-roundtrip/`](typescript/wit/type-roundtrip/),
   [`typescript/tests/type-roundtrip.test.ts`](typescript/tests/type-roundtrip.test.ts)
 
-### `proto-enums`
-
-- WIT: [`inputs/proto-enums.wit`](inputs/proto-enums.wit)
-- .NET: [`dotnet/wit/proto-enums/`](dotnet/wit/proto-enums/),
-  [`dotnet/tests/ProtoEnumChecks.cs`](dotnet/tests/ProtoEnumChecks.cs)
-- Go: [`go/protoenums/`](go/protoenums/),
-  [`go/tests/protoenums_test.go`](go/tests/protoenums_test.go)
-- Python: [`python/wit/proto_enums/`](python/wit/proto_enums/),
-  [`python/tests/test_proto_enums.py`](python/tests/test_proto_enums.py)
-- TypeScript: [`typescript/wit/proto-enums/`](typescript/wit/proto-enums/),
-  [`typescript/tests/proto-enums.test.ts`](typescript/tests/proto-enums.test.ts)
-
-Exercises normal ordered enums, reordered WIT cases, and a gap in protobuf
-numbering, including field defaults. Python, TypeScript, and .NET tests cover
-wire conversions; Go checks the generated enum numbers against the SDK enums.
-
 ### `notification-service`
 
 - WIT: [`inputs/notification-service.wit`](inputs/notification-service.wit)

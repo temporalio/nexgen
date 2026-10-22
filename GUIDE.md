@@ -298,13 +298,11 @@ and `toProto()` methods.
 
 WIT enums become integer-valued enumerations.
 
-Enums with `@nexus.proto` use the protobuf descriptor's numeric values rather
-than WIT declaration indices. Write cases using the protobuf member name in
-kebab-case (for example, `severity-low` for `SEVERITY_LOW`). Declaration order
-does not affect wire values, and gaps in protobuf numbering are preserved,
-including when an enum member is used as a field default. See the
-[`proto-enums` sample](advanced/samples/inputs/proto-enums.wit) for ordered,
-reordered, and sparse enums.
+Enums with `@nexus.proto` must declare every protobuf case in descriptor order,
+using the protobuf member name in kebab-case (for example, `severity-low` for
+`SEVERITY_LOW`). Protobuf numbers must match WIT's zero-based declaration
+indices. Generation fails for missing or reordered cases and for gaps in
+protobuf numbering; omitting individual enum cases is not supported.
 
 ```wit
 enum user-status {

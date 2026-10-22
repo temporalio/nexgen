@@ -509,33 +509,7 @@ impl<'a> TypePlanningContext<'a> {
         })
     }
 
-    fn plan_spec(&mut self, mut spec: ApiSpec<OperationLoweredFamily>) -> Result<PlannedSpec> {
-        // Resolve numbers before cloning the source spec so enum declarations and
-        // field defaults share the same descriptor-backed values.
-        for entry in spec.types.values_mut() {
-            let TypeDeclSpec::Enum(model) = &mut entry.declaration else {
-                continue;
-            };
-            let Some(proto) = model.source.as_ref().and_then(|source| source.proto_type()) else {
-                continue;
-            };
-            let Some(enumeration) = self.descriptors.enumeration(proto.as_str()) else {
-                continue;
-            };
-            for value in &mut model.values {
-                let expected = value.wire_name.to_shouty_snake_case();
-                let member = enumeration
-                    .descriptor
-                    .value
-                    .iter()
-                    .find(|member| member.name.as_deref() == Some(expected.as_str()))
-                    .ok_or_else(|| Error::UnknownProtoEnumCase {
-                        enumeration: enumeration.full_name.clone(),
-                        case: value.wire_name.clone(),
-                    })?;
-                value.number = member.number();
-            }
-        }
+    fn plan_spec(&mut self, spec: ApiSpec<OperationLoweredFamily>) -> PlannedSpec {
         for record in spec.records().map(|(_, record)| record.clone()) {
             self.ensure_record_model_plan(&record);
         }
@@ -545,7 +519,7 @@ impl<'a> TypePlanningContext<'a> {
             planner: self,
         });
         self.resolve_planned_record_field_types(&source_spec, &mut planned_spec);
-        Ok(planned_spec)
+        planned_spec
     }
 
     fn resolve_planned_record_field_types(
@@ -1357,7 +1331,7 @@ impl CompilerPass<OperationLoweredFamily, PlannedFamily> for TypePlanningPass<'_
             TypePlanningContext::new(leaf.spec.clone(), spec_data.clone(), self.descriptors)?;
         let lowered = planner.plan_operations()?;
         let source_spec = planner.spec.clone();
-        let mut planned = planner.plan_spec(source_spec)?;
+        let mut planned = planner.plan_spec(source_spec);
         for service in &mut planned.services {
             if let Some(operations) = lowered.operations.get(&service.name) {
                 service.operations = operations.clone();
