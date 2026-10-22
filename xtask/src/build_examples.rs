@@ -7,7 +7,7 @@ use nexgen::error::Error as NexgenError;
 use nexgen::generator::{GenerationMode, TsDateTimeTypes};
 use nexgen::language::Language;
 use nexgen::nexgen_config::NexgenConfig;
-use nexgen::{GenerateRequest, generate_to_file};
+use nexgen::{GenerateRequest, format_generated_files, generate_to_file};
 use serde::Deserialize;
 
 use crate::error::{Error, Result};
@@ -460,7 +460,7 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
         },
         descriptor_paths: vec![repo_root.join("advanced/samples/descriptors/temporal_api.bin")],
         output_path: output_path.clone(),
-        format: language == Language::Java,
+        format: false,
         java_package_name: (language == Language::Java)
             .then(|| example_directory_name(language, example_id)),
         ts_date_time_types: Default::default(),
@@ -524,7 +524,7 @@ fn build_json_example_variant(
             support_package: None,
             descriptor_paths: Vec::new(),
             output_path: output_path.clone(),
-            format: language == Language::Java,
+            format: false,
             java_package_name: (language == Language::Java)
                 .then(|| json_example_java_package(&dir_name, mode)),
             ts_date_time_types,
@@ -673,7 +673,8 @@ fn format_example_output(
     output_path: &Path,
 ) -> Result<()> {
     let (program, args): (&str, Vec<String>) = match language {
-        Language::Dotnet | Language::Java => return Ok(()),
+        Language::Dotnet => return Ok(()),
+        Language::Java => return format_generated_files(language, output_path).map_err(Into::into),
         Language::Go => (
             "gofmt",
             vec!["-w".into(), output_path.to_string_lossy().into_owned()],
@@ -810,6 +811,29 @@ mod tests {
         assert!(matches!(
             reset_example_output_directory(&root, &root),
             Err(Error::ExampleOutputPathOutsideRoot { .. })
+        ));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn java_example_formatting_skips_directories_without_java_files() {
+        let root = temp_language_root("java-format-empty");
+        fs::write(root.join("notes.txt"), "leave alone").unwrap();
+        format_example_output(&root, Language::Java, &root).unwrap();
+        assert_eq!(
+            fs::read_to_string(root.join("notes.txt")).unwrap(),
+            "leave alone"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn java_example_formatting_propagates_file_discovery_errors() {
+        let root = temp_language_root("java-format-missing");
+        let output = root.join("missing");
+        assert!(matches!(
+            format_example_output(&root, Language::Java, &output),
+            Err(Error::Nexgen(NexgenError::ReadFile { path, .. })) if path == output
         ));
         fs::remove_dir_all(root).unwrap();
     }

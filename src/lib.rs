@@ -225,7 +225,12 @@ fn resolve_java_package(request: &GenerateRequest) -> Result<String> {
     Ok(package_name.to_string())
 }
 
-fn format_generated_files(language: Language, output_path: &Path) -> Result<()> {
+/// Format files at `output_path` using the target language's formatter from `PATH`.
+///
+/// Supports Go, Java, Python, and TypeScript. Directory output may include
+/// handwritten files; formatting is not restricted to files emitted by Nexgen.
+/// The caller is responsible for making the formatter available.
+pub fn format_generated_files(language: Language, output_path: &Path) -> Result<()> {
     if let Some(mut command) = formatter_command(language, output_path)? {
         run_formatter(&mut command, output_path)?;
     }
