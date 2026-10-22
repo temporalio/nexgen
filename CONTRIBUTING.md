@@ -4,6 +4,21 @@ Run `cargo validate` before pushing; it validates Rust, Markdown formatting, and
 all five language sample projects. Run `cargo fmt-markdown` to rewrap Markdown
 you have edited. Follow the generated sample guidance in [AGENTS.md](AGENTS.md).
 
+## Local setup
+
+Install [mise](https://mise.jdx.dev/getting-started.html), then run:
+
+```sh
+mise trust
+mise install
+```
+
+Activate mise in your shell, or prefix repository commands with `mise exec --`.
+`mise.toml` specifies the required global toolchains and Markdown formatter. CI
+installs these before validation; local developers must install them explicitly.
+Sample generation and validation still install project dependencies through npm,
+uv, and the native build tools as needed.
+
 ## Running tests
 
 `cargo test --all-features` runs the Rust-only suite, including parsing,

@@ -19,10 +19,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@3fc1e40d4c4ce3007de028907c886bc3996ce2ea # 1.96.0
-        with:
-          components: rustfmt
+      - name: Install required tooling
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -32,62 +30,12 @@ jobs:
       - name: Verify Cargo.lock is up to date
         run: cargo metadata --locked --format-version 1 > /dev/null
 
-      # `cargo validate markdown` installs the rumdl version pinned in
-      # xtask/src/markdown.rs into target/tools on first use.
-      - name: Cache Markdown tooling
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: target/tools
-          key: markdown-tools-${{ runner.os }}-${{ hashFiles('xtask/src/markdown.rs') }}
-
       - name: Validate Markdown
         run: |
           if ! cargo validate markdown; then
             echo "::error::Markdown formatting check failed. Run \`cargo fmt-markdown\` locally and commit the result."
             exit 1
           fi
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.10"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          enable-cache: true
-          working-directory: samples/python
-
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "26"
-          cache: npm
-          cache-dependency-path: |
-            samples/typescript/package-lock.json
-            advanced/samples/typescript/package-lock.json
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: samples/go/go.mod
-          cache-dependency-path: |
-            samples/go/go.sum
-            advanced/samples/go/go.sum
-
-      - name: Set up Java
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: gradle
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
 
       - name: Validate Rust
         run: cargo validate rust

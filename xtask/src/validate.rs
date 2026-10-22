@@ -7,7 +7,6 @@ use std::time::Instant;
 use nexgen::error::Error as NexgenError;
 
 use crate::error::{Error, Result};
-use crate::markdown;
 
 #[derive(Clone, Copy)]
 pub enum ValidationLanguage {
@@ -255,9 +254,7 @@ fn integration_test_args(language: ValidationLanguage) -> [&'static str; 6] {
 }
 
 fn validate_markdown(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
-    let rumdl = markdown::rumdl_path(repo_root)?;
-    let rumdl = rumdl.to_string_lossy();
-    match run(log, repo_root, &rumdl, &["check", "."]) {
+    match run(log, repo_root, "rumdl", &["check", "."]) {
         // rumdl exits with 1 when files need formatting; other failures are
         // tool or configuration errors and are reported as-is.
         Err(Error::CommandFailed { status, .. }) if status.code() == Some(1) => {
