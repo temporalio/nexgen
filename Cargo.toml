@@ -51,3 +51,6 @@ serde_yaml = "0.9"
 tempfile = "3.23"
 thiserror = "2.0"
 wit_parser_crate = { package = "wit-parser", version = "0.252" }
+
+[dev-dependencies]
+toml = "1.1"

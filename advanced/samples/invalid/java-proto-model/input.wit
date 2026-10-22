@@ -1,0 +1,13 @@
+package test:java-proto@1.0.0;
+
+world system {
+  export api;
+}
+
+interface api {
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
+  record workflow-execution {
+    workflow-id: string,
+    run-id: string,
+  }
+}

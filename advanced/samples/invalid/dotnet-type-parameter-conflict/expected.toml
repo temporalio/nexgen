@@ -1,0 +1,9 @@
+languages = ["dotnet"]
+descriptors = []
+
+[error]
+kind = "dotnet-type-parameter-name-conflict"
+contains = [
+  ".NET type parameter `Output` in `conflict-models.pair` maps to `TOutput`",
+  "conflicts with type parameter `OutputT`",
+]

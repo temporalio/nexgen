@@ -4,7 +4,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use nexgen::descriptors::DescriptorIndex;
 use nexgen::error::Error;
 use nexgen::language::Language;
 use nexgen::{GenerateRequest, generate_to_file};
@@ -167,95 +166,4 @@ fn model_only_exports_also_render_the_enum() {
         let output = generate(language, &wit);
         assert!(output.contains(expected), "missing {expected}:\n{output}");
     }
-}
-
-fn assert_invalid_binding(wit: &str, enumeration: &str, expected_reason: &str) {
-    for language in [
-        Language::Python,
-        Language::TypeScript,
-        Language::Dotnet,
-        Language::Go,
-    ] {
-        let error = try_generate(language, wit).unwrap_err();
-        let Error::InvalidProtoEnumBinding {
-            enumeration: actual,
-            reason,
-        } = error
-        else {
-            panic!("unexpected error for {language:?}: {error}");
-        };
-        assert_eq!(actual, enumeration);
-        assert!(
-            reason.contains(expected_reason),
-            "unexpected diagnostic for {language:?}: {reason}"
-        );
-    }
-}
-
-#[test]
-fn rejects_reordered_cases() {
-    let wit = WIT.replace(
-        "severity-unspecified,\n    severity-high,\n    severity-medium,\n    severity-low,",
-        "severity-low,\n    severity-high,\n    severity-medium,\n    severity-unspecified,",
-    );
-    assert_invalid_binding(
-        &wit,
-        "temporal.api.enums.v1.Severity",
-        "authored case `severity-low` has number 0",
-    );
-}
-
-#[test]
-fn rejects_omitted_cases() {
-    let wit = WIT.replace("    severity-low,\n", "");
-    assert_invalid_binding(
-        &wit,
-        "temporal.api.enums.v1.Severity",
-        "declares 3 cases, but protobuf declares 4",
-    );
-}
-
-#[test]
-fn rejects_mismatched_case_names() {
-    let wit = WIT.replace("severity-low,", "severity-unknown,");
-    assert_invalid_binding(
-        &wit,
-        "temporal.api.enums.v1.Severity",
-        "corresponding protobuf case is `SEVERITY_LOW = 3`",
-    );
-}
-
-#[test]
-fn rejects_sparse_proto_numbers_even_with_all_cases_in_descriptor_order() {
-    let descriptors = DescriptorIndex::load(
-        &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("advanced/samples/descriptors/temporal_api.bin"),
-    )
-    .unwrap();
-    let enumeration = descriptors
-        .enumeration("temporal.api.enums.v1.CommandType")
-        .unwrap();
-    let cases = enumeration
-        .descriptor
-        .value
-        .iter()
-        .map(|member| member.name().to_lowercase().replace('_', "-"))
-        .collect::<Vec<_>>()
-        .join(",\n");
-    let wit = format!(
-        r#"package test:sparse-enum;
-world system {{ export models; }}
-interface models {{
-  /// @nexus.proto "temporal.api.enums.v1.CommandType"
-  enum command-type {{
-    {cases},
-  }}
-}}
-"#
-    );
-    assert_invalid_binding(
-        &wit,
-        "temporal.api.enums.v1.CommandType",
-        "authored case `command-type-modify-workflow-properties` has number 15",
-    );
 }

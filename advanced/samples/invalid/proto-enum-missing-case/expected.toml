@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-proto-enum-binding"
+contains = [
+  "temporal.api.enums.v1.Severity",
+  "declares 3 cases, but protobuf declares 4",
+]

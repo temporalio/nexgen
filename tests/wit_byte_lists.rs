@@ -66,10 +66,3 @@ fn python_reads_a_proto_backed_wit_byte_list_as_bytes() {
     let models = generate_python(PROTO_BYTES_WIT).unwrap();
     assert!(models.contains("    data: bytes\n"), "{models}");
 }
-
-#[test]
-fn python_refuses_a_wider_wit_integer_list_for_a_proto_bytes_field() {
-    let wit = PROTO_BYTES_WIT.replace("data: list<u8>", "data: list<u32>");
-    let err = generate_python(&wit).unwrap_err();
-    assert!(err.contains("bytes"), "{err}");
-}

@@ -1,6 +1,7 @@
 use std::fmt;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Language {
     Dotnet,
     Go,

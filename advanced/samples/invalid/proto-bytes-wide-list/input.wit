@@ -1,0 +1,12 @@
+package test:wide-byte-list;
+
+world system {
+  export callbacks;
+}
+
+interface callbacks {
+  /// @nexus.proto "temporal.api.common.v1.Callback.Internal"
+  record callback-internal {
+    data: list<u32>,
+  }
+}

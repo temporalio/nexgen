@@ -25,6 +25,12 @@ uv, and the native build tools as needed.
 planning, CLI behavior, and generated-source assertions for every language. It
 does not require Python, Node, Go, Java, or .NET tooling.
 
+File-backed rejection tests live in
+[`advanced/samples/invalid/`](advanced/samples/invalid/README.md). Add an input
+and a TOML expectation to test a compiler failure without embedding WIT in Rust.
+Run `cargo test --all-features --test compiler_failures` for the fixture suite.
+Focused pass-level unit tests can remain alongside their implementation.
+
 Use `cargo validate <language>` to validate one language: `rust`, `python`,
 `typescript`, `go`, `java`, or `dotnet`. Each non-Rust stage checks generated
 sample freshness, runs the sample projects' native checks, and exercises

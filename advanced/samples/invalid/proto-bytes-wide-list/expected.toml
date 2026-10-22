@@ -1,0 +1,9 @@
+languages = ["python"]
+descriptors = ["../../descriptors/temporal_api.bin"]
+
+[error]
+kind = "invalid-type-override-field"
+contains = [
+  "temporal.api.common.v1.Callback.Internal.data",
+  "does not match proto field type `bytes`",
+]

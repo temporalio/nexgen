@@ -16,6 +16,11 @@ Advanced generation examples. Two flavors live here:
 For the beginner-friendly JSON Schema definitions samples, see
 [`../../samples/`](../../samples/).
 
+Inputs that intentionally fail compilation live in
+[`invalid/`](invalid/README.md), with expected error kinds and diagnostic
+fragments. They run as Rust integration tests rather than generated-language
+samples.
+
 To use hand-written support code with WIT generation, start with the
 [support-package guide](../../GUIDE.md#integrating-a-support-package) and the
 sample-project instructions for [Go](go/README.md), [Python](python/README.md),

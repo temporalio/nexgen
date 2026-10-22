@@ -174,35 +174,3 @@ fn typescript_emits_a_complete_conversion_pair() {
     assert!(!output.contains("export function pauseActivityRequestFromProto("));
     assert!(!output.contains("export function pauseActivityRequestToProto("));
 }
-
-#[test]
-fn java_rejects_an_ordinary_reachable_proto_model() {
-    let temp = tempfile::tempdir().unwrap();
-    let path = temp.path().join("java-proto.wit");
-    fs::write(
-        &path,
-        r#"package test:java-proto@1.0.0;
-
-world system {
-  export api;
-}
-
-interface api {
-  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
-  record workflow-execution {
-    workflow-id: string,
-    run-id: string,
-  }
-}
-"#,
-    )
-    .unwrap();
-
-    let error = generate(Language::Java, &path).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("Java code generation does not support protobuf-backed model"),
-        "{error}"
-    );
-}

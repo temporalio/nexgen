@@ -8,7 +8,6 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use nexgen::generator::generate_source;
 use nexgen::{GenerateRequest, generate_to_file};
 
 mod common;
@@ -802,59 +801,4 @@ interface notification-models {
 
     assert!(models.contains("namespace Acme.Notifications\n{"));
     assert!(models.contains("public record Notification"));
-}
-
-#[test]
-fn dotnet_rejects_type_parameters_with_the_same_csharp_name() {
-    let temp_dir = unique_output_path("dotnet-type-parameter-conflict");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("conflict.wit");
-    fs::write(
-        &input_path,
-        r#"package test:conflict@1.0.0;
-
-world system {
-  export conflict-models;
-}
-
-interface conflict-models {
-  type placeholder = string;
-
-  /// @nexus.type-parameter
-  type output-t = placeholder;
-
-  /// @nexus.type-parameter
-  type output = placeholder;
-
-  record pair {
-    first: output-t,
-    second: output,
-  }
-}
-"#,
-    )
-    .unwrap();
-
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Dotnet,
-        &[input_path],
-    )
-    .unwrap();
-    let descriptors =
-        nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&project_root())).unwrap();
-    let error = generate_source(
-        nexgen::language::Language::Dotnet,
-        spec,
-        &descriptors,
-        "Nexgen.Support",
-    )
-    .unwrap_err();
-    fs::remove_dir_all(temp_dir).unwrap();
-
-    assert!(
-        error.to_string().contains(
-            ".NET type parameter `Output` in `conflict-models.pair` maps to `TOutput`, which conflicts with type parameter `OutputT`"
-        ),
-        "{error}"
-    );
 }

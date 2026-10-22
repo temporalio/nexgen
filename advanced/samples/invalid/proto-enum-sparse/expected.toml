@@ -1,0 +1,7 @@
+[error]
+kind = "invalid-proto-enum-binding"
+contains = [
+  "temporal.api.enums.v1.CommandType",
+  "authored case `command-type-modify-workflow-properties` has number 15",
+  "COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES = 16",
+]
