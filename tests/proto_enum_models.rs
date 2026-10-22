@@ -50,7 +50,10 @@ fn generate(language: Language, wit: &str) -> String {
             ..Default::default()
         },
         language,
-        input_paths: vec![input],
+        input_paths: vec![
+            input,
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("advanced/samples/inputs/deps"),
+        ],
         support_package: Some(
             match language {
                 Language::Go => "example.com/support",
@@ -109,9 +112,11 @@ fn typescript_operation_reaches_the_authored_enum_model() {
         "export enum AlertLevel {",
         "severity?: AlertLevel;",
         "proto.severity as number as AlertLevel",
+        "as number as temporal.api.enums.v1.Severity",
     ] {
         assert!(output.contains(expected), "missing {expected}:\n{output}");
     }
+    assert!(!output.contains("as any"));
 }
 
 #[test]
@@ -166,5 +171,58 @@ fn model_only_exports_also_render_the_enum() {
     ] {
         let output = generate(language, &wit);
         assert!(output.contains(expected), "missing {expected}:\n{output}");
+    }
+}
+
+#[test]
+fn sample_preserves_ordered_reordered_and_sparse_proto_numbers() {
+    let wit = fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("advanced/samples/inputs/proto-enums.wit"),
+    )
+    .unwrap();
+    for (language, expected) in [
+        (
+            Language::Python,
+            vec![
+                "NamespaceStateRegistered = 1",
+                "SeverityLow = 3",
+                "CommandTypeProtocolMessage = 14",
+                "CommandTypeModifyWorkflowProperties = 16",
+            ],
+        ),
+        (
+            Language::TypeScript,
+            vec![
+                "NamespaceStateRegistered = 1",
+                "SeverityLow = 3",
+                "CommandTypeModifyWorkflowProperties = 16",
+                "as number as temporal.api.enums.v1.CommandType",
+            ],
+        ),
+        (
+            Language::Dotnet,
+            vec![
+                "NamespaceStateRegistered = 1",
+                "SeverityLow = 3",
+                "CommandTypeModifyWorkflowProperties = 16",
+                "proto.Severity = (Temporalio.Api.Enums.V1.Severity)3",
+                "proto.CommandType = (Temporalio.Api.Enums.V1.CommandType)16",
+            ],
+        ),
+        (
+            Language::Go,
+            vec![
+                "NamespaceStateNamespaceStateRegistered NamespaceState = 1",
+                "AlertLevelSeverityLow AlertLevel = 3",
+                "CommandTypeCommandTypeModifyWorkflowProperties CommandType = 16",
+                "message.Severity = enums.Severity(3)",
+                "message.CommandType = enums.CommandType(16)",
+            ],
+        ),
+    ] {
+        let output = generate(language, &wit);
+        for expected in expected {
+            assert!(output.contains(expected), "missing {expected}:\n{output}");
+        }
     }
 }

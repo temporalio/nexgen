@@ -106,7 +106,9 @@ flowchart LR
 - `OperationLoweringPass` turns wire-backed resource returns into explicit
   result records.
 - `TypePlanningPass` materializes target-ready type metadata, including resolved
-  enum defaults on record fields. Defaults identify a member of a declared enum
+  protobuf-backed enum numbers and enum defaults on record fields. Descriptor
+  numbers are applied before resolving defaults so declarations and defaults
+  agree independently of authored case order. Defaults identify a member of a declared enum
   or a descriptor-backed enum, following aliases; language backends render that
   member using the API type's naming and conversion conventions rather than
   resolving the authored case again. Protobuf messages and enums with native

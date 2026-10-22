@@ -659,11 +659,14 @@ pub(crate) fn field_name(field: &FieldDescriptorProto, explicit_name: Option<&st
 }
 
 fn generated_enum_wire_conversion(model: &EnumSpec<PlannedFamily>) -> Option<WireValueConversion> {
-    model.source.as_ref()?.proto_type()?;
+    let source = model.source.as_ref()?.proto_type()?;
+    let PlannedProtoType::Enum(proto) = source else {
+        return None;
+    };
     Some(WireValueConversion {
         annotation: model.name.clone(),
         from_wire: format!("{{wire}} as number as {}", model.name),
-        to_wire: "{value} as any".to_string(),
+        to_wire: format!("{{value}} as number as {}", proto.proto.full_name),
         function_name_to_wire: None,
         wire_function_names: None,
         uses_rendered_model_annotation: true,

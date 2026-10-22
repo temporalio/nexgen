@@ -305,6 +305,9 @@ pub enum Error {
         property: &'static str,
     },
 
+    #[error("protobuf enum `{enumeration}` has no case matching `{case}`")]
+    UnknownProtoEnumCase { enumeration: String, case: String },
+
     #[error("Go code generation does not support {context}: {reason}")]
     UnsupportedGoType { context: String, reason: String },
 
