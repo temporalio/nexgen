@@ -28,6 +28,22 @@
   cargo test --all-features
   ```
 
+## Compiler rejection tests
+
+- Test compiler rejections with file-backed fixtures in
+  `advanced/samples/invalid/<case>/`, rather than embedding input text in Rust
+  tests. Add the input and an `expected.toml` that asserts the typed error kind
+  and diagnostic fragments establishing the intended failure. See the
+  [fixture guide](advanced/samples/invalid/README.md).
+- Use the default language set for shared compiler rules. Restrict `languages`
+  only when the rejection is target-specific.
+- Descriptors are opt-in: use `descriptors = "temporal"` for the standard
+  Temporal set, or a path list for custom descriptors. Omit the field when
+  descriptors are not needed.
+- Run `cargo test --all-features --test compiler_failures` for focused checks.
+  The Rust stage of `cargo validate` also runs this suite. Reserve inline unit
+  tests for internal invariants rather than end-to-end rejection scenarios.
+
 ## Stacked pull requests
 
 When asked to create a stack of pull requests, use the
