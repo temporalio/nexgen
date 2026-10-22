@@ -84,23 +84,42 @@ mod format_tests {
     }
 
     #[test]
-    fn java_formats_only_emitted_files_and_propagates_errors() {
+    fn java_formats_output_directory_and_propagates_errors() {
         let root = project_root();
         let temp = tempfile::tempdir().unwrap();
-        let output = temp.path().join("generated");
-        fs::create_dir(&output).unwrap();
-        let neighbor = output.join("UserCode.java");
-        fs::write(&neighbor, "handwritten, intentionally not valid Java").unwrap();
+        let output = temp.path().join("output with spaces/generated");
+        fs::create_dir_all(&output).unwrap();
+        let neighbor = output.join("nested/UserCode.java");
+        fs::create_dir(output.join("nested")).unwrap();
+        fs::write(&neighbor, "class UserCode {}").unwrap();
         let manifest = output.join("notes.txt");
         fs::write(&manifest, "leave alone").unwrap();
         let java = temp.path().join("java");
-        fs::write(&java, "#!/bin/sh\nfor arg do\ncase \"$arg\" in *.java) printf '\\n// formatted by test\\n' >> \"$arg\" ;; esac\ndone\n").unwrap();
+        fs::write(
+            &java,
+            r#"#!/bin/sh
+[ "$#" -eq 1 ] || exit 1
+case "$1" in @*) ;; *) exit 2 ;; esac
+printf '%s\n' "${1#@}" >> "$FORMAT_LOG"
+while IFS= read -r arg || [ -n "$arg" ]; do
+  case "$arg" in
+    \"*.java\")
+      arg=${arg#\"}
+      arg=${arg%\"}
+      printf '\n// formatted by test\n' >> "$arg"
+      ;;
+  esac
+done < "${1#@}"
+"#,
+        )
+        .unwrap();
         let mut permissions = fs::metadata(&java).unwrap().permissions();
         permissions.set_mode(0o755);
         fs::set_permissions(&java, permissions).unwrap();
         let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
         command
             .env("PATH", formatter_path_env(temp.path()))
+            .env("FORMAT_LOG", temp.path().join("format.log"))
             .env(
                 "NEXGEN_JAVA_FORMAT_JAR",
                 temp.path().join("formatter with spaces.jar"),
@@ -117,6 +136,12 @@ mod format_tests {
                 "--format",
             ]);
         assert!(command.status().unwrap().success());
+        let log = fs::read_to_string(temp.path().join("format.log")).unwrap();
+        assert_eq!(log.lines().count(), 1);
+        assert!(
+            !Path::new(log.trim()).exists(),
+            "argument file should be cleaned up"
+        );
         assert!(
             fs::read_to_string(output.join("Message.java"))
                 .unwrap()
@@ -124,7 +149,7 @@ mod format_tests {
         );
         assert_eq!(
             fs::read_to_string(&neighbor).unwrap(),
-            "handwritten, intentionally not valid Java"
+            "class UserCode {}\n// formatted by test\n"
         );
         assert_eq!(fs::read_to_string(&manifest).unwrap(), "leave alone");
 

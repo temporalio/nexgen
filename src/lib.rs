@@ -97,7 +97,7 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
     write_generated_files(&request.output_path, &generated)?;
 
     if request.format {
-        format_generated_files(request.language, &request.output_path, &generated)?;
+        format_generated_files(request.language, &request.output_path)?;
     }
 
     Ok(())
@@ -225,12 +225,13 @@ fn resolve_java_package(request: &GenerateRequest) -> Result<String> {
     Ok(package_name.to_string())
 }
 
-fn format_generated_files(
-    language: Language,
-    output_path: &Path,
-    generated: &GeneratedFiles,
-) -> Result<()> {
-    for mut command in formatter_commands(language, output_path, generated)? {
+fn format_generated_files(language: Language, output_path: &Path) -> Result<()> {
+    // Keep any formatter argument files alive until the command finishes.
+    let scratch = tempfile::tempdir().map_err(|source| error::Error::WriteFile {
+        path: std::env::temp_dir(),
+        source,
+    })?;
+    if let Some(mut command) = formatter_command(language, output_path, scratch.path())? {
         run_formatter(&mut command, output_path)?;
     }
     Ok(())
@@ -319,24 +320,24 @@ fn write_generated_files(output_path: &Path, generated: &GeneratedFiles) -> Resu
     Ok(())
 }
 
-fn formatter_commands(
+fn formatter_command(
     language: Language,
     output_path: &Path,
-    generated: &GeneratedFiles,
-) -> Result<Vec<Command>> {
+    scratch: &Path,
+) -> Result<Option<Command>> {
     match language {
-        Language::Java => generator::java::format::commands(output_path, generated),
+        Language::Java => generator::java::format::command(output_path, scratch),
         Language::Go => {
             let mut command = Command::new("gofmt");
             command.arg("-w").arg(output_path);
-            Ok(vec![command])
+            Ok(Some(command))
         }
         Language::Python => {
             let mut command = Command::new("ruff");
             command
                 .args(["format", "--line-length", "88"])
                 .arg(output_path);
-            Ok(vec![command])
+            Ok(Some(command))
         }
         // Let the generated package choose its own Prettier configuration. In
         // particular, the TypeScript SDK uses Prettier's default width while
@@ -344,7 +345,7 @@ fn formatter_commands(
         Language::TypeScript => {
             let mut command = Command::new("prettier");
             command.arg("--write").arg(output_path);
-            Ok(vec![command])
+            Ok(Some(command))
         }
         _ => Err(error::Error::UnsupportedLanguage { language }),
     }
@@ -356,8 +357,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        GenerateRequest, formatter_commands, generate_to_file, output_dir_name,
-        resolve_java_package,
+        GenerateRequest, formatter_command, generate_to_file, output_dir_name, resolve_java_package,
     };
     use crate::language::Language;
 
@@ -415,51 +415,54 @@ mod tests {
 
     #[test]
     fn chooses_python_formatter_command() {
-        let generated = crate::generator::GeneratedFiles::directory(Default::default());
-        let commands =
-            formatter_commands(Language::Python, Path::new("output"), &generated).unwrap();
-        assert_eq!(commands.len(), 1);
-        assert_eq!(commands[0].get_program(), "ruff");
+        let scratch = tempfile::tempdir().unwrap();
+        let command = formatter_command(Language::Python, Path::new("output"), scratch.path())
+            .unwrap()
+            .unwrap();
+        assert_eq!(command.get_program(), "ruff");
         assert_eq!(
-            commands[0].get_args().collect::<Vec<_>>(),
+            command.get_args().collect::<Vec<_>>(),
             ["format", "--line-length", "88", "output"]
         );
     }
 
     #[test]
     fn chooses_typescript_formatter_command() {
-        let generated = crate::generator::GeneratedFiles::directory(Default::default());
-        let commands =
-            formatter_commands(Language::TypeScript, Path::new("output"), &generated).unwrap();
-        assert_eq!(commands.len(), 1);
-        assert_eq!(commands[0].get_program(), "prettier");
+        let scratch = tempfile::tempdir().unwrap();
+        let command = formatter_command(Language::TypeScript, Path::new("output"), scratch.path())
+            .unwrap()
+            .unwrap();
+        assert_eq!(command.get_program(), "prettier");
         assert_eq!(
-            commands[0].get_args().collect::<Vec<_>>(),
+            command.get_args().collect::<Vec<_>>(),
             ["--write", "output"]
         );
     }
 
     #[test]
     fn chooses_go_formatter_command() {
-        let generated = crate::generator::GeneratedFiles::directory(Default::default());
-        let commands =
-            formatter_commands(Language::Go, Path::new("output with spaces"), &generated).unwrap();
-        assert_eq!(commands.len(), 1);
-        assert_eq!(commands[0].get_program(), "gofmt");
+        let scratch = tempfile::tempdir().unwrap();
+        let command = formatter_command(
+            Language::Go,
+            Path::new("output with spaces"),
+            scratch.path(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(command.get_program(), "gofmt");
         assert_eq!(
-            commands[0].get_args().collect::<Vec<_>>(),
+            command.get_args().collect::<Vec<_>>(),
             ["-w", "output with spaces"]
         );
     }
 
     #[test]
-    fn java_without_emitted_files_needs_no_formatter() {
+    fn java_without_java_files_needs_no_formatter() {
         let output = tempfile::tempdir().unwrap();
-        let generated = crate::generator::GeneratedFiles::directory(Default::default());
         assert!(
-            formatter_commands(Language::Java, output.path(), &generated)
+            formatter_command(Language::Java, output.path(), output.path())
                 .unwrap()
-                .is_empty()
+                .is_none()
         );
     }
 
