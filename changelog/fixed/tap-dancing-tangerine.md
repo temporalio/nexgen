@@ -1,1 +1,1 @@
-Proto-backed enum fields now retain their authored enum model through type planning, so reachable records keep and generate the enum even when its name differs from the protobuf type. Python, TypeScript, Go, and .NET use the generated enum and convert it at the protobuf boundary.
+Generated Python, TypeScript, Go, and .NET models now use the authored WIT enum type for protobuf-backed enum fields. Generated enum members and field defaults use protobuf numbers, preserving reordered cases and gaps in numbering.
