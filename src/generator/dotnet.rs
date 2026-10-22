@@ -649,7 +649,11 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&self.model_field_type(model, field_name, field));
             output.push(' ');
             output.push_str(&field_property_name(field));
-            output.push_str(" { get; init; }\n");
+            output.push_str(" { get; init; }");
+            if let Some(default) = dotnet_field_default_expr(field) {
+                output.push_str(&format!(" = {default};"));
+            }
+            output.push('\n');
         }
         for (_field_name, field, _source_expr) in model.sourced_fields() {
             render_field_xml_doc(output, "    ", field);
@@ -1741,7 +1745,11 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&field_type);
             output.push(' ');
             output.push_str(&field_property_name(field));
-            output.push_str(" { get; set; }\n");
+            output.push_str(" { get; set; }");
+            if let Some(default) = dotnet_field_default_expr(field) {
+                output.push_str(&format!(" = {default};"));
+            }
+            output.push('\n');
         }
         output.push_str("}\n\n");
     }
@@ -3076,7 +3084,12 @@ fn flattened_request_field_expr(
             csharp_parameter_name(&field.name)
         }
     } else if field.function.is_none() {
-        option_field_expr(field, options_required)
+        let value = option_field_expr(field, options_required);
+        if let Some(default) = dotnet_field_default_expr(field) {
+            format!("{value} ?? {default}")
+        } else {
+            value
+        }
     } else {
         csharp_parameter_name(&field.name)
     }
@@ -3762,6 +3775,38 @@ fn dotnet_function_args_wit_type(wit_type: &PlannedType) -> String {
     }
 }
 
+pub(in crate::generator) fn dotnet_field_default_expr(
+    field: &RecordFieldSpec<PlannedFamily>,
+) -> Option<String> {
+    use crate::spec::{FieldDefaultLiteral, FieldDefaultSpec};
+    let default = field.default_value.as_ref()?;
+    let ty = match field.field_type.without_option() {
+        PlannedType::Enum(enumeration) => csharp_type_name(&enumeration.name),
+        PlannedType::External(ExternalTypeSpec::Proto(proto)) => {
+            dotnet_proto::ModelBackend::default()
+                .model_type_annotation(proto)
+                .expect("proto API type")
+        }
+        ty => dotnet_authored_type(ty),
+    };
+    if let Some(member) = &field.data.default_enum_value {
+        if matches!(field.field_type.without_option(), PlannedType::Enum(_)) {
+            // A property can have the same name as its native enum type. The
+            // cast is a type context, so it cannot bind to that property.
+            return Some(format!("({ty}){}", member.number));
+        }
+        return Some(format!("{ty}.{}", csharp_type_name(&member.name)));
+    }
+    Some(match default {
+        FieldDefaultSpec::Literal(FieldDefaultLiteral::Bool(value)) => value.to_string(),
+        FieldDefaultSpec::Literal(FieldDefaultLiteral::Number(value)) => format!("({ty}){value}"),
+        FieldDefaultSpec::Literal(FieldDefaultLiteral::String(value)) => {
+            csharp_string_literal(value)
+        }
+        FieldDefaultSpec::Expression(expression) => expression.clone(),
+    })
+}
+
 fn dotnet_authored_type(wit_type: &PlannedType) -> String {
     match wit_type {
         TypeSpec::Bool => "bool".to_string(),
@@ -4033,14 +4078,7 @@ fn csharp_ident(name: &str) -> String {
 }
 
 pub(in crate::generator) fn csharp_string_literal(value: &str) -> String {
-    format!(
-        "\"{}\"",
-        value
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-    )
+    serde_json::to_string(value).expect("string literal")
 }
 
 const CSHARP_KEYWORDS: &[&str] = &[

@@ -1746,7 +1746,7 @@ fn build_field_default(
             expression.trim().to_string(),
         )));
     }
-    let Some(case_name) = directive.value("value") else {
+    let Some(value) = directive.value("value") else {
         if directive.value("go").is_some() {
             return Ok(None);
         }
@@ -1754,82 +1754,89 @@ fn build_field_default(
             path: path.to_path_buf(),
             context: context.to_string(),
             directive: "@nexus.default".to_string(),
-            reason: "missing required default enum case".to_string(),
+            reason: "expected a portable literal or a language-specific expression".to_string(),
         });
     };
-    if case_name.is_empty() {
-        return Err(Error::InvalidWitDirective {
+    let literal = if directive.value_quoted {
+        crate::spec::FieldDefaultLiteral::String(value.to_string())
+    } else {
+        match serde_json::from_str::<serde_json::Value>(value) {
+            Ok(serde_json::Value::Bool(value)) => crate::spec::FieldDefaultLiteral::Bool(value),
+            Ok(serde_json::Value::Number(value)) => {
+                crate::spec::FieldDefaultLiteral::Number(value.to_string())
+            }
+            _ => {
+                return Err(Error::InvalidWitDirective {
+                    path: path.to_path_buf(),
+                    context: context.to_string(),
+                    directive: "@nexus.default".to_string(),
+                    reason: "expected a quoted string, boolean, or finite numeric literal"
+                        .to_string(),
+                });
+            }
+        }
+    };
+    validate_default_literal(resolve, ty, &literal).map_err(|reason| {
+        Error::InvalidWitDirective {
             path: path.to_path_buf(),
             context: context.to_string(),
             directive: "@nexus.default".to_string(),
-            reason: "default enum case cannot be empty".to_string(),
-        });
-    }
-    validate_default_enum_case(resolve, ty, case_name, path, context)?;
-    Ok(Some(FieldDefaultSpec::EnumCase(case_name.to_string())))
+            reason,
+        }
+    })?;
+    Ok(Some(FieldDefaultSpec::Literal(literal)))
 }
 
-fn validate_default_enum_case(
+fn validate_default_literal(
     resolve: &Resolve,
     ty: &Type,
-    case_name: &str,
-    path: &Path,
-    context: &str,
-) -> Result<()> {
-    match ty {
-        Type::Id(id) => validate_default_enum_case_for_type_def(
-            resolve,
-            *id,
-            &resolve.types[*id],
-            case_name,
-            path,
-            context,
-        ),
-        _ => Err(default_on_non_enum_error(path, context)),
-    }
-}
+    literal: &crate::spec::FieldDefaultLiteral,
+) -> std::result::Result<(), String> {
+    use crate::spec::FieldDefaultLiteral;
 
-fn validate_default_enum_case_for_type_def(
-    resolve: &Resolve,
-    type_id: TypeId,
-    type_def: &TypeDef,
-    case_name: &str,
-    path: &Path,
-    context: &str,
-) -> Result<()> {
-    if find_proto_name_for_type_def(type_def, path, context)?.is_some() {
-        return Ok(());
-    }
-    match &type_def.kind {
-        TypeDefKind::Enum(enumeration) => {
-            for case in &enumeration.cases {
-                if case.name == case_name {
-                    return Ok(());
+    let mismatch = || format!("default literal {literal:?} does not match field type {ty:?}");
+    match (ty, literal) {
+        (Type::Bool, FieldDefaultLiteral::Bool(_))
+        | (Type::String | Type::Char, FieldDefaultLiteral::String(_)) => Ok(()),
+        (Type::U8, FieldDefaultLiteral::Number(n)) if n.parse::<u8>().is_ok() => Ok(()),
+        (Type::U16, FieldDefaultLiteral::Number(n)) if n.parse::<u16>().is_ok() => Ok(()),
+        (Type::U32, FieldDefaultLiteral::Number(n)) if n.parse::<u32>().is_ok() => Ok(()),
+        (Type::U64, FieldDefaultLiteral::Number(n)) if n.parse::<u64>().is_ok() => Ok(()),
+        (Type::S8, FieldDefaultLiteral::Number(n)) if n.parse::<i8>().is_ok() => Ok(()),
+        (Type::S16, FieldDefaultLiteral::Number(n)) if n.parse::<i16>().is_ok() => Ok(()),
+        (Type::S32, FieldDefaultLiteral::Number(n)) if n.parse::<i32>().is_ok() => Ok(()),
+        (Type::S64, FieldDefaultLiteral::Number(n)) if n.parse::<i64>().is_ok() => Ok(()),
+        (Type::F32, FieldDefaultLiteral::Number(n))
+            if n.parse::<f32>().is_ok_and(f32::is_finite) =>
+        {
+            Ok(())
+        }
+        (Type::F64, FieldDefaultLiteral::Number(n))
+            if n.parse::<f64>().is_ok_and(f64::is_finite) =>
+        {
+            Ok(())
+        }
+        (Type::Id(id), _) => {
+            let def = &resolve.types[*id];
+            match &def.kind {
+                TypeDefKind::Option(inner) | TypeDefKind::Type(inner) => {
+                    validate_default_literal(resolve, inner, literal)
                 }
+                TypeDefKind::Enum(enumeration) => match literal {
+                    FieldDefaultLiteral::String(case)
+                        if enumeration.cases.iter().any(|c| &c.name == case) =>
+                    {
+                        Ok(())
+                    }
+                    _ => Err(format!(
+                        "unknown enum case or non-string default for `{}`",
+                        def.name.as_deref().unwrap_or("enum")
+                    )),
+                },
+                _ => Err(mismatch()),
             }
-            Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: context.to_string(),
-                directive: "@nexus.default".to_string(),
-                reason: format!(
-                    "unknown enum case `{case_name}` for `{}`",
-                    wit_type_full_name(resolve, type_id)
-                ),
-            })
         }
-        TypeDefKind::Option(inner) | TypeDefKind::Type(inner) => {
-            validate_default_enum_case(resolve, inner, case_name, path, context)
-        }
-        _ => Err(default_on_non_enum_error(path, context)),
-    }
-}
-
-fn default_on_non_enum_error(path: &Path, context: &str) -> Error {
-    Error::InvalidWitDirective {
-        path: path.to_path_buf(),
-        context: context.to_string(),
-        directive: "@nexus.default".to_string(),
-        reason: "only enum field defaults are supported".to_string(),
+        _ => Err(mismatch()),
     }
 }
 
@@ -3508,6 +3515,7 @@ pub(crate) fn parse_directives(
 pub(crate) struct Directive {
     name: String,
     args: BTreeMap<String, String>,
+    value_quoted: bool,
 }
 
 impl Directive {
@@ -3542,9 +3550,28 @@ fn parse_directive_line(line: &str, path: &Path, context: &str) -> Result<Direct
     }
     let mut tail = rest[name_end..].trim_start();
     let mut args = BTreeMap::new();
+    let value_quoted = tail.starts_with('"');
+    let first_end = tail
+        .find(|ch: char| ch == '=' || ch.is_whitespace())
+        .unwrap_or(tail.len());
 
-    if tail.starts_with('"') {
-        let (value, remaining) = parse_directive_value(tail, path, context, name)?;
+    if value_quoted
+        || (name == "default"
+            && !tail.is_empty()
+            && !tail[first_end..].trim_start().starts_with('='))
+    {
+        let (mut value, remaining) = parse_directive_value(tail, path, context, name)?;
+        if name == "default" && value_quoted {
+            value =
+                serde_json::from_str(&tail[..tail.len() - remaining.len()]).map_err(|error| {
+                    Error::InvalidWitDirective {
+                        path: path.to_path_buf(),
+                        context: context.to_string(),
+                        directive: "@nexus.default".to_string(),
+                        reason: format!("invalid string literal: {error}"),
+                    }
+                })?;
+        }
         args.insert("value".to_string(), value);
         tail = remaining.trim_start();
     }
@@ -3572,6 +3599,7 @@ fn parse_directive_line(line: &str, path: &Path, context: &str) -> Result<Direct
     Ok(Directive {
         name: name.to_string(),
         args,
+        value_quoted,
     })
 }
 
@@ -3941,7 +3969,7 @@ interface workflow-service {
         assert_eq!(
             request
                 .field_default("workflow_id_reuse_policy")
-                .and_then(|default| default.enum_case()),
+                .and_then(|default| default.string_literal()),
             Some("allow-duplicate")
         );
     }
@@ -3963,6 +3991,14 @@ interface service {
 "#;
         let go = parse(Language::Go, wit);
         let record = go.record("service.request").unwrap();
+        let spaced = parse(Language::Go, &wit.replace("go=", "go = "));
+        assert_eq!(
+            record.field_default("task_queue"),
+            spaced
+                .record("service.request")
+                .unwrap()
+                .field_default("task_queue")
+        );
         assert!(!record.field_required("task_queue"));
         assert_eq!(
             record.field_default("task_queue"),
@@ -3984,7 +4020,7 @@ interface service {
             assert_eq!(
                 record
                     .field_default("mode")
-                    .and_then(|default| default.enum_case()),
+                    .and_then(|default| default.string_literal()),
                 Some("automatic")
             );
         }
@@ -4031,7 +4067,7 @@ interface workflow-service {
     }
 
     #[test]
-    fn rejects_non_enum_field_default() {
+    fn accepts_string_field_default() {
         let wit = r#"
 package temporal:nexus@1.0.0;
 
@@ -4049,18 +4085,85 @@ interface workflow-service {
 }
 "#;
 
-        let error = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
+        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
             Language::Python,
             wit,
             PathBuf::from("inline.wit"),
             &[linked_inputs_path()],
         )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("only enum field defaults are supported")
+        .unwrap();
+        assert_eq!(
+            spec.record("workflow-service.request")
+                .unwrap()
+                .field_default("request_id")
+                .and_then(|default| default.string_literal()),
+            Some("request-id")
         );
+    }
+
+    #[test]
+    fn validates_portable_default_literals() {
+        use crate::spec::{FieldDefaultLiteral, FieldDefaultSpec};
+        let fixture = |default: &str, ty: &str| {
+            format!(
+                "package test:defaults;\nworld system {{ export service; }}\ninterface service {{\n  record request {{\n    /// @nexus.default {default}\n    value: {ty},\n  }}\n}}"
+            )
+        };
+        for (default, ty, expected) in [
+            ("true", "bool", FieldDefaultLiteral::Bool(true)),
+            ("false", "option<bool>", FieldDefaultLiteral::Bool(false)),
+            ("0", "s32", FieldDefaultLiteral::Number("0".into())),
+            ("-128", "s8", FieldDefaultLiteral::Number("-128".into())),
+            ("255", "u8", FieldDefaultLiteral::Number("255".into())),
+            ("1.25", "f64", FieldDefaultLiteral::Number("1.25".into())),
+            (
+                r#""true""#,
+                "string",
+                FieldDefaultLiteral::String("true".into()),
+            ),
+            (r#""""#, "string", FieldDefaultLiteral::String("".into())),
+            (
+                r#""line\n\"quoted\"\\end""#,
+                "string",
+                FieldDefaultLiteral::String("line\n\"quoted\"\\end".into()),
+            ),
+        ] {
+            for language in [
+                Language::Go,
+                Language::Python,
+                Language::TypeScript,
+                Language::Dotnet,
+            ] {
+                let spec = parse(language, &fixture(default, ty));
+                let record = spec.record("service.request").unwrap();
+                assert!(!record.field_required("value"));
+                assert_eq!(
+                    record.field_default("value"),
+                    Some(&FieldDefaultSpec::Literal(expected.clone()))
+                );
+            }
+        }
+        for (default, ty) in [
+            ("true", "string"),
+            (r#""true""#, "bool"),
+            ("1", "bool"),
+            ("1.5", "s32"),
+            ("256", "u8"),
+            ("-1", "u32"),
+            ("-129", "s8"),
+            ("2147483648", "s32"),
+            ("1e40", "f32"),
+            ("NaN", "f64"),
+            ("1e999", "f64"),
+            ("null", "option<string>"),
+            ("[]", "list<string>"),
+            ("1 + 2", "s32"),
+        ] {
+            assert!(
+                parse_result(Language::Go, &fixture(default, ty)).is_err(),
+                "{default} on {ty}"
+            );
+        }
     }
 
     #[test]
@@ -4121,7 +4224,7 @@ interface workflow-service {
             crate::spec::RecordFieldVisibility::Public
         ));
         assert_eq!(
-            field.default_value.as_ref().unwrap().enum_case(),
+            field.default_value.as_ref().unwrap().string_literal(),
             Some("allow-duplicate")
         );
     }

@@ -16,7 +16,7 @@ use crate::planning::{
     PlannedResourceMethodResultKind as PlannedResourceMethodResult, PlannedSpec, PlannedType,
 };
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, EnumValueSpec, ExternalTypeSpec, FieldDefaultSpec, FlagsSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSpec, FieldDefaultSpec, FlagsSpec,
     FunctionArgsSpec as GenericFunctionArgsSpec, FunctionFieldSpec as GenericFunctionFieldSpec,
     FunctionResultSpec as GenericFunctionResultSpec, IntSpec, ModulePath, OperationSpec,
     RecordFieldSpec, RecordSpec, SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
@@ -120,8 +120,6 @@ pub(in crate::generator) struct PlannedField {
     annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) flattened_annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) required: bool,
-    pub(in crate::generator) default_value: Option<FieldDefaultSpec>,
-    pub(in crate::generator) default_enum_value: Option<EnumValueSpec>,
     role: PlannedFieldRole,
     pub(in crate::generator) kind: PlannedFieldKind,
 }
@@ -357,8 +355,6 @@ pub(in crate::generator) fn planned_field(
         annotation_override: field.annotation.clone(),
         flattened_annotation_override: field.flattened_annotation.clone(),
         required: field.required,
-        default_value: field.default_value.clone(),
-        default_enum_value: field.data.default_enum_value.clone(),
         role,
         kind: planned_field_kind(&field.field_type, spec),
     }
@@ -1485,14 +1481,21 @@ impl<'a> ApiPlanner<'a> {
                     };
                     let embed_in_options = !planned_field.required
                         && field_kind_is_flattened_message(&planned_field.kind, self.api_plan);
-                    let default_punning_zero = (!planned_field.required && !embed_in_options)
-                        .then(|| {
-                            public_default_punning_zero_for_field(
-                                &planned_field.kind,
-                                &field.go_type,
-                            )
-                        })
-                        .flatten();
+                    let portable_scalar_default = planned_record
+                        .and_then(|record| record.fields.get(&planned_field.proto_name))
+                        .is_some_and(|field| {
+                            matches!(field.default_value, Some(FieldDefaultSpec::Literal(_)))
+                                && field.data.default_enum_value.is_none()
+                        });
+                    let default_punning_zero =
+                        (!planned_field.required && !embed_in_options && !portable_scalar_default)
+                            .then(|| {
+                                public_default_punning_zero_for_field(
+                                    &planned_field.kind,
+                                    &field.go_type,
+                                )
+                            })
+                            .flatten();
                     let public_go_type = if default_punning_zero.is_some() {
                         field
                             .go_type
@@ -1523,8 +1526,23 @@ impl<'a> ApiPlanner<'a> {
             && let Some(model) = self.models.get(&input.info.full_name)
         {
             for (_, field) in record.model_fields() {
-                let Some(FieldDefaultSpec::Expression(expression)) = &field.default_value else {
+                let Some(default) = &field.default_value else {
                     continue;
+                };
+                let expression = match default {
+                    FieldDefaultSpec::Expression(expression) => expression.clone(),
+                    FieldDefaultSpec::Literal(literal) => {
+                        use crate::spec::FieldDefaultLiteral;
+                        if let Some(member) = &field.data.default_enum_value {
+                            member.number.to_string()
+                        } else {
+                            match literal {
+                                FieldDefaultLiteral::Bool(value) => value.to_string(),
+                                FieldDefaultLiteral::Number(value) => value.to_string(),
+                                FieldDefaultLiteral::String(value) => go_string_literal(value),
+                            }
+                        }
+                    }
                 };
                 let name = go_field_name(&field.name);
                 let rendered = model
@@ -1537,14 +1555,14 @@ impl<'a> ApiPlanner<'a> {
                         path: PathBuf::from("<go-plan>"),
                         context: format!("field `{}.{}`", record.full_name, field.name),
                         directive: "@nexus.default".to_string(),
-                        reason: "expression defaults require a nilable internal Go field type"
-                            .to_string(),
+                        reason: "defaults require a nilable internal Go field type".to_string(),
                     });
                 }
                 // Expressions are code, not type annotations: do not scan their
                 // string literals for package paths. Only an explicit leading
                 // `import/path:expression` supplies an import.
-                let expression = if let Some((path, _)) = expression.split_once(':')
+                let expression = if matches!(default, FieldDefaultSpec::Expression(_))
+                    && let Some((path, _)) = expression.split_once(':')
                     && !path.is_empty()
                     && path
                         .chars()
@@ -1553,9 +1571,9 @@ impl<'a> ApiPlanner<'a> {
                     if !self.package.is_self_import(path) {
                         self.imports.insert(path.to_string());
                     }
-                    self.package.go_type_expr(expression)
+                    self.package.go_type_expr(&expression)
                 } else {
-                    expression.clone()
+                    expression
                 };
                 let assignment = if let Some(value_type) = rendered.go_type.strip_prefix('*') {
                     format!("var value {value_type} = {expression}\n\t\trequest.{name} = &value")
@@ -2792,7 +2810,7 @@ fn is_go_exported_decl(name: &str) -> bool {
 }
 
 pub(in crate::generator) fn go_string_literal(value: &str) -> String {
-    format!("{value:?}")
+    serde_json::to_string(value).expect("string literal")
 }
 
 // ---------------------------------------------------------------------------

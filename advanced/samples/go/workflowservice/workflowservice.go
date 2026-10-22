@@ -183,8 +183,6 @@ func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfi
 	}
 	if m.WorkflowIDReusePolicy != nil {
 		message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy((*m.WorkflowIDReusePolicy))
-	} else {
-		message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy(1)
 	}
 	if m.WorkflowIDConflictPolicy != nil {
 		message.WorkflowIdConflictPolicy = enums.WorkflowIdConflictPolicy((*m.WorkflowIDConflictPolicy))
@@ -396,6 +394,10 @@ func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkfl
 	if request.TaskQueue == nil {
 		var value string = workflow.GetInfo(ctx).TaskQueueName
 		request.TaskQueue = &value
+	}
+	if request.WorkflowIDReusePolicy == nil {
+		var value enums.WorkflowIdReusePolicy = 1
+		request.WorkflowIDReusePolicy = &value
 	}
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})

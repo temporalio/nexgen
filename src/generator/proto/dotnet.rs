@@ -829,6 +829,32 @@ fn field_from_wire_expr(
     support_namespace: Option<&str>,
 ) -> String {
     let optional = !field.required;
+    if let Some(default) = crate::generator::dotnet::dotnet_field_default_expr(field) {
+        let decoded = value_from_wire_expr(
+            &field.field_type,
+            source_expr,
+            false,
+            field.data.has_presence,
+            api_plan,
+            support_namespace,
+        );
+        if field.data.has_presence == Some(true) {
+            let message = matches!(
+                field.field_type.validation_type(),
+                PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(_)))
+            );
+            let present = if message {
+                format!("{source_expr} != null")
+            } else {
+                let (prefix, property) = source_expr.rsplit_once('.').expect("wire property");
+                format!("{prefix}.Has{property}")
+            };
+            return format!("{present} ? {decoded} : {default}");
+        }
+        // A proto3 scalar without presence cannot distinguish omission from an
+        // explicit false, zero, or empty string. Preserve the decoded value.
+        return decoded;
+    }
     if function_args_field_uses_logical_storage(model, field_name, field) {
         let converter = function_args_from_proto_converter(field)
             .map(|converter| qualify_dotnet_support_reference(converter, support_namespace))
@@ -1274,7 +1300,16 @@ fn render_field_to_proto_assignment(
             support_namespace,
         ));
         output.push_str(end);
-        if let Some(default_expr) = default_enum_proto_expr(field) {
+        if let Some(default) = crate::generator::dotnet::dotnet_field_default_expr(field) {
+            let default_expr = field_to_proto_expr(
+                backend,
+                model,
+                field_name,
+                field,
+                &default,
+                api_plan,
+                support_namespace,
+            );
             output.push_str("        }\n        else\n        {\n            ");
             output.push_str(&target);
             output.push_str(" = ");
@@ -1347,32 +1382,6 @@ fn render_oneof_to_proto_assignment(
         ));
     }
     output.push_str("        }\n");
-}
-
-fn default_enum_proto_expr(field: &RecordFieldSpec<PlannedFamily>) -> Option<String> {
-    field.default_value.as_ref()?;
-    let enum_value = field
-        .data
-        .default_enum_value
-        .as_ref()
-        .expect("planned field default enum value should be resolved");
-    let proto = match field.field_type.without_option() {
-        PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(proto))) => proto,
-        PlannedType::External(ExternalTypeSpec::Alias(alias)) => {
-            let PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(proto))) =
-                alias.target.without_option()
-            else {
-                return None;
-            };
-            proto
-        }
-        _ => return None,
-    };
-    Some(format!(
-        "{}.{}",
-        dotnet_proto_type_name_for_info(&proto.proto),
-        csharp_type_name(&enum_value.name)
-    ))
 }
 
 fn field_to_proto_expr(

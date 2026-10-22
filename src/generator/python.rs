@@ -1701,13 +1701,24 @@ impl<'a> ApiPlanner<'a> {
 
         let imports = resolved_type.imports.clone();
 
-        if field.default_value.is_some() {
-            let default_value = field
-                .data
-                .default_enum_value
-                .as_ref()
-                .expect("planned field default enum value should be resolved");
-            let default_expr = enum_default_expr(&resolved_type, default_value);
+        if let Some(default) = &field.default_value {
+            let default_expr = if let Some(member) = &field.data.default_enum_value {
+                enum_default_expr(&resolved_type, member)
+            } else {
+                use crate::spec::{FieldDefaultLiteral, FieldDefaultSpec};
+                match default {
+                    FieldDefaultSpec::Literal(FieldDefaultLiteral::Bool(value)) => {
+                        if *value { "True" } else { "False" }.to_string()
+                    }
+                    FieldDefaultSpec::Literal(FieldDefaultLiteral::Number(value)) => {
+                        value.to_string()
+                    }
+                    FieldDefaultSpec::Literal(FieldDefaultLiteral::String(value)) => {
+                        python_string_literal(value)
+                    }
+                    FieldDefaultSpec::Expression(expression) => expression.clone(),
+                }
+            };
             return Ok(RenderedField {
                 attr_name: attr_name.clone(),
                 annotation: python_field_annotation(
@@ -7652,7 +7663,7 @@ fn validate_python_generated_names<'a>(
 }
 
 pub(in crate::generator) fn python_string_literal(value: &str) -> String {
-    format!("{value:?}")
+    serde_json::to_string(value).expect("string literal")
 }
 
 fn is_python_keyword(name: &str) -> bool {

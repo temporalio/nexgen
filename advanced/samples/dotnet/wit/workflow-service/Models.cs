@@ -128,7 +128,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Behavior when a closed workflow with the same ID exists. Default is allow-duplicate.
         /// </summary>
-        public Temporalio.Api.Enums.V1.WorkflowIdReusePolicy? IdReusePolicy { get; init; }
+        public Temporalio.Api.Enums.V1.WorkflowIdReusePolicy? IdReusePolicy { get; init; } = Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate;
         /// <summary>
         /// Behavior when a workflow is currently running with the same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is terminate-if-running. Defaults to use-existing.
         /// </summary>
@@ -183,7 +183,7 @@ namespace Temporalio.Workflows
                 ExecutionTimeout = wire.WorkflowExecutionTimeout == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.WorkflowExecutionTimeout),
                 RunTimeout = wire.WorkflowRunTimeout == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.WorkflowRunTimeout),
                 TaskTimeout = wire.WorkflowTaskTimeout == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.WorkflowTaskTimeout),
-                IdReusePolicy = (int)wire.WorkflowIdReusePolicy == 0 ? null : wire.WorkflowIdReusePolicy,
+                IdReusePolicy = wire.WorkflowIdReusePolicy,
                 IdConflictPolicy = (int)wire.WorkflowIdConflictPolicy == 0 ? null : wire.WorkflowIdConflictPolicy,
                 RetryPolicy = wire.RetryPolicy == null ? null : Nexgen.Support.ProtoExtensions.FromRetryPolicyProto(wire.RetryPolicy),
                 CronSchedule = string.IsNullOrEmpty(wire.CronSchedule) ? null : wire.CronSchedule,

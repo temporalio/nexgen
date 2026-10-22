@@ -1676,15 +1676,29 @@ Cannot be combined with `@nexus.default`.
 
 ### @nexus.default
 
-**Placement:** Record field **Syntax:** `@nexus.default "<enum-case-name>"` or
+**Placement:** Record field **Syntax:** `@nexus.default <literal>` or
 `@nexus.default go="<expression>"`
 
-Sets a default value for an enum field, making it optional in the generated API.
-For a protobuf-enum alias, the case name is validated against the descriptor.
+Sets a portable default value, making the field optional in the generated API.
+The positional value is a quoted string, a boolean (`true` or `false`), or a
+finite numeric literal. Nexgen checks the value against the field type,
+including integer ranges. String literals use JSON-style escapes, such as `\n`,
+`\"`, and `\\`; a quoted `"true"` is text, not a boolean.
+
+On an enum field, a quoted string identifies an enum case rather than literal
+text. For a protobuf-enum alias, the case name is validated against the
+descriptor. Backends render each portable value using the target language's
+literal or enum-member syntax.
 
 ```wit
 /// @nexus.default "allow-duplicate"
 id-reuse-policy: workflow-id-reuse-policy,
+/// @nexus.default true
+enabled: bool,
+/// @nexus.default 3
+max-attempts: u32,
+/// @nexus.default "default-queue"
+task-queue: string,
 ```
 
 **Python:**
@@ -1712,16 +1726,29 @@ generated package, or prefix the expression with an explicit import path and
 colon, such as `go="strings:strings.ToUpper(\"default\")"`. Unlike
 `@nexus.source`, nexgen does not add a support-package prefix.
 
-Go's existing options conventions still apply: a scalar option's zero value
-represents omission. For example, an empty `TaskQueue` uses the expression
-default, while a nonempty value overrides it. Internally, the request retains a
-pointer to distinguish absence from a supplied value. Expression defaults
-require a nilable internal field representation.
+Go options for portable boolean, numeric, and string defaults retain pointers,
+so callers can override a default with `false`, `0`, or `""`. A nil pointer
+selects the default. Existing enum and expression-default options retain their
+zero-value-as-omission convention. For example, the workflow service sample's
+empty `TaskQueue` uses the expression default, while a nonempty value overrides
+it. Internally, defaulted fields require a nilable representation.
 
-The `go` expression does not affect other target languages. You can combine an
-enum-case default with `go="<expression>"`; Go uses the expression and other
-languages use the enum case. Expression defaults are currently supported only
-for Go and cannot be combined with function fields.
+The `go` expression does not affect other target languages. You can combine a
+portable default with `go="<expression>"`; Go uses the expression and other
+languages use the portable value:
+
+```wit
+/// @nexus.default "default-queue" go="workflow.GetInfo(ctx).TaskQueueName"
+task-queue: string,
+```
+
+Expression defaults are currently supported only for Go and cannot be combined
+with function fields. Portable defaults are values, not a language for
+arithmetic, function calls, or compound initializers.
+
+On decoding protobuf scalars without field presence, nexgen preserves the
+decoded value, including `false`, `0`, and `""`: protobuf does not distinguish
+these values from omission.
 
 Cannot be combined with `@nexus.source`.
 

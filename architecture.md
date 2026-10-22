@@ -106,10 +106,13 @@ flowchart LR
 - `OperationLoweringPass` turns wire-backed resource returns into explicit
   result records.
 - `TypePlanningPass` materializes target-ready type metadata, including resolved
-  enum defaults on record fields. Defaults identify a member of a declared enum
-  or a descriptor-backed enum, following aliases; language backends render that
-  member using the API type's naming and conversion conventions rather than
-  resolving the authored case again.
+  enum members for portable string defaults on enum fields, following aliases.
+  The shared default model distinguishes portable scalar values from
+  target-language expressions. Backends render default API values and apply
+  their initialization rules before normal wire conversion; enum resolution does
+  not require a separate initialization mechanism. Go applies defaults at
+  operation call sites, where the workflow context is available, rather than
+  inside transfer-type converters.
 - `ReachabilityPass` removes declarations outside the generated surface.
 - `EmittedNameResolutionPass` resolves final emitted JSON model identifiers. Its
   name manifest spans the whole tree, not one leaf: a `$ref` across input files

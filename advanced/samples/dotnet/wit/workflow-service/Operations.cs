@@ -54,7 +54,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Behavior when a closed workflow with the same ID exists. Default is allow-duplicate.
         /// </summary>
-        public Temporalio.Api.Enums.V1.WorkflowIdReusePolicy? IdReusePolicy { get; set; }
+        public Temporalio.Api.Enums.V1.WorkflowIdReusePolicy? IdReusePolicy { get; set; } = Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate;
         /// <summary>
         /// Behavior when a workflow is currently running with the same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is terminate-if-running. Defaults to use-existing.
         /// </summary>
@@ -141,7 +141,7 @@ namespace Temporalio.Workflows
                 ExecutionTimeout = options.ExecutionTimeout,
                 RunTimeout = options.RunTimeout,
                 TaskTimeout = options.TaskTimeout,
-                IdReusePolicy = options.IdReusePolicy,
+                IdReusePolicy = options.IdReusePolicy ?? Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate,
                 IdConflictPolicy = options.IdConflictPolicy,
                 RetryPolicy = options.RetryPolicy,
                 CronSchedule = options.CronSchedule,
@@ -175,7 +175,7 @@ namespace Temporalio.Workflows
                 ExecutionTimeout = options.ExecutionTimeout,
                 RunTimeout = options.RunTimeout,
                 TaskTimeout = options.TaskTimeout,
-                IdReusePolicy = options.IdReusePolicy,
+                IdReusePolicy = options.IdReusePolicy ?? Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate,
                 IdConflictPolicy = options.IdConflictPolicy,
                 RetryPolicy = options.RetryPolicy,
                 CronSchedule = options.CronSchedule,
@@ -209,7 +209,7 @@ namespace Temporalio.Workflows
                 ExecutionTimeout = options.ExecutionTimeout,
                 RunTimeout = options.RunTimeout,
                 TaskTimeout = options.TaskTimeout,
-                IdReusePolicy = options.IdReusePolicy,
+                IdReusePolicy = options.IdReusePolicy ?? Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate,
                 IdConflictPolicy = options.IdConflictPolicy,
                 RetryPolicy = options.RetryPolicy,
                 CronSchedule = options.CronSchedule,
@@ -243,7 +243,7 @@ namespace Temporalio.Workflows
                 ExecutionTimeout = options.ExecutionTimeout,
                 RunTimeout = options.RunTimeout,
                 TaskTimeout = options.TaskTimeout,
-                IdReusePolicy = options.IdReusePolicy,
+                IdReusePolicy = options.IdReusePolicy ?? Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate,
                 IdConflictPolicy = options.IdConflictPolicy,
                 RetryPolicy = options.RetryPolicy,
                 CronSchedule = options.CronSchedule,

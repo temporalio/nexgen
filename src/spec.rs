@@ -1463,18 +1463,27 @@ impl<N: AsRef<str>> AsRef<str> for JsonModelSpec<N> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FieldDefaultSpec {
-    EnumCase(String),
+    Literal(FieldDefaultLiteral),
     /// A target-language expression evaluated at an operation call site.
     Expression(String),
 }
 
 impl FieldDefaultSpec {
-    pub fn enum_case(&self) -> Option<&str> {
+    pub fn string_literal(&self) -> Option<&str> {
         match self {
-            Self::EnumCase(case) => Some(case),
-            Self::Expression(_) => None,
+            Self::Literal(FieldDefaultLiteral::String(value)) => Some(value),
+            _ => None,
         }
     }
+}
+
+/// A portable API value. String values also identify cases on enum fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FieldDefaultLiteral {
+    Bool(bool),
+    /// Canonical finite numeric literal text, validated by the frontend.
+    Number(String),
+    String(String),
 }
 
 /// A WIT alias marked with `@nexus.type-parameter`.

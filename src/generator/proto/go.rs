@@ -1771,13 +1771,11 @@ fn build_field_conversion(
             let conversion =
                 go_value_conversion(value, api_plan, backend, &backend.package, Some("cfg"))?;
             let field_is_pointer = native_go_type.starts_with('*');
-            let default_expr = default_enum_proto_expr(field, backend)?;
             let to_lines = singular_to_proto_lines(
                 &conversion,
                 &receiver,
                 &proto_field,
                 field_is_pointer,
-                default_expr.as_deref(),
                 "return nil, err",
             );
             let mut from_lines = singular_from_proto_lines(
@@ -1894,28 +1892,6 @@ fn render_model_transfer_type_converter(
     output.push_str("\t)\n}\n");
 }
 
-fn default_enum_proto_expr(
-    field: &crate::generator::go::PlannedField,
-    backend: &ModelBackend,
-) -> GoConversionResult<Option<String>> {
-    let Some(case_name) = field
-        .default_value
-        .as_ref()
-        .and_then(|default| default.enum_case())
-    else {
-        return Ok(None);
-    };
-    let PlannedFieldKind::Singular(value) = &field.kind else {
-        return Err("a default can only be applied to a singular enum field".to_string());
-    };
-    let enum_value = field
-        .default_enum_value
-        .as_ref()
-        .ok_or_else(|| format!("default enum case `{case_name}` was not resolved"))?;
-    let proto_type = backend.value_proto_type(value)?;
-    Ok(Some(format!("{proto_type}({})", enum_value.number)))
-}
-
 /// `ToProto` lines for a singular field.
 ///
 /// `field_is_pointer` indicates whether the native struct field is rendered as
@@ -1927,7 +1903,6 @@ fn singular_to_proto_lines(
     receiver: &str,
     proto_field: &str,
     field_is_pointer: bool,
-    default_expr: Option<&str>,
     error_return: &str,
 ) -> Vec<String> {
     let assign = |converted: &str| format!("message.{proto_field} = {converted}");
@@ -1983,10 +1958,6 @@ fn singular_to_proto_lines(
                         format!("\t{}", assign(&converted)),
                     ]
                 };
-                if let Some(default_expr) = default_expr {
-                    lines.push("} else {".to_string());
-                    lines.push(format!("\t{}", assign(default_expr)));
-                }
                 lines.push("}".to_string());
                 lines
             } else {

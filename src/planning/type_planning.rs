@@ -481,7 +481,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
             && let Some(case_name) = field
                 .default_value
                 .as_ref()
-                .and_then(|default| default.enum_case())
+                .and_then(|default| default.string_literal())
         {
             data.default_enum_value = self.planner.resolve_default_enum_value(
                 self.source_spec,

@@ -417,6 +417,40 @@ impl<'a> ApiPlanner<'a> {
                 }
             };
             RenderedOperationInput {
+                defaults: if input_conversion.wire_function_names.is_none() {
+                    input_full_name
+                        .and_then(|name| self.api_plan.record(name))
+                        .map(|record| {
+                            record
+                                .public_fields()
+                                .filter_map(|(_, field)| {
+                                    use crate::spec::{FieldDefaultLiteral, FieldDefaultSpec};
+                                    let default = field.default_value.as_ref()?;
+                                    let value = if let Some(member) = &field.data.default_enum_value
+                                    {
+                                        member.number.to_string()
+                                    } else {
+                                        match default {
+                                            FieldDefaultSpec::Literal(
+                                                FieldDefaultLiteral::Bool(value),
+                                            ) => value.to_string(),
+                                            FieldDefaultSpec::Literal(
+                                                FieldDefaultLiteral::Number(value),
+                                            ) => value.to_string(),
+                                            FieldDefaultSpec::Literal(
+                                                FieldDefaultLiteral::String(value),
+                                            ) => typescript_string_literal(value),
+                                            FieldDefaultSpec::Expression(value) => value.clone(),
+                                        }
+                                    };
+                                    Some((typescript_generated_field_name(&field.name), value))
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                },
                 operation_annotation: typescript_erased_model_annotation(
                     &self.operation_type_annotation(input),
                     &type_parameters,
@@ -1034,13 +1068,25 @@ impl<'a> ApiPlanner<'a> {
             };
         }
 
-        if field.default_value.is_some() {
-            let default_value = field
-                .data
-                .default_enum_value
-                .as_ref()
-                .expect("planned field default enum value should be resolved");
+        if let Some(default) = &field.default_value {
             let mut requirements = resolved_type.requirements.clone();
+            let default_expr = if let Some(member) = &field.data.default_enum_value {
+                enum_default_expr(&resolved_type, member, &mut requirements)
+            } else {
+                use crate::spec::{FieldDefaultLiteral, FieldDefaultSpec};
+                match default {
+                    FieldDefaultSpec::Literal(FieldDefaultLiteral::Bool(value)) => {
+                        value.to_string()
+                    }
+                    FieldDefaultSpec::Literal(FieldDefaultLiteral::Number(value)) => {
+                        value.to_string()
+                    }
+                    FieldDefaultSpec::Literal(FieldDefaultLiteral::String(value)) => {
+                        typescript_string_literal(value)
+                    }
+                    FieldDefaultSpec::Expression(expression) => expression.clone(),
+                }
+            };
             return RenderedField {
                 name: generated_field_name.to_string(),
                 wire_name: wire_field_name.to_string(),
@@ -1050,17 +1096,15 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 optional: true,
-                from_wire_expr: defaulted_enum_from_wire_expr(
+                from_wire_expr: defaulted_from_wire_expr(
                     &resolved_type,
                     wire_field_expr,
-                    default_value,
-                    &mut requirements,
+                    &default_expr,
                 ),
-                to_wire_expr: defaulted_enum_to_wire_expr(
+                to_wire_expr: defaulted_to_wire_expr(
                     &resolved_type,
                     &generated_field_name,
-                    default_value,
-                    &mut requirements,
+                    &default_expr,
                 ),
                 flattened_fields: Vec::new(),
                 requirements,
@@ -1782,17 +1826,21 @@ fn function_field_from_wire_expr(
     expression
 }
 
-fn defaulted_enum_from_wire_expr(
+fn defaulted_from_wire_expr(
     resolved_type: &ResolvedFieldType,
     wire_value_expr: &str,
-    enum_value: &EnumValueSpec,
-    requirements: &mut TypeScriptRequirements,
+    default_expr: &str,
 ) -> String {
-    let default_expr = enum_default_expr(resolved_type, enum_value, requirements);
-    format!(
-        "{wire_value_expr} == null ? {default_expr} : {}",
-        enum_from_wire_expr(resolved_type, wire_value_expr)
-    )
+    let decoded = match resolved_type.kind {
+        ResolvedFieldKind::Enum => enum_from_wire_expr(resolved_type, wire_value_expr),
+        ResolvedFieldKind::Message => resolved_type
+            .wire_conversion
+            .as_ref()
+            .expect("message conversion should be present")
+            .from_wire_expr(wire_value_expr),
+        _ => wire_value_expr.to_string(),
+    };
+    format!("{wire_value_expr} == null ? {default_expr} : {decoded}")
 }
 
 pub(in crate::generator) fn flattened_message_to_wire_expr(
@@ -1855,18 +1903,22 @@ fn optional_to_wire_expr_from_expr(resolved_type: &ResolvedFieldType, value_expr
     }
 }
 
-fn defaulted_enum_to_wire_expr(
+fn defaulted_to_wire_expr(
     resolved_type: &ResolvedFieldType,
     field_name: &str,
-    enum_value: &EnumValueSpec,
-    requirements: &mut TypeScriptRequirements,
+    default_expr: &str,
 ) -> String {
     let value_expr = format!("model.{field_name}");
-    let default_expr = enum_default_expr(resolved_type, enum_value, requirements);
-    enum_to_wire_expr(
-        resolved_type,
-        &format!("({value_expr} == null ? {default_expr} : {value_expr})"),
-    )
+    let value = format!("({value_expr} == null ? {default_expr} : {value_expr})");
+    match resolved_type.kind {
+        ResolvedFieldKind::Enum => enum_to_wire_expr(resolved_type, &value),
+        ResolvedFieldKind::Message => resolved_type
+            .wire_conversion
+            .as_ref()
+            .expect("message conversion should be present")
+            .to_wire_expr(&value),
+        _ => value,
+    }
 }
 
 fn required_function_to_wire_expr(owner_name: &str, field_name: &str, converter: &str) -> String {
@@ -2931,6 +2983,7 @@ struct RenderedOperation<'a> {
 
 #[derive(Debug)]
 struct RenderedOperationInput {
+    defaults: Vec<(String, String)>,
     operation_annotation: String,
     model_name: Option<String>,
     type_parameters: Vec<RenderedTypeParameter>,
@@ -6107,7 +6160,7 @@ fn render_resource_start_operation(
     output.push_str(&operation.attr_name);
     output.push_str(",\n");
     output.push_str("      ");
-    output.push_str(input_expr);
+    output.push_str(&typescript_defaulted_input_expr(operation, input_expr));
     output.push_str(",\n");
     output.push_str("    );\n");
 }
@@ -6543,10 +6596,26 @@ fn typescript_service_endpoint_expr(service: &RenderedService<'_>) -> String {
 
 fn typescript_operation_input_expr(operation: &RenderedOperation<'_>) -> String {
     if operation.input.is_some() {
-        "request".to_string()
+        typescript_defaulted_input_expr(operation, "request")
     } else {
         "undefined".to_string()
     }
+}
+
+fn typescript_defaulted_input_expr(operation: &RenderedOperation<'_>, request: &str) -> String {
+    let Some(input) = &operation.input else {
+        return request.to_string();
+    };
+    if input.defaults.is_empty() {
+        return request.to_string();
+    }
+    let fields = input
+        .defaults
+        .iter()
+        .map(|(name, value)| format!("{name}: {request}.{name} ?? {value}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{{ ...{request}, {fields} }}")
 }
 
 pub(in crate::generator) fn required_field_expr(
@@ -6574,7 +6643,7 @@ pub(in crate::generator) fn typescript_generated_field_name(name: &str) -> Strin
 }
 
 fn typescript_string_literal(value: &str) -> String {
-    format!("{value:?}")
+    serde_json::to_string(value).expect("string literal")
 }
 
 fn is_typescript_keyword(name: &str) -> bool {
@@ -6779,22 +6848,14 @@ mod tests {
             number: 7,
         };
         let mut requirements = super::TypeScriptRequirements::default();
+        let default_expr =
+            super::enum_default_expr(&resolved_type, &default_value, &mut requirements);
         assert_eq!(
-            super::defaulted_enum_from_wire_expr(
-                &resolved_type,
-                "message.policy",
-                &default_value,
-                &mut requirements
-            ),
+            super::defaulted_from_wire_expr(&resolved_type, "message.policy", &default_expr),
             "message.policy == null ? policies.AliasPolicy.AllowDuplicate : message.policy as policies.AliasPolicy"
         );
         assert_eq!(
-            super::defaulted_enum_to_wire_expr(
-                &resolved_type,
-                "policy",
-                &default_value,
-                &mut requirements
-            ),
+            super::defaulted_to_wire_expr(&resolved_type, "policy", &default_expr),
             "(model.policy == null ? policies.AliasPolicy.AllowDuplicate : model.policy) as any"
         );
         assert_eq!(
@@ -6824,22 +6885,14 @@ mod tests {
             number: 7,
         };
         let mut requirements = super::TypeScriptRequirements::default();
+        let default_expr =
+            super::enum_default_expr(&resolved_type, &default_value, &mut requirements);
         assert_eq!(
-            super::defaulted_enum_from_wire_expr(
-                &resolved_type,
-                "message.policy",
-                &default_value,
-                &mut requirements
-            ),
+            super::defaulted_from_wire_expr(&resolved_type, "message.policy", &default_expr),
             "message.policy == null ? workflow.WorkflowIdReusePolicy.ALLOW_DUPLICATE : decodePolicy(message.policy)"
         );
         assert_eq!(
-            super::defaulted_enum_to_wire_expr(
-                &resolved_type,
-                "policy",
-                &default_value,
-                &mut requirements
-            ),
+            super::defaulted_to_wire_expr(&resolved_type, "policy", &default_expr),
             "encodePolicy((model.policy == null ? workflow.WorkflowIdReusePolicy.ALLOW_DUPLICATE : model.policy))"
         );
         assert_eq!(

@@ -94,6 +94,7 @@ fn validate_external_type_bindings(
     }
 
     for (_, record) in spec.records() {
+        validate_portable_defaults(record, descriptors)?;
         let Some(proto_name) = record
             .source
             .as_ref()
@@ -670,15 +671,52 @@ fn validate_authored_field_types(
             field,
             descriptors,
         )?;
-        if let Some(case_name) = field_spec
-            .default_value
-            .as_ref()
-            .and_then(|default| default.enum_case())
-        {
-            validate_default_enum_case(message_name, field_name, case_name, field, descriptors)?;
-        }
     }
 
+    Ok(())
+}
+
+fn validate_portable_defaults(record: &RecordSpec, descriptors: &DescriptorIndex) -> Result<()> {
+    use crate::spec::{FieldDefaultLiteral, FieldDefaultSpec, IntSpec};
+    for (field_name, field) in &record.fields {
+        let Some(FieldDefaultSpec::Literal(literal)) = &field.default_value else {
+            continue;
+        };
+        let invalid = |reason: String| Error::InvalidTypeOverrideField {
+            message: record.full_name.clone(),
+            field: field_name.clone(),
+            property: "default",
+            reason,
+        };
+        let ty = field.field_type.without_option().validation_type();
+        if let (TypeSpec::Int(int), FieldDefaultLiteral::Number(number)) = (ty, literal) {
+            let valid = match int {
+                IntSpec::I32 => number.parse::<i32>().is_ok(),
+                IntSpec::I64 => number.parse::<i64>().is_ok(),
+            };
+            if !valid {
+                return Err(invalid(format!(
+                    "literal {number} is outside the generated {int:?} API range"
+                )));
+            }
+        }
+        if let TypeSpec::External(ExternalTypeSpec::Proto(name)) = ty
+            && descriptors.enumeration(name.as_str()).is_some()
+        {
+            let FieldDefaultLiteral::String(case) = literal else {
+                return Err(invalid(
+                    "an enum default must be a quoted case name".to_string(),
+                ));
+            };
+            validate_default_enum_case(
+                &record.full_name,
+                field_name,
+                case,
+                name.as_str(),
+                descriptors,
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -686,25 +724,9 @@ fn validate_default_enum_case(
     message_name: &str,
     field_name: &str,
     case_name: &str,
-    field: &FieldDescriptorProto,
+    enum_name: &str,
     descriptors: &DescriptorIndex,
 ) -> Result<()> {
-    if field_type(field) != Some(Type::Enum) {
-        return Err(Error::InvalidTypeOverrideField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            property: "default",
-            reason: "defaults are only supported on protobuf enum fields".to_string(),
-        });
-    }
-    let Some(enum_name) = field.type_name.as_deref() else {
-        return Err(Error::InvalidTypeOverrideField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            property: "default",
-            reason: "protobuf enum type is unavailable in the descriptors".to_string(),
-        });
-    };
     let Some(enumeration) = descriptors.enumeration(enum_name) else {
         return Err(Error::InvalidTypeOverrideField {
             message: message_name.to_string(),
@@ -1278,7 +1300,7 @@ mod tests {
             &message.full_name,
             "workflow_id_reuse_policy",
             "missing-case",
-            field,
+            field.type_name.as_deref().unwrap(),
             &descriptors,
         )
         .unwrap_err();
