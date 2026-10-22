@@ -226,12 +226,7 @@ fn resolve_java_package(request: &GenerateRequest) -> Result<String> {
 }
 
 fn format_generated_files(language: Language, output_path: &Path) -> Result<()> {
-    // Keep any formatter argument files alive until the command finishes.
-    let scratch = tempfile::tempdir().map_err(|source| error::Error::WriteFile {
-        path: std::env::temp_dir(),
-        source,
-    })?;
-    if let Some(mut command) = formatter_command(language, output_path, scratch.path())? {
+    if let Some(mut command) = formatter_command(language, output_path)? {
         run_formatter(&mut command, output_path)?;
     }
     Ok(())
@@ -320,13 +315,9 @@ fn write_generated_files(output_path: &Path, generated: &GeneratedFiles) -> Resu
     Ok(())
 }
 
-fn formatter_command(
-    language: Language,
-    output_path: &Path,
-    scratch: &Path,
-) -> Result<Option<Command>> {
+fn formatter_command(language: Language, output_path: &Path) -> Result<Option<Command>> {
     match language {
-        Language::Java => generator::java::format::command(output_path, scratch),
+        Language::Java => generator::java::format::command(output_path),
         Language::Go => {
             let mut command = Command::new("gofmt");
             command.arg("-w").arg(output_path);
@@ -415,8 +406,7 @@ mod tests {
 
     #[test]
     fn chooses_python_formatter_command() {
-        let scratch = tempfile::tempdir().unwrap();
-        let command = formatter_command(Language::Python, Path::new("output"), scratch.path())
+        let command = formatter_command(Language::Python, Path::new("output"))
             .unwrap()
             .unwrap();
         assert_eq!(command.get_program(), "ruff");
@@ -428,8 +418,7 @@ mod tests {
 
     #[test]
     fn chooses_typescript_formatter_command() {
-        let scratch = tempfile::tempdir().unwrap();
-        let command = formatter_command(Language::TypeScript, Path::new("output"), scratch.path())
+        let command = formatter_command(Language::TypeScript, Path::new("output"))
             .unwrap()
             .unwrap();
         assert_eq!(command.get_program(), "prettier");
@@ -441,14 +430,9 @@ mod tests {
 
     #[test]
     fn chooses_go_formatter_command() {
-        let scratch = tempfile::tempdir().unwrap();
-        let command = formatter_command(
-            Language::Go,
-            Path::new("output with spaces"),
-            scratch.path(),
-        )
-        .unwrap()
-        .unwrap();
+        let command = formatter_command(Language::Go, Path::new("output with spaces"))
+            .unwrap()
+            .unwrap();
         assert_eq!(command.get_program(), "gofmt");
         assert_eq!(
             command.get_args().collect::<Vec<_>>(),
@@ -460,7 +444,7 @@ mod tests {
     fn java_without_java_files_needs_no_formatter() {
         let output = tempfile::tempdir().unwrap();
         assert!(
-            formatter_command(Language::Java, output.path(), output.path())
+            formatter_command(Language::Java, output.path())
                 .unwrap()
                 .is_none()
         );

@@ -94,36 +94,30 @@ mod format_tests {
         fs::write(&neighbor, "class UserCode {}").unwrap();
         let manifest = output.join("notes.txt");
         fs::write(&manifest, "leave alone").unwrap();
-        let java = temp.path().join("java");
+        let formatter = temp.path().join("google-java-format");
         fs::write(
-            &java,
+            &formatter,
             r#"#!/bin/sh
-[ "$#" -eq 1 ] || exit 1
-case "$1" in @*) ;; *) exit 2 ;; esac
-printf '%s\n' "${1#@}" >> "$FORMAT_LOG"
-while IFS= read -r arg || [ -n "$arg" ]; do
+[ "$1" = --replace ] || exit 1
+shift
+printf 'invoked\n' >> "$FORMAT_LOG"
+for arg do
   case "$arg" in
-    \"*.java\")
-      arg=${arg#\"}
-      arg=${arg%\"}
+    *.java)
       printf '\n// formatted by test\n' >> "$arg"
       ;;
   esac
-done < "${1#@}"
+done
 "#,
         )
         .unwrap();
-        let mut permissions = fs::metadata(&java).unwrap().permissions();
+        let mut permissions = fs::metadata(&formatter).unwrap().permissions();
         permissions.set_mode(0o755);
-        fs::set_permissions(&java, permissions).unwrap();
+        fs::set_permissions(&formatter, permissions).unwrap();
         let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
         command
             .env("PATH", formatter_path_env(temp.path()))
             .env("FORMAT_LOG", temp.path().join("format.log"))
-            .env(
-                "NEXGEN_JAVA_FORMAT_JAR",
-                temp.path().join("formatter with spaces.jar"),
-            )
             .args([
                 "java",
                 root.join("samples/schemas/chat.nexusrpc.yaml")
@@ -139,10 +133,6 @@ done < "${1#@}"
         let log = fs::read_to_string(temp.path().join("format.log")).unwrap();
         assert_eq!(log.lines().count(), 1);
         assert!(
-            !Path::new(log.trim()).exists(),
-            "argument file should be cleaned up"
-        );
-        assert!(
             fs::read_to_string(output.join("Message.java"))
                 .unwrap()
                 .contains("// formatted by test")
@@ -153,31 +143,18 @@ done < "${1#@}"
         );
         assert_eq!(fs::read_to_string(&manifest).unwrap(), "leave alone");
 
-        fs::write(java, "#!/bin/sh\nexit 23\n").unwrap();
+        fs::write(formatter, "#!/bin/sh\nexit 23\n").unwrap();
         let failure = command.output().unwrap();
         assert!(!failure.status.success());
         assert!(String::from_utf8_lossy(&failure.stderr).contains("failed for"));
     }
 
     #[test]
-    fn java_download_is_atomic_and_cached() {
+    fn java_reports_missing_preinstalled_formatter() {
         let root = project_root();
         let temp = tempfile::tempdir().unwrap();
-        let cache = temp.path().join("cache");
-        let curl = temp.path().join("curl");
-        let java = temp.path().join("java");
-        fs::write(&curl, "#!/bin/sh\nwhile [ $# -gt 0 ]; do\nif [ \"$1\" = --output ]; then shift; printf partial > \"$1\"; break; fi\nshift\ndone\nexit 7\n").unwrap();
-        fs::write(&java, "#!/bin/sh\nexit 0\n").unwrap();
-        for path in [&curl, &java] {
-            let mut permissions = fs::metadata(path).unwrap().permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(path, permissions).unwrap();
-        }
-        let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
-        command
-            .env("PATH", formatter_path_env(temp.path()))
-            .env_remove("NEXGEN_JAVA_FORMAT_JAR")
-            .env("XDG_CACHE_HOME", &cache)
+        let failure = Command::new(env!("CARGO_BIN_EXE_nexgen"))
+            .env("PATH", temp.path())
             .args([
                 "java",
                 root.join("samples/schemas/chat.nexusrpc.yaml")
@@ -188,20 +165,13 @@ done < "${1#@}"
                 "--package-name",
                 "test.generated",
                 "--format",
-            ]);
-        let jar = cache.join("nexgen/google-java-format-1.24.0-all-deps.jar");
-        assert!(!command.status().unwrap().success());
-        assert!(!jar.exists());
-        assert_eq!(fs::read_dir(cache.join("nexgen")).unwrap().count(), 0);
-
-        let script = fs::read_to_string(&curl)
-            .unwrap()
-            .replace("exit 7", "exit 0");
-        fs::write(&curl, script).unwrap();
-        assert!(command.status().unwrap().success());
-        assert!(jar.is_file());
-        fs::write(curl, "#!/bin/sh\nexit 99\n").unwrap();
-        assert!(command.status().unwrap().success());
+            ])
+            .output()
+            .unwrap();
+        assert!(!failure.status.success());
+        let stderr = String::from_utf8_lossy(&failure.stderr);
+        assert!(stderr.contains("google-java-format"), "{stderr}");
+        assert!(stderr.contains("failed to run formatter"), "{stderr}");
     }
 
     #[test]
