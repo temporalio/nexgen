@@ -1,4 +1,5 @@
 languages = ["java"]
+descriptors = "temporal"
 
 [error]
 kind = "unsupported-java-proto-model"

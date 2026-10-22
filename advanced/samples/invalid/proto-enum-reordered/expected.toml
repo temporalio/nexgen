@@ -1,3 +1,5 @@
+descriptors = "temporal"
+
 [error]
 kind = "invalid-proto-enum-binding"
 contains = [

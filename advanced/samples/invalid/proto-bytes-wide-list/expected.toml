@@ -1,5 +1,5 @@
 languages = ["python"]
-descriptors = ["../../descriptors/temporal_api.bin"]
+descriptors = "temporal"
 
 [error]
 kind = "invalid-type-override-field"

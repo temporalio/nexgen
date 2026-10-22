@@ -20,6 +20,8 @@ small and self-contained, with only the declarations needed to reproduce the
 failure. For example:
 
 ```toml
+descriptors = "temporal"
+
 [error]
 kind = "invalid-proto-enum-binding"
 contains = ["authored case `severity-low` has number 0"]
@@ -44,7 +46,7 @@ Fields before `[error]` configure compilation:
 ```toml
 languages = ["python"]
 inputs = ["input.wit", "deps"]
-descriptors = ["../../descriptors/temporal_api.bin"]
+descriptors = "temporal"
 
 [error]
 kind = "invalid-type-override-field"
@@ -57,10 +59,12 @@ contains = ["does not match proto field type `bytes`"]
   target lists are rejected.
 - `inputs` defaults to `["input.wit"]`. Use an explicit list for multiple inputs
   or linked packages; paths are relative to the case directory.
-- `descriptors` defaults to the repository's checked-in
-  `advanced/samples/descriptors/temporal_api.bin`, independent of the working
-  directory. Explicit paths are relative to the case directory. Set `[]` to
-  compile without descriptors.
+- `descriptors` defaults to no descriptors. Set `"temporal"` to use the
+  repository's checked-in `advanced/samples/descriptors/temporal_api.bin`,
+  independent of the case directory or working directory. For custom descriptor
+  sets, use a list such as `["custom.bin"]`; paths are relative to the case
+  directory. An empty list also selects no descriptors. Unknown preset names are
+  errors.
 
 Compilation uses native API mode, disables formatting, and supplies a
 target-appropriate support-package name. Each target gets its own temporary

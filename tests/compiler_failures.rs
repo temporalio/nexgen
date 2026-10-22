@@ -18,8 +18,21 @@ struct Expectation {
     languages: Vec<Language>,
     #[serde(default = "default_inputs")]
     inputs: Vec<PathBuf>,
-    descriptors: Option<Vec<PathBuf>>,
+    descriptors: Option<Descriptors>,
     error: ExpectedError,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum Descriptors {
+    Preset(DescriptorPreset),
+    Paths(Vec<PathBuf>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum DescriptorPreset {
+    Temporal,
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,6 +160,23 @@ fn resolve_paths(directory: &Path, paths: &[PathBuf]) -> Result<Vec<PathBuf>, St
         .collect()
 }
 
+fn resolve_descriptors(
+    descriptors: Option<&Descriptors>,
+    directory: &Path,
+    repo: &Path,
+) -> Result<Vec<PathBuf>, String> {
+    match descriptors {
+        None => Ok(Vec::new()),
+        Some(Descriptors::Paths(paths)) => resolve_paths(directory, paths),
+        Some(Descriptors::Preset(DescriptorPreset::Temporal)) => resolve_paths(
+            repo,
+            &[PathBuf::from(
+                "advanced/samples/descriptors/temporal_api.bin",
+            )],
+        ),
+    }
+}
+
 fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
     let config_path = directory.join("expected.toml");
     let source = fs::read_to_string(&config_path)
@@ -154,15 +184,7 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
     let expected = parse_expectation(&source)
         .map_err(|error| format!("{}: {error}", config_path.display()))?;
     let inputs = resolve_paths(directory, &expected.inputs)?;
-    let descriptors = match &expected.descriptors {
-        Some(paths) => resolve_paths(directory, paths)?,
-        None => resolve_paths(
-            repo,
-            &[PathBuf::from(
-                "advanced/samples/descriptors/temporal_api.bin",
-            )],
-        )?,
-    };
+    let descriptors = resolve_descriptors(expected.descriptors.as_ref(), directory, repo)?;
     let mut failures = Vec::new();
     for &language in &expected.languages {
         let output = tempfile::tempdir().map_err(|error| error.to_string())?;
@@ -233,7 +255,12 @@ contains = ["severity-low"]
         explicit.inputs,
         vec![PathBuf::from("api.wit"), PathBuf::from("deps")]
     );
-    assert_eq!(explicit.descriptors, Some(Vec::new()));
+    assert!(matches!(explicit.descriptors, Some(Descriptors::Paths(paths)) if paths.is_empty()));
+    let preset = parse_expectation(&format!("descriptors = \"temporal\"\n{valid}")).unwrap();
+    assert!(matches!(
+        preset.descriptors,
+        Some(Descriptors::Preset(DescriptorPreset::Temporal))
+    ));
     for invalid in [
         valid.replace("[error]", "typo = true\n[error]"),
         valid.replace("contains =", "typo ="),
@@ -245,12 +272,54 @@ contains = ["severity-low"]
         format!("languages = [\"unknown\"]\n{valid}"),
         format!("languages = [\"ruby\"]\n{valid}"),
         format!("inputs = []\n{valid}"),
+        format!("descriptors = \"unknown\"\n{valid}"),
+        format!("descriptors = true\n{valid}"),
     ] {
         assert!(
             parse_expectation(&invalid).is_err(),
             "accepted invalid expectation: {invalid}"
         );
     }
+}
+
+#[test]
+fn descriptors_are_opt_in_and_paths_resolve_from_their_declared_roots() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let case = tempfile::tempdir().unwrap();
+    // With no descriptors selected, even a nonexistent repository is unused.
+    assert!(
+        resolve_descriptors(None, case.path(), &case.path().join("missing-repo"))
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        resolve_descriptors(Some(&Descriptors::Paths(Vec::new())), case.path(), repo)
+            .unwrap()
+            .is_empty()
+    );
+    let temporal = repo
+        .join("advanced/samples/descriptors/temporal_api.bin")
+        .canonicalize()
+        .unwrap();
+    assert_eq!(
+        resolve_descriptors(
+            Some(&Descriptors::Preset(DescriptorPreset::Temporal)),
+            case.path(),
+            repo,
+        )
+        .unwrap(),
+        vec![temporal]
+    );
+    fs::write(case.path().join("custom.bin"), []).unwrap();
+    assert_eq!(
+        resolve_descriptors(
+            Some(&Descriptors::Paths(vec![PathBuf::from("custom.bin")])),
+            case.path(),
+            repo,
+        )
+        .unwrap(),
+        vec![case.path().join("custom.bin").canonicalize().unwrap()]
+    );
 }
 
 #[test]
