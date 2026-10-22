@@ -1,10 +1,8 @@
 import { temporal } from "@temporalio/proto";
 import { describe, expect, it } from "vitest";
 
+import { AlertLevel, CommandType, NamespaceState } from "../wit/proto-enums/models.ts";
 import {
-  AlertLevel,
-  CommandType,
-  NamespaceState,
   alertTransferTypeConverter as alerts,
   commandModelTransferTypeConverter as commands,
   namespaceInfoTransferTypeConverter as namespaces,
