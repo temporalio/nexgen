@@ -51,10 +51,7 @@ describe("proto-backed enums", () => {
     const members = Object.values(CommandType).filter(
       (value): value is CommandType => typeof value === "number",
     );
-    expect(members).toEqual([
-      ...Array.from({ length: 15 }, (_, i) => i),
-      16, 17, 18,
-    ]);
+    expect(members).toEqual([...Array.from({ length: 15 }, (_, i) => i), 16, 17, 18]);
     for (const commandType of members) {
       const wire = commands.toTransferType({ commandType });
       expect(wire.commandType).toBe(commandType);
