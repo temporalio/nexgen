@@ -935,66 +935,6 @@ interface workflow-service {
     }
 
     #[test]
-    fn rejects_operation_bound_to_multiple_resources() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-/// @nexus.endpoint "__temporal_system"
-interface workflow-service {
-  use nexus:temporal-types/model@1.0.0.{payloads, task-queue, workflow-function};
-
-  resource started-workflow {
-    constructor(namespace: string, workflow-id: string, run-id: option<string>);
-
-    restart-workflow: func(
-      workflow: workflow-function,
-      task-queue: task-queue,
-      input: option<payloads>,
-    );
-  }
-
-  resource archived-workflow {
-    constructor(namespace: string, workflow-id: string, run-id: option<string>);
-
-    restart-workflow: func(
-      workflow: workflow-function,
-      task-queue: task-queue,
-      input: option<payloads>,
-    );
-  }
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionRequest"
-  record start-workflow-request {
-    /// @nexus.proto-field "workflow_type"
-    workflow: workflow-function,
-    workflow-id: string,
-    task-queue: task-queue,
-    namespace: option<string>,
-  }
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse"
-  record start-workflow-response {
-    run-id: option<string>,
-  }
-
-  restart-workflow: func(request: start-workflow-request) -> start-workflow-response;
-}
-"#;
-        let spec = parse(Language::Python, wit);
-        let service = &spec.services[0];
-        let error = resolve_service_resources(&spec, service, &descriptors()).unwrap_err();
-
-        assert_eq!(
-            error.to_string(),
-            "resource method `WorkflowService.ArchivedWorkflow.restart-workflow` is invalid: bound operation `RestartWorkflow` is already owned by resource `StartedWorkflow`"
-        );
-    }
-
-    #[test]
     fn resource_method_does_not_bind_operation_when_operation_name_differs_without_annotation() {
         let wit = r#"
 package temporal:users@1.0.0;
@@ -1097,44 +1037,6 @@ interface user-service {
                 panic!("update-email should bind to UpdatesEmail");
             }
         }
-    }
-
-    #[test]
-    fn resource_method_rejects_unknown_explicit_operation_binding() {
-        let wit = r#"
-package temporal:users@1.0.0;
-
-world system {
-  export user-service;
-}
-
-/// @nexus.endpoint "__user_service"
-interface user-service {
-  resource user {
-    constructor(user-id: string, email: string);
-
-    /// @nexus.operation "updates-email"
-    update-email: func(email: string) -> user-result;
-  }
-
-  type user-result = own<user>;
-
-  record update-email-request {
-    user-id: string,
-    email: string,
-  }
-
-  update-email: func(request: update-email-request) -> user-result;
-}
-"#;
-        let spec = parse(Language::Python, wit);
-        let service = &spec.services[0];
-        let error = resolve_service_resources(&spec, service, &empty_descriptors()).unwrap_err();
-
-        assert_eq!(
-            error.to_string(),
-            "resource method `UserService.User.update-email` is invalid: bound operation `UpdatesEmail` was not found"
-        );
     }
 
     #[test]

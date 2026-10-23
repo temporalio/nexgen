@@ -1,0 +1,7 @@
+languages = ["python"]
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "python-generated-name-conflict"
+contains = ["Python generated name `OutcomeValueSuccess`", "conflicts with"]

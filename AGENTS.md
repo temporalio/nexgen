@@ -31,10 +31,10 @@
 ## Compiler rejection tests
 
 - Test compiler rejections with file-backed fixtures in
-  `advanced/samples/invalid/<case>/`, rather than embedding input text in Rust
-  tests. Add the input and an `expected.toml` that asserts the typed error kind
-  and diagnostic fragments establishing the intended failure. See the
-  [fixture guide](advanced/samples/invalid/README.md).
+  `advanced/samples/invalid/<category>/<case>/`, rather than embedding input
+  text in Rust tests. Add the input and an `expected.toml` that asserts the
+  typed error kind and diagnostic fragments establishing the intended failure.
+  See the [fixture guide](advanced/samples/invalid/README.md).
 - Use the default language set for shared compiler rules. Restrict `languages`
   only when the rejection is target-specific.
 - Descriptors are opt-in: use `descriptors = "temporal"` for the standard

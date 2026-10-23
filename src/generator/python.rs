@@ -7757,12 +7757,9 @@ fn is_python_keyword(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
-    use std::fs;
     use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::descriptors::DescriptorIndex;
-    use crate::error::Error;
     use crate::generator::{
         GenerateFilesOptions, GenerationMode, generate_files_for_tree_with_mode_and_options,
         generate_source,
@@ -7921,14 +7918,6 @@ mod tests {
             super::source_paths_label(&paths),
             "schemas/a.yaml, schemas/nested/b.yaml"
         );
-    }
-
-    fn unique_temp_dir(label: &str) -> PathBuf {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("nex-gen-python-{label}-{unique}"))
     }
 
     #[test]
@@ -8381,126 +8370,6 @@ interface example-service {
         assert!(output.contains("async def cancel("));
         assert!(output.contains("async def restart_workflow("));
         assert!(!output.contains("should be replaced during package initialization"));
-    }
-
-    #[test]
-    fn rejects_flattened_api_field_name_conflicts() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-/// @nexus.endpoint "__temporal_system"
-interface workflow-service {
-  use nexus:temporal-types/model@1.0.0.{
-    duration,
-    placeholder,
-    signal-function,
-    task-queue,
-    user-metadata,
-    workflow-function,
-  };
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-  record signal-with-start-workflow-request {
-    /// @nexus.proto-field "workflow_type"
-    workflow: workflow-function,
-    workflow-id: string,
-    task-queue: task-queue,
-    /// @nexus.proto-field "signal_name"
-    signal: signal-function,
-    /// @nexus.proto-field "request_id"
-    static-summary: string,
-    user-metadata: option<user-metadata>,
-    /// @nexus.source "workflow_namespace()"
-    namespace: option<string>,
-    /// @nexus.omit
-    workflow-execution-timeout: placeholder,
-    /// @nexus.omit
-    workflow-run-timeout: placeholder,
-    /// @nexus.omit
-    workflow-task-timeout: placeholder,
-    /// @nexus.omit
-    identity: placeholder,
-    /// @nexus.omit
-    workflow-id-reuse-policy: placeholder,
-    /// @nexus.omit
-    workflow-id-conflict-policy: placeholder,
-    /// @nexus.omit
-    control: placeholder,
-    /// @nexus.omit
-    retry-policy: placeholder,
-    /// @nexus.omit
-    cron-schedule: placeholder,
-    /// @nexus.omit
-    memo: placeholder,
-    /// @nexus.omit
-    search-attributes: placeholder,
-    /// @nexus.omit
-    header: placeholder,
-    workflow-start-delay: option<duration>,
-    /// @nexus.omit
-    links: placeholder,
-    /// @nexus.omit
-    versioning-override: placeholder,
-    /// @nexus.omit
-    priority: placeholder,
-    /// @nexus.omit
-    time-skipping-config: placeholder,
-  }
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse"
-  record signal-with-start-workflow-response {
-    run-id: option<string>,
-    started: option<bool>,
-    /// @nexus.omit
-    first-execution-run-id: placeholder,
-    /// @nexus.omit
-    signal-link: placeholder,
-  }
-
-  signal-with-start-workflow-execution: func(
-    request: signal-with-start-workflow-request,
-  ) -> signal-with-start-workflow-response;
-}
-"#;
-
-        let temp_dir = unique_temp_dir("flatten-conflict");
-        fs::create_dir_all(&temp_dir).unwrap();
-        let input_path = temp_dir.join("conflict.wit");
-        fs::write(&input_path, wit).unwrap();
-
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let spec = crate::parser::load_api_spec_from_wit_for_language_with_inputs(
-            Language::Python,
-            &example_input_paths(&root, input_path.clone()),
-        )
-        .unwrap();
-        let descriptors =
-            DescriptorIndex::load(&root.join("advanced/samples/descriptors/temporal_api.bin"))
-                .unwrap();
-        let error = generate_source(
-            Language::Python,
-            spec.clone(),
-            &descriptors,
-            "temporal_support",
-        )
-        .unwrap_err();
-
-        fs::remove_dir_all(temp_dir).unwrap();
-
-        assert!(matches!(
-            error,
-            Error::FlattenedApiFieldConflict {
-                type_name,
-                field,
-                conflicting_field,
-            } if type_name == "SignalWithStartWorkflowRequest"
-                && field == "static_summary"
-                && conflicting_field.contains("static_summary")
-        ));
     }
 
     #[test]

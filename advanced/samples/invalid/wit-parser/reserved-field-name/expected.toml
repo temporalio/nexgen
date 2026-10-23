@@ -1,0 +1,3 @@
+[error]
+kind = "wit-parse"
+contains = ["expected an identifier or string", "found keyword `include`", "include: string"]

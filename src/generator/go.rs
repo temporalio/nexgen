@@ -5749,22 +5749,6 @@ mod tests {
     }
 
     #[test]
-    fn record_getters_reject_field_method_collisions() {
-        let error =
-            generate_record_models(
-                "record request { id: string, get-id: string }\nread: func(request: request) -> request;",
-            )
-            .unwrap_err();
-        let Error::UnsupportedGoType { context, reason } = error else {
-            panic!("unexpected error: {error}");
-        };
-        assert!(context.contains("Request"), "{context}");
-        assert!(reason.contains("getter `GetID` for field `ID`"), "{reason}");
-        assert!(reason.contains("field `GetID`"), "{reason}");
-        assert!(reason.contains("rename"), "{reason}");
-    }
-
-    #[test]
     fn record_getters_skip_private_fields() {
         let model = super::RenderedModel {
             name: "Request".to_string(),

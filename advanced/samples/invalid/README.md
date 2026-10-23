@@ -15,9 +15,22 @@ test reports all failing case/target pairs, including the actual error.
 
 ## Adding a case
 
-Create a directory containing `input.wit` and `expected.toml`. Keep the input
-small and self-contained, with only the declarations needed to reproduce the
-failure. For example:
+Create `<category>/<case>/` containing `input.wit` and `expected.toml`.
+Categories group the compiler rule, not merely the input format or target:
+
+- `wit-parser/`: WIT syntax and directive parsing.
+- `proto/`: protobuf binding compatibility and defaults.
+- `type-parameters/`: shared generic-type restrictions.
+- `resources/`: resource methods and operation bindings.
+- `name-collisions/`: conflicts caused by emitted names, including
+  target-specific naming transformations.
+
+Discovery recurses through categories but stops at each `expected.toml`, so a
+case's linked packages are not mistaken for additional cases. Empty categories
+and case directories without expectations fail discovery.
+
+Keep the input small and self-contained, with only the declarations needed to
+reproduce the failure. For example:
 
 ```toml
 descriptors = "temporal"

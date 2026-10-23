@@ -1,0 +1,9 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "invalid-type-override-field"
+contains = [
+  "temporal.api.activity.v1.ActivityOptions.retry_policy",
+  "authored field type `option<string>` does not match proto field type `option<temporal.api.common.v1.RetryPolicy>`",
+]

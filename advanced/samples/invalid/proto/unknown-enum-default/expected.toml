@@ -1,0 +1,5 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-type-override-field"
+contains = ["temporal.api.version.v1.Alert.severity", "unknown protobuf enum case `missing-case`"]

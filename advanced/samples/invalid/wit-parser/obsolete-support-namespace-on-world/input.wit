@@ -1,0 +1,4 @@
+package test:obsolete-namespace-world;
+
+/// @nexus.support-namespace dotnet="Nexgen.Support"
+world system {}

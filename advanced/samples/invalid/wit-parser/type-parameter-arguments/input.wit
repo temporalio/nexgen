@@ -1,0 +1,12 @@
+package test:parameter-arguments;
+
+world system { export models; }
+
+interface models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter name="T"
+  type context-t = placeholder;
+
+  record request { context: context-t }
+}

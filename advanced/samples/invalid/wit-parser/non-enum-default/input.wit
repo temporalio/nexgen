@@ -1,0 +1,11 @@
+package test:non-enum-default;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record request {
+    /// @nexus.default "request-id"
+    request-id: string,
+  }
+}

@@ -1,0 +1,10 @@
+package test:parameter-on-field;
+
+world system { export models; }
+
+interface models {
+  record value {
+    /// @nexus.type-parameter
+    text: string,
+  }
+}

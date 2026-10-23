@@ -3810,33 +3810,6 @@ interface generic-service {
     }
 
     #[test]
-    fn rejects_type_parameter_directive_on_records_and_fields() {
-        let record = GENERIC_WIT.replace(
-            "record inner { value: context-t, }",
-            "/// @nexus.type-parameter\n  record inner { value: context-t, }",
-        );
-        assert!(parse_result(Language::Python, &record).is_err());
-
-        let field = GENERIC_WIT.replace(
-            "nested: inner,",
-            "/// @nexus.type-parameter\n    nested: inner,",
-        );
-        assert!(parse_result(Language::Python, &field).is_err());
-    }
-
-    #[test]
-    fn rejects_generic_map_key_parameters() {
-        let wit = GENERIC_WIT.replace(
-            "/// @nexus.type-parameter\n  type output-t = placeholder;",
-            "/// @nexus.type-parameter\n  type output-t = placeholder;\n\n  /// @nexus.type-parameter\n  type key-t = string;\n\n  type keyed-values = map<key-t, string>;",
-        ).replace(
-            "values: list<context-t>,",
-            "values: list<context-t>,\n    by-key: keyed-values,",
-        );
-        assert!(parse_result(Language::Go, &wit).is_err());
-    }
-
-    #[test]
     fn language_type_overrides_and_omitted_fields_do_not_infer_parameters() {
         let wit = GENERIC_WIT.replace(
             "record inner { value: context-t, }",
@@ -3897,21 +3870,6 @@ interface generic-service {
                 .collect::<Vec<_>>(),
             ["ContextT", "KeyT", "OutputT"]
         );
-    }
-
-    #[test]
-    fn rejects_type_parameter_arguments_and_conflicting_directives() {
-        let arguments = GENERIC_WIT.replace(
-            "@nexus.type-parameter\n  type context-t",
-            "@nexus.type-parameter name=\"T\"\n  type context-t",
-        );
-        assert!(parse_result(Language::Go, &arguments).is_err());
-
-        let conflict = GENERIC_WIT.replace(
-            "@nexus.type-parameter\n  type context-t",
-            "@nexus.type-parameter\n  /// @nexus.type typescript=\"string\"\n  type context-t",
-        );
-        assert!(parse_result(Language::TypeScript, &conflict).is_err());
     }
 
     #[test]
@@ -3978,39 +3936,6 @@ interface workflow-service {
             &[linked_inputs_path()],
         )
         .unwrap();
-    }
-
-    #[test]
-    fn rejects_non_enum_field_default() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-interface workflow-service {
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-  record request {
-    /// @nexus.proto-field "request_id"
-    /// @nexus.default "request-id"
-    request-id: string,
-  }
-}
-"#;
-
-        let error = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-            &[linked_inputs_path()],
-        )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("only enum field defaults are supported")
-        );
     }
 
     #[test]
@@ -4115,32 +4040,6 @@ interface workflow-service {
     }
 
     #[test]
-    fn rejects_removed_source_support_import_even_for_unselected_language() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-world system { export workflow-service; }
-interface workflow-service {
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-  record request {
-    /// @nexus.source go="Namespace(ctx)" python-support-import=true
-    namespace: option<string>,
-  }
-}
-"#;
-        let error = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::Go,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("`python-support-import` is no longer supported")
-        );
-    }
-
-    #[test]
     fn validates_sourced_helper_invocations_without_parsing_their_arguments() {
         use super::is_support_helper_invocation;
 
@@ -4158,55 +4057,6 @@ interface workflow-service {
         ] {
             assert!(!is_support_helper_invocation(invalid), "{invalid}");
         }
-    }
-
-    #[test]
-    fn rejects_non_helper_source_expression_with_a_remedy() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-world system { export workflow-service; }
-interface workflow-service {
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-  record request {
-    /// @nexus.source go="workflow.GetInfo(ctx).Namespace"
-    namespace: option<string>,
-  }
-}
-"#;
-        let error = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::Go,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("relative to `--support-package`")
-        );
-        assert!(error.to_string().contains("WorkflowNamespace(ctx)"));
-    }
-
-    #[test]
-    fn rejects_authored_support_prefix_on_sourced_helper() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-world system { export workflow-service; }
-interface workflow-service {
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-  record request {
-    /// @nexus.source python="_support.workflow_namespace()"
-    namespace: option<string>,
-  }
-}
-"#;
-        let error = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap_err();
-        assert!(error.to_string().contains("remove that prefix"));
     }
 
     #[test]
@@ -4635,7 +4485,7 @@ interface workflow-service {
     }
 
     #[test]
-    fn parses_and_validates_experimental_variants() {
+    fn parses_experimental_variants() {
         let wit = r#"
 package example:variants;
 world system { export models; }
@@ -4669,13 +4519,6 @@ interface models {
                 .unwrap()
                 .experimental
         );
-        let invalid = wit.replace(
-            "@nexus.experimental",
-            "@nexus.experimental reason=\"preview\"",
-        );
-        let error = parse_result(Language::Python, &invalid).unwrap_err();
-        assert!(error.to_string().contains("@nexus.experimental"));
-        assert!(error.to_string().contains("does not take arguments"));
     }
 
     #[test]
@@ -4718,33 +4561,6 @@ interface models {
         ] {
             assert!(spec.external_type_binding(proto_name).is_none());
         }
-    }
-
-    #[test]
-    fn rejects_type_replacement_on_native_proto_declaration() {
-        let wit = r#"
-package acme:types@1.0.0;
-
-world system { export models; }
-
-interface models {
-  /// @nexus.proto "acme.v1.Record"
-  /// @nexus.type python="object"
-  record record-model { value: string }
-}
-"#;
-
-        let error = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("cannot be combined with `@nexus.proto` on a native WIT declaration")
-        );
     }
 
     #[test]
@@ -4883,36 +4699,6 @@ interface workflow-service {
 
         let spec = parse(Language::Python, wit);
         assert!(spec.services[0].delay_load_temporalio_workflow);
-    }
-
-    #[test]
-    fn rejects_experimental_annotation_arguments() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-/// @nexus.endpoint "__temporal_system"
-/// @nexus.experimental reason="preview"
-interface workflow-service {
-  record request {
-    id: string,
-  }
-
-  request-op: func(request: request) -> request;
-}
-"#;
-
-        let error = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap_err();
-        assert!(error.to_string().contains("@nexus.experimental"));
-        assert!(error.to_string().contains("does not take arguments"));
     }
 
     #[test]
@@ -5087,7 +4873,7 @@ interface function-execution {
     }
 
     #[test]
-    fn validates_proto_backed_wit_field_types_and_keeps_flattened_types_separate() {
+    fn keeps_proto_backed_wit_field_types_separate_from_flattened_types() {
         let wit = r#"
 package temporal:nexus@1.0.0;
 
@@ -5133,73 +4919,6 @@ interface workflow-service {
                 .and_then(|annotation| annotation.for_language(Language::Python)),
             Some("str")
         );
-
-        let mismatch = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-/// @nexus.endpoint "__temporal_system"
-interface workflow-service {
-  use nexus:temporal-types/model@1.0.0.{placeholder, retry-policy, task-queue};
-
-  /// @nexus.proto "temporal.api.activity.v1.ActivityOptions"
-  record request {
-    task-queue: option<task-queue>,
-    /// @nexus.proto-field "retry_policy"
-    retry-policy: option<string>,
-    /// @nexus.omit
-    schedule-to-close-timeout: placeholder,
-    /// @nexus.omit
-    schedule-to-start-timeout: placeholder,
-    /// @nexus.omit
-    start-to-close-timeout: placeholder,
-    /// @nexus.omit
-    heartbeat-timeout: placeholder,
-    /// @nexus.omit
-    priority: placeholder,
-    /// @nexus.omit
-    start-delay: placeholder,
-  }
-
-  run: func(request: request) -> request;
-}
-"#;
-
-        let error = validate(Language::Python, mismatch).unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("authored field type `option<string>` does not match proto field type `option<temporal.api.common.v1.RetryPolicy>`")
-        );
-    }
-
-    #[test]
-    fn obsolete_support_directives_point_to_support_package() {
-        for directive in [
-            r#"@nexus.support python="extra_support.py""#,
-            r#"@nexus.support-namespace dotnet="Nexgen.Support""#,
-        ] {
-            for wit in [
-                format!("/// {directive}\npackage temporal:nexus@1.0.0;\nworld system {{}}\n"),
-                format!("package temporal:nexus@1.0.0;\n/// {directive}\nworld system {{}}\n"),
-            ] {
-                let error = crate::parser::parse_api_spec_from_wit_for_language(
-                    Language::Python,
-                    &wit,
-                    PathBuf::from("inline.wit"),
-                )
-                .unwrap_err();
-                assert!(
-                    error
-                        .to_string()
-                        .contains(directive.split_whitespace().next().unwrap())
-                );
-                assert!(error.to_string().contains("--support-package"));
-            }
-        }
     }
 
     #[test]
@@ -5386,35 +5105,6 @@ interface workflow-service {
     }
 
     #[test]
-    fn requires_explicit_omit_for_proto_fields_left_out_of_records() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-/// @nexus.endpoint "__temporal_system"
-interface workflow-service {
-  use nexus:temporal-types/model@1.0.0.{placeholder, retry-policy, task-queue};
-
-  /// @nexus.proto "temporal.api.activity.v1.ActivityOptions"
-  record activity-options {
-    task-queue: option<task-queue>,
-    retry-policy: retry-policy,
-  }
-
-  activity-options-operation: func(request: activity-options) -> activity-options;
-}
-"#;
-
-        let error = validate(Language::Python, wit).unwrap_err();
-        assert!(error.to_string().contains(
-            "must declare field `schedule_to_close_timeout` in WIT or add that field and mark it with `@nexus.omit`"
-        ));
-    }
-
-    #[test]
     fn allows_explicitly_omitted_proto_fields() {
         let wit = r#"
 package temporal:nexus@1.0.0;
@@ -5453,72 +5143,6 @@ interface workflow-service {
     }
 
     #[test]
-    fn rejects_type_level_omit_directive() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-/// @nexus.endpoint "__temporal_system"
-interface workflow-service {
-  use nexus:temporal-types/model@1.0.0.{retry-policy, task-queue};
-
-  /// @nexus.proto "temporal.api.activity.v1.ActivityOptions"
-  /// @nexus.omit
-  record activity-options {
-    task-queue: option<task-queue>,
-    retry-policy: retry-policy,
-  }
-
-  activity-options-operation: func(request: activity-options) -> activity-options;
-}
-"#;
-
-        let error = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-            &[linked_inputs_path()],
-        )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("type-level omit is no longer supported")
-        );
-    }
-
-    #[test]
-    fn wit_parse_errors_include_parser_diagnostics() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export example;
-}
-
-interface example {
-  record request {
-    include: string,
-  }
-}
-"#;
-
-        let error = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap_err();
-        let message = error.to_string();
-        assert!(message.contains("expected an identifier or string"));
-        assert!(message.contains("found keyword `include`"));
-        assert!(message.contains("include: string"));
-    }
-
-    #[test]
     fn parses_multiline_directive_arguments() {
         let directives = parse_directives(
             Some(
@@ -5544,34 +5168,5 @@ interface example {
             Some("temporalio.common.RetryPolicy")
         );
         assert_eq!(directive.value("typescript"), Some("common.RetryPolicy"));
-    }
-
-    #[test]
-    fn rejects_duplicate_proto_field_mappings() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-interface workflow-service {
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-  record signal-with-start-workflow-request {
-    /// @nexus.proto-field "workflow_id"
-    workflow-id: string,
-    /// @nexus.proto-field "workflow_id"
-    workflow-id-alias: string,
-  }
-}
-"#;
-
-        let err = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap_err();
-        assert!(matches!(err, Error::InvalidWit { .. }));
     }
 }

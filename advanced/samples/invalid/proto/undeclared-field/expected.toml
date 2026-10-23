@@ -1,0 +1,9 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "undeclared-type-override-field"
+contains = [
+  "temporal.api.activity.v1.ActivityOptions",
+  "must declare field `schedule_to_close_timeout` in WIT or add that field and mark it with `@nexus.omit`",
+]

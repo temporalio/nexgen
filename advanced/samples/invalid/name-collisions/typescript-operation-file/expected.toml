@@ -1,0 +1,12 @@
+languages = ["typescript"]
+
+[error]
+kind = "generated-file-source-conflict"
+contains = [
+  "operations",
+  "collide.ts",
+  "TypeScript operation `FirstService.Collide`",
+  "TypeScript operation `SecondService.Collide`",
+  "rename operation `Collide` in service `FirstService`",
+  "rename operation `Collide` in service `SecondService`",
+]

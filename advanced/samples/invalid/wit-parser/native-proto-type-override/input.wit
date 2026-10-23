@@ -1,0 +1,9 @@
+package test:native-proto-override;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.proto "acme.v1.Record"
+  /// @nexus.type python="object"
+  record record-model { value: string }
+}

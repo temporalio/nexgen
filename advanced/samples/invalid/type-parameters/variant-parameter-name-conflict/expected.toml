@@ -1,0 +1,8 @@
+[error]
+kind = "invalid-wit"
+contains = [
+  "variant `generic-service.collision`",
+  "left.value-t",
+  "right.value-t",
+  "both generate the name `ValueT`",
+]

@@ -1,0 +1,12 @@
+languages = ["python"]
+
+[error]
+kind = "generated-file-source-conflict"
+contains = [
+  "operations",
+  "collide.py",
+  "Python operation `FirstService.Collide`",
+  "Python operation `SecondService.Collide`",
+  "rename operation `Collide` in service `FirstService`",
+  "rename operation `Collide` in service `SecondService`",
+]

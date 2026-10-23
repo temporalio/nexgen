@@ -1,0 +1,11 @@
+package example:variants;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.experimental reason="preview"
+  variant preview {
+    value(string),
+    none,
+  }
+}

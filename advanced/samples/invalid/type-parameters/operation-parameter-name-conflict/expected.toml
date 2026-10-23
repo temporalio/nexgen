@@ -1,0 +1,8 @@
+[error]
+kind = "invalid-wit"
+contains = [
+  "operation `Execute`",
+  "left.value-t",
+  "right.value-t",
+  "both generate the name `ValueT`",
+]

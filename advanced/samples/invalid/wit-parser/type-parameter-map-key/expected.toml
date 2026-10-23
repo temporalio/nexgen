@@ -1,0 +1,3 @@
+[error]
+kind = "wit-parse"
+contains = ["invalid map key type"]

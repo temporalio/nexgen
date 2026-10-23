@@ -1,0 +1,10 @@
+package test:experimental-arguments;
+
+world system { export api; }
+
+/// @nexus.endpoint "__temporal_system"
+/// @nexus.experimental reason="preview"
+interface api {
+  record request { id: string }
+  request-op: func(request: request) -> request;
+}

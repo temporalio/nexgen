@@ -1,0 +1,7 @@
+languages = ["python"]
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "flattened-api-field-conflict"
+contains = ["SignalWithStartWorkflowRequest", "duplicate parameter `static_summary`"]

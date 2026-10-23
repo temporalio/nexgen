@@ -1,0 +1,5 @@
+languages = ["go"]
+
+[error]
+kind = "unsupported-go-type"
+contains = ["Request", "getter `GetID` for field `ID`", "field `GetID`", "rename"]

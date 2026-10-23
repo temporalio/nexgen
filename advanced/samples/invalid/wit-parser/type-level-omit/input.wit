@@ -1,0 +1,9 @@
+package test:type-level-omit;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.proto "temporal.api.activity.v1.ActivityOptions"
+  /// @nexus.omit
+  record activity-options { task-queue: string }
+}

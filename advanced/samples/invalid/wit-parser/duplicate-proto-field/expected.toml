@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit"
+contains = ["workflow-id-alias", "duplicate proto field `workflow_id`"]

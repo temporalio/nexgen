@@ -613,42 +613,6 @@ fn python_non_proto_variants_remain_tagged_tuples_without_transfer_converters() 
 }
 
 #[test]
-fn python_rejects_proto_variant_case_class_name_collisions() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-proto-variant-case-collision");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let collision_path = temp_dir.join("collision.wit");
-    let fixture = fs::read_to_string(wit_input_path(&root, "proto-oneof")).unwrap();
-    let fixture = fixture.strip_suffix("}\n").unwrap();
-    fs::write(
-        &collision_path,
-        format!("{fixture}  record outcome-value-success {{\n    value: string,\n  }}\n}}\n"),
-    )
-    .unwrap();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &[collision_path, linked_inputs_path(&root)],
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-
-    let error = generate_source(
-        nexgen::language::Language::Python,
-        spec,
-        &descriptors,
-        "temporal_support",
-    )
-    .unwrap_err();
-
-    assert!(
-        error
-            .to_string()
-            .contains("Python generated name `OutcomeValueSuccess`")
-    );
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
 fn python_proto_generics_propagate_payload_type_hints() {
     let root = project_root();
     let package = generate_python_package_files(
@@ -761,72 +725,6 @@ fn python_proto_helpers_use_the_supplied_support_module() {
     assert!(output.contains("_support.retry_policy_to_proto("));
     assert!(output.contains("_support.signal_with_start_workflow_serialization_context"));
     assert!(!output.contains("### _support/"));
-}
-
-#[test]
-fn python_generated_standalone_operation_path_collision_names_both_operations() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-operation-path-collision");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("operations-collision.wit");
-    fs::write(
-        &input_path,
-        r#"
-package temporal:collision@1.0.0;
-
-world system {
-  export first-service;
-  export second-service;
-}
-
-/// @nexus.endpoint "first"
-interface first-service {
-  record first-request {
-    value: string,
-  }
-  collide: func(request: first-request);
-}
-
-/// @nexus.endpoint "second"
-interface second-service {
-  record second-request {
-    value: string,
-  }
-  collide: func(request: second-request);
-}
-"#,
-    )
-    .unwrap();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &[input_path],
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let error = generate_source(
-        nexgen::language::Language::Python,
-        spec,
-        &descriptors,
-        "temporal_support",
-    )
-    .unwrap_err();
-
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("operations/collide.py"));
-    assert_eq!(first_source, "Python operation `FirstService.Collide`");
-    assert_eq!(second_source, "Python operation `SecondService.Collide`");
-    assert!(remedy.contains("operation `Collide` in service `FirstService`"));
-    assert!(remedy.contains("operation `Collide` in service `SecondService`"));
-    assert!(!remedy.contains("generated output"));
-    fs::remove_dir_all(temp_dir).unwrap();
 }
 
 /// An inline **structured** object `oneOf` branch on a property: the branch is

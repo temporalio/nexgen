@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit-directive"
+contains = ["@nexus.type", "cannot be combined with `@nexus.proto` on a native WIT declaration"]

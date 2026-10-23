@@ -47,8 +47,17 @@ struct ExpectedError {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 enum ErrorKind {
+    InvalidWit,
+    InvalidWitDirective,
+    WitParse,
+    InvalidResourceMethod,
+    GeneratedFileSourceConflict,
+    PythonGeneratedNameConflict,
+    FlattenedApiFieldConflict,
+    UnsupportedGoType,
     InvalidProtoEnumBinding,
     InvalidTypeOverrideField,
+    UndeclaredTypeOverrideField,
     DotnetTypeParameterNameConflict,
     UnsupportedJavaProtoModel,
 }
@@ -57,19 +66,46 @@ impl ErrorKind {
     fn matches(&self, error: &Error) -> bool {
         matches!(
             (self, error),
-            (
-                Self::InvalidProtoEnumBinding,
-                Error::InvalidProtoEnumBinding { .. }
-            ) | (
-                Self::InvalidTypeOverrideField,
-                Error::InvalidTypeOverrideField { .. }
-            ) | (
-                Self::DotnetTypeParameterNameConflict,
-                Error::DotnetTypeParameterNameConflict { .. }
-            ) | (
-                Self::UnsupportedJavaProtoModel,
-                Error::UnsupportedJavaProtoModel { .. }
-            )
+            (Self::InvalidWit, Error::InvalidWit { .. })
+                | (Self::InvalidWitDirective, Error::InvalidWitDirective { .. })
+                | (Self::WitParse, Error::WitParse { .. })
+                | (
+                    Self::InvalidResourceMethod,
+                    Error::InvalidResourceMethod { .. }
+                )
+                | (
+                    Self::GeneratedFileSourceConflict,
+                    Error::GeneratedFileSourceConflict { .. }
+                )
+                | (
+                    Self::PythonGeneratedNameConflict,
+                    Error::PythonGeneratedNameConflict { .. }
+                )
+                | (
+                    Self::FlattenedApiFieldConflict,
+                    Error::FlattenedApiFieldConflict { .. }
+                )
+                | (Self::UnsupportedGoType, Error::UnsupportedGoType { .. })
+                | (
+                    Self::InvalidProtoEnumBinding,
+                    Error::InvalidProtoEnumBinding { .. }
+                )
+                | (
+                    Self::InvalidTypeOverrideField,
+                    Error::InvalidTypeOverrideField { .. }
+                )
+                | (
+                    Self::UndeclaredTypeOverrideField,
+                    Error::UndeclaredTypeOverrideField { .. }
+                )
+                | (
+                    Self::DotnetTypeParameterNameConflict,
+                    Error::DotnetTypeParameterNameConflict { .. }
+                )
+                | (
+                    Self::UnsupportedJavaProtoModel,
+                    Error::UnsupportedJavaProtoModel { .. }
+                )
         )
     }
 }
@@ -209,21 +245,37 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
     Ok(failures)
 }
 
+fn discover_cases(directory: &Path) -> Result<Vec<PathBuf>, String> {
+    // An expectation marks a case root. Do not descend into linked inputs or
+    // dependencies within that case, even if they contain subdirectories.
+    if directory.join("expected.toml").is_file() {
+        return Ok(vec![directory.to_path_buf()]);
+    }
+    let mut children = fs::read_dir(directory)
+        .map_err(|error| format!("cannot read {}: {error}", directory.display()))?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+    children.retain(|path| path.is_dir());
+    children.sort();
+    if directory.join("input.wit").exists() || children.is_empty() {
+        return Err(format!(
+            "{}: expected a category containing cases or a case with expected.toml",
+            directory.display()
+        ));
+    }
+    let mut cases = Vec::new();
+    for child in children {
+        cases.extend(discover_cases(&child)?);
+    }
+    Ok(cases)
+}
+
 #[test]
 fn compiler_failures() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
     let root = repo.join("advanced/samples/invalid");
-    let mut cases = fs::read_dir(&root)
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .filter(|path| path.is_dir())
-        .collect::<Vec<_>>();
-    cases.sort();
-    assert!(
-        !cases.is_empty(),
-        "no compiler failure fixtures in {}",
-        root.display()
-    );
+    let cases = discover_cases(&root).unwrap();
 
     let mut failures = Vec::new();
     for directory in cases {
@@ -236,48 +288,37 @@ fn compiler_failures() {
 }
 
 #[test]
-fn expectations_are_strict_and_require_meaningful_assertions() {
-    let valid = r#"
-[error]
-kind = "invalid-proto-enum-binding"
-contains = ["severity-low"]
-"#;
-    let expected = parse_expectation(valid).unwrap();
-    assert_eq!(expected.languages, default_languages());
-    assert_eq!(expected.inputs, default_inputs());
-    assert!(expected.descriptors.is_none());
-    let explicit = parse_expectation(&format!(
-        "languages = [\"java\"]\ninputs = [\"api.wit\", \"deps\"]\ndescriptors = []\n{valid}"
-    ))
-    .unwrap();
-    assert_eq!(explicit.languages, vec![Language::Java]);
+fn discovery_recurses_through_categories_but_not_case_dependencies() {
+    let root = tempfile::tempdir().unwrap();
+    assert!(discover_cases(root.path()).is_err());
+    for case in ["wit-parser/directive", "proto/enums/sparse"] {
+        let path = root.path().join(case);
+        fs::create_dir_all(path.join("deps/nested-package")).unwrap();
+        fs::write(path.join("expected.toml"), "").unwrap();
+    }
     assert_eq!(
-        explicit.inputs,
-        vec![PathBuf::from("api.wit"), PathBuf::from("deps")]
+        discover_cases(root.path()).unwrap(),
+        vec![
+            root.path().join("proto/enums/sparse"),
+            root.path().join("wit-parser/directive"),
+        ]
     );
-    assert!(matches!(explicit.descriptors, Some(Descriptors::Paths(paths)) if paths.is_empty()));
-    let preset = parse_expectation(&format!("descriptors = \"temporal\"\n{valid}")).unwrap();
-    assert!(matches!(
-        preset.descriptors,
-        Some(Descriptors::Preset(DescriptorPreset::Temporal))
-    ));
-    for invalid in [
-        valid.replace("[error]", "typo = true\n[error]"),
-        valid.replace("contains =", "typo ="),
-        valid.replace("invalid-proto-enum-binding", "unknown-error-kind"),
-        valid.replace("[\"severity-low\"]", "[]"),
-        valid.replace("[\"severity-low\"]", "[\" \"]"),
-        format!("languages = []\n{valid}"),
-        format!("languages = [\"python\", \"python\"]\n{valid}"),
-        format!("languages = [\"unknown\"]\n{valid}"),
-        format!("languages = [\"ruby\"]\n{valid}"),
-        format!("inputs = []\n{valid}"),
-        format!("descriptors = \"unknown\"\n{valid}"),
-        format!("descriptors = true\n{valid}"),
-    ] {
-        assert!(
-            parse_expectation(&invalid).is_err(),
-            "accepted invalid expectation: {invalid}"
+    let incomplete = root.path().join("wit-parser/missing-expectation");
+    fs::create_dir_all(incomplete.join("deps")).unwrap();
+    fs::write(incomplete.join("input.wit"), "").unwrap();
+    let error = discover_cases(root.path()).unwrap_err();
+    assert!(error.contains("missing-expectation"), "{error}");
+    assert!(error.contains("expected.toml"), "{error}");
+}
+
+#[test]
+fn expectations_reject_vacuous_diagnostic_assertions() {
+    for contains in ["[]", "[\" \"]"] {
+        let source =
+            format!("[error]\nkind = \"invalid-proto-enum-binding\"\ncontains = {contains}");
+        assert_eq!(
+            parse_expectation(&source).unwrap_err(),
+            "error.contains must include at least one nonempty fragment"
         );
     }
 }

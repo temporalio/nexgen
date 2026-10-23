@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-resource-method"
+contains = [
+  "UserService.User.update-email",
+  "bound operation `UpdatesEmail` was not found",
+]

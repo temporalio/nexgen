@@ -1,0 +1,5 @@
+languages = ["python"]
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["@nexus.source", "_support.workflow_namespace()", "remove that prefix"]

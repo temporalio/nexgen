@@ -1,0 +1,14 @@
+package test:generic-resource;
+
+world system { export models; }
+
+interface models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type context-t = placeholder;
+
+  resource holder {
+    constructor(value: context-t);
+  }
+}
