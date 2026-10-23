@@ -30,7 +30,7 @@ pub struct GenerateRequest {
     pub language: Language,
     pub input_paths: Vec<PathBuf>,
     /// Import path or namespace of a user-owned support package. Required for
-    /// WIT generation in Go, Python, TypeScript and .NET; not used for Java
+    /// WIT generation in Go, Java, Python, TypeScript and .NET
     /// or ordinary JSON Schema generation.
     pub support_package: Option<String>,
     pub descriptor_paths: Vec<PathBuf>,
@@ -63,7 +63,11 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
     if parser::is_wit_input(&request.input_paths)?
         && matches!(
             request.language,
-            Language::Dotnet | Language::Go | Language::Python | Language::TypeScript
+            Language::Dotnet
+                | Language::Go
+                | Language::Java
+                | Language::Python
+                | Language::TypeScript
         )
         && request.support_package.as_deref().is_none_or(str::is_empty)
     {
@@ -141,7 +145,12 @@ pub(crate) fn compile_tree_to_files(
     // planned IR -> emitted JSON names -> render target-language files
     let name_resolution = planning::EmittedNameResolutionPass::new(language, &planned_tree)?;
     let generator_ready_tree = name_resolution.apply(planned_tree)?;
-    generator::generate_files_from_planned_tree(language, &generator_ready_tree, options)
+    generator::generate_files_from_planned_tree(
+        language,
+        &generator_ready_tree,
+        descriptors,
+        options,
+    )
 }
 
 /// The output directory's basename, used as the Go package name — matching
@@ -376,6 +385,7 @@ mod tests {
         for language in [
             Language::Dotnet,
             Language::Go,
+            Language::Java,
             Language::Python,
             Language::TypeScript,
         ] {
@@ -397,6 +407,7 @@ mod tests {
         for language in [
             Language::Dotnet,
             Language::Go,
+            Language::Java,
             Language::Python,
             Language::TypeScript,
         ] {
@@ -404,6 +415,9 @@ mod tests {
             request.language = language;
             request.input_paths = vec![input.clone()];
             request.output_path = temp.path().join(language.as_str());
+            if language == Language::Java {
+                request.java_package_name = Some("java".into());
+            }
             generate_to_file(&request).unwrap();
             assert!(request.output_path.exists());
         }

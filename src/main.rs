@@ -87,6 +87,9 @@ struct JavaGenerateArgs {
     /// segment must match the `--output` directory's name.
     #[arg(long = "package-name")]
     package_name: String,
+    /// Class containing user-owned WIT conversion and context helpers.
+    #[arg(long = "support-package")]
+    support_package: Option<String>,
 }
 
 #[derive(Args)]
@@ -182,7 +185,7 @@ fn main() -> ExitCode {
             args.common,
             Default::default(),
             Some(args.package_name),
-            None,
+            args.support_package,
         )),
         Commands::Python(args) => {
             #[cfg(feature = "advanced")]

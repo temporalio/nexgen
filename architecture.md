@@ -122,3 +122,57 @@ flowchart LR
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
   the consuming module can only resolve it from the tree-wide manifest.
+
+## Java emission
+
+Native Java operation rendering honors the selected operations-class name.
+Explicit names produce an inheritable generated base for SDK facades, allowing
+new operations to become available without editing the facade. Package placement
+is controlled by the Java package option. The renderer splits record inputs
+using existing requiredness, defaults, visibility, and flattening metadata:
+required fields become method parameters and optional fields become a generated
+options class. Public methods build the transfer request and call a
+package-private execution helper, also used by generated resource methods. This
+is Java rendering policy, with no additional planning pass or metadata.
+
+Function fields with call-extractor hooks also expose a typed overload using
+bound method references followed directly by their arguments. The IDL's primary
+callable supports zero through six arguments; other callables support zero or
+one. Function result annotations and type parameters come from the existing IDL
+metadata. The generator calls SDK-owned extractors to resolve names and
+arguments, then fills the same request builder. Probe state and method metadata
+remain in the SDK, outside the generated runtime. Existing function
+argument-field metadata maps wire keys to authored API names. The renderer has
+no workflow/start/signal-specific policy. Java's `merge-from-function` field
+rule identifies the callable supplying metadata and a support merge helper. The
+WIT parser resolves authored field names and selects Java hooks, lowering only
+the reference/helper and callable metadata type into the shared model. Existing
+family mappings carry these declarations; there is no new pass or planned merge
+state. Raw WIT annotations are not available to or reparsed by generation.
+
+The Java renderer retains one extractor result per referenced function and emits
+merge calls after extraction, including when explicit options are null. Helpers
+own precedence and annotation semantics. Merging changes only typed request
+construction, not model rendering or transfer conversion. Other language output
+is unchanged. Relationships between callable fields remain undeclared.
+
+The Java backend renders native declarations and external protobuf bindings from
+`PlannedFamily`, alongside its existing JSON Schema renderer. Java-specific type
+mapping, descriptor-based protobuf class naming, and runtime helpers belong to
+`src/generator/java.rs`. JSON Schema orchestration and rendering live in
+`src/generator/json_schema/java.rs`; the formatter is a child module under
+`src/generator/java/`. No additional compiler pass is required.
+
+The Java renderer receives the existing descriptor index directly for protobuf
+accessor names, collection shapes, and numeric widths. It emits typed protobuf
+getters/setters and ordinary Java collection conversions. Runtime requirements
+are tracked locally during Java rendering; only referenced helpers and value
+types are emitted. Converter scoping belongs to SDK internals; generated
+transfer converters obtain the active converter through the configured support
+class. This adds no planning metadata or compiler pass.
+
+System Nexus generation also emits `system-nexus-roots.txt`. Its entries come
+from the protobuf transfer types of operation inputs and outputs, including
+payload-free responses. SDK build-time visitor generators consume this manifest
+without maintaining a separate list of operation message names.
+

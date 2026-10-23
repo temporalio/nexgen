@@ -13,8 +13,14 @@ java {
 }
 
 dependencies {
+    // Test unreleased generator integration against a locally built SDK.
+    def sdkDir = System.getenv('TEMPORAL_JAVA_SDK_DIR')
+    if (sdkDir) {
+        implementation files("$sdkDir/temporal-sdk/build/classes/java/main", "$sdkDir/temporal-serviceclient/build/classes/java/main")
+    }
+
     implementation 'io.temporal:temporal-sdk:1.35.0'
-    implementation 'io.nexusrpc:nexus-sdk:0.5.0-alpha'
+    implementation 'io.nexusrpc:nexus-sdk:0.6.0-alpha'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.4'
 
     compileOnly 'org.jspecify:jspecify:1.0.0'
@@ -33,4 +39,24 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
     useJUnitPlatform()
+    systemProperty 'nexgen.test.classpath', sourceSets.test.runtimeClasspath.asPath
 }
+
+// The descriptor fixture includes unreleased API messages. Generate only the
+// missing fixture package instead of upgrading or duplicating the SDK's protos.
+configurations { protoCompiler }
+def protocPlatform = System.getProperty('os.name').toLowerCase().contains('mac') ? 'osx-x86_64' :
+    System.getProperty('os.name').toLowerCase().contains('windows') ? 'windows-x86_64' :
+    System.getProperty('os.arch') == 'aarch64' ? 'linux-aarch_64' : 'linux-x86_64'
+dependencies { protoCompiler "com.google.protobuf:protoc:3.25.5:${protocPlatform}@exe" }
+def fixtureProtoDir = layout.buildDirectory.dir('generated/protofixtures')
+tasks.register('generateProtoFixtures', Exec) {
+    inputs.file('../descriptors/temporal_api.bin')
+    outputs.dir(fixtureProtoDir)
+    doFirst {
+        fixtureProtoDir.get().asFile.mkdirs()
+        commandLine configurations.protoCompiler.singleFile, '--descriptor_set_in=../descriptors/temporal_api.bin',
+            "--java_out=${fixtureProtoDir.get().asFile}", 'temporal/api/notificationservice/v1/request_response.proto'
+    }
+}
+sourceSets.main.java.srcDir(tasks.named('generateProtoFixtures'))

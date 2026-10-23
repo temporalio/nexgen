@@ -64,9 +64,13 @@ Keep all TypeScript `@temporalio/*` packages on the same version. Python's
 `temporalio` package installs its compatible `nexus-rpc` version transitively;
 declare `nexus-rpc` directly only if your dependency tooling requires it.
 
-Generated Java source uses JSpecify's `@NullMarked` and `@Nullable` annotations.
-Add JSpecify 1.0.0 to the compile classpath; it is not needed at runtime. For
-Gradle:
+Java WIT generation additionally requires the SDK transfer-converter API, which
+is currently available on the Java SDK main branch. See the Java WIT section in
+[the guide](GUIDE.md#java-wit-generation) for local SDK integration.
+
+Generated Java JSON Schema source uses JSpecify's `@NullMarked` and `@Nullable`
+annotations. Add JSpecify 1.0.0 to the compile classpath; it is not needed at
+runtime. For Gradle:
 
 ```groovy
 dependencies {

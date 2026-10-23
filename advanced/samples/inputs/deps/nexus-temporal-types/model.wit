@@ -6,6 +6,7 @@ interface model {
 
   /// @nexus.proto "temporal.api.common.v1.Payload" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="Object"
   ///   python="typing.Any"
   ///   typescript="common.Payload"
   ///   go="any"
@@ -18,6 +19,7 @@ interface model {
   /// @nexus.proto "temporal.api.common.v1.Payloads"
   ///   typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="java.util.List<Object>"
   ///   go="[]any"
   ///   dotnet="IReadOnlyCollection<object?>"
   ///   dotnet-from="ProtoExtensions.FromPayloads"
@@ -28,6 +30,9 @@ interface model {
   /// The SDK failure converter owns the recursive cause and failure-info structure.
   /// @nexus.proto "temporal.api.failure.v1.Failure" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="RuntimeException"
+  ///   java-from="failureFromProto"
+  ///   java-to="failureToProto"
   ///   python="BaseException"
   ///   typescript="Error"
   ///   go="error"
@@ -55,7 +60,7 @@ interface model {
   workflow-call: async func(callable-prefix: callable-prefix, args: payloads) -> workflow-result;
 
   /// Callable result annotation for signal functions.
-  /// @nexus.type python="None | collections.abc.Awaitable[None]" typescript="void" go="any" dotnet="void"
+  /// @nexus.type java="Void" python="None | collections.abc.Awaitable[None]" typescript="void" go="any" dotnet="void"
   type signal-result = placeholder;
 
   /// @nexus.function-args
@@ -66,6 +71,9 @@ interface model {
 
   /// @nexus.proto "temporal.api.common.v1.WorkflowType" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="String"
+  ///   java-from="workflowTypeFromProto"
+  ///   java-to="workflowTypeToProto"
   ///   python="str"
   ///   typescript="string"
   ///   go="string"
@@ -83,6 +91,8 @@ interface model {
   ///   go-name-extractor="WorkflowFunctionName"
   ///   dotnet-name-extractor="TemporalFunctionNames.WorkflowName"
   ///   dotnet-call-extractor="TemporalFunctionNames.ExtractCall"
+  ///   java-call-extractor="captureWorkflowCall"
+  ///   java-call-metadata-type="io.temporal.internal.sync.ExternalWorkflowInvocationHandler.ProbeResult"
   /// @nexus.add-rpc-compatible-with "workflow-type"
   type workflow-function = placeholder;
 
@@ -96,6 +106,7 @@ interface model {
   ///   typescript-name-extractor="signalFunctionName"
   ///   dotnet-name-extractor="TemporalFunctionNames.SignalName"
   ///   dotnet-call-extractor="TemporalFunctionNames.ExtractCall"
+  ///   java-call-extractor="captureSignalCall"
   ///   typescript-value-type="common.SignalDefinition<any[]>"
   ///   typescript-args-type="Value extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
   ///   typescript-import="@temporalio/common"
@@ -104,6 +115,9 @@ interface model {
 
   /// @nexus.proto "temporal.api.common.v1.RetryPolicy" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="io.temporal.common.RetryOptions"
+  ///   java-from="retryPolicyFromProto"
+  ///   java-to="retryPolicyToProto"
   ///   python="temporalio.common.RetryPolicy"
   ///   typescript="common.RetryPolicy"
   ///   go="go.temporal.io/sdk/temporal.RetryPolicy"
@@ -114,6 +128,9 @@ interface model {
 
   /// @nexus.proto "temporal.api.taskqueue.v1.TaskQueue" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="String"
+  ///   java-from="taskQueueFromProto"
+  ///   java-to="taskQueueToProto"
   ///   python="str"
   ///   typescript="string"
   ///   go="string"
@@ -124,6 +141,9 @@ interface model {
 
   /// @nexus.proto "temporal.api.common.v1.Memo" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="java.util.Map<String, Object>"
+  ///   java-from="memoFromProto"
+  ///   java-to="memoToProto"
   ///   python="collections.abc.Mapping[str, typing.Any]"
   ///   typescript="Record<string, unknown>"
   ///   go="map[string]any"
@@ -133,6 +153,9 @@ interface model {
 
   /// @nexus.proto "temporal.api.common.v1.Header" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="java.util.Map<String, io.temporal.api.common.v1.Payload>"
+  ///   java-from="headerFromProto"
+  ///   java-to="headerToProto"
   ///   python="collections.abc.Mapping[str, typing.Any]"
   ///   typescript="common.Headers"
   ///   go="map[string]any"
@@ -144,6 +167,9 @@ interface model {
 
   /// @nexus.proto "temporal.api.common.v1.SearchAttributes" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="io.temporal.common.SearchAttributes"
+  ///   java-from="searchAttributesFromProto"
+  ///   java-to="searchAttributesToProto"
   ///   python="temporalio.common.TypedSearchAttributes"
   ///   typescript="common.TypedSearchAttributes"
   ///   go="go.temporal.io/sdk/temporal.SearchAttributes"
@@ -154,6 +180,9 @@ interface model {
 
   /// @nexus.proto "temporal.api.common.v1.Priority" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="io.temporal.common.Priority"
+  ///   java-from="priorityFromProto"
+  ///   java-to="priorityToProto"
   ///   python="temporalio.common.Priority"
   ///   typescript="common.Priority"
   ///   go="go.temporal.io/sdk/temporal.Priority"
@@ -164,6 +193,9 @@ interface model {
 
   /// @nexus.proto "temporal.api.workflow.v1.VersioningOverride" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="io.temporal.common.VersioningOverride"
+  ///   java-from="versioningOverrideFromProto"
+  ///   java-to="versioningOverrideToProto"
   ///   python="temporalio.common.VersioningOverride"
   ///   typescript="common.VersioningOverride"
   ///   go="go.temporal.io/sdk/client.VersioningOverride"
@@ -174,6 +206,9 @@ interface model {
 
   /// @nexus.proto "google.protobuf.Duration" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="java.time.Duration"
+  ///   java-from="durationFromProto"
+  ///   java-to="durationToProto"
   ///   python="datetime.timedelta"
   ///   typescript="common.Duration"
   ///   go="time.Duration"
@@ -184,6 +219,7 @@ interface model {
 
   /// @nexus.proto "temporal.api.enums.v1.WorkflowIdReusePolicy" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="io.temporal.api.enums.v1.WorkflowIdReusePolicy"
   ///   python="temporalio.common.WorkflowIDReusePolicy"
   ///   typescript="common.WorkflowIdReusePolicy"
   ///   go="go.temporal.io/api/enums/v1:enums.WorkflowIdReusePolicy"
@@ -193,6 +229,7 @@ interface model {
 
   /// @nexus.proto "temporal.api.enums.v1.WorkflowIdConflictPolicy" typescript-import="@temporalio/proto"
   /// @nexus.type
+  ///   java="io.temporal.api.enums.v1.WorkflowIdConflictPolicy"
   ///   python="temporalio.common.WorkflowIDConflictPolicy"
   ///   typescript="common.WorkflowIdConflictPolicy"
   ///   go="go.temporal.io/api/enums/v1:enums.WorkflowIdConflictPolicy"
@@ -207,11 +244,11 @@ interface model {
   record user-metadata {
     /// @nexus.doc "Single-line fixed summary for the workflow execution that may appear in UI and CLI. This can be in single-line Temporal Markdown format."
     /// @nexus.proto-field "summary"
-    /// @nexus.flattened-type python="str" typescript="string" dotnet="string" go="string"
+    /// @nexus.flattened-type java="String" python="str" typescript="string" dotnet="string" go="string"
     static-summary: option<payload>,
     /// @nexus.doc "General fixed details for the workflow execution that may appear in UI and CLI. This can be in Temporal Markdown format and can span multiple lines. This value is fixed on the workflow execution and cannot be updated."
     /// @nexus.proto-field "details"
-    /// @nexus.flattened-type python="str" typescript="string" dotnet="string" go="string"
+    /// @nexus.flattened-type java="String" python="str" typescript="string" dotnet="string" go="string"
     static-details: option<payload>,
   }
 }

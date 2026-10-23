@@ -1105,6 +1105,7 @@ impl<'a> TypePlanningContext<'a> {
             converter: function.converter.clone(),
             name_extractor: function.name_extractor.clone(),
             call_extractor: function.call_extractor.clone(),
+            call_metadata_type: function.call_metadata_type.clone(),
             result_type_parameter: function.result_type_parameter.clone(),
             type_descriptor: function.type_descriptor.as_ref().map(|descriptor| {
                 FunctionTypeDescriptorSpec {
