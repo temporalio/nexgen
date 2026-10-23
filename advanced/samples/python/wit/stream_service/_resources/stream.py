@@ -18,6 +18,7 @@ from ..models import (
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamRef,
+    StreamStatus,
 )
 
 
@@ -80,6 +81,7 @@ class Stream:
 class CreateStreamResult:
     stream: Stream
     created: bool | None = None
+    status: StreamStatus | None = None
 
 
 async def _append_records(

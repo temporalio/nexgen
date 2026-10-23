@@ -36,6 +36,7 @@ async def _create_stream(
             stream=result.stream,
         ),
         created=result.created,
+        status=result.status,
     )
 
 

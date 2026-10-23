@@ -34,36 +34,40 @@ namespace StreamSample.V1 {
             "bXBvcmFsLmFwaS5jb21tb24udjEuUGF5bG9hZCJ/ChNDcmVhdGVTdHJlYW1S",
             "ZXF1ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRInCgNyZWYYAiABKAsyGi5zdHJl",
             "YW1zYW1wbGUudjEuU3RyZWFtUmVmEiwKCXJldGVudGlvbhgDIAEoCzIZLmdv",
-            "b2dsZS5wcm90b2J1Zi5EdXJhdGlvbiJTChRDcmVhdGVTdHJlYW1SZXNwb25z",
-            "ZRIqCgZzdHJlYW0YASABKAsyGi5zdHJlYW1zYW1wbGUudjEuU3RyZWFtUmVm",
-            "Eg8KB2NyZWF0ZWQYAiABKAgilwEKFEFwcGVuZFJlY29yZHNSZXF1ZXN0EhEK",
-            "CW5hbWVzcGFjZRgBIAEoCRIqCgZzdHJlYW0YAiABKAsyGi5zdHJlYW1zYW1w",
-            "bGUudjEuU3RyZWFtUmVmEhAKCHNlcXVlbmNlGAMgASgDEi4KB3JlY29yZHMY",
-            "BCADKAsyHS5zdHJlYW1zYW1wbGUudjEuQXBwZW5kUmVjb3JkIkIKFUFwcGVu",
-            "ZFJlY29yZHNSZXNwb25zZRIUCgxmaXJzdF9vZmZzZXQYASABKAMSEwoLbGFz",
-            "dF9vZmZzZXQYAiABKAMihAEKEkNsb3NlU3RyZWFtUmVxdWVzdBIRCgluYW1l",
-            "c3BhY2UYASABKAkSKgoGc3RyZWFtGAIgASgLMhouc3RyZWFtc2FtcGxlLnYx",
-            "LlN0cmVhbVJlZhIvCgZyZXN1bHQYAyABKAsyHy50ZW1wb3JhbC5hcGkuY29t",
-            "bW9uLnYxLlBheWxvYWQiFQoTQ2xvc2VTdHJlYW1SZXNwb25zZSK2AQoSUmVh",
-            "ZFJlY29yZHNSZXF1ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIqCgZzdHJlYW0Y",
-            "AiABKAsyGi5zdHJlYW1zYW1wbGUudjEuU3RyZWFtUmVmEhMKC2Zyb21fb2Zm",
-            "c2V0GAMgASgDEg4KBnRvcGljcxgEIAMoCRITCgttYXhfcmVjb3JkcxgFIAEo",
-            "BRInCgR3YWl0GAYgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uImgK",
-            "E1JlYWRSZWNvcmRzUmVzcG9uc2USLgoHcmVjb3JkcxgBIAMoCzIdLnN0cmVh",
-            "bXNhbXBsZS52MS5TdHJlYW1SZWNvcmQSEwoLbmV4dF9vZmZzZXQYAiABKAMS",
-            "DAoEZG9uZRgDIAEoCCJWChVEZXNjcmliZVN0cmVhbVJlcXVlc3QSEQoJbmFt",
-            "ZXNwYWNlGAEgASgJEioKBnN0cmVhbRgCIAEoCzIaLnN0cmVhbXNhbXBsZS52",
-            "MS5TdHJlYW1SZWYiWwoWRGVzY3JpYmVTdHJlYW1SZXNwb25zZRITCgtsYXN0",
-            "X29mZnNldBgBIAEoAxIsCglyZXRlbnRpb24YAiABKAsyGS5nb29nbGUucHJv",
-            "dG9idWYuRHVyYXRpb25CEqoCD1N0cmVhbVNhbXBsZS5WMWIGcHJvdG8z"));
+            "b2dsZS5wcm90b2J1Zi5EdXJhdGlvbiKCAQoUQ3JlYXRlU3RyZWFtUmVzcG9u",
+            "c2USKgoGc3RyZWFtGAEgASgLMhouc3RyZWFtc2FtcGxlLnYxLlN0cmVhbVJl",
+            "ZhIPCgdjcmVhdGVkGAIgASgIEi0KBnN0YXR1cxgDIAEoDjIdLnN0cmVhbXNh",
+            "bXBsZS52MS5TdHJlYW1TdGF0dXMilwEKFEFwcGVuZFJlY29yZHNSZXF1ZXN0",
+            "EhEKCW5hbWVzcGFjZRgBIAEoCRIqCgZzdHJlYW0YAiABKAsyGi5zdHJlYW1z",
+            "YW1wbGUudjEuU3RyZWFtUmVmEhAKCHNlcXVlbmNlGAMgASgDEi4KB3JlY29y",
+            "ZHMYBCADKAsyHS5zdHJlYW1zYW1wbGUudjEuQXBwZW5kUmVjb3JkIkIKFUFw",
+            "cGVuZFJlY29yZHNSZXNwb25zZRIUCgxmaXJzdF9vZmZzZXQYASABKAMSEwoL",
+            "bGFzdF9vZmZzZXQYAiABKAMihAEKEkNsb3NlU3RyZWFtUmVxdWVzdBIRCglu",
+            "YW1lc3BhY2UYASABKAkSKgoGc3RyZWFtGAIgASgLMhouc3RyZWFtc2FtcGxl",
+            "LnYxLlN0cmVhbVJlZhIvCgZyZXN1bHQYAyABKAsyHy50ZW1wb3JhbC5hcGku",
+            "Y29tbW9uLnYxLlBheWxvYWQiFQoTQ2xvc2VTdHJlYW1SZXNwb25zZSK2AQoS",
+            "UmVhZFJlY29yZHNSZXF1ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIqCgZzdHJl",
+            "YW0YAiABKAsyGi5zdHJlYW1zYW1wbGUudjEuU3RyZWFtUmVmEhMKC2Zyb21f",
+            "b2Zmc2V0GAMgASgDEg4KBnRvcGljcxgEIAMoCRITCgttYXhfcmVjb3JkcxgF",
+            "IAEoBRInCgR3YWl0GAYgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9u",
+            "ImgKE1JlYWRSZWNvcmRzUmVzcG9uc2USLgoHcmVjb3JkcxgBIAMoCzIdLnN0",
+            "cmVhbXNhbXBsZS52MS5TdHJlYW1SZWNvcmQSEwoLbmV4dF9vZmZzZXQYAiAB",
+            "KAMSDAoEZG9uZRgDIAEoCCJWChVEZXNjcmliZVN0cmVhbVJlcXVlc3QSEQoJ",
+            "bmFtZXNwYWNlGAEgASgJEioKBnN0cmVhbRgCIAEoCzIaLnN0cmVhbXNhbXBs",
+            "ZS52MS5TdHJlYW1SZWYiWwoWRGVzY3JpYmVTdHJlYW1SZXNwb25zZRITCgts",
+            "YXN0X29mZnNldBgBIAEoAxIsCglyZXRlbnRpb24YAiABKAsyGS5nb29nbGUu",
+            "cHJvdG9idWYuRHVyYXRpb24qegoMU3RyZWFtU3RhdHVzEh0KGVNUUkVBTV9T",
+            "VEFUVVNfVU5TUEVDSUZJRUQQABIWChJTVFJFQU1fU1RBVFVTX09QRU4QARIY",
+            "ChRTVFJFQU1fU1RBVFVTX0NMT1NFRBACEhkKFVNUUkVBTV9TVEFUVVNfRVhQ",
+            "SVJFRBADQhKqAg9TdHJlYW1TYW1wbGUuVjFiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.DurationReflection.Descriptor, global::Temporalio.Api.Common.V1.MessageReflection.Descriptor, },
-          new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::StreamSample.V1.StreamStatus), }, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.StreamRef), global::StreamSample.V1.StreamRef.Parser, new[]{ "Id", "WorkflowId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.AppendRecord), global::StreamSample.V1.AppendRecord.Parser, new[]{ "Topic", "Body" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.StreamRecord), global::StreamSample.V1.StreamRecord.Parser, new[]{ "Offset", "Topic", "Body" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.CreateStreamRequest), global::StreamSample.V1.CreateStreamRequest.Parser, new[]{ "Namespace", "Ref", "Retention" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.CreateStreamResponse), global::StreamSample.V1.CreateStreamResponse.Parser, new[]{ "Stream", "Created" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.CreateStreamResponse), global::StreamSample.V1.CreateStreamResponse.Parser, new[]{ "Stream", "Created", "Status" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.AppendRecordsRequest), global::StreamSample.V1.AppendRecordsRequest.Parser, new[]{ "Namespace", "Stream", "Sequence", "Records" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.AppendRecordsResponse), global::StreamSample.V1.AppendRecordsResponse.Parser, new[]{ "FirstOffset", "LastOffset" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::StreamSample.V1.CloseStreamRequest), global::StreamSample.V1.CloseStreamRequest.Parser, new[]{ "Namespace", "Stream", "Result" }, null, null, null, null),
@@ -77,6 +81,16 @@ namespace StreamSample.V1 {
     #endregion
 
   }
+  #region Enums
+  public enum StreamStatus {
+    [pbr::OriginalName("STREAM_STATUS_UNSPECIFIED")] Unspecified = 0,
+    [pbr::OriginalName("STREAM_STATUS_OPEN")] Open = 1,
+    [pbr::OriginalName("STREAM_STATUS_CLOSED")] Closed = 2,
+    [pbr::OriginalName("STREAM_STATUS_EXPIRED")] Expired = 3,
+  }
+
+  #endregion
+
   #region Messages
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class StreamRef : pb::IMessage<StreamRef>
@@ -1165,6 +1179,7 @@ namespace StreamSample.V1 {
     public CreateStreamResponse(CreateStreamResponse other) : this() {
       stream_ = other.stream_ != null ? other.stream_.Clone() : null;
       created_ = other.created_;
+      status_ = other.status_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -1198,6 +1213,18 @@ namespace StreamSample.V1 {
       }
     }
 
+    /// <summary>Field number for the "status" field.</summary>
+    public const int StatusFieldNumber = 3;
+    private global::StreamSample.V1.StreamStatus status_ = global::StreamSample.V1.StreamStatus.Unspecified;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::StreamSample.V1.StreamStatus Status {
+      get { return status_; }
+      set {
+        status_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -1215,6 +1242,7 @@ namespace StreamSample.V1 {
       }
       if (!object.Equals(Stream, other.Stream)) return false;
       if (Created != other.Created) return false;
+      if (Status != other.Status) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1224,6 +1252,7 @@ namespace StreamSample.V1 {
       int hash = 1;
       if (stream_ != null) hash ^= Stream.GetHashCode();
       if (Created != false) hash ^= Created.GetHashCode();
+      if (Status != global::StreamSample.V1.StreamStatus.Unspecified) hash ^= Status.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1250,6 +1279,10 @@ namespace StreamSample.V1 {
         output.WriteRawTag(16);
         output.WriteBool(Created);
       }
+      if (Status != global::StreamSample.V1.StreamStatus.Unspecified) {
+        output.WriteRawTag(24);
+        output.WriteEnum((int) Status);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -1268,6 +1301,10 @@ namespace StreamSample.V1 {
         output.WriteRawTag(16);
         output.WriteBool(Created);
       }
+      if (Status != global::StreamSample.V1.StreamStatus.Unspecified) {
+        output.WriteRawTag(24);
+        output.WriteEnum((int) Status);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -1283,6 +1320,9 @@ namespace StreamSample.V1 {
       }
       if (Created != false) {
         size += 1 + 1;
+      }
+      if (Status != global::StreamSample.V1.StreamStatus.Unspecified) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Status);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1304,6 +1344,9 @@ namespace StreamSample.V1 {
       }
       if (other.Created != false) {
         Created = other.Created;
+      }
+      if (other.Status != global::StreamSample.V1.StreamStatus.Unspecified) {
+        Status = other.Status;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1335,6 +1378,10 @@ namespace StreamSample.V1 {
             Created = input.ReadBool();
             break;
           }
+          case 24: {
+            Status = (global::StreamSample.V1.StreamStatus) input.ReadEnum();
+            break;
+          }
         }
       }
     #endif
@@ -1363,6 +1410,10 @@ namespace StreamSample.V1 {
           }
           case 16: {
             Created = input.ReadBool();
+            break;
+          }
+          case 24: {
+            Status = (global::StreamSample.V1.StreamStatus) input.ReadEnum();
             break;
           }
         }

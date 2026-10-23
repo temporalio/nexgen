@@ -31,6 +31,14 @@ interface stream-service {
     body: option<payload>,
   }
 
+  /// @nexus.proto "streamsample.v1.StreamStatus" typescript-import="#streamsample"
+  enum stream-status {
+    stream-status-unspecified,
+    stream-status-open,
+    stream-status-closed,
+    stream-status-expired,
+  }
+
   /// @nexus.proto "streamsample.v1.CreateStreamRequest" typescript-import="#streamsample"
   record create-stream-request {
     %ref: option<stream-ref>,
@@ -123,6 +131,7 @@ interface stream-service {
   record create-stream-result {
     %stream: own<%stream>,
     created: option<bool>,
+    status: option<stream-status>,
   }
 
   /// @nexus.operation name="CreateStream"

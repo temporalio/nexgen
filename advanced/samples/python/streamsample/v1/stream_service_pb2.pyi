@@ -8,6 +8,7 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import duration_pb2 as _duration_pb2
 from google.protobuf import message as _message
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from temporalio.api.common.v1 import message_pb2 as _message_pb2
 import builtins as _builtins
 import sys
@@ -19,6 +20,25 @@ else:
     from typing_extensions import TypeAlias as _TypeAlias, Never as _Never
 
 DESCRIPTOR: _descriptor.FileDescriptor
+
+class _StreamStatus:
+    ValueType = _typing.NewType("ValueType", _builtins.int)
+    V: _TypeAlias = ValueType  # noqa: Y015
+
+class _StreamStatusEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamStatus.ValueType], _builtins.type):
+    DESCRIPTOR: _descriptor.EnumDescriptor
+    STREAM_STATUS_UNSPECIFIED: _StreamStatus.ValueType  # 0
+    STREAM_STATUS_OPEN: _StreamStatus.ValueType  # 1
+    STREAM_STATUS_CLOSED: _StreamStatus.ValueType  # 2
+    STREAM_STATUS_EXPIRED: _StreamStatus.ValueType  # 3
+
+class StreamStatus(_StreamStatus, metaclass=_StreamStatusEnumTypeWrapper): ...
+
+STREAM_STATUS_UNSPECIFIED: StreamStatus.ValueType  # 0
+STREAM_STATUS_OPEN: StreamStatus.ValueType  # 1
+STREAM_STATUS_CLOSED: StreamStatus.ValueType  # 2
+STREAM_STATUS_EXPIRED: StreamStatus.ValueType  # 3
+Global___StreamStatus: _TypeAlias = StreamStatus  # noqa: Y015
 
 @_typing.final
 class StreamRef(_message.Message):
@@ -124,7 +144,9 @@ class CreateStreamResponse(_message.Message):
 
     STREAM_FIELD_NUMBER: _builtins.int
     CREATED_FIELD_NUMBER: _builtins.int
+    STATUS_FIELD_NUMBER: _builtins.int
     created: _builtins.bool
+    status: Global___StreamStatus.ValueType
     @_builtins.property
     def stream(self) -> Global___StreamRef: ...
     def __init__(
@@ -132,10 +154,11 @@ class CreateStreamResponse(_message.Message):
         *,
         stream: Global___StreamRef | None = ...,
         created: _builtins.bool = ...,
+        status: Global___StreamStatus.ValueType = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["stream", b"stream"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created", b"created", "stream", b"stream"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["created", b"created", "status", b"status", "stream", b"stream"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

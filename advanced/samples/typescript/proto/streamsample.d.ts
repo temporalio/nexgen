@@ -27,9 +27,17 @@ export namespace streamsample {
       retention?: google.protobuf.IDuration | null;
     }
 
+    enum StreamStatus {
+      STREAM_STATUS_UNSPECIFIED = 0,
+      STREAM_STATUS_OPEN = 1,
+      STREAM_STATUS_CLOSED = 2,
+      STREAM_STATUS_EXPIRED = 3,
+    }
+
     interface ICreateStreamResponse {
       stream?: IStreamRef | null;
       created?: boolean | null;
+      status?: StreamStatus | null;
     }
 
     interface IAppendRecordsRequest {

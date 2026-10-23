@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import enum
 import typing
 import typing_extensions
 import datetime
@@ -10,6 +11,13 @@ import streamsample.v1.stream_service_pb2
 import temporalio.converter
 
 import temporal_support as _support
+
+
+class StreamStatus(enum.IntEnum):
+    StreamStatusUnspecified = 0
+    StreamStatusOpen = 1
+    StreamStatusClosed = 2
+    StreamStatusExpired = 3
 
 
 @dataclasses.dataclass(slots=True)
@@ -116,6 +124,7 @@ temporalio.converter.transfer_type_convertible(_StreamRefTransferTypeConverter)(
 class CreateStreamResponse:
     stream: StreamRef | None = None
     created: bool | None = None
+    status: StreamStatus | None = None
 
 
 class _CreateStreamResponseTransferTypeConverter(
@@ -140,6 +149,7 @@ class _CreateStreamResponseTransferTypeConverter(
             if value.HasField("stream")
             else None,
             created=value.created if bool(value.created) else None,
+            status=StreamStatus(value.status) if value.status != 0 else None,
         )
 
     @typing_extensions.override
@@ -154,6 +164,10 @@ class _CreateStreamResponseTransferTypeConverter(
             )
         if value.created is not None:
             message.created = value.created
+        if value.status is not None:
+            message.status = streamsample.v1.stream_service_pb2.StreamStatus.ValueType(
+                value.status
+            )
         return message
 
 
