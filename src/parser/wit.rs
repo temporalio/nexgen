@@ -2767,6 +2767,10 @@ fn build_resource(
         "{service_context} resource `{}`",
         resource_name.to_upper_camel_case()
     );
+    let resource_directives = parse_directives(type_def.docs.contents.as_deref(), path, &context)?;
+    let doc = directive(&resource_directives, "doc", path, &context)?
+        .map(directive_language_string)
+        .unwrap_or_default();
 
     let constructor = interface.functions.values().find(
         |function| matches!(function.kind, FunctionKind::Constructor(id) if id == resource_id),
@@ -2828,6 +2832,7 @@ fn build_resource(
 
     Ok(ResourceSpec {
         name: resource_name,
+        doc,
         fields,
         methods,
         data: (),
@@ -2877,6 +2882,9 @@ fn build_resource_method(
 
     Ok(ResourceMethodSpec {
         name: method_name,
+        doc: directive(&directives, "doc", path, &context)?
+            .map(directive_language_string)
+            .unwrap_or_default(),
         params,
         result,
         operation_name: build_resource_method_operation_name(&directives, path, &context)?,

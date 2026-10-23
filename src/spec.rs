@@ -712,6 +712,7 @@ impl<F: TypeFamily> OperationSpec<F> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
+    pub doc: F::Text,
     pub fields: Vec<ResourceFieldSpec<F>>,
     pub methods: Vec<ResourceMethodSpec<F>>,
     pub data: F::ResourceData,
@@ -728,6 +729,7 @@ pub struct ResourceFieldSpec<F: TypeFamily = AuthoredFamily> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceMethodSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
+    pub doc: F::Text,
     pub params: Vec<ResourceFieldSpec<F>>,
     pub result: Option<ResourceResultSpec<F>>,
     pub operation_name: Option<String>,
@@ -747,6 +749,7 @@ impl<F: TypeFamily> ResourceSpec<F> {
         let data = map.map_resource_data(&self.name, self.data);
         ResourceSpec {
             name: self.name,
+            doc: map.map_text(self.doc),
             fields: self
                 .fields
                 .into_iter()
@@ -785,6 +788,7 @@ impl<F: TypeFamily> ResourceMethodSpec<F> {
     {
         ResourceMethodSpec {
             name: self.name,
+            doc: map.map_text(self.doc),
             params: self
                 .params
                 .into_iter()

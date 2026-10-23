@@ -131,6 +131,7 @@ pub(crate) struct PlannedOperationResourceFieldBinding {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedResource {
     pub(crate) name: String,
+    pub(crate) doc: Option<String>,
     pub(crate) type_name: String,
     pub(crate) fields: Vec<PlannedResourceField>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
@@ -147,6 +148,7 @@ pub(crate) struct PlannedResourceField {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedResourceMethod {
     pub(crate) name: String,
+    pub(crate) doc: Option<String>,
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,

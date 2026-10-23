@@ -93,6 +93,7 @@ pub(crate) struct ResolvedServiceResources {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ResolvedResourceSpec {
     pub(crate) name: String,
+    pub(crate) doc: SelectedTextSpec,
     pub(crate) fields: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) methods: Vec<ResolvedResourceMethodSpec>,
 }
@@ -100,6 +101,7 @@ pub(crate) struct ResolvedResourceSpec {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) name: String,
+    pub(crate) doc: SelectedTextSpec,
     pub(crate) params: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
     pub(crate) binding: ResolvedResourceMethodBinding,
@@ -293,6 +295,7 @@ fn resolve_resource_methods(
         .collect::<Result<Vec<_>>>()?;
     Ok(ResolvedResourceSpec {
         name: resource.name.clone(),
+        doc: resource.doc.clone(),
         fields: resource.fields.clone(),
         methods,
     })
@@ -353,6 +356,7 @@ fn resolve_resource_method(
         }
         return Ok(ResolvedResourceMethodSpec {
             name: method.name.clone(),
+            doc: method.doc.clone(),
             params: method.params.clone(),
             result: method.result.clone(),
             binding: ResolvedResourceMethodBinding::Operation {
@@ -407,6 +411,7 @@ fn resolve_resource_method(
 
     Ok(ResolvedResourceMethodSpec {
         name: method.name.clone(),
+        doc: method.doc.clone(),
         params: method.params.clone(),
         result: method.result.clone(),
         binding,

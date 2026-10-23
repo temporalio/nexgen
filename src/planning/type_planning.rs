@@ -452,6 +452,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
             .cloned()
             .unwrap_or_else(|| PlannedResource {
                 name: name.to_string(),
+                doc: None,
                 type_name: name.to_upper_camel_case(),
                 fields: Vec::new(),
                 methods: Vec::new(),
@@ -842,6 +843,7 @@ impl<'a> TypePlanningContext<'a> {
 
                 Ok(PlannedResourceMethod {
                     name: method.name.clone(),
+                    doc: method.doc.value().map(str::to_string),
                     params: method
                         .params
                         .iter()
@@ -858,6 +860,7 @@ impl<'a> TypePlanningContext<'a> {
 
         Ok(PlannedResource {
             name: resource.name.clone(),
+            doc: resource.doc.value().map(str::to_string),
             type_name: resource.name.to_upper_camel_case(),
             fields: resource
                 .fields
