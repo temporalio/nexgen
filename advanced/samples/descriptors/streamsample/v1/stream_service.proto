@@ -30,9 +30,17 @@ message CreateStreamRequest {
     google.protobuf.Duration retention = 3;
 }
 
+enum StreamStatus {
+    STREAM_STATUS_UNSPECIFIED = 0;
+    STREAM_STATUS_OPEN = 1;
+    STREAM_STATUS_CLOSED = 2;
+    STREAM_STATUS_EXPIRED = 3;
+}
+
 message CreateStreamResponse {
     StreamRef stream = 1;
     bool created = 2;
+    StreamStatus status = 3;
 }
 
 message AppendRecordsRequest {

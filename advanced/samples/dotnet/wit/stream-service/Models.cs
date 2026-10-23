@@ -11,12 +11,22 @@ using Nexgen.Support;
 namespace Nexgen.StreamService
 {
 
+    [GeneratedCode("nexgen", null)]
+    public enum StreamStatus
+    {
+        StreamStatusUnspecified = 0,
+        StreamStatusOpen = 1,
+        StreamStatusClosed = 2,
+        StreamStatusExpired = 3,
+    }
+
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamResponse.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record CreateStreamResponse
     {
         public StreamRef? Stream { get; init; }
         public bool? Created { get; init; }
+        public StreamStatus? Status { get; init; }
 
         internal static CreateStreamResponse FromTransferType(StreamSample.V1.CreateStreamResponse wire)
         {
@@ -24,6 +34,7 @@ namespace Nexgen.StreamService
             {
                 Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
                 Created = wire.Created == false ? null : wire.Created,
+                Status = (int)wire.Status == 0 ? null : (StreamStatus)wire.Status,
             };
         }
 
@@ -37,6 +48,10 @@ namespace Nexgen.StreamService
             if (Created is { } created)
             {
                 proto.Created = created;
+            }
+            if (Status is { } status)
+            {
+                proto.Status = (StreamSample.V1.StreamStatus)status;
             }
             return proto;
         }
@@ -347,6 +362,7 @@ namespace Nexgen.StreamService
 
         public Stream Stream { get; init; }
         public bool? Created { get; init; }
+        public StreamStatus? Status { get; init; }
     }
 
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(DescribeStreamRequest.TransferTypeConverter))]

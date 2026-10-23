@@ -83,7 +83,7 @@ namespace Nexgen.StreamService
         {
             var client = Workflow.CreateNexusWorkflowClient<IStreamService>(StreamServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<CreateStreamResponse>(svc => svc.CreateStream(request)).ConfigureAwait(true);
-            return new CreateStreamResult(new Stream((result.Stream ?? throw new System.InvalidOperationException("CreateStream answered without `stream`")))) { Created = result.Created };
+            return new CreateStreamResult(new Stream((result.Stream ?? throw new System.InvalidOperationException("CreateStream answered without `stream`")))) { Created = result.Created, Status = result.Status };
         }
 
         /// <param name="options">Options for the operation.</param>

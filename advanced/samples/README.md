@@ -207,4 +207,5 @@ protoc -I descriptors -I "$API" --csharp_out=dotnet/proto streamsample/v1/stream
 ```
 
 The TypeScript `typescript/proto/streamsample.d.ts` mirrors the proto by hand,
-with only the `I<Message>` interfaces that the generated code imports.
+with only the `I<Message>` interfaces and the enums that the generated code
+imports.

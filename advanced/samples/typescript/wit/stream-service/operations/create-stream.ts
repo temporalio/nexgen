@@ -34,5 +34,6 @@ export async function createStream(
   return {
     stream: new Stream(requiredField(result.stream, "resource", "stream")),
     created: result.created,
+    status: result.status,
   };
 }
