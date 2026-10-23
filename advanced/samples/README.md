@@ -125,12 +125,29 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
 - TypeScript: [`typescript/wit/proto-generic/`](typescript/wit/proto-generic/),
   [`typescript/tests/proto-generic.test.ts`](typescript/tests/proto-generic.test.ts)
 
+### `stream-service`
+
+A stream API shape: a resource built from a ref and a read with offsets. The
+records are proto-backed, as a stream service's are, on the sample proto in
+[`descriptors/streamsample/`](descriptors/streamsample/).
+
+- WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
+- Python: [`python/wit/stream_service/`](python/wit/stream_service/)
+- TypeScript:
+  [`typescript/wit/stream-service/`](typescript/wit/stream-service/),
+  [`typescript/tests/stream-service.test.ts`](typescript/tests/stream-service.test.ts)
+
 ## Supporting files
 
 - [`inputs/deps/`](inputs/deps/): reusable Temporal semantic/common type WIT
   inputs linked into proto-backed example generation.
 - [`descriptors/temporal_api.bin`](descriptors/temporal_api.bin): Temporal API
   descriptor set used by proto-backed examples.
+- [`descriptors/stream_service.bin`](descriptors/stream_service.bin): descriptor
+  set of the `stream-service` sample proto. The sample projects hold its
+  bindings: [`python/streamsample/`](python/streamsample/),
+  [`dotnet/proto/`](dotnet/proto/) and
+  [`typescript/proto/streamsample.d.ts`](typescript/proto/streamsample.d.ts).
 - [`wire/proto/`](wire/proto/): proto wire fixtures used by the
   proto-compatibility tests.
 - Per-language notes: [`dotnet/README.md`](dotnet/README.md),
@@ -153,3 +170,25 @@ whose definition was renamed or removed never lingers — and nothing hand-writt
 belongs in one. The per-language tests live in the sibling `tests/` directories.
 (The `nexgen` CLI itself never deletes: it writes into an existing `--output`
 directory and leaves everything already there alone.)
+
+### The `stream-service` proto bindings
+
+Upstream has no stream protos, so the sample has its own. After a change to
+`descriptors/streamsample/v1/stream_service.proto`, rebuild its descriptor set
+and bindings with `protoc` 33.1 and `mypy-protobuf` 5.1.0. `API` is a checkout
+of the Temporal API protos (`temporalio/api`), for
+`temporal/api/common/v1/message.proto`.
+
+```sh
+cd advanced/samples
+protoc -I descriptors -I "$API" --descriptor_set_out=descriptors/stream_service.bin \
+  streamsample/v1/stream_service.proto
+protoc -I descriptors -I "$API" --python_out=python --mypy_out=python \
+  streamsample/v1/stream_service.proto
+perl -pi -e 's/^from temporal\.api\./from temporalio.api./' \
+  python/streamsample/v1/stream_service_pb2.py python/streamsample/v1/stream_service_pb2.pyi
+protoc -I descriptors -I "$API" --csharp_out=dotnet/proto streamsample/v1/stream_service.proto
+```
+
+The TypeScript `typescript/proto/streamsample.d.ts` mirrors the proto by hand,
+with only the `I<Message>` interfaces that the generated code imports.

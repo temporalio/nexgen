@@ -1,0 +1,141 @@
+package temporal:stream-service@1.0.0;
+
+world system {
+  export stream-service;
+}
+
+// The records are proto-backed, as the stream service's are. The sample has its own proto in
+// descriptors/streamsample/v1/stream_service.proto.
+/// @nexus.endpoint "streams"
+/// @nexus.service-name "streamsample.v1.StreamService"
+interface stream-service {
+  use nexus:temporal-types/model@1.0.0.{duration, payload, placeholder};
+
+  /// @nexus.doc "Identifies one stream."
+  /// @nexus.proto "streamsample.v1.StreamRef" typescript-import="#streamsample"
+  record stream-ref {
+    id: string,
+    workflow-id: option<string>,
+  }
+
+  /// @nexus.proto "streamsample.v1.AppendRecord" typescript-import="#streamsample"
+  record append-record {
+    topic: string,
+    body: payload,
+  }
+
+  /// @nexus.proto "streamsample.v1.StreamRecord" typescript-import="#streamsample"
+  record stream-record {
+    offset: option<s64>,
+    topic: option<string>,
+    body: option<payload>,
+  }
+
+  /// @nexus.proto "streamsample.v1.CreateStreamRequest" typescript-import="#streamsample"
+  record create-stream-request {
+    %ref: option<stream-ref>,
+    retention: option<duration>,
+    /// @nexus.omit
+    namespace: placeholder,
+  }
+
+  /// @nexus.proto "streamsample.v1.CreateStreamResponse" typescript-import="#streamsample"
+  record create-stream-response {
+    %stream: option<stream-ref>,
+    created: option<bool>,
+  }
+
+  /// @nexus.proto "streamsample.v1.AppendRecordsRequest" typescript-import="#streamsample"
+  record append-records-request {
+    %stream: option<stream-ref>,
+    sequence: option<s64>,
+    records: list<append-record>,
+    /// @nexus.omit
+    namespace: placeholder,
+  }
+
+  /// @nexus.proto "streamsample.v1.AppendRecordsResponse" typescript-import="#streamsample"
+  record append-records-response {
+    first-offset: option<s64>,
+    last-offset: option<s64>,
+  }
+
+  /// @nexus.proto "streamsample.v1.CloseStreamRequest" typescript-import="#streamsample"
+  record close-stream-request {
+    %stream: option<stream-ref>,
+    %result: option<payload>,
+    /// @nexus.omit
+    namespace: placeholder,
+  }
+
+  /// @nexus.proto "streamsample.v1.CloseStreamResponse" typescript-import="#streamsample"
+  record close-stream-response {
+  }
+
+  /// @nexus.proto "streamsample.v1.ReadRecordsRequest" typescript-import="#streamsample"
+  record read-records-request {
+    %stream: option<stream-ref>,
+    from-offset: option<s64>,
+    topics: list<string>,
+    max-records: option<s32>,
+    wait: option<duration>,
+    /// @nexus.omit
+    namespace: placeholder,
+  }
+
+  /// @nexus.proto "streamsample.v1.ReadRecordsResponse" typescript-import="#streamsample"
+  record read-records-response {
+    records: list<stream-record>,
+    next-offset: option<s64>,
+    done: option<bool>,
+  }
+
+  /// @nexus.proto "streamsample.v1.DescribeStreamRequest" typescript-import="#streamsample"
+  record describe-stream-request {
+    %stream: option<stream-ref>,
+    /// @nexus.omit
+    namespace: placeholder,
+  }
+
+  /// @nexus.proto "streamsample.v1.DescribeStreamResponse" typescript-import="#streamsample"
+  record describe-stream-response {
+    last-offset: option<s64>,
+    retention: option<duration>,
+  }
+
+  /// @nexus.doc "A handle on one stream, built from its ref."
+  resource %stream {
+    constructor(%stream: stream-ref);
+
+    /// @nexus.doc "Append records. The answer has the first and the last offset."
+    append-records: func(records: list<append-record>) -> append-records-response;
+
+    /// @nexus.operation "close-stream"
+    close: func(%result: option<payload>);
+
+    /// @nexus.doc "Read one page of records."
+    read-records: func(
+      topics: list<string>,
+      max-records: option<s32>,
+      wait: option<duration>,
+    ) -> read-records-response;
+
+    /// @nexus.operation "describe-stream"
+    describe: func() -> describe-stream-response;
+  }
+
+  /// @nexus.operation name="CreateStream"
+  create-stream: func(request: create-stream-request) -> create-stream-response;
+
+  /// @nexus.operation name="AppendRecords"
+  append-records: func(request: append-records-request) -> append-records-response;
+
+  /// @nexus.operation name="CloseStream"
+  close-stream: func(request: close-stream-request) -> close-stream-response;
+
+  /// @nexus.operation name="ReadRecords"
+  read-records: func(request: read-records-request) -> read-records-response;
+
+  /// @nexus.operation name="DescribeStream"
+  describe-stream: func(request: describe-stream-request) -> describe-stream-response;
+}

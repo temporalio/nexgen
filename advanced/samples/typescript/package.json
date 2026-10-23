@@ -2,6 +2,9 @@
   "name": "advanced-samples-typescript",
   "private": true,
   "type": "module",
+  "imports": {
+    "#streamsample": "./proto/streamsample.d.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

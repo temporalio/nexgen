@@ -458,7 +458,7 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
         } else {
             sample_support_package(repo_root, language, &output_path)
         },
-        descriptor_paths: vec![repo_root.join("advanced/samples/descriptors/temporal_api.bin")],
+        descriptor_paths: sample_descriptor_paths(repo_root)?,
         output_path: output_path.clone(),
         format: false,
         java_package_name: (language == Language::Java)
@@ -910,4 +910,16 @@ mod tests {
         );
         fs::remove_dir_all(root).unwrap();
     }
+}
+
+/// Every descriptor set under `advanced/samples/descriptors/`, sorted so the order is stable.
+fn sample_descriptor_paths(repo_root: &Path) -> Result<Vec<PathBuf>> {
+    let root = repo_root.join("advanced/samples/descriptors");
+    let mut paths = fs::read_dir(&root)
+        .map_err(|source| NexgenError::ReadFile { path: root, source })?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.extension().is_some_and(|extension| extension == "bin"))
+        .collect::<Vec<_>>();
+    paths.sort();
+    Ok(paths)
 }

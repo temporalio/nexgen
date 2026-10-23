@@ -625,6 +625,11 @@ fn descriptor_path(root: &Path) -> PathBuf {
     root.join("advanced/samples/descriptors/temporal_api.bin")
 }
 
+// The descriptor set of the stream-service sample proto.
+fn stream_descriptor_path(root: &Path) -> PathBuf {
+    root.join("advanced/samples/descriptors/stream_service.bin")
+}
+
 fn linked_inputs_path(root: &Path) -> PathBuf {
     root.join("advanced/samples/inputs/deps")
 }
@@ -736,6 +741,8 @@ fn generate_formatted_python_output(root: &Path, example_id: &str, output_path: 
         .args([
             "--descriptors",
             descriptor_path(root).to_str().unwrap(),
+            "--descriptors",
+            stream_descriptor_path(root).to_str().unwrap(),
             "--output",
             output_path.to_str().unwrap(),
             "--native-api",

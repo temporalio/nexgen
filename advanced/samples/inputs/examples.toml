@@ -12,3 +12,6 @@ languages = ["python", "dotnet", "typescript"]
 
 [notification-service]
 languages = ["python", "dotnet", "typescript"]
+
+[stream-service]
+languages = ["python", "typescript"]

@@ -1,0 +1,56 @@
+
+Õ
+$streamsample/v1/stream_service.protostreamsample.v1google/protobuf/duration.proto$temporal/api/common/v1/message.proto"<
+	StreamRef
+id (	Rid
+workflow_id (	R
+workflowId"Y
+AppendRecord
+topic (	Rtopic3
+body (2.temporal.api.common.v1.PayloadRbody"q
+StreamRecord
+offset (Roffset
+topic (	Rtopic3
+body (2.temporal.api.common.v1.PayloadRbody"š
+CreateStreamRequest
+	namespace (	R	namespace,
+ref (2.streamsample.v1.StreamRefRref7
+	retention (2.google.protobuf.DurationR	retention"d
+CreateStreamResponse2
+stream (2.streamsample.v1.StreamRefRstream
+created (Rcreated"½
+AppendRecordsRequest
+	namespace (	R	namespace2
+stream (2.streamsample.v1.StreamRefRstream
+sequence (Rsequence7
+records (2.streamsample.v1.AppendRecordRrecords"[
+AppendRecordsResponse!
+first_offset (RfirstOffset
+last_offset (R
+lastOffset"Ÿ
+CloseStreamRequest
+	namespace (	R	namespace2
+stream (2.streamsample.v1.StreamRefRstream7
+result (2.temporal.api.common.v1.PayloadRresult"
+CloseStreamResponse"ï
+ReadRecordsRequest
+	namespace (	R	namespace2
+stream (2.streamsample.v1.StreamRefRstream
+from_offset (R
+fromOffset
+topics (	Rtopics
+max_records (R
+maxRecords-
+wait (2.google.protobuf.DurationRwait"ƒ
+ReadRecordsResponse7
+records (2.streamsample.v1.StreamRecordRrecords
+next_offset (R
+nextOffset
+done (Rdone"i
+DescribeStreamRequest
+	namespace (	R	namespace2
+stream (2.streamsample.v1.StreamRefRstream"r
+DescribeStreamResponse
+last_offset (R
+lastOffset7
+	retention (2.google.protobuf.DurationR	retentionBªStreamSample.V1bproto3
