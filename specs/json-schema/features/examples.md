@@ -100,6 +100,9 @@ Loader behavior:
 None — ignored, so no type is emitted. When supported it will contribute **no**
 type and **no** identifier (a doc-comment annotation only).
 
+C# drops it like every target: the generated code is byte-identical to the same
+schema without `examples`, and no sample value reaches the `/// <summary>`.
+
 ## Validator mapping
 
 None — an annotation (§9.5); it will never appear in the shared `Validate` or
@@ -164,9 +167,10 @@ and an `examples` beside a `$ref` — and compares the whole emitted file map.
    each language's native slot where one exists — JSDoc `@example` (TS), an
    `Examples:` section in the attribute docstring for a field / in the class
    docstring for a type (Python), a rendered `Example:` line (Go godoc, Java
-   Javadoc `{@code …}`). Each array value is serialized to a canonical JSON
-   literal; multiple values → multiple tags/lines; merged occurrences flatten
-   per the spec's flat-array rule.
+   Javadoc `{@code …}`), an `<example>` element beside the `<summary>` (C#).
+   Each array value is serialized to a canonical JSON literal; multiple values →
+   multiple tags/lines; merged occurrences flatten per the spec's flat-array
+   rule.
 2. **Validity as a load-time MUST.** Following [[default]], each example would
    be required to validate against the schema at load (P7.1), sharing the
    deferred constraint-validation obligation those specs carry. Note the

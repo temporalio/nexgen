@@ -446,6 +446,8 @@ pub(crate) struct GenerateFilesOptions {
     /// The TypeScript temporal representation (`--date-time-types`); ignored by
     /// the non-TypeScript backends.
     pub(crate) ts_date_time_types: TsDateTimeTypes,
+    /// The C# root namespace (`--namespace`); ignored by the other backends.
+    pub(crate) dotnet_namespace: Option<String>,
 }
 
 pub(crate) fn generate_files_for_tree_with_mode_and_options(
@@ -470,7 +472,11 @@ pub(crate) fn generate_files_from_planned_tree(
 ) -> Result<GeneratedFiles> {
     let mode = crate::nexgen_config::current().mode;
     let mut generated = match language {
-        Language::Dotnet => dotnet::generate(tree, options.support_package.as_deref()),
+        Language::Dotnet => dotnet::generate(
+            tree,
+            options.support_package.as_deref(),
+            options.dotnet_namespace.as_deref(),
+        ),
         Language::Go => generate_go_tree(tree, options),
         Language::Java => java::generate(tree, options.java_package_root.as_deref()),
         Language::Python => {

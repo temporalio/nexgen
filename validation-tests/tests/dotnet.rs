@@ -10,6 +10,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod support;
 use support::common;
 
+#[path = "support/dotnet_json_schema.rs"]
+mod dotnet_json_schema;
+
+#[path = "support/json_schema/selected_tests.rs"]
+mod json_schema_tests;
+
+const JSON_SCHEMA_TARGET: support::json_schema::toolchain::Target =
+    support::json_schema::toolchain::Target::CSharp;
+
 use common::wit_input_path;
 
 const WORKFLOW_SERVICE_EXAMPLE_ID: &str = "workflow-service";

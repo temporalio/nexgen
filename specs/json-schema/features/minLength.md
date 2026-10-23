@@ -36,7 +36,7 @@ Distilled:
 ## Support decision
 
 **Support:** yes — runtime code-point-count comparison, [[maxLength]] with `≥`.
-Same grounding: **P1** (identical code-point count across all four — the crux,
+Same grounding: **P1** (identical code-point count across all five — the crux,
 documented in [[maxLength]]), **P10** (enforced), **P11** (aggregated), **P12**
 (shared `Validate` predicate, identical both directions). No effect on emitted
 types.
@@ -85,6 +85,7 @@ bare `len`/`.length`.
 | TypeScript | The shared `codePointLength` surrogate-aware scan (see [[maxLength]]) with **early-exit** the moment the running count reaches `min` (pass — no need to count the rest). If the string ends first the full count `n` is already in hand, so the failure path needs **no second pass** (the asymmetry with [[maxLength]], where the over-length case must recount): ``push(Violation{path, reason: `must have length >= ${min}, got ${n}`})``, throw one `PayloadValidationError` application failure. **Never `v.length`** (UTF-16 units). |
 | Python     | `if (n := len(v)) < min: violations.append(Violation(path=…, reason=f"must have length >= {min}, got {n}"))` in the transfer type converter — `len` on a `str` counts code points (see [[maxLength]]); aggregates into the single generated `PayloadValidationError` application failure.                                                                                                                                                                                                                                                  |
 | Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the `String`, checks `int n = v.codePointCount(0, v.length()); if (n < min)`, pushing a `Violation{path, "must have length >= " + min + ", got " + n}` into the single `PayloadValidationError` application failure. Not bean-validation `@Size`.                                                                                                                                                                                                                          |
+| C#         | `Converter.Parse` reads the `string`, checks `var n = SpecJson.CodePoints(v); if (n < min)`, recording `Violation{path, "must have length >= " + min + ", got " + n}` into the single `PayloadValidationError` application failure; `Validate` repeats the check before writing.                                                                                                                                                                                                                                                           |
 
 Reason strings name the concrete bound and offending count
 (`must have length >= 5, got 2`), per the [[maximum]] convention.

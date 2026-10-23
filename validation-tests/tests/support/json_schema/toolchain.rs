@@ -23,21 +23,28 @@
 
 #![allow(dead_code)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::OnceLock;
 
+use heck::ToUpperCamelCase;
 use nexgen::generator::TsDateTimeTypes;
 use nexgen::language::Language;
 use nexgen::{GenerateRequest, generate_to_file};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-/// The four JSON-Schema targets, in the order reports list them.
-pub const TARGETS: [Target; 4] = [Target::Go, Target::Java, Target::Python, Target::TypeScript];
+/// The JSON-Schema targets, in the order reports list them.
+pub const TARGETS: [Target; 5] = [
+    Target::CSharp,
+    Target::Go,
+    Target::Java,
+    Target::Python,
+    Target::TypeScript,
+];
 
 /// An explicit target limits validation to that backend; absent selection
 /// preserves the complete cross-target checks.
@@ -47,6 +54,7 @@ pub fn selected_targets(target: Option<Target>) -> Vec<Target> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Target {
+    CSharp,
     Go,
     Java,
     Python,
@@ -56,6 +64,7 @@ pub enum Target {
 impl Target {
     pub fn name(self) -> &'static str {
         match self {
+            Target::CSharp => "csharp",
             Target::Go => "go",
             Target::Java => "java",
             Target::Python => "python",
@@ -65,6 +74,7 @@ impl Target {
 
     pub fn language(self) -> Language {
         match self {
+            Target::CSharp => Language::Dotnet,
             Target::Go => Language::Go,
             Target::Java => Language::Java,
             Target::Python => Language::Python,
@@ -163,13 +173,14 @@ impl Workspace {
                 Target::Go => Some("samples/go/support".into()),
                 Target::Python => Some("conformance_support".into()),
                 Target::TypeScript => Some("./support".into()),
-                Target::Java => None,
+                Target::Java | Target::CSharp => None,
             },
             descriptor_paths: Vec::new(),
             output_path: output_path.clone(),
             format: false,
             java_package_name: (target == Target::Java).then(|| format!("conformance.{dir}")),
             ts_date_time_types,
+            dotnet_namespace: (target == Target::CSharp).then(|| csharp_namespace(dir)),
         })
         .map_err(|error| error.to_string())?;
         Ok(output_path)
@@ -193,8 +204,14 @@ impl Drop for Workspace {
     }
 }
 
+/// The C# root namespace a case generates into: one per case directory, so
+/// every case compiles into one runner assembly without colliding.
+pub fn csharp_namespace(dir: &str) -> String {
+    format!("Conformance.{}", dir.to_upper_camel_case())
+}
+
 // ---------------------------------------------------------------------------
-// Probe plan / verdict protocol shared with the four runners.
+// Probe plan / verdict protocol shared with the runners.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
@@ -237,12 +254,26 @@ pub struct PlanCase {
 }
 
 impl PlanCase {
+    /// The C# type of the case's model: `java_model` is `<module>.<Model>` for
+    /// a multi-file case, and each module is a PascalCase namespace segment.
+    fn csharp_model(&self) -> String {
+        let mut segments: Vec<String> = self.java_model.split('.').map(str::to_string).collect();
+        let model = segments.pop().unwrap_or_default();
+        let mut namespace = csharp_namespace(&self.dir);
+        for segment in segments {
+            namespace.push('.');
+            namespace.push_str(&segment.to_upper_camel_case());
+        }
+        format!("{namespace}.{model}")
+    }
+
     fn to_json(&self) -> Value {
         json!({
             "id": self.id,
             "dir": self.dir,
             "model": self.model,
             "java_model": self.java_model,
+            "csharp_model": self.csharp_model(),
             "probes": self.probes.iter().map(|probe| json!({
                 "id": probe.id,
                 "kind": probe.kind.name(),
@@ -974,6 +1005,140 @@ pub fn run_java(workspace: &Workspace, cases: &[PlanCase]) -> Result<TargetVerdi
 }
 
 // ---------------------------------------------------------------------------
+// C#
+// ---------------------------------------------------------------------------
+
+/// A `dotnet` invocation with the SDK's first-run chatter disabled.
+pub fn dotnet() -> Command {
+    let mut command = command("dotnet");
+    command
+        .env("DOTNET_CLI_TELEMETRY_OPTOUT", "1")
+        .env("DOTNET_SKIP_FIRST_TIME_EXPERIENCE", "1")
+        .env("DOTNET_NOLOGO", "1");
+    command
+}
+
+/// A project compiling every generated case directory under `root` (minus
+/// `excluded`) with the runtime the generated code targets. It compiles for
+/// net8.0, the generated code's floor, and runs on the newest installed runtime.
+pub fn csharp_project(
+    excluded: &BTreeSet<String>,
+    warnings_as_errors: bool,
+    executable: bool,
+) -> String {
+    let output_type = if executable { "Exe" } else { "Library" };
+    let mut removes = String::from("bin/**;obj/**;out/**");
+    for dir in excluded {
+        removes.push_str(&format!(";{dir}/**"));
+    }
+    format!(
+        "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <OutputType>{output_type}</OutputType>\n    <TargetFramework>net8.0</TargetFramework>\n    <RollForward>LatestMajor</RollForward>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>{warnings_as_errors}</TreatWarningsAsErrors>\n    <AssemblyName>Conformance</AssemblyName>\n  </PropertyGroup>\n  <ItemGroup>\n    <Compile Remove=\"{removes}\" />\n  </ItemGroup>\n  <ItemGroup>\n    <PackageReference Include=\"Temporalio\" Version=\"1.19.0\" />\n  </ItemGroup>\n</Project>\n"
+    )
+}
+
+/// The case directories a failed `dotnet build` reports errors in. An error
+/// outside every case directory (the runner itself) yields `None`.
+pub fn csharp_error_dirs(root: &Path, detail: &str) -> Option<BTreeMap<String, String>> {
+    let prefix = format!("{}/", root.display());
+    let mut dirs: BTreeMap<String, String> = BTreeMap::new();
+    for line in detail.lines().filter(|line| line.contains(": error ")) {
+        let start = line.find(&prefix)?;
+        let relative = &line[start + prefix.len()..];
+        let dir = relative.split('/').next()?;
+        if !relative.contains('/') {
+            return None;
+        }
+        dirs.entry(dir.to_string())
+            .or_insert_with(|| line.trim().to_string());
+    }
+    (!dirs.is_empty()).then_some(dirs)
+}
+
+/// Build the C# project, excluding a case directory whose generated code does
+/// not compile (a per-case verdict, not a reason to lose the other cases).
+pub fn csharp_build(
+    root: &Path,
+    warnings_as_errors: bool,
+    executable: bool,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut broken: BTreeMap<String, String> = BTreeMap::new();
+    loop {
+        let excluded: BTreeSet<String> = broken.keys().cloned().collect();
+        fs::write(
+            root.join("Conformance.csproj"),
+            csharp_project(&excluded, warnings_as_errors, executable),
+        )
+        .map_err(|error| error.to_string())?;
+        let build = run(dotnet().current_dir(root).args([
+            "build",
+            "Conformance.csproj",
+            "-c",
+            "Release",
+            "-o",
+            "out",
+            "--nologo",
+            "-clp:NoSummary",
+        ]));
+        if build.ok {
+            return Ok(broken);
+        }
+        let Some(dirs) = csharp_error_dirs(root, &build.detail) else {
+            return Err(build.detail);
+        };
+        let before = broken.len();
+        for (dir, error) in dirs {
+            broken.entry(dir).or_insert(error);
+        }
+        if broken.len() == before {
+            return Err(build.detail);
+        }
+    }
+}
+
+pub fn run_csharp(workspace: &Workspace, cases: &[PlanCase]) -> Result<TargetVerdicts, String> {
+    let root = workspace.target_root(Target::CSharp);
+    fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+    fs::write(
+        root.join("Runner.cs"),
+        include_str!("../../../../samples/conformance/runners/Runner.cs"),
+    )
+    .map_err(|error| error.to_string())?;
+    let by_dir = csharp_build(&root, false, true)
+        .map_err(|error| format!("the conformance runner itself does not compile:\n{error}"))?;
+    let broken: BTreeMap<String, String> = cases
+        .iter()
+        .filter_map(|case| {
+            by_dir
+                .get(&case.dir)
+                .map(|error| (case.id.clone(), error.clone()))
+        })
+        .collect();
+    let runnable: Vec<PlanCase> = cases
+        .iter()
+        .filter(|case| !broken.contains_key(&case.id))
+        .cloned()
+        .collect();
+    let plan_path = root.join("plan.json");
+    let result_path = root.join("result.json");
+    write_plan(&plan_path, &runnable)?;
+    let mut verdicts = if runnable.is_empty() {
+        TargetVerdicts::new()
+    } else {
+        let execution = run(dotnet()
+            .current_dir(&root)
+            .arg(root.join("out/Conformance.dll"))
+            .arg(&plan_path)
+            .arg(&result_path));
+        if !execution.ok {
+            return Err(format!("csharp runner failed:\n{}", execution.detail));
+        }
+        read_verdicts(&result_path)?
+    };
+    add_build_failures(&mut verdicts, cases, &broken);
+    Ok(verdicts)
+}
+
+// ---------------------------------------------------------------------------
 // Driver entry point
 // ---------------------------------------------------------------------------
 
@@ -1004,5 +1169,6 @@ pub fn run_target(
         Target::Java => run_java(workspace, cases),
         Target::Python => run_python(workspace, cases),
         Target::TypeScript => run_typescript(workspace, cases),
+        Target::CSharp => run_csharp(workspace, cases),
     }
 }

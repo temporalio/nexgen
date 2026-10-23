@@ -33,22 +33,22 @@ deferred — *not* a categorical P6 exclusion). Applies to both `integer` and
 
 Rationale (citing [[PRINCIPLES.md]]):
 - **P1 (identical cross-language validation).** Divisibility must produce the
-  *same* accept/reject in Go, TypeScript, Python, and Java for the same
+  *same* accept/reject in C#, Go, TypeScript, Python, and Java for the same
   `(schema, instance)`. Empirically:
   - **Integer divisor → exact and portable.** Integer modulo (`integer` fields)
-    and IEEE `fmod` (`number` fields) agree value-for-value across all four: Go
-    `math.Mod`, Java `%`, JS `%`, and Python `math.fmod` return identical
-    results for integer divisors (`10.0`/`6.0` accepted, `7.5` rejected, `1e300`
-    accepted for divisor `2`).
+    and IEEE `fmod` (`number` fields) agree value-for-value across all five: Go
+    `math.Mod`, Java `%`, C# `%`, JS `%`, and Python `math.fmod` return
+    identical results for integer divisors (`10.0`/`6.0` accepted, `7.5`
+    rejected, `1e300` accepted for divisor `2`).
   - **Fractional divisor → no defensible answer.** `fmod` treats the stored
     doubles literally, so `0.3 % 0.1 == 0.09999999999999998` and
-    `1.1 % 0.1 == 2.77e-17` — i.e. Go/Java/JS/Python all *reject* `0.3` against
-    `multipleOf: 0.1`, which is not what an author writing `multipleOf: 0.1`
-    means. The alternative — a **tolerant** divisibility check, of the kind
-    several validation libraries ship — *accepts* `0.3`, `1.1` and `0.2`, but
-    the tolerance is unspecified and per-library, so any target left on raw
-    `fmod` then disagrees. Neither branch is reconcilable without imposing a
-    shared decimal algorithm on every target.
+    `1.1 % 0.1 == 2.77e-17` — i.e. C#/Go/Java/JS/Python all *reject* `0.3`
+    against `multipleOf: 0.1`, which is not what an author writing
+    `multipleOf: 0.1` means. The alternative — a **tolerant** divisibility
+    check, of the kind several validation libraries ship — *accepts* `0.3`,
+    `1.1` and `0.2`, but the tolerance is unspecified and per-library, so any
+    target left on raw `fmod` then disagrees. Neither branch is reconcilable
+    without imposing a shared decimal algorithm on every target.
 - **P4 (minimal runtime deps).** A correct fractional check needs decimal
   scaling / big-decimal arithmetic; TypeScript and Go have no native decimal
   type, so we would have to ship one (P4 tension) *and* re-implement it
@@ -77,13 +77,13 @@ Loader behavior:
   fractional part of a `bound / divisor` quotient: above `2^52` a double
   quotient has no fractional part at all, so a rounding-to-integer step over it
   degenerates into a no-op and every large bound reports "satisfiable". That is
-  a third divisibility semantics, disagreeing with all four runtimes.
+  a third divisibility semantics, disagreeing with all five runtimes.
   `{type:"number", minimum:1e23, maximum:1e23, multipleOf:5}` is a reject —
   `1e23` is not a multiple of `5` — exactly as its small-magnitude twin is.
 
 **Deferred, not excluded.** A future lowering could support fixed-precision
 fractional divisors via decimal scaling (multiply instance and divisor by `10^k`
-to integers, then integer-divide), gated on all four targets agreeing. Revisit
+to integers, then integer-divide), gated on all five targets agreeing. Revisit
 on demand — mirrors [[patternProperties]]' "temporarily unsupported, plausibly
 lowerable later" posture.
 
@@ -101,19 +101,20 @@ predicate is defined per field kind:
 - **`number` field:** `fmod(v, m) == 0` (IEEE remainder — exact for the stored
   double).
 
-| Language   | Strategy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Go         | A predicate in the shared `Validate`, applied identically on both directions' paths (**P12.2**: sharing is a requirement on the predicate, not on the call graph). Integer field: `if v % m != 0 { push(Violation{Reason: fmt.Sprintf("must be a multiple of %v, got %v", m, v)}) }` (`int64`). Number field: same message when `math.Mod(v, m) != 0` (`float64`). Violations collect into one `PayloadValidationError` application failure.                                                                                                                                                                                                                                                                                                                                                                                          |
-| TypeScript | ``if (v % m !== 0) push(Violation{path, reason: `must be a multiple of ${m}, got ${v}`})`` — `%` is IEEE `fmod`, and integer fields are safe integers so it is exact for both kinds. `m` is an emitted numeric constant. Throw one `PayloadValidationError` application failure.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Python     | An inline check in the transfer type converter (PRINCIPLES Python §3), emitted the same way TypeScript emits it rather than behind a runtime helper, appending `Violation(path, reason=f"must be a multiple of {m}, got {v}")`. **Integer field:** exact Python-`int` modulo, over the value `_parse_spec_integer` has already normalized. **Number field:** `math.fmod(v, m) != 0` — deliberately the same primitive as the other three rather than any *tolerant* native divisibility check, so the predicate is **bit-identical `fmod`** across targets (a tolerant check would only be safe because we reject the fractional divisors where the tolerance would bite; standardizing on `fmod` keeps the predicate provably identical instead). Aggregates into the single generated `PayloadValidationError` application failure. |
-| Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the field via the [[type]] `SpecNumbers` helper, then checks `v % m != 0` — `long % long` (integer field) or `double % double` (number field, IEEE `fmod`, matching the others) — pushing a `Violation{path, "must be a multiple of " + m + ", got " + v}` into the single `PayloadValidationError` application failure. Not `BigDecimal.remainder` (would risk decimal-vs-`fmod` divergence on the number path).                                                                                                                                                                                                                                                                                                                                                     |
+| Language   | Strategy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Go         | A predicate in the shared `Validate`, applied identically on both directions' paths (**P12.2**: sharing is a requirement on the predicate, not on the call graph). Integer field: `if v % m != 0 { push(Violation{Reason: fmt.Sprintf("must be a multiple of %v, got %v", m, v)}) }` (`int64`). Number field: same message when `math.Mod(v, m) != 0` (`float64`). Violations collect into one `PayloadValidationError` application failure.                                                                                                                                                                                                                                                                                                                                                                                         |
+| TypeScript | ``if (v % m !== 0) push(Violation{path, reason: `must be a multiple of ${m}, got ${v}`})`` — `%` is IEEE `fmod`, and integer fields are safe integers so it is exact for both kinds. `m` is an emitted numeric constant. Throw one `PayloadValidationError` application failure.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Python     | An inline check in the transfer type converter (PRINCIPLES Python §3), emitted the same way TypeScript emits it rather than behind a runtime helper, appending `Violation(path, reason=f"must be a multiple of {m}, got {v}")`. **Integer field:** exact Python-`int` modulo, over the value `_parse_spec_integer` has already normalized. **Number field:** `math.fmod(v, m) != 0` — deliberately the same primitive as the other four rather than any *tolerant* native divisibility check, so the predicate is **bit-identical `fmod`** across targets (a tolerant check would only be safe because we reject the fractional divisors where the tolerance would bite; standardizing on `fmod` keeps the predicate provably identical instead). Aggregates into the single generated `PayloadValidationError` application failure. |
+| Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the field via the [[type]] `SpecNumbers` helper, then checks `v % m != 0` — `long % long` (integer field) or `double % double` (number field, IEEE `fmod`, matching the others) — pushing a `Violation{path, "must be a multiple of " + m + ", got " + v}` into the single `PayloadValidationError` application failure. Not `BigDecimal.remainder` (would risk decimal-vs-`fmod` divergence on the number path).                                                                                                                                                                                                                                                                                                                                                    |
+| C#         | `Converter.Parse` reads the value via `SpecJson.SpecLong`/`SpecDouble`, then checks `v % m != 0` — `long % long` (integer field) or `double % double` (number field, IEEE `fmod`, matching the others) — recording `Violation{path, "must be a multiple of " + m + ", got " + v}`. Not `decimal` remainder.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 Reason strings name the divisor and offending value
 (`must be a multiple of 2, got 3`), per the [[maximum]] convention.
 
 For `integer` fields the divisor and value are both within the [[type]] cap
 `±(2^53−1)`, so integer modulo is exact everywhere (TS included — safe
-integers). For `number` fields IEEE `fmod` is exact and portable across all four
+integers). For `number` fields IEEE `fmod` is exact and portable across all five
 (verified, including large integer-valued doubles like `1e300`).
 
 ### Serialize-side (P12)
@@ -154,7 +155,7 @@ being written. No parse-adapter-only or encode-adapter-only logic.
   `1e300`-if-divisible; reject `7.5`, `4.0`.
 - **No fractional-divisor surprises:** because `multipleOf:0.1` is a load
   reject, the `0.3 %` footgun never reaches runtime — the accepted forms are all
-  `fmod`/integer-exact and agree across the four languages.
+  `fmod`/integer-exact and agree across the five languages.
 - Combined with a failing bound / sibling field → all reported in one shot
   (**P11**); serialize of an off-grid in-memory value → rejected (**P12**).
 

@@ -1,6 +1,6 @@
 # nexgen
 
-Generate code for Go, Java, Python, and TypeScript from
+Generate code for C#, Go, Java, Python, and TypeScript from
 **NexusRPC definition files** describing your services and the types they
 exchange. Each type becomes a typed model with a runtime validator, wired to the
 **Nexus service bindings** — one contract, shared across every language. Types
@@ -24,7 +24,7 @@ concrete bound and the offending value. A Nexus handler maps that error straight
 to `BAD_REQUEST`.
 
 The supported subset is deliberately strict. Anything ambiguous, or anything
-that can't be lowered cleanly and identically into all four languages, is
+that can't be lowered cleanly and identically into all five languages, is
 **rejected at generation time** with a fix-it diagnostic that tells you how to
 express it instead. The generator would rather reject loudly than emit something
 subtly wrong in one language.
@@ -55,6 +55,7 @@ Generated code requires at least these Temporal SDK and Nexus SDK versions:
 
 | Language   | Temporal SDK                      | Nexus SDK                            |
 | ---------- | --------------------------------- | ------------------------------------ |
+| C#         | `Temporalio` 1.19.0               | `NexusRpc` 0.4.0                     |
 | Go         | `go.temporal.io/sdk` v1.48.0      | `github.com/nexus-rpc/sdk-go` v0.7.0 |
 | Java       | `io.temporal:temporal-sdk` 1.39.0 | `io.nexusrpc:nexus-sdk` 0.6.0-alpha  |
 | Python     | `temporalio` 1.32.0               | `nexus-rpc` 1.4.0                    |
@@ -62,7 +63,10 @@ Generated code requires at least these Temporal SDK and Nexus SDK versions:
 
 Keep all TypeScript `@temporalio/*` packages on the same version. Python's
 `temporalio` package installs its compatible `nexus-rpc` version transitively;
-declare `nexus-rpc` directly only if your dependency tooling requires it.
+declare `nexus-rpc` directly only if your dependency tooling requires it. The
+same holds for C#: the `Temporalio` NuGet package brings in `NexusRpc`.
+
+Generated C# targets .NET 8 or later (`net8.0`, C# 12).
 
 Generated Java source uses JSpecify's `@NullMarked` and `@Nullable` annotations.
 Add JSpecify 1.0.0 to the compile classpath; it is not needed at runtime. For
@@ -92,7 +96,8 @@ For Maven, use a `provided` dependency:
 nexgen <lang> [OPTIONS] <INPUT>...
 
 Arguments:
-  <lang>       Target language: go | java | python | typescript  (ts = typescript)
+  <lang>       Target language: dotnet | go | java | python | typescript
+               (ts = typescript; dotnet = C#)
   <INPUT>...   One or more JSON Schema definition files or directories
                (.json / .yaml / .yml)
 
@@ -105,6 +110,9 @@ Options:
       --date-time-types <REPR>    TypeScript only: in-memory type for materialized
                                   temporal `format` fields (date-time/date/time/
                                   duration) — string | date | temporal [default: string]
+      --namespace <NS>            C# only (required): root namespace for the
+                                  generated types, e.g. Example.Chat; each input
+                                  module's types live in a namespace below it.
   -h, --help                      Print help
   -V, --version                   Print version
 ```
@@ -137,6 +145,14 @@ nexgen java samples/schemas/showcase.nexusrpc.yaml \
   --output ./gen/com/example/showcase --package-name com.example.showcase
 ```
 
+C# requires `--namespace`, the root namespace for the generated types; each
+input module's types live in a namespace below it:
+
+```bash
+nexgen dotnet samples/schemas/showcase.nexusrpc.yaml \
+  --output ./gen/showcase --namespace Example.Showcase
+```
+
 Choose how TypeScript represents temporal `format` fields (date-time, date,
 time, duration) in memory:
 
@@ -165,7 +181,7 @@ nexgen ts samples/schemas/temporal.yaml --output ./gen --date-time-types tempora
   otherwise a polyfill.
 
 See what the output looks like without generating it yourself: the checked-in
-results live under `samples/{go,typescript,python,java}/`.
+results live under `samples/{go,typescript,python,java,dotnet}/`.
 
 ## Definition files
 
@@ -258,11 +274,13 @@ $defs:
         type: string
         x-py-name: sender        # `from` is a Python keyword — it can't be a field
       state:
+        type: string
         enum: ["open", "n/a"]
         # `n/a` isn't a valid identifier, so name the Go/Java constants explicitly
         x-go-enum-names: { "open": Open, "n/a": Unavailable }
         x-java-enum-names: { "open": OPEN, "n/a": UNAVAILABLE }
       schemaVersion:
+        type: integer
         const: 2
         x-go-const-name: SchemaVersionV2   # a bare `2` has no usable identifier
         x-java-const-name: SCHEMA_VERSION_V2
@@ -270,24 +288,27 @@ $defs:
 
 `x-<lang>-name` sets the emitted identifier — one keyword per target:
 `x-go-name`, `x-ts-name`, `x-py-name` (note: the token is `py`, not `python`),
-and `x-java-name`. For the languages that emit *named* constants,
-`x-go-const-name` / `x-java-const-name` name the identifier for a `const`, and
-`x-go-enum-names` / `x-java-enum-names` name each `enum` member (keyed by its
-wire value). TypeScript and Python have no equivalent, because there a constant
-or enum member *is* its literal value.
+`x-java-name`, and `x-cs-name` (C#). For the languages that emit *named*
+constants, `x-go-const-name` / `x-java-const-name` / `x-cs-const-name` name the
+identifier for a `const`, and `x-go-enum-names` / `x-java-enum-names` /
+`x-cs-enum-names` name each `enum` member (keyed by its wire value). C# derives
+usable names for the example above (`NA`, `V2`), so it needs no override there.
+TypeScript and Python have no equivalent, because there a constant or enum
+member *is* its literal value.
 
 ## Known cross-language divergences
 
 Three edge cases do not yet behave identically in every target:
 
-- **Negative zero:** TypeScript serializes JSON `-0` as `0`. Go, Java, and
+- **Negative zero:** TypeScript serializes JSON `-0` as `0`. C#, Go, Java, and
   Python preserve the sign.
 - **A very large fractional integer:** the JSON number `4503599627370496.5` is
   rounded before validation by Python and TypeScript, so they accept it as an
-  integer. Go and Java retain the original `.5` and reject it.
-- **Nanosecond timestamps in Python:** Python timestamps hold only six
-  fractional digits, so a value such as `.123456789` is re-emitted as `.123456`.
-  Go, Java, and TypeScript preserve all nine digits.
+  integer. C#, Go, and Java retain the original `.5` and reject it.
+- **Nanosecond timestamps in Python and C#:** Python timestamps hold only six
+  fractional digits and C# timestamps (`DateTimeOffset`) seven, so a value such
+  as `.123456789` is re-emitted as `.123456` or `.1234567`. Go, Java, and
+  TypeScript preserve all nine digits.
 
 The conformance tests pin these differences so that any change is noticed.
 
@@ -367,8 +388,8 @@ deferred, not yet lowered).
 
 Sample inputs live under [`samples/schemas/`](samples/schemas/) and their
 generated output — in every language — under
-[`samples/`](samples/)`{go,typescript,python,java}/`. Two are worth starting
-with:
+[`samples/`](samples/)`{go,typescript,python,java,dotnet}/`. Two are worth
+starting with:
 
 - [`showcase.nexusrpc.yaml`](samples/schemas/showcase.nexusrpc.yaml) — a tour
   exercising most of the supported subset in one file.

@@ -10,7 +10,7 @@ use serde_json::Value;
 use crate::error::{Error, Result};
 // The P15 collision pass names every synthesized identifier through the emitter's
 // own naming helpers, so the load-time check cannot drift from what is emitted.
-use crate::generator::json_schema::{java, python, typescript};
+use crate::generator::json_schema::{dotnet, java, python, typescript};
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, ExternalTypeBindingSpec, ExternalTypeSpec, JsonModelBindingSpec, JsonModelSpec,
@@ -392,7 +392,13 @@ impl Schema {
 /// Every target's `x-<lang>-name` keyword. On a member it renames the member; on
 /// a type declaration it renames the type (see [`lang_name_keyword`] for the
 /// per-target lookup).
-const LANG_NAME_KEYWORDS: [&str; 4] = ["x-go-name", "x-ts-name", "x-py-name", "x-java-name"];
+const LANG_NAME_KEYWORDS: [&str; 5] = [
+    "x-go-name",
+    "x-ts-name",
+    "x-py-name",
+    "x-java-name",
+    "x-cs-name",
+];
 
 /// Keywords admitted by the strict schema-node grammar. This is deliberately
 /// an exact allowlist: supported keywords, specifically rejected keywords, and
@@ -451,8 +457,10 @@ fn schema_extra_keyword_is_known(keyword: &str) -> bool {
             | "examples"
             | "x-go-const-name"
             | "x-java-const-name"
+            | "x-cs-const-name"
             | "x-go-enum-names"
             | "x-java-enum-names"
+            | "x-cs-enum-names"
     ) || LANG_NAME_KEYWORDS.contains(&keyword)
 }
 
@@ -8114,14 +8122,15 @@ fn normalize(path: &Path) -> PathBuf {
 // ---------------------------------------------------------------------------
 
 /// The `x-<lang>-name` extension keyword for a target, or `None` for a language
-/// with no JSON identifier policy (Dotnet/Ruby are not part of the P15 subset).
+/// with no JSON identifier policy (Ruby is not part of the P15 subset).
 fn lang_name_keyword(language: Language) -> Option<&'static str> {
     match language {
         Language::Go => Some("x-go-name"),
         Language::TypeScript => Some("x-ts-name"),
         Language::Python => Some("x-py-name"),
         Language::Java => Some("x-java-name"),
-        _ => None,
+        Language::Dotnet => Some("x-cs-name"),
+        Language::Ruby => None,
     }
 }
 
@@ -8129,6 +8138,7 @@ fn lang_const_name_keyword(language: Language) -> Option<&'static str> {
     match language {
         Language::Go => Some("x-go-const-name"),
         Language::Java => Some("x-java-const-name"),
+        Language::Dotnet => Some("x-cs-const-name"),
         _ => None,
     }
 }
@@ -8137,6 +8147,7 @@ fn lang_enum_names_keyword(language: Language) -> Option<&'static str> {
     match language {
         Language::Go => Some("x-go-enum-names"),
         Language::Java => Some("x-java-enum-names"),
+        Language::Dotnet => Some("x-cs-enum-names"),
         _ => None,
     }
 }
@@ -8334,9 +8345,92 @@ fn ident_is_reserved(language: Language, name: &str) -> bool {
                 | "false"
                 | "null"
         ),
-        _ => false,
+        Language::Dotnet => CSHARP_KEYWORDS.contains(&name),
+        Language::Ruby => false,
     }
 }
+
+/// C#'s reserved keywords. Contextual keywords (`value`, `var`, `record`, …)
+/// are legal identifiers and are not listed.
+const CSHARP_KEYWORDS: &[&str] = &[
+    "abstract",
+    "as",
+    "base",
+    "bool",
+    "break",
+    "byte",
+    "case",
+    "catch",
+    "char",
+    "checked",
+    "class",
+    "const",
+    "continue",
+    "decimal",
+    "default",
+    "delegate",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "event",
+    "explicit",
+    "extern",
+    "false",
+    "finally",
+    "fixed",
+    "float",
+    "for",
+    "foreach",
+    "goto",
+    "if",
+    "implicit",
+    "in",
+    "int",
+    "interface",
+    "internal",
+    "is",
+    "lock",
+    "long",
+    "namespace",
+    "new",
+    "null",
+    "object",
+    "operator",
+    "out",
+    "override",
+    "params",
+    "private",
+    "protected",
+    "public",
+    "readonly",
+    "ref",
+    "return",
+    "sbyte",
+    "sealed",
+    "short",
+    "sizeof",
+    "stackalloc",
+    "static",
+    "string",
+    "struct",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typeof",
+    "uint",
+    "ulong",
+    "unchecked",
+    "unsafe",
+    "ushort",
+    "using",
+    "virtual",
+    "void",
+    "volatile",
+    "while",
+];
 
 /// Recases a JSON member name to the target's idiomatic identifier (Stage 1-2),
 /// mirroring each backend's field-name derivation.
@@ -8367,7 +8461,8 @@ fn recase_member(language: Language, json_name: &str) -> String {
             }
         }
         Language::Java => json_name.to_lower_camel_case(),
-        _ => json_name.to_string(),
+        Language::Dotnet => json_name.to_upper_camel_case(),
+        Language::Ruby => json_name.to_string(),
     }
 }
 
@@ -8381,7 +8476,8 @@ fn member_identifier_defect(language: Language, json_name: &str) -> Option<(Stri
         Language::Go => json_name.to_upper_camel_case(),
         Language::TypeScript | Language::Java => json_name.to_lower_camel_case(),
         Language::Python => json_name.to_snake_case(),
-        _ => return None,
+        Language::Dotnet => json_name.to_upper_camel_case(),
+        Language::Ruby => return None,
     };
     if !ident_is_syntactically_valid(&base) {
         return Some((base, "is not a valid identifier"));
@@ -8802,7 +8898,7 @@ pub(crate) fn build_name_manifest(
     //   import runs last, which is exactly the silent incorrectness P7 forbids.
     // - **Java and .NET** resolve per module: each module lands in its own
     //   sub-package/namespace (`com.example.api.content.page`,
-    //   `Nexgen.Generated.Content.Page`) and neither emits an aggregating barrel,
+    //   `Example.Api.Content.Page`) and neither emits an aggregating barrel,
     //   so the same type name in two modules is two distinct qualified names.
     //
     // A module with services but no models still has a scope, so its service
@@ -8859,6 +8955,13 @@ pub(crate) fn build_name_manifest(
                 language,
                 (*ident).to_string(),
                 format!("generated runtime identifier `{ident}`"),
+            )?;
+        }
+        for ident in converter_member_idents(language) {
+            top.insert(
+                language,
+                (*ident).to_string(),
+                format!("generated converter member `{ident}`"),
             )?;
         }
         // A service's bindings live in the module scope of the file that declares
@@ -8934,6 +9037,13 @@ pub(crate) fn build_name_manifest(
                     language,
                     (*ident).to_string(),
                     format!("generated runtime identifier `{ident}`"),
+                )?;
+            }
+            for ident in converter_member_idents(language) {
+                module.insert(
+                    language,
+                    (*ident).to_string(),
+                    format!("generated converter member `{ident}`"),
                 )?;
             }
             for service in services
@@ -9144,6 +9254,18 @@ fn boilerplate_idents(language: Language) -> &'static [&'static str] {
             "TemporalSupport",
             "Base64Support",
         ],
+        Language::Dotnet => dotnet::RUNTIME_TYPES,
+        Language::Ruby => &[],
+    }
+}
+
+/// Members of a target's generated per-model converter that the converter's
+/// own body would resolve before a same-module type of that name. See
+/// [`dotnet::CONVERTER_MEMBERS`]; the other targets name types in positions a
+/// converter member cannot capture.
+fn converter_member_idents(language: Language) -> &'static [&'static str] {
+    match language {
+        Language::Dotnet => dotnet::CONVERTER_MEMBERS,
         _ => &[],
     }
 }
@@ -9155,7 +9277,15 @@ fn service_import_idents(language: Language) -> &'static [&'static str] {
         Language::Go | Language::TypeScript => &["nexus"],
         Language::Python => &["Operation", "service"],
         Language::Java => &["Operation", "Service"],
-        _ => &[],
+        Language::Dotnet => &[
+            "GeneratedCode",
+            "NexusOperation",
+            "NexusService",
+            "NexusWorkflowClient",
+            "Task",
+            "Workflow",
+        ],
+        Language::Ruby => &[],
     }
 }
 
@@ -9327,6 +9457,9 @@ fn collect_synthesized_top_level(
             schema,
             imports_java_offset_date_time,
         );
+    }
+    if language == Language::Dotnet {
+        return collect_csharp_nested_scope(model_full_name, type_ident, schema);
     }
     if language != Language::Go {
         return Ok(());
@@ -9544,6 +9677,257 @@ fn collect_java_nested_scope(
         nested.insert(language, "OffsetDateTime".to_string(), origin.to_string())?;
     }
     Ok(())
+}
+
+/// The P15 pass for everything the **C#** emitter declares inside a model.
+///
+/// A C# type keeps its properties, nested types and methods in one declaration
+/// space, so a model's scope holds its members together with every name the
+/// emitter synthesizes beside them: the nested closed-value class
+/// (`<Member>Value`), inline-union interface (`<Member>Union`) and its sibling
+/// `<Member>Union<Kind>` wrappers, default accessor (`<Member>OrDefault`), the
+/// catch-all `AdditionalProperties`, the nested `Converter`, the members a
+/// `record` synthesizes, and the runtime types the model body names by bare
+/// identifier. A member may also not share its
+/// enclosing type's name (CS0542). Each closed-value class and union interface
+/// is a further scope of its own.
+fn collect_csharp_nested_scope(
+    model_full_name: &str,
+    type_ident: &str,
+    schema: &Schema,
+) -> Result<()> {
+    let language = Language::Dotnet;
+    if is_sum_type_union(schema) {
+        return collect_csharp_union_scope(
+            &format!("`{model_full_name}` union"),
+            type_ident,
+            schema,
+            true,
+        );
+    }
+    let mut scope = Namespace::default();
+    scope.insert(
+        language,
+        type_ident.to_string(),
+        format!("type `{model_full_name}`"),
+    )?;
+    let required: BTreeSet<&str> = schema
+        .required
+        .as_ref()
+        .and_then(Value::as_array)
+        .map(|values| values.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    let properties = schema.properties.iter().flatten().collect::<Vec<_>>();
+    for (json_name, property) in &properties {
+        scope.insert(
+            language,
+            member_identifier(language, json_name, property),
+            format!("member `{model_full_name}.{json_name}`"),
+        )?;
+    }
+    for (json_name, property) in &properties {
+        let member = member_identifier(language, json_name, property);
+        let origin = format!("`{model_full_name}.{json_name}`");
+        if is_sum_type_union(property) {
+            let interface = dotnet::inline_union_name(&member);
+            scope.insert(
+                language,
+                interface.clone(),
+                format!("{origin} inline union interface"),
+            )?;
+            let union_origin = format!("{origin} inline union");
+            insert_csharp_union_wrappers(&mut scope, &union_origin, &interface, property)?;
+            collect_csharp_union_scope(&union_origin, &interface, property, false)?;
+            continue;
+        }
+        let shape = java_constraint_shape(property);
+        let values = schema_closed_values(shape);
+        if !values.is_empty() && !csharp_materializes(shape) {
+            let class = dotnet::closed_value_class_name(&member);
+            scope.insert(
+                language,
+                class.clone(),
+                format!("{origin} closed-value class"),
+            )?;
+            let remedy = if values.len() == 1 {
+                "x-cs-const-name"
+            } else {
+                "x-cs-enum-names"
+            };
+            let mut constants = Namespace::default();
+            constants.insert(
+                language,
+                class.clone(),
+                format!("{origin} closed-value class name"),
+            )?;
+            for value in &values {
+                let name = dotnet::closed_value_constant_name(
+                    value_constant_override(language, shape, value),
+                    value,
+                );
+                if !ident_is_syntactically_valid(&name) {
+                    return Err(Error::InvalidJsonSchema {
+                        path: PathBuf::from("<json-schema>"),
+                        reason: format!(
+                            "{origin} value {value} does not encode to a legal C# constant identifier; provide an `{remedy}` override"
+                        ),
+                    });
+                }
+                constants.insert_with_remedy(
+                    language,
+                    name,
+                    format!("{origin} value constant for {value}"),
+                    remedy,
+                )?;
+            }
+            for ident in ["Value", "Equals", "GetHashCode", "ToString"] {
+                constants.insert_with_remedy(
+                    language,
+                    ident.to_string(),
+                    format!("generated closed-value member `{ident}`"),
+                    remedy,
+                )?;
+            }
+            for ident in dotnet::OBJECT_MEMBERS {
+                constants.insert_with_remedy(
+                    language,
+                    (*ident).to_string(),
+                    format!("inherited `object` member `{ident}`"),
+                    remedy,
+                )?;
+            }
+        }
+        let has_scalar_default = property.extra.get("default").is_some_and(|default| {
+            !(default.is_null() || default.is_object() || default.is_array())
+        });
+        if has_scalar_default && !required.contains(json_name.as_str()) {
+            scope.insert(
+                language,
+                dotnet::default_accessor_name(&member),
+                format!("{origin} OrDefault accessor"),
+            )?;
+        }
+    }
+    if !matches!(&schema.additional_properties, Some(Value::Bool(false))) {
+        scope.insert(
+            language,
+            "AdditionalProperties".to_string(),
+            format!("`{model_full_name}` additional-properties catch-all"),
+        )?;
+    }
+    for ident in [
+        "Converter",
+        "EqualityContract",
+        "Equals",
+        "GetHashCode",
+        "ToString",
+        "PrintMembers",
+        "Deconstruct",
+    ] {
+        scope.insert(
+            language,
+            ident.to_string(),
+            format!("generated record member `{ident}`"),
+        )?;
+    }
+    // A record may itself be named after an inherited member (it hides
+    // nothing); the scope holds the type's own name only for CS0542.
+    for ident in dotnet::OBJECT_MEMBERS
+        .iter()
+        .filter(|ident| **ident != type_ident)
+    {
+        scope.insert(
+            language,
+            (*ident).to_string(),
+            format!("inherited `object` member `{ident}`"),
+        )?;
+    }
+    Ok(())
+}
+
+/// A C# union interface's own scope: one wrapper class per non-`$ref` branch
+/// and the nested converter.
+fn collect_csharp_union_scope(
+    origin: &str,
+    interface: &str,
+    schema: &Schema,
+    wrappers_inside: bool,
+) -> Result<()> {
+    let language = Language::Dotnet;
+    let mut scope = Namespace::default();
+    scope.insert(
+        language,
+        interface.to_string(),
+        format!("{origin} interface"),
+    )?;
+    if wrappers_inside {
+        insert_csharp_union_wrappers(&mut scope, origin, interface, schema)?;
+    }
+    scope.insert(
+        language,
+        "Converter".to_string(),
+        "generated nested `Converter` class".to_string(),
+    )
+}
+
+/// Inserts the wrapper class the C# emitter synthesizes for each non-`$ref`
+/// branch (`<Union><Kind>`) into `scope`: the union interface's own scope for a
+/// named union, or the declaring model's scope for an inline union, whose
+/// wrappers are siblings of the interface.
+fn insert_csharp_union_wrappers(
+    scope: &mut Namespace,
+    origin: &str,
+    interface: &str,
+    schema: &Schema,
+) -> Result<()> {
+    for branch in schema.one_of.iter().flatten() {
+        if branch.reference.is_some() {
+            continue;
+        }
+        let Some(suffix) = branch
+            .ty
+            .as_ref()
+            .and_then(Value::as_str)
+            .and_then(|ty| match ty {
+                "object" => Some("Object"),
+                "string" => Some("String"),
+                "integer" => Some("Integer"),
+                "number" => Some("Number"),
+                "boolean" => Some("Boolean"),
+                "array" => Some("Array"),
+                _ => None,
+            })
+        else {
+            continue;
+        };
+        scope.insert(
+            Language::Dotnet,
+            format!("{interface}{suffix}"),
+            format!("{origin} `{suffix}` variant wrapper"),
+        )?;
+    }
+    Ok(())
+}
+
+/// Whether the C# emitter materializes a string member (a temporal `format` or a
+/// `contentEncoding`), in which case a closed value set stays an assertion
+/// instead of a value class.
+fn csharp_materializes(shape: &Schema) -> bool {
+    if shape.ty.as_ref().and_then(Value::as_str) != Some("string") {
+        return false;
+    }
+    shape
+        .extra
+        .get("format")
+        .and_then(Value::as_str)
+        .and_then(crate::json_schema::format::TemporalKind::from_name)
+        .is_some()
+        || shape
+            .extra
+            .get("contentEncoding")
+            .and_then(Value::as_str)
+            .and_then(crate::json_schema::content_encoding::Encoding::from_name)
+            .is_some()
 }
 
 /// Mirrors the Java emitter's `upper_first`.
@@ -15947,6 +16331,138 @@ $defs:
     }
 
     #[test]
+    fn csharp_rejects_a_member_named_after_its_type() {
+        let colliding = r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+$defs:
+  Widget:
+    type: object
+    properties:
+      widget: { type: string }
+"##;
+        let error = reject_for(Language::Dotnet, colliding);
+        assert!(
+            error.contains("`Widget`") && error.contains("x-cs-name"),
+            "{error}"
+        );
+        // The other targets recase the member away from the type name.
+        for language in [
+            Language::Go,
+            Language::TypeScript,
+            Language::Python,
+            Language::Java,
+        ] {
+            parse_for(language, colliding).unwrap_or_else(|error| panic!("{language:?}: {error}"));
+        }
+        parse_for(
+            Language::Dotnet,
+            &colliding.replace(
+                "widget: { type: string }",
+                "widget: { type: string, x-cs-name: Label }",
+            ),
+        )
+        .expect("x-cs-name moves the member off the type name");
+    }
+
+    #[test]
+    fn csharp_reserves_synthesized_member_scope_names() {
+        for (property, synthesized) in [
+            ("statusValue: { type: string }", "StatusValue"),
+            ("converter: { type: string }", "Converter"),
+            ("equalityContract: { type: string }", "EqualityContract"),
+        ] {
+            let input = format!(
+                r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: false
+properties:
+  status: {{ type: string, enum: [active, inactive] }}
+  {property}
+"##
+            );
+            let error = reject_for(Language::Dotnet, &input);
+            assert!(
+                error.contains(&format!("`{synthesized}`")) && error.contains("collision"),
+                "{synthesized}: {error}"
+            );
+        }
+        let defaulted = r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: false
+properties:
+  retries: { type: integer, default: 3 }
+  retriesOrDefault: { type: integer }
+"##;
+        let error = reject_for(Language::Dotnet, defaulted);
+        assert!(error.contains("`RetriesOrDefault`"), "{error}");
+    }
+
+    #[test]
+    fn csharp_value_constants_reject_folds_and_accept_overrides() {
+        let folding = r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: false
+properties:
+  phase: { type: string, enum: [in-progress, in_progress] }
+"##;
+        let error = reject_for(Language::Dotnet, folding);
+        assert!(
+            error.contains("`InProgress`") && error.contains("x-cs-enum-names"),
+            "{error}"
+        );
+        parse_for(
+            Language::Dotnet,
+            &folding.replace(
+                "enum: [in-progress, in_progress] }",
+                "enum: [in-progress, in_progress], x-cs-enum-names: { in_progress: InProgressUnderscore } }",
+            ),
+        )
+        .expect("x-cs-enum-names separates the folded constants");
+
+        let value_member = r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+additionalProperties: false
+properties:
+  pick: { type: string, enum: [value, other] }
+"##;
+        let error = reject_for(Language::Dotnet, value_member);
+        assert!(error.contains("`Value`"), "{error}");
+    }
+
+    #[test]
+    fn csharp_overrides_must_be_legal_identifiers() {
+        let input = r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  name: { type: string, x-cs-name: class }
+"##;
+        let error = reject_for(Language::Dotnet, input);
+        assert!(
+            error.contains("x-cs-name") && error.contains("dotnet"),
+            "{error}"
+        );
+        parse_for(
+            Language::Dotnet,
+            &input.replace("x-cs-name: class", "x-cs-name: Title"),
+        )
+        .expect("a legal override loads");
+        // A member name that recases to a leading digit needs an override.
+        let digit = r##"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  2fa: { type: string }
+"##;
+        let error = reject_for(Language::Dotnet, digit);
+        assert!(error.contains("x-cs-name"), "{error}");
+    }
+
+    #[test]
     fn reserves_go_native_service_client_and_constructor_identifiers() {
         for declared in ["ChatClient", "NewChatClient"] {
             let input = format!(
@@ -16232,6 +16748,36 @@ properties:
                 && error.contains("collision"),
             "{error}"
         );
+    }
+
+    /// C# declares an inline union's wrappers beside its interface in the
+    /// declaring model (`Model.ChoiceUnionString`), so a wrapper shares the
+    /// model's member scope.
+    #[test]
+    fn rejects_csharp_inline_union_wrapper_collisions() {
+        let wrapper_collision = r#"
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  choice:
+    oneOf:
+      - { type: string }
+      - { type: integer }
+  choiceUnionString: { type: string }
+"#;
+        let error = reject_for(Language::Dotnet, wrapper_collision);
+        assert!(
+            error.contains("ChoiceUnionString")
+                && error.contains("variant wrapper")
+                && error.contains("collision"),
+            "{error}"
+        );
+        let renamed = wrapper_collision.replace(
+            "  choiceUnionString: { type: string }",
+            "  choiceUnionString: { type: string, x-cs-name: ChoiceLabel }",
+        );
+        parse_for(Language::Dotnet, &renamed)
+            .expect("x-cs-name moves the member off the wrapper's name");
     }
 
     /// Two members that recase alike are separated by an `x-go-name`, and the

@@ -38,6 +38,7 @@ fn generate_python(wit: &str) -> Result<String, String> {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     });
     let mut rendered = String::new();
     if result.is_ok() {

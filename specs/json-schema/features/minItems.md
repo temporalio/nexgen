@@ -73,6 +73,7 @@ collection's native length. Same per-language strategy as [[maxItems]] with
 | TypeScript | After the `Array.isArray` guard ([[items]]), deserialize checks `raw.length < min` after parsing the elements; serialize checks the typed array. A failure pushes ``Violation{path, reason: `must have at least ${min} items, got ${raw.length}`}``.                               |
 | Python     | After the `isinstance(raw, list)` guard ([[items]]), the transfer converter checks `len(raw) < min` after parsing the elements; serialize checks the typed list. Both aggregate into the generated `PayloadValidationError` application failure.                                   |
 | Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5) checks `node.size() < min` after parsing the elements; serialize checks the typed `List<T>`. Both push a structured violation into the single `PayloadValidationError` application failure. Not bean-validation `@Size`. |
+| C#         | `Converter.Parse` checks `GetArrayLength() < min` over the wire array; `Validate` checks the in-memory list's `Count`. Both record a structured violation in the single `PayloadValidationError` application failure.                                                              |
 
 Reason strings name the concrete bound and offending count
 (`must have at least 2 items, got 1`), per the [[maxProperties]] count-family

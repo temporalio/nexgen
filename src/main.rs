@@ -23,9 +23,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[cfg(feature = "advanced")]
     #[command(about = "Generate C# / .NET bindings")]
-    Dotnet(SupportPackageGenerateArgs),
+    Dotnet(DotnetGenerateArgs),
     #[command(about = "Generate Go bindings")]
     Go(SupportPackageGenerateArgs),
     #[command(about = "Generate Java bindings")]
@@ -77,6 +76,16 @@ struct SupportPackageGenerateArgs {
     /// Import path or namespace of the user-owned support package (required for WIT).
     #[arg(long = "support-package")]
     support_package: Option<String>,
+}
+
+#[derive(Args)]
+struct DotnetGenerateArgs {
+    #[command(flatten)]
+    common: SupportPackageGenerateArgs,
+    /// The root namespace for generated types (required for JSON Schema).
+    /// Each input module's types live in a namespace below it.
+    #[arg(long = "namespace")]
+    namespace: Option<String>,
 }
 
 #[derive(Args)]
@@ -162,14 +171,17 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        #[cfg(feature = "advanced")]
-        Commands::Dotnet(args) => generate_to_file(&generate_request(
-            Language::Dotnet,
-            args.common,
-            Default::default(),
-            None,
-            args.support_package,
-        )),
+        Commands::Dotnet(args) => {
+            let mut request = generate_request(
+                Language::Dotnet,
+                args.common.common,
+                Default::default(),
+                None,
+                args.common.support_package,
+            );
+            request.dotnet_namespace = args.namespace;
+            generate_to_file(&request)
+        }
         Commands::Go(args) => generate_to_file(&generate_request(
             Language::Go,
             args.common,
@@ -311,6 +323,7 @@ fn generate_request(
         format: false,
         java_package_name,
         ts_date_time_types,
+        dotnet_namespace: None,
     }
 }
 
@@ -321,7 +334,7 @@ mod tests {
 
     #[test]
     fn support_package_option_is_available_but_not_a_json_schema_requirement() {
-        for language in ["go", "python", "typescript"] {
+        for language in ["dotnet", "go", "python", "typescript"] {
             assert!(
                 Cli::try_parse_from(["nexgen", language, "input.json", "--output", "out"]).is_ok()
             );
@@ -338,8 +351,18 @@ mod tests {
                 .is_ok()
             );
         }
-        #[cfg(feature = "advanced")]
-        assert!(Cli::try_parse_from(["nexgen", "dotnet", "input.wit", "--output", "out"]).is_ok());
+        assert!(
+            Cli::try_parse_from([
+                "nexgen",
+                "dotnet",
+                "input.json",
+                "--output",
+                "out",
+                "--namespace",
+                "Example.Chat",
+            ])
+            .is_ok()
+        );
         assert!(matches!(
             Cli::try_parse_from([
                 "nexgen",

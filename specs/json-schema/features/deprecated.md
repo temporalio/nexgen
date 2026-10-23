@@ -85,7 +85,7 @@ The defining choices (citing [[PRINCIPLES.md]]):
   effect in any target. Python is held to the same bar: it uses PEP 702's
   `category=None` so even its `@deprecated` marker raises no access-time
   `DeprecationWarning` (see Type mapping); we deliberately do **not** emit the
-  runtime `Field(deprecated=True)` form, keeping the four targets in parity
+  runtime `Field(deprecated=True)` form, keeping the five targets in parity
   (P1).
 - **Never an identifier (P13/P1/P15).** `deprecated` never names a type, field,
   service, or operation. On an ordinary declaration it therefore synthesizes
@@ -112,7 +112,7 @@ Loader behavior:
   deprecates the *member* and asserts nothing about the referenced value. The OR
   is applied at the **use site**: the member keeps the referenced type and the
   marker lands on the member, which is what the Type-mapping table below says
-  and what all four targets can express (a Go struct-field doc comment, a TS
+  and what all five targets can express (a Go struct-field doc comment, a TS
   property JSDoc tag, a Python `Annotated`, a Java getter annotation). The
   sibling must **not** trigger the implicit-`allOf` fold ([[ref]], [[allOf]]): a
   fold would clone the target into a use-site type, move the marker off the
@@ -166,6 +166,7 @@ Per-language marker (the meat — a native construct, not just comment text):
 | TypeScript | a bare JSDoc `@deprecated` tag in the `/** … */` block                                                                                                                                                             | Editors and language services strike through or suggest at call sites; `tsc` emits no deprecation diagnostic.                                                                                                                                    |
 | Python     | PEP 702 `@deprecated("…", category=None)` (`typing_extensions` backport) on a generated type/service; fields and operation attributes use `Annotated[T, deprecated("…", category=None)]` as documentation metadata | Type/service decorators are recognized by PEP 702-aware checkers. Field and operation attribute metadata is not a PEP 702 warning construct. `category=None` suppresses access-time `DeprecationWarning`.                                        |
 | Java       | the `@Deprecated` annotation on the type / getter / method, paired with a Javadoc `@deprecated This <kind> is deprecated.` tag                                                                                     | `javac` warns at every use; IDEs strike-through; `javadoc` renders the tag text in the "Deprecated." block and `deprecated-list.html`.                                                                                                           |
+| C#         | `[Obsolete("This <kind> is deprecated.")]` on the type or property, beside its `<summary>` (generic reason — see below)                                                                                            | the compiler warns (CS0618) at every use and IDEs strike through; a generated file that refers to its own deprecated declarations suppresses the warning with a commented `#pragma`, emitted only when the run has a deprecation.                |
 
 The marker attaches to a declaration that already exists; no new identifier is
 synthesized for it, in any position — including beside a `$ref`, where the
@@ -188,8 +189,8 @@ doc-comment body ([[description]]) directly above the marker, and copying it in
 would repeat the same text twice in the generated source.
 
 The marker is emitted **bare** only where the native construct carries no text
-slot at all — a JSDoc `@deprecated` tag (TS). The other three targets have a
-text slot that their tooling renders, so they carry a **generic** reason,
+slot at all — a JSDoc `@deprecated` tag (TS). The other four targets have a text
+slot that their tooling renders, so they carry a **generic** reason,
 `This <kind> is deprecated.` — where `<kind>` ∈ type / field / service /
 operation, already known from the placement:
 - **Java** — the `@Deprecated` annotation paired with
@@ -205,6 +206,9 @@ operation, already known from the placement:
   `Annotated[T, deprecated("This field is deprecated.", category=None)]` on a
   field. (`category=None` is what keeps the marker static-only — see Type
   mapping.)
+- **C#** — `[Obsolete]` takes an optional message, which the compiler reports at
+  every use (CS0618) and IDEs show on hover:
+  `[Obsolete("This field is deprecated.")]`.
 
 The rationale the author actually wrote still travels with the symbol, in the
 doc-comment body, for every target — adjacent to the marker in Go, TypeScript

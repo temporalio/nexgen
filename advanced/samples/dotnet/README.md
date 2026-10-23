@@ -9,8 +9,9 @@ snapshot-only native-api form of the JSON-Schema inputs.
   `type-showcase`, `type-roundtrip`, `start-workflow`, `function-execution`):
   models, operations, and Nexus service interfaces.
 - `json_schema/api/` — native-api (service + client) output for the JSON-Schema
-  inputs. Snapshot-only: regenerated and diffed by the Rust tests, not exercised
-  by runtime tests here.
+  inputs, compiled by its own project,
+  `json_schema/Nexgen.DotNetJsonSchemaApi.csproj` (`net8.0` with its default C#
+  12, the JSON Schema output's floor; the WIT projects pin C# 9).
 - `tests/` — endpoint runtime checks (`WorkflowService`, `UserService`), the
   generated-api compile check, and proto-wire compatibility checks against the
   fixtures in [`../wire/proto/`](../wire/proto/).
@@ -21,6 +22,7 @@ from the repo root.
 ```bash
 dotnet build Nexgen.DotNetExamples.csproj
 dotnet test tests/
+dotnet build json_schema/Nexgen.DotNetJsonSchemaApi.csproj
 ```
 
 For the beginner-facing JSON-Schema definitions models, see

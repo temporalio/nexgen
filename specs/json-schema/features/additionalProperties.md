@@ -87,7 +87,7 @@ Rationale (citing [[PRINCIPLES.md]]):
 
 ### Catch-all representation: always a named field
 
-The catch-all is emitted as a **dedicated named member in all four languages** —
+The catch-all is emitted as a **dedicated named member in all five languages** —
 never an inline open map — *even with no `properties`*. A pure map
 (`{type:object, additionalProperties:{type:T}}`) emits the same named aggregate
 it would carry with properties, holding the map in the catch-all member:
@@ -148,20 +148,20 @@ type converter doing the same for `additional_properties`).
 
 ## Type mapping
 
-All four languages emit the named catch-all member when extras are allowed (see
+All five languages emit the named catch-all member when extras are allowed (see
 representation note above). The catch-all element type is `T` for `{type:T}`,
 else the raw type (`json.RawMessage` / `unknown` / `Any` / `JsonNode`) so
 untyped extras survive a round-trip without the generator guessing their shape
 (**P13**).
 
-| Case                                           | Go                                                                   | TypeScript                                                              | Python                                                                                                                          | Java                                                                                                               |
-| ---------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Open struct, untyped extras (default / `true`) | struct + `AdditionalProperties map[string]json.RawMessage`           | `interface` + `additionalProperties: Record<string, unknown>`           | dataclass + `additional_properties: dict[str, typing.Any]`, populated/emitted by the converter (Python §3)                      | POJO + `Map<String,JsonNode>`, populated/emitted by the collecting (de)serializer (Java §5)                        |
-| **Typed extras + `properties` (`{type:T}`)**   | struct + `AdditionalProperties map[string]T`                         | `interface` + `additionalProperties: Record<string, T>`                 | dataclass + `additional_properties: dict[str, T]`, populated/emitted by the converter (Python §3) with per-extra `T` validation | POJO + `Map<String,T>`, populated/emitted by the collecting (de)serializer (Java §5) with per-extra `T` validation |
-| Closed struct (`false`)                        | no catch-all field; unknown → error                                  | exact `interface`, no `additionalProperties`; unknown → error           | no catch-all member; the converter flags each undeclared key as a `Violation`                                                   | no catch-all field; the collecting deserializer (Java §5) flags each undeclared tree key as a `Violation`          |
-| Open opaque map (`true`, no props)             | struct + `AdditionalProperties map[string]json.RawMessage` (wrapper) | `interface` + `additionalProperties: Record<string, unknown>` (wrapper) | dataclass + `additional_properties: dict[str, typing.Any]` (wrapper)                                                            | class + `Map<String,JsonNode> additionalProperties` (wrapper)                                                      |
-| Typed map (`{type:T}`, no props)               | struct + `AdditionalProperties map[string]T` (wrapper)               | `interface` + `additionalProperties: Record<string, T>` (wrapper)       | dataclass + `additional_properties: dict[str, T]` (wrapper) + per-extra `T` validation                                          | class + `Map<String,T> additionalProperties` (wrapper)                                                             |
-| Closed empty object (`false`, no props)        | empty `struct{}`; any member → error                                 | empty `interface`; any member → error                                   | empty dataclass; the converter flags any key as a `Violation`                                                                   | empty POJO; the collecting deserializer (Java §5) flags any tree key as a `Violation`                              |
+| Case                                           | Go                                                                   | TypeScript                                                              | Python                                                                                                                          | Java                                                                                                               | C#                                                                                                   |
+| ---------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Open struct, untyped extras (default / `true`) | struct + `AdditionalProperties map[string]json.RawMessage`           | `interface` + `additionalProperties: Record<string, unknown>`           | dataclass + `additional_properties: dict[str, typing.Any]`, populated/emitted by the converter (Python §3)                      | POJO + `Map<String,JsonNode>`, populated/emitted by the collecting (de)serializer (Java §5)                        | record + `AdditionalProperties: IReadOnlyDictionary<string, JsonElement>`                            |
+| **Typed extras + `properties` (`{type:T}`)**   | struct + `AdditionalProperties map[string]T`                         | `interface` + `additionalProperties: Record<string, T>`                 | dataclass + `additional_properties: dict[str, T]`, populated/emitted by the converter (Python §3) with per-extra `T` validation | POJO + `Map<String,T>`, populated/emitted by the collecting (de)serializer (Java §5) with per-extra `T` validation | record + `AdditionalProperties: IReadOnlyDictionary<string, T>`, parsed and written by the converter |
+| Closed struct (`false`)                        | no catch-all field; unknown → error                                  | exact `interface`, no `additionalProperties`; unknown → error           | no catch-all member; the converter flags each undeclared key as a `Violation`                                                   | no catch-all field; the collecting deserializer (Java §5) flags each undeclared tree key as a `Violation`          | no catch-all member; the converter flags each undeclared key as a `Violation`                        |
+| Open opaque map (`true`, no props)             | struct + `AdditionalProperties map[string]json.RawMessage` (wrapper) | `interface` + `additionalProperties: Record<string, unknown>` (wrapper) | dataclass + `additional_properties: dict[str, typing.Any]` (wrapper)                                                            | class + `Map<String,JsonNode> additionalProperties` (wrapper)                                                      | record + `AdditionalProperties: IReadOnlyDictionary<string, JsonElement>` (wrapper)                  |
+| Typed map (`{type:T}`, no props)               | struct + `AdditionalProperties map[string]T` (wrapper)               | `interface` + `additionalProperties: Record<string, T>` (wrapper)       | dataclass + `additional_properties: dict[str, T]` (wrapper) + per-extra `T` validation                                          | class + `Map<String,T> additionalProperties` (wrapper)                                                             | record + `AdditionalProperties: IReadOnlyDictionary<string, T>` (wrapper)                            |
+| Closed empty object (`false`, no props)        | empty `struct{}`; any member → error                                 | empty `interface`; any member → error                                   | empty dataclass; the converter flags any key as a `Violation`                                                                   | empty POJO; the collecting deserializer (Java §5) flags any tree key as a `Violation`                              | empty record; the converter flags any key as a `Violation`                                           |
 
 The TS `additionalProperties` member and the Python `additional_properties`
 field are always present when extras are allowed (empty when none were received
@@ -169,10 +169,10 @@ field are always present when extras are allowed (empty when none were received
 uniform whether or not a given instance carried extras.
 
 A declared [[properties]] member literally named `additionalProperties` collides
-with the generated catch-all member in **all four languages** — **Go**
+with the generated catch-all member in **all five languages** — **Go**
 (`AdditionalProperties`), **Java** (`additionalProperties`), **TS**
-(`additionalProperties`), **Python** (`additional_properties`) → reject at load
-time with a diagnostic.
+(`additionalProperties`), **Python** (`additional_properties`), **C#**
+(`AdditionalProperties`) → reject at load time with a diagnostic.
 
 ### Why `json.RawMessage`, not `any`, for Go untyped extras
 
@@ -248,6 +248,7 @@ to that clause and is not restated per target here.
 | TypeScript | deser lifts non-declared keys into the `additionalProperties` Record; reser spreads them back to top-level                                                                    | same, but each value validated as `T` before going into `additionalProperties` (member stays fully typed `Record<string,T>`)                  | check parsed keys against the known set; push one `Violation` per extra, throw one `PayloadValidationError` application failure                                                                                                     |
 | Python     | `from_transfer_type` lifts non-declared keys into the `additional_properties` dict verbatim; `to_transfer_type` spreads them back to top-level                                | same, but each value is validated and materialized as `T` before going into `additional_properties` (member stays fully typed `dict[str, T]`) | check parsed keys against the declared set; append one `Violation` with `reason="unknown field"` per extra, raise one `PayloadValidationError` application failure                                                                  |
 | Java       | the per-POJO collecting deserializer (Java §5) routes parsed-tree keys not in the declared set into the `additionalProperties` map; the matching serializer spreads them back | same routing, but each extra value is validated as `T` (bad keys → a `Violation` at the extra's path)                                         | the collecting deserializer pushes one `Violation` with `"unknown field"` per undeclared tree key into the single `PayloadValidationError` application failure — no fail-fast `ignoreUnknown=false`/`UnrecognizedPropertyException` |
+| C#         | `Converter.Parse` copies every undeclared member's `JsonElement` into `AdditionalProperties` (a repeated key keeps its last value); `WriteValue` writes them back verbatim    | same routing, but each extra is parsed and validated as `T` (a bad value is a `Violation` at the extra's path)                                | `Converter.Parse` records one `Violation` with `"unknown field"` per undeclared key into the single `PayloadValidationError` application failure                                                                                    |
 
 ### Per-member `T` validation
 
@@ -276,7 +277,7 @@ Per language, the mechanism is the one that position already uses:
 - A **closed member value set** (`const`/`enum`) is a validator-only closedness
   in Go and Java: a member has no field to hang a defined type or value class
   off, so the admissible set is checked against wire literals instead. The
-  accepted value set is identical in all four languages (TypeScript and Python
+  accepted value set is identical in all five languages (TypeScript and Python
   additionally close the *type*, as `Record<string, "a" | "b">` /
   `Literal["a","b"]`).
 
@@ -311,6 +312,14 @@ The catch-all is re-emitted by spreading its members back to top-level JSON (Go
 Declared members serialize under their original wire names ([[properties]]
 case-mapping is reversed on the way out); extras keep their verbatim keys — the
 named-catch-all split keeps the two namespaces unambiguous in both directions.
+
+That split is enforced, not assumed: a catch-all key that a declared member
+names fails serialization (`declared property key collision` in C#)
+**whether or not the declared member is set**. Writing it would emit a member
+that the declared type then parses as its own — rejecting the catch-all's value
+or keeping the wrong one — or emit the key twice. Go, TypeScript, Python and C#
+reject it unconditionally; Java flags it only when the declared member is also
+written.
 
 **The lift and the spread are key-preserving.** Every key the wire object owns
 and `properties` does not match appears in the catch-all, and every catch-all
@@ -361,7 +370,7 @@ that clause.
 - Open struct + extra key → preserved, present on re-serialize.
 - Open struct or map + a hostile extra key (`""`, `"0"`, `"a-b"`, `"toString"`,
   `"constructor"`, `"__proto__"` — object- and string-valued) → every key
-  preserved and re-emitted, in all four targets; the same key set is what the
+  preserved and re-emitted, in all five targets; the same key set is what the
   count keywords see at both boundaries.
 - Closed struct + extra key → one `Violation` per extra, aggregated with
   declared-field errors into a single `PayloadValidationError` application
@@ -377,7 +386,7 @@ that clause.
   still validates against `T`.
 - Typed extras + good value → validated and round-trips.
 - Open opaque map round-trips arbitrary nested JSON unchanged.
-- Pure map (all four languages) decodes into the wrapper's catch-all
+- Pure map (all five languages) decodes into the wrapper's catch-all
   (`AdditionalProperties` member / `additionalProperties` Record /
   `additional_properties` dict), not a bare map/dict.
 

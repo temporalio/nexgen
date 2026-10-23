@@ -7,4 +7,4 @@ node = "26"
 go = "1.26"
 java = "temurin-21"
 google-java-format = "1.24.0"
-dotnet = ["9", "8"]
+dotnet = ["10", "8"]

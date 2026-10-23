@@ -130,12 +130,12 @@ The emitted type is **closed to the const value**, in each language's idiom and
 for **every scalar kind** (**P13.1**). Optional vs required wrapping is owned by
 [[required]] / [[nullability]].
 
-| const value kind | Go                                        | TypeScript | Python           | Java                        |
-| ---------------- | ----------------------------------------- | ---------- | ---------------- | --------------------------- |
-| string           | `type UserEventKind string` + typed const | `"<v>"`    | `Literal["<v>"]` | value class `UserEventKind` |
-| integer          | `type Priority int64` + typed const       | `<v>`      | `Literal[<v>]`   | value class `Priority`      |
-| number           | `type Ratio float64` + typed const        | `<v>`      | `float`          | value class `Ratio`         |
-| boolean          | `type Enabled bool` + typed const         | `<v>`      | `Literal[<v>]`   | value class `Enabled`       |
+| const value kind | Go                                        | TypeScript | Python           | Java                        | C#                                 |
+| ---------------- | ----------------------------------------- | ---------- | ---------------- | --------------------------- | ---------------------------------- |
+| string           | `type UserEventKind string` + typed const | `"<v>"`    | `Literal["<v>"]` | value class `UserEventKind` | closed-value class `KindValue`     |
+| integer          | `type Priority int64` + typed const       | `<v>`      | `Literal[<v>]`   | value class `Priority`      | closed-value class `PriorityValue` |
+| number           | `type Ratio float64` + typed const        | `<v>`      | `float`          | value class `Ratio`         | closed-value class `RatioValue`    |
+| boolean          | `type Enabled bool` + typed const         | `<v>`      | `Literal[<v>]`   | value class `Enabled`       | closed-value class `EnabledValue`  |
 
 **Go.** A **defined type** over the primitive plus a typed value constant, for
 every scalar kind:
@@ -240,7 +240,7 @@ namespace.
 > **`$defs`-named scalar closed values are unimplemented.** A `$defs` entry must
 > currently be `type: object`, a `oneOf` union, or a bare `$ref`, so
 > `$defs: {Color: {type: string, enum: [red, green, blue]}}` is a load reject in
-> all four languages. Every "named definition" branch below — the `$defs`-name
+> all five languages. Every "named definition" branch below — the `$defs`-name
 > reuse, the P15 row for a `$defs`-named type, and `x-<lang>-const-name` on a
 > `$defs` node — describes the intended design and is unreachable until scalar
 > `$defs` entries are admitted.
@@ -249,8 +249,14 @@ namespace.
 | ---------- | ------------------------------------------------------------------ | ------------------------------------------------------- |
 | Go         | defined type `UserEventKind` **+** value const `UserEventKindUser` | **flat package** (Go has no nested types); P15 backstop |
 | Java       | value class `Kind` + class-scoped constant (`USER`)                | **nested** `UserEvent.Kind`                             |
+| C#         | closed-value class `KindValue` + class-scoped constant (`User`)    | **nested** `UserEvent.KindValue`                        |
 | TypeScript | none — the type is the inline literal `"user"`                     | —                                                       |
 | Python     | none — the type is the inline `Literal["user"]`                    | —                                                       |
+
+C# cannot follow Java and name the class `Kind`: a C# type keeps its properties
+and nested types in one declaration space, so the class nested beside property
+`Kind` cannot share its name (CS0102; see **PRINCIPLES C# §2**). The `Value`
+suffix resolves that for every closed-value member.
 
 Per **P15** every synthesized name enters the **same per-scope namespace** as
 the declared names and as one another; the generator runs a single collision
@@ -287,12 +293,12 @@ encoded as an identifier through the [[properties]] Stage 1–4 pipeline, with a
 per-kind front-end producing the token and a **constant recasing scope** (Go
 `PascalCase`, Java `UPPER_SNAKE`):
 
-| kind    | token                                                              | Go                  | Java             |
-| ------- | ------------------------------------------------------------------ | ------------------- | ---------------- |
-| string  | value split on **any non-alphanumeric ASCII** into words (Stage 1) | `UserEventKindUser` | `USER`           |
-| integer | the digits                                                         | `Priority3`         | `V_3`            |
-| number  | shortest round-trippable decimal, `.` → `_`                        | `Ratio3_14`         | `V_3_14`         |
-| boolean | `True` / `False`                                                   | `EnabledTrue`       | `TRUE` / `FALSE` |
+| kind    | token                                                              | Go                  | Java             | C#               |
+| ------- | ------------------------------------------------------------------ | ------------------- | ---------------- | ---------------- |
+| string  | value split on **any non-alphanumeric ASCII** into words (Stage 1) | `UserEventKindUser` | `USER`           | `User`           |
+| integer | the digits                                                         | `Priority3`         | `V_3`            | `V3`             |
+| number  | shortest round-trippable decimal, `.` → `_`                        | `Ratio3_14`         | `V_3_14`         | `V3_14`          |
+| boolean | `True` / `False`                                                   | `EnabledTrue`       | `TRUE` / `FALSE` | `True` / `False` |
 
 Rules:
 - **Negatives** encode the sign as the word `Neg`: `-3` → `PriorityNeg3` /
@@ -371,6 +377,7 @@ in both directions (it is a pure predicate over the decoded value — the
 | TypeScript | the shared `Validate` predicate compares against the literal: ``if (v !== "user") push(Violation{path, reason: `must equal "user", got ${JSON.stringify(v)}`})``, throwing one `PayloadValidationError` application failure. The field's literal type closes it in-language.                                                                                                                                                                                                                                                                                                                           |
 | Python     | the transfer type converter (PRINCIPLES Python §3) compares against the literal — `v != "user"` → `Violation(path=…, reason='must equal "user", got <json>')`, the same reason string TypeScript emits — aggregated into the single generated `PayloadValidationError` application failure. The field is the closed `Literal` (`float` consts are plain `float`, validated the same way).                                                                                                                                                                                                              |
 | Java       | the aggregating path is the per-POJO collecting deserializer (PRINCIPLES Java §5), which does a **non-throwing membership lookup** — known value → the constant, otherwise record a `Violation{path, "must equal \"user\", got …"}` — so multiple bad fields all collect into the single `PayloadValidationError` application failure, consistent with every other §5 constraint helper. The value class's `@JsonCreator fromString` *throws* only on the **standalone/interop** path, where fail-fast is expected. Serialize needs no separate check: the value class can only hold a known constant. |
+| C#         | `Converter.Parse` does a **non-throwing lookup** — a known value maps to its constant, any other records a `Violation{path, "must equal \"user\", got …"}` — so every bad field collects into the single `PayloadValidationError` application failure. Serialize needs no separate check: the class's private constructor means it can only hold a known constant.                                                                                                                                                                                                                                     |
 
 ### Co-authored assertions on the same node
 
@@ -418,6 +425,7 @@ How each language guarantees "set in memory" — and validates on the way in:
 | TypeScript | The field is the closed literal (`kind: "user"`); a wrong value is a compile error, so a required+const is always correct in memory and emitted by the normal `toTransferType`. optional+const emits when not `undefined`.                                                                                                                                                                                                                                                                                                                                          |
 | Python     | Presence follows [[required]] like any field — **no auto-fill on parse**: a required+const absent on the wire is a `"required"` violation, an optional+const absent stays omitted, and `from_transfer_type` enforces `== "user"` whenever the value is present. In memory the dataclass field carries the const as its **default**, so a consumer never has to restate it and `to_transfer_type` always has the right value to write; it re-checks equality before emitting the key. This all runs under the **default Temporal converter** (PRINCIPLES Python §3). |
 | Java       | `private final UserEventKind kind = UserEventKind.USER;` for required+const, getter only. The value class can only hold a known constant, so the getter (via `@JsonValue`) emits `"user"` by the normal path. On the way in, the collecting deserializer's membership lookup records a `Violation` for a non-`"user"` wire value. optional+const is a `@Nullable UserEventKind` constructor parameter, validated if non-null. Numeric/boolean consts use their value classes the same way.                                                                          |
+| C#         | required+const is `public required UserEvent.KindValue Kind { get; init; }`, set to `KindValue.User`; `WriteValue` writes the constant's `Value` (`"user"`), and `Converter.Parse` maps the wire value through the same lookup. optional+const is `KindValue?`, validated if present. Numeric and boolean consts use their closed-value classes the same way.                                                                                                                                                                                                       |
 
 The serialize equality check has teeth only where a wrong value can be set in
 memory before emit: an optional+const set to a wrong value, a Go

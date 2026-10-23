@@ -1027,6 +1027,7 @@ fn python_json_enforces_remaining_scalar_and_typed_extra_contracts() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1083,6 +1084,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1136,6 +1138,7 @@ fn python_json_union_serializer_validates_before_dispatching() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -1205,6 +1208,7 @@ fn generate_python_schema_tree(name: &str, files: &[(&str, &str)]) -> (PathBuf, 
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     (temp_dir, output_path)
@@ -1282,6 +1286,7 @@ fn python_json_bare_ref_root_alias_is_the_target_class_at_runtime() {
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1344,6 +1349,7 @@ fn python_json_property_names_never_shadow_converter_locals() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -1427,6 +1433,7 @@ fn python_json_model_properties_use_union_none_and_defaults_preserve_presence() 
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -1482,6 +1489,7 @@ fn generate_unformatted_python_package(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     output_path
@@ -1894,6 +1902,7 @@ fn renders_sample_with_versioned_header() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     assert!(output_path.is_dir());

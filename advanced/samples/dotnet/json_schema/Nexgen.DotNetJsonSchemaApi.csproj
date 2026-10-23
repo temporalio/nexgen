@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Nexgen.DotNetJsonSchemaApi</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- JSON Schema native-API samples (models, services, clients). -->
+    <Compile Remove="bin/**/*.cs;obj/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NexusRpc" Version="0.4.0" />
+    <PackageReference Include="Temporalio" Version="1.19.0" />
+  </ItemGroup>
+</Project>

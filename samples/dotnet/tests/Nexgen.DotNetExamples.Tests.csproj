@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <LangVersion>9.0</LangVersion>
+    <!-- net8.0 enforces the generated code's floor (.NET 8, C# 12) and runs
+         the tests on the oldest supported runtime; net10.0 runs them on the
+         newest. -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>

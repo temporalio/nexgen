@@ -1,0 +1,1 @@
+Generated C# Nexus service interfaces (`[NexusService]` `I<Name>`) are now `public` without `--native-api`, so a handler or caller in another assembly can implement or call them; with `--native-api` they stay `internal`, behind the generated `<Name>Client` wrapper.

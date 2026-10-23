@@ -3,7 +3,7 @@
 Source: **not** a JSON Schema 2020-12 keyword. A Nexus extension to the input
 document — the cross-cutting design note for declaring
 **Nexus services and their operations** (alongside the type-producing `$defs`),
-and emitting idiomatic service bindings in all four targets. Like
+and emitting idiomatic service bindings in all five targets. Like
 [[nullability]] and [[generated-file-layout]], this is a design note, not a
 keyword spec, so it adapts the `features/<keyword>.md` skeleton rather than
 following it verbatim.
@@ -35,11 +35,12 @@ following it verbatim.
 
 Rationale (citing [[PRINCIPLES.md]]):
 - **P1 (polyglot wire compatibility)**: an operation's wire name is the single
-  contract every language must agree on. The four SDKs default an omitted name
+  contract every language must agree on. The five SDKs default an omitted name
   *differently* (Go requires it; Java defaults to the unqualified method name;
-  Python to the class/attr name; TS requires it), so the generator
-  **always emits the resolved wire name explicitly** rather than relying on any
-  SDK default — identical bytes on the wire in every target.
+  Python to the class/attr name; C# to the unqualified method name; TS requires
+  it), so the generator **always emits the resolved wire name explicitly**
+  rather than relying on any SDK default — identical bytes on the wire in every
+  target.
 - **P2 (idiomatic output)**: each target uses its native service idiom — Go a
   typed `struct` of `OperationReference`s, TS a `nexus.service(...)` object,
   Python an `@nexusrpc.service` class, Java a `@Service` interface.
@@ -143,10 +144,10 @@ services:                       # map<service-name, service-def>
   neither has Nexus envelope semantics in this format.
 - The resolved wire name is **always emitted explicitly** (`name=…` /
   `@Operation(name=…)` / the Go struct field / the TS `name` key), even when it
-  equals what the SDK would default to. This is P1 itself: the four SDKs default
-  an omitted name *differently* (Go/TS require one; Java/Python derive it from
-  the identifier), so leaning on any default would make the wire contract vary
-  per target and shift silently if the identifier is later recased. The
+  equals what the SDK would default to. This is P1 itself: the five SDKs default
+  an omitted name *differently* (Go/TS require one; Java/Python/C# derive it
+  from the identifier), so leaning on any default would make the wire contract
+  vary per target and shift silently if the identifier is later recased. The
   redundancy is cosmetic; the explicitness is the cross-language wire guarantee,
   so it is kept unconditionally.
 
@@ -189,7 +190,7 @@ that wrapper *can* gain fields; the bare scalar cannot.
 ### Scope: a typed contract, not a handler
 
 The generated binding is deliberately a **typed contract** — operation
-references (Go/TS/Python) or a service interface (Java) — and nothing more.
+references (Go/TS/Python) or a service interface (Java, C#) — and nothing more.
 Handler-shape and runtime concerns the SDKs carry —
 **sync vs async handlers, headers, links** — live at *implementation* time, are
 expressed by the SDKs there, and are **intentionally out of scope** here: a
@@ -211,23 +212,23 @@ algorithm). `description` → the language's native doc comment. `description` i
 optional at both levels ([[input-files]]); when absent, Go still emits a
 name-led fallback comment on the service binding, client, constructor, and each
 operation entry/method (every exported Go declaration must carry one —
-PRINCIPLES.md, Go §1). The other three languages simply emit no comment, as
-elsewhere ([[description]]). `deprecated: true` is also annotation-only and
-lowers to each target's native service/operation marker and documentation tag;
-it never changes the wire name, signature, validation, or dispatch behavior. A
-non-boolean value rejects.
+PRINCIPLES.md, Go §1). The other languages simply emit no comment, as elsewhere
+([[description]]). `deprecated: true` is also annotation-only and lowers to each
+target's native service/operation marker and documentation tag; it never changes
+the wire name, signature, validation, or dispatch behavior. A non-boolean value
+rejects.
 
-| Aspect              | Go                                                                                            | TypeScript                                                                    | Python                                                     | Java                                               |
-| ------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------- |
-| Service binding     | pkg-level `var <Name> = struct{…}{…}`                                                         | `export const <name> = nexus.service(fqn, {…})`                               | `@service(name=fqn)` class                                 | `@Service(name=fqn)` interface                     |
-| Operation entry     | field `nexus.OperationReference[In, Out]` set via `nexus.NewOperationReference[In,Out](wire)` | `nexus.operation<In, Out>({ name: wire, inputType, outputType })`             | attr `Operation[In, Out] = Operation(name=wire)`           | method `Out m(In input)` + `@Operation(name=wire)` |
-| Operation type info | —                                                                                             | `inputType`/`outputType` carry the I/O type's transfer type converter (below) | —                                                          | —                                                  |
-| Service wire name   | `ServiceName` struct field                                                                    | first arg to `nexus.service`                                                  | `service(name=…)`                                          | `@Service(name=…)`                                 |
-| Void output         | `nexus.NoValue`                                                                               | `void`                                                                        | `None`                                                     | `void` return                                      |
-| Void input          | `nexus.NoValue`                                                                               | `void`                                                                        | `None`                                                     | **no-arg method** `Out m()`                        |
-| Deprecated          | godoc `Deprecated:` paragraph                                                                 | JSDoc `@deprecated`                                                           | PEP 702 `typing_extensions.deprecated(..., category=None)` | `@Deprecated` + Javadoc `@deprecated`              |
-| Import              | `github.com/nexus-rpc/sdk-go/nexus`                                                           | `nexus-rpc`                                                                   | `from nexusrpc import Operation, service`                  | `io.nexusrpc.{Service,Operation}`                  |
-| File                | declaring module's `<module>.go`                                                              | `services.ts`                                                                 | `services.py`                                              | **own `<Service>.java`**                           |
+| Aspect              | Go                                                                                            | TypeScript                                                                    | Python                                                     | Java                                               | C#                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| Service binding     | pkg-level `var <Name> = struct{…}{…}`                                                         | `export const <name> = nexus.service(fqn, {…})`                               | `@service(name=fqn)` class                                 | `@Service(name=fqn)` interface                     | `[NexusService(fqn)]` `public interface I<Name>`             |
+| Operation entry     | field `nexus.OperationReference[In, Out]` set via `nexus.NewOperationReference[In,Out](wire)` | `nexus.operation<In, Out>({ name: wire, inputType, outputType })`             | attr `Operation[In, Out] = Operation(name=wire)`           | method `Out m(In input)` + `@Operation(name=wire)` | `[NexusOperation(wire)]` method `Out <Name>(In request)`     |
+| Operation type info | —                                                                                             | `inputType`/`outputType` carry the I/O type's transfer type converter (below) | —                                                          | —                                                  | —                                                            |
+| Service wire name   | `ServiceName` struct field                                                                    | first arg to `nexus.service`                                                  | `service(name=…)`                                          | `@Service(name=…)`                                 | `[NexusService(…)]`                                          |
+| Void output         | `nexus.NoValue`                                                                               | `void`                                                                        | `None`                                                     | `void` return                                      | `void` return                                                |
+| Void input          | `nexus.NoValue`                                                                               | `void`                                                                        | `None`                                                     | **no-arg method** `Out m()`                        | **no-arg method** `Out M()`                                  |
+| Deprecated          | godoc `Deprecated:` paragraph                                                                 | JSDoc `@deprecated`                                                           | PEP 702 `typing_extensions.deprecated(..., category=None)` | `@Deprecated` + Javadoc `@deprecated`              | `[Obsolete("This <kind> is deprecated.")]` + `/// <summary>` |
+| Import              | `github.com/nexus-rpc/sdk-go/nexus`                                                           | `nexus-rpc`                                                                   | `from nexusrpc import Operation, service`                  | `io.nexusrpc.{Service,Operation}`                  | `NexusRpc`                                                   |
+| File                | declaring module's `<module>.go`                                                              | `services.ts`                                                                 | `services.py`                                              | **own `<Service>.java`**                           | `Services.cs`                                                |
 
 ### Verified SDK signatures
 
@@ -251,6 +252,16 @@ non-boolean value rejects.
   unqualified method name); a method takes **zero or one** convertible param
   (zero ⇒ absent input) and returns `void` (absent output) or a convertible
   type, no `throws`.
+- **C#** (`NexusRpc` 0.4.0, a dependency of `Temporalio` 1.19.0):
+  `[NexusService(name)]` on an **interface** and `[NexusOperation(name)]` on
+  each method; a method takes zero or one parameter (zero ⇒ absent input) and
+  returns `void` (absent output) or the output type. Without `--native-api` the
+  interface is **`public`**, like Java's, so a handler or caller in another
+  assembly can name it; with `--native-api` callers use the generated
+  `<Name>Client` wrapper, and the interface is `internal`. A handler is a
+  `[NexusServiceHandler(typeof(I<Name>))]` class whose `[NexusOperationHandler]`
+  methods return `IOperationHandler<In, Out>`, and a workflow calls it through
+  `Workflow.CreateNexusWorkflowClient<I<Name>>(new(endpoint))`.
 
 ### The Go `--native-api` client
 
@@ -378,15 +389,44 @@ public interface ChatService {
 }
 ```
 
-All four agree byte-for-byte on the wire: service `"example.v1.ChatService"`,
+### C# (`Services.cs`)
+
+```csharp
+using NexusRpc;
+
+/// <summary>
+/// A service for sending chat messages.
+/// </summary>
+[NexusService("example.v1.ChatService")]
+public interface IChatService
+{
+    /// <summary>
+    /// Poll for new messages.
+    /// </summary>
+    [NexusOperation("poll-messages")]
+    PollMessagesOutput PollMessages(PollMessagesInput request);
+
+    /// <summary>
+    /// Send a message.
+    /// </summary>
+    [NexusOperation("SendMessage")]
+    void SendMessage(SendMessageInput request);
+}
+```
+
+In native-API mode the same file also carries a `ChatServiceClient` that a
+workflow uses to call each operation (`SendMessageAsync`, …).
+
+All five agree byte-for-byte on the wire: service `"example.v1.ChatService"`,
 operations `"poll-messages"` and `"SendMessage"` (P1).
 
-`sendMessage` here has a present input and an absent output, so Java emits a
-`void` *return*. The mirror case — an operation with an absent *input* (e.g. a
-`ping` with output but no `input:`) — is the one place Java diverges from the
-other targets: it emits a **no-arg method**, `PingOutput ping()`, rather than a
-void argument. Go/TS/Python instead carry their void marker (`nexus.NoValue` /
-`void` / `None`) symmetrically in the input type position.
+`sendMessage` here has a present input and an absent output, so Java and C# emit
+a `void` *return*. The mirror case — an operation with an absent *input* (e.g. a
+`ping` with output but no `input:`) — is the one place Java and C# diverge from
+the other targets: they emit a **no-arg method**, `PingOutput ping()` /
+`PingOutput Ping()`, rather than a void argument. Go/TS/Python instead carry
+their void marker (`nexus.NoValue` / `void` / `None`) symmetrically in the input
+type position.
 
 ## Identifiers & naming
 
@@ -468,12 +508,13 @@ case-mapping rule applied to service keys.
 name reserved against everything else in the scope; what this spec supplies is
 *which* names each target's service file imports:
 
-| Target     | Imported bare names    |
-| ---------- | ---------------------- |
-| Go         | `nexus`                |
-| TypeScript | `nexus`                |
-| Python     | `Operation`, `service` |
-| Java       | `Operation`, `Service` |
+| Target     | Imported bare names                                                                          |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| Go         | `nexus`                                                                                      |
+| TypeScript | `nexus`                                                                                      |
+| Python     | `Operation`, `service`                                                                       |
+| Java       | `Operation`, `Service`                                                                       |
+| C#         | `GeneratedCode`, `NexusOperation`, `NexusService`, `NexusWorkflowClient`, `Task`, `Workflow` |
 
 Two routes reach them, and both are load rejects. An `x-<lang>-name` on a
 service or operation may name one directly. And a `$defs` model may be named
@@ -491,8 +532,8 @@ delegation). A bad payload surfaces as that type's non-retryable Temporal
 application failure with type `PayloadValidationError` and the aggregated
 violations as its first detail (P11). The SDK's Nexus integration recognizes
 that reserved type; the generated service binding adds no wrapper or behavior to
-the path. Void I/O (`nexus.NoValue` / TS `void` / Python `None` / Java `void`
-return or no-arg method) has no value to validate.
+the path. Void I/O (`nexus.NoValue` / TS `void` / Python `None` / Java and C#
+`void` return or no-arg method) has no value to validate.
 
 ### TypeScript operation type info
 
@@ -560,7 +601,7 @@ rather than duplicate it:
 | Operation `$ref` I/O (object)                    | `input: {$ref: '#/$defs/X'}`, `X` is `type: object` → field typed `X`                                   |
 | Inline-object I/O promoted                       | `input: {type: object, properties: {…}}` → `<Op>Input`                                                  |
 | Omitted output                                   | → `NoValue` / `void` / `None` / Java `void` return                                                      |
-| Omitted input                                    | → `NoValue` / `void` / `None` / Java **no-arg method**                                                  |
+| Omitted input                                    | → `NoValue` / `void` / `None` / Java and C# **no-arg method**                                           |
 | TS type info on a non-void side                  | `inputType`/`outputType` = `{ transferTypeConverter: … }` naming the I/O type's converter               |
 | TS type info on a void side                      | neither field emitted                                                                                   |
 | TS type info across modules                      | I/O `$ref` into another module → converter imported as a value from that module                         |
@@ -599,6 +640,20 @@ rather than duplicate it:
   (de)serializer; an invalid one aggregates a `Violation` with a path into that
   type (P11) — the operation binding adds nothing.
 - Void I/O carries no payload to validate in any language.
+- Every target's sample suite drives the generated `kb` service end to end over
+  a Temporal Nexus endpoint (Go through the SDK's in-memory test environment,
+  the others through a local dev server): a handler implementing the generated
+  binding and a caller workflow invoking every operation through the SDK's Nexus
+  client (`samples/<lang>/tests/*kb*nexus*`; C#'s is
+  `samples/dotnet/tests/JsonSchemaKbNexusChecks.cs`, which also implements
+  `GetCategoryTree` as an asynchronous, workflow-backed operation whose workflow
+  loads the tree through an activity — the binding is unchanged, since sync or
+  async is the handler's choice). The Go, Python and C# suites also send an
+  input the generated converter rejects and pin that the handler side reports it
+  as a non-retryable `BAD_REQUEST` before the operation runs. Java's suite
+  carries that expectation as a disabled test (its note records the Java SDK
+  1.35 reporting `INTERNAL` instead); the TypeScript suite does not cover it
+  yet.
 
 ## Interactions
 

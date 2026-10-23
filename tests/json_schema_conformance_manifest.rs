@@ -430,7 +430,7 @@ fn json_schema_conformance_manifest_is_structural_and_consumed() {
     );
     assert!(!manifest.cases.is_empty(), "manifest must contain cases");
 
-    let target_names = ["go", "java", "python", "typescript"]
+    let target_names = ["csharp", "go", "java", "python", "typescript"]
         .into_iter()
         .collect::<BTreeSet<_>>();
     let mut case_ids = BTreeSet::new();

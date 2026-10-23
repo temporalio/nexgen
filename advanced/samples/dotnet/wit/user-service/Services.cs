@@ -61,6 +61,9 @@ namespace Nexgen.UserService
         public string Email { get; set; }
     }
 
+    /// <summary>
+    /// Calls the <c>UserService</c> service's operations from a workflow.
+    /// </summary>
     [GeneratedCode("nexgen", null)]
     public class NotifyOptions
     {
@@ -85,6 +88,10 @@ namespace Nexgen.UserService
     {
         private readonly NexusWorkflowClient<IUserService> _client;
 
+        /// <summary>
+        /// Creates a client for the given Nexus endpoint.
+        /// </summary>
+        /// <param name="endpoint">The Nexus endpoint name.</param>
         public UserServiceClient(string endpoint)
         {
             _client = Workflow.CreateNexusWorkflowClient<IUserService>(endpoint);

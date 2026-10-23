@@ -11,18 +11,18 @@ stable references, do not renumber them.
 ### Foundational mandates
 
 1. **Polyglot wire compatibility is mandatory.** One schema generates models in
-   every supported language (Go, TypeScript, Python, Java), and a JSON payload
-   accepted by one language's deserializer must be accepted — and validated
-   *identically* — by every other's. Validation semantics are part of the wire
-   contract, not a per-language implementation detail: a value one language
-   rejects (`1.5` for an `integer`, a `minLength` underflow, a missing required
-   key) must be rejected by all, and a value one accepts must round-trip through
-   any other with the same JSON value. JSON identity does not include
-   insignificant whitespace, object-member order, or a number's lexical
+   every supported language (C#, Go, TypeScript, Python, Java), and a JSON
+   payload accepted by one language's deserializer must be accepted — and
+   validated *identically* — by every other's. Validation semantics are part of
+   the wire contract, not a per-language implementation detail: a value one
+   language rejects (`1.5` for an `integer`, a `minLength` underflow, a missing
+   required key) must be rejected by all, and a value one accepts must
+   round-trip through any other with the same JSON value. JSON identity does not
+   include insignificant whitespace, object-member order, or a number's lexical
    spelling: `5`, `5.0`, and `5e0` are the same mathematical number, and
    positive/negative zero compare equal. This is enforced from both ends — the
    strict subset (P6) refuses at load time any feature that cannot carry
-   identical semantics across all four targets rather than approximate it, and
+   identical semantics across all five targets rather than approximate it, and
    the shared validator (P12) is specified once as language-agnostic constraint
    predicates whose per-language reimplementations must agree value-for-value.
    This takes precedence: where cross-language wire agreement conflicts with
@@ -49,11 +49,11 @@ stable references, do not renumber them.
    others', **fix the outlier**: an incidental target limitation does not by
    itself license narrowing every target's accepted set. That prohibition does
    not reach (c) — a domain explicitly declared once and enforced identically in
-   all four targets is a P6 subset decision rather than a per-target loss. This
+   all five targets is a P6 subset decision rather than a per-target loss. This
    licenses the binary64 `number` domain and ±(2^53−1) integer range ([[type]])
    and the materialized `time` / `date-time` offset domain `-14:00..+14:00`
    ([[format]]). All three preserve one accepted-and-rejected value set across
-   all four languages (validation semantics are never excepted), and each loss
+   all five languages (validation semantics are never excepted), and each loss
    or domain boundary is bounded and documented at its own keyword. Everything
    else an accepted schema expresses round-trips unchanged by JSON value.
    Members the schema does **not** declare fall outside this clause: their
@@ -73,7 +73,7 @@ stable references, do not renumber them.
 
 3. **Works with the default Temporal payload converter setup.** A contrib
    library is admissible only where a target genuinely cannot express the wire
-   contract without one — a bar none of the four targets meets, so this holds
+   contract without one — a bar none of the five targets meets, so this holds
    literally in all of them: every language's output runs on the stock converter
    (`DataConverter.default`) with **no** contrib dependency and no user wiring.
    Python reaches it through the SDK's own transfer-type hook (Python §3), which
@@ -182,7 +182,7 @@ stable references, do not renumber them.
         indistinguishable from a nested `a` → `b`, and a key spelled `[0]` is
         indistinguishable from an array index. Bracket-quoting every
         non-identifier key removes both ambiguities, and it is why a nested path
-        beginning with `[` can only be an index. All four runtimes route
+        beginning with `[` can only be an index. All five runtimes route
         declared and map keys through the same segment encoder before joining
         nested or indexed paths.
     3. **The failure must survive the boundaries the caller observes it
@@ -194,19 +194,23 @@ stable references, do not renumber them.
        `type == "PayloadValidationError"`, and that it reports **non-retryable**
        — a payload that fails validation can never validate, so a retry is
        always wrong. Python and Java meet it; their stock converters preserve
-       the failure and its details. **Go does not, and the cause is upstream:**
-       the Go SDK's JSON payload converter `%w`-wraps its own sentinel and
-       stringifies the real error, severing the chain. A direct converter
-       round-trip yields a `*fmt.wrapError` on which `errors.As` fails outright,
-       and through Temporal's in-memory Nexus test environment the failure is
-       recovered but reports `Type() == "wrapError"` and
-       **`NonRetryable() == false`**, so a permanently-invalid payload is
-       retried. TypeScript is unmeasured; no claim is made for it.
-       **Status: open** — generated Go cannot deliver this clause today, so
-       generated code must not depend on a caller recovering `Violation` details
-       after a converter hop, and a test that constructs the failure locally or
-       bypasses the payload converter is not evidence for this clause and must
-       say so where it bypasses.
+       the failure and its details. C# meets it too, measured with Temporalio
+       1.19.0 both on a direct converter round trip and over a real Nexus
+       endpoint, where the caller recovers the failure, non-retryable and with
+       decodable violations, as the cause of the worker's non-retryable
+       `BAD_REQUEST` handler error (C# §5).
+       **Go does not, and the cause is upstream:** the Go SDK's JSON payload
+       converter `%w`-wraps its own sentinel and stringifies the real error,
+       severing the chain. A direct converter round-trip yields a
+       `*fmt.wrapError` on which `errors.As` fails outright, and through
+       Temporal's in-memory Nexus test environment the failure is recovered but
+       reports `Type() == "wrapError"` and **`NonRetryable() == false`**, so a
+       permanently-invalid payload is retried. TypeScript is unmeasured; no
+       claim is made for it. **Status: open** — generated Go cannot deliver this
+       clause today, so generated code must not depend on a caller recovering
+       `Violation` details after a converter hop, and a test that constructs the
+       failure locally or bypasses the payload converter is not evidence for
+       this clause and must say so where it bypasses.
 12. **Serialize-side validation; one shared validator, mirror-image adapters.**
     Validation runs in *both* directions (P10 is literal). Every (de)serializer
     decomposes into three layers, and crucially
@@ -339,7 +343,7 @@ stable references, do not renumber them.
     bind whichever import runs last and drop the other model off the package
     surface — precisely the silent incorrectness P7 forbids, and the reason
     Python's scope is the whole run rather than per module: the collision is
-    rejected at load, before either barrel is emitted. For **Java and .NET** the
+    rejected at load, before either barrel is emitted. For **Java and C#** the
     scope is the **module** the declaring file emits into: each module lands in
     its own sub-package/namespace and neither target emits an aggregating
     barrel, so two input files may each declare a `Page` and stay unambiguous. A
@@ -652,3 +656,193 @@ encoding cannot introduce a new name collision.
    release. Nested aggregation uses `ApplicationError.Details(&violations)` to
    cast the locally-retained first detail back to `[]Violation`; this is a cheap
    reflection assignment and performs no serialization.
+
+## C#
+
+The C# backend follows the Java backend's structure (collecting per-model
+deserializer, spec-strict primitive parse, validate-then-write) in C# idiom.
+
+Generated code that exists only to support other generated code is `internal`:
+the runtime helper classes `SpecJson`, `ValueEquality`, `TemporalSupport`, and
+`Base64Support`, each model's nested `Converter`, and `Violation`'s path and
+failure helpers. The `Violation` record itself stays `public` because it is the
+detail payload a caller reads from a validation failure.
+
+The generated runtime type names `Violation`, `SpecJson`, `ValueEquality`,
+`TemporalSupport`, and `Base64Support` are reserved in every C# module scope.
+They are not reserved as member names: generated model code spells them fully
+qualified from `global::` (`global::Nexgen.JsonSchema.Chat.Violation`), which no
+member, nested type, or local can capture. `TemporalSupport` and `Base64Support`
+stay reserved even when a run does not emit them, so adding a temporal `format`
+or a `contentEncoding` cannot introduce a collision. The members every generated
+converter declares or inherits (`Parse`, `Validate`, `WriteValue`, `Read`,
+`Write`, `Type`, `HandleNull`, `CanConvert`, `ReadAsPropertyName`,
+`WriteAsPropertyName`, `GetType`, `MemberwiseClone`, `ReferenceEquals`) are
+reserved *type* names in every C# module scope too: a converter names the
+same-module types it handles by simple name, and one of these would bind to the
+member instead. A member may still be named after most of them, but not after
+the non-overridden members every type inherits from `object` (`GetType`,
+`MemberwiseClone`, `ReferenceEquals`): a record member or closed-value constant
+of one of those names would hide it (CS0108), so they are reserved in every
+model member scope and closed-value constant scope.
+
+1. **Targets `net8.0` and C# 12.** Generated code may use any API and language
+   feature `net8.0` provides with its default language version, C# 12. Today it
+   needs no more than .NET 7 APIs (`char.IsAsciiDigit` and kin) and C# 11
+   (`required` members). Every sample and test project compiles for `net8.0`,
+   which enforces the floor. The sample test projects also target `net10.0`, so
+   the tests run on both the oldest and newest supported runtimes; the
+   validation probes and conformance harness set `RollForward=LatestMajor` and
+   run on the newest installed runtime.
+2. **Models emit `sealed record`s with `required` `init` members (P2).** Every
+   object model is a `public sealed record` carrying `[GeneratedCode]`. A
+   required member is `public required T Name { get; init; }`, so a missing
+   required member is a compile error at the construction site; an optional
+   member is `{ get; init; }` without `required`. Optional value types are
+   `Nullable<T>` (`long?`, `double?`, `bool?`), so absence is never aliased to a
+   zero value (P9); optional reference types are `T?` nullable reference
+   annotations, and the optional+nullable in-memory collapse follows
+   [[nullability]] as for Java. Lists and maps are `IReadOnlyList<T>` /
+   `IReadOnlyDictionary<string, V>`; an open model keeps unknown members
+   verbatim in `AdditionalProperties` as `JsonElement`s (P13). Nullable
+   annotations are compile-time only, so a required reference member carries a
+   serialize-side non-null check (Java §6). Record equality is structural: the
+   generated `Equals`/`GetHashCode` compare collections, byte arrays and
+   `JsonElement`s by content (through the runtime `ValueEquality`), so a value
+   equals its own round trip. A model synthesizes, in its own member scope, a
+   nested closed-value class `<Member>Value` per `const`/`enum` member, a nested
+   interface `<Member>Union` (and its `<Member>Union<Kind>` wrappers) per inline
+   `oneOf` member, and a computed `<Member>OrDefault` per optional member with a
+   scalar `default`. The `Value` and `Union` suffixes are required rather than
+   stylistic: a C# type keeps its properties and nested types in one declaration
+   space, so the nested type of property `Kind` cannot itself be named `Kind`
+   (CS0102). Java reaches members through `getKind()` and so can name the nested
+   type `Kind` directly. A named `$defs` type has no property beside it and
+   keeps its own name (`Foo`), so the suffix marks exactly the types synthesized
+   from a member. Value constants are PascalCase tokens of the value (`Active`,
+   `V1_5`, `VNeg3`, `True`), renamed by `x-cs-const-name` / `x-cs-enum-names`.
+   Construction is unchecked (P12).
+3. **Unions are interfaces.** A `oneOf` model is a `public interface` whose
+   object branches are the member models (which implement it) and whose scalar
+   and array branches are wrapper classes `<Union>String`, `<Union>Integer`,
+   `<Union>Number`, `<Union>Boolean`, `<Union>Array` holding a `Value`
+   (`<Union>Object` holds a free-form object's members). As in Java, a named
+   union nests its wrappers in the interface (`Foo.FooString`), and an inline
+   union declares them beside its interface in the declaring model
+   (`Showcase.DetailUnionString`). A model may be a member of several unions,
+   which is why an interface is used rather than a base record. The union's
+   converter selects the branch by JSON value kind and, for object branches, by
+   the discriminator (see [[oneOf]]).
+4. **One class-level converter per model (P11/P12; the analog of Java §5).**
+   Each model carries `[JsonConverter(typeof(<Model>.Converter))]` and a nested
+   `internal sealed class Converter : JsonConverter<<Model>>`, which
+   `System.Text.Json` honors on the stock `DataConverter.Default` with no user
+   wiring (P3). Because the converter writes every member name itself, a user's
+   `JsonSerializerOptions` naming policy cannot rename wire keys. The converter
+   carries three static methods that take the violation path of the value they
+   handle: `Parse` (wire → model, the parse adapter), `Validate` (every shared
+   predicate over the in-memory model), and `WriteValue` (model → wire, the
+   encode adapter). A parent calls a child's methods with the child's path, so a
+   nested model's violations land in the parent's list directly — no exception
+   is thrown and caught between levels — and only the outermost `Read`/`Write`
+   throws. `Read` binds the whole value with `JsonElement.ParseValue` before
+   checking any member, so every violation is collected. Per-member attribute
+   binding (`[JsonPropertyName]`, `[JsonRequired]`) is not used: it is fail-fast
+   on the first bad member, which defeats aggregation.
+5. **Aggregate via one Temporal `ApplicationFailureException` (P11).** The
+   generated `public sealed record Violation(string Path, string Reason)`
+   carries the P11.2 path grammar (`Violation.Member`, `Join`, `Index`), and
+   `Violation.Failure` returns
+   `PayloadValidationError.CreateException(violations)`: a non-retryable
+   application failure with message `Payload validation failed`, type
+   `PayloadValidationError`, and the `IReadOnlyList<Violation>` as its first
+   detail. Generated C# requires Temporal SDK 1.19.0 or newer for this factory.
+   Through `DataConverter.Default` the failure reaches the caller unwrapped, as
+   type `PayloadValidationError` and non-retryable (measured with Temporalio
+   1.19.0 on a direct converter round trip). Across the Nexus boundary, an input
+   the generated converter rejects never reaches the operation: the Temporal
+   worker reports it as a non-retryable `BAD_REQUEST` handler error ("Invalid
+   operation input") whose cause the calling workflow recovers as the original
+   non-retryable `PayloadValidationError`, its violations decodable from the
+   first detail. That meets P11.3, and
+   `samples/dotnet/tests/JsonSchemaKbNexusChecks.cs` pins it over a local dev
+   server. The bare NexusRpc dispatcher below the worker propagates the
+   converter's failure unclassified; the classification is the worker's.
+6. **Spec-strict primitive parse over the raw number token (P1; Java §4).**
+   `JsonElement.GetRawText()` is the exact wire spelling (`1.0e2`,
+   `12345678901234567890.5`, and `-0` survive verbatim). `SpecJson.SpecLong`
+   classifies integers from that token's significant digits and exponent —
+   integral spellings such as `1.0`/`1e2` are accepted, `1.5` is rejected — and
+   enforces the ±(2^53−1) cap before narrowing to `long`; `number` is a finite
+   `double` (see [[type]]). A bad value records a `Violation` and parsing
+   continues.
+7. **Code points, not UTF-16 units.** `minLength` / `maxLength` count code
+   points (`SpecJson.CodePoints`), never `string.Length`.
+8. **Patterns compile to static `Regex` fields.** Each normalized [[pattern]]
+   compiles once into a `static readonly Regex` with
+   `RegexOptions.CultureInvariant`. The portability gate already spells `\d`,
+   `\w`, `\s` and `.` as explicit ASCII classes, so .NET's Unicode-aware
+   shorthand never runs. Two .NET-specific rewrites apply at emit: end anchors
+   become `\z` (`rewrite_end_anchor`; .NET's `$` also matches before a final
+   newline), and `rewrite_for_utf16_code_units` makes negated classes, astral
+   class members and quantified astral literals consume a whole surrogate pair,
+   because .NET matches UTF-16 code units where the portable contract matches
+   code points. Every row of the pattern corpus holds in C#; a construct .NET
+   could not hold identically would narrow the strict subset for every target
+   (P6) rather than C# approximating it.
+9. **Duplicate object keys: the last occurrence wins — provisional.**
+   `SpecJson.Members` reads an object's members into a dictionary where a
+   repeated key keeps its last value, the rule the other targets' stock decoders
+   apply. A conformance case pins it.
+10. **Serialize: validate-then-write (P11.1/P12; Java §6).** `Write` runs
+    `Validate` over the complete value tree, aggregating nested children's
+    violations with their siblings', before writing the first token, then emits
+    members per the [[nullability]] serialize table. No bytes are written for an
+    invalid value.
+11. **Materialized formats.** `date-time` is `DateTimeOffset`, `date` is
+    `DateOnly`, `duration` is `TimeSpan`, and `time` stays a validated,
+    canonicalized `string` (no BCL type holds both offset-bearing and
+    offset-less times of day); `contentEncoding` is `byte[]`. `DateTimeOffset`
+    resolves 100 ns, so a longer fraction is truncated to seven digits (P1
+    exception (b); the open `09#8` divergence, shared with Python's microsecond
+    `datetime` and reported on every run of
+    `tests/json_schema_corpus_runtime.rs`). It holds UTC offsets only within
+    ±14:00, which is exactly the shared [[format]] domain.
+12. **Name overrides are `x-cs-name`, `x-cs-const-name`, and
+    `x-cs-enum-names`.** Types, members, and constants are PascalCase, so a
+    derived name is never a C# keyword; an override must itself be a legal,
+    non-reserved identifier. A name that cannot be a C# identifier at all
+    (empty, or starting with a digit) is a P15 load reject with the override as
+    its fix-it, as is a member that shares its enclosing type's name (CS0542).
+    An override may be lowercase and may spell any parameter or local the
+    generated code binds (`value`, `path`, `violations`, `other`, `hash`, …);
+    none is reserved, unlike Java's deserializer locals. Converter locals carry
+    a member-derived prefix or never meet a member by bare name, a converter
+    reaches members through an instance (`value.Member`), and generated record
+    and closed-value methods qualify their own members with `this.` (the Java
+    `equals` pattern), so a parameter such as `Equals(T? other)` cannot capture
+    a member named `other`. A test harvests every such identifier from the
+    generated showcase and overrides a member to each.
+13. **One namespace per module (P14).** Each input file's module is one
+    namespace: the root module's is the required `--namespace` (as Java requires
+    `--package-name`; a guessed default would move every type whenever the input
+    set changed) and every other module's is that root plus the module path in
+    PascalCase. Each module emits `Models.cs` (and `Services.cs` when it
+    declares services); the runtime types are emitted once, in the root
+    namespace, as `Violation.cs`, `SpecJson.cs`, `ValueEquality.cs`, and — when
+    used — `TemporalSupport.cs` and `Base64Support.cs`, and every model file
+    names them fully qualified (`global::<root namespace>.Violation`). Generated
+    code spells framework types `global::`-qualified too, so no schema type name
+    can shadow them. The generator emits formatted C# directly; no external
+    formatter runs.
+14. **Services are NexusRpc interfaces, `public` unless `--native-api`.** Each
+    service is a `[NexusService(fqn)]` `interface I<Name>` with one
+    `[NexusOperation(wire)]` method per operation (see [[services]]). Without
+    `--native-api` the contract is the API, so it is `public`, like Java's
+    service interface: a handler (`[NexusServiceHandler(typeof(I<Name>))]`) or a
+    caller (`Workflow.CreateNexusWorkflowClient<I<Name>>`) in another assembly
+    can name it. With `--native-api`, callers use the generated `<Name>Client`
+    wrapper instead, so the contract is `internal`. Definitions mode emits the
+    contract only, with no handler or client scaffolding; the sample suite
+    implements and calls it end to end over a real Nexus endpoint (§5), with
+    both synchronous operations and an asynchronous, workflow-backed one.
