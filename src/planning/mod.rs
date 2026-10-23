@@ -37,8 +37,8 @@ pub(crate) use proto::{message_model_name, relative_descriptor_name};
 pub(crate) use reachability::ReachabilityPass;
 pub(crate) use resource_resolution::{
     RequestPlan, RequestPlanField, RequestPlanSource, ResolvedResourceBindingSource,
-    ResolvedResourceMethodBinding, ResolvedResourceReturnSpec, ResolvedResourceSpec,
-    ResourceBoundData, ResourceBoundFamily, ResourceResolutionPass,
+    ResolvedResourceHolder, ResolvedResourceMethodBinding, ResolvedResourceReturnSpec,
+    ResolvedResourceSpec, ResourceBoundData, ResourceBoundFamily, ResourceResolutionPass,
 };
 pub(crate) use selected_validation::SelectedValidationPass;
 pub(crate) use selection::LanguageSelectionPass;
@@ -119,6 +119,25 @@ pub(crate) enum PlanningMode {
 pub(crate) struct PlannedOperationResourceReturn {
     pub(crate) resource_type_name: String,
     pub(crate) bindings: Vec<PlannedOperationResourceFieldBinding>,
+    pub(crate) holder: Option<PlannedResourceHolder>,
+}
+
+/// The result record that holds the returned resource, by model and field names. Its other
+/// fields have the same names in the wire record.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PlannedResourceHolder {
+    pub(crate) record_full_name: String,
+    pub(crate) model_name: String,
+    /// The record's fields in order. The resource field holds the resource.
+    pub(crate) fields: Vec<PlannedResourceHolderField>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PlannedResourceHolderField {
+    pub(crate) name: String,
+    pub(crate) proto_name: String,
+    pub(crate) required: bool,
+    pub(crate) resource: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

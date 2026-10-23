@@ -517,9 +517,13 @@ impl<'a> ApiPlanner<'a> {
             output_annotation: output_transform
                 .and_then(|transform| transform.type_name.value().map(str::to_string))
                 .or_else(|| {
-                    output_resource_return
-                        .as_ref()
-                        .map(|resource| resource.resource_type_name.clone())
+                    output_resource_return.as_ref().map(|resource| {
+                        resource
+                            .holder
+                            .as_ref()
+                            .map_or(&resource.resource_type_name, |holder| &holder.model_name)
+                            .clone()
+                    })
                 })
                 .unwrap_or(output_annotation_default),
             output_transform_type_import: output_transform
@@ -3891,6 +3895,16 @@ fn render_endpoint_service_operation_body(
         output.push_str("    return ");
         output.push_str(transform_expr);
         output.push_str(";\n");
+    } else if let Some(resource_return) = &operation.output_resource_return
+        && resource_return.holder.is_some()
+    {
+        output.push_str("    const result = await handle.result();\n");
+        output.push_str("    return ");
+        output.push_str(&typescript_resource_return_value(
+            resource_return,
+            Some("this.client"),
+        ));
+        output.push_str(";\n");
     } else if let Some(resource_return) = &operation.output_resource_return {
         output.push_str("    const result = await handle.result();\n");
         output.push_str("    return ");
@@ -4270,6 +4284,20 @@ fn render_models_module(
         api_plan,
         &body,
     );
+    // A result record that holds a resource uses its class.
+    let held_resources = api_plan
+        .services
+        .iter()
+        .flat_map(|service| service.operations.iter())
+        .filter_map(|operation| operation.data.output_resource_return.as_ref())
+        .filter(|resource_return| resource_return.holder.is_some())
+        .map(|resource_return| resource_return.resource_type_name.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if !held_resources.is_empty() {
+        render_type_imports(&mut imports, "./resources", &held_resources);
+    }
     render_generated_module(imports, body)
 }
 
@@ -6177,6 +6205,44 @@ fn render_request_plan_typescript(plan: &RequestPlan) -> String {
     )
 }
 
+/// The resource that an operation returns, bound to `client` when one is given, or the
+/// result record that holds it. The record takes each other field from the field of the
+/// same name in the wire record.
+fn typescript_resource_return_value(
+    resource_return: &PlannedOperationResourceReturn,
+    client: Option<&str>,
+) -> String {
+    let args = resource_return
+        .bindings
+        .iter()
+        .map(resource_return_binding_expr_typescript)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut value = format!("new {}({args})", resource_return.resource_type_name);
+    if let Some(client) = client {
+        value = format!(
+            "{}({value}, {client})",
+            resource_client_bind_function_name_for_type(&resource_return.resource_type_name)
+        );
+    }
+    let Some(holder) = &resource_return.holder else {
+        return value;
+    };
+    let fields = holder
+        .fields
+        .iter()
+        .map(|field| {
+            let name = typescript_generated_field_name(&field.name);
+            if field.resource {
+                format!("{name}: {value}")
+            } else {
+                format!("{name}: result.{name}")
+            }
+        })
+        .collect::<Vec<_>>();
+    format!("{{ {} }}", fields.join(", "))
+}
+
 fn resource_return_binding_expr_typescript(
     binding: &PlannedOperationResourceFieldBinding,
 ) -> String {
@@ -6372,6 +6438,13 @@ fn render_operation_function(
             output.push_str("  return ");
             output.push_str(transform_expr);
             output.push_str(";\n");
+        } else if let Some(resource_return) = &operation.output_resource_return
+            && resource_return.holder.is_some()
+        {
+            // The answer is the wire message, so the record and its resource are built from it.
+            output.push_str("  return ");
+            output.push_str(&typescript_resource_return_value(resource_return, None));
+            output.push_str(";\n");
         } else {
             output.push_str("  return result as ");
             output.push_str(&operation.output_annotation);
@@ -6402,6 +6475,16 @@ fn render_operation_function(
         output.push_str("  const result = await handle.result();\n");
         output.push_str("  return ");
         output.push_str(transform_expr);
+        output.push_str(";\n");
+    } else if let Some(resource_return) = &operation.output_resource_return
+        && resource_return.holder.is_some()
+    {
+        output.push_str("  const result = await handle.result();\n");
+        output.push_str("  return ");
+        output.push_str(&typescript_resource_return_value(
+            resource_return,
+            service.endpoint.is_none().then_some("endpoint"),
+        ));
         output.push_str(";\n");
     } else if let Some(resource_return) = &operation.output_resource_return {
         output.push_str("  const result = await handle.result();\n");

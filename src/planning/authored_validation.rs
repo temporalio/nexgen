@@ -14,7 +14,7 @@ use crate::generator::python;
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, AuthoredFamily, ExternalTypeBindingSpec, ExternalTypeSourceSpec, ExternalTypeSpec,
-    RecordFieldVisibility, RecordSpec, ServiceSpec, TypeSpec,
+    RecordFieldSpec, RecordFieldVisibility, RecordSpec, ServiceSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 
@@ -492,7 +492,7 @@ fn validate_message_model_config(
         .record
         .fields
         .iter()
-        .filter(|(_, field)| field.required)
+        .filter(|(_, field)| field.required && !is_resource_field(field))
         .map(|(field_name, _)| field_name)
     {
         if oneof_by_name(&oneofs, field_name).is_some() {
@@ -512,8 +512,8 @@ fn validate_message_model_config(
         }
         validate_model_override_field(message_name, field_name, message)?;
     }
-    for field_name in model_config.record.fields.keys() {
-        if oneof_by_name(&oneofs, field_name).is_some() {
+    for (field_name, field) in &model_config.record.fields {
+        if oneof_by_name(&oneofs, field_name).is_some() || is_resource_field(field) {
             continue;
         }
         validate_model_override_field(message_name, field_name, message)?;
@@ -551,7 +551,7 @@ fn validate_record_fields(
     language: Language,
 ) -> Result<()> {
     for (field_name, field) in &model_config.record.fields {
-        if oneof_by_name(oneofs, field_name).is_some() {
+        if oneof_by_name(oneofs, field_name).is_some() || is_resource_field(field) {
             continue;
         }
         validate_model_override_field(message_name, field_name, message)?;
@@ -639,13 +639,17 @@ fn validate_record_fields(
         }
     }
 
+    // A record that holds a resource declares only what its caller sees. The resource binds
+    // the fields that it needs, and the other fields of the message are left out.
+    let holds_resource = model_config.record.fields.values().any(is_resource_field);
     let mut seen_generated_names: BTreeMap<String, String> = BTreeMap::new();
     for field in &message.descriptor.field {
         let proto_name = field
             .name
             .as_deref()
             .expect("descriptor fields should be named");
-        if !model_config.is_field_omitted(proto_name)
+        if !holds_resource
+            && !model_config.is_field_omitted(proto_name)
             && !model_config.record.fields.contains_key(proto_name)
             && !oneofs.iter().any(|oneof| {
                 model_config.record.fields.contains_key(oneof.name)
@@ -701,6 +705,9 @@ fn validate_authored_field_types(
             continue;
         }
 
+        if is_resource_field(field_spec) {
+            continue;
+        }
         let field = validate_model_override_field(message_name, field_name, message)?;
         if model_config.is_field_omitted(field_name) {
             continue;
@@ -1221,6 +1228,12 @@ fn validate_model_override_field<'a>(
             message: message_name.to_string(),
             field: field_name.to_string(),
         })
+}
+
+/// A resource field holds a resource that an operation result builds from the message, so
+/// it has no proto field of its own.
+fn is_resource_field(field: &RecordFieldSpec) -> bool {
+    matches!(field.field_type.without_option(), TypeSpec::Resource(_))
 }
 
 fn validate_model_required_field(

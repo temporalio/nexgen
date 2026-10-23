@@ -814,6 +814,9 @@ struct RenderedResourceReturn {
     local_lines: Vec<String>,
     field_initializers: Vec<RenderedResourceFieldInitializer>,
     requires_data_converter: bool,
+    /// The result record that holds the resource: its type, the resource field, and each
+    /// other field with its value.
+    holder: Option<(String, String, Vec<(String, String)>)>,
 }
 
 #[derive(Debug)]
@@ -1285,20 +1288,38 @@ pub(in crate::generator) fn render_operation_function_proto(
                 output.push_str("\t\t\treturn\n");
                 output.push_str("\t\t}\n");
                 for line in &resource_return.local_lines {
+                    // The lines run in the future's goroutine, which sets the error.
+                    if line.trim() == "return nil, err" {
+                        let indent = &line[..line.len() - line.trim_start().len()];
+                        output.push_str(&format!(
+                            "\t\t{indent}resultSettable.SetError(err)\n\t\t{indent}return\n"
+                        ));
+                        continue;
+                    }
                     output.push_str("\t\t");
                     output.push_str(line);
                     output.push('\n');
                 }
-                output.push_str("\t\tvalue := New");
-                output.push_str(&resource_return.resource_type_name);
-                output.push('(');
+                let mut resource = format!("New{}(", resource_return.resource_type_name);
                 for (index, initializer) in resource_return.field_initializers.iter().enumerate() {
                     if index > 0 {
-                        output.push_str(", ");
+                        resource.push_str(", ");
                     }
-                    output.push_str(&initializer.expr);
+                    resource.push_str(&initializer.expr);
                 }
-                output.push_str(")\n");
+                resource.push(')');
+                output.push_str("\t\tvalue := ");
+                match &resource_return.holder {
+                    Some((type_name, resource_field, fields)) => {
+                        output.push_str(&format!("{type_name}{{{resource_field}: {resource}"));
+                        for (name, expr) in fields {
+                            output.push_str(&format!(", {name}: {expr}"));
+                        }
+                        output.push('}');
+                    }
+                    None => output.push_str(&resource),
+                }
+                output.push('\n');
             },
         );
     } else {
@@ -1435,11 +1456,67 @@ fn build_rendered_resource_return(
         field_initializers.push(RenderedResourceFieldInitializer { expr });
     }
 
+    let holder = match &resource_return.holder {
+        Some(holder) => {
+            let record = api_plan
+                .record(&holder.record_full_name)
+                .expect("the plan has the holder record");
+            let mut resource_field = String::new();
+            let mut fields = Vec::new();
+            for field in &holder.fields {
+                if field.resource {
+                    resource_field = go_field_name(&field.name);
+                    continue;
+                }
+                let planned = &record.fields[&field.proto_name];
+                let resource_field = PlannedResourceField {
+                    name: field.name.clone(),
+                    optional: !field.required,
+                    kind: planned.field_type.clone(),
+                    function: None,
+                };
+                let (lines, expr, uses_data_converter) = resource_return_proto_field_source(
+                    &resource_field,
+                    "result",
+                    &field.proto_name,
+                    api_plan,
+                    backend,
+                    package,
+                )
+                .map_err(|reason| Error::UnsupportedGoProtoConversion {
+                    context: format!("result record field `{}.{}`", holder.model_name, field.name),
+                    reason,
+                })?;
+                requires_data_converter |= uses_data_converter;
+                local_lines.extend(lines);
+                // An optional scalar field of the record is a pointer, and the zero value
+                // means unset, as in the record's model.
+                let field_kind = planned_field_kind(&resource_field.kind, api_plan);
+                let field_type = resolve_resource_field_kind(&field_kind, true, package);
+                let expr = match public_default_punning_zero_for_field(&field_kind, &field_type) {
+                    Some(zero) if !field.required => {
+                        let local = format!("held{}", go_field_name(&field.name));
+                        local_lines.push(format!("var {local} {field_type}"));
+                        local_lines.push(format!("if value := {expr}; value != {zero} {{"));
+                        local_lines.push(format!("\t{local} = &value"));
+                        local_lines.push("}".to_string());
+                        local
+                    }
+                    _ => expr,
+                };
+                fields.push((go_field_name(&field.name), expr));
+            }
+            Some((holder.model_name.clone(), resource_field, fields))
+        }
+        None => None,
+    };
+
     Ok(RenderedResourceReturn {
         resource_type_name: resource_return.resource_type_name.clone(),
         local_lines,
         field_initializers,
         requires_data_converter,
+        holder,
     })
 }
 

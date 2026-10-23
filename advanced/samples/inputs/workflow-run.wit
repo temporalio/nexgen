@@ -1,0 +1,114 @@
+package temporal:nexus@1.0.0;
+
+world system {
+  export workflow-run-service;
+}
+
+/// @nexus.endpoint "temporal-system" go="__temporal_system" python="__temporal_system"
+/// @nexus.service-name "temporal.example.v1.WorkflowRunService"
+interface workflow-run-service {
+  use nexus:temporal-types/model@1.0.0.{duration, placeholder, task-queue, workflow-type};
+
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution" typescript-import="@temporalio/proto"
+  record workflow-execution {
+    workflow-id: string,
+    run-id: option<string>,
+  }
+
+  resource workflow-run {
+    constructor(workflow-id: string, run-id: option<string>);
+
+    /// @nexus.operation "cancel-run"
+    cancel: func(reason: option<string>);
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionRequest" typescript-import="@temporalio/proto"
+  record start-run-request {
+    /// @nexus.proto-field "workflow_type"
+    workflow: workflow-type,
+    /// @nexus.omit
+    input: placeholder,
+    workflow-id: string,
+    task-queue: task-queue,
+    workflow-start-delay: option<duration>,
+    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
+    namespace: string,
+    /// @nexus.omit
+    workflow-execution-timeout: placeholder,
+    /// @nexus.omit
+    workflow-run-timeout: placeholder,
+    /// @nexus.omit
+    workflow-task-timeout: placeholder,
+    /// @nexus.omit
+    identity: placeholder,
+    /// @nexus.omit
+    request-id: placeholder,
+    /// @nexus.omit
+    workflow-id-reuse-policy: placeholder,
+    /// @nexus.omit
+    workflow-id-conflict-policy: placeholder,
+    /// @nexus.omit
+    retry-policy: placeholder,
+    /// @nexus.omit
+    cron-schedule: placeholder,
+    /// @nexus.omit
+    memo: placeholder,
+    /// @nexus.omit
+    search-attributes: placeholder,
+    /// @nexus.omit
+    header: placeholder,
+    /// @nexus.omit
+    request-eager-execution: placeholder,
+    /// @nexus.omit
+    continued-failure: placeholder,
+    /// @nexus.omit
+    last-completion-result: placeholder,
+    /// @nexus.omit
+    completion-callbacks: placeholder,
+    /// @nexus.omit
+    user-metadata: placeholder,
+    /// @nexus.omit
+    links: placeholder,
+    /// @nexus.omit
+    versioning-override: placeholder,
+    /// @nexus.omit
+    on-conflict-options: placeholder,
+    /// @nexus.omit
+    priority: placeholder,
+    /// @nexus.omit
+    eager-worker-deployment-options: placeholder,
+    /// @nexus.omit
+    time-skipping-config: placeholder,
+  }
+
+  // The handle binds from the response, and the other fields stay beside it.
+  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse" typescript-import="@temporalio/proto"
+  record start-run-result {
+    run: own<workflow-run>,
+    started: option<bool>,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest" typescript-import="@temporalio/proto"
+  record cancel-run-request {
+    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
+    namespace: string,
+    workflow-execution: workflow-execution,
+    reason: option<string>,
+    /// @nexus.omit
+    identity: placeholder,
+    /// @nexus.omit
+    request-id: placeholder,
+    /// @nexus.omit
+    first-execution-run-id: placeholder,
+    /// @nexus.omit
+    links: placeholder,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse" typescript-import="@temporalio/proto"
+  record cancel-run-response {
+  }
+
+  start-run: func(request: start-run-request) -> start-run-result;
+
+  cancel-run: func(request: cancel-run-request) -> cancel-run-response;
+}

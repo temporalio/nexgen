@@ -1,0 +1,23 @@
+package test:holder@1.0.0;
+
+world system {
+  export api;
+}
+
+/// @nexus.endpoint "runs"
+interface api {
+  resource workflow-run {
+    constructor(run-id: option<string>);
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.GetSystemInfoRequest"
+  record start-run-request {
+  }
+
+  record start-run-result {
+    run: own<workflow-run>,
+    started: option<bool>,
+  }
+
+  start-run: func(request: start-run-request) -> start-run-result;
+}

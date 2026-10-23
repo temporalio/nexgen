@@ -15,7 +15,8 @@ use crate::planning::{
     PlannedSpec, PlannedType, operation_input_model,
 };
 use crate::planning::{
-    RequestPlan, RequestPlanField, RequestPlanSource, ResolvedResourceBindingSource,
+    PlannedResourceHolderField, RequestPlan, RequestPlanField, RequestPlanSource,
+    ResolvedResourceBindingSource,
 };
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec,
@@ -911,11 +912,14 @@ impl<'a> ApiPlanner<'a> {
             let expression =
                 operation_transform_expression(operation, "request", "result", self.api_plan);
             output.push_str("        return ");
-            if let Some(resource) = &operation.data.output_resource_return {
-                output.push_str(&csharp_type_name(&resource.resource_type_name));
-                output.push_str(".BindClient(");
-                output.push_str(&expression);
-                output.push_str(", _client)");
+            if operation.data.output_resource_return.is_some() {
+                output.push_str(&resource_return_expression(
+                    operation,
+                    "request",
+                    "result",
+                    self.api_plan,
+                    Some("_client"),
+                ));
             } else {
                 output.push_str(&expression);
             }
@@ -1115,11 +1119,14 @@ impl<'a> ApiPlanner<'a> {
             let expression =
                 operation_transform_expression(operation, "request", "result", self.api_plan);
             output.push_str("        return ");
-            if endpoint_parameter && let Some(resource) = &operation.data.output_resource_return {
-                output.push_str(&csharp_type_name(&resource.resource_type_name));
-                output.push_str(".BindClient(");
-                output.push_str(&expression);
-                output.push_str(", client)");
+            if endpoint_parameter && operation.data.output_resource_return.is_some() {
+                output.push_str(&resource_return_expression(
+                    operation,
+                    "request",
+                    "result",
+                    self.api_plan,
+                    Some("client"),
+                ));
             } else {
                 output.push_str(&expression);
             }
@@ -1203,11 +1210,14 @@ impl<'a> ApiPlanner<'a> {
             let expression =
                 operation_transform_expression(operation, "request", "result", self.api_plan);
             output.push_str("        return ");
-            if let Some(resource) = &operation.data.output_resource_return {
-                output.push_str(&csharp_type_name(&resource.resource_type_name));
-                output.push_str(".BindClient(");
-                output.push_str(&expression);
-                output.push_str(", RequireNexgenClient())");
+            if operation.data.output_resource_return.is_some() {
+                output.push_str(&resource_return_expression(
+                    operation,
+                    "request",
+                    "result",
+                    self.api_plan,
+                    Some("RequireNexgenClient()"),
+                ));
             } else {
                 output.push_str(&expression);
             }
@@ -1313,7 +1323,12 @@ impl<'a> ApiPlanner<'a> {
             return type_name.to_string();
         }
         if let Some(resource) = &operation.data.output_resource_return {
-            return csharp_type_name(&resource.resource_type_name);
+            return csharp_type_name(
+                resource
+                    .holder
+                    .as_ref()
+                    .map_or(&resource.resource_type_name, |holder| &holder.model_name),
+            );
         }
         self.operation_output_type(operation)
     }
@@ -3649,40 +3664,91 @@ fn operation_transform_expression(
             .replace("request", request_expr)
             .replace("result", result_expr);
     }
-    if let Some(resource) = &operation.data.output_resource_return {
-        let args = resource
-            .bindings
-            .iter()
-            .map(|binding| {
-                let expr = resource_return_binding_expr(
-                    resource,
-                    binding,
-                    request_expr,
-                    result_expr,
-                    api_plan,
-                );
-                // A response model field is always nullable, so a required one is checked.
-                match &binding.source {
-                    ResolvedResourceBindingSource::ResultField {
-                        proto_field_name, ..
-                    } if !binding.optional => format!(
-                        "({expr} ?? throw new System.InvalidOperationException({}))",
-                        csharp_string_literal(&format!(
-                            "{} answered without `{proto_field_name}`",
-                            operation.wire_name
-                        ))
-                    ),
-                    _ => expr,
-                }
-            })
-            .collect::<Vec<_>>();
-        return format!(
-            "new {}({})",
-            csharp_type_name(&resource.resource_type_name),
-            args.join(", ")
-        );
+    if operation.data.output_resource_return.is_some() {
+        return resource_return_expression(operation, request_expr, result_expr, api_plan, None);
     }
     result_expr.to_string()
+}
+
+/// The resource that an operation returns, bound to `client` when one is given. A result
+/// record that holds the resource gets it in its resource field, and each other field from
+/// the field of the same name in the wire record.
+fn resource_return_expression(
+    operation: &PlannedOperation,
+    request_expr: &str,
+    result_expr: &str,
+    api_plan: &PlannedSpec,
+    client: Option<&str>,
+) -> String {
+    let resource = operation
+        .data
+        .output_resource_return
+        .as_ref()
+        .expect("the operation returns a resource");
+    let type_name = csharp_type_name(&resource.resource_type_name);
+    let args = resource
+        .bindings
+        .iter()
+        .map(|binding| {
+            let expr = resource_return_binding_expr(
+                resource,
+                binding,
+                request_expr,
+                result_expr,
+                api_plan,
+            );
+            // A response model field is always nullable, so a required one is checked.
+            match &binding.source {
+                ResolvedResourceBindingSource::ResultField {
+                    proto_field_name, ..
+                } if !binding.optional => format!(
+                    "({expr} ?? throw new System.InvalidOperationException({}))",
+                    csharp_string_literal(&format!(
+                        "{} answered without `{proto_field_name}`",
+                        operation.wire_name
+                    ))
+                ),
+                _ => expr,
+            }
+        })
+        .collect::<Vec<_>>();
+    let mut value = format!("new {type_name}({})", args.join(", "));
+    if let Some(client) = client {
+        value = format!("{type_name}.BindClient({value}, {client})");
+    }
+    let Some(holder) = &resource.holder else {
+        return value;
+    };
+    let field_value = |field: &PlannedResourceHolderField| {
+        if field.resource {
+            value.clone()
+        } else {
+            format!("{result_expr}.{}", csharp_type_name(&field.name))
+        }
+    };
+    let required = holder
+        .fields
+        .iter()
+        .filter(|field| field.required)
+        .map(field_value)
+        .collect::<Vec<_>>();
+    let optional = holder
+        .fields
+        .iter()
+        .filter(|field| !field.required)
+        .map(|field| format!("{} = {}", csharp_type_name(&field.name), field_value(field)))
+        .collect::<Vec<_>>();
+    let mut expression = format!(
+        "new {}({})",
+        csharp_type_name(&holder.model_name),
+        required.join(", ")
+    );
+    if !optional.is_empty() {
+        expression.push_str(" { ");
+        expression.push_str(&optional.join(", "));
+        expression.push_str(" }");
+    }
+    expression
 }
 
 fn resource_return_binding_expr(

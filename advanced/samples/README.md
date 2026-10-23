@@ -138,6 +138,17 @@ records are proto-backed, as a stream service's are, on the sample proto in
   [`typescript/wit/stream-service/`](typescript/wit/stream-service/),
   [`typescript/tests/stream-service.test.ts`](typescript/tests/stream-service.test.ts)
 
+### `workflow-run`
+
+A System Nexus operation that returns a proto-backed record that holds a
+resource, next to the other fields of the same message.
+
+- WIT: [`inputs/workflow-run.wit`](inputs/workflow-run.wit)
+- .NET: [`dotnet/wit/workflow-run/`](dotnet/wit/workflow-run/)
+- Go: [`go/workflowrun/`](go/workflowrun/)
+- Python: [`python/wit/workflow_run/`](python/wit/workflow_run/)
+- TypeScript: [`typescript/wit/workflow-run/`](typescript/wit/workflow-run/)
+
 ## Supporting files
 
 - [`inputs/deps/`](inputs/deps/): reusable Temporal semantic/common type WIT

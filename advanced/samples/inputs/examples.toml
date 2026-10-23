@@ -26,6 +26,11 @@ descriptors = "temporal"
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
+[workflow-run]
+system_nexus = true
+languages = ["python", "typescript", "dotnet", "go"]
+descriptors = "temporal"
+
 [stream-service]
 languages = ["python", "typescript", "dotnet"]
 # The sample proto imports the Temporal API messages, so it needs both sets.

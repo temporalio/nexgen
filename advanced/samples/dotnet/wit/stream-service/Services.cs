@@ -19,7 +19,7 @@ namespace Nexgen.StreamService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("CreateStream")]
-        CreateStreamResult CreateStream(CreateStreamRequest request);
+        CreateStreamResponse CreateStream(CreateStreamRequest request);
 
         [GeneratedCode("nexgen", null)]
         [NexusOperation("AppendRecords")]
@@ -71,7 +71,7 @@ namespace Nexgen.StreamService
 
         internal static IReadOnlyDictionary<(string Service, string Operation), INexgenOperationInfo> Operations { get; } = new Dictionary<(string Service, string Operation), INexgenOperationInfo>
         {
-            [("streamsample.v1.StreamService", "CreateStream")] = new NexgenOperationInfo<CreateStreamRequest, CreateStreamResult>(
+            [("streamsample.v1.StreamService", "CreateStream")] = new NexgenOperationInfo<CreateStreamRequest, CreateStreamResponse>(
                 StreamServiceServiceDefinition.Operations["CreateStream"]),
             [("streamsample.v1.StreamService", "AppendRecords")] = new NexgenOperationInfo<AppendRecordsRequest, AppendRecordsResponse>(
                 StreamServiceServiceDefinition.Operations["AppendRecords"]),

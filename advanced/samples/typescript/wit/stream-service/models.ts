@@ -4,6 +4,7 @@ import type { streamsample } from "#streamsample";
 import type * as common from "@temporalio/common";
 import type Long from "long";
 import * as support from "../../support/temporal_model_converters";
+import type { Stream } from "./resources";
 
 function requiredField<T>(
   value: T | null | undefined,
@@ -16,33 +17,36 @@ function requiredField<T>(
   return value;
 }
 
-export interface CreateStreamResult {
+export interface CreateStreamResponse {
   stream?: StreamRef;
+  created?: boolean;
 }
 
-function createStreamResultFromProto(
+function createStreamResponseFromProto(
   proto: streamsample.v1.ICreateStreamResponse,
-): CreateStreamResult {
+): CreateStreamResponse {
   return {
     stream: proto.stream == null ? undefined : streamRefFromProto(proto.stream),
+    created: proto.created ?? undefined,
   };
 }
 
-function createStreamResultToProto(
-  model: CreateStreamResult,
+function createStreamResponseToProto(
+  model: CreateStreamResponse,
 ): streamsample.v1.ICreateStreamResponse {
   return {
     stream: model.stream == null ? undefined : streamRefToProto(model.stream),
+    created: model.created,
   };
 }
 
-export const createStreamResultTransferTypeConverter = {
-  fromTransferType(value: streamsample.v1.ICreateStreamResponse): CreateStreamResult {
-    return createStreamResultFromProto(value);
+export const createStreamResponseTransferTypeConverter = {
+  fromTransferType(value: streamsample.v1.ICreateStreamResponse): CreateStreamResponse {
+    return createStreamResponseFromProto(value);
   },
 
-  toTransferType(value: CreateStreamResult): streamsample.v1.ICreateStreamResponse {
-    return createStreamResultToProto(value);
+  toTransferType(value: CreateStreamResponse): streamsample.v1.ICreateStreamResponse {
+    return createStreamResponseToProto(value);
   },
 };
 export interface StreamRef {
@@ -443,3 +447,7 @@ export const describeStreamRequestTransferTypeConverter = {
     return describeStreamRequestToProto(value);
   },
 };
+export interface CreateStreamResult {
+  stream: Stream;
+  created?: boolean;
+}

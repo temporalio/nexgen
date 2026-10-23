@@ -1,0 +1,5 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-resource"
+contains = ["result record `StartRunResult`", "so it needs `@nexus.proto`"]

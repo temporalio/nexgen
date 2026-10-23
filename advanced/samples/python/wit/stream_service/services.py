@@ -9,7 +9,7 @@ from .models import (
     CloseStreamRequest,
     CloseStreamResponse,
     CreateStreamRequest,
-    CreateStreamResult,
+    CreateStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
     ReadRecordsRequest,
@@ -21,7 +21,7 @@ from .models import (
 class StreamService:
     create_stream: Operation[
         CreateStreamRequest,
-        CreateStreamResult,
+        CreateStreamResponse,
     ] = Operation(name="CreateStream")
 
     append_records: Operation[

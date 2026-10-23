@@ -51,6 +51,14 @@ fn prune(spec: &mut PlannedSpec) {
                     .flatten()
                     .cloned(),
             );
+            if let Some(holder) = operation
+                .data
+                .output_resource_return
+                .as_ref()
+                .and_then(|resource_return| resource_return.holder.as_ref())
+            {
+                add_name(spec, &holder.record_full_name, &mut reachable);
+            }
         }
         for resource in &service.resources {
             enqueue_resource(&resource.data, &mut pending);
