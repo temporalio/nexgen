@@ -23,6 +23,25 @@ struct ExampleConfig {
     languages: Option<Vec<String>>,
     #[serde(default)]
     system_nexus: bool,
+    // Each example plans against only the protos it declares, so one sample's protos can't
+    // change how another example resolves a proto name.
+    descriptors: Option<ExampleDescriptors>,
+}
+
+/// The same shape as the compiler rejection fixtures. An example with no `descriptors` gets the
+/// Temporal set, since every proto-backed sample builds on the Temporal API.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ExampleDescriptors {
+    Preset(DescriptorPreset),
+    /// File names under `advanced/samples/descriptors/`.
+    Paths(Vec<PathBuf>),
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum DescriptorPreset {
+    Temporal,
 }
 
 impl ExampleConfig {
@@ -272,6 +291,33 @@ fn load_examples_config(input_root: &Path) -> Result<ExamplesConfig> {
     })
 }
 
+fn example_descriptor_paths(
+    repo_root: &Path,
+    example: Option<&ExampleConfig>,
+) -> Result<Vec<PathBuf>> {
+    let root = repo_root.join("advanced/samples/descriptors");
+    let names = match example.and_then(|example| example.descriptors.as_ref()) {
+        None | Some(ExampleDescriptors::Preset(DescriptorPreset::Temporal)) => {
+            vec![PathBuf::from("temporal_api.bin")]
+        }
+        Some(ExampleDescriptors::Paths(paths)) => paths.clone(),
+    };
+    names
+        .into_iter()
+        .map(|name| {
+            let path = root.join(name);
+            if path.is_file() {
+                Ok(path)
+            } else {
+                Err(Error::InvalidExampleConfig {
+                    path: repo_root.join("advanced/samples/inputs/examples.toml"),
+                    reason: format!("descriptor set `{}` does not exist", path.display()),
+                })
+            }
+        })
+        .collect()
+}
+
 fn discover_example_input_paths(path: &Path, inputs: &mut Vec<PathBuf>) -> Result<()> {
     for entry in fs::read_dir(path).map_err(|source| NexgenError::ReadFile {
         path: path.to_path_buf(),
@@ -458,7 +504,7 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
         } else {
             sample_support_package(repo_root, language, &output_path)
         },
-        descriptor_paths: sample_descriptor_paths(repo_root)?,
+        descriptor_paths: example_descriptor_paths(repo_root, config.examples.get(example_id))?,
         output_path: output_path.clone(),
         format: false,
         java_package_name: (language == Language::Java)
@@ -910,16 +956,4 @@ mod tests {
         );
         fs::remove_dir_all(root).unwrap();
     }
-}
-
-/// Every descriptor set under `advanced/samples/descriptors/`, sorted so the order is stable.
-fn sample_descriptor_paths(repo_root: &Path) -> Result<Vec<PathBuf>> {
-    let root = repo_root.join("advanced/samples/descriptors");
-    let mut paths = fs::read_dir(&root)
-        .map_err(|source| NexgenError::ReadFile { path: root, source })?
-        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .filter(|path| path.extension().is_some_and(|extension| extension == "bin"))
-        .collect::<Vec<_>>();
-    paths.sort();
-    Ok(paths)
 }

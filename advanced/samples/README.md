@@ -144,7 +144,9 @@ records are proto-backed, as a stream service's are, on the sample proto in
 - [`descriptors/temporal_api.bin`](descriptors/temporal_api.bin): Temporal API
   descriptor set used by proto-backed examples.
 - [`descriptors/stream_service.bin`](descriptors/stream_service.bin): descriptor
-  set of the `stream-service` sample proto. The sample projects hold its
+  set of the `stream-service` sample proto. Only `stream-service` lists it in
+  `descriptors` in [`inputs/examples.toml`](inputs/examples.toml). An example
+  with no `descriptors` gets `temporal_api.bin`. The sample projects hold its
   bindings: [`python/streamsample/`](python/streamsample/),
   [`dotnet/proto/`](dotnet/proto/) and
   [`typescript/proto/streamsample.d.ts`](typescript/proto/streamsample.d.ts).

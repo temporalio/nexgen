@@ -15,3 +15,5 @@ languages = ["python", "dotnet", "typescript"]
 
 [stream-service]
 languages = ["python", "typescript"]
+# The sample proto imports the Temporal API messages, so it needs both sets.
+descriptors = ["temporal_api.bin", "stream_service.bin"]
