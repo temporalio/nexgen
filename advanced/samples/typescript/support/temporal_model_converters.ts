@@ -225,8 +225,11 @@ export function headerFromProto(proto: temporal.api.common.v1.IHeader): common.H
   return proto.fields ?? {};
 }
 
-export function headerToProto(header: common.Headers): temporal.api.common.v1.IHeader {
-  return { fields: header };
+export function headerToProto(
+  header: Record<string, unknown>,
+): temporal.api.common.v1.IHeader {
+  // The WIT type is broader than the encoded payloads supplied by interceptors.
+  return { fields: header as common.Headers };
 }
 
 export function durationFromProto(proto: google.protobuf.IDuration): common.Duration {

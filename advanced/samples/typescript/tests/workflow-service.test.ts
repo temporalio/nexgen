@@ -7,6 +7,10 @@ import { signalWithStartWorkflow } from "../wit/workflow-service/index.ts";
 import type { SignalWithStartWorkflowRequest } from "../wit/workflow-service/index.ts";
 import { workflowService } from "../wit/workflow-service/services.ts";
 import { signalWithStartWorkflowRequestTransferTypeConverter as requestConverter } from "../wit/workflow-service/models.ts";
+import {
+  headerFromProto,
+  headerToProto,
+} from "../support/temporal_model_converters.ts";
 import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts";
 
 const workflowsPath = fileURLToPath(
@@ -28,6 +32,18 @@ vi.mock("../support/temporal_model_converters.ts", async (importOriginal) => {
 });
 
 describe("workflow-service generated output", () => {
+  test("passes through encoded interceptor headers", () => {
+    const headers: Record<string, unknown> = {
+      trace: {
+        metadata: { encoding: new TextEncoder().encode("json/plain") },
+        data: new TextEncoder().encode('"trace-id"'),
+      },
+    };
+    const proto = headerToProto(headers);
+    expect(proto.fields).toBe(headers);
+    expect(headerFromProto(proto)).toBe(headers);
+  });
+
   test("exposes workflow service metadata", () => {
     expect(workflowService.name).toBe(
       "temporal.api.workflowservice.v1.WorkflowService",
