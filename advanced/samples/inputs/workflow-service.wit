@@ -117,14 +117,13 @@ interface workflow-service {
     /// @nexus.doc "Whether the workflow was started."
     started: option<bool>,
     /// @nexus.omit
-    first-execution-run-id: placeholder,
-    /// @nexus.omit
     signal-link: placeholder,
+    /// @nexus.omit
+    first-execution-run-id: placeholder,
   }
 
   /// @nexus.doc
   ///   "Signal a workflow, starting it first if needed."
-  ///   go="Signal a workflow, starting it first if needed."
   ///   returns="A workflow handle to the started workflow."
   /// @nexus.output-transform
   ///   python-type="temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]"

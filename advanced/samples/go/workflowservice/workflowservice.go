@@ -128,7 +128,7 @@ func (m signalWithStartWorkflowRequest) GetNamespace() string {
 	return m.Namespace
 }
 
-func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfig, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
+func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusContext, m *signalWithStartWorkflowRequest) (*workflowservice.SignalWithStartWorkflowExecutionRequest, error) {
 	message := &workflowservice.SignalWithStartWorkflowExecutionRequest{}
 	{
 		converted, err := support.WorkflowTypeToProto(cfg.DataConverter, &m.Workflow)
@@ -252,7 +252,7 @@ func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfi
 	return message, nil
 }
 
-func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
+func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusContext, proto *workflowservice.SignalWithStartWorkflowExecutionRequest, out *signalWithStartWorkflowRequest) error {
 	*out = signalWithStartWorkflowRequest{}
 	{
 		converted, err := support.WorkflowTypeFromProto(cfg.DataConverter, proto.GetWorkflowType())
@@ -404,7 +404,7 @@ func (m userMetadata) GetStaticDetails() *string {
 	return m.StaticDetails
 }
 
-func userMetadataToProto(cfg *commonconverter.SystemNexusConfig, m *userMetadata) (*sdk.UserMetadata, error) {
+func userMetadataToProto(cfg *commonconverter.SystemNexusContext, m *userMetadata) (*sdk.UserMetadata, error) {
 	message := &sdk.UserMetadata{}
 	if m.StaticSummary != nil {
 		{
@@ -427,7 +427,7 @@ func userMetadataToProto(cfg *commonconverter.SystemNexusConfig, m *userMetadata
 	return message, nil
 }
 
-func userMetadataFromProto(cfg *commonconverter.SystemNexusConfig, proto *sdk.UserMetadata, out *userMetadata) error {
+func userMetadataFromProto(cfg *commonconverter.SystemNexusContext, proto *sdk.UserMetadata, out *userMetadata) error {
 	*out = userMetadata{}
 	if proto.GetSummary() != nil {
 		converted, err := support.PayloadFromProto(cfg.DataConverter, proto.GetSummary())
@@ -493,7 +493,7 @@ func (m SignalWithStartWorkflowResponse) GetStarted() *bool {
 	return m.Started
 }
 
-func signalWithStartWorkflowResponseToProto(cfg *commonconverter.SystemNexusConfig, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
+func signalWithStartWorkflowResponseToProto(cfg *commonconverter.SystemNexusContext, m *SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
 	message := &workflowservice.SignalWithStartWorkflowExecutionResponse{}
 	if m.RunID != nil {
 		message.RunId = (*m.RunID)
@@ -504,7 +504,7 @@ func signalWithStartWorkflowResponseToProto(cfg *commonconverter.SystemNexusConf
 	return message, nil
 }
 
-func signalWithStartWorkflowResponseFromProto(cfg *commonconverter.SystemNexusConfig, proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
+func signalWithStartWorkflowResponseFromProto(cfg *commonconverter.SystemNexusContext, proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SignalWithStartWorkflowResponse) error {
 	*out = SignalWithStartWorkflowResponse{}
 	{
 		converted := proto.GetRunId()
@@ -681,7 +681,7 @@ func SignalWithStartWorkflow(
 
 // --- Registry ---
 
-var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry{
+var NexusOperationRegistry = map[internal.SystemNexusRegistryKey]internal.SystemNexusRegistryEntry{
 	{
 		Service:   "temporal.api.workflowservice.v1.WorkflowService",
 		Operation: "SignalWithStartWorkflowExecution",
@@ -693,5 +693,5 @@ var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperat
 }
 
 func init() {
-	internal.UpdateNexusOperationRegistry(NexusOperationRegistry)
+	internal.UpdateSystemNexusRegistry(NexusOperationRegistry)
 }

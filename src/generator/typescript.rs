@@ -6953,7 +6953,7 @@ mod tests {
         ));
         assert!(output.contains("> = ReplaceSignalWithStartWorkflowRequest<"));
         assert!(output.contains(
-            "SignalValue extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
+            "SignalValue extends common.SignalDefinition<infer Args, any> ? Args : never"
         ));
         assert!(output.contains("SignalArgs extends any[] = SignalValue extends"));
         assert!(output.contains("signalArgs: SignalArgs | Readonly<SignalArgs>;"));
@@ -7033,7 +7033,7 @@ mod tests {
         assert!(output.contains(
             "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest {"
         ));
-        assert!(output.contains("headers?: common.Headers;"));
+        assert!(output.contains("headers?: Record<string, unknown>;"));
         assert!(!output.contains("export interface Header"));
         assert!(!output.contains("export interface WorkflowType"));
         assert!(!output.contains("export interface TaskQueue"));
