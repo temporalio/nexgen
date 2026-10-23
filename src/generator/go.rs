@@ -649,11 +649,11 @@ impl GoPackageContext {
         }
     }
 
-    pub(in crate::generator) fn system_nexus_config_type(&self) -> String {
+    pub(in crate::generator) fn system_nexus_context_type(&self) -> String {
         if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            "SystemNexusConfig".to_string()
+            "SystemNexusContext".to_string()
         } else {
-            "commonconverter.SystemNexusConfig".to_string()
+            "commonconverter.SystemNexusContext".to_string()
         }
     }
 
@@ -2112,10 +2112,13 @@ fn render_operation_registry(
     }
     let mut output = String::from("\n// --- Registry ---\n");
     let sc = package.serialization_context_type();
-    let key = package.qualified_expr("go.temporal.io/sdk/internal", "internal.NexusOperationKey");
+    let key = package.qualified_expr(
+        "go.temporal.io/sdk/internal",
+        "internal.SystemNexusRegistryKey",
+    );
     let info = package.qualified_expr(
         "go.temporal.io/sdk/internal",
-        "internal.NexusOperationRegistryEntry",
+        "internal.SystemNexusRegistryEntry",
     );
     output.push_str(&format!(
         "\nvar NexusOperationRegistry = map[{key}]{info}{{\n"
@@ -2154,7 +2157,7 @@ fn render_operation_registry(
     if !keys.is_empty() {
         let register = package.qualified_expr(
             "go.temporal.io/sdk/internal",
-            "internal.UpdateNexusOperationRegistry",
+            "internal.UpdateSystemNexusRegistry",
         );
         output.push_str(&format!(
             "\nfunc init() {{\n\t{register}(NexusOperationRegistry)\n}}\n"
@@ -5874,6 +5877,14 @@ mod tests {
                     )
                     .unwrap();
                     let source = &files[&PathBuf::from("sampleservice.go")];
+                    for legacy_name in [
+                        "SystemNexusConfig",
+                        "internal.NexusOperationKey",
+                        "internal.NexusOperationRegistryEntry",
+                        "internal.UpdateNexusOperationRegistry",
+                    ] {
+                        assert!(!source.contains(legacy_name), "{source}");
+                    }
                     if system_nexus {
                         assert!(
                             source.contains("internal.NewSystemNexusClient("),
@@ -5885,7 +5896,7 @@ mod tests {
                             "{source}"
                         );
                         assert!(
-                            source.contains("cfg *commonconverter.SystemNexusConfig"),
+                            source.contains("cfg *commonconverter.SystemNexusContext"),
                             "{source}"
                         );
                         assert_eq!(
@@ -5893,6 +5904,20 @@ mod tests {
                             annotated,
                             "{source}"
                         );
+                        if annotated {
+                            assert!(
+                                source.contains(
+                                    "map[internal.SystemNexusRegistryKey]internal.SystemNexusRegistryEntry"
+                                ),
+                                "{source}"
+                            );
+                            assert!(
+                                source.contains(
+                                    "internal.UpdateSystemNexusRegistry(NexusOperationRegistry)"
+                                ),
+                                "{source}"
+                            );
+                        }
                     } else {
                         assert!(
                             source.contains(&format!("workflow.NewNexusClient(\"{endpoint}\",")),
@@ -5904,7 +5929,7 @@ mod tests {
                             "{source}"
                         );
                         assert!(!source.contains("go.temporal.io/sdk/internal"), "{source}");
-                        assert!(!source.contains("SystemNexusConfig"), "{source}");
+                        assert!(!source.contains("SystemNexusContext"), "{source}");
                         assert!(!source.contains("// --- Registry ---"), "{source}");
                     }
                 }
@@ -5978,7 +6003,7 @@ mod tests {
             "{source}"
         );
         assert!(
-            source.contains("func requestToProto(cfg *commonconverter.SystemNexusConfig, m *"),
+            source.contains("func requestToProto(cfg *commonconverter.SystemNexusContext, m *"),
             "{source}"
         );
         assert!(
@@ -6014,7 +6039,7 @@ mod tests {
             package.new_transfer_type_converter(),
             "NewSystemNexusTransferTypeConverter"
         );
-        assert_eq!(package.system_nexus_config_type(), "SystemNexusConfig");
+        assert_eq!(package.system_nexus_context_type(), "SystemNexusContext");
         assert_eq!(
             package.transfer_type_converter_type(),
             "TransferTypeConverter"
@@ -6031,8 +6056,8 @@ mod tests {
         );
         assert_eq!(package.workflow_context_type(), "Context");
         assert_eq!(
-            package.system_nexus_config_type(),
-            "commonconverter.SystemNexusConfig"
+            package.system_nexus_context_type(),
+            "commonconverter.SystemNexusContext"
         );
     }
 

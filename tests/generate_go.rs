@@ -1157,10 +1157,10 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     ));
     assert!(!rendered.contains("func(cfg *"), "{rendered}");
     assert!(rendered.contains(
-        "func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfig,"
+        "func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusContext,"
     ));
     assert!(rendered.contains(
-        "func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusConfig,"
+        "func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusContext,"
     ));
     assert!(!rendered.contains("GetDataConverterFromWorkflowContext"));
     assert!(!rendered.contains("SDKFlagMemoUserDCEncode"));
@@ -1256,7 +1256,7 @@ fn go_serialization_context_is_only_emitted_for_a_selected_helper() {
         assert!(!rendered.contains("nexgenWithOperationSerializationContext"));
         assert!(!rendered.contains("SerializationContext() converter.SerializationContext"));
         assert!(!rendered.contains("nexgenPayloadContext"));
-        assert!(rendered.contains("cancelRequestToProto(cfg *commonconverter.SystemNexusConfig,"));
+        assert!(rendered.contains("cancelRequestToProto(cfg *commonconverter.SystemNexusContext,"));
     }
 }
 
@@ -1362,8 +1362,8 @@ fn go_serialization_context_wrapper_assigns_sources_before_sdk() {
     assert!(sourced < execute);
     assert!(!rendered.contains("nexgenWithOperationSerializationContext"));
     assert!(rendered.contains("\tNamespace string\n"));
-    assert!(rendered.contains("cancelRequestToProto(cfg *commonconverter.SystemNexusConfig,"));
-    assert!(rendered.contains("cancelRequestFromProto(cfg *commonconverter.SystemNexusConfig,"));
+    assert!(rendered.contains("cancelRequestToProto(cfg *commonconverter.SystemNexusContext,"));
+    assert!(rendered.contains("cancelRequestFromProto(cfg *commonconverter.SystemNexusContext,"));
     assert!(!rendered.contains("SerializationContext()"));
     assert!(!rendered.contains("SerializationContextProvider"));
     assert!(!rendered.contains("GetNexusOperationInnerDataConverter"));
@@ -1571,17 +1571,16 @@ fn go_serialization_context_registry_uses_wire_names_and_typed_adapter() {
     assert_registry_entry(registry, "SampleService", "Third", None);
     assert!(!registry.contains("Operation: \"First\""));
     let compact = registry.split_whitespace().collect::<Vec<_>>().join(" ");
-    assert!(!registry.contains("type NexusOperationKey"));
+    assert!(!registry.contains("type SystemNexusRegistryKey"));
     assert!(!registry.contains("NexusOperationInfo"));
     assert!(!registry.contains("nexgenOperationInfo"));
     assert!(!registry.contains("// NexusOperationRegistry"));
     assert!(
-        compact.contains(
-            "func init() { internal.UpdateNexusOperationRegistry(NexusOperationRegistry) }"
-        )
+        compact
+            .contains("func init() { internal.UpdateSystemNexusRegistry(NexusOperationRegistry) }")
     );
     assert!(compact.contains(
-        "var NexusOperationRegistry = map[internal.NexusOperationKey]internal.NexusOperationRegistryEntry"
+        "var NexusOperationRegistry = map[internal.SystemNexusRegistryKey]internal.SystemNexusRegistryEntry"
     ));
     assert!(compact.contains("return support.requestContext(request.(contextRequest))"));
     assert!(!registry.contains("\"reflect\""));
@@ -1793,7 +1792,7 @@ fn go_serialization_context_preserves_owned_input_and_uses_dc_for_eager_output()
         compact.contains("value, err := support.RetryPolicyFromProto(dc, &result)"),
         "{operation}"
     );
-    assert!(operation.contains("contextRequestToProto(cfg *commonconverter.SystemNexusConfig,"));
+    assert!(operation.contains("contextRequestToProto(cfg *commonconverter.SystemNexusContext,"));
     let execute = operation
         .find("c.ExecuteOperation(ctx, \"Roundtrip\", request,")
         .unwrap();
