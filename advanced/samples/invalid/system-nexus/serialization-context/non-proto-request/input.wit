@@ -1,0 +1,11 @@
+package test:context-non-proto;
+
+world system { export sample-service; }
+
+/// @nexus.endpoint "temporal-system"
+interface sample-service {
+  record cancel-request { namespace: string }
+
+  /// @nexus.serialization-context go="requestContext"
+  cancel: func(request: cancel-request);
+}

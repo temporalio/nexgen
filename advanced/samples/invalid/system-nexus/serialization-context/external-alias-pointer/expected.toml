@@ -1,0 +1,7 @@
+languages = ["go"]
+descriptors = "temporal"
+system_nexus = true
+
+[error]
+kind = "unsupported-go-proto-conversion"
+contains = ["Send", "*temporal.RetryPolicy", "@nexus.serialization-context", "TransferTypeConverter", "locally owned request model"]

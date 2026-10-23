@@ -29,6 +29,8 @@ Categories group the compiler rule, not merely the input format or target:
 - `resources/`: resource methods and operation bindings.
 - `name-collisions/`: conflicts caused by emitted names, including
   target-specific naming transformations.
+- `system-nexus/`: cases requiring system-Nexus mode, grouped further by
+  feature, such as `serialization-context/`.
 
 Discovery recurses through categories but stops at each `expected.toml`, so a
 case's linked packages are not mistaken for additional cases. Empty categories
@@ -78,12 +80,19 @@ contains = ["does not match proto field type `bytes`"]
   target lists are rejected.
 - `inputs` defaults to `["input.wit"]`. Use an explicit list for multiple inputs
   or linked packages; paths are relative to the case directory.
+- `system_nexus` defaults to `false`. Set it to `true` for cases requiring
+  system-Nexus generation. Category names are organizational only and never
+  enable compiler settings implicitly.
 - `descriptors` defaults to no descriptors. Set `"temporal"` to use the
   repository's checked-in `advanced/samples/descriptors/temporal_api.bin`,
   independent of the case directory or working directory. For custom descriptor
   sets, use a list such as `["custom.bin"]`; paths are relative to the case
   directory. An empty list also selects no descriptors. Unknown preset names are
   errors.
+
+Use representative compiler fixtures for equivalent spelling or syntax
+variations. Keep exhaustive lexical checks, such as Go's disallowed helper
+identifiers and keywords, in focused helper-level unit tests.
 
 Compilation uses native API mode, disables formatting, and supplies a
 target-appropriate support-package name. Each target gets its own temporary

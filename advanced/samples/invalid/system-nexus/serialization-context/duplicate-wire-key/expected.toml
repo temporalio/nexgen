@@ -1,0 +1,7 @@
+languages = ["go"]
+descriptors = "temporal"
+system_nexus = true
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["@nexus.serialization-context", "duplicate registry key", "SameWireService", "SameWireOperation"]

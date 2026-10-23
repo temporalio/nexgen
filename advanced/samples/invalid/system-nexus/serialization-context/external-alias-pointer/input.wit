@@ -1,0 +1,16 @@
+package test:external-context-alias;
+
+world system { export sample-service; }
+
+/// @nexus.endpoint "temporal-system"
+interface sample-service {
+  type placeholder = string;
+  /// @nexus.proto "temporal.api.common.v1.RetryPolicy"
+  /// @nexus.type go="go.temporal.io/sdk/*temporal.RetryPolicy"
+  type retry-policy = placeholder;
+
+  type request = retry-policy;
+
+  /// @nexus.serialization-context go="requestContext"
+  send: func(request: request) -> retry-policy;
+}
