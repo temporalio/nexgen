@@ -145,7 +145,7 @@ records are proto-backed, as a stream service's are, on the sample proto in
   descriptor set. An example selects it with `descriptors = "temporal"` in
   [`inputs/examples.toml`](inputs/examples.toml). Descriptors are opt-in, as in
   the compiler rejection fixtures, so an example with no `descriptors` gets
-  none. A list names files in `descriptors/`.
+  none. A list specifies files in `descriptors/`.
 - [`descriptors/stream_service.bin`](descriptors/stream_service.bin): descriptor
   set of the `stream-service` sample proto. Only `stream-service` lists it in
   `descriptors`. The sample projects hold its bindings:
