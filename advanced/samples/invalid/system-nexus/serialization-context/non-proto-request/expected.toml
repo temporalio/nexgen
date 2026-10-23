@@ -1,0 +1,6 @@
+languages = ["go"]
+system_nexus = true
+
+[error]
+kind = "unsupported-go-proto-conversion"
+contains = ["Cancel", "serialization-context requires a proto-backed operation"]

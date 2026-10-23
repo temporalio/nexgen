@@ -1,0 +1,10 @@
+package test:context-helper-hyphen;
+
+world system { export api; }
+
+interface api {
+  record request { value: string }
+
+  /// @nexus.serialization-context go="request-context"
+  send: func(request: request);
+}

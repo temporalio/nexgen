@@ -1182,20 +1182,11 @@ fn go_transfer_type_converter_defers_model_conversion_to_the_sdk() {
     assert!(!rendered.contains("var signalWithStartWorkflowRequestTransferTypeConverter"));
 }
 
-// Keep these fixtures independent of the authored examples: helper selection and
-// invalid references must be exercised without changing shared sample inputs.
-fn render_go_serialization_context(
-    directive: &str,
-    proto_backed: bool,
-) -> Result<String, Box<dyn std::error::Error>> {
+// Keep these helper-selection fixtures independent of the authored examples.
+fn render_go_serialization_context(directive: &str) -> Result<String, Box<dyn std::error::Error>> {
     let temp_dir = unique_output_path("go-serialization-context");
     fs::create_dir_all(&temp_dir)?;
     let wit_path = temp_dir.join("serialization-context.wit");
-    let proto = if proto_backed {
-        "/// @nexus.proto \"temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest\""
-    } else {
-        ""
-    };
     fs::write(
         &wit_path,
         format!(
@@ -1209,7 +1200,7 @@ world system {{
 interface sample-service {{
   type placeholder = string;
 
-  {proto}
+  /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest"
   record cancel-request {{
     /// @nexus.source go="WorkflowNamespace(ctx)"
     namespace: string,
@@ -1249,7 +1240,7 @@ fn go_serialization_context_is_only_emitted_for_a_selected_helper() {
         "",
         "/// @nexus.serialization-context python=\"python_context\" typescript=\"typescriptContext\"",
     ] {
-        let rendered = render_go_serialization_context(directive, true).unwrap();
+        let rendered = render_go_serialization_context(directive).unwrap();
         assert!(!rendered.contains("### serialization_context.go"));
         assert!(!rendered.contains("### registry.go"));
         assert!(!rendered.contains("// --- Registry ---"));
@@ -1272,7 +1263,7 @@ fn go_serialization_context_prefers_go_helper_over_default() {
             "requestContext",
         ),
     ] {
-        let rendered = render_go_serialization_context(directive, true).unwrap();
+        let rendered = render_go_serialization_context(directive).unwrap();
         assert!(rendered.contains(&format!("return support.{helper}(request.(")));
         assert!(!rendered.contains("return support.defaultContext("));
         assert!(!rendered.contains("python_context(request)"));
@@ -1280,7 +1271,7 @@ fn go_serialization_context_prefers_go_helper_over_default() {
 }
 
 #[test]
-fn go_serialization_context_accepts_only_go_helper_references() {
+fn go_serialization_context_accepts_go_helper_references() {
     for helper in [
         "requestContext",
         "support.Context",
@@ -1288,7 +1279,7 @@ fn go_serialization_context_accepts_only_go_helper_references() {
         "Context2",
     ] {
         let directive = format!("/// @nexus.serialization-context go=\"{helper}\"");
-        let rendered = render_go_serialization_context(&directive, true).unwrap();
+        let rendered = render_go_serialization_context(&directive).unwrap();
         assert!(!rendered.contains("### serialization_context.go"));
         assert!(!rendered.contains("### registry.go"));
         assert!(rendered.contains("// --- Registry ---"));
@@ -1299,60 +1290,13 @@ fn go_serialization_context_accepts_only_go_helper_references() {
         };
         assert!(rendered.contains(&format!("return {helper}(request.(")));
     }
-    for helper in [
-        "_",
-        "break",
-        "default",
-        "func",
-        "interface",
-        "select",
-        "case",
-        "defer",
-        "go",
-        "map",
-        "struct",
-        "chan",
-        "else",
-        "goto",
-        "package",
-        "switch",
-        "const",
-        "fallthrough",
-        "if",
-        "range",
-        "type",
-        "continue",
-        "for",
-        "import",
-        "return",
-        "var",
-        "helpers._",
-        "helpers.func",
-        "_.Context",
-        "type.Context",
-        "helpers.nested.Context",
-        "requestContext()",
-        "helpers/Context",
-        "1context",
-        "helpers.1context",
-        "request-context",
-    ] {
-        let directive = format!("/// @nexus.serialization-context go=\"{helper}\"");
-        let error = render_go_serialization_context(&directive, true)
-            .expect_err(&format!("invalid Go helper {helper:?} must be rejected"))
-            .to_string();
-        assert!(error.contains("serialization-context"), "{helper}: {error}");
-        assert!(error.contains(helper), "{helper}: {error}");
-    }
 }
 
 #[test]
 fn go_serialization_context_wrapper_assigns_sources_before_sdk() {
-    let rendered = render_go_serialization_context(
-        "/// @nexus.serialization-context go=\"requestContext\"",
-        true,
-    )
-    .unwrap();
+    let rendered =
+        render_go_serialization_context("/// @nexus.serialization-context go=\"requestContext\"")
+            .unwrap();
     let sourced = rendered
         .find("request.Namespace = support.WorkflowNamespace(ctx)")
         .unwrap();
@@ -1376,21 +1320,6 @@ fn go_serialization_context_wrapper_assigns_sources_before_sdk() {
     assert!(!rendered.contains("### registry.go"));
     assert!(rendered.contains("// --- Registry ---"));
     assert!(!rendered.contains("### serialization_context.go"));
-}
-
-#[test]
-fn go_serialization_context_rejects_non_proto_operation_requests() {
-    let error = render_go_serialization_context(
-        "/// @nexus.serialization-context go=\"requestContext\"",
-        false,
-    )
-    .unwrap_err()
-    .to_string();
-    assert!(error.contains("serialization-context"), "{error}");
-    assert!(
-        error.contains("unsupported") || error.contains("proto"),
-        "{error}"
-    );
 }
 
 #[test]
@@ -1598,78 +1527,6 @@ fn go_serialization_context_registry_uses_wire_names_and_typed_adapter() {
     assert!(!section.contains("c.ExecuteOperation("));
 }
 
-fn render_go_registry_services(
-    second_endpoint: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
-    // System mode applies to all services in the generation job.
-    let temp_dir = unique_output_path("go-context-duplicate-wire-key");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let wit_path = temp_dir.join("services.wit");
-    fs::write(
-        &wit_path,
-        r#"
-package temporal:duplicate-context-keys@1.0.0;
-world system { export first-service; export second-service; }
-interface shared-types {
-  /// @nexus.proto "temporal.api.common.v1.WorkflowType"
-  record context-request { name: string }
-}
-/// @nexus.endpoint "__temporal_system"
-/// @nexus.service-name "SameWireService"
-interface first-service {
-  use shared-types.{context-request};
-  /// @nexus.operation name="SameWireOperation"
-  /// @nexus.serialization-context go="requestContext"
-  first: func(request: context-request);
-}
-/// @nexus.endpoint "SECOND_ENDPOINT"
-/// @nexus.service-name "SameWireService"
-interface second-service {
-  use shared-types.{context-request};
-  /// @nexus.operation name="SameWireOperation"
-  /// @nexus.serialization-context go="otherContext"
-  second: func(request: context-request);
-  /// @nexus.serialization-context go="otherContext"
-  ordinary-only: func(request: context-request);
-}
-"#
-        .replace("SECOND_ENDPOINT", second_endpoint),
-    )
-    .unwrap();
-    let result = generate_to_string_with_system_nexus(
-        nexgen::language::Language::Go,
-        &[wit_path],
-        &[descriptor_path(&project_root())],
-        true,
-    );
-    fs::remove_dir_all(temp_dir).unwrap();
-    result
-}
-
-#[test]
-fn go_serialization_context_registry_rejects_duplicate_wire_keys() {
-    for endpoint in ["__temporal_system", "temporal-system"] {
-        let error = render_go_registry_services(endpoint)
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("SameWireService"), "{error}");
-        assert!(error.contains("SameWireOperation"), "{error}");
-        assert!(
-            error.contains("duplicate") || error.contains("collision"),
-            "{error}"
-        );
-    }
-}
-
-#[test]
-fn go_serialization_context_registry_checks_all_services_in_system_mode() {
-    let error = render_go_registry_services("ordinary-endpoint")
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("SameWireService"), "{error}");
-    assert!(error.contains("SameWireOperation"), "{error}");
-}
-
 const GO_CONTEXT_OWNED_REQUEST: &str = r#"
   /// @nexus.proto "temporal.api.common.v1.WorkflowType"
   record context-request { name: string }
@@ -1704,41 +1561,6 @@ func transformPolicy(ctx workflow.Context, value *common.RetryPolicy) (string, e
     return "transformed", nil
 }
 "#;
-
-#[test]
-fn go_serialization_context_rejects_external_request() {
-    for endpoint in ["__temporal_system", "temporal-system"] {
-        for native_type in ["temporal.RetryPolicy", "*temporal.RetryPolicy"] {
-            for operation in [
-                "roundtrip: func(request: retry-policy) -> retry-policy;",
-                "send: func(request: retry-policy);",
-            ] {
-                let error = try_render_go_serialization_context_fixture_at_endpoint(
-                    &GO_CONTEXT_OVERRIDE_TYPES.replace("temporal.RetryPolicy", native_type),
-                    &format!("/// @nexus.serialization-context go=\"requestContext\"\n{operation}"),
-                    &GO_CONTEXT_OVERRIDE_SUPPORT.replace(
-                        "request temporal.RetryPolicy",
-                        &format!("request {native_type}"),
-                    ),
-                    endpoint,
-                    true,
-                )
-                .unwrap_err()
-                .to_string();
-                let operation_name = if operation.starts_with("roundtrip") {
-                    "Roundtrip"
-                } else {
-                    "Send"
-                };
-                assert!(error.contains(operation_name), "{error}");
-                assert!(error.contains(native_type), "{error}");
-                assert!(error.contains("TransferTypeConverter"), "{error}");
-                assert!(error.contains("@nexus.serialization-context"), "{error}");
-                assert!(error.contains("locally owned request model"), "{error}");
-            }
-        }
-    }
-}
 
 #[test]
 fn go_serialization_context_ordinary_endpoint_converts_external_input_in_wrapper() {

@@ -18,6 +18,8 @@ struct Expectation {
     #[serde(default = "default_inputs")]
     inputs: Vec<PathBuf>,
     descriptors: Option<Descriptors>,
+    #[serde(default)]
+    system_nexus: bool,
     error: ExpectedError,
 }
 
@@ -158,7 +160,7 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
         let result = generate_to_file(&GenerateRequest {
             config: nexgen::nexgen_config::NexgenConfig {
                 mode: GenerationMode::NativeApi,
-                ..Default::default()
+                system_nexus: expected.system_nexus,
             },
             language,
             input_paths: inputs.clone(),
@@ -216,6 +218,34 @@ fn compiler_failures() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+#[test]
+fn system_nexus_requires_explicit_configuration_not_a_category_name() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixture =
+        repo.join("advanced/samples/invalid/system-nexus/serialization-context/helper-keyword");
+    let temp = tempfile::tempdir().unwrap();
+    let case = temp.path().join("system-nexus");
+    fs::create_dir(&case).unwrap();
+    fs::copy(fixture.join("input.wit"), case.join("input.wit")).unwrap();
+    let config = fs::read_to_string(fixture.join("expected.toml")).unwrap();
+
+    fs::write(
+        case.join("expected.toml"),
+        config.replace("system_nexus = true\n", ""),
+    )
+    .unwrap();
+    let failures = run_case(&case, repo).unwrap();
+    assert_eq!(failures.len(), 1);
+    assert!(
+        failures[0].contains("compilation succeeded"),
+        "{}",
+        failures[0]
+    );
+
+    fs::write(case.join("expected.toml"), config).unwrap();
+    assert!(run_case(&case, repo).unwrap().is_empty());
 }
 
 #[test]

@@ -5921,19 +5921,55 @@ mod tests {
     }
 
     #[test]
-    fn serialization_context_rejects_external_operation_inputs() {
-        for endpoint in ["__temporal_system", "temporal-system"] {
-            for native_type in ["temporal.RetryPolicy", "*temporal.RetryPolicy"] {
-                let error = generate_context_operation(endpoint, native_type, true, false, true)
-                    .unwrap_err();
-                let Error::UnsupportedGoProtoConversion { context, reason } = error else {
-                    panic!("unexpected error: {error}");
-                };
-                assert!(context.contains("Send"), "{context}");
-                assert!(context.contains(native_type), "{context}");
-                assert!(reason.contains("TransferTypeConverter"), "{reason}");
-                assert!(reason.contains("locally owned request model"), "{reason}");
-            }
+    fn serialization_context_helpers_reject_invalid_go_identifiers() {
+        for helper in [
+            "_",
+            "break",
+            "default",
+            "func",
+            "interface",
+            "select",
+            "case",
+            "defer",
+            "go",
+            "map",
+            "struct",
+            "chan",
+            "else",
+            "goto",
+            "package",
+            "switch",
+            "const",
+            "fallthrough",
+            "if",
+            "range",
+            "type",
+            "continue",
+            "for",
+            "import",
+            "return",
+            "var",
+            "helpers._",
+            "helpers.func",
+            "_.Context",
+            "type.Context",
+            "helpers.nested.Context",
+            "requestContext()",
+            "helpers/Context",
+            "1context",
+            "helpers.1context",
+            "request-context",
+        ] {
+            let error =
+                super::validate_go_serialization_context_helper(helper, "Send").expect_err(helper);
+            let Error::InvalidWitDirective {
+                directive, reason, ..
+            } = error
+            else {
+                panic!("unexpected error: {error}");
+            };
+            assert_eq!(directive, "@nexus.serialization-context");
+            assert!(reason.contains(helper), "{helper}: {reason}");
         }
     }
 

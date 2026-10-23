@@ -1,0 +1,7 @@
+languages = ["go"]
+descriptors = "temporal"
+system_nexus = true
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["@nexus.serialization-context", "Go support helper `helpers.nested.Context`", "identifier or pkg.Func"]
