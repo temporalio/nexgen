@@ -9,6 +9,16 @@ use crate::language::Language;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
+#[cfg_attr(feature = "test-support", derive(strum::EnumDiscriminants))]
+#[cfg_attr(feature = "test-support", strum_discriminants(name(ErrorKind)))]
+#[cfg_attr(
+    feature = "test-support",
+    strum_discriminants(derive(serde::Deserialize))
+)]
+#[cfg_attr(
+    feature = "test-support",
+    strum_discriminants(serde(rename_all = "kebab-case"))
+)]
 pub enum Error {
     #[error("failed to read `{path}`: {source}")]
     ReadFile {

@@ -1,11 +1,10 @@
 //! File-backed compiler rejection tests, requiring no target-language tools.
-#![cfg(feature = "advanced")]
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use nexgen::error::Error;
+use nexgen::error::{Error, ErrorKind};
 use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
 use nexgen::{GenerateRequest, generate_to_file};
@@ -40,74 +39,6 @@ enum DescriptorPreset {
 struct ExpectedError {
     kind: ErrorKind,
     contains: Vec<String>,
-}
-
-// This is deliberately a test-only vocabulary, not a public diagnostic API.
-// Extend it as more existing rejection tests move into the fixture suite.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-enum ErrorKind {
-    InvalidWit,
-    InvalidWitDirective,
-    WitParse,
-    InvalidResourceMethod,
-    GeneratedFileSourceConflict,
-    PythonGeneratedNameConflict,
-    FlattenedApiFieldConflict,
-    UnsupportedGoType,
-    InvalidProtoEnumBinding,
-    InvalidTypeOverrideField,
-    UndeclaredTypeOverrideField,
-    DotnetTypeParameterNameConflict,
-    UnsupportedJavaProtoModel,
-}
-
-impl ErrorKind {
-    fn matches(&self, error: &Error) -> bool {
-        matches!(
-            (self, error),
-            (Self::InvalidWit, Error::InvalidWit { .. })
-                | (Self::InvalidWitDirective, Error::InvalidWitDirective { .. })
-                | (Self::WitParse, Error::WitParse { .. })
-                | (
-                    Self::InvalidResourceMethod,
-                    Error::InvalidResourceMethod { .. }
-                )
-                | (
-                    Self::GeneratedFileSourceConflict,
-                    Error::GeneratedFileSourceConflict { .. }
-                )
-                | (
-                    Self::PythonGeneratedNameConflict,
-                    Error::PythonGeneratedNameConflict { .. }
-                )
-                | (
-                    Self::FlattenedApiFieldConflict,
-                    Error::FlattenedApiFieldConflict { .. }
-                )
-                | (Self::UnsupportedGoType, Error::UnsupportedGoType { .. })
-                | (
-                    Self::InvalidProtoEnumBinding,
-                    Error::InvalidProtoEnumBinding { .. }
-                )
-                | (
-                    Self::InvalidTypeOverrideField,
-                    Error::InvalidTypeOverrideField { .. }
-                )
-                | (
-                    Self::UndeclaredTypeOverrideField,
-                    Error::UndeclaredTypeOverrideField { .. }
-                )
-                | (
-                    Self::DotnetTypeParameterNameConflict,
-                    Error::DotnetTypeParameterNameConflict { .. }
-                )
-                | (
-                    Self::UnsupportedJavaProtoModel,
-                    Error::UnsupportedJavaProtoModel { .. }
-                )
-        )
-    }
 }
 
 fn support_package(language: Language) -> Option<String> {
@@ -164,7 +95,7 @@ fn check_result(expected: &ExpectedError, result: Result<(), Error>) -> Result<(
         .err()
         .ok_or_else(|| format!("expected {:?}, but compilation succeeded", expected.kind))?;
     let message = error.to_string();
-    if !expected.kind.matches(&error) {
+    if expected.kind != ErrorKind::from(&error) {
         return Err(format!(
             "expected error kind {:?}, got {error:?}\ndiagnostic: {message}",
             expected.kind
@@ -396,6 +327,23 @@ contains = ["input.wit"]
             .unwrap_err()
             .contains("missing.bin")
     );
+}
+
+#[test]
+fn matches_io_error_by_kind_and_message() {
+    let expected = parse_expectation(
+        r#"
+[error]
+kind = "read-file"
+contains = ["missing.wit", "fixture file missing"]
+"#,
+    )
+    .unwrap();
+    let actual = Error::ReadFile {
+        path: PathBuf::from("missing.wit"),
+        source: std::io::Error::new(std::io::ErrorKind::NotFound, "fixture file missing"),
+    };
+    check_result(&expected.error, Err(actual)).unwrap();
 }
 
 #[test]

@@ -13,6 +13,11 @@ cargo test --all-features --test compiler_failures
 The normal Rust stage of `cargo validate` also runs this suite. The integration
 test reports all failing case/target pairs, including the actual error.
 
+The suite requires `advanced` and `test-support`, both enabled by
+`--all-features`. The opt-in `test-support` feature derives `ErrorKind` using
+Strum; ordinary builds, including those with only `advanced`, do not include
+Strum or the derived enum.
+
 ## Adding a case
 
 Create `<category>/<case>/` containing `input.wit` and `expected.toml`.
@@ -40,9 +45,10 @@ kind = "invalid-proto-enum-binding"
 contains = ["authored case `severity-low` has number 0"]
 ```
 
-`kind` selects a typed Rust compiler error through a test-only adapter in
-`tests/compiler_failures.rs`. This is not a public diagnostic-code API. Add a
-new adapter variant when migrating a failure that uses a different error.
+`kind` names a compiler `Error` variant in kebab-case. The fieldless `ErrorKind`
+enum is derived directly from `Error`, so every compiler error variant is
+available without a separate test mapping. It identifies the error variant
+without requiring the fixture to provide its payload fields.
 
 `contains` must have at least one nonempty fragment. Every fragment must occur
 in the rendered diagnostic. Assert details that establish the intended failure,
