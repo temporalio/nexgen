@@ -79,16 +79,16 @@ namespace Nexgen.StreamService
         private const string StreamServiceEndpoint = "streams";
 
         [GeneratedCode("nexgen", null)]
-        private static async Task<CreateStreamResponse> CreateStreamAsync(CreateStreamRequest request)
+        private static async Task<Stream> CreateStreamAsync(CreateStreamRequest request)
         {
             var client = Workflow.CreateNexusWorkflowClient<IStreamService>(StreamServiceEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<CreateStreamResponse>(svc => svc.CreateStream(request)).ConfigureAwait(true);
-            return result;
+            var result = await client.ExecuteNexusOperationAsync<CreateStreamResult>(svc => svc.CreateStream(request)).ConfigureAwait(true);
+            return new Stream((result.Stream ?? throw new System.InvalidOperationException("CreateStream answered without `stream`")));
         }
 
         /// <param name="options">Options for the operation.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<CreateStreamResponse> CreateStreamAsync(CreateStreamOptions? options = null)
+        public static Task<Stream> CreateStreamAsync(CreateStreamOptions? options = null)
         {
             var request = new CreateStreamRequest()
             {

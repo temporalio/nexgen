@@ -16,36 +16,33 @@ function requiredField<T>(
   return value;
 }
 
-export interface CreateStreamResponse {
+export interface CreateStreamResult {
   stream?: StreamRef;
-  created?: boolean;
 }
 
-function createStreamResponseFromProto(
+function createStreamResultFromProto(
   proto: streamsample.v1.ICreateStreamResponse,
-): CreateStreamResponse {
+): CreateStreamResult {
   return {
     stream: proto.stream == null ? undefined : streamRefFromProto(proto.stream),
-    created: proto.created ?? undefined,
   };
 }
 
-function createStreamResponseToProto(
-  model: CreateStreamResponse,
+function createStreamResultToProto(
+  model: CreateStreamResult,
 ): streamsample.v1.ICreateStreamResponse {
   return {
     stream: model.stream == null ? undefined : streamRefToProto(model.stream),
-    created: model.created,
   };
 }
 
-export const createStreamResponseTransferTypeConverter = {
-  fromTransferType(value: streamsample.v1.ICreateStreamResponse): CreateStreamResponse {
-    return createStreamResponseFromProto(value);
+export const createStreamResultTransferTypeConverter = {
+  fromTransferType(value: streamsample.v1.ICreateStreamResponse): CreateStreamResult {
+    return createStreamResultFromProto(value);
   },
 
-  toTransferType(value: CreateStreamResponse): streamsample.v1.ICreateStreamResponse {
-    return createStreamResponseToProto(value);
+  toTransferType(value: CreateStreamResult): streamsample.v1.ICreateStreamResponse {
+    return createStreamResultToProto(value);
   },
 };
 export interface StreamRef {

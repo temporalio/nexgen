@@ -3654,7 +3654,26 @@ fn operation_transform_expression(
             .bindings
             .iter()
             .map(|binding| {
-                resource_return_binding_expr(resource, binding, request_expr, result_expr, api_plan)
+                let expr = resource_return_binding_expr(
+                    resource,
+                    binding,
+                    request_expr,
+                    result_expr,
+                    api_plan,
+                );
+                // A response model field is always nullable, so a required one is checked.
+                match &binding.source {
+                    ResolvedResourceBindingSource::ResultField {
+                        proto_field_name, ..
+                    } if !binding.optional => format!(
+                        "({expr} ?? throw new System.InvalidOperationException({}))",
+                        csharp_string_literal(&format!(
+                            "{} answered without `{proto_field_name}`",
+                            operation.wire_name
+                        ))
+                    ),
+                    _ => expr,
+                }
             })
             .collect::<Vec<_>>();
         return format!(

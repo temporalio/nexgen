@@ -2,17 +2,32 @@
 
 import * as workflow from "@temporalio/workflow";
 import { streamService } from "../services";
-import type { CreateStreamResponse, CreateStreamRequest } from "../models";
+import type { CreateStreamRequest } from "../models";
+import { Stream } from "../resources";
+
+function requiredField<T>(
+  value: T | null | undefined,
+  owner: string,
+  field: string,
+): T {
+  if (value == null) {
+    throw new Error(`missing required field ${owner}.${field}`);
+  }
+  return value;
+}
 
 /**
  * @param request - Request for the operation.
  */
-export async function createStream(
-  request: CreateStreamRequest,
-): Promise<workflow.NexusOperationHandle<CreateStreamResponse>> {
+export async function createStream(request: CreateStreamRequest): Promise<Stream> {
   const client = workflow.createNexusServiceClient({
     service: streamService,
     endpoint: "streams",
   });
-  return await client.startOperation(streamService.operations.createStream, request);
+  const handle = await client.startOperation(
+    streamService.operations.createStream,
+    request,
+  );
+  const result = await handle.result();
+  return new Stream(requiredField(result.stream, "resource", "stream"));
 }

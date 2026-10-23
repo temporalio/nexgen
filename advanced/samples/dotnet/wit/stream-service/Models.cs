@@ -287,19 +287,17 @@ namespace Nexgen.StreamService
 
     }
 
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamResponse.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamResult.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record CreateStreamResponse
+    public record CreateStreamResult
     {
         public StreamRef? Stream { get; init; }
-        public bool? Created { get; init; }
 
-        internal static CreateStreamResponse FromTransferType(StreamSample.V1.CreateStreamResponse wire)
+        internal static CreateStreamResult FromTransferType(StreamSample.V1.CreateStreamResponse wire)
         {
-            return new CreateStreamResponse()
+            return new CreateStreamResult()
             {
                 Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
-                Created = wire.Created == false ? null : wire.Created,
             };
         }
 
@@ -309,10 +307,6 @@ namespace Nexgen.StreamService
             if (Stream is { } stream)
             {
                 proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
-            }
-            if (Created is { } created)
-            {
-                proto.Created = created;
             }
             return proto;
         }
@@ -326,10 +320,10 @@ namespace Nexgen.StreamService
             public System.Type TransferType => typeof(StreamSample.V1.CreateStreamResponse);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamResponse)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamResult)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamResponse.FromTransferType((StreamSample.V1.CreateStreamResponse)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamResult.FromTransferType((StreamSample.V1.CreateStreamResponse)transferType);
         }
 
     }

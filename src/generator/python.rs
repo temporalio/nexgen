@@ -5028,6 +5028,7 @@ fn render_endpoint_service_object_operation_body(
             output.push('\n');
         } else if let Some(resource_return) = &operation.output_resource_return {
             output.push_str("        result = await handle\n");
+            render_resource_return_guards(output, "        ", operation, resource_return);
             output.push_str("        resource = ");
             output.push_str(&resource_return.resource_type_name);
             output.push_str("(\n");
@@ -5396,6 +5397,7 @@ fn render_resource_method_inline_operation_body(
             output.push('\n');
         } else if let Some(resource_return) = &operation.output_resource_return {
             output.push_str("        result = await handle\n");
+            render_resource_return_guards(output, "        ", operation, resource_return);
             output.push_str("        resource = ");
             output.push_str(&resource_return.resource_type_name);
             output.push_str("(\n");
@@ -5572,6 +5574,38 @@ fn resource_method_list_param(param: &PlannedResourceField) -> Option<&PlannedTy
     match &param.kind {
         PlannedType::List(value) if !param.optional && param.function.is_none() => Some(value),
         _ => None,
+    }
+}
+
+/// A response model field is always optional, so a required resource field that the response
+/// fills in is checked before the resource is built.
+fn render_resource_return_guards(
+    output: &mut String,
+    indent: &str,
+    operation: &RenderedOperation<'_>,
+    resource_return: &PlannedOperationResourceReturn,
+) {
+    for binding in &resource_return.bindings {
+        let ResolvedResourceBindingSource::ResultField {
+            proto_field_name, ..
+        } = &binding.source
+        else {
+            continue;
+        };
+        if binding.optional {
+            continue;
+        }
+        output.push_str(indent);
+        output.push_str("if result.");
+        output.push_str(proto_field_name);
+        output.push_str(" is None:\n");
+        output.push_str(indent);
+        output.push_str("    raise RuntimeError(");
+        output.push_str(&python_string_literal(&format!(
+            "{} answered without `{}`",
+            operation.wire_name, proto_field_name
+        )));
+        output.push_str(")\n");
     }
 }
 
@@ -6837,6 +6871,7 @@ fn render_request_only_operation_function(
         output.push('\n');
     } else if let Some(resource_return) = &operation.output_resource_return {
         output.push_str("    result = await handle\n");
+        render_resource_return_guards(output, "    ", operation, resource_return);
         if service.endpoint.is_none() {
             output.push_str("    resource = ");
         } else {

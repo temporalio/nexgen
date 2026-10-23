@@ -2,7 +2,7 @@
 
 import * as nexus from "nexus-rpc";
 import {
-  createStreamResponseTransferTypeConverter,
+  createStreamResultTransferTypeConverter,
   createStreamRequestTransferTypeConverter,
   appendRecordsResponseTransferTypeConverter,
   appendRecordsRequestTransferTypeConverter,
@@ -14,7 +14,7 @@ import {
   describeStreamRequestTransferTypeConverter,
 } from "./models";
 import type {
-  CreateStreamResponse,
+  CreateStreamResult,
   CreateStreamRequest,
   AppendRecordsResponse,
   AppendRecordsRequest,
@@ -27,10 +27,10 @@ import type {
 } from "./models";
 
 export const streamService = nexus.service("streamsample.v1.StreamService", {
-  createStream: nexus.operation<CreateStreamRequest, CreateStreamResponse>({
+  createStream: nexus.operation<CreateStreamRequest, CreateStreamResult>({
     name: "CreateStream",
     inputType: { transferTypeConverter: createStreamRequestTransferTypeConverter },
-    outputType: { transferTypeConverter: createStreamResponseTransferTypeConverter },
+    outputType: { transferTypeConverter: createStreamResultTransferTypeConverter },
   }),
   appendRecords: nexus.operation<AppendRecordsRequest, AppendRecordsResponse>({
     name: "AppendRecords",

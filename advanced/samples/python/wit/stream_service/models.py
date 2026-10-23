@@ -113,14 +113,13 @@ temporalio.converter.transfer_type_convertible(_StreamRefTransferTypeConverter)(
 
 
 @dataclasses.dataclass(slots=True)
-class CreateStreamResponse:
+class CreateStreamResult:
     stream: StreamRef | None = None
-    created: bool | None = None
 
 
-class _CreateStreamResponseTransferTypeConverter(
+class _CreateStreamResultTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        CreateStreamResponse, streamsample.v1.stream_service_pb2.CreateStreamResponse
+        CreateStreamResult, streamsample.v1.stream_service_pb2.CreateStreamResponse
     ]
 ):
     transfer_type: (
@@ -131,35 +130,32 @@ class _CreateStreamResponseTransferTypeConverter(
     def from_transfer_type(
         self,
         value: streamsample.v1.stream_service_pb2.CreateStreamResponse,
-        type_hint: type[CreateStreamResponse],
-    ) -> CreateStreamResponse:
-        return CreateStreamResponse(
+        type_hint: type[CreateStreamResult],
+    ) -> CreateStreamResult:
+        return CreateStreamResult(
             stream=_StreamRefTransferTypeConverter().from_transfer_type(
                 value.stream, StreamRef
             )
             if value.HasField("stream")
             else None,
-            created=value.created if bool(value.created) else None,
         )
 
     @typing_extensions.override
     def to_transfer_type(
         self,
-        value: CreateStreamResponse,
+        value: CreateStreamResult,
     ) -> streamsample.v1.stream_service_pb2.CreateStreamResponse:
         message = streamsample.v1.stream_service_pb2.CreateStreamResponse()
         if value.stream is not None:
             message.stream.CopyFrom(
                 _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
             )
-        if value.created is not None:
-            message.created = value.created
         return message
 
 
 temporalio.converter.transfer_type_convertible(
-    _CreateStreamResponseTransferTypeConverter
-)(CreateStreamResponse)  # pyright: ignore[reportUnusedCallResult]
+    _CreateStreamResultTransferTypeConverter
+)(CreateStreamResult)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
