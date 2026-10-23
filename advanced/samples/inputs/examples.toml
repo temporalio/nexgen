@@ -30,3 +30,9 @@ descriptors = "temporal"
 languages = ["python", "typescript", "dotnet"]
 # The sample proto imports the Temporal API messages, so it needs both sets.
 descriptors = ["temporal_api.bin", "stream_service.bin"]
+
+# A System Nexus operation that returns a resource.
+[workflow-handle]
+languages = ["python", "dotnet", "typescript"]
+system_nexus = true
+descriptors = "temporal"

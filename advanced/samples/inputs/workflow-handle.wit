@@ -1,0 +1,79 @@
+package temporal:nexus@1.0.0;
+
+world system {
+  export workflow-handle-service;
+}
+
+/// @nexus.endpoint "temporal-system"
+interface workflow-handle-service {
+  use nexus:temporal-types/model@1.0.0.{duration, placeholder, task-queue, workflow-type};
+
+  resource workflow-handle {
+    constructor(namespace: string, workflow-id: string, run-id: option<string>);
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionRequest" typescript-import="@temporalio/proto"
+  record start-workflow-request {
+    /// @nexus.proto-field "workflow_type"
+    workflow: workflow-type,
+    /// @nexus.omit
+    input: placeholder,
+    workflow-id: string,
+    task-queue: task-queue,
+    workflow-start-delay: option<duration>,
+    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
+    namespace: string,
+    /// @nexus.omit
+    workflow-execution-timeout: placeholder,
+    /// @nexus.omit
+    workflow-run-timeout: placeholder,
+    /// @nexus.omit
+    workflow-task-timeout: placeholder,
+    /// @nexus.omit
+    identity: placeholder,
+    /// @nexus.omit
+    request-id: placeholder,
+    /// @nexus.omit
+    workflow-id-reuse-policy: placeholder,
+    /// @nexus.omit
+    workflow-id-conflict-policy: placeholder,
+    /// @nexus.omit
+    retry-policy: placeholder,
+    /// @nexus.omit
+    cron-schedule: placeholder,
+    /// @nexus.omit
+    memo: placeholder,
+    /// @nexus.omit
+    search-attributes: placeholder,
+    /// @nexus.omit
+    header: placeholder,
+    /// @nexus.omit
+    request-eager-execution: placeholder,
+    /// @nexus.omit
+    continued-failure: placeholder,
+    /// @nexus.omit
+    last-completion-result: placeholder,
+    /// @nexus.omit
+    completion-callbacks: placeholder,
+    /// @nexus.omit
+    user-metadata: placeholder,
+    /// @nexus.omit
+    links: placeholder,
+    /// @nexus.omit
+    versioning-override: placeholder,
+    /// @nexus.omit
+    on-conflict-options: placeholder,
+    /// @nexus.omit
+    priority: placeholder,
+    /// @nexus.omit
+    eager-worker-deployment-options: placeholder,
+    /// @nexus.omit
+    time-skipping-config: placeholder,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse" typescript-import="@temporalio/proto"
+  type start-workflow-result = own<workflow-handle>;
+
+  /// @nexus.doc "Start a Workflow through System Nexus and get a handle to it."
+  start-workflow: func(request: start-workflow-request) -> start-workflow-result;
+}

@@ -6372,6 +6372,18 @@ fn render_operation_function(
             output.push_str("  return ");
             output.push_str(transform_expr);
             output.push_str(";\n");
+        } else if let Some(resource_return) = &operation.output_resource_return {
+            // The answer is the resource's wire message, so the resource is built from it.
+            let args = resource_return
+                .bindings
+                .iter()
+                .map(resource_return_binding_expr_typescript)
+                .collect::<Vec<_>>();
+            output.push_str("  return new ");
+            output.push_str(&resource_return.resource_type_name);
+            output.push('(');
+            output.push_str(&args.join(", "));
+            output.push_str(");\n");
         } else {
             output.push_str("  return result as ");
             output.push_str(&operation.output_annotation);

@@ -70,6 +70,16 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
   [`typescript/wit/start-workflow/`](typescript/wit/start-workflow/),
   [`typescript/tests/start-workflow.test.ts`](typescript/tests/start-workflow.test.ts)
 
+### `workflow-handle`
+
+A System Nexus operation that returns a resource.
+
+- WIT: [`inputs/workflow-handle.wit`](inputs/workflow-handle.wit)
+- .NET: [`dotnet/wit/workflow-handle/`](dotnet/wit/workflow-handle/)
+- Python: [`python/wit/workflow_handle/`](python/wit/workflow_handle/)
+- TypeScript:
+  [`typescript/wit/workflow-handle/`](typescript/wit/workflow-handle/)
+
 ### `workflow-service`
 
 - WIT: [`inputs/workflow-service.wit`](inputs/workflow-service.wit)
