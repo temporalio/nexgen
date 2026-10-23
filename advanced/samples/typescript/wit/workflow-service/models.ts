@@ -94,7 +94,7 @@ export type SignalWithStartWorkflowRequest<
   ) => Promise<any>,
   SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
   SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
-    infer Args extends any[],
+    infer Args,
     any
   >
     ? Args
@@ -193,7 +193,7 @@ export type SignalWithStartWorkflowRequest<
     /**
      * Headers for the request.
      */
-    headers?: common.Headers;
+    headers?: Record<string, unknown>;
     /**
      * Namespace of the workflow execution.
      */
@@ -267,7 +267,7 @@ function signalWithStartWorkflowRequestFromProto<
   ) => Promise<any>,
   SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
   SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
-    infer Args extends any[],
+    infer Args,
     any
   >
     ? Args
@@ -388,7 +388,7 @@ function signalWithStartWorkflowRequestToProto<
   ) => Promise<any>,
   SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
   SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
-    infer Args extends any[],
+    infer Args,
     any
   >
     ? Args
@@ -473,7 +473,7 @@ export const signalWithStartWorkflowRequestTransferTypeConverter = {
     ) => Promise<any>,
     SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
     SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
-      infer Args extends any[],
+      infer Args,
       any
     >
       ? Args
@@ -492,7 +492,7 @@ export const signalWithStartWorkflowRequestTransferTypeConverter = {
     ) => Promise<any>,
     SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
     SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
-      infer Args extends any[],
+      infer Args,
       any
     >
       ? Args
