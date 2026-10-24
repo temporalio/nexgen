@@ -5,7 +5,6 @@
 using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
-using Temporalio.Converters;
 
 namespace Nexgen.NotificationService
 {
@@ -22,12 +21,14 @@ namespace Nexgen.NotificationService
         /// <summary>
         /// The source operation completed successfully with this output.
         /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public sealed record Success(TOutput Value) : OnCompleteRequestResult<TOutput>;
 
         /// <summary>
         /// The source operation failed, including timeout, cancellation, and application errors.
         /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public sealed record Failure(System.Exception Value) : OnCompleteRequestResult<TOutput>;
     }

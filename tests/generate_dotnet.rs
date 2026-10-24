@@ -190,7 +190,7 @@ interface api {
 }
 
 #[test]
-fn dotnet_experimental_variant_warning_applies_only_to_base_records() {
+fn dotnet_experimental_variant_warning_applies_to_base_and_case_records() {
     let temp_dir = unique_output_path("dotnet-experimental-variants");
     fs::create_dir_all(&temp_dir).unwrap();
     let wit_path = temp_dir.join("variants.wit");
@@ -238,12 +238,19 @@ interface api {
     assert!(rendered.contains(&format!(
         "{WARNING}\n[GeneratedCode(\"nexgen\", null)]\npublic abstract record Undocumented"
     )));
+    assert!(rendered.contains(&format!(
+        "    /// <summary>\n    /// Documented case.\n    /// </summary>\n    {WARNING}\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record First("
+    )));
+    assert!(rendered.contains(&format!(
+        "    {WARNING}\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record Second : Undocumented;"
+    )));
+    assert!(
+        rendered.contains("\n[GeneratedCode(\"nexgen\", null)]\npublic abstract record Stable")
+    );
     assert!(rendered.contains(
-        "    /// <summary>\n    /// Documented case.\n    /// </summary>\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record First("
+        "\n    [GeneratedCode(\"nexgen\", null)]\n    public sealed record Third : Stable;"
     ));
-    assert!(rendered.contains("public sealed record Second : Undocumented;"));
-    assert!(rendered.contains("public abstract record Stable"));
-    assert_eq!(rendered.matches(WARNING).count(), 2);
+    assert_eq!(rendered.matches(WARNING).count(), 4);
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -646,6 +653,24 @@ interface workflow-service {
 }
 
 #[test]
+fn dotnet_imports_converters_only_where_unqualified_types_need_them() {
+    let root = project_root();
+    for example in ["notification-service", "proto-oneof", "workflow-service"] {
+        let files = generate_dotnet_files(
+            &example_input_paths(&root, example),
+            &[descriptor_path(&root)],
+        );
+        let models = &files[&PathBuf::from("Models.cs")];
+        assert!(models.contains("Temporalio.Converters.TemporalTransferTypeConverter"));
+        assert!(!models.contains("using Temporalio.Converters;"));
+        if let Some(services) = files.get(&PathBuf::from("Services.cs")) {
+            assert!(services.contains("ISerializationContext"));
+            assert!(services.contains("using Temporalio.Converters;"));
+        }
+    }
+}
+
+#[test]
 fn dotnet_notification_models_convert_generic_oneofs_without_service() {
     let root = project_root();
     let files = generate_dotnet_files(
@@ -658,15 +683,16 @@ fn dotnet_notification_models_convert_generic_oneofs_without_service() {
 
     assert!(!files.contains_key(&PathBuf::from("Services.cs")));
     assert!(!files.contains_key(&PathBuf::from("Operations.cs")));
+    assert!(!models.contains("using Temporalio.Converters;"));
     assert!(models.contains("namespace Nexgen.NotificationService\n{"));
     assert!(models.contains(
         "    /// <summary>\n    /// The successful output or failure of the source operation.\n    /// </summary>\n    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>\n    [GeneratedCode(\"nexgen\", null)]\n    public abstract record OnCompleteRequestResult<TOutput>"
     ));
     assert!(models.contains(
-        "        /// <summary>\n        /// The source operation completed successfully with this output.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        public sealed record Success(TOutput Value)"
+        "        /// <summary>\n        /// The source operation completed successfully with this output.\n        /// </summary>\n        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>\n        [GeneratedCode(\"nexgen\", null)]\n        public sealed record Success(TOutput Value)"
     ));
     assert!(models.contains(
-        "        /// <summary>\n        /// The source operation failed, including timeout, cancellation, and application errors.\n        /// </summary>\n        [GeneratedCode(\"nexgen\", null)]\n        public sealed record Failure(System.Exception Value)"
+        "        /// <summary>\n        /// The source operation failed, including timeout, cancellation, and application errors.\n        /// </summary>\n        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>\n        [GeneratedCode(\"nexgen\", null)]\n        public sealed record Failure(System.Exception Value)"
     ));
     assert!(
         models.contains("    /// A notification that reports that a source operation completed.")

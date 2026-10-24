@@ -5,7 +5,6 @@
 using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
-using Temporalio.Converters;
 using Nexgen.Support;
 
 namespace Nexgen.ProtoOneof

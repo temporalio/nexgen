@@ -1723,8 +1723,9 @@ Cannot be combined with `@nexus.source`.
 Adds an experimental API warning to the generated declaration's documentation.
 The directive takes no arguments. Mark declarations individually; marking an
 interface does not implicitly mark its types. For variants, the warning belongs
-to the variant declaration, not its individual cases, in Python, TypeScript, Go,
-and .NET.
+to the variant declaration, not its individual cases, in Python, TypeScript, and
+Go. In .NET, the warning appears on both the variant's base record and each
+nested case record.
 
 ```wit
 /// @nexus.experimental
