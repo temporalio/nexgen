@@ -1594,15 +1594,25 @@ for a `NoValue` result. If a `Payloads` carrier holds more than one payload,
 decoding throws `InvalidOperationException` with the field name and the payload
 count. This requires `Temporalio` 1.19.0 or newer.
 
-TypeScript retains model type parameters on transfer-converter methods. Generic
-`Payload` fields use the support module's `payloadToValue<T>` and
-`valueToPayload` helpers; generic `Payloads` fields use
-`singleValueFromPayloads<T>` and `payloadsToProto([value])`. The single-value
-decoder returns `undefined` for an empty payload list and rejects more than one
-payload. These helpers must use the configured application payload converter.
-Generic type arguments describe the decoded values statically; they do not
-supply runtime type hints. Required carrier fields require a wire envelope but
-can contain application values that are themselves `null` or `undefined`.
+TypeScript retains model type parameters on the default transfer-converter
+methods. Generic proto-backed models also export a
+`create<Model>TransferTypeConverter` factory that binds optional runtime
+`TypeInfo` for each explicit type parameter. Configuration keys are the
+parameter names in lower camel case, such as `outputT` and `sourceContextT`. For
+example, a notification handler can preserve a successful output as a `RawValue`
+while decoding source context normally:
+
+```ts
+import { RawValue, rawValueTypeInfo } from "@temporalio/common";
+import { createOnCompleteRequestTransferTypeConverter } from "./generated";
+
+const inputType = {
+  transferTypeConverter: createOnCompleteRequestTransferTypeConverter<
+    RawValue,
+    { workflowId: string }
+  >({ outputT: rawValueTypeInfo }),
+};
+```
 
 Type parameters are also unsupported in resources, map keys, function-signature
 metadata, or resource-bound generic operations.

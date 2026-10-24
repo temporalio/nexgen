@@ -3,6 +3,7 @@ import type { temporal } from "@temporalio/proto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createOnCompleteRequestTransferTypeConverter,
   type OnCompleteRequest,
   onCompleteRequestTransferTypeConverter as requestConverter,
   onCompleteResponseTransferTypeConverter as responseConverter,
@@ -38,6 +39,107 @@ afterEach(() => {
 });
 
 describe("notification-service generated models", () => {
+  it("preserves RawValue success payloads while decoding source context normally", () => {
+    const converter = createOnCompleteRequestTransferTypeConverter<
+      common.RawValue,
+      SourceContext
+    >({ outputT: common.rawValueTypeInfo });
+    const payload: common.Payload = {
+      metadata: { encoding: new TextEncoder().encode("unknown/opaque") },
+      data: new Uint8Array([1, 2, 3]),
+    };
+    const sourceContext = common.defaultPayloadConverter.toPayload({
+      workflowId: "workflow-id",
+    });
+    const decoded = converter.fromTransferType({
+      result: "success",
+      success: payload,
+      sourceContext,
+    });
+    expect(decoded.sourceContext).toEqual({ workflowId: "workflow-id" });
+    if (decoded.result.tag !== "success") throw new Error("expected success");
+    expect(decoded.result.value).toBeInstanceOf(common.RawValue);
+    expect(decoded.result.value.payload).toBe(payload);
+    expect(converter.toTransferType(decoded).success).toBe(payload);
+
+    // Configured converters are ordinary SDK transfer converters.
+    const inputType: common.TypeInfo<
+      OnCompleteRequest<common.RawValue, SourceContext>,
+      temporal.api.notificationservice.v1.IOnCompleteRequest
+    > = { transferTypeConverter: converter };
+    expect(inputType.transferTypeConverter).toBe(converter);
+    // @ts-expect-error A RawValue converter cannot decode a Completion.
+    const wrong: common.TransferTypeConverter<
+      OnCompleteRequest<Completion, SourceContext>
+    > = converter;
+    expect(wrong).toBe(converter);
+  });
+
+  it("binds independent transfer types and passes payload converter hints", () => {
+    const outputHint = { converter: "output-test" };
+    const contextHint = { converter: "context-test" };
+    const toPayload = vi.fn(
+      (
+        value: unknown,
+        _context?: common.SerializationContext,
+        _hint?: common.ConverterHint,
+      ) => common.defaultPayloadConverter.toPayload(value),
+    );
+    const fromPayload = vi.fn(
+      (
+        payload: common.Payload,
+        _context?: common.SerializationContext,
+        _hint?: common.ConverterHint,
+      ) => common.defaultPayloadConverter.fromPayload(payload),
+    );
+    runtime.__TEMPORAL_ACTIVATOR__ = {
+      payloadConverter: {
+        toPayload,
+        fromPayload<T>(
+          payload: common.Payload,
+          context?: common.SerializationContext,
+          hint?: common.ConverterHint<T>,
+        ): T {
+          return fromPayload(payload, context, hint) as T;
+        },
+      },
+    };
+    const converter = createOnCompleteRequestTransferTypeConverter<
+      Completion,
+      SourceContext
+    >({
+      outputT: {
+        payloadConverterHint: outputHint,
+        transferTypeConverter: {
+          toTransferType: (value: Completion) => value.message,
+          fromTransferType: (value: string): Completion => ({ message: value }),
+        },
+      },
+      sourceContextT: {
+        payloadConverterHint: contextHint,
+        transferTypeConverter: {
+          toTransferType: (value: SourceContext) => value.workflowId,
+          fromTransferType: (value: string): SourceContext => ({ workflowId: value }),
+        },
+      },
+    });
+    const model: OnCompleteRequest<Completion, SourceContext> = {
+      result: { tag: "success", value: { message: "done" } },
+      sourceContext: { workflowId: "workflow-id" },
+    };
+    const wire = converter.toTransferType(model);
+    expect(toPayload).toHaveBeenNthCalledWith(1, "done", undefined, outputHint);
+    expect(toPayload).toHaveBeenNthCalledWith(2, "workflow-id", undefined, contextHint);
+    expect(converter.fromTransferType(wire)).toEqual(model);
+    expect(fromPayload).toHaveBeenNthCalledWith(1, wire.success, undefined, outputHint);
+    expect(fromPayload).toHaveBeenNthCalledWith(
+      2,
+      wire.sourceContext,
+      undefined,
+      contextHint,
+    );
+  });
+
   it("round-trips distinct generic output and source context values", () => {
     const model: OnCompleteRequest<Completion, SourceContext> = {
       result: { tag: "success", value: { message: "completed" } },

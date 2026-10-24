@@ -7,3 +7,4 @@ export type {
 } from "./models";
 export { onCompleteRequestTransferTypeConverter } from "./models";
 export { onCompleteResponseTransferTypeConverter } from "./models";
+export { createOnCompleteRequestTransferTypeConverter } from "./models";

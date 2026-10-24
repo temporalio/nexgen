@@ -173,31 +173,56 @@ export function payloadsFromProto(proto: temporal.api.common.v1.IPayloads): unkn
 }
 
 /** Decode a generic value carried by a protobuf Payloads message. */
-export function singleValueFromPayloads<T>(proto: temporal.api.common.v1.IPayloads): T {
+export function singleValueFromPayloads<T>(
+  proto: temporal.api.common.v1.IPayloads,
+  typeInfo?: common.TypeInfo<T, any>,
+): T {
   if ((proto.payloads?.length ?? 0) > 1) {
     throw new Error("expected at most one payload for a generic value");
   }
-  return payloadsFromProto(proto)[0] as T;
+  return common.fromPayloadsAtIndex(
+    configuredPayloadConverter(),
+    0,
+    proto.payloads,
+    undefined,
+    typeInfo,
+  );
 }
 
 /** Convert one application value to a protobuf payload. */
-export function valueToPayload(value: unknown): common.Payload {
-  return configuredPayloadConverter().toPayload(value);
+export function valueToPayload<T>(
+  value: T,
+  typeInfo?: common.TypeInfo<T, any>,
+): common.Payload {
+  return common.toPayloadWithTypeInfo(
+    configuredPayloadConverter(),
+    value,
+    undefined,
+    typeInfo,
+  );
 }
 
 /** Convert one protobuf payload to an application value. */
-export function payloadToValue<T>(payload: common.Payload): T {
-  return configuredPayloadConverter().fromPayload<T>(payload);
+export function payloadToValue<T>(
+  payload: common.Payload,
+  typeInfo?: common.TypeInfo<T, any>,
+): T {
+  return common.fromPayloadWithTypeInfo(
+    configuredPayloadConverter(),
+    payload,
+    undefined,
+    typeInfo,
+  );
 }
 
-export function failureFromProto(proto: temporal.api.failure.v1.IFailure): Error {
+export function errorFromFailure(proto: temporal.api.failure.v1.IFailure): Error {
   return common.defaultFailureConverter.failureToError(
     proto,
     configuredPayloadConverter(),
   );
 }
 
-export function failureToProto(failure: Error): temporal.api.failure.v1.IFailure {
+export function errorToFailure(failure: Error): temporal.api.failure.v1.IFailure {
   return common.defaultFailureConverter.errorToFailure(
     failure,
     configuredPayloadConverter(),

@@ -3,6 +3,7 @@ import { temporal } from "@temporalio/proto";
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
+  createOutcomeTransferTypeConverter,
   type Outcome,
   type PauseActivityRequest,
   outcomeTransferTypeConverter as outcomeConverter,
@@ -28,6 +29,45 @@ function pauseRequest(): PauseActivityRequest {
 }
 
 describe("proto-oneof generated models", () => {
+  it("preserves RawValue in a generic Payloads carrier without payload conversion", () => {
+    const converter = createOutcomeTransferTypeConverter({
+      outputT: common.rawValueTypeInfo,
+    });
+    const toPayload = vi.fn(() => {
+      throw new Error("must bypass payload converter");
+    });
+    const fromPayload = vi.fn(() => {
+      throw new Error("must bypass payload converter");
+    });
+    vi.stubGlobal("__TEMPORAL_ACTIVATOR__", {
+      payloadConverter: { toPayload, fromPayload },
+    });
+    const payload: common.Payload = {
+      metadata: { encoding: new TextEncoder().encode("unknown/opaque") },
+      data: new Uint8Array([1, 2, 3]),
+    };
+    const wire = converter.toTransferType({
+      value: { tag: "success", value: common.RawValue.fromPayload(payload) },
+    });
+    expect(wire.success!.payloads).toEqual([payload]);
+    const decoded = converter.fromTransferType(wire);
+    if (decoded.value.tag !== "success") throw new Error("expected success");
+    expectTypeOf(decoded.value.value).toEqualTypeOf<common.RawValue>();
+    expect(decoded.value.value).toBeInstanceOf(common.RawValue);
+    expect(decoded.value.value.payload).toBe(payload);
+    expect(converter.fromTransferType({ value: "success", success: {} })).toEqual({
+      value: { tag: "success", value: undefined },
+    });
+    expect(() =>
+      converter.fromTransferType({
+        value: "success",
+        success: { payloads: [payload, payload] },
+      }),
+    ).toThrow("expected at most one payload");
+    expect(toPayload).not.toHaveBeenCalled();
+    expect(fromPayload).not.toHaveBeenCalled();
+  });
+
   it("round-trips a generic success through Payloads and protobuf bytes", () => {
     const model: Outcome<{ message: string }> = {
       value: { tag: "success", value: { message: "completed" } },

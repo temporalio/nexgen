@@ -3,6 +3,7 @@ import { temporal } from "@temporalio/proto";
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
+  createPayloadBackedEnvelopeTransferTypeConverter,
   type PayloadBackedEnvelope,
   payloadBackedContextTransferTypeConverter as contextConverter,
   payloadBackedEnvelopeTransferTypeConverter as envelopeConverter,
@@ -50,6 +51,68 @@ describe("proto-generic generated models", () => {
       }),
     ).toThrow("expected at most one payload");
   });
+
+  it("propagates independent TypeInfo through nested records", () => {
+    const converter = createPayloadBackedEnvelopeTransferTypeConverter<
+      common.RawValue,
+      Context
+    >({
+      outputT: common.rawValueTypeInfo,
+      contextT: {
+        transferTypeConverter: {
+          toTransferType: (value: Context) => value.workflowId,
+          fromTransferType: (value: string): Context => ({ workflowId: value }),
+        },
+      },
+    });
+    const payload: common.Payload = {
+      metadata: { encoding: new TextEncoder().encode("unknown/opaque") },
+      data: new Uint8Array([1, 2, 3]),
+    };
+    const model: PayloadBackedEnvelope<common.RawValue, Context> = {
+      provider: { details: common.RawValue.fromPayload(payload) },
+      scaler: { details: { workflowId: "workflow-id" } },
+    };
+    const wire = converter.toTransferType(model);
+    expect(wire.provider!.details).toBe(payload);
+    expect(common.defaultPayloadConverter.fromPayload(wire.scaler!.details!)).toBe(
+      "workflow-id",
+    );
+    const envelopeConverter: common.PayloadConverter = {
+      toPayload<T>(value: T): common.Payload {
+        return {
+          data: temporal.api.compute.v1.ComputeConfigScalingGroup.encode(
+            value as temporal.api.compute.v1.IComputeConfigScalingGroup,
+          ).finish(),
+        };
+      },
+      fromPayload<T>(payload: common.Payload): T {
+        return temporal.api.compute.v1.ComputeConfigScalingGroup.decode(
+          payload.data!,
+        ) as T;
+      },
+    };
+    const typeInfo: common.TypeInfo<
+      PayloadBackedEnvelope<common.RawValue, Context>,
+      temporal.api.compute.v1.IComputeConfigScalingGroup
+    > = { transferTypeConverter: converter };
+    const encoded = common.toPayloadWithTypeInfo(
+      envelopeConverter,
+      model,
+      undefined,
+      typeInfo,
+    );
+    const decoded = common.fromPayloadWithTypeInfo(
+      envelopeConverter,
+      encoded,
+      undefined,
+      typeInfo,
+    );
+    expect(decoded.provider.details).toBeInstanceOf(common.RawValue);
+    expect(Array.from(decoded.provider.details.payload.data!)).toEqual([1, 2, 3]);
+    expect(decoded.scaler.details).toEqual(model.scaler.details);
+  });
+
   it("round-trips independent type arguments through nested records and protobuf bytes", () => {
     const model: PayloadBackedEnvelope<Output, Context> = {
       provider: { details: { message: "completed" } },

@@ -251,6 +251,15 @@ impl TypeScriptExternalModels {
         Ok(support)
     }
 
+    fn model_value_exports(
+        &self,
+        models: &[&RenderedModel],
+        include_default_converters: bool,
+    ) -> Vec<String> {
+        self.proto
+            .model_value_exports(models, include_default_converters)
+    }
+
     /// The `TransferTypeConverter` instance a model reference converts through, if
     /// the backend that owns the model emits one. Only the JSON backend does, so
     /// proto-backed and locally-planned records answer `None` and their operations
@@ -1641,7 +1650,10 @@ fn resolve_typescript_value_type(
     }
 }
 
-fn repeated_from_wire_expr(resolved_type: &ResolvedFieldType, wire_value_expr: &str) -> String {
+pub(in crate::generator) fn repeated_from_wire_expr(
+    resolved_type: &ResolvedFieldType,
+    wire_value_expr: &str,
+) -> String {
     match resolved_type.kind {
         ResolvedFieldKind::Message => {
             let conversion = resolved_type
@@ -1666,7 +1678,10 @@ fn repeated_from_wire_expr(resolved_type: &ResolvedFieldType, wire_value_expr: &
     }
 }
 
-fn repeated_to_wire_expr(resolved_type: &ResolvedFieldType, field_name: &str) -> String {
+pub(in crate::generator) fn repeated_to_wire_expr(
+    resolved_type: &ResolvedFieldType,
+    field_name: &str,
+) -> String {
     repeated_to_wire_expr_from_expr(resolved_type, &format!("model.{field_name}"))
 }
 
@@ -1688,7 +1703,10 @@ fn repeated_to_wire_expr_from_expr(resolved_type: &ResolvedFieldType, value_expr
     }
 }
 
-fn map_value_from_wire_expr(map_value_type: &ResolvedFieldType, wire_value_expr: &str) -> String {
+pub(in crate::generator) fn map_value_from_wire_expr(
+    map_value_type: &ResolvedFieldType,
+    wire_value_expr: &str,
+) -> String {
     let value_expr = match map_value_type.kind {
         ResolvedFieldKind::Message => map_value_type
             .wire_conversion
@@ -1704,7 +1722,7 @@ fn map_value_from_wire_expr(map_value_type: &ResolvedFieldType, wire_value_expr:
     )
 }
 
-fn map_value_to_wire_expr_from_expr(
+pub(in crate::generator) fn map_value_to_wire_expr_from_expr(
     map_value_type: &ResolvedFieldType,
     value_expr: &str,
 ) -> String {
@@ -1722,7 +1740,7 @@ fn map_value_to_wire_expr_from_expr(
     )
 }
 
-fn required_from_wire_expr(
+pub(in crate::generator) fn required_from_wire_expr(
     resolved_type: &ResolvedFieldType,
     owner_name: &str,
     wire_value_expr: &str,
@@ -1766,7 +1784,7 @@ fn required_from_wire_expr(
     }
 }
 
-fn required_to_wire_expr(
+pub(in crate::generator) fn required_to_wire_expr(
     resolved_type: &ResolvedFieldType,
     owner_name: &str,
     field_name: &str,
@@ -1784,7 +1802,10 @@ fn required_to_wire_expr(
     }
 }
 
-fn optional_from_wire_expr(resolved_type: &ResolvedFieldType, wire_value_expr: &str) -> String {
+pub(in crate::generator) fn optional_from_wire_expr(
+    resolved_type: &ResolvedFieldType,
+    wire_value_expr: &str,
+) -> String {
     match resolved_type.kind {
         ResolvedFieldKind::Message => format!(
             "{wire_value_expr} == null ? undefined : {}",
@@ -1875,7 +1896,10 @@ pub(in crate::generator) fn flattened_field_from_wire_expr(
     format!("{containing_wire_expr} == null ? undefined : {nested_field_from_wire_expr}")
 }
 
-fn optional_to_wire_expr(resolved_type: &ResolvedFieldType, field_name: &str) -> String {
+pub(in crate::generator) fn optional_to_wire_expr(
+    resolved_type: &ResolvedFieldType,
+    field_name: &str,
+) -> String {
     optional_to_wire_expr_from_expr(resolved_type, &format!("model.{field_name}"))
 }
 
@@ -3082,11 +3106,11 @@ pub(in crate::generator) struct RenderedSourcedField {
 
 #[derive(Debug, Clone)]
 pub(in crate::generator) struct RenderedTypeParameter {
-    name: String,
+    pub(in crate::generator) name: String,
     constraint: String,
     default: String,
     infer_from_operation_request: bool,
-    explicit: bool,
+    pub(in crate::generator) explicit: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -3288,16 +3312,8 @@ fn render_module_files(
     index_model_names.extend(variants.iter().map(|item| item.name.clone()));
     index_model_names.extend(models.iter().map(|item| item.name.clone()));
     let mut index_exports = rendered_support.root_exports.clone();
-    if services.is_empty() {
-        for model in models
-            .iter()
-            .filter(|model| model.wire_function_names.is_some())
-        {
-            index_exports.push(format!(
-                "export {{ {}TransferTypeConverter }} from './models';",
-                model.name.to_lower_camel_case()
-            ));
-        }
+    for name in external_models.model_value_exports(models, services.is_empty()) {
+        index_exports.push(format!("export {{ {name} }} from './models';"));
     }
     files.insert(
         "index.ts",
@@ -4217,7 +4233,7 @@ fn render_models_module(
     }
     let body = with_private_required_field(body);
     let mut imports = String::new();
-    let mut generated_value_imports = Vec::new();
+    let mut generated_value_imports = vec![("common", "@temporalio/common", true)];
     if crate::nexgen_config::current().system_nexus
         && contains_qualified_identifier(&body, "workflow")
     {

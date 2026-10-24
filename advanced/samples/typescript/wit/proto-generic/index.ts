@@ -10,3 +10,7 @@ export { optionalPayloadsTransferTypeConverter } from "./models";
 export { payloadBackedContextTransferTypeConverter } from "./models";
 export { payloadBackedEnvelopeTransferTypeConverter } from "./models";
 export { payloadBackedOutputTransferTypeConverter } from "./models";
+export { createOptionalPayloadsTransferTypeConverter } from "./models";
+export { createPayloadBackedContextTransferTypeConverter } from "./models";
+export { createPayloadBackedEnvelopeTransferTypeConverter } from "./models";
+export { createPayloadBackedOutputTransferTypeConverter } from "./models";
