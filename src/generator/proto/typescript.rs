@@ -9,9 +9,11 @@ use crate::generator::ExternalModelBackend;
 use crate::generator::typescript::{
     RenderedExternalModelFragments, RenderedField, RenderedModel, ResolvedFieldType,
     WireFunctionNames, WireValueConversion, flattened_field_from_wire_expr,
-    flattened_message_to_wire_expr, generic_model_annotation, render_named_generic_function_start,
-    required_field_expr, support_reference, typescript_authored_type_annotation,
-    typescript_generated_field_name, typescript_ident,
+    flattened_message_to_wire_expr, generic_model_annotation, map_value_from_wire_expr,
+    map_value_to_wire_expr_from_expr, optional_from_wire_expr, optional_to_wire_expr,
+    render_named_generic_function_start, repeated_from_wire_expr, repeated_to_wire_expr,
+    required_field_expr, required_from_wire_expr, required_to_wire_expr, support_reference,
+    typescript_authored_type_annotation, typescript_generated_field_name, typescript_ident,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
@@ -125,7 +127,8 @@ fn oneof_wire_field<'a>(
             .payload
             .as_ref()
             .expect("proto oneof cases have payloads");
-        let value = resolve_type(payload);
+        let mut value = resolve_type(payload);
+        bind_nested_type_info(api_plan, payload, &mut value);
         let conversion = generic_carrier_conversion(payload, &member.wire_type, &value.annotation)
             .or_else(|| value.wire_conversion.clone());
         cases.push(OneofCase {
@@ -182,6 +185,81 @@ fn generic_carrier_expressions(
     Some((from_wire_expr, to_wire_expr))
 }
 
+/// Bind only the parameters used by the nested record. Parameter identity is
+/// shared across records, but the nested converter may use a subset or order.
+fn bind_nested_type_info(
+    api_plan: &PlannedSpec,
+    kind: &PlannedType,
+    resolved: &mut ResolvedFieldType,
+) {
+    if let PlannedType::Record(record) = kind.validation_type()
+        && let Some(conversion) = &mut resolved.wire_conversion
+        && let Some(names) = &conversion.wire_function_names
+    {
+        let parameters = api_plan.record_type_parameters(&record.full_name);
+        if !parameters.is_empty() {
+            let bindings = parameters
+                .iter()
+                .map(|usage| {
+                    let name = usage.parameter.name.to_lower_camel_case();
+                    format!("{name}: typeInfo.{name}")
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            conversion.from_wire = format!("{}({{wire}}, {{ {bindings} }})", names.from_wire);
+            conversion.to_wire = format!("{}({{value}}, {{ {bindings} }})", names.to_wire);
+        }
+    }
+}
+
+fn nested_generic_expressions(
+    record: &RecordSpec<PlannedFamily>,
+    field: &RecordFieldSpec<PlannedFamily>,
+    name: &str,
+    wire: &str,
+    api_plan: &PlannedSpec,
+    resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
+) -> Option<(String, String)> {
+    let kind = match &field.field_type {
+        PlannedType::List(inner) | PlannedType::Map(_, inner) => inner,
+        kind => kind,
+    };
+    let PlannedType::Record(nested) = kind.validation_type() else {
+        return None;
+    };
+    if api_plan
+        .record_type_parameters(&nested.full_name)
+        .is_empty()
+    {
+        return None;
+    }
+    let mut resolved = resolve_type(kind);
+    bind_nested_type_info(api_plan, kind, &mut resolved);
+    resolved
+        .wire_conversion
+        .as_ref()?
+        .wire_function_names
+        .as_ref()?;
+    Some(match &field.field_type {
+        PlannedType::List(_) => (
+            repeated_from_wire_expr(&resolved, wire),
+            repeated_to_wire_expr(&resolved, name),
+        ),
+        PlannedType::Map(_, _) => (
+            map_value_from_wire_expr(&resolved, wire),
+            map_value_to_wire_expr_from_expr(&resolved, &format!("model.{name}")),
+        ),
+        _ if field.required => (
+            required_from_wire_expr(&resolved, &record.name, wire, name, field),
+            required_to_wire_expr(&resolved, &record.name, name),
+        ),
+        _ => (
+            optional_from_wire_expr(&resolved, wire),
+            optional_to_wire_expr(&resolved, name),
+        ),
+    })
+}
+
 /// Wire-only field expressions are prepared at emission. Public model fields
 /// retain their ordinary TypeScript metadata; unchanged fields are borrowed.
 fn model_wire_fields<'a>(
@@ -220,6 +298,20 @@ fn model_wire_fields<'a>(
             }
             // Flattened fields still belong to their nested protobuf record.
             let mut wire_field = Cow::Borrowed(rendered);
+            if rendered.flattened_fields.is_empty()
+                && let Some((from_wire, to_wire)) = nested_generic_expressions(
+                    record,
+                    field,
+                    &rendered.name,
+                    &wire_expr,
+                    api_plan,
+                    resolve_type,
+                )
+            {
+                let target = wire_field.to_mut();
+                target.from_wire_expr = from_wire;
+                target.to_wire_expr = to_wire;
+            }
             if !rendered.flattened_fields.is_empty()
                 && let PlannedType::Record(nested) = &field.field_type
             {
@@ -239,16 +331,23 @@ fn model_wire_fields<'a>(
                         nested_field,
                         &flattened.name,
                         &nested_wire_expr,
-                    ) {
-                        let nested_annotation = match nested_field.field_type.validation_type() {
-                            PlannedType::TypeParameter(parameter) => &parameter.name,
-                            _ => unreachable!("generic carrier requires a type parameter"),
-                        };
+                    )
+                    .or_else(|| {
+                        nested_generic_expressions(
+                            nested,
+                            nested_field,
+                            &flattened.name,
+                            &nested_wire_expr,
+                            api_plan,
+                            resolve_type,
+                        )
+                    }) {
+                        let nested_annotation = resolve_type(&nested_field.field_type).annotation;
                         let target = &mut wire_field.to_mut().flattened_fields[index];
                         target.from_wire_expr = flattened_field_from_wire_expr(
                             &wire_expr,
                             &from_wire,
-                            nested_annotation,
+                            &nested_annotation,
                             &flattened.annotation,
                         );
                         target.to_wire_expr = to_wire;
@@ -279,20 +378,27 @@ fn generic_carrier_conversion(
     else {
         return None;
     };
+    let type_info = format!("typeInfo.{}", annotation.to_lower_camel_case());
     let (from_wire, to_wire) = match message.proto.full_name.as_str() {
         "temporal.api.common.v1.Payload" => (
             format!(
-                "{}<{annotation}>({{wire}})",
+                "{}<{annotation}>({{wire}}, {type_info})",
                 support_reference("payloadToValue")
             ),
-            format!("{}({{value}})", support_reference("valueToPayload")),
+            format!(
+                "{}({{value}}, {type_info})",
+                support_reference("valueToPayload")
+            ),
         ),
         "temporal.api.common.v1.Payloads" => (
             format!(
-                "{}<{annotation}>({{wire}})",
+                "{}<{annotation}>({{wire}}, {type_info})",
                 support_reference("singleValueFromPayloads")
             ),
-            format!("{}([{{value}}])", support_reference("payloadsToProto")),
+            format!(
+                "{}([{{value}}], [{type_info} ?? {{}}])",
+                support_reference("payloadsToProto")
+            ),
         ),
         _ => return None,
     };
@@ -385,6 +491,30 @@ fn render_oneof_to_proto(output: &mut String, owner: &str, oneof: &OneofField<'_
 }
 
 impl ModelBackend {
+    /// Report the proto converter values that the native API barrel exposes.
+    /// Definitions-only barrels already re-export every model value.
+    pub(in crate::generator) fn model_value_exports(
+        &self,
+        models: &[&RenderedModel],
+        include_default_converters: bool,
+    ) -> Vec<String> {
+        let mut exports = Vec::new();
+        if include_default_converters {
+            exports.extend(
+                models
+                    .iter()
+                    .filter(|model| model.wire_function_names.is_some())
+                    .map(|model| transfer_converter_name(model)),
+            );
+        }
+        exports.extend(
+            models
+                .iter()
+                .filter_map(|model| transfer_converter_factory_name(model)),
+        );
+        exports
+    }
+
     pub(in crate::generator) fn render_model_wire_functions(
         &self,
         output: &mut String,
@@ -406,6 +536,19 @@ impl ModelBackend {
     }
 }
 
+fn transfer_converter_name(model: &RenderedModel) -> String {
+    format!("{}TransferTypeConverter", model.name.to_lower_camel_case())
+}
+
+fn transfer_converter_factory_name(model: &RenderedModel) -> Option<String> {
+    (model.wire_function_names.is_some()
+        && model
+            .type_parameters
+            .iter()
+            .any(|parameter| parameter.explicit))
+    .then(|| format!("create{}TransferTypeConverter", model.name))
+}
+
 /// Render the transfer-type adapter for a WIT model backed by a protobuf
 /// message. This keeps the public operation input in its generated TypeScript
 /// model form while letting the payload converter transport its protobuf
@@ -421,7 +564,7 @@ fn render_model_transfer_type_converter(
         .proto
         .as_ref()
         .expect("wire functions require a protobuf-backed record");
-    let converter_name = format!("{}TransferTypeConverter", model.name.to_lower_camel_case());
+    let converter_name = transfer_converter_name(model);
     let proto_type = message_typescript_interface_ref(proto);
     output.push_str("export const ");
     output.push_str(&converter_name);
@@ -448,6 +591,46 @@ fn render_model_transfer_type_converter(
     output.push_str(" {\n    return ");
     output.push_str(&names.to_wire);
     output.push_str("(value);\n  },\n};");
+    if let Some(factory_name) = transfer_converter_factory_name(model) {
+        output.push_str("\n\n");
+        render_named_generic_function_start(
+            output,
+            &format!("export function {factory_name}"),
+            &model.type_parameters,
+            0,
+        );
+        render_type_info_parameter(output, model);
+        output.push_str(&format!(
+            "): common.TransferTypeConverter<{}, {proto_type}> {{\n  return {{\n    fromTransferType(value) {{\n      return {}{}(value, typeInfo);\n    }},\n    toTransferType(value) {{\n      return {}(value, typeInfo);\n    }},\n  }};\n}}",
+            generic_model_annotation(&model.name, &model.type_parameters),
+            names.from_wire,
+            type_arguments(model),
+            names.to_wire,
+        ));
+    }
+}
+
+fn render_type_info_parameter(output: &mut String, model: &RenderedModel) {
+    if !model
+        .type_parameters
+        .iter()
+        .any(|parameter| parameter.explicit)
+    {
+        return;
+    }
+    output.push_str("  typeInfo: {\n");
+    for parameter in model
+        .type_parameters
+        .iter()
+        .filter(|parameter| parameter.explicit)
+    {
+        output.push_str(&format!(
+            "    {}?: common.TypeInfo<{}, any>;\n",
+            parameter.name.to_lower_camel_case(),
+            parameter.name,
+        ));
+    }
+    output.push_str("  } = {},\n");
 }
 
 fn type_arguments(model: &RenderedModel) -> String {
@@ -739,6 +922,7 @@ fn render_model_to_proto_function(
         &model.type_parameters,
     ));
     output.push_str(",\n");
+    render_type_info_parameter(output, model);
     output.push_str("): ");
     output.push_str(&wire_annotation);
     output.push_str(" {\n");
@@ -814,6 +998,7 @@ fn render_model_from_proto_function(
     output.push_str("  proto: ");
     output.push_str(&wire_annotation);
     output.push_str(",\n");
+    render_type_info_parameter(output, model);
     output.push_str("): ");
     output.push_str(&generic_model_annotation(
         &model.name,

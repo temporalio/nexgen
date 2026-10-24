@@ -9,8 +9,8 @@ import { typeRoundtripService } from "../wit/type-roundtrip/services.ts";
 import { activityOptionsTransferTypeConverter } from "../wit/type-roundtrip/models.ts";
 import * as support from "../support/temporal_model_converters.ts";
 import {
-  failureFromProto,
-  failureToProto,
+  errorFromFailure,
+  errorToFailure,
 } from "../support/temporal_model_converters.ts";
 import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts";
 
@@ -27,12 +27,12 @@ vi.mock("../support/temporal_model_converters.ts", async (importOriginal) => {
   const common = await import("@temporalio/common");
   return {
     ...support,
-    failureFromProto: (failure: temporal.api.failure.v1.IFailure) =>
+    errorFromFailure: (failure: temporal.api.failure.v1.IFailure) =>
       common.defaultFailureConverter.failureToError(
         failure,
         common.defaultPayloadConverter,
       ),
-    failureToProto: (failure: Error) =>
+    errorToFailure: (failure: Error) =>
       common.defaultFailureConverter.errorToFailure(
         failure,
         common.defaultPayloadConverter,
@@ -92,7 +92,7 @@ describe("type-roundtrip generated output", () => {
     };
 
     try {
-      const proto = failureToProto(
+      const proto = errorToFailure(
         common.ApplicationFailure.create({
           message: "unencoded failure",
           type: "EncodedFailure",
@@ -106,13 +106,13 @@ describe("type-roundtrip generated output", () => {
         stack_trace: "decoded stack",
       });
 
-      const failure = failureFromProto(proto) as common.ApplicationFailure;
+      const failure = errorFromFailure(proto) as common.ApplicationFailure;
       expect(failure.message).toBe("decoded encoded failure");
       expect(failure.stack).toBe("decoded stack");
       expect(failure.type).toBe("EncodedFailure");
       expect(failure.details).toEqual(["detail"]);
 
-      const roundTripped = failureToProto(failure);
+      const roundTripped = errorToFailure(failure);
       expect(roundTripped.message).toBe("decoded encoded failure");
       expect(roundTripped.applicationFailureInfo?.type).toBe("EncodedFailure");
       expect(roundTripped.encodedAttributes).toBeDefined();

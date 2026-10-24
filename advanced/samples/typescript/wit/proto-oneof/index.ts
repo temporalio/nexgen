@@ -10,3 +10,4 @@ export type {
 export { outcomeTransferTypeConverter } from "./models";
 export { pauseActivityRequestTransferTypeConverter } from "./models";
 export { workflowExecutionTransferTypeConverter } from "./models";
+export { createOutcomeTransferTypeConverter } from "./models";

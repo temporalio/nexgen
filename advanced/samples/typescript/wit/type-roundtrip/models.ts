@@ -80,7 +80,7 @@ function failureContainerFromProto(
 ): FailureContainer {
   return {
     failure:
-      proto.failure == null ? undefined : support.failureFromProto(proto.failure),
+      proto.failure == null ? undefined : support.errorFromFailure(proto.failure),
   };
 }
 
@@ -88,7 +88,7 @@ function failureContainerToProto(
   model: FailureContainer,
 ): temporal.api.command.v1.IFailWorkflowExecutionCommandAttributes {
   return {
-    failure: model.failure == null ? undefined : support.failureToProto(model.failure),
+    failure: model.failure == null ? undefined : support.errorToFailure(model.failure),
   };
 }
 
