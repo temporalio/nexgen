@@ -10,6 +10,15 @@ using Nexgen.Support;
 namespace Nexgen.ProtoBackedShowcaseService
 {
 
+    [GeneratedCode("nexgen", null)]
+    public enum AlertLevel
+    {
+        SeverityUnspecified = 0,
+        SeverityHigh = 1,
+        SeverityMedium = 2,
+        SeverityLow = 3,
+    }
+
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ActivityOptions.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record ActivityOptions
@@ -69,6 +78,61 @@ namespace Nexgen.ProtoBackedShowcaseService
 
             /// <summary>Converts a transfer-type value to this model.</summary>
             public object? FromTransferType(object? transferType) => transferType is null ? null : ActivityOptions.FromTransferType((Temporalio.Api.Activity.V1.ActivityOptions)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(Alert.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record Alert
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Alert"/> class.
+        /// </summary>
+        public Alert(string message)
+        {
+            Message = message;
+        }
+
+        public string Message { get; init; }
+        public AlertLevel? Severity { get; init; }
+
+        internal static Alert FromTransferType(Temporalio.Api.Version.V1.Alert wire)
+        {
+            return new Alert(wire.Message)
+            {
+                Severity = (int)wire.Severity == 0 ? null : (AlertLevel)wire.Severity,
+            };
+        }
+
+        internal Temporalio.Api.Version.V1.Alert ToTransferType()
+        {
+            var proto = new Temporalio.Api.Version.V1.Alert();
+            proto.Message = Message;
+            if (Severity is { } severity)
+            {
+                proto.Severity = (Temporalio.Api.Enums.V1.Severity)severity;
+            }
+            else
+            {
+                proto.Severity = (Temporalio.Api.Enums.V1.Severity)3;
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Version.V1.Alert);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((Alert)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : Alert.FromTransferType((Temporalio.Api.Version.V1.Alert)transferType);
         }
 
     }
@@ -160,6 +224,95 @@ namespace Nexgen.ProtoBackedShowcaseService
 
     }
 
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CallbackInternal.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record CallbackInternal
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CallbackInternal"/> class.
+        /// </summary>
+        public CallbackInternal(byte[] data)
+        {
+            Data = data;
+        }
+
+        public byte[] Data { get; init; }
+
+        internal static CallbackInternal FromTransferType(Temporalio.Api.Common.V1.Callback.Types.Internal wire)
+        {
+            return new CallbackInternal(wire.Data.ToByteArray());
+        }
+
+        internal Temporalio.Api.Common.V1.Callback.Types.Internal ToTransferType()
+        {
+            var proto = new Temporalio.Api.Common.V1.Callback.Types.Internal();
+            proto.Data = Google.Protobuf.ByteString.CopyFrom(Data);
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Common.V1.Callback.Types.Internal);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((CallbackInternal)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CallbackInternal.FromTransferType((Temporalio.Api.Common.V1.Callback.Types.Internal)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CallbackNexus.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record CallbackNexus
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CallbackNexus"/> class.
+        /// </summary>
+        public CallbackNexus(string url, IReadOnlyDictionary<string, string> header)
+        {
+            Url = url;
+            Header = header;
+        }
+
+        public string Url { get; init; }
+        public IReadOnlyDictionary<string, string> Header { get; init; }
+
+        internal static CallbackNexus FromTransferType(Temporalio.Api.Common.V1.Callback.Types.Nexus wire)
+        {
+            return new CallbackNexus(wire.Url, System.Linq.Enumerable.ToDictionary(wire.Header, entry => entry.Key, entry => entry.Value));
+        }
+
+        internal Temporalio.Api.Common.V1.Callback.Types.Nexus ToTransferType()
+        {
+            var proto = new Temporalio.Api.Common.V1.Callback.Types.Nexus();
+            proto.Url = Url;
+            proto.Header.Add(System.Linq.Enumerable.ToDictionary(Header, entry => entry.Key, entry => entry.Value));
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Common.V1.Callback.Types.Nexus);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((CallbackNexus)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CallbackNexus.FromTransferType((Temporalio.Api.Common.V1.Callback.Types.Nexus)transferType);
+        }
+
+    }
+
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(FailureContainer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record FailureContainer
@@ -197,6 +350,53 @@ namespace Nexgen.ProtoBackedShowcaseService
 
             /// <summary>Converts a transfer-type value to this model.</summary>
             public object? FromTransferType(object? transferType) => transferType is null ? null : FailureContainer.FromTransferType((Temporalio.Api.Command.V1.FailWorkflowExecutionCommandAttributes)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(NamespaceInfo.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record NamespaceInfo
+    {
+        public string? Name { get; init; }
+        public IReadOnlyDictionary<string, string>? Data { get; init; }
+
+        internal static NamespaceInfo FromTransferType(Temporalio.Api.Namespace.V1.NamespaceInfo wire)
+        {
+            return new NamespaceInfo()
+            {
+                Name = string.IsNullOrEmpty(wire.Name) ? null : wire.Name,
+                Data = System.Linq.Enumerable.ToDictionary(wire.Data, entry => entry.Key, entry => entry.Value),
+            };
+        }
+
+        internal Temporalio.Api.Namespace.V1.NamespaceInfo ToTransferType()
+        {
+            var proto = new Temporalio.Api.Namespace.V1.NamespaceInfo();
+            if (Name is { } name)
+            {
+                proto.Name = name;
+            }
+            if (Data is { } data)
+            {
+                proto.Data.Add(System.Linq.Enumerable.ToDictionary(data, entry => entry.Key, entry => entry.Value));
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Namespace.V1.NamespaceInfo);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((NamespaceInfo)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : NamespaceInfo.FromTransferType((Temporalio.Api.Namespace.V1.NamespaceInfo)transferType);
         }
 
     }
@@ -251,11 +451,20 @@ namespace Nexgen.ProtoBackedShowcaseService
     [GeneratedCode("nexgen", null)]
     public record TaskQueuePartitions
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TaskQueuePartitions"/> class.
+        /// </summary>
+        public TaskQueuePartitions(IReadOnlyList<TaskQueuePartition> activityTaskQueuePartitions)
+        {
+            ActivityTaskQueuePartitions = activityTaskQueuePartitions;
+        }
+
         public IReadOnlyList<TaskQueuePartition>? WorkflowTaskQueuePartitions { get; init; }
+        public IReadOnlyList<TaskQueuePartition> ActivityTaskQueuePartitions { get; init; }
 
         internal static TaskQueuePartitions FromTransferType(Temporalio.Api.WorkflowService.V1.ListTaskQueuePartitionsResponse wire)
         {
-            return new TaskQueuePartitions()
+            return new TaskQueuePartitions(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.ActivityTaskQueuePartitions, item => TaskQueuePartition.FromTransferType(item))))
             {
                 WorkflowTaskQueuePartitions = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.WorkflowTaskQueuePartitions, item => TaskQueuePartition.FromTransferType(item))),
             };
@@ -268,6 +477,7 @@ namespace Nexgen.ProtoBackedShowcaseService
             {
                 proto.WorkflowTaskQueuePartitions.Add(System.Linq.Enumerable.Select(workflowTaskQueuePartitions, item => (Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata)item.ToTransferType()));
             }
+            proto.ActivityTaskQueuePartitions.Add(System.Linq.Enumerable.Select(ActivityTaskQueuePartitions, item => (Temporalio.Api.TaskQueue.V1.TaskQueuePartitionMetadata)item.ToTransferType()));
             return proto;
         }
 

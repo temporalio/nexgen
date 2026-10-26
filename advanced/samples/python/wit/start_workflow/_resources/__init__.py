@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from .started_workflow import StartedWorkflow
+from .signal_result import SignalResult
 
 __all__ = [
     "StartedWorkflow",
+    "SignalResult",
 ]

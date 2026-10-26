@@ -5,8 +5,12 @@ from __future__ import annotations
 from nexusrpc import Operation, service
 from .models import (
     ActivityOptions,
+    Alert,
     BadBinaries,
+    CallbackInternal,
+    CallbackNexus,
     FailureContainer,
+    NamespaceInfo,
     TaskQueuePartitions,
     WorkflowExecutionInfo,
 )
@@ -38,3 +42,23 @@ class ProtoBackedShowcaseService:
         BadBinaries,
         BadBinaries,
     ] = Operation(name="BadBinariesOperation")
+
+    alert_operation: Operation[
+        Alert,
+        Alert,
+    ] = Operation(name="AlertOperation")
+
+    callback_internal_operation: Operation[
+        CallbackInternal,
+        CallbackInternal,
+    ] = Operation(name="CallbackInternalOperation")
+
+    callback_nexus_operation: Operation[
+        CallbackNexus,
+        CallbackNexus,
+    ] = Operation(name="CallbackNexusOperation")
+
+    namespace_info_operation: Operation[
+        NamespaceInfo,
+        None,
+    ] = Operation(name="NamespaceInfoOperation")

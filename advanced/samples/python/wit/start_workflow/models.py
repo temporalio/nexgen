@@ -274,3 +274,47 @@ class _CancelWorkflowResponseTransferTypeConverter(
 temporalio.converter.transfer_type_convertible(
     _CancelWorkflowResponseTransferTypeConverter
 )(CancelWorkflowResponse)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class SignalResultResponse:
+    started: bool | None = None
+
+
+class _SignalResultResponseTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        SignalResultResponse,
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+    ]
+):
+    transfer_type: (
+        type[
+            temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse
+        ]
+        | None
+    ) = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+        type_hint: type[SignalResultResponse],
+    ) -> SignalResultResponse:
+        return SignalResultResponse(
+            started=value.started if bool(value.started) else None,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: SignalResultResponse,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse:
+        message = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse()
+        if value.started is not None:
+            message.started = value.started
+        return message
+
+
+temporalio.converter.transfer_type_convertible(
+    _SignalResultResponseTransferTypeConverter
+)(SignalResultResponse)  # pyright: ignore[reportUnusedCallResult]

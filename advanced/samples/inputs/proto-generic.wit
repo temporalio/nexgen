@@ -38,4 +38,12 @@ interface proto-generic {
     provider: payload-backed-output,
     scaler: payload-backed-context,
   }
+
+  /// An optional application value carried by a non-oneof Payloads message.
+  /// @nexus.proto "temporal.api.failure.v1.CanceledFailureInfo" typescript-import="@temporalio/proto"
+  record optional-payloads {
+    details: option<output-t>,
+    /// @nexus.omit
+    identity: placeholder,
+  }
 }

@@ -6,6 +6,7 @@ from nexusrpc import Operation, service
 from .models import (
     CancelWorkflowRequest,
     CancelWorkflowResponse,
+    SignalResultResponse,
     StartWorkflowRequest,
     StartWorkflowResult,
 )
@@ -27,3 +28,8 @@ class StartWorkflowService:
         CancelWorkflowRequest,
         CancelWorkflowResponse,
     ] = Operation(name="CancelWorkflow")
+
+    signal_with_start: Operation[
+        CancelWorkflowRequest,
+        SignalResultResponse,
+    ] = Operation(name="SignalWithStart")

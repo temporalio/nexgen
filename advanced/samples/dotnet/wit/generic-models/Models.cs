@@ -10,6 +10,24 @@ namespace Nexgen.GenericModelService
 {
 
     [GeneratedCode("nexgen", null)]
+    public sealed class NexusResult<TOk, TErr>
+    {
+        private NexusResult(bool isOk, TOk? ok, TErr? err)
+        {
+            IsOk = isOk;
+            Ok = ok;
+            Err = err;
+        }
+
+        public bool IsOk { get; }
+        public TOk? Ok { get; }
+        public TErr? Err { get; }
+
+        public static NexusResult<TOk, TErr> FromOk(TOk value) => new(true, value, default);
+        public static NexusResult<TOk, TErr> FromErr(TErr value) => new(false, default, value);
+    }
+
+    [GeneratedCode("nexgen", null)]
     public abstract record OperationCompletionResult<TOutput>
     {
         private OperationCompletionResult() { }
@@ -39,6 +57,7 @@ namespace Nexgen.GenericModelService
         public IReadOnlyList<TContext> Contexts { get; init; }
         public IReadOnlyDictionary<string, TContext> ByName { get; init; }
         public Inner<TContext> Nested { get; init; }
+        public GetterProbe<TContext>? Probe { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -56,6 +75,57 @@ namespace Nexgen.GenericModelService
         public TContext Context { get; init; }
         public OperationCompletionResult<TOutput> Completion { get; init; }
         public TMetadata? Metadata { get; init; }
+        public GetterPair<TContext, TOutput>? Pair { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record GetterPair<TContext, TOutput>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GetterPair{TContext, TOutput}"/> class.
+        /// </summary>
+        public GetterPair(TContext value, IReadOnlyList<TContext> history, (TContext, TOutput) tupleValue, NexusResult<TContext, TOutput> resultValue)
+        {
+            Value = value;
+            History = history;
+            TupleValue = tupleValue;
+            ResultValue = resultValue;
+        }
+
+        public TContext Value { get; init; }
+        public TOutput? Other { get; init; }
+        public IReadOnlyList<TContext> History { get; init; }
+        public (TContext, TOutput) TupleValue { get; init; }
+        public NexusResult<TContext, TOutput> ResultValue { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record GetterProbe<TContext>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GetterProbe{TContext}"/> class.
+        /// </summary>
+        public GetterProbe(TContext value, IReadOnlyList<TContext> history, (TContext, TContext) tupleValue, NexusResult<TContext, TContext> resultValue, IReadOnlyList<(string, uint)> lookup, ulong elapsed, string @namespace, string type)
+        {
+            Value = value;
+            History = history;
+            TupleValue = tupleValue;
+            ResultValue = resultValue;
+            Lookup = lookup;
+            Elapsed = elapsed;
+            Namespace = @namespace;
+            Type = type;
+        }
+
+        public TContext Value { get; init; }
+        public TContext? Other { get; init; }
+        public IReadOnlyList<TContext> History { get; init; }
+        public (TContext, TContext) TupleValue { get; init; }
+        public NexusResult<TContext, TContext> ResultValue { get; init; }
+        public IReadOnlyList<(string, uint)> Lookup { get; init; }
+        public ulong Elapsed { get; init; }
+        public string Namespace { get; init; }
+        public string Type { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]

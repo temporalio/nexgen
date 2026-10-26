@@ -145,6 +145,16 @@ describe("proto-backed-showcase generated output", () => {
         async badBinariesOperation(_ctx, input) {
           return input;
         },
+        async alertOperation(_ctx, input) {
+          return input;
+        },
+        async callbackInternalOperation(_ctx, input) {
+          return input;
+        },
+        async callbackNexusOperation(_ctx, input) {
+          return input;
+        },
+        async namespaceInfoOperation() {},
       });
 
       const result = await executeWorkflowWithNexus<{

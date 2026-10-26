@@ -3,10 +3,13 @@
 package functionexecution
 
 import (
+	"context"
 	"reflect"
 	"runtime"
 	"strings"
+	"time"
 
+	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -92,6 +95,49 @@ func (m executeNamedVarargsFunctionRequest) GetArgs() []string {
 	return m.Args
 }
 
+type executeDescriptorsRequest struct {
+	Function       string
+	Args           []string
+	Durations      string
+	DurationValues []any
+	Callback       string
+	CallbackValues []any
+	Callable       string
+	CallableValues []any
+}
+
+func (m executeDescriptorsRequest) GetFunction() string {
+	return m.Function
+}
+
+func (m executeDescriptorsRequest) GetArgs() []string {
+	return m.Args
+}
+
+func (m executeDescriptorsRequest) GetDurations() string {
+	return m.Durations
+}
+
+func (m executeDescriptorsRequest) GetDurationValues() []any {
+	return m.DurationValues
+}
+
+func (m executeDescriptorsRequest) GetCallback() string {
+	return m.Callback
+}
+
+func (m executeDescriptorsRequest) GetCallbackValues() []any {
+	return m.CallbackValues
+}
+
+func (m executeDescriptorsRequest) GetCallable() string {
+	return m.Callable
+}
+
+func (m executeDescriptorsRequest) GetCallableValues() []any {
+	return m.CallableValues
+}
+
 // --- Operations (internal) ---
 
 func executeFunction(ctx workflow.Context, request executeFunctionRequest) workflow.Future {
@@ -121,6 +167,12 @@ func executeVarargsFunction(ctx workflow.Context, request executeVarargsFunction
 func executeNamedVarargsFunction(ctx workflow.Context, request executeNamedVarargsFunctionRequest) workflow.Future {
 	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
 	fut := c.ExecuteOperation(ctx, "ExecuteNamedVarargsFunction", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func executeDescriptors(ctx workflow.Context, request executeDescriptorsRequest) workflow.Future {
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteDescriptors", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
@@ -313,5 +365,55 @@ func ExecuteNamedVarargsFunction[FunctionF interface {
 	return executeNamedVarargsFunction(ctx, executeNamedVarargsFunctionRequest{
 		Function: functionName,
 		Args:     args,
+	})
+}
+
+type ExecuteDescriptorsOptions struct {
+}
+
+// Input durationValues: Arguments for the durations.
+// Input callbackValues: Arguments for the callback.
+// Input callableValues: Arguments for the callable.
+// Input args: Arguments for the function.
+func ExecuteDescriptors[FunctionF interface {
+	~string | func(...string) string
+}](
+	ctx workflow.Context,
+	opts ExecuteDescriptorsOptions,
+	durations []time.Duration,
+	durationValues []string,
+	callback func(context.Context) any,
+	callbackValues any,
+	callable func(...any) string,
+	callableValues any,
+	function FunctionF,
+	args ...string,
+) workflow.Future {
+	functionName := ""
+	{
+		switch rv := reflect.ValueOf(function); rv.Kind() {
+		case reflect.String:
+			functionName = rv.String()
+		case reflect.Func:
+			fullName := runtime.FuncForPC(rv.Pointer()).Name()
+			elements := strings.Split(fullName, ".")
+			shortName := elements[len(elements)-1]
+			functionName = strings.TrimSuffix(shortName, "-fm")
+		default:
+			panic("nexgen function name requires string or function")
+		}
+	}
+	durationsName := support.DescriptorName(ctx, durations)
+	callbackName := support.DescriptorName(ctx, callback)
+	callableName := support.DescriptorName(ctx, callable)
+	return executeDescriptors(ctx, executeDescriptorsRequest{
+		Function:       functionName,
+		Args:           args,
+		Durations:      durationsName,
+		DurationValues: []any{durationValues},
+		Callback:       callbackName,
+		CallbackValues: []any{callbackValues},
+		Callable:       callableName,
+		CallableValues: []any{callableValues},
 	})
 }

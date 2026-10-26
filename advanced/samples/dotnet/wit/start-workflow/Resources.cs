@@ -45,4 +45,17 @@ namespace Nexgen.StartWorkflowService
 
     }
 
+    [GeneratedCode("nexgen", null)]
+    public class SignalResult
+    {
+        public SignalResult(string @namespace, bool? started)
+        {
+            Namespace = @namespace;
+            Started = started;
+        }
+
+        public string Namespace { get; }
+        public bool? Started { get; }
+    }
+
 }

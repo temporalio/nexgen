@@ -7,6 +7,10 @@ import {
   workflowExecutionInfoTransferTypeConverter,
   taskQueuePartitionsTransferTypeConverter,
   badBinariesTransferTypeConverter,
+  alertTransferTypeConverter,
+  callbackInternalTransferTypeConverter,
+  callbackNexusTransferTypeConverter,
+  namespaceInfoTransferTypeConverter,
 } from "./models";
 import type {
   ActivityOptions,
@@ -14,6 +18,10 @@ import type {
   WorkflowExecutionInfo,
   TaskQueuePartitions,
   BadBinaries,
+  Alert,
+  CallbackInternal,
+  CallbackNexus,
+  NamespaceInfo,
 } from "./models";
 
 export const protoBackedShowcaseService = nexus.service("ProtoBackedShowcaseService", {
@@ -47,5 +55,24 @@ export const protoBackedShowcaseService = nexus.service("ProtoBackedShowcaseServ
     name: "BadBinariesOperation",
     inputType: { transferTypeConverter: badBinariesTransferTypeConverter },
     outputType: { transferTypeConverter: badBinariesTransferTypeConverter },
+  }),
+  alertOperation: nexus.operation<Alert, Alert>({
+    name: "AlertOperation",
+    inputType: { transferTypeConverter: alertTransferTypeConverter },
+    outputType: { transferTypeConverter: alertTransferTypeConverter },
+  }),
+  callbackInternalOperation: nexus.operation<CallbackInternal, CallbackInternal>({
+    name: "CallbackInternalOperation",
+    inputType: { transferTypeConverter: callbackInternalTransferTypeConverter },
+    outputType: { transferTypeConverter: callbackInternalTransferTypeConverter },
+  }),
+  callbackNexusOperation: nexus.operation<CallbackNexus, CallbackNexus>({
+    name: "CallbackNexusOperation",
+    inputType: { transferTypeConverter: callbackNexusTransferTypeConverter },
+    outputType: { transferTypeConverter: callbackNexusTransferTypeConverter },
+  }),
+  namespaceInfoOperation: nexus.operation<NamespaceInfo, void>({
+    name: "NamespaceInfoOperation",
+    inputType: { transferTypeConverter: namespaceInfoTransferTypeConverter },
   }),
 });

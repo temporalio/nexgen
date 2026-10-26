@@ -11,7 +11,15 @@ import type {
 } from "./models";
 import type { User } from "./resources";
 
+/**
+ * @experimental This API is experimental and subject to change.
+ */
 export const typeShowcase = nexus.service("TypeShowcase", {
+  /**
+   * Get a user.
+   *
+   * @experimental This API is experimental and subject to change.
+   */
   getUser: nexus.operation<GetUserRequest, User>({ name: "GetUser" }),
   updateEmail: nexus.operation<UpdateEmailRequest, User>({ name: "UpdateEmail" }),
   rename: nexus.operation<RenameRequest, User>({ name: "Rename" }),

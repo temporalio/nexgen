@@ -12,6 +12,7 @@ import type {
   ExecuteVarargsFunctionRequest,
   ExecuteNamedVarargsFunctionResult,
   ExecuteNamedVarargsFunctionRequest,
+  ExecuteDescriptorsRequest,
 } from "./models";
 
 export const functionExecution = nexus.service("FunctionExecution", {
@@ -34,4 +35,7 @@ export const functionExecution = nexus.service("FunctionExecution", {
     ExecuteNamedVarargsFunctionRequest,
     ExecuteNamedVarargsFunctionResult
   >({ name: "ExecuteNamedVarargsFunction" }),
+  executeDescriptors: nexus.operation<ExecuteDescriptorsRequest, ExecuteFunctionResult>(
+    { name: "ExecuteDescriptors" },
+  ),
 });

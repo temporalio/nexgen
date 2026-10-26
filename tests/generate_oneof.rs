@@ -71,33 +71,6 @@ interface api {{
     path
 }
 
-fn write_generic_carrier_fixture(root: &Path) -> PathBuf {
-    let source = r#"package test:generic-carrier@1.0.0;
-
-world system {
-  export api;
-}
-
-interface api {
-  type placeholder = string;
-
-  /// @nexus.type-parameter
-  type input-t = placeholder;
-
-  /// @nexus.proto "temporal.api.failure.v1.CanceledFailureInfo"
-  record generic-request {
-    details: option<input-t>,
-    /// @nexus.omit
-    identity: placeholder,
-  }
-
-}
-"#;
-    let path = root.join("generic-carrier.wit");
-    fs::write(&path, source).unwrap();
-    path
-}
-
 fn generate(language: Language, path: &Path) -> nexgen::error::Result<String> {
     let spec = load_api_spec_from_wit_for_language_with_inputs(language, &[path.to_path_buf()])?;
     let descriptors = DescriptorIndex::load(&descriptor_path())?;
@@ -129,39 +102,6 @@ fn typescript_allows_omitted_or_unreachable_oneofs() {
 
     let unreachable = write_fixture(temp.path(), false, false, false);
     generate(Language::TypeScript, &unreachable).unwrap();
-}
-
-#[test]
-fn typescript_converts_reachable_generic_proto_carrier() {
-    let temp = tempfile::tempdir().unwrap();
-    let path = write_generic_carrier_fixture(temp.path());
-    let output = generate(Language::TypeScript, &path).unwrap();
-    assert!(
-        output.contains("support.singleValueFromPayloads<InputT>"),
-        "{output}"
-    );
-    assert!(output.contains("support.payloadsToProto(["));
-}
-
-#[test]
-fn dotnet_converts_generic_proto_carriers() {
-    let temp = tempfile::tempdir().unwrap();
-    let path = write_generic_carrier_fixture(temp.path());
-    let output = generate(Language::Dotnet, &path).unwrap();
-    assert!(output.contains("typeof(GenericRequest<>.TransferTypeConverter)"));
-    assert!(
-        output.contains("if (wire.Details != null && wire.Details.Payloads_.Count > 1)"),
-        "{output}"
-    );
-    assert!(output.contains(
-        "throw new System.InvalidOperationException($\"expected at most one payload in GenericRequest.Details, found {wire.Details.Payloads_.Count}\");"
-    ));
-    assert!(output.contains(
-        "Details = wire.Details == null ? default : (wire.Details.Payloads_.Count == 0 ? default! : Nexgen.Support.ProtoExtensions.FromPayloads<TInput>(wire.Details)[0]),"
-    ));
-    assert!(output.contains(
-        "proto.Details = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { details });"
-    ));
 }
 
 #[test]

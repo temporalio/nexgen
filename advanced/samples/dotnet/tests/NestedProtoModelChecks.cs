@@ -12,7 +12,7 @@ namespace Nexgen.DotNetExamples.Tests
         [InlineData(true)]
         public void NestedModelCollectionsRoundTrip(bool populated)
         {
-            var partitions = new TaskQueuePartitions
+            var partitions = new TaskQueuePartitions(System.Array.Empty<TaskQueuePartition>())
             {
                 WorkflowTaskQueuePartitions = populated
                     ? new[]

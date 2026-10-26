@@ -16,6 +16,8 @@ from ..models import (
 
 @dataclasses.dataclass
 class User:
+    """Python user."""
+
     user_id: str
     email: str
     display_name: str
@@ -36,6 +38,7 @@ class User:
         self,
         display_name: str,
     ) -> User:
+        """Python rename."""
         request = RenameRequest(
             user_id=self.user_id,
             display_name=display_name,

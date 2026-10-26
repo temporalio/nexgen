@@ -17,6 +17,7 @@ class GenericRequest(typing.Generic[ContextT]):
     contexts: list[ContextT] | None = dataclasses.field(default_factory=list)
     by_name: dict[str, ContextT] | None = dataclasses.field(default_factory=dict)
     nested: Inner[ContextT]
+    probe: GetterProbe[ContextT] | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -24,11 +25,27 @@ class Inner(typing.Generic[ContextT]):
     value: ContextT
 
 
+@dataclasses.dataclass(slots=True, kw_only=True)
+class GetterProbe(typing.Generic[ContextT]):
+    value: ContextT
+    other: ContextT | None = None
+    history: list[ContextT] | None = dataclasses.field(default_factory=list)
+    tuple_value: tuple[ContextT, ContextT]
+    result_value: (
+        tuple[typing.Literal["ok"], ContextT] | tuple[typing.Literal["err"], ContextT]
+    )
+    lookup: list[tuple[str, int]] | None = dataclasses.field(default_factory=list)
+    elapsed: int
+    namespace: str
+    type: str
+
+
 @dataclasses.dataclass(slots=True)
 class GenericResponse(typing.Generic[ContextT, OutputT, MetadataT]):
     context: ContextT
     completion: OperationCompletionResult[OutputT]
     metadata: MetadataT | None = None
+    pair: GetterPair[ContextT, OutputT] | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -39,6 +56,17 @@ class OperationCompletionSuccess(typing.Generic[OutputT]):
 @dataclasses.dataclass(slots=True)
 class OperationCompletionFailure:
     message: str
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class GetterPair(typing.Generic[ContextT, OutputT]):
+    value: ContextT
+    other: OutputT | None = None
+    history: list[ContextT] | None = dataclasses.field(default_factory=list)
+    tuple_value: tuple[ContextT, OutputT]
+    result_value: (
+        tuple[typing.Literal["ok"], ContextT] | tuple[typing.Literal["err"], OutputT]
+    )
 
 
 OperationCompletionResult = (

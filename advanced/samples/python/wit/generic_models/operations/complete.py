@@ -8,6 +8,7 @@ import temporalio.workflow
 from ..models import (
     GenericRequest,
     GenericResponse,
+    GetterProbe,
     Inner,
 )
 
@@ -42,6 +43,7 @@ async def complete(
     contexts: list[ContextT] | None = None,
     by_name: dict[str, ContextT] | None = None,
     nested: Inner[ContextT],
+    probe: GetterProbe[ContextT] | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[
     GenericResponse[ContextT, object, object],
 ]:
@@ -50,5 +52,6 @@ async def complete(
         contexts=contexts or [],
         by_name=by_name or {},
         nested=nested,
+        probe=probe,
     )
     return await _complete(request)

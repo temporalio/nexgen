@@ -10,6 +10,52 @@ using Nexgen.Support;
 namespace Nexgen.ProtoGeneric
 {
 
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(OptionalPayloads<>.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record OptionalPayloads<TOutput>
+    {
+        public TOutput? Details { get; init; }
+
+        internal static OptionalPayloads<TOutput> FromTransferType(Temporalio.Api.Failure.V1.CanceledFailureInfo wire)
+        {
+            if (wire.Details != null && wire.Details.Payloads_.Count > 1)
+            {
+                throw new System.InvalidOperationException($"expected at most one payload in OptionalPayloads.Details, found {wire.Details.Payloads_.Count}");
+            }
+
+            return new OptionalPayloads<TOutput>()
+            {
+                Details = wire.Details == null ? default : (wire.Details.Payloads_.Count == 0 ? default! : Nexgen.Support.ProtoExtensions.FromPayloads<TOutput>(wire.Details)[0]),
+            };
+        }
+
+        internal Temporalio.Api.Failure.V1.CanceledFailureInfo ToTransferType()
+        {
+            var proto = new Temporalio.Api.Failure.V1.CanceledFailureInfo();
+            if (Details is { } details)
+            {
+                proto.Details = Nexgen.Support.ProtoExtensions.ToPayloads(new object?[] { details });
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Failure.V1.CanceledFailureInfo);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((OptionalPayloads<TOutput>)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : OptionalPayloads<TOutput>.FromTransferType((Temporalio.Api.Failure.V1.CanceledFailureInfo)transferType);
+        }
+
+    }
+
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(PayloadBackedContext<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record PayloadBackedContext<TContext>

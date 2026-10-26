@@ -6,6 +6,7 @@ from nexusrpc import Operation, service
 from .models import (
     ExecuteCountedFunctionRequest,
     ExecuteCountedFunctionResult,
+    ExecuteDescriptorsRequest,
     ExecuteFunctionRequest,
     ExecuteFunctionResult,
     ExecuteNamedFunctionRequest,
@@ -43,3 +44,8 @@ class FunctionExecution:
         ExecuteNamedVarargsFunctionRequest,
         ExecuteNamedVarargsFunctionResult,
     ] = Operation(name="ExecuteNamedVarargsFunction")
+
+    execute_descriptors: Operation[
+        ExecuteDescriptorsRequest,
+        ExecuteFunctionResult,
+    ] = Operation(name="ExecuteDescriptors")

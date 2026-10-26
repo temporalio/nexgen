@@ -26,6 +26,13 @@ interface start-workflow-service {
     get-result: func() -> string;
   }
 
+  resource signal-result {
+    constructor(namespace: string, started: option<bool>);
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse" typescript-import="@temporalio/proto"
+  type signal-result-response = own<signal-result>;
+
   /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionRequest" typescript-import="@temporalio/proto"
   record start-workflow-request {
     /// @nexus.proto-field "workflow_type"
@@ -112,4 +119,5 @@ interface start-workflow-service {
   restart-workflow: func(request: start-workflow-request) -> start-workflow-result;
 
   cancel-workflow: func(request: cancel-workflow-request) -> cancel-workflow-response;
+  signal-with-start: func(request: cancel-workflow-request) -> signal-result-response;
 }

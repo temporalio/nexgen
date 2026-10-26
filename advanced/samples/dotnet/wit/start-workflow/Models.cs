@@ -96,6 +96,47 @@ namespace Nexgen.StartWorkflowService
 
     }
 
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(SignalResultResponse.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record SignalResultResponse
+    {
+        public bool? Started { get; init; }
+
+        internal static SignalResultResponse FromTransferType(Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse wire)
+        {
+            return new SignalResultResponse()
+            {
+                Started = wire.Started == false ? null : wire.Started,
+            };
+        }
+
+        internal Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse ToTransferType()
+        {
+            var proto = new Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse();
+            if (Started is { } started)
+            {
+                proto.Started = started;
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((SignalResultResponse)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : SignalResultResponse.FromTransferType((Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse)transferType);
+        }
+
+    }
+
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(StartWorkflowRequest.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record StartWorkflowRequest

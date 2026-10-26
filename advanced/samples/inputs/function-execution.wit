@@ -42,11 +42,46 @@ interface functions {
   ///   signature="varargs-function-call"
   ///   alternate-type="function-name"
   type named-varargs-function = placeholder;
+
+  /// @nexus.type go="any"
+  type payload = placeholder;
+  type payloads = list<payload>;
+  /// @nexus.function-args varargs=true
+  duration-call: func(duration-values: payloads) -> string;
+  /// @nexus.function-args varargs=true
+  context-call: func(callback-values: payloads) -> string;
+  /// @nexus.function-args varargs=true
+  callable-call: func(callable-values: payloads) -> string;
+
+  /// @nexus.function
+  ///   signature="duration-call"
+  ///   args-field="notification-payloads"
+  ///   go-value-type="[]time.Duration"
+  ///   go-args-type="[]string"
+  ///   go-name-extractor="DescriptorName"
+  type duration-descriptor = placeholder;
+
+  /// @nexus.function
+  ///   signature="context-call"
+  ///   args-field="callback-input"
+  ///   go-value-type="func(context.Context) any"
+  ///   go-args-type="any"
+  ///   go-name-extractor="DescriptorName"
+  type context-descriptor = placeholder;
+
+  /// @nexus.function
+  ///   signature="callable-call"
+  ///   args-field="callable-input"
+  ///   go-value-type="func(...any) string"
+  ///   go-args-type="any"
+  ///   go-name-extractor="DescriptorName"
+  type callable-descriptor = placeholder;
 }
 
 /// @nexus.endpoint "function-execution"
 interface function-execution {
   use functions.{counted-function, executable-function, named-function, named-varargs-function, varargs-function};
+  use functions.{duration-descriptor, context-descriptor, callable-descriptor};
 
   record execute-function-request {
     function: executable-function,
@@ -88,9 +123,17 @@ interface function-execution {
     value: string,
   }
 
+  record execute-descriptors-request {
+    function: named-varargs-function,
+    durations: duration-descriptor,
+    callback: context-descriptor,
+    callable: callable-descriptor,
+  }
+
   execute-function: func(request: execute-function-request) -> execute-function-result;
   execute-counted-function: func(request: execute-counted-function-request) -> execute-counted-function-result;
   execute-named-function: func(request: execute-named-function-request) -> execute-named-function-result;
   execute-varargs-function: func(request: execute-varargs-function-request) -> execute-varargs-function-result;
   execute-named-varargs-function: func(request: execute-named-varargs-function-request) -> execute-named-varargs-function-result;
+  execute-descriptors: func(request: execute-descriptors-request) -> execute-function-result;
 }

@@ -254,6 +254,9 @@ impl ModelBackend {
     ) -> String {
         let _ = optional;
         match value {
+            PlannedType::Bytes => {
+                format!("Google.Protobuf.ByteString.CopyFrom({source_expr})")
+            }
             model_type @ (PlannedType::External(ExternalTypeSpec::Proto(
                 PlannedProtoType::Message(_),
             ))
@@ -1096,7 +1099,7 @@ fn value_from_wire_expr(
                 source_expr.to_string()
             }
         }
-        PlannedType::Bytes => source_expr.to_string(),
+        PlannedType::Bytes => format!("{source_expr}.ToByteArray()"),
         PlannedType::Enum(_)
         | PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_))) => {
             let converted = match value {

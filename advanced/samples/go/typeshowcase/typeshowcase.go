@@ -183,30 +183,64 @@ const (
 	UserCapabilityDeactivate  UserCapability = 1 << 2
 )
 
+// Go notification target.
+//
+// WARNING: This API is experimental and may change in the future.
 type NotificationTarget interface {
 	isNotificationTarget()
 }
 
+// Go payload.
 type NotificationTargetEmail struct {
 	Value string
 }
 
 func (NotificationTargetEmail) isNotificationTarget() {}
 
+// XML characters remain valid in docs: <tag attr="value"> & 'quoted'.
 type NotificationTargetSms struct {
 	Value string
 }
 
 func (NotificationTargetSms) isNotificationTarget() {}
 
+// Default empty case.
 type NotificationTargetNone struct{}
 
 func (NotificationTargetNone) isNotificationTarget() {}
 
+type NotificationTargetUndocumented struct{}
+
+func (NotificationTargetUndocumented) isNotificationTarget() {}
+
+// Default-only documentation on a single-case variant.
+type SingleTarget interface {
+	isSingleTarget()
+}
+
+// Only case.
+type SingleTargetOnly struct{}
+
+func (SingleTargetOnly) isSingleTarget() {}
+
+// WARNING: This API is experimental and may change in the future.
+type ExperimentalTarget interface {
+	isExperimentalTarget()
+}
+
+type ExperimentalTargetSecond struct{}
+
+func (ExperimentalTargetSecond) isExperimentalTarget() {}
+
 type UserProfile struct {
-	// Tags - Required.
+	// Tags - A very long field doc that has to be wrapped because it exceeds the generated
+	// comment line width by a comfortable margin for testing.
+	//
+	// Required.
 	Tags []string
-	// Metadata - Required.
+	// Metadata - Go-specific metadata.
+	//
+	// Required.
 	Metadata map[string]string
 	// Capabilities - Required.
 	Capabilities UserCapability
@@ -216,6 +250,10 @@ type UserProfile struct {
 	NotificationTarget NotificationTarget
 	// Address - Optional.
 	Address *PostalAddress
+	// SingleTarget - Optional.
+	SingleTarget SingleTarget
+	// ExperimentalTarget - Optional.
+	ExperimentalTarget ExperimentalTarget
 }
 
 func (m UserProfile) GetTags() []string {
@@ -242,6 +280,14 @@ func (m UserProfile) GetAddress() *PostalAddress {
 	return m.Address
 }
 
+func (m UserProfile) GetSingleTarget() SingleTarget {
+	return m.SingleTarget
+}
+
+func (m UserProfile) GetExperimentalTarget() ExperimentalTarget {
+	return m.ExperimentalTarget
+}
+
 type Result[T, E any] struct {
 	// Result - Optional.
 	Result T
@@ -258,7 +304,9 @@ func (m Result[T, E]) GetError() E {
 }
 
 type PostalAddress struct {
-	// Street - Required.
+	// Street - Street with <tag> & "quotes".
+	//
+	// Required.
 	Street string
 	// City - Required.
 	City string
@@ -345,6 +393,9 @@ type GetUserOptions struct {
 	ConsistencyToken string
 }
 
+// Get a user.
+//
+// Returns: The matching user.
 func GetUser(ctx workflow.Context, opts GetUserOptions) workflow.Future {
 	var consistencyToken *string
 	if opts.ConsistencyToken != "" {

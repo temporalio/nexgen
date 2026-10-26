@@ -7,6 +7,7 @@ import {
   payloadBackedContextTransferTypeConverter as contextConverter,
   payloadBackedEnvelopeTransferTypeConverter as envelopeConverter,
   payloadBackedOutputTransferTypeConverter as outputConverter,
+  optionalPayloadsTransferTypeConverter as optionalConverter,
 } from "../wit/proto-generic/index.ts";
 
 interface Output {
@@ -26,6 +27,29 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("proto-generic generated models", () => {
+  it("preserves optional generic Payloads and checks cardinality", () => {
+    expect(optionalConverter.fromTransferType({})).toEqual({ details: undefined });
+    expect(optionalConverter.toTransferType({})).toEqual({ details: undefined });
+    expect(optionalConverter.fromTransferType({ details: { payloads: [] } })).toEqual({
+      details: undefined,
+    });
+    const model = { details: { message: "optional" } };
+    const wire = optionalConverter.toTransferType(model);
+    expect(wire.details?.payloads).toHaveLength(1);
+    const decoded = optionalConverter.fromTransferType<Output>(
+      temporal.api.failure.v1.CanceledFailureInfo.decode(
+        temporal.api.failure.v1.CanceledFailureInfo.encode(wire).finish(),
+      ),
+    );
+    expectTypeOf(decoded.details).toEqualTypeOf<Output | undefined>();
+    expect(decoded).toEqual(model);
+    const payload = common.defaultPayloadConverter.toPayload(model.details);
+    expect(() =>
+      optionalConverter.fromTransferType({
+        details: { payloads: [payload, payload] },
+      }),
+    ).toThrow("expected at most one payload");
+  });
   it("round-trips independent type arguments through nested records and protobuf bytes", () => {
     const model: PayloadBackedEnvelope<Output, Context> = {
       provider: { details: { message: "completed" } },

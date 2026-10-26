@@ -56,13 +56,74 @@ namespace Nexgen.ProtoBackedShowcaseService
     [GeneratedCode("nexgen", null)]
     public class TaskQueuePartitionsOperationOptions
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TaskQueuePartitionsOperationOptions"/> class.
+        /// </summary>
+        public TaskQueuePartitionsOperationOptions(IReadOnlyList<TaskQueuePartition> activityTaskQueuePartitions)
+        {
+            ActivityTaskQueuePartitions = activityTaskQueuePartitions;
+        }
+
         public IReadOnlyList<TaskQueuePartition>? WorkflowTaskQueuePartitions { get; set; }
+        public IReadOnlyList<TaskQueuePartition> ActivityTaskQueuePartitions { get; set; }
     }
 
     [GeneratedCode("nexgen", null)]
     public class BadBinariesOperationOptions
     {
         public IReadOnlyDictionary<string, BadBinary>? Binaries { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class AlertOperationOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AlertOperationOptions"/> class.
+        /// </summary>
+        public AlertOperationOptions(string message)
+        {
+            Message = message;
+        }
+
+        public string Message { get; set; }
+        public AlertLevel? Severity { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class CallbackInternalOperationOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CallbackInternalOperationOptions"/> class.
+        /// </summary>
+        public CallbackInternalOperationOptions(byte[] data)
+        {
+            Data = data;
+        }
+
+        public byte[] Data { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class CallbackNexusOperationOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CallbackNexusOperationOptions"/> class.
+        /// </summary>
+        public CallbackNexusOperationOptions(string url, IReadOnlyDictionary<string, string> header)
+        {
+            Url = url;
+            Header = header;
+        }
+
+        public string Url { get; set; }
+        public IReadOnlyDictionary<string, string> Header { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class NamespaceInfoOperationOptions
+    {
+        public string? Name { get; set; }
+        public IReadOnlyDictionary<string, string>? Data { get; set; }
     }
 
     /// <summary>
@@ -143,11 +204,11 @@ namespace Nexgen.ProtoBackedShowcaseService
 
         /// <param name="options">Options for the operation.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<TaskQueuePartitions> TaskQueuePartitionsOperationAsync(TaskQueuePartitionsOperationOptions? options = null)
+        public static Task<TaskQueuePartitions> TaskQueuePartitionsOperationAsync(TaskQueuePartitionsOperationOptions options)
         {
-            var request = new TaskQueuePartitions()
+            var request = new TaskQueuePartitions(options.ActivityTaskQueuePartitions)
             {
-                WorkflowTaskQueuePartitions = options?.WorkflowTaskQueuePartitions,
+                WorkflowTaskQueuePartitions = options.WorkflowTaskQueuePartitions,
             };
             return TaskQueuePartitionsOperationAsync(request);
         }
@@ -169,6 +230,76 @@ namespace Nexgen.ProtoBackedShowcaseService
                 Binaries = options?.Binaries,
             };
             return BadBinariesOperationAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<Alert> AlertOperationAsync(Alert request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<Alert>(svc => svc.AlertOperation(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<Alert> AlertOperationAsync(AlertOperationOptions options)
+        {
+            var request = new Alert(options.Message)
+            {
+                Severity = options.Severity,
+            };
+            return AlertOperationAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<CallbackInternal> CallbackInternalOperationAsync(CallbackInternal request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<CallbackInternal>(svc => svc.CallbackInternalOperation(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<CallbackInternal> CallbackInternalOperationAsync(CallbackInternalOperationOptions options)
+        {
+            var request = new CallbackInternal(options.Data);
+            return CallbackInternalOperationAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<CallbackNexus> CallbackNexusOperationAsync(CallbackNexus request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<CallbackNexus>(svc => svc.CallbackNexusOperation(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<CallbackNexus> CallbackNexusOperationAsync(CallbackNexusOperationOptions options)
+        {
+            var request = new CallbackNexus(options.Url, options.Header);
+            return CallbackNexusOperationAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task NamespaceInfoOperationAsync(NamespaceInfo request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
+            await client.ExecuteNexusOperationAsync(svc => svc.NamespaceInfoOperation(request)).ConfigureAwait(true);
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task NamespaceInfoOperationAsync(NamespaceInfoOperationOptions? options = null)
+        {
+            var request = new NamespaceInfo()
+            {
+                Name = options?.Name,
+                Data = options?.Data,
+            };
+            return NamespaceInfoOperationAsync(request);
         }
 
     }

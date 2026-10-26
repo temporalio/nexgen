@@ -8,6 +8,7 @@ export interface GenericResponse<ContextT, OutputT, MetadataT> {
   context: ContextT;
   completion: OperationCompletionResult<OutputT>;
   metadata?: MetadataT;
+  pair?: GetterPair<ContextT, OutputT>;
 }
 
 export interface OperationCompletionSuccess<OutputT> {
@@ -18,13 +19,34 @@ export interface OperationCompletionFailure {
   message: string;
 }
 
+export interface GetterPair<ContextT, OutputT> {
+  value: ContextT;
+  other?: OutputT;
+  history?: ContextT[];
+  tupleValue: [ContextT, OutputT];
+  resultValue: { tag: "ok"; value: ContextT } | { tag: "err"; value: OutputT };
+}
+
 export interface GenericRequest<ContextT> {
   context: ContextT;
   contexts?: ContextT[];
   byName?: Record<string, ContextT>;
   nested: Inner<ContextT>;
+  probe?: GetterProbe<ContextT>;
 }
 
 export interface Inner<ContextT> {
   value: ContextT;
+}
+
+export interface GetterProbe<ContextT> {
+  value: ContextT;
+  other?: ContextT;
+  history?: ContextT[];
+  tupleValue: [ContextT, ContextT];
+  resultValue: { tag: "ok"; value: ContextT } | { tag: "err"; value: ContextT };
+  lookup?: [string, number][];
+  elapsed: number;
+  namespace: string;
+  type: string;
 }

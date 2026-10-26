@@ -13,9 +13,11 @@ from .operations.execute_counted_function import execute_counted_function
 from .operations.execute_named_function import execute_named_function
 from .operations.execute_varargs_function import execute_varargs_function
 from .operations.execute_named_varargs_function import execute_named_varargs_function
+from .operations.execute_descriptors import execute_descriptors
 
 __all__ = [
     "execute_counted_function",
+    "execute_descriptors",
     "execute_function",
     "execute_named_function",
     "execute_named_varargs_function",
@@ -77,5 +79,11 @@ __nexus_operation_registry__: dict[
         "ExecuteNamedVarargsFunction",
     ): _NexusOperationInfo(
         operation=_services.FunctionExecution.execute_named_varargs_function,
+    ),
+    (
+        "FunctionExecution",
+        "ExecuteDescriptors",
+    ): _NexusOperationInfo(
+        operation=_services.FunctionExecution.execute_descriptors,
     ),
 }

@@ -77,6 +77,14 @@ class StartWorkflowServiceHandler:
         assert input.workflow_execution.run_id == "run-123"
         return start_workflow_models.CancelWorkflowResponse()
 
+    @sync_operation
+    async def signal_with_start(
+        self,
+        _ctx: StartOperationContext,
+        _input: start_workflow_models.CancelWorkflowRequest,
+    ) -> start_workflow_models.SignalResultResponse:
+        return start_workflow_models.SignalResultResponse(started=True)
+
 
 @workflow.defn
 class StartWorkflowCallerWorkflow:

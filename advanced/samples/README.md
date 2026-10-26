@@ -93,6 +93,9 @@ A System Nexus operation that returns a resource.
 
 ### `proto-backed-showcase`
 
+Protobuf-backed records, enums and defaults, byte lists, bare collections, and
+sourced maps. Native tests exercise conversions through the generated APIs.
+
 - WIT: [`inputs/proto-backed-showcase.wit`](inputs/proto-backed-showcase.wit)
 - .NET: [`dotnet/wit/proto-backed-showcase/`](dotnet/wit/proto-backed-showcase/)
 - Go: [`go/protobackedshowcase/`](go/protobackedshowcase/),

@@ -15,6 +15,13 @@ function requiredField<T>(
   return value;
 }
 
+export enum AlertLevel {
+  SeverityUnspecified = 0,
+  SeverityHigh = 1,
+  SeverityMedium = 2,
+  SeverityLow = 3,
+}
+
 export interface ActivityOptions {
   taskQueue?: string;
   retryPolicy: common.RetryPolicy;
@@ -195,6 +202,7 @@ export const workflowExecutionTransferTypeConverter = {
 };
 export interface TaskQueuePartitions {
   workflowTaskQueuePartitions?: TaskQueuePartition[];
+  activityTaskQueuePartitions?: TaskQueuePartition[];
 }
 
 function taskQueuePartitionsFromProto(
@@ -202,6 +210,9 @@ function taskQueuePartitionsFromProto(
 ): TaskQueuePartitions {
   return {
     workflowTaskQueuePartitions: proto.workflowTaskQueuePartitions?.map((value: any) =>
+      taskQueuePartitionFromProto(value),
+    ),
+    activityTaskQueuePartitions: proto.activityTaskQueuePartitions?.map((value: any) =>
       taskQueuePartitionFromProto(value),
     ),
   };
@@ -212,6 +223,9 @@ function taskQueuePartitionsToProto(
 ): temporal.api.workflowservice.v1.IListTaskQueuePartitionsResponse {
   return {
     workflowTaskQueuePartitions: model.workflowTaskQueuePartitions?.map((value) =>
+      taskQueuePartitionToProto(value),
+    ),
+    activityTaskQueuePartitions: model.activityTaskQueuePartitions?.map((value) =>
       taskQueuePartitionToProto(value),
     ),
   };
@@ -357,5 +371,171 @@ export const badBinaryTransferTypeConverter = {
 
   toTransferType(value: BadBinary): temporal.api.namespace.v1.IBadBinaryInfo {
     return badBinaryToProto(value);
+  },
+};
+export interface Alert {
+  message: string;
+  severity?: AlertLevel;
+}
+
+function alertFromProto(proto: temporal.api.version.v1.IAlert): Alert {
+  return {
+    message: requiredField(
+      proto.message === "" ? undefined : proto.message,
+      "Alert",
+      "message",
+    ),
+    severity:
+      proto.severity == null
+        ? AlertLevel.SeverityLow
+        : (proto.severity as number as AlertLevel),
+  };
+}
+
+function alertToProto(model: Alert): temporal.api.version.v1.IAlert {
+  return {
+    message: requiredField(model.message, "Alert", "message"),
+    severity: (model.severity == null
+      ? AlertLevel.SeverityLow
+      : model.severity) as number as temporal.api.enums.v1.Severity,
+  };
+}
+
+export const alertTransferTypeConverter = {
+  fromTransferType(value: temporal.api.version.v1.IAlert): Alert {
+    return alertFromProto(value);
+  },
+
+  toTransferType(value: Alert): temporal.api.version.v1.IAlert {
+    return alertToProto(value);
+  },
+};
+export interface CallbackInternal {
+  data: Uint8Array;
+}
+
+function callbackInternalFromProto(
+  proto: temporal.api.common.v1.Callback.IInternal,
+): CallbackInternal {
+  return {
+    data: requiredField(
+      proto.data == null || proto.data.length === 0 ? undefined : proto.data,
+      "CallbackInternal",
+      "data",
+    ),
+  };
+}
+
+function callbackInternalToProto(
+  model: CallbackInternal,
+): temporal.api.common.v1.Callback.IInternal {
+  return {
+    data: requiredField(model.data, "CallbackInternal", "data"),
+  };
+}
+
+export const callbackInternalTransferTypeConverter = {
+  fromTransferType(value: temporal.api.common.v1.Callback.IInternal): CallbackInternal {
+    return callbackInternalFromProto(value);
+  },
+
+  toTransferType(value: CallbackInternal): temporal.api.common.v1.Callback.IInternal {
+    return callbackInternalToProto(value);
+  },
+};
+export interface CallbackNexus {
+  url: string;
+  header?: Record<string, string>;
+}
+
+function callbackNexusFromProto(
+  proto: temporal.api.common.v1.Callback.INexus,
+): CallbackNexus {
+  return {
+    url: requiredField(
+      proto.url === "" ? undefined : proto.url,
+      "CallbackNexus",
+      "url",
+    ),
+    header:
+      proto.header == null
+        ? undefined
+        : (Object.fromEntries(
+            Object.entries(proto.header as Record<string, any>).map(
+              ([key, value]: [string, any]) => [key, value as string],
+            ),
+          ) as Record<string, string>),
+  };
+}
+
+function callbackNexusToProto(
+  model: CallbackNexus,
+): temporal.api.common.v1.Callback.INexus {
+  return {
+    url: requiredField(model.url, "CallbackNexus", "url"),
+    header:
+      model.header == null
+        ? undefined
+        : Object.fromEntries(
+            Object.entries(model.header as Record<string, any>).map(
+              ([key, value]: [string, any]) => [key, value],
+            ),
+          ),
+  };
+}
+
+export const callbackNexusTransferTypeConverter = {
+  fromTransferType(value: temporal.api.common.v1.Callback.INexus): CallbackNexus {
+    return callbackNexusFromProto(value);
+  },
+
+  toTransferType(value: CallbackNexus): temporal.api.common.v1.Callback.INexus {
+    return callbackNexusToProto(value);
+  },
+};
+export interface NamespaceInfo {
+  name?: string;
+  data?: Record<string, string>;
+}
+
+function namespaceInfoFromProto(
+  proto: temporal.api.namespace.v1.INamespaceInfo,
+): NamespaceInfo {
+  return {
+    name: proto.name ?? undefined,
+    data:
+      proto.data == null
+        ? undefined
+        : (Object.fromEntries(
+            Object.entries(proto.data as Record<string, any>).map(
+              ([key, value]: [string, any]) => [key, value as string],
+            ),
+          ) as Record<string, string>),
+  };
+}
+
+function namespaceInfoToProto(
+  model: NamespaceInfo,
+): temporal.api.namespace.v1.INamespaceInfo {
+  return {
+    name: model.name,
+    data:
+      model.data == null
+        ? undefined
+        : Object.fromEntries(
+            Object.entries(model.data as Record<string, any>).map(
+              ([key, value]: [string, any]) => [key, value],
+            ),
+          ),
+  };
+}
+
+export const namespaceInfoTransferTypeConverter = {
+  fromTransferType(value: temporal.api.namespace.v1.INamespaceInfo): NamespaceInfo {
+    return namespaceInfoFromProto(value);
+  },
+
+  toTransferType(value: NamespaceInfo): temporal.api.namespace.v1.INamespaceInfo {
+    return namespaceInfoToProto(value);
   },
 };

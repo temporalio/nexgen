@@ -21,6 +21,11 @@ UserCapabilityDeactivate = 1 << 2
 
 @dataclasses.dataclass(slots=True)
 class GetUserRequest:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
     user_id: str
     consistency_token: str | None = None
 
@@ -51,6 +56,8 @@ class UserProfile:
     sync_state: tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]
     notification_target: NotificationTarget
     address: PostalAddress | None = None
+    single_target: SingleTarget | None = None
+    experimental_target: ExperimentalTarget | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -69,6 +76,11 @@ class RecordSyncRequest:
 
 @dataclasses.dataclass(slots=True, kw_only=True)
 class SyncReport:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
     route: list[tuple[float, float]] | None = dataclasses.field(default_factory=list)
     attempts: (
         list[tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]]
@@ -90,7 +102,30 @@ class DeactivateRequest:
 
 
 NotificationTarget = (
+    # Python payload.
     tuple[typing.Literal["email"], str]
+    # XML characters remain valid in docs: <tag attr="value"> & 'quoted'.
     | tuple[typing.Literal["sms"], str]
+    # Default empty case.
     | tuple[typing.Literal["none"]]
+    | tuple[typing.Literal["undocumented"]]
 )
+"""Python notification target.
+
+.. warning::
+    This API is experimental and subject to change.
+"""
+
+
+SingleTarget = (
+    # Only case.
+    tuple[typing.Literal["only"]]
+)
+"""Default-only documentation on a single-case variant."""
+
+
+ExperimentalTarget = tuple[typing.Literal["second"]]
+"""
+.. warning::
+    This API is experimental and subject to change.
+"""

@@ -35,3 +35,10 @@ export class StartedWorkflow {
     throw new Error("started-workflow.getResult is not yet implemented");
   }
 }
+
+export class SignalResult {
+  public constructor(
+    public readonly namespace: string,
+    public readonly started: boolean | undefined,
+  ) {}
+}

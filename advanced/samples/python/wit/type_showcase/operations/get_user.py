@@ -28,6 +28,14 @@ async def get_user(
     user_id: str,
     consistency_token: str | None = None,
 ) -> User:
+    """Get a user.
+
+    .. warning::
+        This API is experimental and subject to change.
+
+    Returns:
+        The matching user.
+    """
     request = GetUserRequest(
         user_id=user_id,
         consistency_token=consistency_token,

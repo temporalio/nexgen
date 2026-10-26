@@ -37,6 +37,10 @@ namespace Nexgen.FunctionExecution
         [NexusOperation("ExecuteNamedVarargsFunction")]
         ExecuteNamedVarargsFunctionResult ExecuteNamedVarargsFunction(ExecuteNamedVarargsFunctionRequest request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("ExecuteDescriptors")]
+        ExecuteFunctionResult ExecuteDescriptors(ExecuteDescriptorsRequest request);
+
     }
 
     internal interface INexgenOperationInfo
@@ -81,6 +85,8 @@ namespace Nexgen.FunctionExecution
                 FunctionExecutionServiceDefinition.Operations["ExecuteVarargsFunction"]),
             [("FunctionExecution", "ExecuteNamedVarargsFunction")] = new NexgenOperationInfo<ExecuteNamedVarargsFunctionRequest, ExecuteNamedVarargsFunctionResult>(
                 FunctionExecutionServiceDefinition.Operations["ExecuteNamedVarargsFunction"]),
+            [("FunctionExecution", "ExecuteDescriptors")] = new NexgenOperationInfo<ExecuteDescriptorsRequest, ExecuteFunctionResult>(
+                FunctionExecutionServiceDefinition.Operations["ExecuteDescriptors"]),
         };
     }
 

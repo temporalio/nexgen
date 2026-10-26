@@ -8,6 +8,7 @@ import temporalio.nexus.system
 from typing_extensions import assert_type
 
 from wit.proto_generic import (
+    OptionalPayloads,
     PayloadBackedContext,
     PayloadBackedEnvelope,
     PayloadBackedOutput,
@@ -65,3 +66,19 @@ def test_unparameterized_proto_backed_generic_decodes_payload_values() -> None:
     )
 
     assert decoded == model
+
+
+def test_optional_payloads_preserve_typed_values_and_absence() -> None:
+    converter = temporalio.nexus.system._SystemNexusPayloadConverter(
+        temporalio.converter.PayloadConverter.default,
+        temporalio.converter.FailureConverter.default,
+    )
+    for model in [
+        OptionalPayloads[EchoOutput](),
+        OptionalPayloads(details=EchoOutput("optional")),
+    ]:
+        payload = converter.to_payload(model)
+        decoded = converter.from_payload(payload, OptionalPayloads[EchoOutput])
+        assert decoded == model
+        if decoded.details is not None:
+            assert isinstance(decoded.details, EchoOutput)

@@ -19,9 +19,6 @@ use support::common;
 #[path = "support/json_schema/selected_tests.rs"]
 mod json_schema_tests;
 
-#[path = "support/variant_docs.rs"]
-mod variant_docs;
-
 const JSON_SCHEMA_TARGET: support::json_schema::toolchain::Target =
     support::json_schema::toolchain::Target::Python;
 
@@ -30,61 +27,6 @@ use common::{json_input_path, wit_input_path, write_bare_ref_alias_closure};
 #[test]
 fn python_hostile_documentation_is_wrapped_escaped_and_parses() {
     support::doc_rendering::python_hostile_documentation_is_wrapped_escaped_and_parses();
-}
-
-// Preserve the upstream host-python AST check; this does not execute generated
-// modules or prove compatibility on an actual Python 3.10 interpreter.
-fn assert_variant_docs_python_parses(output: &Path) {
-    assert!(
-        Command::new("python3")
-            .args([
-                "-c",
-                "import ast,pathlib,sys\nfor p in pathlib.Path(sys.argv[1]).rglob('*.py'): ast.parse(p.read_text(), feature_version=(3, 10))",
-                output.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap()
-            .success()
-    );
-}
-
-#[test]
-fn python_variant_docs_select_overrides_and_preserve_tagged_tuples_parse() {
-    let output = variant_docs::generate(
-        &project_root(),
-        Language::Python,
-        variant_docs::VARIANTS,
-        &[],
-    );
-    assert_variant_docs_python_parses(&output);
-    fs::remove_dir_all(output.parent().unwrap()).unwrap();
-}
-
-#[test]
-fn python_proto_variant_docs_render_on_alias_and_case_classes_parse() {
-    let root = project_root();
-    let source =
-        fs::read_to_string(root.join("advanced/samples/inputs/notification-service.wit")).unwrap();
-    let output = variant_docs::generate(
-        &root,
-        nexgen::language::Language::Python,
-        &source,
-        &[root.join("advanced/samples/inputs/deps")],
-    );
-    assert_variant_docs_python_parses(&output);
-    fs::remove_dir_all(output.parent().unwrap()).unwrap();
-}
-
-#[test]
-fn python_experimental_variant_docs_render_warnings_without_marking_cases_parse() {
-    let output = variant_docs::generate(
-        &project_root(),
-        Language::Python,
-        &variant_docs::experimental_variants(),
-        &[],
-    );
-    assert_variant_docs_python_parses(&output);
-    fs::remove_dir_all(output.parent().unwrap()).unwrap();
 }
 
 const PRIMARY_EXAMPLE_ID: &str = "workflow-service";

@@ -15,6 +15,10 @@ using Nexgen.Support;
 namespace Nexgen.TypeShowcase
 {
 
+    /// <summary>
+    /// Get a user.
+    /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public class GetUserOptions
     {
@@ -112,12 +116,18 @@ namespace Nexgen.TypeShowcase
     /// <summary>
     /// Provides generated workflow operation helpers.
     /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public static class Operations
     {
         [GeneratedCode("nexgen", null)]
         private const string TypeShowcaseEndpoint = "type-showcase";
 
+        /// <summary>
+        /// Get a user.
+        /// </summary>
+        /// <returns>The matching user.</returns>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         private static async Task<User> GetUserAsync(GetUserRequest request)
         {
@@ -126,7 +136,12 @@ namespace Nexgen.TypeShowcase
             return result;
         }
 
+        /// <summary>
+        /// Get a user.
+        /// </summary>
         /// <param name="options">Options for the operation.</param>
+        /// <returns>The matching user.</returns>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public static Task<User> GetUserAsync(GetUserOptions options)
         {

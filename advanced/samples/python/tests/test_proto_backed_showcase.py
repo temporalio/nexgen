@@ -95,6 +95,38 @@ class ProtoBackedShowcaseServiceHandler:
     ) -> proto_backed_showcase_models.BadBinaries:
         return input
 
+    @sync_operation
+    async def alert_operation(
+        self,
+        _ctx: StartOperationContext,
+        input: proto_backed_showcase_models.Alert,
+    ) -> proto_backed_showcase_models.Alert:
+        return input
+
+    @sync_operation
+    async def callback_internal_operation(
+        self,
+        _ctx: StartOperationContext,
+        input: proto_backed_showcase_models.CallbackInternal,
+    ) -> proto_backed_showcase_models.CallbackInternal:
+        return input
+
+    @sync_operation
+    async def callback_nexus_operation(
+        self,
+        _ctx: StartOperationContext,
+        input: proto_backed_showcase_models.CallbackNexus,
+    ) -> proto_backed_showcase_models.CallbackNexus:
+        return input
+
+    @sync_operation
+    async def namespace_info_operation(
+        self,
+        _ctx: StartOperationContext,
+        _input: proto_backed_showcase_models.NamespaceInfo,
+    ) -> None:
+        pass
+
 
 @pytest.mark.parametrize("populated", [False, True])
 def test_nested_model_collections_round_trip(populated: bool) -> None:

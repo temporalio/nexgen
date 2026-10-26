@@ -16,6 +16,12 @@ from ._resources.user import User
 
 @service
 class TypeShowcase:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    # .. warning:: This API is experimental and subject to change.
     get_user: Operation[
         GetUserRequest,
         User,

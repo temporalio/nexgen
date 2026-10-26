@@ -243,3 +243,36 @@ export const workflowExecutionTransferTypeConverter = {
     return workflowExecutionToProto(value);
   },
 };
+export interface SignalResultResponse {
+  started?: boolean;
+}
+
+function signalResultResponseFromProto(
+  proto: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse,
+): SignalResultResponse {
+  return {
+    started: proto.started ?? undefined,
+  };
+}
+
+function signalResultResponseToProto(
+  model: SignalResultResponse,
+): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse {
+  return {
+    started: model.started,
+  };
+}
+
+export const signalResultResponseTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse,
+  ): SignalResultResponse {
+    return signalResultResponseFromProto(value);
+  },
+
+  toTransferType(
+    value: SignalResultResponse,
+  ): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse {
+    return signalResultResponseToProto(value);
+  },
+};

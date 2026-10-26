@@ -5,8 +5,10 @@ export { executeCountedFunction } from "./operations/execute-counted-function";
 export { executeNamedFunction } from "./operations/execute-named-function";
 export { executeVarargsFunction } from "./operations/execute-varargs-function";
 export { executeNamedVarargsFunction } from "./operations/execute-named-varargs-function";
+export { executeDescriptors } from "./operations/execute-descriptors";
 export type {
   ExecuteCountedFunctionRequest,
+  ExecuteDescriptorsRequest,
   ExecuteFunctionRequest,
   ExecuteNamedFunctionRequest,
   ExecuteNamedVarargsFunctionRequest,

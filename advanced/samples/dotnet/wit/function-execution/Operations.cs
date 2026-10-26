@@ -64,6 +64,14 @@ namespace Nexgen.FunctionExecution
             return result;
         }
 
+        [GeneratedCode("nexgen", null)]
+        public static async Task<ExecuteFunctionResult> ExecuteDescriptorsAsync(ExecuteDescriptorsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<ExecuteFunctionResult>(svc => svc.ExecuteDescriptors(request)).ConfigureAwait(true);
+            return result;
+        }
+
     }
 
 }

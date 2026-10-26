@@ -12,11 +12,46 @@ export enum UserCapability {
   Deactivate = 2 ** 2,
 }
 
+/**
+ * TypeScript notification target.
+ *
+ * @experimental This API is experimental and subject to change.
+ */
 export type NotificationTarget =
+  /**
+   * TypeScript payload * / safe.
+   */
   | { tag: "email"; value: string }
+  /**
+   * XML characters remain valid in docs: <tag attr="value"> & 'quoted'.
+   */
   | { tag: "sms"; value: string }
-  | { tag: "none" };
+  /**
+   * Default empty case.
+   */
+  | { tag: "none" }
+  /**
+   * TypeScript-only case.
+   */
+  | { tag: "undocumented" };
 
+/**
+ * Default-only documentation on a single-case variant.
+ */
+export type SingleTarget =
+  /**
+   * Only case.
+   */
+  { tag: "only" };
+
+/**
+ * @experimental This API is experimental and subject to change.
+ */
+export type ExperimentalTarget = { tag: "second" };
+
+/**
+ * @experimental This API is experimental and subject to change.
+ */
 export interface GetUserRequest {
   userId: string;
   consistencyToken?: string;
@@ -38,15 +73,27 @@ export interface SetProfileRequest {
 }
 
 export interface UserProfile {
+  /**
+   * A very long field doc that has to be wrapped because it exceeds the generated
+   * comment line width by a comfortable margin for testing.
+   */
   tags?: string[];
+  /**
+   * Default metadata.
+   */
   metadata?: Record<string, string>;
   capabilities: UserCapability;
   syncState: { tag: "ok"; value: string } | { tag: "err"; value: string };
   notificationTarget: NotificationTarget;
   address?: PostalAddress;
+  singleTarget?: SingleTarget;
+  experimentalTarget?: ExperimentalTarget;
 }
 
 export interface PostalAddress {
+  /**
+   * Street with <tag> & "quotes".
+   */
   street: string;
   city: string;
   country: string;
@@ -58,6 +105,9 @@ export interface RecordSyncRequest {
   report: SyncReport;
 }
 
+/**
+ * @experimental This API is experimental and subject to change.
+ */
 export interface SyncReport {
   route?: [number, number][];
   attempts?: ({ tag: "ok"; value: string } | { tag: "err"; value: string })[];

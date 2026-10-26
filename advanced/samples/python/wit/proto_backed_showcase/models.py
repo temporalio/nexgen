@@ -3,19 +3,29 @@
 from __future__ import annotations
 
 import dataclasses
+import enum
 import typing_extensions
 import datetime
 import temporalio.common
 import temporalio.api.activity.v1.message_pb2
 import temporalio.api.command.v1.message_pb2
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.enums.v1.common_pb2
 import temporalio.api.namespace.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
+import temporalio.api.version.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.converter
 
 import temporal_support as _support
+
+
+class AlertLevel(enum.IntEnum):
+    SeverityUnspecified = 0
+    SeverityHigh = 1
+    SeverityMedium = 2
+    SeverityLow = 3
 
 
 @dataclasses.dataclass(slots=True, kw_only=True)
@@ -242,6 +252,9 @@ class TaskQueuePartitions:
     workflow_task_queue_partitions: list[TaskQueuePartition] | None = dataclasses.field(
         default_factory=list
     )
+    activity_task_queue_partitions: list[TaskQueuePartition] | None = dataclasses.field(
+        default_factory=list
+    )
 
 
 class _TaskQueuePartitionsTransferTypeConverter(
@@ -270,6 +283,12 @@ class _TaskQueuePartitionsTransferTypeConverter(
                 )
                 for item in value.workflow_task_queue_partitions
             ],
+            activity_task_queue_partitions=[
+                _TaskQueuePartitionTransferTypeConverter().from_transfer_type(
+                    item, TaskQueuePartition
+                )
+                for item in value.activity_task_queue_partitions
+            ],
         )
 
     @typing_extensions.override
@@ -281,6 +300,12 @@ class _TaskQueuePartitionsTransferTypeConverter(
         if value.workflow_task_queue_partitions:
             for element in value.workflow_task_queue_partitions:
                 item = message.workflow_task_queue_partitions.add()
+                item.CopyFrom(
+                    _TaskQueuePartitionTransferTypeConverter().to_transfer_type(element)
+                )
+        if value.activity_task_queue_partitions:
+            for element in value.activity_task_queue_partitions:
+                item = message.activity_task_queue_partitions.add()
                 item.CopyFrom(
                     _TaskQueuePartitionTransferTypeConverter().to_transfer_type(element)
                 )
@@ -436,4 +461,181 @@ class _BadBinaryTransferTypeConverter(
 
 temporalio.converter.transfer_type_convertible(_BadBinaryTransferTypeConverter)(
     BadBinary
+)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class Alert:
+    message: str
+    severity: AlertLevel = AlertLevel.SeverityLow
+
+
+class _AlertTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        Alert, temporalio.api.version.v1.message_pb2.Alert
+    ]
+):
+    transfer_type: type[temporalio.api.version.v1.message_pb2.Alert] | None = (
+        temporalio.api.version.v1.message_pb2.Alert
+    )
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.version.v1.message_pb2.Alert,
+        type_hint: type[Alert],
+    ) -> Alert:
+        if not value.message:
+            raise ValueError("missing required field Alert.message")
+        message = value.message
+        return Alert(
+            message=message,
+            severity=AlertLevel(value.severity),
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: Alert,
+    ) -> temporalio.api.version.v1.message_pb2.Alert:
+        message = temporalio.api.version.v1.message_pb2.Alert()
+        message.message = value.message
+        message.severity = temporalio.api.enums.v1.common_pb2.Severity.ValueType(
+            value.severity
+        )
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_AlertTransferTypeConverter)(Alert)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class CallbackInternal:
+    data: bytes
+
+
+class _CallbackInternalTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        CallbackInternal, temporalio.api.common.v1.message_pb2.Callback.Internal
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.common.v1.message_pb2.Callback.Internal] | None
+    ) = temporalio.api.common.v1.message_pb2.Callback.Internal
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.common.v1.message_pb2.Callback.Internal,
+        type_hint: type[CallbackInternal],
+    ) -> CallbackInternal:
+        if not value.data:
+            raise ValueError("missing required field CallbackInternal.data")
+        data = value.data
+        return CallbackInternal(
+            data=data,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: CallbackInternal,
+    ) -> temporalio.api.common.v1.message_pb2.Callback.Internal:
+        message = temporalio.api.common.v1.message_pb2.Callback.Internal()
+        message.data = value.data
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_CallbackInternalTransferTypeConverter)(
+    CallbackInternal
+)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class CallbackNexus:
+    url: str
+    header: dict[str, str] | None = dataclasses.field(default_factory=dict)
+
+
+class _CallbackNexusTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        CallbackNexus, temporalio.api.common.v1.message_pb2.Callback.Nexus
+    ]
+):
+    transfer_type: type[temporalio.api.common.v1.message_pb2.Callback.Nexus] | None = (
+        temporalio.api.common.v1.message_pb2.Callback.Nexus
+    )
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.common.v1.message_pb2.Callback.Nexus,
+        type_hint: type[CallbackNexus],
+    ) -> CallbackNexus:
+        if not value.url:
+            raise ValueError("missing required field CallbackNexus.url")
+        url = value.url
+        return CallbackNexus(
+            url=url,
+            header={key: item for key, item in value.header.items()},
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: CallbackNexus,
+    ) -> temporalio.api.common.v1.message_pb2.Callback.Nexus:
+        message = temporalio.api.common.v1.message_pb2.Callback.Nexus()
+        message.url = value.url
+        if value.header:
+            message.header.update(value.header)
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_CallbackNexusTransferTypeConverter)(
+    CallbackNexus
+)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class NamespaceInfo:
+    name: str | None = None
+    data: dict[str, str] | None = dataclasses.field(default_factory=dict)
+
+
+class _NamespaceInfoTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        NamespaceInfo, temporalio.api.namespace.v1.message_pb2.NamespaceInfo
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.namespace.v1.message_pb2.NamespaceInfo] | None
+    ) = temporalio.api.namespace.v1.message_pb2.NamespaceInfo
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.namespace.v1.message_pb2.NamespaceInfo,
+        type_hint: type[NamespaceInfo],
+    ) -> NamespaceInfo:
+        return NamespaceInfo(
+            name=value.name if bool(value.name) else None,
+            data={key: item for key, item in value.data.items()},
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: NamespaceInfo,
+    ) -> temporalio.api.namespace.v1.message_pb2.NamespaceInfo:
+        message = temporalio.api.namespace.v1.message_pb2.NamespaceInfo()
+        if value.name is not None:
+            message.name = value.name
+        if value.data:
+            message.data.update(value.data)
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_NamespaceInfoTransferTypeConverter)(
+    NamespaceInfo
 )  # pyright: ignore[reportUnusedCallResult]

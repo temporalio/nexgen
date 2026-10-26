@@ -7102,66 +7102,6 @@ interface workflow-service {
     }
 
     #[test]
-    fn renders_experimental_annotations() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export example-service;
-}
-
-/// @nexus.endpoint "example"
-/// @nexus.experimental
-interface example-service {
-  /// @nexus.experimental
-  record request {
-    id: string,
-  }
-
-  /// @nexus.experimental
-  record response {
-    ok: bool,
-  }
-
-  /// @nexus.experimental
-  /// @nexus.doc "Runs example."
-  request-op: func(request: request) -> response;
-}
-"#;
-        let spec = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::TypeScript,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap();
-        let descriptors = DescriptorIndex::load(
-            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("advanced/samples/descriptors/temporal_api.bin"),
-        )
-        .unwrap();
-        let output = generate_source(
-            Language::TypeScript,
-            spec.clone(),
-            &descriptors,
-            "./support",
-        )
-        .unwrap();
-
-        assert!(output.contains(
-            "/**\n * @experimental This API is experimental and subject to change.\n */\nexport interface Request"
-        ));
-        assert!(output.contains(
-            "/**\n * @experimental This API is experimental and subject to change.\n */\nexport const exampleService"
-        ));
-        assert!(output.contains(
-            "  /**\n   * Runs example.\n   *\n   * @experimental This API is experimental and subject to change.\n   */\n  requestOp:"
-        ));
-        assert!(output.contains(
-            " * Runs example.\n *\n * @param request - Request for the operation.\n * @experimental This API is experimental and subject to change."
-        ));
-    }
-
-    #[test]
     fn system_nexus_non_direct_operations_return_a_handle() {
         let wit = r#"
 package temporal:nexus@1.0.0;

@@ -163,6 +163,31 @@ func (cancelWorkflowRequest) TransferTypeConverter() (converter.TransferTypeConv
 	)
 }
 
+type signalResultResponse struct {
+	Started *bool
+}
+
+func (m signalResultResponse) GetStarted() *bool {
+	return m.Started
+}
+
+func signalResultResponseToProto(m *signalResultResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
+	message := &workflowservice.SignalWithStartWorkflowExecutionResponse{}
+	if m.Started != nil {
+		message.Started = (*m.Started)
+	}
+	return message, nil
+}
+
+func signalResultResponseFromProto(proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *signalResultResponse) error {
+	*out = signalResultResponse{}
+	{
+		converted := proto.GetStarted()
+		out.Started = &converted
+	}
+	return nil
+}
+
 type startWorkflowResult struct {
 	RunID *string
 }
@@ -227,6 +252,24 @@ func (u *StartedWorkflow) GetResult(ctx workflow.Context) workflow.Future {
 	panic("StartedWorkflow.GetResult is not yet implemented")
 }
 
+type SignalResult struct {
+	// Namespace - Required.
+	Namespace string
+	// Started - Optional.
+	Started *bool
+}
+
+func NewSignalResult(namespace string, started bool) SignalResult {
+	var startedPtr *bool
+	if started != false {
+		startedPtr = &started
+	}
+	return SignalResult{
+		Namespace: namespace,
+		Started:   startedPtr,
+	}
+}
+
 // --- Operations (internal) ---
 
 func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
@@ -274,6 +317,23 @@ func cancelWorkflow(ctx workflow.Context, request cancelWorkflowRequest) workflo
 			resultSettable.SetError(err)
 			return
 		}
+		resultSettable.Set(value, nil)
+	})
+	return result
+}
+
+func signalWithStart(ctx workflow.Context, request cancelWorkflowRequest) workflow.Future {
+	request.Namespace = support.WorkflowNamespace(ctx)
+	c := workflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	fut := c.ExecuteOperation(ctx, "SignalWithStart", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var result workflowservice.SignalWithStartWorkflowExecutionResponse
+		if err := fut.Get(ctx, &result); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		value := NewSignalResult(request.Namespace, result.GetStarted())
 		resultSettable.Set(value, nil)
 	})
 	return result
@@ -396,6 +456,24 @@ func CancelWorkflow(ctx workflow.Context, opts CancelWorkflowOptions) workflow.F
 		reason = &opts.Reason
 	}
 	return cancelWorkflow(ctx, cancelWorkflowRequest{
+		WorkflowExecution: opts.WorkflowExecution,
+		Reason:            reason,
+	})
+}
+
+type SignalWithStartOptions struct {
+	// WorkflowExecution - Required.
+	WorkflowExecution WorkflowExecution
+	// Reason - Optional.
+	Reason string
+}
+
+func SignalWithStart(ctx workflow.Context, opts SignalWithStartOptions) workflow.Future {
+	var reason *string
+	if opts.Reason != "" {
+		reason = &opts.Reason
+	}
+	return signalWithStart(ctx, cancelWorkflowRequest{
 		WorkflowExecution: opts.WorkflowExecution,
 		Reason:            reason,
 	})

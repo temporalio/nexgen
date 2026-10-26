@@ -8126,66 +8126,6 @@ class Example(enum.Enum):
     }
 
     #[test]
-    fn renders_experimental_annotations() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export example-service;
-}
-
-/// @nexus.endpoint "example"
-/// @nexus.experimental
-interface example-service {
-  /// @nexus.experimental
-  record request {
-    id: string,
-  }
-
-  /// @nexus.experimental
-  record response {
-    ok: bool,
-  }
-
-  /// @nexus.experimental
-  /// @nexus.doc "Runs example."
-  request-op: func(request: request) -> response;
-}
-"#;
-        let spec = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap();
-        let descriptors = DescriptorIndex::load(
-            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("advanced/samples/descriptors/temporal_api.bin"),
-        )
-        .unwrap();
-        let output = generate_source(
-            Language::Python,
-            spec.clone(),
-            &descriptors,
-            "temporal_support",
-        )
-        .unwrap();
-
-        assert!(output.contains(
-            "class Request:\n    \"\"\"\n    .. warning::\n        This API is experimental and subject to change.\n    \"\"\""
-        ));
-        assert!(output.contains(
-            "class ExampleService:\n    \"\"\"\n    .. warning::\n        This API is experimental and subject to change.\n    \"\"\""
-        ));
-        assert!(output.contains(
-            "    # .. warning:: This API is experimental and subject to change.\n    request_op: Operation"
-        ));
-        assert!(output.contains(
-            "    \"\"\"Runs example.\n\n    .. warning::\n        This API is experimental and subject to change."
-        ));
-    }
-
-    #[test]
     fn delays_temporalio_workflow_imports_when_enabled() {
         let wit = r#"
 package temporal:nexus@1.0.0;

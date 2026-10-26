@@ -15,11 +15,19 @@ from .operations.workflow_execution_info_operation import (
 )
 from .operations.task_queue_partitions_operation import task_queue_partitions_operation
 from .operations.bad_binaries_operation import bad_binaries_operation
+from .operations.alert_operation import alert_operation
+from .operations.callback_internal_operation import callback_internal_operation
+from .operations.callback_nexus_operation import callback_nexus_operation
+from .operations.namespace_info_operation import namespace_info_operation
 
 __all__ = [
     "activity_options_operation",
+    "alert_operation",
     "bad_binaries_operation",
+    "callback_internal_operation",
+    "callback_nexus_operation",
     "failure_operation",
+    "namespace_info_operation",
     "task_queue_partitions_operation",
     "workflow_execution_info_operation",
 ]
@@ -79,5 +87,29 @@ __nexus_operation_registry__: dict[
         "BadBinariesOperation",
     ): _NexusOperationInfo(
         operation=_services.ProtoBackedShowcaseService.bad_binaries_operation,
+    ),
+    (
+        "ProtoBackedShowcaseService",
+        "AlertOperation",
+    ): _NexusOperationInfo(
+        operation=_services.ProtoBackedShowcaseService.alert_operation,
+    ),
+    (
+        "ProtoBackedShowcaseService",
+        "CallbackInternalOperation",
+    ): _NexusOperationInfo(
+        operation=_services.ProtoBackedShowcaseService.callback_internal_operation,
+    ),
+    (
+        "ProtoBackedShowcaseService",
+        "CallbackNexusOperation",
+    ): _NexusOperationInfo(
+        operation=_services.ProtoBackedShowcaseService.callback_nexus_operation,
+    ),
+    (
+        "ProtoBackedShowcaseService",
+        "NamespaceInfoOperation",
+    ): _NexusOperationInfo(
+        operation=_services.ProtoBackedShowcaseService.namespace_info_operation,
     ),
 }

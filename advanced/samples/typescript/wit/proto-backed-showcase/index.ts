@@ -5,10 +5,18 @@ export { failureOperation } from "./operations/failure-operation";
 export { workflowExecutionInfoOperation } from "./operations/workflow-execution-info-operation";
 export { taskQueuePartitionsOperation } from "./operations/task-queue-partitions-operation";
 export { badBinariesOperation } from "./operations/bad-binaries-operation";
+export { alertOperation } from "./operations/alert-operation";
+export { callbackInternalOperation } from "./operations/callback-internal-operation";
+export { callbackNexusOperation } from "./operations/callback-nexus-operation";
+export { namespaceInfoOperation } from "./operations/namespace-info-operation";
 export type {
   ActivityOptions,
+  Alert,
   BadBinaries,
+  CallbackInternal,
+  CallbackNexus,
   FailureContainer,
+  NamespaceInfo,
   TaskQueuePartitions,
   WorkflowExecutionInfo,
 } from "./models";

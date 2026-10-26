@@ -13,10 +13,16 @@ using Nexgen.Support;
 namespace Nexgen.TypeShowcase
 {
 
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     [NexusService("TypeShowcase")]
     internal interface ITypeShowcase
     {
+        /// <summary>
+        /// Get a user.
+        /// </summary>
+        /// <returns>The matching user.</returns>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         [NexusOperation("GetUser")]
         User GetUser(GetUserRequest request);

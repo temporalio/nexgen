@@ -48,6 +48,42 @@ namespace Nexgen.FunctionExecution
     }
 
     [GeneratedCode("nexgen", null)]
+    public record ExecuteDescriptorsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExecuteDescriptorsRequest"/> class.
+        /// </summary>
+        public ExecuteDescriptorsRequest(string function, string durations, string callback, string callable)
+        {
+            Function = function;
+            Durations = durations;
+            Callback = callback;
+            Callable = callable;
+        }
+
+        public string Function { get; init; }
+        /// <summary>
+        /// Arguments for the function.
+        /// </summary>
+        public IReadOnlyCollection<string>? Args { get; init; }
+        public string Durations { get; init; }
+        /// <summary>
+        /// Arguments for the durations.
+        /// </summary>
+        public IReadOnlyCollection<string>? DurationValues { get; init; }
+        public string Callback { get; init; }
+        /// <summary>
+        /// Arguments for the callback.
+        /// </summary>
+        public IReadOnlyCollection<string>? CallbackValues { get; init; }
+        public string Callable { get; init; }
+        /// <summary>
+        /// Arguments for the callable.
+        /// </summary>
+        public IReadOnlyCollection<string>? CallableValues { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record ExecuteFunctionRequest
     {
         /// <summary>

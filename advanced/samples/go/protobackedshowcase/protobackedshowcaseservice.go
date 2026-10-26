@@ -8,8 +8,10 @@ import (
 	activity "go.temporal.io/api/activity/v1"
 	command "go.temporal.io/api/command/v1"
 	common "go.temporal.io/api/common/v1"
+	enums "go.temporal.io/api/enums/v1"
 	namespace "go.temporal.io/api/namespace/v1"
 	taskqueue "go.temporal.io/api/taskqueue/v1"
+	version "go.temporal.io/api/version/v1"
 	workflow2 "go.temporal.io/api/workflow/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 	support "go.temporal.io/sdk/advanced/samples/go/support"
@@ -17,6 +19,57 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
+
+// --- Datatypes ---
+
+type namespaceInfo struct {
+	Name *string
+	Data map[string]string
+}
+
+func (m namespaceInfo) GetName() *string {
+	return m.Name
+}
+
+func (m namespaceInfo) GetData() map[string]string {
+	return m.Data
+}
+
+func namespaceInfoToProto(m *namespaceInfo) (*namespace.NamespaceInfo, error) {
+	message := &namespace.NamespaceInfo{}
+	if m.Name != nil {
+		message.Name = (*m.Name)
+	}
+	if len(m.Data) > 0 {
+		message.Data = make(map[string]string, len(m.Data))
+		for k, v := range m.Data {
+			message.Data[k] = v
+		}
+	}
+	return message, nil
+}
+
+func namespaceInfoFromProto(proto *namespace.NamespaceInfo, out *namespaceInfo) error {
+	*out = namespaceInfo{}
+	{
+		converted := proto.GetName()
+		out.Name = &converted
+	}
+	if len(proto.GetData()) > 0 {
+		out.Data = make(map[string]string, len(proto.GetData()))
+		for k, v := range proto.GetData() {
+			out.Data[k] = v
+		}
+	}
+	return nil
+}
+
+func (namespaceInfo) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return converter.NewTransferTypeConverter(
+		namespaceInfoToProto,
+		namespaceInfoFromProto,
+	)
+}
 
 // --- Operations (internal) ---
 
@@ -95,7 +148,68 @@ func badBinariesOperation(ctx workflow.Context, request BadBinaries) workflow.Fu
 	return result
 }
 
+func alertOperation(ctx workflow.Context, request Alert) workflow.Future {
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "AlertOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value Alert
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
+	})
+	return result
+}
+
+func callbackInternalOperation(ctx workflow.Context, request CallbackInternal) workflow.Future {
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "CallbackInternalOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value CallbackInternal
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
+	})
+	return result
+}
+
+func callbackNexusOperation(ctx workflow.Context, request CallbackNexus) workflow.Future {
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "CallbackNexusOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value CallbackNexus
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
+	})
+	return result
+}
+
+func namespaceInfoOperation(ctx workflow.Context, request namespaceInfo) workflow.Future {
+	request.Data = support.NamespaceData(ctx)
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "NamespaceInfoOperation", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
 // --- Operations (public API) ---
+
+type AlertLevel int32
+
+const (
+	AlertLevelSeverityUnspecified AlertLevel = 0
+	AlertLevelSeverityHigh        AlertLevel = 1
+	AlertLevelSeverityMedium      AlertLevel = 2
+	AlertLevelSeverityLow         AlertLevel = 3
+)
 
 type ActivityOptions struct {
 	// TaskQueue - Optional.
@@ -326,10 +440,16 @@ func workflowExecutionFromProto(proto *common.WorkflowExecution, out *WorkflowEx
 type TaskQueuePartitions struct {
 	// WorkflowTaskQueuePartitions - Optional.
 	WorkflowTaskQueuePartitions []TaskQueuePartition
+	// ActivityTaskQueuePartitions - Required.
+	ActivityTaskQueuePartitions []TaskQueuePartition
 }
 
 func (m TaskQueuePartitions) GetWorkflowTaskQueuePartitions() []TaskQueuePartition {
 	return m.WorkflowTaskQueuePartitions
+}
+
+func (m TaskQueuePartitions) GetActivityTaskQueuePartitions() []TaskQueuePartition {
+	return m.ActivityTaskQueuePartitions
 }
 
 func taskQueuePartitionsToProto(m *TaskQueuePartitions) (*workflowservice.ListTaskQueuePartitionsResponse, error) {
@@ -340,6 +460,13 @@ func taskQueuePartitionsToProto(m *TaskQueuePartitions) (*workflowservice.ListTa
 			return nil, err
 		}
 		message.WorkflowTaskQueuePartitions = append(message.WorkflowTaskQueuePartitions, converted)
+	}
+	for _, item := range m.ActivityTaskQueuePartitions {
+		converted, err := taskQueuePartitionToProto(&item)
+		if err != nil {
+			return nil, err
+		}
+		message.ActivityTaskQueuePartitions = append(message.ActivityTaskQueuePartitions, converted)
 	}
 	return message, nil
 }
@@ -352,6 +479,13 @@ func taskQueuePartitionsFromProto(proto *workflowservice.ListTaskQueuePartitions
 			return err
 		}
 		out.WorkflowTaskQueuePartitions = append(out.WorkflowTaskQueuePartitions, converted)
+	}
+	for _, item := range proto.GetActivityTaskQueuePartitions() {
+		var converted TaskQueuePartition
+		if err := taskQueuePartitionFromProto(item, &converted); err != nil {
+			return err
+		}
+		out.ActivityTaskQueuePartitions = append(out.ActivityTaskQueuePartitions, converted)
 	}
 	return nil
 }
@@ -467,6 +601,123 @@ func badBinaryFromProto(proto *namespace.BadBinaryInfo, out *BadBinary) error {
 	return nil
 }
 
+type Alert struct {
+	// Message - Required.
+	Message string
+	// Severity - Optional.
+	Severity *AlertLevel
+}
+
+func (m Alert) GetMessage() string {
+	return m.Message
+}
+
+func (m Alert) GetSeverity() *AlertLevel {
+	return m.Severity
+}
+
+func alertToProto(m *Alert) (*version.Alert, error) {
+	message := &version.Alert{}
+	message.Message = m.Message
+	if m.Severity != nil {
+		message.Severity = enums.Severity((*m.Severity))
+	} else {
+		message.Severity = enums.Severity(3)
+	}
+	return message, nil
+}
+
+func alertFromProto(proto *version.Alert, out *Alert) error {
+	*out = Alert{}
+	out.Message = proto.GetMessage()
+	{
+		converted := AlertLevel(int32(proto.GetSeverity()))
+		out.Severity = &converted
+	}
+	return nil
+}
+
+func (Alert) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return converter.NewTransferTypeConverter(
+		alertToProto,
+		alertFromProto,
+	)
+}
+
+type CallbackInternal struct {
+	// Data - Required.
+	Data []byte
+}
+
+func (m CallbackInternal) GetData() []byte {
+	return m.Data
+}
+
+func callbackInternalToProto(m *CallbackInternal) (*common.Callback_Internal, error) {
+	message := &common.Callback_Internal{}
+	message.Data = m.Data
+	return message, nil
+}
+
+func callbackInternalFromProto(proto *common.Callback_Internal, out *CallbackInternal) error {
+	*out = CallbackInternal{}
+	out.Data = proto.GetData()
+	return nil
+}
+
+func (CallbackInternal) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return converter.NewTransferTypeConverter(
+		callbackInternalToProto,
+		callbackInternalFromProto,
+	)
+}
+
+type CallbackNexus struct {
+	// Url - Required.
+	Url string
+	// Header - Required.
+	Header map[string]string
+}
+
+func (m CallbackNexus) GetUrl() string {
+	return m.Url
+}
+
+func (m CallbackNexus) GetHeader() map[string]string {
+	return m.Header
+}
+
+func callbackNexusToProto(m *CallbackNexus) (*common.Callback_Nexus, error) {
+	message := &common.Callback_Nexus{}
+	message.Url = m.Url
+	if len(m.Header) > 0 {
+		message.Header = make(map[string]string, len(m.Header))
+		for k, v := range m.Header {
+			message.Header[k] = v
+		}
+	}
+	return message, nil
+}
+
+func callbackNexusFromProto(proto *common.Callback_Nexus, out *CallbackNexus) error {
+	*out = CallbackNexus{}
+	out.Url = proto.GetUrl()
+	if len(proto.GetHeader()) > 0 {
+		out.Header = make(map[string]string, len(proto.GetHeader()))
+		for k, v := range proto.GetHeader() {
+			out.Header[k] = v
+		}
+	}
+	return nil
+}
+
+func (CallbackNexus) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return converter.NewTransferTypeConverter(
+		callbackNexusToProto,
+		callbackNexusFromProto,
+	)
+}
+
 type ActivityOptionsOperationOptions struct {
 	// TaskQueue - Optional.
 	TaskQueue string
@@ -523,11 +774,14 @@ func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecution
 type TaskQueuePartitionsOperationOptions struct {
 	// WorkflowTaskQueuePartitions - Optional.
 	WorkflowTaskQueuePartitions []TaskQueuePartition
+	// ActivityTaskQueuePartitions - Required.
+	ActivityTaskQueuePartitions []TaskQueuePartition
 }
 
 func TaskQueuePartitionsOperation(ctx workflow.Context, opts TaskQueuePartitionsOperationOptions) workflow.Future {
 	return taskQueuePartitionsOperation(ctx, TaskQueuePartitions{
 		WorkflowTaskQueuePartitions: opts.WorkflowTaskQueuePartitions,
+		ActivityTaskQueuePartitions: opts.ActivityTaskQueuePartitions,
 	})
 }
 
@@ -539,5 +793,63 @@ type BadBinariesOperationOptions struct {
 func BadBinariesOperation(ctx workflow.Context, opts BadBinariesOperationOptions) workflow.Future {
 	return badBinariesOperation(ctx, BadBinaries{
 		Binaries: opts.Binaries,
+	})
+}
+
+type AlertOperationOptions struct {
+	// Message - Required.
+	Message string
+	// Severity - Optional.
+	Severity AlertLevel
+}
+
+func AlertOperation(ctx workflow.Context, opts AlertOperationOptions) workflow.Future {
+	var severity *AlertLevel
+	if opts.Severity != 0 {
+		severity = &opts.Severity
+	}
+	return alertOperation(ctx, Alert{
+		Message:  opts.Message,
+		Severity: severity,
+	})
+}
+
+type CallbackInternalOperationOptions struct {
+	// Data - Required.
+	Data []byte
+}
+
+func CallbackInternalOperation(ctx workflow.Context, opts CallbackInternalOperationOptions) workflow.Future {
+	return callbackInternalOperation(ctx, CallbackInternal{
+		Data: opts.Data,
+	})
+}
+
+type CallbackNexusOperationOptions struct {
+	// Url - Required.
+	Url string
+	// Header - Required.
+	Header map[string]string
+}
+
+func CallbackNexusOperation(ctx workflow.Context, opts CallbackNexusOperationOptions) workflow.Future {
+	return callbackNexusOperation(ctx, CallbackNexus{
+		Url:    opts.Url,
+		Header: opts.Header,
+	})
+}
+
+type NamespaceInfoOperationOptions struct {
+	// Name - Optional.
+	Name string
+}
+
+func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOptions) workflow.Future {
+	var name *string
+	if opts.Name != "" {
+		name = &opts.Name
+	}
+	return namespaceInfoOperation(ctx, namespaceInfo{
+		Name: name,
 	})
 }

@@ -14,6 +14,43 @@ function requiredField<T>(
   return value;
 }
 
+export interface OptionalPayloads<OutputT> {
+  details?: OutputT;
+}
+
+function optionalPayloadsFromProto<OutputT>(
+  proto: temporal.api.failure.v1.ICanceledFailureInfo,
+): OptionalPayloads<OutputT> {
+  return {
+    details:
+      proto.details == null
+        ? undefined
+        : support.singleValueFromPayloads<OutputT>(proto.details),
+  };
+}
+
+function optionalPayloadsToProto<OutputT>(
+  model: OptionalPayloads<OutputT>,
+): temporal.api.failure.v1.ICanceledFailureInfo {
+  return {
+    details:
+      model.details == null ? undefined : support.payloadsToProto([model.details]),
+  };
+}
+
+export const optionalPayloadsTransferTypeConverter = {
+  fromTransferType<OutputT>(
+    value: temporal.api.failure.v1.ICanceledFailureInfo,
+  ): OptionalPayloads<OutputT> {
+    return optionalPayloadsFromProto<OutputT>(value);
+  },
+
+  toTransferType<OutputT>(
+    value: OptionalPayloads<OutputT>,
+  ): temporal.api.failure.v1.ICanceledFailureInfo {
+    return optionalPayloadsToProto(value);
+  },
+};
 export interface PayloadBackedContext<ContextT> {
   details: ContextT;
 }

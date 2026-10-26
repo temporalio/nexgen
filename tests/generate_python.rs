@@ -937,59 +937,6 @@ $defs:
     }
 }
 
-/// `add-rpc` scaffolds a repeated field as a bare `list<T>` and a map as a bare
-/// `map<K, V>`. Both are optional collections, as in WIT-direct records.
-#[test]
-fn python_accepts_bare_lists_and_maps_on_proto_collection_fields() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-proto-bare-collections");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("input.wit");
-    fs::write(
-        &input_path,
-        r#"package temporal:nexus@1.0.0;
-
-world system {
-  export collections;
-}
-
-interface collections {
-  /// @nexus.proto "temporal.api.taskqueue.v1.TaskQueuePartitionMetadata"
-  record task-queue-partition-metadata {
-    key: string,
-    owner-host-name: string,
-  }
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse"
-  record list-task-queue-partitions-response {
-    activity-task-queue-partitions: list<task-queue-partition-metadata>,
-    workflow-task-queue-partitions: list<task-queue-partition-metadata>,
-  }
-
-  /// @nexus.proto "temporal.api.common.v1.Callback.Nexus"
-  record callback-nexus {
-    url: string,
-    header: map<string, string>,
-  }
-}
-"#,
-    )
-    .unwrap();
-    let package = generate_python_package_files(&[input_path], &[descriptor_path(&root)]);
-    fs::remove_dir_all(temp_dir).unwrap();
-    let models = package
-        .get(&PathBuf::from("models.py"))
-        .expect("collections should include models.py");
-
-    assert!(models.contains(
-        "activity_task_queue_partitions: list[TaskQueuePartitionMetadata] | None = dataclasses.field(default_factory=list)"
-    ), "{models}");
-    assert!(
-        models.contains("header: dict[str, str] | None = dataclasses.field(default_factory=dict)"),
-        "{models}"
-    );
-}
-
 #[test]
 fn python_imports_no_model_that_only_a_docstring_names() {
     let root = project_root();

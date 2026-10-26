@@ -107,8 +107,7 @@ interface proto-backed-showcase-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse" typescript-import="@temporalio/proto"
   record task-queue-partitions {
     workflow-task-queue-partitions: option<list<task-queue-partition>>,
-    /// @nexus.omit
-    activity-task-queue-partitions: placeholder,
+    activity-task-queue-partitions: list<task-queue-partition>,
   }
 
   /// @nexus.proto "temporal.api.namespace.v1.BadBinaryInfo" typescript-import="@temporalio/proto"
@@ -124,9 +123,60 @@ interface proto-backed-showcase-service {
     binaries: option<map<string, bad-binary>>,
   }
 
+  /// @nexus.proto "temporal.api.enums.v1.Severity" typescript-import="@temporalio/proto"
+  enum alert-level {
+    severity-unspecified,
+    severity-high,
+    severity-medium,
+    severity-low,
+  }
+
+  /// @nexus.proto "temporal.api.version.v1.Alert" typescript-import="@temporalio/proto"
+  record alert {
+    message: string,
+    /// @nexus.default "severity-low"
+    severity: option<alert-level>,
+  }
+
+  /// @nexus.proto "temporal.api.common.v1.Callback.Internal" typescript-import="@temporalio/proto"
+  record callback-internal {
+    data: list<u8>,
+  }
+
+  /// @nexus.proto "temporal.api.common.v1.Callback.Nexus" typescript-import="@temporalio/proto"
+  record callback-nexus {
+    url: string,
+    header: map<string, string>,
+  }
+
+  /// @nexus.proto "temporal.api.namespace.v1.NamespaceInfo" typescript-import="@temporalio/proto"
+  record namespace-info {
+    name: option<string>,
+    /// @nexus.source go="NamespaceData(ctx)"
+    data: option<map<string, string>>,
+    /// @nexus.omit
+    state: placeholder,
+    /// @nexus.omit
+    description: placeholder,
+    /// @nexus.omit
+    owner-email: placeholder,
+    /// @nexus.omit
+    id: placeholder,
+    /// @nexus.omit
+    capabilities: placeholder,
+    /// @nexus.omit
+    limits: placeholder,
+    /// @nexus.omit
+    supports-schedules: placeholder,
+  }
+
   activity-options-operation: func(request: activity-options) -> activity-options;
   failure-operation: func(request: failure-container) -> failure-container;
   workflow-execution-info-operation: func(request: workflow-execution-info) -> workflow-execution-info;
   task-queue-partitions-operation: func(request: task-queue-partitions) -> task-queue-partitions;
   bad-binaries-operation: func(request: bad-binaries) -> bad-binaries;
+  alert-operation: func(request: alert) -> alert;
+  callback-internal-operation: func(request: callback-internal) -> callback-internal;
+  callback-nexus-operation: func(request: callback-nexus) -> callback-nexus;
+  namespace-info-operation: func(request: namespace-info);
 }

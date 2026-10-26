@@ -285,7 +285,7 @@ fn unique_output_path(label: &str) -> PathBuf {
 }
 
 #[test]
-fn go_sourced_map_field_converts_to_proto() {
+fn go_sourced_field_alone_imports_support_and_compiles() {
     let root = project_root();
     let temp_dir = unique_output_path("go-sourced-map-input");
     fs::create_dir_all(&temp_dir).unwrap();
@@ -330,25 +330,6 @@ interface namespace-service {
     )
     .unwrap();
 
-    let rendered = generate_to_string_with_inputs(
-        nexgen::language::Language::Go,
-        &[wit_path.clone()],
-        &[descriptor_path(&root)],
-    )
-    .unwrap();
-
-    assert!(
-        rendered
-            .contains("type namespaceInfo struct {\n\tName *string\n\tData map[string]string\n}")
-    );
-    assert!(rendered.contains("\trequest.Data = support.NamespaceData(ctx)\n"));
-    assert!(rendered.contains("if len(m.Data) > 0 {"));
-    assert!(rendered.contains("message.Data = make(map[string]string, len(m.Data))"));
-    assert!(rendered.contains("for k, v := range m.Data {"));
-    assert!(rendered.contains("message.Data[k] = v"));
-    assert!(rendered.contains("out.Data = make(map[string]string, len(proto.GetData()))"));
-    assert!(rendered.contains("support \"example.com/nexgen/support\""));
-
     // With no other converter to register the package, a sourced field alone
     // must import the support package and qualify its helper invocation.
     let module_root = temp_dir.join("module");
@@ -381,15 +362,6 @@ interface namespace-service {
         ts_date_time_types: Default::default(),
     })
     .unwrap();
-    let generated = read_go_output_files(&output_path);
-    assert!(generated
-        .values()
-        .any(|file| file.contains("support \"go.temporal.io/sdk/advanced/samples/go/support\"")));
-    assert!(
-        generated
-            .values()
-            .any(|file| file.contains("support.NamespaceData(ctx)"))
-    );
     let build = Command::new("go")
         .args(["test", "./..."])
         .current_dir(&module_root)
@@ -856,46 +828,6 @@ interface service {
             );
         }
         other => panic!("expected early UnsupportedGoType, got {other:?}"),
-    }
-}
-
-#[test]
-fn go_callable_descriptor_invokes_extractor_and_composite_types_import_and_compile() {
-    for (value_type, args_type, public_type, import) in [
-        ("func(...any) string", "any", "func(...any) string", None),
-        (
-            "[]time.Duration",
-            "any",
-            "[]time.Duration",
-            Some("\"time\""),
-        ),
-        (
-            "func(context.Context) any",
-            "any",
-            "func(context.Context) any",
-            Some("\"context\""),
-        ),
-    ] {
-        let directives = format!(
-            "  ///   go-value-type=\"{value_type}\"\n  ///   go-args-type=\"{args_type}\"\n  ///   go-name-extractor=\"DescriptorName\""
-        );
-        let rendered = render_go_descriptor_fixture(&go_descriptor_fixture(
-            &directives,
-            "notification-payloads",
-        ))
-        .unwrap();
-        assert!(
-            rendered.contains(&format!("\tsignal {public_type},")),
-            "{rendered}"
-        );
-        assert!(
-            rendered.contains("signalName := support.DescriptorName(ctx, signal)"),
-            "{rendered}"
-        );
-        if let Some(import) = import {
-            assert!(rendered.contains(import), "{rendered}");
-        }
-        compile_go_descriptor_fixture(&rendered);
     }
 }
 

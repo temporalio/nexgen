@@ -37,6 +37,22 @@ namespace Nexgen.ProtoBackedShowcaseService
         [NexusOperation("BadBinariesOperation")]
         BadBinaries BadBinariesOperation(BadBinaries request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("AlertOperation")]
+        Alert AlertOperation(Alert request);
+
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("CallbackInternalOperation")]
+        CallbackInternal CallbackInternalOperation(CallbackInternal request);
+
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("CallbackNexusOperation")]
+        CallbackNexus CallbackNexusOperation(CallbackNexus request);
+
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("NamespaceInfoOperation")]
+        void NamespaceInfoOperation(NamespaceInfo request);
+
     }
 
     internal interface INexgenOperationInfo
@@ -81,6 +97,14 @@ namespace Nexgen.ProtoBackedShowcaseService
                 ProtoBackedShowcaseServiceServiceDefinition.Operations["TaskQueuePartitionsOperation"]),
             [("ProtoBackedShowcaseService", "BadBinariesOperation")] = new NexgenOperationInfo<BadBinaries, BadBinaries>(
                 ProtoBackedShowcaseServiceServiceDefinition.Operations["BadBinariesOperation"]),
+            [("ProtoBackedShowcaseService", "AlertOperation")] = new NexgenOperationInfo<Alert, Alert>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["AlertOperation"]),
+            [("ProtoBackedShowcaseService", "CallbackInternalOperation")] = new NexgenOperationInfo<CallbackInternal, CallbackInternal>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["CallbackInternalOperation"]),
+            [("ProtoBackedShowcaseService", "CallbackNexusOperation")] = new NexgenOperationInfo<CallbackNexus, CallbackNexus>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["CallbackNexusOperation"]),
+            [("ProtoBackedShowcaseService", "NamespaceInfoOperation")] = new NexgenOperationInfo<NamespaceInfo, object>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["NamespaceInfoOperation"]),
         };
     }
 

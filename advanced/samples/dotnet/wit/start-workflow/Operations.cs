@@ -68,6 +68,21 @@ namespace Nexgen.StartWorkflowService
         public string? Reason { get; set; }
     }
 
+    [GeneratedCode("nexgen", null)]
+    public class SignalWithStartOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SignalWithStartOptions"/> class.
+        /// </summary>
+        public SignalWithStartOptions(WorkflowExecution workflowExecution)
+        {
+            WorkflowExecution = workflowExecution;
+        }
+
+        public WorkflowExecution WorkflowExecution { get; set; }
+        public string? Reason { get; set; }
+    }
+
     /// <summary>
     /// Provides generated workflow operation helpers.
     /// </summary>
@@ -132,6 +147,25 @@ namespace Nexgen.StartWorkflowService
                 Reason = options.Reason,
             };
             return CancelWorkflowAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<SignalResult> SignalWithStartAsync(CancelWorkflowRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IStartWorkflowService>(StartWorkflowServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<SignalResultResponse>(svc => svc.SignalWithStart(request)).ConfigureAwait(true);
+            return new SignalResult(request.Namespace, result.Started);
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<SignalResult> SignalWithStartAsync(SignalWithStartOptions options)
+        {
+            var request = new CancelWorkflowRequest(options.WorkflowExecution, Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
+            {
+                Reason = options.Reason,
+            };
+            return SignalWithStartAsync(request);
         }
 
     }

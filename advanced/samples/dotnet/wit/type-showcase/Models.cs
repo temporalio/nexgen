@@ -45,19 +45,65 @@ namespace Nexgen.TypeShowcase
         Deactivate = 1 << 2,
     }
 
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
+    [GeneratedCode("nexgen", null)]
+    public abstract record ExperimentalTarget
+    {
+        private ExperimentalTarget() { }
+
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
+        [GeneratedCode("nexgen", null)]
+        public sealed record Second : ExperimentalTarget;
+    }
+
+    /// <summary>
+    /// Dotnet variant &lt;doc&gt; &amp; more.
+    /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public abstract record NotificationTarget
     {
         private NotificationTarget() { }
 
+        /// <summary>
+        /// Dotnet payload &lt;doc&gt; &amp; more.
+        /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public sealed record Email(string Value) : NotificationTarget;
 
+        /// <summary>
+        /// XML characters remain valid in docs: &lt;tag attr="value"&gt; &amp; 'quoted'.
+        /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public sealed record Sms(string Value) : NotificationTarget;
 
+        /// <summary>
+        /// Default empty case.
+        /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public sealed record None : NotificationTarget;
+
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
+        [GeneratedCode("nexgen", null)]
+        public sealed record Undocumented : NotificationTarget;
+    }
+
+    /// <summary>
+    /// Default-only documentation on a single-case variant.
+    /// </summary>
+    [GeneratedCode("nexgen", null)]
+    public abstract record SingleTarget
+    {
+        private SingleTarget() { }
+
+        /// <summary>
+        /// Only case.
+        /// </summary>
+        [GeneratedCode("nexgen", null)]
+        public sealed record Only : SingleTarget;
     }
 
     [GeneratedCode("nexgen", null)]
@@ -75,6 +121,7 @@ namespace Nexgen.TypeShowcase
         public string? Reason { get; init; }
     }
 
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public record GetUserRequest
     {
@@ -103,6 +150,9 @@ namespace Nexgen.TypeShowcase
             Country = country;
         }
 
+        /// <summary>
+        /// Street with &lt;tag&gt; &amp; "quotes".
+        /// </summary>
         public string Street { get; init; }
         public string City { get; init; }
         public string Country { get; init; }
@@ -157,6 +207,7 @@ namespace Nexgen.TypeShowcase
         public UserProfile Profile { get; init; }
     }
 
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public record SyncReport
     {
@@ -212,12 +263,20 @@ namespace Nexgen.TypeShowcase
             NotificationTarget = notificationTarget;
         }
 
+        /// <summary>
+        /// A very long field doc that has to be wrapped because it exceeds the generated comment line width by a comfortable margin for testing.
+        /// </summary>
         public IReadOnlyList<string> Tags { get; init; }
+        /// <summary>
+        /// Default metadata.
+        /// </summary>
         public IReadOnlyDictionary<string, string> Metadata { get; init; }
         public UserCapability Capabilities { get; init; }
         public NexusResult<string, string> SyncState { get; init; }
         public NotificationTarget NotificationTarget { get; init; }
         public PostalAddress? Address { get; init; }
+        public SingleTarget? SingleTarget { get; init; }
+        public ExperimentalTarget? ExperimentalTarget { get; init; }
     }
 
 }

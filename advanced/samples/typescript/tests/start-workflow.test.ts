@@ -46,6 +46,9 @@ describe("start-workflow generated output", () => {
           calls.push(["CancelWorkflow", input]);
           return {};
         },
+        async signalWithStart() {
+          return { started: true };
+        },
       });
 
       const result = await executeWorkflowWithNexus<{
