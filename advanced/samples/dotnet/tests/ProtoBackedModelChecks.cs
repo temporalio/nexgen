@@ -24,7 +24,12 @@ namespace Nexgen.DotNetExamples.Tests
                 var model = new Alert("alert") { Severity = level };
                 var wire = Assert.IsType<WireAlert>(converter.ToTransferType(model));
                 Assert.Equal((int)level, (int)wire.Severity);
-                Assert.Equal(model, converter.FromTransferType(WireAlert.Parser.ParseFrom(wire.ToByteArray())));
+                var decoded = Assert.IsType<Alert>(converter.FromTransferType(
+                    WireAlert.Parser.ParseFrom(wire.ToByteArray())));
+                Assert.Equal(model.Message, decoded.Message);
+                // Proto3 has no presence for this enum. .NET optional scalars
+                // decode the zero member as absence.
+                Assert.Equal(level == AlertLevel.SeverityUnspecified ? (AlertLevel?)null : level, decoded.Severity);
             }
             var defaultWire = Assert.IsType<WireAlert>(converter.ToTransferType(new Alert("default")));
             Assert.Equal(Temporalio.Api.Enums.V1.Severity.Low, defaultWire.Severity);
