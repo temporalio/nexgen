@@ -37,11 +37,11 @@ func TestProtoBackedEnumAndBytes(t *testing.T) {
 		require.NoError(t, dc.FromPayload(payload, &decoded))
 		require.Equal(t, model, decoded)
 	}
-	payload, err := dc.ToPayload(tr.Alert{Message: "default"})
+	payload, err := dc.ToPayload(tr.Alert{Message: "optional"})
 	require.NoError(t, err)
 	var wire versionpb.Alert
 	require.NoError(t, dc.FromPayload(payload, &wire))
-	require.Equal(t, enums.SEVERITY_LOW, wire.Severity)
+	require.Equal(t, enums.SEVERITY_UNSPECIFIED, wire.Severity)
 
 	for _, data := range [][]byte{nil, {0, 1, 127, 128, 255}} {
 		payload, err := dc.ToPayload(tr.CallbackInternal{Data: data})
@@ -106,6 +106,7 @@ func TestSourcedMapReachesTheWire(t *testing.T) {
 	require.NoError(t, service.Register(nexus.NewSyncOperation("NamespaceInfoOperation",
 		func(_ context.Context, input *namespacepb.NamespaceInfo, _ nexus.StartOperationOptions) (any, error) {
 			data = input.Data
+			require.Equal(t, enums.NAMESPACE_STATE_REGISTERED, input.State)
 			return nil, nil
 		})))
 	env.RegisterNexusService(service)

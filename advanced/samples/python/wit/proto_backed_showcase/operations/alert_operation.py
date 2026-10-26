@@ -27,7 +27,7 @@ async def _alert_operation(
 async def alert_operation(
     *,
     message: str,
-    severity: AlertLevel = AlertLevel.SeverityLow,
+    severity: AlertLevel | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[Alert,]:
     request = Alert(
         message=message,

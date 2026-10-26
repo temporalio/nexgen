@@ -8,6 +8,8 @@ from wit.proto_backed_showcase.models import (
     AlertLevel,
     CallbackInternal,
     CallbackNexus,
+    NamespaceInfo,
+    NamespaceState,
     TaskQueuePartition,
     TaskQueuePartitions,
 )
@@ -22,15 +24,33 @@ def test_authored_enum_round_trip(level: AlertLevel) -> None:
     decoded = converter.from_transfer_type(
         type(wire).FromString(wire.SerializeToString()), Alert
     )
-    assert decoded == model
-    assert isinstance(decoded.severity, AlertLevel)
+    assert decoded.message == model.message
+    # This proto3 enum has no presence: zero decodes as absence.
+    assert decoded.severity == (
+        None if level == AlertLevel.SeverityUnspecified else level
+    )
+    if decoded.severity is not None:
+        assert isinstance(decoded.severity, AlertLevel)
+
+
+def test_optional_authored_enum_without_default() -> None:
+    model = Alert(message="optional")
+    _ = assert_type(model.severity, AlertLevel | None)
+    assert model.severity is None
+    converter = getattr(Alert, "__temporal_transfer_type_converter")
+    wire = converter.to_transfer_type(model)
+    assert wire.severity == 0
+    assert converter.from_transfer_type(wire, Alert) == model
 
 
 def test_authored_enum_default() -> None:
-    model = Alert(message="default")
-    assert model.severity == AlertLevel.SeverityLow
-    converter = getattr(Alert, "__temporal_transfer_type_converter")
-    assert converter.to_transfer_type(model).severity == AlertLevel.SeverityLow.value
+    model = NamespaceInfo()
+    assert model.state == NamespaceState.NamespaceStateRegistered
+    converter = getattr(NamespaceInfo, "__temporal_transfer_type_converter")
+    assert (
+        converter.to_transfer_type(model).state
+        == NamespaceState.NamespaceStateRegistered.value
+    )
 
 
 @pytest.mark.parametrize("data", [b"", b"\x00\x01\x7f\x80\xff"])

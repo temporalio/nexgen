@@ -2,7 +2,9 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { temporal } from "@temporalio/proto";
 import {
   AlertLevel,
+  NamespaceState,
   alertTransferTypeConverter as alerts,
+  namespaceInfoTransferTypeConverter as namespaces,
   callbackInternalTransferTypeConverter as callbacks,
 } from "../wit/proto-backed-showcase/models.ts";
 
@@ -31,9 +33,18 @@ describe("authored protobuf enum and byte models", () => {
   });
 
   it("uses the authored enum default", () => {
-    expect(alerts.toTransferType({ message: "default" }).severity).toBe(
-      temporal.api.enums.v1.Severity.SEVERITY_LOW,
+    expect(namespaces.toTransferType({}).state).toBe(
+      temporal.api.enums.v1.NamespaceState.NAMESPACE_STATE_REGISTERED,
     );
+    expect(namespaces.fromTransferType({}).state).toBe(
+      NamespaceState.NamespaceStateRegistered,
+    );
+  });
+
+  it("keeps the non-defaulted enum optional", () => {
+    const model = alerts.fromTransferType({ message: "optional" });
+    expect(model.severity).toBeUndefined();
+    expect(alerts.toTransferType(model).severity).toBeUndefined();
   });
 
   it("round-trips byte lists including zero and non-ASCII bytes", () => {

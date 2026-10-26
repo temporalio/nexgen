@@ -19,6 +19,15 @@ namespace Nexgen.ProtoBackedShowcaseService
         SeverityLow = 3,
     }
 
+    [GeneratedCode("nexgen", null)]
+    public enum NamespaceState
+    {
+        NamespaceStateUnspecified = 0,
+        NamespaceStateRegistered = 1,
+        NamespaceStateDeprecated = 2,
+        NamespaceStateDeleted = 3,
+    }
+
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ActivityOptions.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record ActivityOptions
@@ -112,10 +121,6 @@ namespace Nexgen.ProtoBackedShowcaseService
             if (Severity is { } severity)
             {
                 proto.Severity = (Temporalio.Api.Enums.V1.Severity)severity;
-            }
-            else
-            {
-                proto.Severity = (Temporalio.Api.Enums.V1.Severity)3;
             }
             return proto;
         }
@@ -360,6 +365,7 @@ namespace Nexgen.ProtoBackedShowcaseService
     {
         public string? Name { get; init; }
         public IReadOnlyDictionary<string, string>? Data { get; init; }
+        public NamespaceState? State { get; init; }
 
         internal static NamespaceInfo FromTransferType(Temporalio.Api.Namespace.V1.NamespaceInfo wire)
         {
@@ -367,6 +373,7 @@ namespace Nexgen.ProtoBackedShowcaseService
             {
                 Name = string.IsNullOrEmpty(wire.Name) ? null : wire.Name,
                 Data = System.Linq.Enumerable.ToDictionary(wire.Data, entry => entry.Key, entry => entry.Value),
+                State = (int)wire.State == 0 ? null : (NamespaceState)wire.State,
             };
         }
 
@@ -380,6 +387,14 @@ namespace Nexgen.ProtoBackedShowcaseService
             if (Data is { } data)
             {
                 proto.Data.Add(System.Linq.Enumerable.ToDictionary(data, entry => entry.Key, entry => entry.Value));
+            }
+            if (State is { } state)
+            {
+                proto.State = (Temporalio.Api.Enums.V1.NamespaceState)state;
+            }
+            else
+            {
+                proto.State = (Temporalio.Api.Enums.V1.NamespaceState)1;
             }
             return proto;
         }

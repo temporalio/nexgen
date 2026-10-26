@@ -134,7 +134,6 @@ interface proto-backed-showcase-service {
   /// @nexus.proto "temporal.api.version.v1.Alert" typescript-import="@temporalio/proto"
   record alert {
     message: string,
-    /// @nexus.default "severity-low"
     severity: option<alert-level>,
   }
 
@@ -149,13 +148,21 @@ interface proto-backed-showcase-service {
     header: map<string, string>,
   }
 
+  /// @nexus.proto "temporal.api.enums.v1.NamespaceState" typescript-import="@temporalio/proto"
+  enum namespace-state {
+    namespace-state-unspecified,
+    namespace-state-registered,
+    namespace-state-deprecated,
+    namespace-state-deleted,
+  }
+
   /// @nexus.proto "temporal.api.namespace.v1.NamespaceInfo" typescript-import="@temporalio/proto"
   record namespace-info {
     name: option<string>,
     /// @nexus.source go="NamespaceData(ctx)"
     data: option<map<string, string>>,
-    /// @nexus.omit
-    state: placeholder,
+    /// @nexus.default "namespace-state-registered"
+    state: namespace-state,
     /// @nexus.omit
     description: placeholder,
     /// @nexus.omit

@@ -11,6 +11,7 @@ import temporalio.api.activity.v1.message_pb2
 import temporalio.api.command.v1.message_pb2
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.common_pb2
+import temporalio.api.enums.v1.namespace_pb2
 import temporalio.api.namespace.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
@@ -26,6 +27,13 @@ class AlertLevel(enum.IntEnum):
     SeverityHigh = 1
     SeverityMedium = 2
     SeverityLow = 3
+
+
+class NamespaceState(enum.IntEnum):
+    NamespaceStateUnspecified = 0
+    NamespaceStateRegistered = 1
+    NamespaceStateDeprecated = 2
+    NamespaceStateDeleted = 3
 
 
 @dataclasses.dataclass(slots=True, kw_only=True)
@@ -467,7 +475,7 @@ temporalio.converter.transfer_type_convertible(_BadBinaryTransferTypeConverter)(
 @dataclasses.dataclass(slots=True)
 class Alert:
     message: str
-    severity: AlertLevel = AlertLevel.SeverityLow
+    severity: AlertLevel | None = None
 
 
 class _AlertTransferTypeConverter(
@@ -490,7 +498,7 @@ class _AlertTransferTypeConverter(
         message = value.message
         return Alert(
             message=message,
-            severity=AlertLevel(value.severity),
+            severity=AlertLevel(value.severity) if value.severity != 0 else None,
         )
 
     @typing_extensions.override
@@ -500,9 +508,10 @@ class _AlertTransferTypeConverter(
     ) -> temporalio.api.version.v1.message_pb2.Alert:
         message = temporalio.api.version.v1.message_pb2.Alert()
         message.message = value.message
-        message.severity = temporalio.api.enums.v1.common_pb2.Severity.ValueType(
-            value.severity
-        )
+        if value.severity is not None:
+            message.severity = temporalio.api.enums.v1.common_pb2.Severity.ValueType(
+                value.severity
+            )
         return message
 
 
@@ -601,6 +610,7 @@ temporalio.converter.transfer_type_convertible(_CallbackNexusTransferTypeConvert
 class NamespaceInfo:
     name: str | None = None
     data: dict[str, str] | None = dataclasses.field(default_factory=dict)
+    state: NamespaceState = NamespaceState.NamespaceStateRegistered
 
 
 class _NamespaceInfoTransferTypeConverter(
@@ -621,6 +631,7 @@ class _NamespaceInfoTransferTypeConverter(
         return NamespaceInfo(
             name=value.name if bool(value.name) else None,
             data={key: item for key, item in value.data.items()},
+            state=NamespaceState(value.state),
         )
 
     @typing_extensions.override
@@ -633,6 +644,9 @@ class _NamespaceInfoTransferTypeConverter(
             message.name = value.name
         if value.data:
             message.data.update(value.data)
+        message.state = temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType(
+            value.state
+        )
         return message
 
 

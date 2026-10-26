@@ -40,9 +40,18 @@ class _OptionalPayloadsTransferTypeConverter(
         type_hint: type[OptionalPayloads[OutputT]],
     ) -> OptionalPayloads[OutputT]:
         (output_type,) = typing.get_args(type_hint) or (typing.Any,)
+        if len(value.details.payloads) > 1:
+            raise ValueError(
+                f"expected at most one payload in OptionalPayloads.details, found {len(value.details.payloads)}"
+            )
         return OptionalPayloads(
             details=typing.cast(
-                OutputT, _support.payloads_from_proto(value.details, [output_type])[0]
+                OutputT,
+                (
+                    _support.payloads_from_proto(value.details, [output_type])[0]
+                    if value.details.payloads
+                    else None
+                ),
             )
             if value.HasField("details")
             else None,

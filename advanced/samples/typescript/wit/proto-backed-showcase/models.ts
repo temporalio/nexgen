@@ -22,6 +22,13 @@ export enum AlertLevel {
   SeverityLow = 3,
 }
 
+export enum NamespaceState {
+  NamespaceStateUnspecified = 0,
+  NamespaceStateRegistered = 1,
+  NamespaceStateDeprecated = 2,
+  NamespaceStateDeleted = 3,
+}
+
 export interface ActivityOptions {
   taskQueue?: string;
   retryPolicy: common.RetryPolicy;
@@ -386,18 +393,17 @@ function alertFromProto(proto: temporal.api.version.v1.IAlert): Alert {
       "message",
     ),
     severity:
-      proto.severity == null
-        ? AlertLevel.SeverityLow
-        : (proto.severity as number as AlertLevel),
+      proto.severity == null ? undefined : (proto.severity as number as AlertLevel),
   };
 }
 
 function alertToProto(model: Alert): temporal.api.version.v1.IAlert {
   return {
     message: requiredField(model.message, "Alert", "message"),
-    severity: (model.severity == null
-      ? AlertLevel.SeverityLow
-      : model.severity) as number as temporal.api.enums.v1.Severity,
+    severity:
+      model.severity == null
+        ? undefined
+        : (model.severity as number as temporal.api.enums.v1.Severity),
   };
 }
 
@@ -496,6 +502,7 @@ export const callbackNexusTransferTypeConverter = {
 export interface NamespaceInfo {
   name?: string;
   data?: Record<string, string>;
+  state?: NamespaceState;
 }
 
 function namespaceInfoFromProto(
@@ -511,6 +518,10 @@ function namespaceInfoFromProto(
               ([key, value]: [string, any]) => [key, value as string],
             ),
           ) as Record<string, string>),
+    state:
+      proto.state == null
+        ? NamespaceState.NamespaceStateRegistered
+        : (proto.state as number as NamespaceState),
   };
 }
 
@@ -527,6 +538,9 @@ function namespaceInfoToProto(
               ([key, value]: [string, any]) => [key, value],
             ),
           ),
+    state: (model.state == null
+      ? NamespaceState.NamespaceStateRegistered
+      : model.state) as number as temporal.api.enums.v1.NamespaceState,
   };
 }
 

@@ -647,6 +647,7 @@ fn enum_wire_conversion(value_type: &PlannedType) -> Option<WireValueConversion>
 }
 
 fn field_read(
+    model_name: &str,
     proto_name: &str,
     attr_name: &str,
     field: &RecordFieldSpec<PlannedFamily>,
@@ -674,7 +675,7 @@ fn field_read(
         },
     };
 
-    match policy {
+    let mut read = match policy {
         WireReadPolicy::Required { missing_error } => {
             let mut setup_lines = Vec::new();
             if field_has_proto_presence(field) {
@@ -698,7 +699,14 @@ fn field_read(
             setup_lines: Vec::new(),
             expr: defaulted_from_proto_expr(field, proto_name, value_expr, default_expr),
         },
+    };
+    if generic_carrier == Some(ProtoGenericCarrier::Payloads) {
+        let mut checks =
+            payloads_cardinality_check(&proto_expr, &format!("{model_name}.{attr_name}"));
+        checks.append(&mut read.setup_lines);
+        read.setup_lines = checks;
     }
+    read
 }
 
 fn field_write(
@@ -741,11 +749,23 @@ fn generic_carrier_from_proto_expr(
             concrete_type_hint(&resolved_type.annotation, type_arguments)
         ),
         ProtoGenericCarrier::Payloads => format!(
-            "_support.payloads_from_proto({proto_expr}, [{}])[0]",
+            "(_support.payloads_from_proto({proto_expr}, [{}])[0] if {proto_expr}.payloads else None)",
             concrete_type_hint(&resolved_type.annotation, type_arguments)
         ),
     };
     format!("typing.cast({}, {converted})", resolved_type.annotation)
+}
+
+fn payloads_cardinality_check(proto_expr: &str, owner: &str) -> Vec<String> {
+    vec![
+        format!("if len({proto_expr}.payloads) > 1:"),
+        format!(
+            "    raise ValueError(f{})",
+            python_string_literal(&format!(
+                "expected at most one payload in {owner}, found {{len({proto_expr}.payloads)}}"
+            ))
+        ),
+    ]
 }
 
 fn concrete_type_hint(annotation: &str, type_arguments: &[(String, String)]) -> String {
@@ -1224,6 +1244,7 @@ fn render_record_wire_block(
                 let read = proto_field.oneof.as_ref().map_or_else(
                     || {
                         field_read(
+                            &model.name,
                             field_name,
                             &rendered_field.attr_name,
                             planned_field,
@@ -1269,6 +1290,7 @@ fn render_record_wire_block(
                 let read = proto_field.oneof.as_ref().map_or_else(
                     || {
                         field_read(
+                            &model.name,
                             field_name,
                             &rendered_field.attr_name,
                             planned_field,
@@ -1493,6 +1515,16 @@ fn oneof_field_read(
             "    case {}:",
             python_string_literal(&case.proto_name)
         ));
+        if case.generic_carrier == Some(ProtoGenericCarrier::Payloads) {
+            setup_lines.extend(
+                payloads_cardinality_check(
+                    &format!("value.{}", case.proto_name),
+                    &format!("{model_name}.{attr_name}"),
+                )
+                .into_iter()
+                .map(|line| format!("        {line}")),
+            );
+        }
         setup_lines.push(format!(
             "        {local_var} = {}({})",
             case.class_name,

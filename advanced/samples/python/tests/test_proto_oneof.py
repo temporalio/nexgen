@@ -5,6 +5,7 @@ import typing
 
 import pytest
 from temporalio.api.update.v1 import Outcome as ProtoOutcome
+from temporalio.api.common.v1 import Payloads
 from temporalio.api.workflowservice.v1 import (
     PauseActivityRequest as ProtoPauseActivityRequest,
 )
@@ -108,6 +109,23 @@ def test_required_proto_oneof_rejects_unset_wire() -> None:
 
     with pytest.raises(ValueError, match="missing required field Outcome.value"):
         _ = converter.from_transfer_type(ProtoOutcome(), Outcome)
+
+
+def test_proto_oneof_payloads_handle_empty_and_reject_multiple_values() -> None:
+    converter = _OutcomeTransferTypeConverter[SuccessfulOutput | None]()
+    decoded = converter.from_transfer_type(
+        ProtoOutcome(success=Payloads()), Outcome[SuccessfulOutput | None]
+    )
+    assert isinstance(decoded.value, OutcomeValueSuccess)
+    assert decoded.value.value is None
+    payload = PayloadConverter.default.to_payload(SuccessfulOutput("one"))
+    with pytest.raises(
+        ValueError, match="expected at most one payload in Outcome.value, found 2"
+    ):
+        _ = converter.from_transfer_type(
+            ProtoOutcome(success=Payloads(payloads=[payload, payload])),
+            Outcome[SuccessfulOutput | None],
+        )
 
 
 def test_optional_proto_oneof_round_trips_unset_as_none() -> None:

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import temporalio.workflow
 
-from ..models import NamespaceInfo
+from ..models import (
+    NamespaceInfo,
+    NamespaceState,
+)
 
 
 async def _namespace_info_operation(
@@ -24,9 +27,11 @@ async def namespace_info_operation(
     *,
     name: str | None = None,
     data: dict[str, str] | None = None,
+    state: NamespaceState = NamespaceState.NamespaceStateRegistered,
 ) -> temporalio.workflow.NexusOperationHandle[None,]:
     request = NamespaceInfo(
         name=name,
         data=data or {},
+        state=state,
     )
     return await _namespace_info_operation(request)

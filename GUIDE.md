@@ -1577,9 +1577,11 @@ Type parameters are not currently supported in proto-backed records except in
 Python, .NET, and TypeScript when a field or oneof member maps to Temporal's
 protobuf `Payload` or `Payloads` carrier. When decoding a parameterized Python
 model, concrete type arguments propagate through nested proto-backed records and
-become type hints for single-value `Payload` fields. An unparameterized model
-decodes those fields as `typing.Any`. `Payloads` fields continue to decode as
-untyped sequences.
+become type hints for single-value `Payload` and `Payloads` fields. An
+unparameterized model decodes those fields as `typing.Any`. A generic `Payloads`
+carrier with an empty envelope decodes as `None`; more than one payload raises
+`ValueError` with the field name and payload count. Required carrier fields
+still require a wire envelope.
 
 .NET generic proto-backed records declare an open generic transfer-type
 converter, such as `typeof(Request<,>.TransferTypeConverter)`, which the SDK

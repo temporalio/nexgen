@@ -23,12 +23,17 @@ import (
 // --- Datatypes ---
 
 type namespaceInfo struct {
-	Name *string
-	Data map[string]string
+	Name  *string
+	State *NamespaceState
+	Data  map[string]string
 }
 
 func (m namespaceInfo) GetName() *string {
 	return m.Name
+}
+
+func (m namespaceInfo) GetState() *NamespaceState {
+	return m.State
 }
 
 func (m namespaceInfo) GetData() map[string]string {
@@ -39,6 +44,11 @@ func namespaceInfoToProto(m *namespaceInfo) (*namespace.NamespaceInfo, error) {
 	message := &namespace.NamespaceInfo{}
 	if m.Name != nil {
 		message.Name = (*m.Name)
+	}
+	if m.State != nil {
+		message.State = enums.NamespaceState((*m.State))
+	} else {
+		message.State = enums.NamespaceState(1)
 	}
 	if len(m.Data) > 0 {
 		message.Data = make(map[string]string, len(m.Data))
@@ -54,6 +64,10 @@ func namespaceInfoFromProto(proto *namespace.NamespaceInfo, out *namespaceInfo) 
 	{
 		converted := proto.GetName()
 		out.Name = &converted
+	}
+	{
+		converted := NamespaceState(int32(proto.GetState()))
+		out.State = &converted
 	}
 	if len(proto.GetData()) > 0 {
 		out.Data = make(map[string]string, len(proto.GetData()))
@@ -209,6 +223,15 @@ const (
 	AlertLevelSeverityHigh        AlertLevel = 1
 	AlertLevelSeverityMedium      AlertLevel = 2
 	AlertLevelSeverityLow         AlertLevel = 3
+)
+
+type NamespaceState int32
+
+const (
+	NamespaceStateNamespaceStateUnspecified NamespaceState = 0
+	NamespaceStateNamespaceStateRegistered  NamespaceState = 1
+	NamespaceStateNamespaceStateDeprecated  NamespaceState = 2
+	NamespaceStateNamespaceStateDeleted     NamespaceState = 3
 )
 
 type ActivityOptions struct {
@@ -621,8 +644,6 @@ func alertToProto(m *Alert) (*version.Alert, error) {
 	message.Message = m.Message
 	if m.Severity != nil {
 		message.Severity = enums.Severity((*m.Severity))
-	} else {
-		message.Severity = enums.Severity(3)
 	}
 	return message, nil
 }
@@ -842,6 +863,8 @@ func CallbackNexusOperation(ctx workflow.Context, opts CallbackNexusOperationOpt
 type NamespaceInfoOperationOptions struct {
 	// Name - Optional.
 	Name string
+	// State - Optional.
+	State NamespaceState
 }
 
 func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOptions) workflow.Future {
@@ -849,7 +872,12 @@ func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOpt
 	if opts.Name != "" {
 		name = &opts.Name
 	}
+	var state *NamespaceState
+	if opts.State != 0 {
+		state = &opts.State
+	}
 	return namespaceInfoOperation(ctx, namespaceInfo{
-		Name: name,
+		Name:  name,
+		State: state,
 	})
 }

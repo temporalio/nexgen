@@ -124,6 +124,7 @@ namespace Nexgen.ProtoBackedShowcaseService
     {
         public string? Name { get; set; }
         public IReadOnlyDictionary<string, string>? Data { get; set; }
+        public NamespaceState? State { get; set; }
     }
 
     /// <summary>
@@ -298,6 +299,7 @@ namespace Nexgen.ProtoBackedShowcaseService
             {
                 Name = options?.Name,
                 Data = options?.Data,
+                State = options?.State,
             };
             return NamespaceInfoOperationAsync(request);
         }

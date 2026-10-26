@@ -40,10 +40,20 @@ class _OutcomeTransferTypeConverter(
         _oneof_value: OutcomeValueSuccess[OutputT] | OutcomeValueFailure
         match value.WhichOneof("value"):
             case "success":
+                if len(value.success.payloads) > 1:
+                    raise ValueError(
+                        f"expected at most one payload in Outcome.value, found {len(value.success.payloads)}"
+                    )
                 _oneof_value = OutcomeValueSuccess(
                     typing.cast(
                         OutputT,
-                        _support.payloads_from_proto(value.success, [output_type])[0],
+                        (
+                            _support.payloads_from_proto(value.success, [output_type])[
+                                0
+                            ]
+                            if value.success.payloads
+                            else None
+                        ),
                     )
                 )
             case "failure":

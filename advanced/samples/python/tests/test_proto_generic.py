@@ -3,6 +3,9 @@ from __future__ import annotations
 import dataclasses
 import typing
 
+import pytest
+from temporalio.api.common.v1 import Payloads
+from temporalio.api.failure.v1 import CanceledFailureInfo
 import temporalio.converter
 import temporalio.nexus.system
 from typing_extensions import assert_type
@@ -82,3 +85,22 @@ def test_optional_payloads_preserve_typed_values_and_absence() -> None:
         assert decoded == model
         if decoded.details is not None:
             assert isinstance(decoded.details, EchoOutput)
+
+
+def test_optional_payloads_handle_empty_and_reject_multiple_values() -> None:
+    converter = getattr(OptionalPayloads, "__temporal_transfer_type_converter")
+    decoded = converter.from_transfer_type(
+        CanceledFailureInfo(details=Payloads()), OptionalPayloads[EchoOutput]
+    )
+    assert decoded == OptionalPayloads[EchoOutput]()
+    payload = temporalio.converter.PayloadConverter.default.to_payload(
+        EchoOutput("one")
+    )
+    with pytest.raises(
+        ValueError,
+        match="expected at most one payload in OptionalPayloads.details, found 2",
+    ):
+        converter.from_transfer_type(
+            CanceledFailureInfo(details=Payloads(payloads=[payload, payload])),
+            OptionalPayloads[EchoOutput],
+        )

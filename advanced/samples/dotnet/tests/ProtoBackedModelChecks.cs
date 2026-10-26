@@ -31,8 +31,13 @@ namespace Nexgen.DotNetExamples.Tests
                 // decode the zero member as absence.
                 Assert.Equal(level == AlertLevel.SeverityUnspecified ? (AlertLevel?)null : level, decoded.Severity);
             }
-            var defaultWire = Assert.IsType<WireAlert>(converter.ToTransferType(new Alert("default")));
-            Assert.Equal(Temporalio.Api.Enums.V1.Severity.Low, defaultWire.Severity);
+            var optional = new Alert("optional");
+            Assert.Null(optional.Severity);
+            var optionalWire = Assert.IsType<WireAlert>(converter.ToTransferType(optional));
+            Assert.Equal(Temporalio.Api.Enums.V1.Severity.Unspecified, optionalWire.Severity);
+            var defaultWire = Assert.IsType<Temporalio.Api.Namespace.V1.NamespaceInfo>(
+                new NamespaceInfo.TransferTypeConverter().ToTransferType(new NamespaceInfo()));
+            Assert.Equal(Temporalio.Api.Enums.V1.NamespaceState.Registered, defaultWire.State);
         }
 
         [Fact]
