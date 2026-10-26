@@ -137,7 +137,10 @@ callable supports zero through six arguments; other callables support zero or
 one. Function result annotations and type parameters come from the existing IDL
 metadata. The generator calls SDK-owned extractors to resolve names and
 arguments, then fills the same request builder. Probe state and method metadata
-remain in the SDK, outside the generated runtime. Existing function
+remain in the SDK, outside the generated runtime. Typed overloads forward to one
+private invocation helper per operation; a shared request-builder helper
+validates options and copies their fields once. Public signatures retain the
+argument and result type checks across all arities. Existing function
 argument-field metadata maps wire keys to authored API names. The renderer has
 no workflow/start/signal-specific policy. Java's `merge-from-function` field
 rule identifies the callable supplying metadata and a support merge helper. The
@@ -148,9 +151,11 @@ state. Raw WIT annotations are not available to or reparsed by generation.
 
 The Java renderer retains one extractor result per referenced function and emits
 merge calls after extraction, including when explicit field values are null.
-Helpers own precedence and annotation semantics. Merging changes only typed
-request construction, not model rendering or transfer conversion. Other language
-output is unchanged. Relationships between callable fields remain undeclared.
+Helpers own precedence and annotation semantics. Required merged fields can be
+omitted from Java options and are validated after resolution. Name-based calls
+require the explicit value before dispatch. Request models and wire mappings
+retain their requiredness; other language output is unchanged. Relationships
+between callable fields remain undeclared.
 
 The Java backend renders native declarations and external protobuf bindings from
 `PlannedFamily`, alongside its existing JSON Schema renderer. Java-specific type

@@ -9,13 +9,13 @@ public final class GenericModelServiceOperations {
       wit.genericmodels.GenericResponse<ContextT, OutputT, MetadataT> complete(
           wit.genericmodels.CompleteOptions<ContextT> options) {
     java.util.Objects.requireNonNull(options, "options");
-    java.lang.reflect.Type resultType = options.getResultType();
     wit.genericmodels.GenericRequest.Builder<ContextT> requestBuilder =
         wit.genericmodels.GenericRequest.<ContextT>newBuilder();
     requestBuilder.setContext(options.getContext());
     requestBuilder.setContexts(options.getContexts());
     requestBuilder.setByName(options.getByName());
     requestBuilder.setNested(options.getNested());
+    java.lang.reflect.Type resultType = options.getResultType();
     wit.genericmodels.GenericRequest<ContextT> request = requestBuilder.build();
     return executeComplete(request, resultType);
   }

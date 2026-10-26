@@ -1,0 +1,1 @@
+Java function-merge hooks can resolve required fields omitted from options, with required values validated at invocation; workflow signal-with-start derives its ID from the workflow reference and checks explicit IDs and run bindings.

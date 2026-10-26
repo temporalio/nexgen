@@ -159,7 +159,7 @@ fn operation_api_keeps_only_functions_and_their_inputs_outside_required_options(
     assert!(!operations.contains(
         "public static io.temporal.workflow.ExternalWorkflowStub executeSignalWithStartWorkflow("
     ));
-    assert!(operations.contains("requestBuilder.setStaticSummary(options.getStaticSummary())"));
+    assert!(operations.contains("builder.setStaticSummary(options.getStaticSummary())"));
     assert!(operations.contains("Functions.Func<WorkflowResult> workflow"));
     assert!(operations.contains("Functions.Func6<WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5, WorkflowArg6, WorkflowResult> workflow"));
     assert!(operations.contains("Functions.Proc6<WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5, WorkflowArg6> workflow"));
@@ -202,7 +202,6 @@ fn operation_api_keeps_only_functions_and_their_inputs_outside_required_options(
         "setStaticDetails(String value)",
         "setId(String value)",
         "setTaskQueue(String value)",
-        "java.util.Objects.requireNonNull(id, \"id\")",
         "java.util.Objects.requireNonNull(taskQueue, \"taskQueue\")",
         "private String id = null",
         "toBuilder()",
@@ -214,6 +213,7 @@ fn operation_api_keeps_only_functions_and_their_inputs_outside_required_options(
         );
     }
     for hidden in [
+        "java.util.Objects.requireNonNull(id, \"id\")",
         "getArgs()",
         "getSignalArgs()",
         "setArgs(",

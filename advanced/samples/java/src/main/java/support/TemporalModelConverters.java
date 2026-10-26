@@ -2,49 +2,84 @@ package support;
 
 import io.temporal.api.common.v1.*;
 import io.temporal.api.taskqueue.v1.TaskQueue;
+import io.temporal.common.CronSchedule;
+import io.temporal.common.MethodRetry;
 import io.temporal.common.RetryOptions;
 import io.temporal.common.VersioningOverride;
 import io.temporal.common.converter.DataConverter;
+import io.temporal.common.metadata.WorkflowMethodType;
 import io.temporal.internal.common.*;
-import wit.workflowservice.SignalWithStartWorkflowRequest;
+import io.temporal.internal.nexus.system.SystemNexusDataConverter;
+import io.temporal.internal.sync.ExternalWorkflowInvocationHandler;
 import io.temporal.payload.context.WorkflowSerializationContext;
+import io.temporal.workflow.Functions;
 import io.temporal.workflow.Workflow;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import wit.workflowservice.SignalWithStartWorkflowRequest;
 
 /** User-owned conversion hooks consumed by the generated workflow service models. */
 public final class TemporalModelConverters {
   private TemporalModelConverters() {}
 
+  /** Returns the user converter active during system Nexus transfer conversion. */
   public static DataConverter currentDataConverter() {
-    return io.temporal.internal.nexus.system.TemporalModelConverters.currentDataConverter();
+    return SystemNexusDataConverter.currentDataConverter();
   }
 
   public static String workflowNamespace() {
     return Workflow.getInfo().getNamespace();
   }
 
-  public static io.temporal.internal.sync.ExternalWorkflowInvocationHandler.ProbeResult captureWorkflowCall(
-      Object method, io.temporal.workflow.Functions.Proc invocation,
-      java.util.function.BiConsumer<String, Object[]> result) {
-    return io.temporal.internal.nexus.system.TemporalModelConverters.captureWorkflowCall(method, invocation, result);
+  /** Captures one typed workflow invocation without starting a child workflow. */
+  public static ExternalWorkflowInvocationHandler.ProbeResult captureWorkflowCall(
+      Object method, Functions.Proc invocation, BiConsumer<String, Object[]> result) {
+    ExternalWorkflowInvocationHandler.ProbeResult call =
+        ExternalWorkflowInvocationHandler.probe(method, invocation, WorkflowMethodType.WORKFLOW);
+    result.accept(call.getName(), call.getArguments());
+    return call;
   }
 
+  /** Captures one typed signal invocation without sending a signal. */
   public static void captureSignalCall(
-      Object method, io.temporal.workflow.Functions.Proc invocation,
-      java.util.function.BiConsumer<String, Object[]> result) {
-    io.temporal.internal.nexus.system.TemporalModelConverters.captureSignalCall(method, invocation, result);
+      Object method, Functions.Proc invocation, BiConsumer<String, Object[]> result) {
+    ExternalWorkflowInvocationHandler.ProbeResult call =
+        ExternalWorkflowInvocationHandler.probe(method, invocation, WorkflowMethodType.SIGNAL);
+    result.accept(call.getName(), call.getArguments());
   }
 
+  /** Resolves a start operation's workflow ID from its bound workflow reference. */
+  public static String mergeWorkflowIdForStart(
+      ExternalWorkflowInvocationHandler.ProbeResult call, String explicit) {
+    WorkflowExecution execution = call.getStub().getExecution();
+    if (!execution.getRunId().isEmpty()) {
+      throw new IllegalArgumentException(
+          "Cannot start through a workflow reference bound to a run ID");
+    }
+    String id = execution.getWorkflowId();
+    if (id.isEmpty()) {
+      throw new IllegalArgumentException("Workflow reference must have a nonempty workflow ID");
+    }
+    if (explicit != null && !explicit.equals(id)) {
+      throw new IllegalArgumentException(
+          "Explicit workflow ID does not match the workflow reference");
+    }
+    return id;
+  }
+
+  /** Merges the original method annotation with explicit retry settings. */
   public static RetryOptions mergeMethodRetry(
-      io.temporal.internal.sync.ExternalWorkflowInvocationHandler.ProbeResult call, RetryOptions explicit) {
-    return io.temporal.internal.nexus.system.TemporalModelConverters.mergeMethodRetry(call, explicit);
+      ExternalWorkflowInvocationHandler.ProbeResult call, RetryOptions explicit) {
+    return RetryOptions.merge(call.getMethod().getAnnotation(MethodRetry.class), explicit);
   }
 
+  /** Explicit schedules, including an empty string, override the method annotation. */
   public static String mergeCronSchedule(
-      io.temporal.internal.sync.ExternalWorkflowInvocationHandler.ProbeResult call, String explicit) {
-    return io.temporal.internal.nexus.system.TemporalModelConverters.mergeCronSchedule(call, explicit);
+      ExternalWorkflowInvocationHandler.ProbeResult call, String explicit) {
+    CronSchedule annotation = call.getMethod().getAnnotation(CronSchedule.class);
+    return OptionsUtils.merge(annotation == null ? "" : annotation.value(), explicit, String.class);
   }
 
   public static WorkflowSerializationContext signalWithStartWorkflowSerializationContext(
@@ -112,13 +147,28 @@ public final class TemporalModelConverters {
 
   public static Header headerToProto(DataConverter converter, Map<String, Payload> value) {
     Header.Builder builder = Header.newBuilder();
-    value.forEach((key, payload) -> builder.putFields(key, converter.toPayload(new io.temporal.common.converter.RawValue(payload)).get()));
+    value.forEach(
+        (key, payload) ->
+            builder.putFields(
+                key,
+                converter.toPayload(new io.temporal.common.converter.RawValue(payload)).get()));
     return builder.build();
   }
 
   public static Map<String, Payload> headerFromProto(DataConverter converter, Header value) {
     Map<String, Payload> result = new LinkedHashMap<>();
-    value.getFieldsMap().forEach((key, payload) -> result.put(key, converter.fromPayload(payload, io.temporal.common.converter.RawValue.class, io.temporal.common.converter.RawValue.class).getPayload()));
+    value
+        .getFieldsMap()
+        .forEach(
+            (key, payload) ->
+                result.put(
+                    key,
+                    converter
+                        .fromPayload(
+                            payload,
+                            io.temporal.common.converter.RawValue.class,
+                            io.temporal.common.converter.RawValue.class)
+                        .getPayload()));
     return result;
   }
 

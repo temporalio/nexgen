@@ -11,7 +11,10 @@ public final class SignalWithStartWorkflowRequest {
   /** Arguments for the workflow. */
   private final java.util.List<Object> args;
 
-  /** Unique identifier for the workflow execution. Must be nonempty. */
+  /**
+   * Workflow ID. Typed calls derive it from the workflow reference when omitted; an explicit ID
+   * must match. Required for name-based calls.
+   */
   private final String id;
 
   /** Task queue to run the workflow on. */

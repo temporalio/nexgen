@@ -2080,6 +2080,22 @@ validates references and lowers the selected rule into the shared model, which
 existing passes carry to generation; raw WIT directives are not reparsed by the
 generator.
 
+Required fields with a merge hook may be omitted from Java options. Typed
+operations validate the resolved value after the hook runs; name-based
+operations require the explicit value before dispatch. Requiredness in the
+request model and wire mapping is unchanged.
+
+For example, the workflow service's ID field merges from the workflow reference:
+
+```wit
+/// @nexus.merge-from-function function="workflow" java="mergeWorkflowIdForStart"
+id: string,
+```
+
+The SDK helper derives an omitted ID, checks a supplied ID against the workflow
+reference, and rejects a workflow reference pinned to a run ID. The signal
+reference contributes its name and arguments; its execution binding is ignored.
+
 The Java SDK uses the original workflow method's `@MethodRetry` and
 `@CronSchedule` annotations. Retry merging follows
 `RetryOptions.merge(annotation, explicit)`; cron uses the annotation unless an

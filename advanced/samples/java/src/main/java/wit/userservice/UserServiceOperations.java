@@ -7,10 +7,10 @@ public final class UserServiceOperations {
 
   public static wit.userservice.User getUser(wit.userservice.GetUserOptions options) {
     java.util.Objects.requireNonNull(options, "options");
-    String endpoint = options.getEndpoint();
     wit.userservice.GetUserRequest.Builder requestBuilder =
         wit.userservice.GetUserRequest.newBuilder();
     requestBuilder.setUserId(options.getUserId());
+    String endpoint = options.getEndpoint();
     wit.userservice.GetUserRequest request = requestBuilder.build();
     return executeGetUser(endpoint, request);
   }
@@ -31,11 +31,11 @@ public final class UserServiceOperations {
 
   public static wit.userservice.User updateEmail(wit.userservice.UpdateEmailOptions options) {
     java.util.Objects.requireNonNull(options, "options");
-    String endpoint = options.getEndpoint();
     wit.userservice.UpdateEmailRequest.Builder requestBuilder =
         wit.userservice.UpdateEmailRequest.newBuilder();
     requestBuilder.setUserId(options.getUserId());
     requestBuilder.setEmail(options.getEmail());
+    String endpoint = options.getEndpoint();
     wit.userservice.UpdateEmailRequest request = requestBuilder.build();
     return executeUpdateEmail(endpoint, request);
   }
