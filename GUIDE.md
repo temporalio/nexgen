@@ -1670,6 +1670,17 @@ type retry-policy = placeholder;
 The `placeholder` WIT type is a string alias used when the actual type is
 entirely replaced by language-specific overrides.
 
+Go imports required by an override are collected for both type aliases and
+record fields. For example, this field generates `time.Duration` and imports
+`time` without needing a separate type alias:
+
+```wit
+record timing {
+  /// @nexus.type go="time.Duration"
+  elapsed: u64,
+}
+```
+
 ---
 
 ### @nexus.omit

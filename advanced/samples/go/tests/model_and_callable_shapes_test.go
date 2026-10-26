@@ -56,6 +56,8 @@ func TestProtoBackedEnumAndBytes(t *testing.T) {
 }
 
 func TestGenericValueReceiverGetters(t *testing.T) {
+	// Elapsed's direct field override must supply the generated package's
+	// time import; no type alias in the sample supplies it indirectly.
 	other := "other"
 	model := gm.GetterProbe[string]{
 		Value: "value", Other: &other, History: []string{"past"},

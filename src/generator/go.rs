@@ -3321,10 +3321,21 @@ fn parse_go_expr(expr: &str) -> (BTreeSet<String>, String) {
 fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<String>) {
     for (_, model) in api_plan.records() {
         for (_, field) in model.model_fields() {
-            collect_imports_from_value_type(
-                &planned_field_kind(&field.field_type, api_plan),
-                imports,
-            );
+            if let Some(annotation) = field
+                .flattened_annotation
+                .as_ref()
+                .or(field.annotation.as_ref())
+                .and_then(|annotation| annotation.value())
+            {
+                // Match field rendering: the override replaces the underlying
+                // type, including its import requirements.
+                imports.extend(parse_go_expr(annotation).0);
+            } else {
+                collect_imports_from_value_type(
+                    &planned_field_kind(&field.field_type, api_plan),
+                    imports,
+                );
+            }
             if field.required
                 && let Some(function) = &field.function
             {

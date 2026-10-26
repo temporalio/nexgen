@@ -17,9 +17,6 @@ interface generic-model-service {
   /// @nexus.type-parameter
   type metadata-t = placeholder;
 
-  /// @nexus.type go="time:time.Duration"
-  type elapsed-time = u64;
-
   record inner {
     value: context-t,
   }
@@ -32,7 +29,8 @@ interface generic-model-service {
     result-value: result<context-t, context-t>,
     /// @nexus.type go="map[string]int32"
     lookup: list<tuple<string, u32>>,
-    elapsed: elapsed-time,
+    /// @nexus.type go="time.Duration"
+    elapsed: u64,
     /// @nexus.source go="WorkflowNamespace(ctx)"
     namespace: string,
     /// @nexus.source go="RequestType(ctx)"
