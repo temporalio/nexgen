@@ -7,17 +7,15 @@ public final class GenericModelServiceOperations {
 
   public static <ContextT, MetadataT, OutputT>
       wit.genericmodels.GenericResponse<ContextT, OutputT, MetadataT> complete(
-          ContextT context,
-          java.util.List<ContextT> contexts,
-          java.util.Map<String, ContextT> byName,
-          wit.genericmodels.Inner<ContextT> nested,
-          java.lang.reflect.Type resultType) {
+          wit.genericmodels.CompleteOptions<ContextT> options) {
+    java.util.Objects.requireNonNull(options, "options");
+    java.lang.reflect.Type resultType = options.getResultType();
     wit.genericmodels.GenericRequest.Builder<ContextT> requestBuilder =
         wit.genericmodels.GenericRequest.<ContextT>newBuilder();
-    requestBuilder.setContext(java.util.Objects.requireNonNull(context, "context"));
-    requestBuilder.setContexts(java.util.Objects.requireNonNull(contexts, "contexts"));
-    requestBuilder.setByName(java.util.Objects.requireNonNull(byName, "byName"));
-    requestBuilder.setNested(java.util.Objects.requireNonNull(nested, "nested"));
+    requestBuilder.setContext(options.getContext());
+    requestBuilder.setContexts(options.getContexts());
+    requestBuilder.setByName(options.getByName());
+    requestBuilder.setNested(options.getNested());
     wit.genericmodels.GenericRequest<ContextT> request = requestBuilder.build();
     return executeComplete(request, resultType);
   }

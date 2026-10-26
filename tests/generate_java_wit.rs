@@ -89,21 +89,69 @@ interface example-service {
     assert!(operations.contains(" first("));
     assert!(operations.contains(" second("));
     assert!(!output.join("ExampleServiceOperations.java").exists());
-    assert!(operations.contains(" first(String value)"));
-    assert!(operations.contains(" second(String value)"));
+    assert!(operations.contains(" first(io.temporal.workflow.FirstOptions options)"));
+    assert!(operations.contains(" second(io.temporal.workflow.SecondOptions options)"));
     assert!(operations.contains("static io.temporal.workflow.Request executeFirst("));
     assert!(!operations.contains("public static io.temporal.workflow.Request executeFirst("));
-    assert!(!output.join("FirstOptions.java").exists());
+    let options = fs::read_to_string(output.join("FirstOptions.java")).unwrap();
+    assert!(options.contains("setValue(String value)"));
+    assert!(options.contains("java.util.Objects.requireNonNull(value, \"value\")"));
     assert!(!operations.contains("Functions.Proc1<"));
 }
 
 #[test]
-fn operation_api_splits_required_arguments_from_generated_options() {
+fn dynamic_endpoint_and_required_values_live_in_options_without_name_collisions() {
+    let temp = tempfile::tempdir().unwrap();
+    let input = temp.path().join("service.wit");
+    fs::write(
+        &input,
+        r#"
+package example:routing;
+world system { export router; }
+interface router {
+  record request { endpoint: string, endpoint2: string, value: string, }
+  dispatch: func(request: request) -> request;
+}
+"#,
+    )
+    .unwrap();
+    let output = temp.path().join("generated");
+    generate_to_file(&GenerateRequest {
+        config: NexgenConfig {
+            mode: GenerationMode::NativeApi,
+            system_nexus: false,
+        },
+        language: Language::Java,
+        input_paths: vec![input],
+        descriptor_paths: vec![],
+        support_package: Some("example.Support".into()),
+        java_package_name: Some("example.generated".into()),
+        output_path: output.clone(),
+        format: false,
+        ts_date_time_types: Default::default(),
+    })
+    .unwrap();
+    let operations = fs::read_to_string(output.join("RouterOperations.java")).unwrap();
+    let options = fs::read_to_string(output.join("DispatchOptions.java")).unwrap();
+    assert!(operations.contains("dispatch(example.generated.DispatchOptions options)"));
+    assert!(operations.contains("String endpoint = options.getEndpoint3()"));
+    assert!(operations.contains("requestBuilder.setEndpoint(options.getEndpoint())"));
+    assert!(operations.contains("requestBuilder.setValue(options.getValue())"));
+    for field in ["endpoint", "endpoint2", "endpoint3", "value"] {
+        assert!(options.contains(&format!(
+            "java.util.Objects.requireNonNull({field}, \"{field}\")"
+        )));
+        assert!(options.contains(&format!("private String {field} = null")));
+    }
+}
+
+#[test]
+fn operation_api_keeps_only_functions_and_their_inputs_outside_required_options() {
     let temp = generate("workflow-service", GenerationMode::NativeApi, true);
     let output = temp.path().join("generated");
     let operations = fs::read_to_string(output.join("WorkflowOperations.java")).unwrap();
     assert!(operations.contains(
-        "signalWithStartWorkflow(String workflow, Object[] args, String id, String taskQueue, String signal, Object[] signalArgs)"
+        "signalWithStartWorkflow(String workflow, Object[] args, String signal, Object[] signalArgs, test.generated.SignalWithStartWorkflowOptions options)"
     ));
     assert!(operations.contains(
         "String signal, Object[] signalArgs, test.generated.SignalWithStartWorkflowOptions options)"
@@ -126,8 +174,11 @@ fn operation_api_splits_required_arguments_from_generated_options() {
     assert!(operations.contains(
         "ProbeResult workflowMetadata = support.TemporalModelConverters.captureWorkflowCall("
     ));
-    assert!(operations.contains("requestBuilder.setRetryPolicy(support.TemporalModelConverters.mergeMethodRetry(workflowMetadata, options == null ? null : options.getRetryPolicy()))"));
-    assert!(operations.contains("requestBuilder.setCronSchedule(support.TemporalModelConverters.mergeCronSchedule(workflowMetadata, options == null ? null : options.getCronSchedule()))"));
+    assert!(operations.contains("requestBuilder.setRetryPolicy(support.TemporalModelConverters.mergeMethodRetry(workflowMetadata, options.getRetryPolicy()))"));
+    assert!(operations.contains("requestBuilder.setCronSchedule(support.TemporalModelConverters.mergeCronSchedule(workflowMetadata, options.getCronSchedule()))"));
+    assert!(operations.contains("java.util.Objects.requireNonNull(options, \"options\")"));
+    assert!(!operations.contains("String id,"));
+    assert!(!operations.contains("String taskQueue,"));
     let untyped = operations
         .split("ProbeResult workflowMetadata")
         .next()
@@ -149,7 +200,11 @@ fn operation_api_splits_required_arguments_from_generated_options() {
     for expected in [
         "setStaticSummary(String value)",
         "setStaticDetails(String value)",
-        "getDefaultInstance()",
+        "setId(String value)",
+        "setTaskQueue(String value)",
+        "java.util.Objects.requireNonNull(id, \"id\")",
+        "java.util.Objects.requireNonNull(taskQueue, \"taskQueue\")",
+        "private String id = null",
         "toBuilder()",
         "WorkflowIdReusePolicy.forNumber(1)",
     ] {
@@ -164,8 +219,7 @@ fn operation_api_splits_required_arguments_from_generated_options() {
         "setArgs(",
         "setSignalArgs(",
         "getWorkflow()",
-        "getId()",
-        "getTaskQueue()",
+        "getDefaultInstance()",
         "getSignal()",
         "getNamespace()",
         "getRequestId()",

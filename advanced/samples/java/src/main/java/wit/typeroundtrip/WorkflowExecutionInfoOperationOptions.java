@@ -3,15 +3,18 @@ package wit.typeroundtrip;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class WorkflowExecutionInfoOperationOptions {
+  private final wit.typeroundtrip.WorkflowExecution execution;
   private final wit.typeroundtrip.WorkflowExecution parentExecution;
 
-  public static WorkflowExecutionInfoOperationOptions getDefaultInstance() {
-    return WorkflowExecutionInfoOperationOptions.newBuilder().build();
+  private WorkflowExecutionInfoOperationOptions(
+      wit.typeroundtrip.WorkflowExecution execution,
+      wit.typeroundtrip.WorkflowExecution parentExecution) {
+    this.execution = java.util.Objects.requireNonNull(execution, "execution");
+    this.parentExecution = parentExecution;
   }
 
-  private WorkflowExecutionInfoOperationOptions(
-      wit.typeroundtrip.WorkflowExecution parentExecution) {
-    this.parentExecution = parentExecution;
+  public wit.typeroundtrip.WorkflowExecution getExecution() {
+    return execution;
   }
 
   public wit.typeroundtrip.WorkflowExecution getParentExecution() {
@@ -35,7 +38,15 @@ public final class WorkflowExecutionInfoOperationOptions {
 
     private Builder(WorkflowExecutionInfoOperationOptions value) {
       if (value == null) return;
+      this.execution = value.execution;
       this.parentExecution = value.parentExecution;
+    }
+
+    private wit.typeroundtrip.WorkflowExecution execution = null;
+
+    public Builder setExecution(wit.typeroundtrip.WorkflowExecution value) {
+      this.execution = value;
+      return this;
     }
 
     private wit.typeroundtrip.WorkflowExecution parentExecution = null;
@@ -46,7 +57,7 @@ public final class WorkflowExecutionInfoOperationOptions {
     }
 
     public WorkflowExecutionInfoOperationOptions build() {
-      return new WorkflowExecutionInfoOperationOptions(parentExecution);
+      return new WorkflowExecutionInfoOperationOptions(execution, parentExecution);
     }
   }
 }

@@ -3,20 +3,11 @@ package wit.functionexecution;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class ExecuteVarargsFunctionOptions {
-  /** Arguments for the function. */
-  private final java.util.List<String> args;
-
   public static ExecuteVarargsFunctionOptions getDefaultInstance() {
     return ExecuteVarargsFunctionOptions.newBuilder().build();
   }
 
-  private ExecuteVarargsFunctionOptions(java.util.List<String> args) {
-    this.args = args;
-  }
-
-  public java.util.List<String> getArgs() {
-    return args;
-  }
+  private ExecuteVarargsFunctionOptions() {}
 
   public Builder toBuilder() {
     return newBuilder(this);
@@ -35,18 +26,10 @@ public final class ExecuteVarargsFunctionOptions {
 
     private Builder(ExecuteVarargsFunctionOptions value) {
       if (value == null) return;
-      this.args = value.args;
-    }
-
-    private java.util.List<String> args = null;
-
-    public Builder setArgs(java.util.List<String> value) {
-      this.args = value;
-      return this;
     }
 
     public ExecuteVarargsFunctionOptions build() {
-      return new ExecuteVarargsFunctionOptions(args);
+      return new ExecuteVarargsFunctionOptions();
     }
   }
 }

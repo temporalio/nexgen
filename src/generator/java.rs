@@ -656,7 +656,7 @@ impl Context<'_> {
             )
             .unwrap();
         }
-        if options {
+        if options && !fields.iter().any(|field| api_field_required(field)) {
             writeln!(out, "  public static {args} {name}{args} getDefaultInstance() {{ return {name}.{args}newBuilder().build(); }}").unwrap();
         }
         let constructor_prefix = if options {
@@ -686,7 +686,16 @@ impl Context<'_> {
         .unwrap();
         for f in &fields {
             let n = ident(&f.name);
-            writeln!(out, "    this.{n} = {n};").unwrap();
+            if options && api_field_required(f) {
+                writeln!(
+                    out,
+                    "    this.{n} = java.util.Objects.requireNonNull({n}, {});",
+                    literal(&n)
+                )
+                .unwrap();
+            } else {
+                writeln!(out, "    this.{n} = {n};").unwrap();
+            }
         }
         writeln!(out, "  }}").unwrap();
         for f in &fields {
@@ -713,6 +722,7 @@ impl Context<'_> {
         for f in &fields {
             let default = if matches!(f.visibility, RecordFieldVisibility::Sourced { .. })
                 || (f.function.is_some() && f.data.wire_binding.is_none())
+                || (options && api_field_required(f))
             {
                 "null".into()
             } else if let Some(v) = &f.data.default_enum_value {
@@ -1831,7 +1841,7 @@ impl Context<'_> {
         fields: &[RecordFieldSpec<PlannedFamily>],
     ) -> Vec<TypeParameterUsage> {
         let mut parameters = BTreeMap::new();
-        for field in fields.iter().filter(|f| !api_field_required(f)) {
+        for field in fields {
             if field
                 .annotation
                 .as_ref()
@@ -1854,24 +1864,12 @@ impl Context<'_> {
         let Some(model) = self.operation_input_record(operation) else {
             return Ok(None);
         };
-        let fields = self.operation_api_fields(model)?;
-        let argument_fields = callable_argument_fields(&fields, model);
-        let fields = fields
-            .into_iter()
-            .filter(|field| !argument_fields.contains(field.name.as_str()))
-            .collect::<Vec<_>>();
+        let fields = self.operation_option_fields(service, operation, model)?;
         let parameters = self.options_type_parameters(&fields);
         let fields = fields
             .into_iter()
-            .filter(|f| !api_field_required(f))
-            .map(|mut f| {
-                f.required = false;
-                (f.name.clone(), f)
-            })
+            .map(|f| (f.name.clone(), f))
             .collect::<indexmap::IndexMap<_, _>>();
-        if fields.is_empty() {
-            return Ok(None);
-        }
         let name = self.operation_options_name(service, operation);
         let options = RecordSpec {
             name: name.clone(),
@@ -1887,6 +1885,51 @@ impl Context<'_> {
             name,
             self.render_record(&options, &parameters, true),
         )))
+    }
+    fn operation_option_fields(
+        &self,
+        service: &ServiceSpec<PlannedFamily>,
+        operation: &OperationSpec<PlannedFamily>,
+        model: &Record,
+    ) -> Result<Vec<RecordFieldSpec<PlannedFamily>>> {
+        let fields = self.operation_api_fields(model)?;
+        let direct = function_api_field_names(model);
+        let endpoint_name = operation_metadata_name(&fields, "endpoint");
+        let result_type_name = operation_metadata_name(&fields, "resultType");
+        let mut fields = fields
+            .into_iter()
+            .filter(|field| !direct.contains(field.name.as_str()))
+            .collect::<Vec<_>>();
+        let mut metadata = Vec::new();
+        if service.endpoint.is_none() {
+            metadata.push((endpoint_name, None));
+        }
+        if operation
+            .output
+            .as_ref()
+            .is_some_and(|ty| !self.spec.type_parameters(ty).is_empty())
+        {
+            metadata.push((result_type_name, Some("java.lang.reflect.Type")));
+        }
+        for (name, java_type) in metadata {
+            fields.push(RecordFieldSpec {
+                name,
+                doc: None,
+                annotation: java_type.map(|value| SelectedTextSpec {
+                    value: Some(value.into()),
+                    import: None,
+                }),
+                flattened_annotation: None,
+                field_type: TypeSpec::String,
+                default_value: None,
+                required: true,
+                visibility: RecordFieldVisibility::Public,
+                function: None,
+                merge_from_function: None,
+                data: Default::default(),
+            });
+        }
+        Ok(fields)
     }
     fn function_result_type(&self, function: &FunctionFieldSpec<PlannedFamily>) -> String {
         function
@@ -1949,6 +1992,9 @@ impl Context<'_> {
             return Ok(String::new());
         };
         let fields = self.operation_api_fields(model)?;
+        let endpoint_field = operation_metadata_name(&fields, "endpoint");
+        let result_type_field = operation_metadata_name(&fields, "resultType");
+        let direct = function_api_field_names(model);
         let captured_arguments = callable_argument_fields(&fields, model);
         let fields = fields
             .into_iter()
@@ -1956,11 +2002,11 @@ impl Context<'_> {
             .collect::<Vec<_>>();
         let required = fields
             .iter()
-            .filter(|f| api_field_required(f))
+            .filter(|f| direct.contains(f.name.as_str()))
             .collect::<Vec<_>>();
         let optional = fields
             .iter()
-            .filter(|f| !api_field_required(f))
+            .filter(|f| !direct.contains(f.name.as_str()))
             .collect::<Vec<_>>();
         let mut names = required
             .iter()
@@ -2014,7 +2060,6 @@ impl Context<'_> {
             }
         }
         let mut parameters = Vec::new();
-        let mut arguments = Vec::new();
         let mut call_arguments = BTreeMap::new();
         if let Some(shapes) = shapes {
             for field in &required {
@@ -2073,10 +2118,6 @@ impl Context<'_> {
         } else {
             generic.to_string()
         };
-        if service.endpoint.is_none() {
-            parameters.push(format!("String {endpoint}"));
-            arguments.push(endpoint.clone());
-        }
         for field in &required {
             let name = ident(&field.name);
             let function = captured_function(field).filter(|_| typed);
@@ -2105,48 +2146,28 @@ impl Context<'_> {
                 self.field_ty(field)
             };
             parameters.push(format!("{ty} {name}"));
-            arguments.push(name);
             if let Some(args) = call_arguments.get(&field.name) {
                 for (ty, name) in args {
                     parameters.push(format!("{ty} {name}"));
-                    arguments.push(name.clone());
                 }
             } else if let Some(function) = captured_function(field).filter(|_| !typed) {
                 let argument = &model.fields[&function.arg_fields[0]];
                 let name = ident(&argument.name);
                 parameters.push(format!("Object[] {name}"));
-                arguments.push(name);
             }
-        }
-        if generic_output {
-            parameters.push(format!("java.lang.reflect.Type {result_parameter}"));
-            arguments.push(result_parameter.clone());
         }
         let method = ident(&operation.name);
         let mut out = String::new();
         let typed_doc = typed.then(|| format!(
-            "{}\n\nPass bound method references followed by their arguments. SDK-owned call extractors probe these invocations. Supply invocation arguments as parameters, not in options. Fields with declared merge-from-function hooks merge explicit values with the named callable's metadata. Other required fields remain explicit.",
+            "{}\n\nPass bound method references followed by their arguments. SDK-owned call extractors probe these invocations. Supply all other fields through the required options object. Fields with declared merge-from-function hooks merge explicit values with the named callable's metadata.",
             operation.doc.value().unwrap_or_default(),
         ));
         let doc = typed_doc.as_deref().or(operation.doc.value());
-        if !optional.is_empty() {
-            let options_name = self.operation_options_name(service, operation);
-            let args = self.type_args(&self.options_type_parameters(&fields));
-            let options_type = format!("{}.{options_name}{args}", self.package);
-            let default = format!("{}.{options_name}.{args}getDefaultInstance()", self.package);
-            let forwarded = arguments
-                .iter()
-                .cloned()
-                .chain(std::iter::once(default))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let returned = if result_type == "void" { "" } else { "return " };
-            if typed {
-                render_java_doc_comment(&mut out, "  ", doc, &[]);
-            }
-            writeln!(out, "  public static {generic}{result_type} {method}({}) {{\n    {returned}{method}({forwarded});\n  }}", parameters.join(", ")).unwrap();
-            parameters.push(format!("{options_type} {options}"));
-        }
+        let options_name = self.operation_options_name(service, operation);
+        let option_fields = self.operation_option_fields(service, operation, model)?;
+        let args = self.type_args(&self.options_type_parameters(&option_fields));
+        let options_type = format!("{}.{options_name}{args}", self.package);
+        parameters.push(format!("{options_type} {options}"));
         render_java_doc_comment(&mut out, "  ", doc, &[]);
         writeln!(
             out,
@@ -2154,6 +2175,27 @@ impl Context<'_> {
             parameters.join(", ")
         )
         .unwrap();
+        writeln!(
+            out,
+            "    java.util.Objects.requireNonNull({options}, \"options\");"
+        )
+        .unwrap();
+        if generic_output {
+            writeln!(
+                out,
+                "    java.lang.reflect.Type {result_parameter} = {options}.get{}();",
+                result_type_field.to_upper_camel_case()
+            )
+            .unwrap();
+        }
+        if service.endpoint.is_none() {
+            writeln!(
+                out,
+                "    String {endpoint} = {options}.get{}();",
+                endpoint_field.to_upper_camel_case()
+            )
+            .unwrap();
+        }
         let input_type = self.ty(operation.input.as_ref().unwrap());
         let input_class = input_type.split('<').next().unwrap();
         let input_args = self.type_args(&self.spec.record_type_parameters(&model.full_name));
@@ -2191,28 +2233,23 @@ impl Context<'_> {
             .unwrap();
         }
         if !optional.is_empty() {
-            writeln!(out, "    if ({options} != null) {{").unwrap();
             for field in optional {
                 let name = field.name.to_upper_camel_case();
                 if typed && field.merge_from_function.is_some() {
                     continue;
                 }
-                writeln!(out, "      if ({options}.get{name}() != null) {builder}.set{name}({options}.get{name}());").unwrap();
+                if api_field_required(field) {
+                    writeln!(out, "    {builder}.set{name}({options}.get{name}());").unwrap();
+                } else {
+                    writeln!(out, "    if ({options}.get{name}() != null) {builder}.set{name}({options}.get{name}());").unwrap();
+                }
             }
-            out.push_str("    }\n");
         }
         if typed {
             for field in &fields {
                 if let Some(rule) = &field.merge_from_function {
                     let metadata = &merge_sources[&rule.function].2;
-                    let value = if api_field_required(field) {
-                        ident(&field.name)
-                    } else {
-                        format!(
-                            "{options} == null ? null : {options}.get{}()",
-                            field.name.to_upper_camel_case()
-                        )
-                    };
+                    let value = format!("{options}.get{}()", field.name.to_upper_camel_case());
                     let helper = self.helper(&rule.helper);
                     writeln!(
                         out,
@@ -2463,6 +2500,36 @@ fn callable_argument_fields<'a>(
         .flat_map(|function| &function.arg_fields)
         .filter_map(|key| model.fields.get(key).map(|field| field.name.as_str()))
         .collect()
+}
+
+fn function_api_field_names(model: &Record) -> BTreeSet<&str> {
+    model
+        .public_fields()
+        .map(|(_, field)| field)
+        .filter_map(|field| field.function.as_ref().map(|function| (field, function)))
+        .flat_map(|(field, function)| {
+            std::iter::once(field.name.as_str()).chain(
+                function
+                    .arg_fields
+                    .iter()
+                    .filter_map(|key| model.fields.get(key).map(|field| field.name.as_str())),
+            )
+        })
+        .collect()
+}
+
+fn operation_metadata_name(fields: &[RecordFieldSpec<PlannedFamily>], base: &str) -> String {
+    let names = fields
+        .iter()
+        .map(|field| field.name.to_upper_camel_case())
+        .collect::<BTreeSet<_>>();
+    let mut name = base.to_string();
+    let mut suffix = 2;
+    while names.contains(&name.to_upper_camel_case()) {
+        name = format!("{base}{suffix}");
+        suffix += 1;
+    }
+    name
 }
 
 fn request_operation_name(operation: &OperationSpec<PlannedFamily>) -> String {

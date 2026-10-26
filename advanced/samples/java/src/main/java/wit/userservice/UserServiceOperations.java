@@ -5,10 +5,12 @@ package wit.userservice;
 public final class UserServiceOperations {
   private UserServiceOperations() {}
 
-  public static wit.userservice.User getUser(String endpoint, String userId) {
+  public static wit.userservice.User getUser(wit.userservice.GetUserOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    String endpoint = options.getEndpoint();
     wit.userservice.GetUserRequest.Builder requestBuilder =
         wit.userservice.GetUserRequest.newBuilder();
-    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
+    requestBuilder.setUserId(options.getUserId());
     wit.userservice.GetUserRequest request = requestBuilder.build();
     return executeGetUser(endpoint, request);
   }
@@ -27,11 +29,13 @@ public final class UserServiceOperations {
     return result.withEndpoint(endpoint);
   }
 
-  public static wit.userservice.User updateEmail(String endpoint, String userId, String email) {
+  public static wit.userservice.User updateEmail(wit.userservice.UpdateEmailOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    String endpoint = options.getEndpoint();
     wit.userservice.UpdateEmailRequest.Builder requestBuilder =
         wit.userservice.UpdateEmailRequest.newBuilder();
-    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
-    requestBuilder.setEmail(java.util.Objects.requireNonNull(email, "email"));
+    requestBuilder.setUserId(options.getUserId());
+    requestBuilder.setEmail(options.getEmail());
     wit.userservice.UpdateEmailRequest request = requestBuilder.build();
     return executeUpdateEmail(endpoint, request);
   }

@@ -3,14 +3,29 @@ package wit.startworkflow;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class StartWorkflowOptions {
+  private final String workflow;
+  private final String workflowId;
+  private final String taskQueue;
   private final java.time.Duration workflowStartDelay;
 
-  public static StartWorkflowOptions getDefaultInstance() {
-    return StartWorkflowOptions.newBuilder().build();
+  private StartWorkflowOptions(
+      String workflow, String workflowId, String taskQueue, java.time.Duration workflowStartDelay) {
+    this.workflow = java.util.Objects.requireNonNull(workflow, "workflow");
+    this.workflowId = java.util.Objects.requireNonNull(workflowId, "workflowId");
+    this.taskQueue = java.util.Objects.requireNonNull(taskQueue, "taskQueue");
+    this.workflowStartDelay = workflowStartDelay;
   }
 
-  private StartWorkflowOptions(java.time.Duration workflowStartDelay) {
-    this.workflowStartDelay = workflowStartDelay;
+  public String getWorkflow() {
+    return workflow;
+  }
+
+  public String getWorkflowId() {
+    return workflowId;
+  }
+
+  public String getTaskQueue() {
+    return taskQueue;
   }
 
   public java.time.Duration getWorkflowStartDelay() {
@@ -34,7 +49,31 @@ public final class StartWorkflowOptions {
 
     private Builder(StartWorkflowOptions value) {
       if (value == null) return;
+      this.workflow = value.workflow;
+      this.workflowId = value.workflowId;
+      this.taskQueue = value.taskQueue;
       this.workflowStartDelay = value.workflowStartDelay;
+    }
+
+    private String workflow = null;
+
+    public Builder setWorkflow(String value) {
+      this.workflow = value;
+      return this;
+    }
+
+    private String workflowId = null;
+
+    public Builder setWorkflowId(String value) {
+      this.workflowId = value;
+      return this;
+    }
+
+    private String taskQueue = null;
+
+    public Builder setTaskQueue(String value) {
+      this.taskQueue = value;
+      return this;
     }
 
     private java.time.Duration workflowStartDelay = null;
@@ -45,7 +84,7 @@ public final class StartWorkflowOptions {
     }
 
     public StartWorkflowOptions build() {
-      return new StartWorkflowOptions(workflowStartDelay);
+      return new StartWorkflowOptions(workflow, workflowId, taskQueue, workflowStartDelay);
     }
   }
 }

@@ -1970,14 +1970,17 @@ Set `@nexus.operations-class java="WorkflowOperations"` on an interface to emit
 an abstract operations class with a protected constructor. An SDK facade can
 extend it once to expose every generated static operation, including operations
 added later. Use `--package-name io.temporal.workflow` to put the models and
-operations in the SDK's workflow package. Record-input operations take required
-fields as parameters and optional or defaulted fields through a generated
-`<Operation>Options` class. An overload omitting options uses defaults. Options
-have builders and copy builders. Callable argument lists are explicit parameters
-in the name-based API and are excluded from options. Sourced and omitted fields
-stay out of the public arguments and options, while flattened records expose
-their fields directly. The operation constructs the request internally; no
-handwritten options class or operation wrapper is required.
+operations in the SDK's workflow package. Record-input operations take function
+fields and their inputs as parameters. Every other field, including required
+fields, belongs to a required generated `<Operation>Options` object. There is no
+overload omitting options. Options have builders and copy builders, and building
+options validates required fields. Services without a fixed endpoint also put
+their routing endpoint in options. Generic responses take their reflective
+`resultType` through options too. Callable argument lists are explicit
+parameters in the name-based API and are excluded from options. Sourced and
+omitted fields stay out of the public arguments and options, while flattened
+records expose their fields directly. The operation constructs the request
+internally; no handwritten options class or operation wrapper is required.
 
 Protobuf-bound varargs function fields can specify `java-call-extractor` on
 `@nexus.function` to additionally generate typed overloads. Bound method
@@ -2065,7 +2068,7 @@ The extractor returns that metadata type while supplying the resolved name and
 arguments through its existing callback. Each typed operation probes the source
 once and retains its result for all referencing merge hooks. The selected
 support helper receives `(probeMetadata, explicitFieldValue)` and returns the
-final field value. It runs even when options or the field value are null. The
+final field value. It runs even when the explicit field value is null. The
 helper owns precedence and defaults; the generator does not understand retry or
 scheduling.
 

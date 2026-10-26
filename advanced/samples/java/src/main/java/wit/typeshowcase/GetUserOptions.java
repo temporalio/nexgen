@@ -3,14 +3,16 @@ package wit.typeshowcase;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class GetUserOptions {
+  private final String userId;
   private final String consistencyToken;
 
-  public static GetUserOptions getDefaultInstance() {
-    return GetUserOptions.newBuilder().build();
+  private GetUserOptions(String userId, String consistencyToken) {
+    this.userId = java.util.Objects.requireNonNull(userId, "userId");
+    this.consistencyToken = consistencyToken;
   }
 
-  private GetUserOptions(String consistencyToken) {
-    this.consistencyToken = consistencyToken;
+  public String getUserId() {
+    return userId;
   }
 
   public String getConsistencyToken() {
@@ -34,7 +36,15 @@ public final class GetUserOptions {
 
     private Builder(GetUserOptions value) {
       if (value == null) return;
+      this.userId = value.userId;
       this.consistencyToken = value.consistencyToken;
+    }
+
+    private String userId = null;
+
+    public Builder setUserId(String value) {
+      this.userId = value;
+      return this;
     }
 
     private String consistencyToken = null;
@@ -45,7 +55,7 @@ public final class GetUserOptions {
     }
 
     public GetUserOptions build() {
-      return new GetUserOptions(consistencyToken);
+      return new GetUserOptions(userId, consistencyToken);
     }
   }
 }

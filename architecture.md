@@ -122,11 +122,14 @@ Native Java operation rendering honors the selected operations-class name.
 Explicit names produce an inheritable generated base for SDK facades, allowing
 new operations to become available without editing the facade. Package placement
 is controlled by the Java package option. The renderer splits record inputs
-using existing requiredness, defaults, visibility, and flattening metadata:
-required fields become method parameters and optional fields become a generated
-options class. Public methods build the transfer request and call a
-package-private execution helper, also used by generated resource methods. This
-is Java rendering policy, with no additional planning pass or metadata.
+using existing function, requiredness, defaults, visibility, and flattening
+metadata: only function fields and their inputs become method parameters. Other
+fields, including required fields, dynamic routing endpoints, and generic result
+type metadata, become a required generated options class. Options builders
+validate required values, and there are no overloads omitting options. Public
+methods build the transfer request and call a package-private execution helper,
+also used by generated resource methods. This is Java rendering policy, with no
+additional planning pass or metadata.
 
 Function fields with call-extractor hooks also expose a typed overload using
 bound method references followed directly by their arguments. The IDL's primary
@@ -144,10 +147,10 @@ family mappings carry these declarations; there is no new pass or planned merge
 state. Raw WIT annotations are not available to or reparsed by generation.
 
 The Java renderer retains one extractor result per referenced function and emits
-merge calls after extraction, including when explicit options are null. Helpers
-own precedence and annotation semantics. Merging changes only typed request
-construction, not model rendering or transfer conversion. Other language output
-is unchanged. Relationships between callable fields remain undeclared.
+merge calls after extraction, including when explicit field values are null.
+Helpers own precedence and annotation semantics. Merging changes only typed
+request construction, not model rendering or transfer conversion. Other language
+output is unchanged. Relationships between callable fields remain undeclared.
 
 The Java backend renders native declarations and external protobuf bindings from
 `PlannedFamily`, alongside its existing JSON Schema renderer. Java-specific type

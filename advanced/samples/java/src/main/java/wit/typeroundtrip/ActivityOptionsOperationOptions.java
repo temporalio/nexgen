@@ -4,24 +4,27 @@ package wit.typeroundtrip;
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class ActivityOptionsOperationOptions {
   private final String taskQueue;
+  private final io.temporal.common.RetryOptions retryPolicy;
   private final java.time.Duration scheduleToCloseTimeout;
   private final io.temporal.common.Priority priority;
 
-  public static ActivityOptionsOperationOptions getDefaultInstance() {
-    return ActivityOptionsOperationOptions.newBuilder().build();
-  }
-
   private ActivityOptionsOperationOptions(
       String taskQueue,
+      io.temporal.common.RetryOptions retryPolicy,
       java.time.Duration scheduleToCloseTimeout,
       io.temporal.common.Priority priority) {
     this.taskQueue = taskQueue;
+    this.retryPolicy = java.util.Objects.requireNonNull(retryPolicy, "retryPolicy");
     this.scheduleToCloseTimeout = scheduleToCloseTimeout;
     this.priority = priority;
   }
 
   public String getTaskQueue() {
     return taskQueue;
+  }
+
+  public io.temporal.common.RetryOptions getRetryPolicy() {
+    return retryPolicy;
   }
 
   public java.time.Duration getScheduleToCloseTimeout() {
@@ -50,6 +53,7 @@ public final class ActivityOptionsOperationOptions {
     private Builder(ActivityOptionsOperationOptions value) {
       if (value == null) return;
       this.taskQueue = value.taskQueue;
+      this.retryPolicy = value.retryPolicy;
       this.scheduleToCloseTimeout = value.scheduleToCloseTimeout;
       this.priority = value.priority;
     }
@@ -58,6 +62,13 @@ public final class ActivityOptionsOperationOptions {
 
     public Builder setTaskQueue(String value) {
       this.taskQueue = value;
+      return this;
+    }
+
+    private io.temporal.common.RetryOptions retryPolicy = null;
+
+    public Builder setRetryPolicy(io.temporal.common.RetryOptions value) {
+      this.retryPolicy = value;
       return this;
     }
 
@@ -76,7 +87,8 @@ public final class ActivityOptionsOperationOptions {
     }
 
     public ActivityOptionsOperationOptions build() {
-      return new ActivityOptionsOperationOptions(taskQueue, scheduleToCloseTimeout, priority);
+      return new ActivityOptionsOperationOptions(
+          taskQueue, retryPolicy, scheduleToCloseTimeout, priority);
     }
   }
 }

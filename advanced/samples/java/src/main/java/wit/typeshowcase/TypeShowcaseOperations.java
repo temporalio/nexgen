@@ -5,19 +5,13 @@ package wit.typeshowcase;
 public final class TypeShowcaseOperations {
   private TypeShowcaseOperations() {}
 
-  public static wit.typeshowcase.User getUser(String userId) {
-    return getUser(userId, wit.typeshowcase.GetUserOptions.getDefaultInstance());
-  }
-
-  public static wit.typeshowcase.User getUser(
-      String userId, wit.typeshowcase.GetUserOptions options) {
+  public static wit.typeshowcase.User getUser(wit.typeshowcase.GetUserOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.GetUserRequest.Builder requestBuilder =
         wit.typeshowcase.GetUserRequest.newBuilder();
-    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
-    if (options != null) {
-      if (options.getConsistencyToken() != null)
-        requestBuilder.setConsistencyToken(options.getConsistencyToken());
-    }
+    requestBuilder.setUserId(options.getUserId());
+    if (options.getConsistencyToken() != null)
+      requestBuilder.setConsistencyToken(options.getConsistencyToken());
     wit.typeshowcase.GetUserRequest request = requestBuilder.build();
     return executeGetUser(request);
   }
@@ -35,11 +29,12 @@ public final class TypeShowcaseOperations {
     return result;
   }
 
-  public static wit.typeshowcase.User updateEmail(String userId, String email) {
+  public static wit.typeshowcase.User updateEmail(wit.typeshowcase.UpdateEmailOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.UpdateEmailRequest.Builder requestBuilder =
         wit.typeshowcase.UpdateEmailRequest.newBuilder();
-    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
-    requestBuilder.setEmail(java.util.Objects.requireNonNull(email, "email"));
+    requestBuilder.setUserId(options.getUserId());
+    requestBuilder.setEmail(options.getEmail());
     wit.typeshowcase.UpdateEmailRequest request = requestBuilder.build();
     return executeUpdateEmail(request);
   }
@@ -60,11 +55,12 @@ public final class TypeShowcaseOperations {
     return result;
   }
 
-  public static wit.typeshowcase.User rename(String userId, String displayName) {
+  public static wit.typeshowcase.User rename(wit.typeshowcase.RenameOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.RenameRequest.Builder requestBuilder =
         wit.typeshowcase.RenameRequest.newBuilder();
-    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
-    requestBuilder.setDisplayName(java.util.Objects.requireNonNull(displayName, "displayName"));
+    requestBuilder.setUserId(options.getUserId());
+    requestBuilder.setDisplayName(options.getDisplayName());
     wit.typeshowcase.RenameRequest request = requestBuilder.build();
     return executeRename(request);
   }
@@ -82,12 +78,12 @@ public final class TypeShowcaseOperations {
     return result;
   }
 
-  public static wit.typeshowcase.User setProfile(
-      String userId, wit.typeshowcase.UserProfile profile) {
+  public static wit.typeshowcase.User setProfile(wit.typeshowcase.SetProfileOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.SetProfileRequest.Builder requestBuilder =
         wit.typeshowcase.SetProfileRequest.newBuilder();
-    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
-    requestBuilder.setProfile(java.util.Objects.requireNonNull(profile, "profile"));
+    requestBuilder.setUserId(options.getUserId());
+    requestBuilder.setProfile(options.getProfile());
     wit.typeshowcase.SetProfileRequest request = requestBuilder.build();
     return executeSetProfile(request);
   }
@@ -108,11 +104,12 @@ public final class TypeShowcaseOperations {
     return result;
   }
 
-  public static void recordSync(String userId, wit.typeshowcase.SyncReport report) {
+  public static void recordSync(wit.typeshowcase.RecordSyncOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.RecordSyncRequest.Builder requestBuilder =
         wit.typeshowcase.RecordSyncRequest.newBuilder();
-    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
-    requestBuilder.setReport(java.util.Objects.requireNonNull(report, "report"));
+    requestBuilder.setUserId(options.getUserId());
+    requestBuilder.setReport(options.getReport());
     wit.typeshowcase.RecordSyncRequest request = requestBuilder.build();
     executeRecordSync(request);
   }
@@ -129,17 +126,12 @@ public final class TypeShowcaseOperations {
     return;
   }
 
-  public static void deactivate(String userId) {
-    deactivate(userId, wit.typeshowcase.DeactivateOptions.getDefaultInstance());
-  }
-
-  public static void deactivate(String userId, wit.typeshowcase.DeactivateOptions options) {
+  public static void deactivate(wit.typeshowcase.DeactivateOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.DeactivateRequest.Builder requestBuilder =
         wit.typeshowcase.DeactivateRequest.newBuilder();
-    requestBuilder.setUserId(java.util.Objects.requireNonNull(userId, "userId"));
-    if (options != null) {
-      if (options.getReason() != null) requestBuilder.setReason(options.getReason());
-    }
+    requestBuilder.setUserId(options.getUserId());
+    if (options.getReason() != null) requestBuilder.setReason(options.getReason());
     wit.typeshowcase.DeactivateRequest request = requestBuilder.build();
     executeDeactivate(request);
   }

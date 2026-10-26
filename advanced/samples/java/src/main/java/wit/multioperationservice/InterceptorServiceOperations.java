@@ -5,10 +5,12 @@ package wit.multioperationservice;
 public final class InterceptorServiceOperations {
   private InterceptorServiceOperations() {}
 
-  public static wit.multioperationservice.Response firstOperation(String id) {
+  public static wit.multioperationservice.Response firstOperation(
+      wit.multioperationservice.FirstOperationOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
     wit.multioperationservice.Request.Builder requestBuilder =
         wit.multioperationservice.Request.newBuilder();
-    requestBuilder.setId(java.util.Objects.requireNonNull(id, "id"));
+    requestBuilder.setId(options.getId());
     wit.multioperationservice.Request request = requestBuilder.build();
     return executeFirstOperation(request);
   }
@@ -30,10 +32,12 @@ public final class InterceptorServiceOperations {
     return result;
   }
 
-  public static wit.multioperationservice.Response secondOperation(String id) {
+  public static wit.multioperationservice.Response secondOperation(
+      wit.multioperationservice.SecondOperationOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
     wit.multioperationservice.Request.Builder requestBuilder =
         wit.multioperationservice.Request.newBuilder();
-    requestBuilder.setId(java.util.Objects.requireNonNull(id, "id"));
+    requestBuilder.setId(options.getId());
     wit.multioperationservice.Request request = requestBuilder.build();
     return executeSecondOperation(request);
   }

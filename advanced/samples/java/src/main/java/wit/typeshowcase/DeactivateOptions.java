@@ -3,14 +3,16 @@ package wit.typeshowcase;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class DeactivateOptions {
+  private final String userId;
   private final String reason;
 
-  public static DeactivateOptions getDefaultInstance() {
-    return DeactivateOptions.newBuilder().build();
+  private DeactivateOptions(String userId, String reason) {
+    this.userId = java.util.Objects.requireNonNull(userId, "userId");
+    this.reason = reason;
   }
 
-  private DeactivateOptions(String reason) {
-    this.reason = reason;
+  public String getUserId() {
+    return userId;
   }
 
   public String getReason() {
@@ -34,7 +36,15 @@ public final class DeactivateOptions {
 
     private Builder(DeactivateOptions value) {
       if (value == null) return;
+      this.userId = value.userId;
       this.reason = value.reason;
+    }
+
+    private String userId = null;
+
+    public Builder setUserId(String value) {
+      this.userId = value;
+      return this;
     }
 
     private String reason = null;
@@ -45,7 +55,7 @@ public final class DeactivateOptions {
     }
 
     public DeactivateOptions build() {
-      return new DeactivateOptions(reason);
+      return new DeactivateOptions(userId, reason);
     }
   }
 }

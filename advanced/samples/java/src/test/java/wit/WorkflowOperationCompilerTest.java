@@ -22,13 +22,15 @@ class WorkflowOperationCompilerTest {
     for (int arity = 0; arity <= 6; arity++) {
       for (boolean procedure : new boolean[] {false, true}) {
         for (boolean signalArgument : new boolean[] {false, true}) {
-          String name =
-              (procedure ? "void" : "value")
-                  + " workflow arity "
-                  + arity
-                  + ", signal arity "
-                  + (signalArgument ? 1 : 0);
-          tests.add(check(name, call(arity, procedure, signalArgument), true));
+          tests.add(
+              check(
+                  (procedure ? "void" : "value")
+                      + " workflow arity "
+                      + arity
+                      + ", signal arity "
+                      + (signalArgument ? 1 : 0),
+                  call(arity, procedure, signalArgument),
+                  true));
         }
       }
     }
@@ -37,90 +39,109 @@ class WorkflowOperationCompilerTest {
     tests.add(
         check(
             "signal arity two",
-            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\", \"id\","
-                + " \"queue\", t::signalTwo, \"a\", \"b\");",
+            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\","
+                + " t::signalTwo, \"a\", \"b\", options);",
             false));
     tests.add(
         check(
             "workflow missing argument",
-            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"id\", \"queue\","
-                + " t::signal, \"signal\");",
+            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, t::signal,"
+                + " \"signal\", options);",
             false));
     tests.add(
         check(
             "workflow excess argument",
             "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\","
-                + " \"extra\", \"id\", \"queue\", t::signal, \"signal\");",
+                + " \"extra\", t::signal, \"signal\", options);",
             false));
     tests.add(
         check(
             "workflow wrong type",
-            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, 42, \"id\","
-                + " \"queue\", t::signal, \"signal\");",
+            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, 42, t::signal,"
+                + " \"signal\", options);",
             false));
     tests.add(
         check(
             "signal missing argument",
-            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\", \"id\","
-                + " \"queue\", t::signal);",
+            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\","
+                + " t::signal, options);",
             false));
     tests.add(
         check(
             "signal excess argument",
-            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\", \"id\","
-                + " \"queue\", t::signal, \"signal\", \"extra\");",
+            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\","
+                + " t::signal, \"signal\", \"extra\", options);",
             false));
     tests.add(
         check(
             "signal wrong type",
-            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\", \"id\","
-                + " \"queue\", t::signal, 42);",
+            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\","
+                + " t::signal, 42, options);",
             false));
     tests.add(
         check(
             "wrong generic workflow result",
             "Target1 t=null; WorkflowOperations.<String, String,"
-                + " Integer>signalWithStartWorkflow(t::run, \"input\", \"id\", \"queue\","
-                + " t::signal, \"signal\");",
+                + " Integer>signalWithStartWorkflow(t::run, \"input\", t::signal, \"signal\","
+                + " options);",
             false));
     tests.add(
         check(
             "correct generic workflow result",
             "Target1 t=null; WorkflowOperations.<String, String,"
-                + " String>signalWithStartWorkflow(t::run, \"input\", \"id\", \"queue\", t::signal,"
-                + " \"signal\");",
+                + " String>signalWithStartWorkflow(t::run, \"input\", t::signal, \"signal\","
+                + " options);",
             true));
     tests.add(
         check(
             "valid nested generic arguments",
             "Generic t=null; WorkflowOperations.signalWithStartWorkflow(t::run,"
-                + " Collections.singletonList(\"input\"), \"id\", \"queue\", t::signal,"
-                + " Collections.singletonMap(\"key\", 1));",
+                + " Collections.singletonList(\"input\"), t::signal,"
+                + " Collections.singletonMap(\"key\", 1), options);",
             true));
     tests.add(
         check(
             "wrong nested workflow generic argument",
             "Generic t=null; WorkflowOperations.signalWithStartWorkflow(t::run,"
-                + " Collections.singletonList(42), \"id\", \"queue\", t::signal,"
-                + " Collections.singletonMap(\"key\", 1));",
+                + " Collections.singletonList(42), t::signal, Collections.singletonMap(\"key\", 1),"
+                + " options);",
             false));
     tests.add(
         check(
             "wrong nested signal generic argument",
             "Generic t=null; WorkflowOperations.signalWithStartWorkflow(t::run,"
-                + " Collections.singletonList(\"input\"), \"id\", \"queue\", t::signal,"
-                + " Collections.singletonMap(\"key\", \"bad\"));",
+                + " Collections.singletonList(\"input\"), t::signal,"
+                + " Collections.singletonMap(\"key\", \"bad\"), options);",
             false));
-    for (boolean options : new boolean[] {false, true}) {
-      tests.add(
-          check(
-              "untyped higher arities, options=" + options,
-              "WorkflowOperations.signalWithStartWorkflow(\"type\", new Object[]{1,2,3,4,5,6,7},"
-                  + " \"id\", \"queue\", \"signal\", new Object[]{1,2}"
-                  + (options ? ", SignalWithStartWorkflowOptions.getDefaultInstance()" : "")
-                  + ");",
-              true));
-    }
+    tests.add(
+        check(
+            "untyped higher arities",
+            "WorkflowOperations.signalWithStartWorkflow(\"type\", new Object[]{1,2,3,4,5,6,7},"
+                + " \"signal\", new Object[]{1,2}, options);",
+            true));
+    tests.add(
+        check(
+            "typed options are required",
+            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\","
+                + " t::signal, \"signal\");",
+            false));
+    tests.add(
+        check(
+            "zero-arity typed options are required",
+            "Target0 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, t::signalZero);",
+            false));
+    tests.add(
+        check(
+            "untyped options are required",
+            "WorkflowOperations.signalWithStartWorkflow(\"type\", new Object[0], \"signal\", new"
+                + " Object[0]);",
+            false));
+    tests.add(
+        check(
+            "ID and task queue cannot be top-level arguments",
+            "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\", \"id\","
+                + " \"queue\", t::signal, \"signal\", options);",
+            false));
     tests.add(
         check(
             "workflow arguments cannot be options",
@@ -131,6 +152,19 @@ class WorkflowOperationCompilerTest {
             "signal arguments cannot be options",
             "SignalWithStartWorkflowOptions.newBuilder().setSignalArgs(\"signal\");",
             false));
+    tests.add(
+        check(
+            "generic operation takes only options",
+            "wit.genericmodels.CompleteOptions<String> genericOptions = null;"
+                + " wit.genericmodels.GenericModelServiceOperations.complete(genericOptions);",
+            true));
+    tests.add(
+        check(
+            "generic result type cannot be a top-level argument",
+            "wit.genericmodels.CompleteOptions<String> genericOptions = null;"
+                + " wit.genericmodels.GenericModelServiceOperations.complete(Object.class,"
+                + " genericOptions);",
+            false));
     return tests;
   }
 
@@ -140,7 +174,13 @@ class WorkflowOperationCompilerTest {
         () -> {
           JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
           assertNotNull(compiler, "Compiler tests require a JDK");
-          String code = declarations() + "void check() { " + body + " } }";
+          String code =
+              declarations()
+                  + "void check() { SignalWithStartWorkflowOptions options ="
+                  + " SignalWithStartWorkflowOptions.newBuilder().setId(\"id\").setTaskQueue(\"queue\").build();"
+                  + " "
+                  + body
+                  + " } }";
           JavaFileObject source =
               new SimpleJavaFileObject(
                   URI.create("string:///CompilerCase.java"), JavaFileObject.Kind.SOURCE) {
@@ -211,10 +251,7 @@ class WorkflowOperationCompilerTest {
                 + arity
                 + " t=null; WorkflowOperations.signalWithStartWorkflow(t::run, ");
     for (int i = 0; i < arity; i++) source.append("\"arg").append(i).append("\", ");
-    source
-        .append("\"id\", \"queue\", ")
-        .append(signalArgument ? "t::signal, \"signal\"" : "t::signalZero");
-    if (arity % 2 == 0) source.append(", SignalWithStartWorkflowOptions.getDefaultInstance()");
-    return source.append(");").toString();
+    source.append(signalArgument ? "t::signal, \"signal\"" : "t::signalZero");
+    return source.append(", options);").toString();
   }
 }

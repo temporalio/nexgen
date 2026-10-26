@@ -3,14 +3,18 @@ package wit.startworkflow;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class CancelWorkflowOptions {
+  private final wit.startworkflow.WorkflowExecution workflowExecution;
   private final String reason;
 
-  public static CancelWorkflowOptions getDefaultInstance() {
-    return CancelWorkflowOptions.newBuilder().build();
+  private CancelWorkflowOptions(
+      wit.startworkflow.WorkflowExecution workflowExecution, String reason) {
+    this.workflowExecution =
+        java.util.Objects.requireNonNull(workflowExecution, "workflowExecution");
+    this.reason = reason;
   }
 
-  private CancelWorkflowOptions(String reason) {
-    this.reason = reason;
+  public wit.startworkflow.WorkflowExecution getWorkflowExecution() {
+    return workflowExecution;
   }
 
   public String getReason() {
@@ -34,7 +38,15 @@ public final class CancelWorkflowOptions {
 
     private Builder(CancelWorkflowOptions value) {
       if (value == null) return;
+      this.workflowExecution = value.workflowExecution;
       this.reason = value.reason;
+    }
+
+    private wit.startworkflow.WorkflowExecution workflowExecution = null;
+
+    public Builder setWorkflowExecution(wit.startworkflow.WorkflowExecution value) {
+      this.workflowExecution = value;
+      return this;
     }
 
     private String reason = null;
@@ -45,7 +57,7 @@ public final class CancelWorkflowOptions {
     }
 
     public CancelWorkflowOptions build() {
-      return new CancelWorkflowOptions(reason);
+      return new CancelWorkflowOptions(workflowExecution, reason);
     }
   }
 }
