@@ -19,59 +19,6 @@ namespace Nexgen.StreamService
         StreamStatusExpired = 3,
     }
 
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamResponse.TransferTypeConverter))]
-    [GeneratedCode("nexgen", null)]
-    public record CreateStreamResponse
-    {
-        public StreamRef? Stream { get; init; }
-        public bool? Created { get; init; }
-        public StreamStatus? Status { get; init; }
-
-        internal static CreateStreamResponse FromTransferType(StreamSample.V1.CreateStreamResponse wire)
-        {
-            return new CreateStreamResponse()
-            {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
-                Created = wire.Created == false ? null : wire.Created,
-                Status = (int)wire.Status == 0 ? null : (StreamStatus)wire.Status,
-            };
-        }
-
-        internal StreamSample.V1.CreateStreamResponse ToTransferType()
-        {
-            var proto = new StreamSample.V1.CreateStreamResponse();
-            if (Stream is { } stream)
-            {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
-            }
-            if (Created is { } created)
-            {
-                proto.Created = created;
-            }
-            if (Status is { } status)
-            {
-                proto.Status = (StreamSample.V1.StreamStatus)status;
-            }
-            return proto;
-        }
-
-        /// <summary>
-        /// Converts this model to and from its generated transfer type.
-        /// </summary>
-        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
-        {
-            /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.CreateStreamResponse);
-
-            /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamResponse)value).ToTransferType();
-
-            /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamResponse.FromTransferType((StreamSample.V1.CreateStreamResponse)transferType);
-        }
-
-    }
-
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(AppendRecord.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record AppendRecord
@@ -348,20 +295,57 @@ namespace Nexgen.StreamService
 
     }
 
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamResult.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record CreateStreamResult
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="CreateStreamResult"/> class.
-        /// </summary>
-        public CreateStreamResult(Stream stream)
-        {
-            Stream = stream;
-        }
-
-        public Stream Stream { get; init; }
+        public StreamRef? Stream { get; init; }
         public bool? Created { get; init; }
         public StreamStatus? Status { get; init; }
+
+        internal static CreateStreamResult FromTransferType(StreamSample.V1.CreateStreamResponse wire)
+        {
+            return new CreateStreamResult()
+            {
+                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
+                Created = wire.Created == false ? null : wire.Created,
+                Status = (int)wire.Status == 0 ? null : (StreamStatus)wire.Status,
+            };
+        }
+
+        internal StreamSample.V1.CreateStreamResponse ToTransferType()
+        {
+            var proto = new StreamSample.V1.CreateStreamResponse();
+            if (Stream is { } stream)
+            {
+                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
+            }
+            if (Created is { } created)
+            {
+                proto.Created = created;
+            }
+            if (Status is { } status)
+            {
+                proto.Status = (StreamSample.V1.StreamStatus)status;
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(StreamSample.V1.CreateStreamResponse);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamResult)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamResult.FromTransferType((StreamSample.V1.CreateStreamResponse)transferType);
+        }
+
     }
 
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(DescribeStreamRequest.TransferTypeConverter))]

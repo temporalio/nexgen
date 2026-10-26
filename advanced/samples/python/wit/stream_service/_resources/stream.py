@@ -27,6 +27,8 @@ class Stream:
     """A handle on one stream, built from its ref."""
 
     stream: StreamRef
+    created: bool | None
+    status: StreamStatus | None
 
     async def append_records(
         self,
@@ -75,13 +77,6 @@ class Stream:
         )
         handle = await _describe_stream(request)
         return await handle
-
-
-@dataclasses.dataclass(slots=True)
-class CreateStreamResult:
-    stream: Stream
-    created: bool | None = None
-    status: StreamStatus | None = None
 
 
 async def _append_records(

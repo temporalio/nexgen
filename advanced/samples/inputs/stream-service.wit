@@ -107,7 +107,7 @@ interface stream-service {
 
   /// @nexus.doc "A handle on one stream, built from its ref."
   resource %stream {
-    constructor(%stream: stream-ref);
+    constructor(%stream: stream-ref, created: option<bool>, status: option<stream-status>);
 
     /// @nexus.doc "Append records. The answer has the first and the last offset."
     append-records: func(records: list<append-record>) -> append-records-response;
@@ -126,13 +126,9 @@ interface stream-service {
     describe: func() -> describe-stream-response;
   }
 
-  // The stream binds from the stream field of the response, and the other fields stay beside it.
+  // The stream binds its ref and the facts of the create from the response.
   /// @nexus.proto "streamsample.v1.CreateStreamResponse" typescript-import="#streamsample"
-  record create-stream-result {
-    %stream: own<%stream>,
-    created: option<bool>,
-    status: option<stream-status>,
-  }
+  type create-stream-result = own<%stream>;
 
   /// @nexus.operation name="CreateStream"
   create-stream: func(request: create-stream-request) -> create-stream-result;

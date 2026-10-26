@@ -2,6 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type {
+  StreamStatus,
   StreamRef,
   AppendRecordsResponse,
   AppendRecord,
@@ -14,7 +15,11 @@ import { readRecords } from "./operations/read-records";
 import { describeStream } from "./operations/describe-stream";
 
 export class Stream {
-  public constructor(public readonly stream: StreamRef) {}
+  public constructor(
+    public readonly stream: StreamRef,
+    public readonly created: boolean | undefined,
+    public readonly status: StreamStatus | undefined,
+  ) {}
 
   public async appendRecords(records: AppendRecord[]): Promise<AppendRecordsResponse> {
     const request = { stream: this.stream, records: records };

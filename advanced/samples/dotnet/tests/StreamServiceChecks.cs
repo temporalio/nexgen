@@ -10,7 +10,7 @@ namespace Nexgen.DotNetExamples.Tests
         public void StreamWithItsOwnFieldNameRoundTrips()
         {
             var converter = DataConverter.Default.PayloadConverter;
-            var stream = new StreamServiceExample.Stream(new StreamServiceExample.StreamRef("stream-1"));
+            var stream = new StreamServiceExample.Stream(new StreamServiceExample.StreamRef("stream-1"), null, null);
 
             var decoded = converter.ToValue<StreamServiceExample.Stream>(converter.ToPayload(stream));
 

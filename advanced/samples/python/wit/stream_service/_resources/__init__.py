@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from .stream import (
-    Stream,
-    CreateStreamResult,
-)
+from .stream import Stream
 
 __all__ = [
     "Stream",
-    "CreateStreamResult",
 ]

@@ -4,7 +4,6 @@ import type { streamsample } from "#streamsample";
 import type * as common from "@temporalio/common";
 import type Long from "long";
 import * as support from "../../support/temporal_model_converters";
-import type { Stream } from "./resources";
 
 function requiredField<T>(
   value: T | null | undefined,
@@ -24,15 +23,15 @@ export enum StreamStatus {
   StreamStatusExpired = 3,
 }
 
-export interface CreateStreamResponse {
+export interface CreateStreamResult {
   stream?: StreamRef;
   created?: boolean;
   status?: StreamStatus;
 }
 
-function createStreamResponseFromProto(
+function createStreamResultFromProto(
   proto: streamsample.v1.ICreateStreamResponse,
-): CreateStreamResponse {
+): CreateStreamResult {
   return {
     stream: proto.stream == null ? undefined : streamRefFromProto(proto.stream),
     created: proto.created ?? undefined,
@@ -40,8 +39,8 @@ function createStreamResponseFromProto(
   };
 }
 
-function createStreamResponseToProto(
-  model: CreateStreamResponse,
+function createStreamResultToProto(
+  model: CreateStreamResult,
 ): streamsample.v1.ICreateStreamResponse {
   return {
     stream: model.stream == null ? undefined : streamRefToProto(model.stream),
@@ -53,13 +52,13 @@ function createStreamResponseToProto(
   };
 }
 
-export const createStreamResponseTransferTypeConverter = {
-  fromTransferType(value: streamsample.v1.ICreateStreamResponse): CreateStreamResponse {
-    return createStreamResponseFromProto(value);
+export const createStreamResultTransferTypeConverter = {
+  fromTransferType(value: streamsample.v1.ICreateStreamResponse): CreateStreamResult {
+    return createStreamResultFromProto(value);
   },
 
-  toTransferType(value: CreateStreamResponse): streamsample.v1.ICreateStreamResponse {
-    return createStreamResponseToProto(value);
+  toTransferType(value: CreateStreamResult): streamsample.v1.ICreateStreamResponse {
+    return createStreamResultToProto(value);
   },
 };
 export interface StreamRef {
@@ -460,8 +459,3 @@ export const describeStreamRequestTransferTypeConverter = {
     return describeStreamRequestToProto(value);
   },
 };
-export interface CreateStreamResult {
-  stream: Stream;
-  created?: boolean;
-  status?: StreamStatus;
-}

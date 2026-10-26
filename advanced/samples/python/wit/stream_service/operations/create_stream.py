@@ -7,18 +7,15 @@ import temporalio.workflow
 
 from ..models import (
     CreateStreamRequest,
-    CreateStreamResponse,
+    CreateStreamResult,
     StreamRef,
 )
-from .._resources import (
-    CreateStreamResult,
-    Stream,
-)
+from .._resources import Stream
 
 
 async def _create_stream(
     request: CreateStreamRequest,
-) -> CreateStreamResult:
+) -> Stream:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="streamsample.v1.StreamService",
         endpoint="streams",
@@ -26,17 +23,15 @@ async def _create_stream(
     handle = await nexus_client.start_operation(
         operation="CreateStream",
         input=request,
-        output_type=CreateStreamResponse,
+        output_type=CreateStreamResult,
     )
     result = await handle
     if result.stream is None:
         raise RuntimeError("CreateStream answered without `stream`")
-    return CreateStreamResult(
-        stream=Stream(
-            stream=result.stream,
-        ),
-        created=result.created,
-        status=result.status,
+    return Stream(
+        stream=result.stream,
+        created=result.created or None,
+        status=result.status or None,
     )
 
 
@@ -44,7 +39,7 @@ async def create_stream(
     *,
     ref: StreamRef | None = None,
     retention: datetime.timedelta | None = None,
-) -> CreateStreamResult:
+) -> Stream:
     request = CreateStreamRequest(
         ref=ref,
         retention=retention,

@@ -15,12 +15,16 @@ namespace Nexgen.StreamService
     [GeneratedCode("nexgen", null)]
     public class Stream
     {
-        public Stream(StreamRef streamValue)
+        public Stream(StreamRef streamValue, bool? created, StreamStatus? status)
         {
             StreamValue = streamValue;
+            Created = created;
+            Status = status;
         }
 
         public StreamRef StreamValue { get; }
+        public bool? Created { get; }
+        public StreamStatus? Status { get; }
 
         [GeneratedCode("nexgen", null)]
         public Task<AppendRecordsResponse> AppendRecordsAsync(IReadOnlyList<AppendRecord> records)
