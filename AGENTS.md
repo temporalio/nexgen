@@ -44,6 +44,19 @@
   The Rust stage of `cargo validate` also runs this suite. Reserve inline unit
   tests for internal invariants rather than end-to-end rejection scenarios.
 
+## Generation tests
+
+- Do not add tests that validate generated code by comparing output strings,
+  searching for substrings, or counting occurrences in generated source.
+- For new generation scenarios, extend an existing sample or add a new one.
+  Regenerate its checked-in outputs and add target-language tests that compile
+  and exercise the generated API, conversions, or runtime behavior.
+- Rely on sample regeneration and native sample validation for output already
+  covered by a sample. Do not add duplicate source or file-existence checks.
+- Test internal compiler decisions and invariants directly through the owning
+  parser, pass, planner, or backend helper and its actual data, rather than
+  inferring those decisions from emitted source.
+
 ## Stacked pull requests
 
 When asked to create a stack of pull requests, use the

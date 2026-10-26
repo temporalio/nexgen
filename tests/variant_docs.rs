@@ -7,7 +7,7 @@ use nexgen::language::Language;
 
 #[path = "../validation-tests/tests/support/variant_docs.rs"]
 mod variant_docs;
-use variant_docs::{VARIANTS, experimental_variants, generate, generate_proto_variants};
+use variant_docs::{VARIANTS, experimental_variants, generate};
 
 #[test]
 fn python_variant_docs_select_overrides_and_preserve_tagged_tuples() {
@@ -50,31 +50,6 @@ fn typescript_variant_docs_select_overrides_and_escape_comments() {
     assert!(models.contains("   * Single case."));
     assert!(!models.contains("Python-only case."));
     assert!(!models.contains("Default variant."));
-    fs::remove_dir_all(output.parent().unwrap()).unwrap();
-}
-
-#[test]
-fn python_proto_variant_docs_render_on_alias_and_case_classes() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let output = generate_proto_variants(root);
-    let models = fs::read_to_string(output.join("models.py")).unwrap();
-    assert!(models.contains(
-        "class OnCompleteRequest(typing.Generic[OutputT, SourceContextT]):\n    \"\"\"A notification that reports that a source operation completed.\n\n    .. warning::\n        This API is experimental and subject to change.\n    \"\"\""
-    ));
-    assert!(models.contains(
-        "class OnCompleteResponse:\n    \"\"\"An empty response that acknowledges a completion notification.\n\n    .. warning::\n        This API is experimental and subject to change.\n    \"\"\""
-    ));
-    assert!(models.contains(
-        "class OnCompleteRequestResultSuccess(typing.Generic[OutputT]):\n    \"\"\"The source operation completed successfully with this output.\"\"\""
-    ));
-    assert!(models.contains(
-        "class OnCompleteRequestResultFailure:\n    \"\"\"The source operation failed, including timeout, cancellation, and application\n    errors.\n    \"\"\""
-    ));
-    assert!(models.contains(
-        ")\n\"\"\"The successful output or failure of the source operation.\n\n.. warning::\n    This API is experimental and subject to change.\n\"\"\""
-    ));
-    // Only the two records and variant alias carry warnings, not case classes.
-    assert_eq!(models.matches(".. warning::").count(), 3);
     fs::remove_dir_all(output.parent().unwrap()).unwrap();
 }
 

@@ -62,7 +62,15 @@ fn python_variant_docs_select_overrides_and_preserve_tagged_tuples_parse() {
 
 #[test]
 fn python_proto_variant_docs_render_on_alias_and_case_classes_parse() {
-    let output = variant_docs::generate_proto_variants(&project_root());
+    let root = project_root();
+    let source =
+        fs::read_to_string(root.join("advanced/samples/inputs/notification-service.wit")).unwrap();
+    let output = variant_docs::generate(
+        &root,
+        nexgen::language::Language::Python,
+        &source,
+        &[root.join("advanced/samples/inputs/deps")],
+    );
     assert_variant_docs_python_parses(&output);
     fs::remove_dir_all(output.parent().unwrap()).unwrap();
 }

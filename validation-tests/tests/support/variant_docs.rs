@@ -83,14 +83,3 @@ pub fn generate(
     .unwrap();
     output
 }
-
-pub fn generate_proto_variants(root: &Path) -> PathBuf {
-    let source =
-        fs::read_to_string(root.join("advanced/samples/inputs/notification-service.wit")).unwrap();
-    generate(
-        root,
-        Language::Python,
-        &source,
-        &[root.join("advanced/samples/inputs/deps")],
-    )
-}

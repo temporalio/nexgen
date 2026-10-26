@@ -15,8 +15,6 @@ mod common;
 use common::wit_input_path;
 
 const PRIMARY_EXAMPLE_ID: &str = "workflow-service";
-const START_WORKFLOW_EXAMPLE_ID: &str = "start-workflow";
-const TYPE_ROUNDTRIP_EXAMPLE_ID: &str = "type-roundtrip";
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// A property whose union has one inline structured object branch (named
@@ -371,18 +369,6 @@ fn linked_inputs_path(root: &Path) -> PathBuf {
     root.join("advanced/samples/inputs/deps")
 }
 
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
-}
-
 fn read_typescript_output_files(dir: &Path) -> BTreeMap<PathBuf, String> {
     fn visit(root: &Path, dir: &Path, files: &mut BTreeMap<PathBuf, String>) {
         let mut entries = fs::read_dir(dir)
@@ -443,24 +429,6 @@ fn generate_typescript_files(
     let files = read_typescript_output_files(&output_path);
     fs::remove_dir_all(temp_dir).unwrap();
     files
-}
-
-#[test]
-fn typescript_proto_model_only_examples_emit_only_model_files() {
-    let root = project_root();
-    // Types, exports, and conversion behavior are exercised by the TypeScript
-    // sample tests. Here the contract is the output layout, not source spelling.
-    for example in ["notification-service", "proto-generic", "proto-oneof"] {
-        let files = generate_typescript_files(
-            &example_input_paths(&root, example),
-            &[descriptor_path(&root)],
-        );
-        assert_eq!(
-            files.into_keys().collect::<Vec<_>>(),
-            vec![PathBuf::from("index.ts"), PathBuf::from("models.ts")],
-            "model-only example {example} must not emit service or operation modules",
-        );
-    }
 }
 
 fn unique_output_path(label: &str) -> PathBuf {
@@ -545,196 +513,6 @@ interface models {
     assert!(rendered.contains("import * as support from './support';"));
     assert!(rendered.contains("support.workflowNamespace()"));
     fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn typescript_renders_required_fields_and_custom_message_types() {
-    let root = project_root();
-    let rendered = generate_typescript_to_string(
-        &example_input_paths(&root, PRIMARY_EXAMPLE_ID),
-        &[descriptor_path(&root)],
-    );
-
-    assert!(!rendered.contains("type _RequestWithFunctionField<"));
-    assert!(!rendered.contains("type _RequestWithArgumentsField<"));
-    assert!(!rendered.contains("type SignalWithStartWorkflowRequestBase = {"));
-    assert!(rendered.contains("export type SignalWithStartWorkflowRequest<"));
-    assert!(rendered.contains("export type ReplaceSignalWithStartWorkflowRequest<Base, New>"));
-    assert!(rendered.contains(
-        "WorkflowFn extends (...args: any[]) => Promise<any> = (...args: any[]) => Promise<any>,"
-    ));
-    assert!(rendered.contains(
-        "SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>"
-    ));
-    assert!(rendered.contains("> = ReplaceSignalWithStartWorkflowRequest<"));
-    assert!(rendered.contains(
-        "SignalValue extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
-    ));
-    assert!(rendered.contains("SignalArgs extends any[] = SignalValue extends"));
-    assert!(rendered.contains("signalArgs: SignalArgs | Readonly<SignalArgs>;"));
-    assert!(rendered.contains("signalArgs?: SignalArgs | Readonly<SignalArgs>;"));
-    assert!(
-        rendered
-            .contains("Workflow type name or workflow function identifying the workflow to start.")
-    );
-    assert!(rendered.contains("workflow: string;"));
-    assert!(rendered.contains("Arguments for workflow."));
-    assert!(rendered.contains("args?: ReadonlyArray<unknown>;"));
-    assert!(rendered.contains("Arguments for signal."));
-    assert!(rendered.contains("signalArgs?: ReadonlyArray<unknown>;"));
-    assert!(rendered.contains("* Unique identifier for the workflow execution. Must be nonempty."));
-    assert!(!rendered.contains("@property workflow"));
-    assert!(rendered.contains("* @returns A workflow handle to the started workflow."));
-    assert!(rendered.contains("id: string;"));
-    assert!(rendered.contains("taskQueue: string;"));
-    assert!(rendered.contains("runTimeout?: common.Duration;"));
-    assert!(rendered.contains("idReusePolicy?: common.WorkflowIdReusePolicy;"));
-    assert!(rendered.contains("idConflictPolicy?: common.WorkflowIdConflictPolicy;"));
-    assert!(!rendered.contains("identity?: string;"));
-    assert!(rendered.contains("memo?: Record<string, unknown>;"));
-    assert!(rendered.contains("searchAttributes?: common.TypedSearchAttributes;"));
-    assert!(!rendered.contains("common.TypedSearchAttributes | common.SearchAttributes"));
-    assert!(rendered.contains("versioningOverride?: common.VersioningOverride;"));
-    assert!(rendered.contains("priority?: common.Priority;"));
-    assert!(rendered.contains("signal: string;"));
-    assert!(rendered.contains("staticSummary?: string;"));
-    assert!(rendered.contains("staticDetails?: string;"));
-    assert!(!rendered.contains("userMetadata?: UserMetadata;"));
-    assert!(!rendered.contains("### support.ts"));
-    assert!(rendered.contains("### index.ts"));
-    let index_rendered = rendered
-        .split("### index.ts")
-        .nth(1)
-        .expect("rendered output should include index.ts");
-    assert!(!index_rendered.contains("export * from './support.ts';"));
-    assert!(rendered.contains("support.retryPolicyFromProto("));
-    assert!(!index_rendered.contains("export const SignalWithStartWorkflowRequest = {"));
-    assert!(!index_rendered.contains("const UserMetadata = {"));
-    assert!(index_rendered.contains("function userMetadataFromProto("));
-    assert!(index_rendered.contains("function signalWithStartWorkflowRequestToProto<"));
-    assert!(rendered.contains("workflowType: support.workflowTypeToProto("));
-    assert!(rendered.contains("input: requestArgsToPayloads(model.args, model.workflow),"));
-    assert!(
-        rendered.contains("signalInput: requestArgsToPayloads(model.signalArgs, model.signal),")
-    );
-    assert!(!rendered.contains("_RequestArgsToPayloads"));
-    let signal_request_to_proto = rendered
-        .split("function signalWithStartWorkflowRequestToProto<")
-        .nth(1)
-        .and_then(|body| {
-            body.split("export async function signalWithStartWorkflow")
-                .next()
-        })
-        .expect("signal-with-start request renderer should be present");
-    let workflow_type_index = signal_request_to_proto
-        .find("workflowType: support.workflowTypeToProto(")
-        .expect("workflow type should be serialized");
-    let input_index = signal_request_to_proto
-        .find("input: requestArgsToPayloads(model.args, model.workflow),")
-        .expect("workflow args should be serialized");
-    let workflow_id_index = signal_request_to_proto
-        .find("workflowId: requiredField(")
-        .expect("workflow id should be serialized");
-    let task_queue_index = signal_request_to_proto
-        .find("taskQueue: support.taskQueueToProto(")
-        .expect("task queue should be serialized");
-    let signal_name_index = signal_request_to_proto
-        .find("signalName:")
-        .expect("signal name should be serialized");
-    assert!(workflow_type_index < input_index);
-    assert!(input_index < workflow_id_index);
-    assert!(workflow_id_index < task_queue_index);
-    assert!(task_queue_index < signal_name_index);
-    assert!(rendered.contains("signalName: support.signalFunctionName("));
-    assert!(!rendered.contains("signalName: ((value) =>"));
-    assert!(rendered.contains("workflowType: support.workflowTypeToProto("));
-    assert!(rendered.contains("taskQueue: support.taskQueueToProto("));
-    assert!(rendered.contains(
-        "workflowRunTimeout: model.runTimeout == null ? undefined : support.durationToProto(model.runTimeout),"
-    ));
-    assert!(rendered.contains("common.WorkflowIdReusePolicy.ALLOW_DUPLICATE"));
-    assert!(rendered.contains("workflowIdReusePolicy: support.workflowIdReusePolicyToProto("));
-    assert!(!rendered.contains("workflowIdReusePolicyToProto(0"));
-    assert!(rendered.contains("workflowIdConflictPolicy:"));
-    assert!(!rendered.contains("workflowIdConflictPolicyToProto(0"));
-    assert!(rendered.contains("model.idConflictPolicy == null"));
-    assert!(rendered.contains("support.workflowIdConflictPolicyToProto(model.idConflictPolicy)"));
-    assert!(
-        rendered
-            .contains("memo: model.memo == null ? undefined : support.memoToProto(model.memo),")
-    );
-    assert!(rendered.contains(
-        "searchAttributes: model.searchAttributes == null ? undefined : support.searchAttributesToProto(model.searchAttributes),"
-    ));
-    assert!(rendered.contains(
-        "priority: model.priority == null ? undefined : support.priorityToProto(model.priority),"
-    ));
-    assert!(rendered.contains("model.staticSummary == null && model.staticDetails == null"));
-    assert!(rendered.contains("summary: model.staticSummary == null"));
-    assert!(rendered.contains("support.valueToPayload(model.staticSummary)"));
-    assert!(rendered.contains("requestArgsToPayloads(model.args, model.workflow)"));
-    assert!(!rendered.contains("common.defaultPayloadConverter"));
-    assert!(!rendered.contains("payloadToProto(payload: unknown"));
-    assert!(!rendered.contains("function isPayload("));
-    assert!(rendered.contains(
-        "versioningOverride: model.versioningOverride == null ? undefined : support.versioningOverrideToProto(model.versioningOverride),"
-    ));
-    assert!(rendered.contains("support.taskQueueFromProto("));
-    assert!(rendered.contains("support.taskQueueToProto("));
-    assert!(
-        rendered.contains(
-            "): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionRequest {"
-        )
-    );
-    assert!(rendered.contains("const result = await handle.result();"));
-    assert!(rendered.contains("return workflow.getExternalWorkflowHandle("));
-    assert!(rendered.contains("request.id"));
-    assert!(rendered.contains("result.runId ?? undefined"));
-    assert!(rendered.contains("export async function signalWithStartWorkflow<"));
-    assert!(rendered.contains(
-        "export { signalWithStartWorkflow } from './operations/signal-with-start-workflow';"
-    ));
-    assert!(rendered.contains("export type { SignalWithStartWorkflowRequest } from './models';"));
-    assert!(!rendered.contains("export { WorkflowService } from './services';"));
-    assert!(!rendered.contains("export type { SignalWithStartWorkflowResponse"));
-    assert!(rendered.contains("headers?: never"));
-    assert!(
-        rendered.contains("requestInput: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,")
-    );
-    assert!(rendered.contains("const client = workflow.createNexusServiceClient({"));
-    assert!(!rendered.contains("export class WorkflowServiceClient"));
-    assert!(rendered.contains("): Promise<ExternalWorkflowHandle> {"));
-    assert!(!rendered.contains("SignalWithStartWorkflowRequest = {\n  fromProto("));
-    assert!(!rendered.contains("export interface SignalWithStartWorkflowRequest {"));
-    assert!(!rendered.contains("export interface RetryPolicy"));
-    assert!(!rendered.contains("export interface WorkflowType"));
-    assert!(!rendered.contains("export interface TaskQueue"));
-    assert!(!rendered.contains("export interface Duration"));
-    assert!(!rendered.contains("export interface Memo"));
-    assert!(!rendered.contains("export interface SearchAttributes"));
-    assert!(!rendered.contains("export interface Priority"));
-    assert!(!rendered.contains("export interface VersioningOverride"));
-    assert!(!rendered.contains("export enum WorkflowIdReusePolicy"));
-    assert!(!rendered.contains("export enum WorkflowIdConflictPolicy"));
-    assert!(!rendered.contains("signalWithStartWorkflowExecution("));
-    assert!(!rendered.contains("from './temporal_model_converters.ts'"));
-
-    let start_workflow_rendered = generate_typescript_to_string(
-        &example_input_paths(&root, START_WORKFLOW_EXAMPLE_ID),
-        &[descriptor_path(&root)],
-    );
-    assert!(
-        start_workflow_rendered
-            .contains("export type CancelWorkflowResponse = Record<string, never>;")
-    );
-    assert!(!start_workflow_rendered.contains("export interface CancelWorkflowResponse {}"));
-
-    let type_roundtrip_rendered = generate_typescript_to_string(
-        &example_input_paths(&root, TYPE_ROUNDTRIP_EXAMPLE_ID),
-        &[descriptor_path(&root)],
-    );
-    assert!(type_roundtrip_rendered.contains("retryPolicy: common.RetryPolicy;"));
-    assert!(!type_roundtrip_rendered.contains("retryPolicyOperation"));
 }
 
 /// An inline **structured** object `oneOf` branch on a property: the branch is
