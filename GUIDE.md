@@ -495,7 +495,9 @@ wrapper (for WIT-direct fields) or proto field presence semantics (for
 proto-backed fields).
 
 In a record with `@nexus.proto`, write a proto `bytes` field as `list<u8>`.
-nexgen generates the field as bytes. In other records, `list<u8>` is a list of
+nexgen generates Python `bytes`, TypeScript `Uint8Array`, Go `[]byte`, or .NET
+`byte[]`. The .NET converters translate between `byte[]` and protobuf
+`ByteString` at the wire boundary. In other records, `list<u8>` is a list of
 integers, like any other `list<T>`.
 
 ---
