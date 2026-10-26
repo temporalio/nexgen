@@ -91,17 +91,18 @@ A System Nexus operation that returns a resource.
   [`typescript/wit/workflow-service/`](typescript/wit/workflow-service/),
   [`typescript/tests/workflow-service.test.ts`](typescript/tests/workflow-service.test.ts)
 
-### `type-roundtrip`
+### `proto-backed-showcase`
 
-- WIT: [`inputs/type-roundtrip.wit`](inputs/type-roundtrip.wit)
-- .NET: [`dotnet/wit/type-roundtrip/`](dotnet/wit/type-roundtrip/)
-- Go: [`go/typeroundtrip/`](go/typeroundtrip/),
-  [`go/tests/typeroundtrip_test.go`](go/tests/typeroundtrip_test.go)
-- Python: [`python/wit/type_roundtrip/`](python/wit/type_roundtrip/),
-  [`python/tests/test_type_roundtrip.py`](python/tests/test_type_roundtrip.py)
+- WIT: [`inputs/proto-backed-showcase.wit`](inputs/proto-backed-showcase.wit)
+- .NET: [`dotnet/wit/proto-backed-showcase/`](dotnet/wit/proto-backed-showcase/)
+- Go: [`go/protobackedshowcase/`](go/protobackedshowcase/),
+  [`go/tests/protobackedshowcase_test.go`](go/tests/protobackedshowcase_test.go)
+- Python:
+  [`python/wit/proto_backed_showcase/`](python/wit/proto_backed_showcase/),
+  [`python/tests/test_proto_backed_showcase.py`](python/tests/test_proto_backed_showcase.py)
 - TypeScript:
-  [`typescript/wit/type-roundtrip/`](typescript/wit/type-roundtrip/),
-  [`typescript/tests/type-roundtrip.test.ts`](typescript/tests/type-roundtrip.test.ts)
+  [`typescript/wit/proto-backed-showcase/`](typescript/wit/proto-backed-showcase/),
+  [`typescript/tests/proto-backed-showcase.test.ts`](typescript/tests/proto-backed-showcase.test.ts)
 
 ### `notification-service`
 

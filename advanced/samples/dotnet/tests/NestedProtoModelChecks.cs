@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Nexgen.TypeRoundtripService;
+using Nexgen.ProtoBackedShowcaseService;
 using Xunit;
 using Wire = Temporalio.Api;
 

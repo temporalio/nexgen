@@ -2,11 +2,11 @@ import * as common from "@temporalio/common";
 import {
   activityOptionsOperation,
   failureOperation,
-} from "../../wit/type-roundtrip/index.ts";
+} from "../../wit/proto-backed-showcase/index.ts";
 
 const TASK_QUEUE = "demo-task-queue";
 
-export async function typeRoundtripCaller(): Promise<{
+export async function protoBackedShowcaseCaller(): Promise<{
   failureCauseMessage: string | undefined;
   failureDetails: unknown[] | undefined;
   failureMessage: string | undefined;

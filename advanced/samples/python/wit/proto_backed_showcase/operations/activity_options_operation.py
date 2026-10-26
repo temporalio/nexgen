@@ -13,7 +13,7 @@ async def _activity_options_operation(
     request: ActivityOptions,
 ) -> temporalio.workflow.NexusOperationHandle[ActivityOptions,]:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="TypeRoundtripService",
+        service="ProtoBackedShowcaseService",
         endpoint="temporal-system",
     )
     return await nexus_client.start_operation(

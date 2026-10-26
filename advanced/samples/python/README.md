@@ -52,11 +52,11 @@ keeps its authored converters in [`temporal_support/`](temporal_support/). Its
 generated code. From the repository root, the corresponding command is:
 
 ```sh
-cargo run --features advanced -- python advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- python advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package temporal_support \
-  --native-api --output advanced/samples/python/wit/type_roundtrip
+  --native-api --output advanced/samples/python/wit/proto_backed_showcase
 ```
 
 To make your package importable, install it or put its parent directory on

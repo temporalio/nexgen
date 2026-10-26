@@ -16,7 +16,7 @@ import type {
   BadBinaries,
 } from "./models";
 
-export const typeRoundtripService = nexus.service("TypeRoundtripService", {
+export const protoBackedShowcaseService = nexus.service("ProtoBackedShowcaseService", {
   activityOptionsOperation: nexus.operation<ActivityOptions, ActivityOptions>({
     name: "ActivityOptionsOperation",
     inputType: { transferTypeConverter: activityOptionsTransferTypeConverter },

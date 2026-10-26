@@ -10,12 +10,12 @@ using NexusRpc;
 using Temporalio.Converters;
 using Nexgen.Support;
 
-namespace Nexgen.TypeRoundtripService
+namespace Nexgen.ProtoBackedShowcaseService
 {
 
     [GeneratedCode("nexgen", null)]
-    [NexusService("TypeRoundtripService")]
-    internal interface ITypeRoundtripService
+    [NexusService("ProtoBackedShowcaseService")]
+    internal interface IProtoBackedShowcaseService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("ActivityOptionsOperation")]
@@ -67,20 +67,20 @@ namespace Nexgen.TypeRoundtripService
 
     internal static class NexgenOperationRegistry
     {
-        private static readonly ServiceDefinition TypeRoundtripServiceServiceDefinition = ServiceDefinition.FromType<ITypeRoundtripService>();
+        private static readonly ServiceDefinition ProtoBackedShowcaseServiceServiceDefinition = ServiceDefinition.FromType<IProtoBackedShowcaseService>();
 
         internal static IReadOnlyDictionary<(string Service, string Operation), INexgenOperationInfo> Operations { get; } = new Dictionary<(string Service, string Operation), INexgenOperationInfo>
         {
-            [("TypeRoundtripService", "ActivityOptionsOperation")] = new NexgenOperationInfo<ActivityOptions, ActivityOptions>(
-                TypeRoundtripServiceServiceDefinition.Operations["ActivityOptionsOperation"]),
-            [("TypeRoundtripService", "FailureOperation")] = new NexgenOperationInfo<FailureContainer, FailureContainer>(
-                TypeRoundtripServiceServiceDefinition.Operations["FailureOperation"]),
-            [("TypeRoundtripService", "WorkflowExecutionInfoOperation")] = new NexgenOperationInfo<WorkflowExecutionInfo, WorkflowExecutionInfo>(
-                TypeRoundtripServiceServiceDefinition.Operations["WorkflowExecutionInfoOperation"]),
-            [("TypeRoundtripService", "TaskQueuePartitionsOperation")] = new NexgenOperationInfo<TaskQueuePartitions, TaskQueuePartitions>(
-                TypeRoundtripServiceServiceDefinition.Operations["TaskQueuePartitionsOperation"]),
-            [("TypeRoundtripService", "BadBinariesOperation")] = new NexgenOperationInfo<BadBinaries, BadBinaries>(
-                TypeRoundtripServiceServiceDefinition.Operations["BadBinariesOperation"]),
+            [("ProtoBackedShowcaseService", "ActivityOptionsOperation")] = new NexgenOperationInfo<ActivityOptions, ActivityOptions>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["ActivityOptionsOperation"]),
+            [("ProtoBackedShowcaseService", "FailureOperation")] = new NexgenOperationInfo<FailureContainer, FailureContainer>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["FailureOperation"]),
+            [("ProtoBackedShowcaseService", "WorkflowExecutionInfoOperation")] = new NexgenOperationInfo<WorkflowExecutionInfo, WorkflowExecutionInfo>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["WorkflowExecutionInfoOperation"]),
+            [("ProtoBackedShowcaseService", "TaskQueuePartitionsOperation")] = new NexgenOperationInfo<TaskQueuePartitions, TaskQueuePartitions>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["TaskQueuePartitionsOperation"]),
+            [("ProtoBackedShowcaseService", "BadBinariesOperation")] = new NexgenOperationInfo<BadBinaries, BadBinaries>(
+                ProtoBackedShowcaseServiceServiceDefinition.Operations["BadBinariesOperation"]),
         };
     }
 

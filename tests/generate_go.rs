@@ -759,7 +759,7 @@ fn go_proto_models_use_the_configured_support_package() {
     let root = project_root();
     let rendered = generate_to_string_with_inputs(
         nexgen::language::Language::Go,
-        &example_input_paths(&root, "type-roundtrip"),
+        &example_input_paths(&root, "proto-backed-showcase"),
         &[descriptor_path(&root)],
     )
     .unwrap();

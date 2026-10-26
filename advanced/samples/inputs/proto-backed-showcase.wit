@@ -1,11 +1,11 @@
 package temporal:nexus@1.0.0;
 
 world system {
-  export type-roundtrip-service;
+  export proto-backed-showcase-service;
 }
 
 /// @nexus.endpoint "temporal-system"
-interface type-roundtrip-service {
+interface proto-backed-showcase-service {
   use nexus:temporal-types/model@1.0.0.{
     duration,
     failure,

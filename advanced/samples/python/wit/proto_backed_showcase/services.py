@@ -13,7 +13,7 @@ from .models import (
 
 
 @service
-class TypeRoundtripService:
+class ProtoBackedShowcaseService:
     activity_options_operation: Operation[
         ActivityOptions,
         ActivityOptions,

@@ -131,11 +131,11 @@ path, not the package name or a `.go` file path. For the sample
 `support`. For example:
 
 ```sh
-cargo run --features advanced -- go advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- go advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package go.temporal.io/sdk/advanced/samples/go/support \
-  --native-api --output advanced/samples/go/typeroundtrip
+  --native-api --output advanced/samples/go/protobackedshowcase
 ```
 
 Export converter functions from the support package. For
@@ -168,11 +168,11 @@ submodule is not enough if they are not re-exported. Generated code imports
 `_support.retry_policy_to_proto(value)` or `_support.payloads_to_proto(values)`.
 
 ```sh
-cargo run --features advanced -- python advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- python advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package temporal_support \
-  --native-api --output advanced/samples/python/wit/type_roundtrip
+  --native-api --output advanced/samples/python/wit/proto_backed_showcase
 ```
 
 Your runtime must also be able to `import temporal_support` (for example,
@@ -195,17 +195,17 @@ Export helpers from a TypeScript module and pass either an installed package
 specifier (for example `@my-org/nexgen-support`) or a path
 **relative to the output directory**, not the directory in which you run the
 CLI. For the sample output root
-`advanced/samples/typescript/wit/type-roundtrip`, the sample module is
+`advanced/samples/typescript/wit/proto-backed-showcase`, the sample module is
 `../../support/temporal_model_converters`; generated `models.ts` imports it as
 `support`. Nexgen adjusts that relative specifier for nested files such as
 `operations/<operation>.ts`.
 
 ```sh
-cargo run --features advanced -- typescript advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- typescript advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package ../../support/temporal_model_converters \
-  --native-api --output advanced/samples/typescript/wit/type-roundtrip
+  --native-api --output advanced/samples/typescript/wit/proto-backed-showcase
 ```
 
 Export the exact WIT-named or derived converter functions, for example
@@ -239,11 +239,11 @@ directories, explicitly include the authored sources (see
 [`Nexgen.DotNetMultiOperationService.csproj`](advanced/samples/dotnet/Nexgen.DotNetMultiOperationService.csproj)).
 
 ```sh
-cargo run --features advanced -- dotnet advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package Nexgen.Support \
-  --native-api --output advanced/samples/dotnet/wit/type-roundtrip
+  --native-api --output advanced/samples/dotnet/wit/proto-backed-showcase
 ```
 
 Generated calls qualify helper names with `Nexgen.Support`; where extension

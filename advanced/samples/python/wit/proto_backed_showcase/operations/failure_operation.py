@@ -11,7 +11,7 @@ async def _failure_operation(
     request: FailureContainer,
 ) -> temporalio.workflow.NexusOperationHandle[FailureContainer,]:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="TypeRoundtripService",
+        service="ProtoBackedShowcaseService",
         endpoint="temporal-system",
     )
     return await nexus_client.start_operation(

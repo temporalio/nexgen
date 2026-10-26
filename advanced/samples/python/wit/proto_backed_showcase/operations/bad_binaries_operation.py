@@ -14,7 +14,7 @@ async def _bad_binaries_operation(
     request: BadBinaries,
 ) -> temporalio.workflow.NexusOperationHandle[BadBinaries,]:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="TypeRoundtripService",
+        service="ProtoBackedShowcaseService",
         endpoint="temporal-system",
     )
     return await nexus_client.start_operation(

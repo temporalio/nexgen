@@ -23,19 +23,19 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"google.golang.org/protobuf/proto"
 
-	tr "go.temporal.io/sdk/advanced/samples/go/typeroundtrip"
+	tr "go.temporal.io/sdk/advanced/samples/go/protobackedshowcase"
 )
 
-const typeRoundtripServiceName = "TypeRoundtripService"
+const protoBackedShowcaseServiceName = "ProtoBackedShowcaseService"
 
-type TypeRoundtripIntegrationSuite struct {
+type ProtoBackedShowcaseIntegrationSuite struct {
 	suite.Suite
 	testsuite.WorkflowTestSuite
 	env   *testsuite.TestWorkflowEnvironment
 	calls []nexusCall
 }
 
-func (s *TypeRoundtripIntegrationSuite) SetupTest() {
+func (s *ProtoBackedShowcaseIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
 	s.calls = nil
 
@@ -62,7 +62,7 @@ func (s *TypeRoundtripIntegrationSuite) SetupTest() {
 			return input, nil
 		})
 
-	service := nexus.NewService(typeRoundtripServiceName)
+	service := nexus.NewService(protoBackedShowcaseServiceName)
 	s.NoError(service.Register(activityOptionsOp))
 	s.NoError(service.Register(failureOp))
 	s.NoError(service.Register(nexus.NewSyncOperation("WorkflowExecutionInfoOperation",
@@ -83,11 +83,11 @@ func (s *TypeRoundtripIntegrationSuite) SetupTest() {
 	s.env.RegisterNexusService(service)
 }
 
-func TestTypeRoundtripIntegrationSuite(t *testing.T) {
-	suite.Run(t, new(TypeRoundtripIntegrationSuite))
+func TestProtoBackedShowcaseIntegrationSuite(t *testing.T) {
+	suite.Run(t, new(ProtoBackedShowcaseIntegrationSuite))
 }
 
-type typeRoundtripResults struct {
+type protoBackedShowcaseResults struct {
 	ActivityOption      tr.ActivityOptions
 	FailureCauseMessage string
 	FailureCauseType    string
@@ -97,7 +97,7 @@ type typeRoundtripResults struct {
 	FailureType         string
 }
 
-func (s *TypeRoundtripIntegrationSuite) TestProtoRoundTrips() {
+func (s *ProtoBackedShowcaseIntegrationSuite) TestProtoRoundTrips() {
 	policy := temporal.RetryPolicy{MaximumAttempts: 3}
 	priority := temporal.Priority{
 		PriorityKey:    4,
@@ -105,8 +105,8 @@ func (s *TypeRoundtripIntegrationSuite) TestProtoRoundTrips() {
 		FairnessWeight: 2.5,
 	}
 
-	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*typeRoundtripResults, error) {
-		var results typeRoundtripResults
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*protoBackedShowcaseResults, error) {
+		var results protoBackedShowcaseResults
 		// Public Temporal SDK types are converted to protobuf at the Nexus
 		// boundary, then converted back when the future resolves.
 		if err := tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{
@@ -154,7 +154,7 @@ func (s *TypeRoundtripIntegrationSuite) TestProtoRoundTrips() {
 
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
-	var results typeRoundtripResults
+	var results protoBackedShowcaseResults
 	s.NoError(s.env.GetWorkflowResult(&results))
 	s.Equal(int32(3), results.ActivityOption.RetryPolicy.MaximumAttempts)
 	s.Require().NotNil(results.ActivityOption.TaskQueue)
@@ -187,7 +187,7 @@ func (s *TypeRoundtripIntegrationSuite) TestProtoRoundTrips() {
 	s.Equal("inner failure", failureInput.GetFailure().GetCause().GetMessage())
 }
 
-func (s *TypeRoundtripIntegrationSuite) TestFailureOperationPreservesAbsence() {
+func (s *ProtoBackedShowcaseIntegrationSuite) TestFailureOperationPreservesAbsence() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) (bool, error) {
 		var result tr.FailureContainer
 		if err := tr.FailureOperation(ctx, tr.FailureOperationOptions{}).Get(ctx, &result); err != nil {
@@ -205,7 +205,7 @@ func (s *TypeRoundtripIntegrationSuite) TestFailureOperationPreservesAbsence() {
 	s.Nil(s.calls[0].Input.(*commandpb.FailWorkflowExecutionCommandAttributes).GetFailure())
 }
 
-func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly() {
+func (s *ProtoBackedShowcaseIntegrationSuite) TestActivityOptionsOperationRequiredOnly() {
 	policy := temporal.RetryPolicy{MaximumAttempts: 5}
 
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*tr.ActivityOptions, error) {
@@ -230,7 +230,7 @@ func (s *TypeRoundtripIntegrationSuite) TestActivityOptionsOperationRequiredOnly
 	s.Equal(int32(5), handlerInput.GetRetryPolicy().GetMaximumAttempts())
 }
 
-func (s *TypeRoundtripIntegrationSuite) TestNestedModelRoundTrips() {
+func (s *ProtoBackedShowcaseIntegrationSuite) TestNestedModelRoundTrips() {
 	cases := []struct {
 		name       string
 		execution  tr.WorkflowExecutionInfo

@@ -12,7 +12,7 @@ using Google.Protobuf.WellKnownTypes;
 using Temporalio.Workflows;
 using Nexgen.Support;
 
-namespace Nexgen.TypeRoundtripService
+namespace Nexgen.ProtoBackedShowcaseService
 {
 
     [GeneratedCode("nexgen", null)]
@@ -72,12 +72,12 @@ namespace Nexgen.TypeRoundtripService
     public static class Operations
     {
         [GeneratedCode("nexgen", null)]
-        private const string TypeRoundtripServiceEndpoint = "temporal-system";
+        private const string ProtoBackedShowcaseServiceEndpoint = "temporal-system";
 
         [GeneratedCode("nexgen", null)]
         private static async Task<ActivityOptions> ActivityOptionsOperationAsync(ActivityOptions request)
         {
-            var client = Workflow.CreateNexusWorkflowClient<ITypeRoundtripService>(TypeRoundtripServiceEndpoint);
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<ActivityOptions>(svc => svc.ActivityOptionsOperation(request)).ConfigureAwait(true);
             return result;
         }
@@ -98,7 +98,7 @@ namespace Nexgen.TypeRoundtripService
         [GeneratedCode("nexgen", null)]
         private static async Task<FailureContainer> FailureOperationAsync(FailureContainer request)
         {
-            var client = Workflow.CreateNexusWorkflowClient<ITypeRoundtripService>(TypeRoundtripServiceEndpoint);
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<FailureContainer>(svc => svc.FailureOperation(request)).ConfigureAwait(true);
             return result;
         }
@@ -117,7 +117,7 @@ namespace Nexgen.TypeRoundtripService
         [GeneratedCode("nexgen", null)]
         private static async Task<WorkflowExecutionInfo> WorkflowExecutionInfoOperationAsync(WorkflowExecutionInfo request)
         {
-            var client = Workflow.CreateNexusWorkflowClient<ITypeRoundtripService>(TypeRoundtripServiceEndpoint);
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<WorkflowExecutionInfo>(svc => svc.WorkflowExecutionInfoOperation(request)).ConfigureAwait(true);
             return result;
         }
@@ -136,7 +136,7 @@ namespace Nexgen.TypeRoundtripService
         [GeneratedCode("nexgen", null)]
         private static async Task<TaskQueuePartitions> TaskQueuePartitionsOperationAsync(TaskQueuePartitions request)
         {
-            var client = Workflow.CreateNexusWorkflowClient<ITypeRoundtripService>(TypeRoundtripServiceEndpoint);
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<TaskQueuePartitions>(svc => svc.TaskQueuePartitionsOperation(request)).ConfigureAwait(true);
             return result;
         }
@@ -155,7 +155,7 @@ namespace Nexgen.TypeRoundtripService
         [GeneratedCode("nexgen", null)]
         private static async Task<BadBinaries> BadBinariesOperationAsync(BadBinaries request)
         {
-            var client = Workflow.CreateNexusWorkflowClient<ITypeRoundtripService>(TypeRoundtripServiceEndpoint);
+            var client = Workflow.CreateNexusWorkflowClient<IProtoBackedShowcaseService>(ProtoBackedShowcaseServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<BadBinaries>(svc => svc.BadBinariesOperation(request)).ConfigureAwait(true);
             return result;
         }

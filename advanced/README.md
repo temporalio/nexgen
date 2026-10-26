@@ -65,9 +65,10 @@ replaced without deleting these authored helpers.
 - [`workflow-service`](samples/inputs/workflow-service.wit): a proto-backed
   `SignalWithStartWorkflowExecution` example showing flattened APIs, function
   arguments, sourced fields, support converters, and output transforms.
-- [`type-roundtrip`](samples/inputs/type-roundtrip.wit): a proto-backed type
-  roundtrip example for focused native/proto conversion coverage, including
-  retry policies, activity options, durations, task queues, and priority.
+- [`proto-backed-showcase`](samples/inputs/proto-backed-showcase.wit): a
+  proto-backed type roundtrip example for focused native/proto conversion
+  coverage, including retry policies, activity options, durations, task queues,
+  and priority.
 - [`notification-service`](samples/inputs/notification-service.wit): a
   proto-backed notification completion payload with generic source-context and
   output values, generated for Python, .NET, and TypeScript.

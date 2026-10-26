@@ -51,33 +51,33 @@ __nexus_operation_registry__: dict[
     tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
 ] = {
     (
-        "TypeRoundtripService",
+        "ProtoBackedShowcaseService",
         "ActivityOptionsOperation",
     ): _NexusOperationInfo(
-        operation=_services.TypeRoundtripService.activity_options_operation,
+        operation=_services.ProtoBackedShowcaseService.activity_options_operation,
     ),
     (
-        "TypeRoundtripService",
+        "ProtoBackedShowcaseService",
         "FailureOperation",
     ): _NexusOperationInfo(
-        operation=_services.TypeRoundtripService.failure_operation,
+        operation=_services.ProtoBackedShowcaseService.failure_operation,
     ),
     (
-        "TypeRoundtripService",
+        "ProtoBackedShowcaseService",
         "WorkflowExecutionInfoOperation",
     ): _NexusOperationInfo(
-        operation=_services.TypeRoundtripService.workflow_execution_info_operation,
+        operation=_services.ProtoBackedShowcaseService.workflow_execution_info_operation,
     ),
     (
-        "TypeRoundtripService",
+        "ProtoBackedShowcaseService",
         "TaskQueuePartitionsOperation",
     ): _NexusOperationInfo(
-        operation=_services.TypeRoundtripService.task_queue_partitions_operation,
+        operation=_services.ProtoBackedShowcaseService.task_queue_partitions_operation,
     ),
     (
-        "TypeRoundtripService",
+        "ProtoBackedShowcaseService",
         "BadBinariesOperation",
     ): _NexusOperationInfo(
-        operation=_services.TypeRoundtripService.bad_binaries_operation,
+        operation=_services.ProtoBackedShowcaseService.bad_binaries_operation,
     ),
 }

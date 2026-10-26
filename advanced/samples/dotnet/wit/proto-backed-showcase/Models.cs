@@ -7,7 +7,7 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using Nexgen.Support;
 
-namespace Nexgen.TypeRoundtripService
+namespace Nexgen.ProtoBackedShowcaseService
 {
 
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ActivityOptions.TransferTypeConverter))]

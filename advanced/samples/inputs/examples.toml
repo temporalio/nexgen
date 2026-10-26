@@ -11,7 +11,7 @@ descriptors = "temporal"
 [start-workflow]
 descriptors = "temporal"
 
-[type-roundtrip]
+[proto-backed-showcase]
 descriptors = "temporal"
 
 [proto-generic]

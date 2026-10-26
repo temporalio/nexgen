@@ -6,8 +6,8 @@ snapshot-only native-api form of the JSON-Schema inputs.
 - `TemporalSupport/` — authored converters and workflow-service helpers shared
   by the generated projects.
 - `wit/` — generated output per WIT example (`workflow-service`, `user-service`,
-  `type-showcase`, `type-roundtrip`, `start-workflow`, `function-execution`):
-  models, operations, and Nexus service interfaces.
+  `type-showcase`, `proto-backed-showcase`, `start-workflow`,
+  `function-execution`): models, operations, and Nexus service interfaces.
 - `json_schema/api/` — native-api (service + client) output for the JSON-Schema
   inputs. Snapshot-only: regenerated and diffed by the Rust tests, not exercised
   by runtime tests here.
@@ -41,11 +41,11 @@ For example, this repository keeps support sources in
 directories. They declare `namespace Nexgen.Support`:
 
 ```sh
-cargo run --features advanced -- dotnet advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package Nexgen.Support \
-  --native-api --output advanced/samples/dotnet/wit/type-roundtrip
+  --native-api --output advanced/samples/dotnet/wit/proto-backed-showcase
 ```
 
 If your project disables default compile items or excludes the support

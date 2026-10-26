@@ -72,15 +72,15 @@ For example, this repository exports `retryPolicyToProto` and
 `durationFromProto` from
 [`support/temporal_model_converters.ts`](support/temporal_model_converters.ts),
 outside the generated `wit/<example>/` directories. The module is
-`../../support/temporal_model_converters` relative to its `wit/type-roundtrip`
-output directory:
+`../../support/temporal_model_converters` relative to its
+`wit/proto-backed-showcase` output directory:
 
 ```sh
-cargo run --features advanced -- typescript advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- typescript advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package ../../support/temporal_model_converters \
-  --native-api --output advanced/samples/typescript/wit/type-roundtrip
+  --native-api --output advanced/samples/typescript/wit/proto-backed-showcase
 ```
 
 Include both your authored module and generated output in your TypeScript

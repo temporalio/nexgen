@@ -4,9 +4,12 @@ import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import * as nexus from "nexus-rpc";
 
-import type { ActivityOptions, FailureContainer } from "../wit/type-roundtrip/index.ts";
-import { typeRoundtripService } from "../wit/type-roundtrip/services.ts";
-import { activityOptionsTransferTypeConverter } from "../wit/type-roundtrip/models.ts";
+import type {
+  ActivityOptions,
+  FailureContainer,
+} from "../wit/proto-backed-showcase/index.ts";
+import { protoBackedShowcaseService } from "../wit/proto-backed-showcase/services.ts";
+import { activityOptionsTransferTypeConverter } from "../wit/proto-backed-showcase/models.ts";
 import * as support from "../support/temporal_model_converters.ts";
 import {
   failureFromProto,
@@ -15,7 +18,7 @@ import {
 import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts";
 
 const workflowsPath = fileURLToPath(
-  new URL("./workflows/type-roundtrip.ts", import.meta.url),
+  new URL("./workflows/proto-backed-showcase.ts", import.meta.url),
 );
 
 // The handler is only a test transport. Give its copy of the generated
@@ -40,13 +43,13 @@ vi.mock("../support/temporal_model_converters.ts", async (importOriginal) => {
   };
 });
 
-describe("type-roundtrip generated output", () => {
+describe("proto-backed-showcase generated output", () => {
   test("exposes type roundtrip service metadata", () => {
-    expect(typeRoundtripService.name).toBe("TypeRoundtripService");
-    expect(typeRoundtripService.operations.activityOptionsOperation.name).toBe(
+    expect(protoBackedShowcaseService.name).toBe("ProtoBackedShowcaseService");
+    expect(protoBackedShowcaseService.operations.activityOptionsOperation.name).toBe(
       "ActivityOptionsOperation",
     );
-    expect(typeRoundtripService.operations.failureOperation.name).toBe(
+    expect(protoBackedShowcaseService.operations.failureOperation.name).toBe(
       "FailureOperation",
     );
   });
@@ -124,7 +127,7 @@ describe("type-roundtrip generated output", () => {
   test("round-trips proto-backed types through a real Nexus client", async () => {
     await withWorkflowEnvironment(async (env) => {
       const calls: Array<[string, unknown]> = [];
-      const handler = nexus.serviceHandler(typeRoundtripService, {
+      const handler = nexus.serviceHandler(protoBackedShowcaseService, {
         async activityOptionsOperation(_ctx, input) {
           calls.push(["ActivityOptionsOperation", input]);
           return input;
@@ -157,7 +160,7 @@ describe("type-roundtrip generated output", () => {
       }>(env, {
         endpoint: "temporal-system",
         nexusServices: [handler],
-        workflowType: "typeRoundtripCaller",
+        workflowType: "protoBackedShowcaseCaller",
         workflowsPath,
       });
 

@@ -14,7 +14,7 @@ async def _task_queue_partitions_operation(
     request: TaskQueuePartitions,
 ) -> temporalio.workflow.NexusOperationHandle[TaskQueuePartitions,]:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="TypeRoundtripService",
+        service="ProtoBackedShowcaseService",
         endpoint="temporal-system",
     )
     return await nexus_client.start_operation(

@@ -25,7 +25,7 @@ describe("generated private validation helpers", () => {
     "../wit/proto-generic/models.ts",
     "../wit/proto-oneof/models.ts",
     "../wit/start-workflow/models.ts",
-    "../wit/type-roundtrip/models.ts",
+    "../wit/proto-backed-showcase/models.ts",
     "../wit/workflow-service/models.ts",
     "../wit/start-workflow/operations/start-workflow.ts",
     "../wit/start-workflow/operations/restart-workflow.ts",

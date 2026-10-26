@@ -17,25 +17,25 @@ from temporalio import workflow
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
-import wit.type_roundtrip as type_roundtrip
-import wit.type_roundtrip.models as type_roundtrip_models
-import wit.type_roundtrip.services as type_roundtrip_services
+import wit.proto_backed_showcase as proto_backed_showcase
+import wit.proto_backed_showcase.models as proto_backed_showcase_models
+import wit.proto_backed_showcase.services as proto_backed_showcase_services
 
-OUTPUT_PATH = Path(__file__).resolve().parent.parent / "wit" / "type_roundtrip"
+OUTPUT_PATH = Path(__file__).resolve().parent.parent / "wit" / "proto_backed_showcase"
 TASK_QUEUE = "demo-task-queue"
 
-ACTIVITY_OPTIONS_OPERATION_INFO = type_roundtrip.__nexus_operation_registry__[
-    ("TypeRoundtripService", "ActivityOptionsOperation")
+ACTIVITY_OPTIONS_OPERATION_INFO = proto_backed_showcase.__nexus_operation_registry__[
+    ("ProtoBackedShowcaseService", "ActivityOptionsOperation")
 ]
 ACTIVITY_OPTIONS_OPERATION = ACTIVITY_OPTIONS_OPERATION_INFO.operation
-FAILURE_OPERATION_INFO = type_roundtrip.__nexus_operation_registry__[
-    ("TypeRoundtripService", "FailureOperation")
+FAILURE_OPERATION_INFO = proto_backed_showcase.__nexus_operation_registry__[
+    ("ProtoBackedShowcaseService", "FailureOperation")
 ]
 FAILURE_OPERATION = FAILURE_OPERATION_INFO.operation
 
 
-@service_handler(service=type_roundtrip_services.TypeRoundtripService)
-class TypeRoundtripServiceHandler:
+@service_handler(service=proto_backed_showcase_services.ProtoBackedShowcaseService)
+class ProtoBackedShowcaseServiceHandler:
     def __init__(self) -> None:
         self.calls: list[tuple[str, object]] = []
 
@@ -43,8 +43,8 @@ class TypeRoundtripServiceHandler:
     async def activity_options_operation(
         self,
         _ctx: StartOperationContext,
-        input: type_roundtrip_models.ActivityOptions,
-    ) -> type_roundtrip_models.ActivityOptions:
+        input: proto_backed_showcase_models.ActivityOptions,
+    ) -> proto_backed_showcase_models.ActivityOptions:
         self.calls.append(("ActivityOptionsOperation", input))
         converter = getattr(input, "__temporal_transfer_type_converter")
         proto = converter.to_transfer_type(input)
@@ -58,8 +58,8 @@ class TypeRoundtripServiceHandler:
     async def failure_operation(
         self,
         _ctx: StartOperationContext,
-        input: type_roundtrip_models.FailureContainer,
-    ) -> type_roundtrip_models.FailureContainer:
+        input: proto_backed_showcase_models.FailureContainer,
+    ) -> proto_backed_showcase_models.FailureContainer:
         self.calls.append(("FailureOperation", input))
         failure = input.failure
         assert isinstance(failure, temporalio.exceptions.ApplicationError)
@@ -75,35 +75,35 @@ class TypeRoundtripServiceHandler:
     async def workflow_execution_info_operation(
         self,
         _ctx: StartOperationContext,
-        input: type_roundtrip_models.WorkflowExecutionInfo,
-    ) -> type_roundtrip_models.WorkflowExecutionInfo:
+        input: proto_backed_showcase_models.WorkflowExecutionInfo,
+    ) -> proto_backed_showcase_models.WorkflowExecutionInfo:
         return input
 
     @sync_operation
     async def task_queue_partitions_operation(
         self,
         _ctx: StartOperationContext,
-        input: type_roundtrip_models.TaskQueuePartitions,
-    ) -> type_roundtrip_models.TaskQueuePartitions:
+        input: proto_backed_showcase_models.TaskQueuePartitions,
+    ) -> proto_backed_showcase_models.TaskQueuePartitions:
         return input
 
     @sync_operation
     async def bad_binaries_operation(
         self,
         _ctx: StartOperationContext,
-        input: type_roundtrip_models.BadBinaries,
-    ) -> type_roundtrip_models.BadBinaries:
+        input: proto_backed_showcase_models.BadBinaries,
+    ) -> proto_backed_showcase_models.BadBinaries:
         return input
 
 
 @pytest.mark.parametrize("populated", [False, True])
 def test_nested_model_collections_round_trip(populated: bool) -> None:
-    partitions = type_roundtrip_models.TaskQueuePartitions(
+    partitions = proto_backed_showcase_models.TaskQueuePartitions(
         workflow_task_queue_partitions=[
-            type_roundtrip_models.TaskQueuePartition(
+            proto_backed_showcase_models.TaskQueuePartition(
                 key="first", owner_host_name="first-host"
             ),
-            type_roundtrip_models.TaskQueuePartition(
+            proto_backed_showcase_models.TaskQueuePartition(
                 key="second", owner_host_name="second-host"
             ),
         ]
@@ -117,18 +117,18 @@ def test_nested_model_collections_round_trip(populated: bool) -> None:
         for item in wire_partitions.workflow_task_queue_partitions
     ] == ([("first", "first-host"), ("second", "second-host")] if populated else [])
     decoded_partitions = partition_converter.from_transfer_type(
-        wire_partitions, type_roundtrip_models.TaskQueuePartitions
+        wire_partitions, proto_backed_showcase_models.TaskQueuePartitions
     )
     assert decoded_partitions.workflow_task_queue_partitions == (
         partitions.workflow_task_queue_partitions or []
     )
 
-    binaries = type_roundtrip_models.BadBinaries(
+    binaries = proto_backed_showcase_models.BadBinaries(
         binaries={
-            "first": type_roundtrip_models.BadBinary(
+            "first": proto_backed_showcase_models.BadBinary(
                 reason="first-reason", operator="first-operator"
             ),
-            "second": type_roundtrip_models.BadBinary(
+            "second": proto_backed_showcase_models.BadBinary(
                 reason="second-reason", operator="second-operator"
             ),
         }
@@ -149,19 +149,19 @@ def test_nested_model_collections_round_trip(populated: bool) -> None:
         else {}
     )
     decoded_binaries = binary_converter.from_transfer_type(
-        wire_binaries, type_roundtrip_models.BadBinaries
+        wire_binaries, proto_backed_showcase_models.BadBinaries
     )
     assert decoded_binaries.binaries == (binaries.binaries or {})
 
 
 @workflow.defn
-class TypeRoundtripCallerWorkflow:
+class ProtoBackedShowcaseCallerWorkflow:
     @workflow.run
     async def run(
         self,
     ) -> tuple[str | None, int | None, int | None, str, str, bool, str]:
         retry_policy = temporalio.common.RetryPolicy(maximum_attempts=3)
-        activity_handle = await type_roundtrip.activity_options_operation(
+        activity_handle = await proto_backed_showcase.activity_options_operation(
             task_queue=TASK_QUEUE,
             schedule_to_close_timeout=datetime.timedelta(seconds=7),
             retry_policy=retry_policy,
@@ -183,7 +183,7 @@ class TypeRoundtripCallerWorkflow:
             non_retryable=True,
         )
         failure.__cause__ = cause
-        failure_handle = await type_roundtrip.failure_operation(failure=failure)
+        failure_handle = await proto_backed_showcase.failure_operation(failure=failure)
         failure_response = await failure_handle
         converted_failure = failure_response.failure
         assert isinstance(converted_failure, temporalio.exceptions.ApplicationError)
@@ -221,31 +221,32 @@ def test_generated_metadata() -> None:
     assert isinstance(ACTIVITY_OPTIONS_OPERATION, Operation)
     assert isinstance(FAILURE_OPERATION, Operation)
     assert (
-        type_roundtrip.__nexus_operation_registry__[
-            ("TypeRoundtripService", "ActivityOptionsOperation")
+        proto_backed_showcase.__nexus_operation_registry__[
+            ("ProtoBackedShowcaseService", "ActivityOptionsOperation")
         ].operation
         is ACTIVITY_OPTIONS_OPERATION
     )
     assert (
-        type_roundtrip.__nexus_operation_registry__[
-            ("TypeRoundtripService", "ActivityOptionsOperation")
+        proto_backed_showcase.__nexus_operation_registry__[
+            ("ProtoBackedShowcaseService", "ActivityOptionsOperation")
         ].serialization_context
         is None
     )
-    assert not hasattr(type_roundtrip, "TypeRoundtripService")
-    assert not hasattr(type_roundtrip, "ActivityOptions")
-    assert not hasattr(type_roundtrip, "FailureContainer")
+    assert not hasattr(proto_backed_showcase, "ProtoBackedShowcaseService")
+    assert not hasattr(proto_backed_showcase, "ActivityOptions")
+    assert not hasattr(proto_backed_showcase, "FailureContainer")
 
 
 def test_activity_options_round_trip() -> None:
-    activity_options = type_roundtrip_models.ActivityOptions(
+    activity_options = proto_backed_showcase_models.ActivityOptions(
         retry_policy=retry_policy(),
         task_queue=TASK_QUEUE,
         schedule_to_close_timeout=datetime.timedelta(seconds=7),
         priority=priority(),
     )
     converter = getattr(
-        type_roundtrip_models.ActivityOptions, "__temporal_transfer_type_converter"
+        proto_backed_showcase_models.ActivityOptions,
+        "__temporal_transfer_type_converter",
     )
     activity_proto = converter.to_transfer_type(activity_options)
     assert activity_proto.HasField("retry_policy")
@@ -254,7 +255,7 @@ def test_activity_options_round_trip() -> None:
     assert activity_proto.priority.priority_key == 4
     round_tripped_activity = converter.from_transfer_type(
         activity_proto,
-        type_roundtrip_models.ActivityOptions,
+        proto_backed_showcase_models.ActivityOptions,
     )
     assert isinstance(
         round_tripped_activity.retry_policy, temporalio.common.RetryPolicy
@@ -284,7 +285,7 @@ def test_failure_encoded_attributes_round_trip() -> None:
         failure=failure
     )
     converter = getattr(
-        type_roundtrip_models.FailureContainer,
+        proto_backed_showcase_models.FailureContainer,
         "__temporal_transfer_type_converter",
     )
     user_converters = temporalio.nexus.system._SystemNexusUserConverters(
@@ -295,7 +296,7 @@ def test_failure_encoded_attributes_round_trip() -> None:
     with temporalio.nexus.system._user_converter_context(user_converters):
         model = converter.from_transfer_type(
             proto,
-            type_roundtrip_models.FailureContainer,
+            proto_backed_showcase_models.FailureContainer,
         )
         round_tripped = converter.to_transfer_type(model)
 
@@ -310,26 +311,26 @@ def test_failure_encoded_attributes_round_trip() -> None:
     with temporalio.nexus.system._user_converter_context(user_converters):
         absent = converter.from_transfer_type(
             temporalio.api.command.v1.FailWorkflowExecutionCommandAttributes(),
-            type_roundtrip_models.FailureContainer,
+            proto_backed_showcase_models.FailureContainer,
         )
     assert absent.failure is None
 
 
 async def test_operations_use_real_nexus_client(env: WorkflowEnvironment) -> None:
     task_queue = str(uuid.uuid4())
-    service_handler = TypeRoundtripServiceHandler()
+    service_handler = ProtoBackedShowcaseServiceHandler()
 
     async with Worker(
         env.client,
         task_queue=task_queue,
-        workflows=[TypeRoundtripCallerWorkflow],
+        workflows=[ProtoBackedShowcaseCallerWorkflow],
         nexus_service_handlers=[service_handler],
         workflow_runner=UnsandboxedWorkflowRunner(),
     ):
         endpoint = await env.create_nexus_endpoint("temporal-system", task_queue)
         try:
             result = await env.client.execute_workflow(
-                TypeRoundtripCallerWorkflow.run,
+                ProtoBackedShowcaseCallerWorkflow.run,
                 id=str(uuid.uuid4()),
                 task_queue=task_queue,
             )
@@ -348,7 +349,7 @@ async def test_operations_use_real_nexus_client(env: WorkflowEnvironment) -> Non
     assert len(service_handler.calls) == 2
     activity_operation, activity_request = service_handler.calls[0]
     assert activity_operation == "ActivityOptionsOperation"
-    assert isinstance(activity_request, type_roundtrip_models.ActivityOptions)
+    assert isinstance(activity_request, proto_backed_showcase_models.ActivityOptions)
     failure_operation, failure_request = service_handler.calls[1]
     assert failure_operation == "FailureOperation"
-    assert isinstance(failure_request, type_roundtrip_models.FailureContainer)
+    assert isinstance(failure_request, proto_backed_showcase_models.FailureContainer)
