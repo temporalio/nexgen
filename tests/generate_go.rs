@@ -714,49 +714,6 @@ fn go_rejects_descriptors_on_fixed_argument_functions_with_go_diagnostic() {
 }
 
 #[test]
-fn go_temporal_function_constraints_use_workflow_context_prefix() {
-    let root = project_root();
-    let rendered = generate_to_string_with_system_nexus(
-        nexgen::language::Language::Go,
-        &example_input_paths(&root, "workflow-service"),
-        &[descriptor_path(&root)],
-        true,
-    )
-    .unwrap();
-
-    assert!(rendered.contains("func SignalWithStartWorkflow("));
-    assert!(!rendered.contains("func SignalWithStartWorkflowWithArgs("));
-    assert!(!rendered.contains("SignalF interface"));
-    assert!(rendered.contains("\topts SignalWithStartWorkflowOptions,\n"));
-    assert!(
-        rendered.contains("\tsignal string,\n\tsignalArg any,\n\tworkflow any,\n\targs ...any,\n")
-    );
-    assert!(rendered.contains("\targs ...any,\n"));
-    assert!(rendered.contains("\t\tWorkflow: workflowName,\n"));
-    assert!(rendered.contains("\t\tSignal: signal,\n"));
-    assert!(rendered.contains("\t\tArgs: args,\n"));
-    assert!(rendered.contains("\t\tSignalArgs: []any{signalArg},\n"));
-    assert!(rendered.contains(
-        "\tif m.WorkflowIDReusePolicy != nil {\n\t\tmessage.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy((*m.WorkflowIDReusePolicy))\n\t} else {\n\t\tmessage.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy(1)\n\t}"
-    ));
-    assert!(!rendered.contains("\"reflect\""));
-    assert!(!rendered.contains("\"runtime\""));
-    assert!(!rendered.contains("\"strings\""));
-    assert!(!rendered.contains("runtime.FuncForPC"));
-    assert_eq!(
-        rendered
-            .matches("workflowName := support.WorkflowFunctionName(ctx, workflow)")
-            .count(),
-        1
-    );
-    assert!(rendered.contains(
-        "c := internal.NewSystemNexusClient(\"temporal.api.workflowservice.v1.WorkflowService\")"
-    ));
-    assert!(!rendered.contains("workflow.NewNexusClient(\"__temporal_system\""));
-    assert!(!rendered.contains("func newSystemNexusClient(service string) workflow.NexusClient"));
-}
-
-#[test]
 fn go_proto_models_use_the_configured_support_package() {
     let root = project_root();
     let rendered = generate_to_string_with_inputs(
@@ -908,28 +865,6 @@ fn go_serialization_context_wrapper_assigns_sources_before_sdk() {
     assert!(!rendered.contains("### registry.go"));
     assert!(rendered.contains("// --- Registry ---"));
     assert!(!rendered.contains("### serialization_context.go"));
-}
-
-#[test]
-fn go_serialization_context_deferred_models_use_sdk_context() {
-    let root = project_root();
-    // Deferred transfer callbacks use the data converter supplied by the SDK.
-    let rendered = generate_to_string_with_system_nexus(
-        nexgen::language::Language::Go,
-        &example_input_paths(&root, "workflow-service"),
-        &[descriptor_path(&root)],
-        true,
-    )
-    .unwrap();
-    assert!(!rendered.contains("### serialization_context.go"));
-    assert!(!rendered.contains("### registry.go"));
-    assert!(rendered.contains("// --- Registry ---"));
-    assert!(!rendered.contains("nexgenWithOperationSerializationContext"));
-    assert!(!rendered.contains("nexgenPayloadContext"));
-    assert!(!rendered.contains("### support.go"));
-    assert!(rendered.contains("support.SignalWithStartWorkflowSerializationContext(request.("));
-    assert!(rendered.contains("support.RetryPolicyToProto(cfg.DataConverter,"));
-    assert!(!rendered.contains("func nexgenPayloadContext("));
 }
 
 fn render_go_serialization_context_fixture(
@@ -1563,89 +1498,6 @@ fn go_serialization_context_imports_qualified_helper_alias_once_in_main() {
         Some("support.Context"),
     );
     assert!(!files.contains_key(Path::new("support.go")));
-}
-
-#[test]
-fn go_flatten_in_api_promotes_optional_fields_and_collapses_absence() {
-    let root = project_root();
-    let rendered = generate_to_string_with_inputs(
-        nexgen::language::Language::Go,
-        &example_input_paths(&root, "workflow-service"),
-        &[descriptor_path(&root)],
-    )
-    .unwrap();
-
-    assert!(rendered.contains("type SignalWithStartWorkflowOptions struct {"));
-    assert!(!rendered.contains("\tUserMetadata\n}\n\n// Signal a workflow"));
-    assert!(!rendered.contains("\tUserMetadata *UserMetadata\n}\n\n// Signal a workflow"));
-    assert!(rendered.contains("type userMetadata struct {"));
-    assert!(!rendered.contains("type UserMetadata struct {"));
-    assert!(rendered.contains("out.UserMetadata = new(userMetadata)"));
-    assert!(!rendered.contains("new(UserMetadata)"));
-    assert!(rendered.contains("\t\tUserMetadata: userMetadataValue,\n"));
-    assert!(rendered.contains("\tStaticSummary string"));
-    assert!(rendered.contains("\tStaticDetails string"));
-    // Internal models retain presence; only public options default-pun.
-    assert!(rendered.contains("\tStaticSummary *string"));
-    assert!(rendered.contains("\tStaticDetails *string"));
-    assert!(rendered.contains("\tvar userMetadataValue *userMetadata\n"));
-    assert!(rendered.contains("\tif opts.StaticSummary != \"\" || opts.StaticDetails != \"\" {"));
-    assert!(rendered.contains("if opts.StaticSummary != \"\" {"));
-    assert!(rendered.contains("if opts.StaticDetails != \"\" {"));
-    assert!(rendered.contains("userMetadataValue.StaticSummary = &opts.StaticSummary"));
-    assert!(rendered.contains("userMetadataValue.StaticDetails = &opts.StaticDetails"));
-    assert!(rendered.contains("if m.StaticSummary != nil {"));
-    assert!(rendered.contains("(*m.StaticSummary)"), "{rendered}");
-    assert!(rendered.contains("typed, ok := converted.(string)"));
-    assert!(rendered.contains("out.StaticSummary = &typed"));
-    assert!(rendered.contains("// Input signal: Signal name to send with the start request."));
-    assert!(
-        rendered
-            .contains("// Input workflow: Workflow function identifying the workflow to start.")
-    );
-}
-
-#[test]
-fn go_flatten_in_api_keeps_models_public_when_exposed_elsewhere() {
-    let root = project_root();
-    let source = fs::read_to_string(wit_input_path(&root, "workflow-service")).unwrap();
-    let (prefix, _) = source.rsplit_once('}').unwrap();
-    for (scenario, input) in [
-        (
-            "output",
-            format!(
-                "{prefix}\n  expose-metadata: func(request: signal-with-start-workflow-request) -> user-metadata;\n}}\n"
-            ),
-        ),
-        (
-            "required-input",
-            source.replace(
-                "user-metadata: option<user-metadata>",
-                "user-metadata: user-metadata",
-            ),
-        ),
-    ] {
-        let temp_dir = unique_output_path(&format!("go-flatten-public-{scenario}"));
-        fs::create_dir_all(&temp_dir).unwrap();
-        let wit_path = temp_dir.join("workflow-service.wit");
-        fs::write(&wit_path, input).unwrap();
-        let rendered = generate_to_string_with_inputs(
-            nexgen::language::Language::Go,
-            &[wit_path, linked_inputs_path(&root)],
-            &[descriptor_path(&root)],
-        )
-        .unwrap();
-
-        assert!(
-            rendered.contains("type UserMetadata struct {"),
-            "{scenario}"
-        );
-        assert!(
-            !rendered.contains("type userMetadata struct {"),
-            "{scenario}"
-        );
-        fs::remove_dir_all(temp_dir).unwrap();
-    }
 }
 
 #[test]

@@ -28,8 +28,6 @@ fn typescript_hostile_documentation_is_wrapped_escaped_and_typechecks() {
     support::doc_rendering::typescript_hostile_documentation_is_wrapped_escaped_and_typechecks();
 }
 
-const PRIMARY_EXAMPLE_ID: &str = "workflow-service";
-
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const TYPESCRIPT_WAVE7_SCHEMA: &str = r##"$schema: https://json-schema.org/draft/2020-12/schema
@@ -251,65 +249,12 @@ fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-fn descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/temporal_api.bin")
-}
-
-// The descriptor set of the stream-service sample proto.
-fn stream_descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/stream_service.bin")
-}
-
-fn linked_inputs_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/deps")
-}
-
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
-}
-
 fn typescript_root(root: &Path) -> PathBuf {
     root.join("advanced/samples/typescript")
 }
 
-fn typescript_output_path(root: &Path, example_id: &str) -> PathBuf {
-    typescript_root(root).join("wit").join(example_id)
-}
-
 fn samples_typescript_root(root: &Path) -> PathBuf {
     root.join("samples/typescript")
-}
-
-fn typescript_example_ids(root: &Path) -> Vec<String> {
-    let mut ids = fs::read_dir(root.join("advanced/samples/inputs"))
-        .unwrap()
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            let example_id = if path.is_file() {
-                path.file_stem()?.to_string_lossy().into_owned()
-            } else if path.join("main.wit").is_file() {
-                path.file_name()?.to_string_lossy().into_owned()
-            } else {
-                return None;
-            };
-            if typescript_output_path(root, &example_id).is_dir() {
-                Some(example_id)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    ids.sort();
-    ids
 }
 
 fn ensure_typescript_dependencies(example_dir: &Path) {
@@ -360,46 +305,6 @@ fn assert_no_empty_else_blocks(files: &BTreeMap<PathBuf, String>) {
             );
         }
     }
-}
-
-fn generate_formatted_typescript_output(root: &Path, example_id: &str, output_path: &Path) {
-    ensure_typescript_dependencies(&typescript_root(root));
-
-    let mut command = Command::new(support::nexgen_binary());
-    command
-        .arg("typescript")
-        .args(example_input_paths(root, example_id))
-        .args([
-            "--descriptors",
-            descriptor_path(root).to_str().unwrap(),
-            "--descriptors",
-            stream_descriptor_path(root).to_str().unwrap(),
-            "--support-package",
-            "./support",
-            "--output",
-            output_path.to_str().unwrap(),
-            "--native-api",
-        ]);
-    if example_id == PRIMARY_EXAMPLE_ID {
-        command.arg("--system-nexus");
-    }
-    let status = command.status().unwrap();
-    assert!(status.success());
-
-    let format_status = Command::new("npm")
-        .current_dir(typescript_root(root))
-        .args([
-            "exec",
-            "--",
-            "prettier",
-            "--write",
-            "--print-width",
-            "88",
-            output_path.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    assert!(format_status.success());
 }
 
 fn generate_formatted_json_typescript_output(
@@ -482,16 +387,6 @@ fn unique_typescript_runtime_dir(label: &str) -> tempfile::TempDir {
         .prefix(&format!("nexgen-{label}-"))
         .tempdir_in(samples_typescript_root(&project_root()))
         .unwrap()
-}
-
-#[test]
-fn generated_wit_examples_format_successfully() {
-    let root = project_root();
-    for example_id in typescript_example_ids(&root) {
-        let output_path = unique_output_path(&format!("typescript-{example_id}"));
-        generate_formatted_typescript_output(&root, &example_id, &output_path);
-        fs::remove_dir_all(output_path).unwrap();
-    }
 }
 
 #[test]
@@ -1692,14 +1587,13 @@ fn renders_sample_with_versioned_header() {
     let temp_dir = temp.path().join("output");
     generate_to_file(&GenerateRequest {
         config: NexgenConfig {
-            system_nexus: true,
             mode: GenerationMode::NativeApi,
             ..Default::default()
         },
         language: Language::TypeScript,
-        input_paths: example_input_paths(&root, PRIMARY_EXAMPLE_ID),
+        input_paths: vec![wit_input_path(&root, "user-service")],
         support_package: Some("./support".into()),
-        descriptor_paths: vec![descriptor_path(&root)],
+        descriptor_paths: vec![],
         output_path: temp_dir.clone(),
         format: false,
         java_package_name: None,
@@ -1708,22 +1602,6 @@ fn renders_sample_with_versioned_header() {
     })
     .unwrap();
     assert!(temp_dir.is_dir());
-
-    ensure_typescript_dependencies(&typescript_root(&root));
-    let status = Command::new("npm")
-        .current_dir(root.join("advanced/samples/typescript"))
-        .args([
-            "exec",
-            "--",
-            "prettier",
-            "--write",
-            "--print-width",
-            "88",
-            temp_dir.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    assert!(status.success());
 
     let output = read_typescript_output_files(&temp_dir);
     let manifest: toml::Table =

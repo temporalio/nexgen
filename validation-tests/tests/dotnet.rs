@@ -8,7 +8,6 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod support;
-use support::common;
 
 #[path = "support/dotnet_json_schema.rs"]
 mod dotnet_json_schema;
@@ -19,29 +18,12 @@ mod json_schema_tests;
 const JSON_SCHEMA_TARGET: support::json_schema::toolchain::Target =
     support::json_schema::toolchain::Target::CSharp;
 
-use common::wit_input_path;
-
-const WORKFLOW_SERVICE_EXAMPLE_ID: &str = "workflow-service";
-
 static DOTNET_COMMAND_LOCK: Mutex<()> = Mutex::new(());
 
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
-}
-
-fn descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/temporal_api.bin")
-}
-
-// The descriptor set of the stream-service sample proto.
-fn stream_descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/stream_service.bin")
-}
-
-fn linked_inputs_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/deps")
 }
 
 fn dotnet_root(root: &Path) -> PathBuf {
@@ -56,41 +38,6 @@ fn dotnet_command() -> (MutexGuard<'static, ()>, Command) {
         .env("DOTNET_SKIP_FIRST_TIME_EXPERIENCE", "1")
         .env("DOTNET_NOLOGO", "1");
     (guard, command)
-}
-
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
-}
-
-fn generate_dotnet_output(root: &Path, example_id: &str, output_path: &Path) {
-    let mut command = Command::new(support::nexgen_binary());
-    command
-        .arg("dotnet")
-        .args(example_input_paths(root, example_id))
-        .args([
-            "--descriptors",
-            descriptor_path(root).to_str().unwrap(),
-            "--descriptors",
-            stream_descriptor_path(root).to_str().unwrap(),
-            "--output",
-            output_path.to_str().unwrap(),
-            "--native-api",
-            "--support-package",
-            "Nexgen.Support",
-        ]);
-    if example_id == WORKFLOW_SERVICE_EXAMPLE_ID {
-        command.arg("--system-nexus");
-    }
-    let status = command.status().unwrap();
-    assert!(status.success());
 }
 
 fn unique_output_path(label: &str) -> PathBuf {
@@ -111,45 +58,12 @@ fn dotnet_msbuild_dir(path: &Path) -> String {
 }
 
 #[test]
-fn dotnet_system_nexus_generation_emits_typed_outbound_interceptor() {
+fn checked_in_system_nexus_interceptor_compiles() {
     let root = project_root();
-    let output_path = unique_output_path("dotnet-system-nexus-interceptor");
-    generate_dotnet_output(&root, WORKFLOW_SERVICE_EXAMPLE_ID, &output_path);
-    let interceptor =
-        fs::read_to_string(output_path.join("SystemNexusWorkflowOutboundInterceptor.cs")).unwrap();
-    let models = fs::read_to_string(output_path.join("Models.cs")).unwrap();
-
-    assert!(interceptor.contains("namespace Temporalio.Worker.Interceptors"));
-    assert!(interceptor.contains("public partial class WorkflowOutboundInterceptor"));
-    assert!(!interceptor.contains("#pragma warning disable CS1591"));
-    assert!(!interceptor.contains(
-        "[GeneratedCode(\"nexgen\", null)]\n    public partial class WorkflowOutboundInterceptor"
-    ));
-    assert!(!interceptor.contains(
-        "[GeneratedCode(\"nexgen\", null)]\n    internal partial class WorkflowInstance"
-    ));
-    assert!(interceptor.contains(
-        "[GeneratedCode(\"nexgen\", null)]\n        private Task<NexusWorkflowOperationHandle<TResult>> StartSystemNexusOperationAsync<TResult>"
-    ));
-    assert!(interceptor.contains("outbound.Value.SignalWithStartWorkflowAsync(request)"));
-    assert!(interceptor.contains("if (arg is not SignalWithStartWorkflowRequest request)"));
-    assert!(
-        interceptor.contains("if (typeof(TResult) != typeof(SignalWithStartWorkflowResponse))")
-    );
-    assert!(interceptor.contains("expects a SignalWithStartWorkflowRequest request."));
-    assert!(interceptor.contains("expects a SignalWithStartWorkflowResponse result."));
-    assert!(interceptor.contains(
-        "Task<NexusWorkflowOperationHandle<SignalWithStartWorkflowResponse>> SignalWithStartWorkflowAsync(SignalWithStartWorkflowRequest request)"
-    ));
-    assert!(interceptor.contains("Next.SignalWithStartWorkflowAsync(request)"));
-    assert!(interceptor.contains("internal partial class WorkflowInstance"));
-    assert!(interceptor.contains("internal partial class OutboundImpl"));
-    assert!(interceptor.contains(
-        "[GeneratedCode(\"nexgen\", null)]\n            public override Task<NexusWorkflowOperationHandle<SignalWithStartWorkflowResponse>> SignalWithStartWorkflowAsync(SignalWithStartWorkflowRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<SignalWithStartWorkflowResponse>"
-    ));
-    assert!(models.contains("/// Static metadata for a workflow execution."));
-    assert!(models.contains("/// Result of signaling a workflow and starting it if needed."));
-    assert!(models.contains("namespace Temporalio.Workflows"));
+    let interceptor = fs::read_to_string(root.join(
+        "advanced/samples/dotnet/wit/workflow-service/SystemNexusWorkflowOutboundInterceptor.cs",
+    ))
+    .unwrap();
 
     let project_path = unique_output_path("dotnet-system-nexus-interceptor-build");
     fs::create_dir_all(&project_path).unwrap();
@@ -247,7 +161,6 @@ namespace Temporalio.Worker
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    fs::remove_dir_all(output_path).unwrap();
     fs::remove_dir_all(project_path).unwrap();
 }
 

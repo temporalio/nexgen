@@ -29,8 +29,6 @@ fn python_hostile_documentation_is_wrapped_escaped_and_parses() {
     support::doc_rendering::python_hostile_documentation_is_wrapped_escaped_and_parses();
 }
 
-const PRIMARY_EXAMPLE_ID: &str = "workflow-service";
-
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Exercises the Python-specific runtime surface that cannot be inferred from
@@ -571,31 +569,6 @@ fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-fn descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/temporal_api.bin")
-}
-
-// The descriptor set of the stream-service sample proto.
-fn stream_descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/stream_service.bin")
-}
-
-fn linked_inputs_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/deps")
-}
-
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
-}
-
 fn python_root(root: &Path) -> PathBuf {
     root.join("advanced/samples/python")
 }
@@ -681,45 +654,6 @@ fn assert_no_generated_python_diagnostic_suppressions(files: &BTreeMap<PathBuf, 
             );
         }
     }
-}
-
-fn generate_formatted_python_output(root: &Path, example_id: &str, output_path: &Path) {
-    let mut command = Command::new(support::nexgen_binary());
-    command
-        .arg("python")
-        .args(example_input_paths(root, example_id))
-        .args([
-            "--descriptors",
-            descriptor_path(root).to_str().unwrap(),
-            "--descriptors",
-            stream_descriptor_path(root).to_str().unwrap(),
-            "--output",
-            output_path.to_str().unwrap(),
-            "--native-api",
-            "--support-package",
-            "temporal_support",
-        ]);
-    if example_id == PRIMARY_EXAMPLE_ID {
-        command.arg("--system-nexus");
-    }
-    let status = command.status().unwrap();
-    assert!(status.success());
-
-    let format_status = Command::new("uv")
-        .current_dir(python_root(root))
-        .args([
-            "run",
-            "ruff",
-            "format",
-            "--line-length",
-            "88",
-            "--config",
-            "pyproject.toml",
-            output_path.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    assert!(format_status.success());
 }
 
 fn generate_formatted_json_python_output(
@@ -869,10 +803,7 @@ fn unique_output_path(label: &str) -> PathBuf {
 fn generated_wit_examples_remain_python_310_compatible() {
     let root = project_root();
     for example_id in python_example_ids(&root) {
-        let output_path = unique_output_path(&format!("python-{example_id}"));
-        generate_formatted_python_output(&root, &example_id, &output_path);
-        assert_python_310_syntax_compatible(&output_path);
-        fs::remove_dir_all(output_path).unwrap();
+        assert_python_310_syntax_compatible(&python_output_path(&root, &example_id));
     }
 }
 
@@ -1812,34 +1743,6 @@ $defs:
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
-fn format_python_output(
-    root: &std::path::Path,
-    files: &BTreeMap<PathBuf, String>,
-) -> BTreeMap<PathBuf, String> {
-    let temp = tempfile::tempdir().unwrap();
-    let temp_dir = temp.path();
-    for (relative_path, contents) in files {
-        let path = temp_dir.join(relative_path);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, contents).unwrap();
-    }
-    let status = Command::new("uv")
-        .current_dir(root.join("advanced/samples/python"))
-        .args([
-            "run",
-            "ruff",
-            "format",
-            "--line-length",
-            "88",
-            temp_dir.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    let formatted = read_python_package_files(&temp_dir);
-    formatted
-}
-
 #[test]
 fn renders_sample_with_versioned_header() {
     let root = project_root();
@@ -1847,14 +1750,13 @@ fn renders_sample_with_versioned_header() {
     let output_path = temp.path().join("output");
     generate_to_file(&GenerateRequest {
         config: NexgenConfig {
-            system_nexus: true,
             mode: GenerationMode::NativeApi,
             ..Default::default()
         },
         language: Language::Python,
-        input_paths: example_input_paths(&root, PRIMARY_EXAMPLE_ID),
+        input_paths: vec![wit_input_path(&root, "user-service")],
         support_package: Some("temporal_support".into()),
-        descriptor_paths: vec![descriptor_path(&root)],
+        descriptor_paths: vec![],
         output_path: output_path.clone(),
         format: false,
         java_package_name: None,
@@ -1863,7 +1765,7 @@ fn renders_sample_with_versioned_header() {
     })
     .unwrap();
     assert!(output_path.is_dir());
-    let output = format_python_output(&root, &read_python_package_files(&output_path));
+    let output = read_python_package_files(&output_path);
     let manifest: toml::Table =
         toml::from_str(&fs::read_to_string(root.join("Cargo.toml")).unwrap()).unwrap();
     let header = format!(

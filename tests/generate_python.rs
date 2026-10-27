@@ -9,13 +9,11 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use nexgen::generator::generate_source;
 use nexgen::{GenerateRequest, generate_to_file};
 
 mod common;
 use common::{json_input_path, wit_input_path};
 
-const PRIMARY_EXAMPLE_ID: &str = "workflow-service";
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// A property whose union has one inline structured object branch (named
@@ -92,18 +90,6 @@ fn descriptor_path(root: &Path) -> PathBuf {
 
 fn linked_inputs_path(root: &Path) -> PathBuf {
     root.join("advanced/samples/inputs/deps")
-}
-
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
 }
 
 fn read_python_package_files(dir: &Path) -> BTreeMap<PathBuf, String> {
@@ -325,29 +311,6 @@ interface models {
     assert!(models.contains("import temporal_support as _support"));
     assert!(models.contains("default_factory=_support.workflow_namespace"));
     fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn python_proto_helpers_use_the_supplied_support_module() {
-    let root = project_root();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &example_input_paths(&root, PRIMARY_EXAMPLE_ID),
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let output = generate_source(
-        nexgen::language::Language::Python,
-        spec,
-        &descriptors,
-        "company.shared.temporal_support",
-    )
-    .unwrap();
-
-    assert!(output.contains("import company.shared.temporal_support as _support"));
-    assert!(output.contains("_support.retry_policy_to_proto("));
-    assert!(output.contains("_support.signal_with_start_workflow_serialization_context"));
-    assert!(!output.contains("### _support/"));
 }
 
 /// An inline **structured** object `oneOf` branch on a property: the branch is

@@ -14,7 +14,7 @@ use nexgen::{GenerateRequest, generate_to_file};
 mod common;
 use common::wit_input_path;
 
-const PRIMARY_EXAMPLE_ID: &str = "workflow-service";
+const PROTO_GENERIC_EXAMPLE_ID: &str = "proto-generic";
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// A property whose union has one inline structured object branch (named
@@ -451,7 +451,9 @@ fn cli_uses_typescript_support_package_without_copying_sources() {
     let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
         .args([
             "typescript",
-            wit_input_path(&root, PRIMARY_EXAMPLE_ID).to_str().unwrap(),
+            wit_input_path(&root, PROTO_GENERIC_EXAMPLE_ID)
+                .to_str()
+                .unwrap(),
             linked_inputs_path(&root).to_str().unwrap(),
             "--descriptors",
             descriptor_path(&root).to_str().unwrap(),

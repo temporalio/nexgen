@@ -14,15 +14,7 @@ mod format_tests {
     }
 
     fn sample_input_path(root: &Path) -> PathBuf {
-        root.join("advanced/samples/inputs/workflow-service.wit")
-    }
-
-    fn descriptor_path(root: &Path) -> PathBuf {
-        root.join("advanced/samples/descriptors/temporal_api.bin")
-    }
-
-    fn linked_inputs_path(root: &Path) -> PathBuf {
-        root.join("advanced/samples/inputs/deps")
+        root.join("advanced/samples/inputs/user-service.wit")
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {
@@ -63,9 +55,6 @@ mod format_tests {
             .args([
                 "python",
                 sample_input_path(&root).to_str().unwrap(),
-                linked_inputs_path(&root).to_str().unwrap(),
-                "--descriptors",
-                descriptor_path(&root).to_str().unwrap(),
                 "--output",
                 output_path.to_str().unwrap(),
                 "--support-package",
@@ -187,9 +176,6 @@ done
             .args([
                 "ts",
                 sample_input_path(&root).to_str().unwrap(),
-                linked_inputs_path(&root).to_str().unwrap(),
-                "--descriptors",
-                descriptor_path(&root).to_str().unwrap(),
                 "--output",
                 output_path.to_str().unwrap(),
                 "--support-package",

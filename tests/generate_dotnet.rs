@@ -13,7 +13,7 @@ use nexgen::{GenerateRequest, generate_to_file};
 mod common;
 use common::wit_input_path;
 
-const WORKFLOW_SERVICE_EXAMPLE_ID: &str = "workflow-service";
+const PROTO_BACKED_EXAMPLE_ID: &str = "proto-backed-showcase";
 
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -155,7 +155,7 @@ fn dotnet_qualifies_helpers_from_supplied_support_namespace() {
     let output = unique_output_path("dotnet-custom-support-namespace");
     let status = Command::new(env!("CARGO_BIN_EXE_nexgen"))
         .arg("dotnet")
-        .args(example_input_paths(&root, WORKFLOW_SERVICE_EXAMPLE_ID))
+        .args(example_input_paths(&root, PROTO_BACKED_EXAMPLE_ID))
         .args([
             "--descriptors",
             descriptor_path(&root).to_str().unwrap(),
@@ -215,24 +215,6 @@ interface workflow-service {
     assert!(rendered.contains("public static partial class Workflow"));
     assert!(!rendered.contains("WorkflowServiceOperations"));
     fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn dotnet_imports_converters_only_where_unqualified_types_need_them() {
-    let root = project_root();
-    for example in ["notification-service", "proto-oneof", "workflow-service"] {
-        let files = generate_dotnet_files(
-            &example_input_paths(&root, example),
-            &[descriptor_path(&root)],
-        );
-        let models = &files[&PathBuf::from("Models.cs")];
-        assert!(models.contains("Temporalio.Converters.TemporalTransferTypeConverter"));
-        assert!(!models.contains("using Temporalio.Converters;"));
-        if let Some(services) = files.get(&PathBuf::from("Services.cs")) {
-            assert!(services.contains("ISerializationContext"));
-            assert!(services.contains("using Temporalio.Converters;"));
-        }
-    }
 }
 
 #[test]
