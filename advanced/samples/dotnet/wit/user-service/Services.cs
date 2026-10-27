@@ -78,6 +78,7 @@ namespace Nexgen.UserService
         public string? Reason { get; set; }
         public IReadOnlyList<string> Channels { get; set; }
         public string Sender { get; set; }
+        public long? Attempt { get; set; }
     }
 
     /// <summary>
@@ -140,6 +141,7 @@ namespace Nexgen.UserService
             var request = new NotifyRequest(options.UserId, options.Channels, options.Sender)
             {
                 Reason = options.Reason,
+                Attempt = options.Attempt,
             };
             return NotifyAsync(request);
         }

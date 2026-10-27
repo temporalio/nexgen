@@ -3241,28 +3241,82 @@ fn collect_typescript_resource_requirements(
     let mut requirements = TypeScriptRequirements::default();
     for service in services {
         for resource in &service.resources {
+            let long_fields = typescript_resource_long_fields(resource);
             for field in &resource.fields {
                 requirements.merge(&typescript_resource_field_requirements(
                     &field.kind,
                     field.function.as_ref(),
+                    long_fields.contains(&field.name),
                 ));
             }
             for method in &resource.methods {
+                let long_params = typescript_method_long_params(method);
                 for param in &method.params {
                     requirements.merge(&typescript_resource_field_requirements(
                         &param.kind,
                         param.function.as_ref(),
+                        long_params.contains(&param.name),
                     ));
                 }
                 if let Some(result) = &method.result
                     && let PlannedResourceMethodResultKind::Value(kind) = &result.kind
                 {
-                    requirements.merge(&typescript_resource_field_requirements(kind, None));
+                    requirements.merge(&typescript_resource_field_requirements(kind, None, false));
                 }
             }
         }
     }
     requirements
+}
+
+// A proto message of the request holds a 64-bit integer as a `Long`, so a resource value that it
+// reads is a `Long` too. Other values stay `number`.
+fn collect_typescript_long_sources(
+    plan: &RequestPlan,
+    proto: bool,
+    fields: &mut BTreeSet<String>,
+    params: &mut BTreeSet<String>,
+) {
+    match plan {
+        RequestPlan::Source(RequestPlanSource::ResourceField(name)) if proto => {
+            fields.insert(name.clone());
+        }
+        RequestPlan::Source(RequestPlanSource::MethodParam(name)) if proto => {
+            params.insert(name.clone());
+        }
+        RequestPlan::Source(_) => {}
+        RequestPlan::Construct {
+            proto,
+            fields: plan_fields,
+            ..
+        } => {
+            for field in plan_fields {
+                collect_typescript_long_sources(&field.value, *proto, fields, params);
+            }
+        }
+    }
+}
+
+/// The params of a resource method that a proto message of its request reads.
+fn typescript_method_long_params(method: &PlannedResourceMethod) -> BTreeSet<String> {
+    let mut fields = BTreeSet::new();
+    let mut params = BTreeSet::new();
+    if let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } = &method.binding {
+        collect_typescript_long_sources(request_plan, false, &mut fields, &mut params);
+    }
+    params
+}
+
+/// The fields of a resource that a proto message of a method's request reads.
+fn typescript_resource_long_fields(resource: &PlannedResource) -> BTreeSet<String> {
+    let mut fields = BTreeSet::new();
+    let mut params = BTreeSet::new();
+    for method in &resource.methods {
+        if let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } = &method.binding {
+            collect_typescript_long_sources(request_plan, false, &mut fields, &mut params);
+        }
+    }
+    fields
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5638,6 +5692,7 @@ fn render_resource(output: &mut String, resource: &PlannedResource, service: &Re
         output.push_str(&service.attr_name);
         output.push_str("> | undefined;\n\n");
     }
+    let long_fields = typescript_resource_long_fields(resource);
     output.push_str("  public constructor(\n");
     for field in &resource.fields {
         output.push_str("    public readonly ");
@@ -5647,6 +5702,7 @@ fn render_resource(output: &mut String, resource: &PlannedResource, service: &Re
             &field.kind,
             field.optional,
             field.function.as_ref(),
+            long_fields.contains(&field.name),
         ));
         output.push_str(",\n");
     }
@@ -5658,6 +5714,7 @@ fn render_resource(output: &mut String, resource: &PlannedResource, service: &Re
     }
 
     for method in &resource.methods {
+        let long_params = typescript_method_long_params(method);
         let result_annotation = typescript_resource_method_result_annotation(method);
         output.push('\n');
         output.push_str("  public async ");
@@ -5678,6 +5735,7 @@ fn render_resource(output: &mut String, resource: &PlannedResource, service: &Re
                 &param.kind,
                 false,
                 param.function.as_ref(),
+                long_params.contains(&param.name),
             ));
             if param.optional && before_required {
                 output.push_str(" | undefined");
@@ -5754,7 +5812,7 @@ fn render_resource(output: &mut String, resource: &PlannedResource, service: &Re
         output.push_str("(resource: ");
         output.push_str(&resource.type_name);
         output.push_str(" | ");
-        render_resource_structural_type(output, resource);
+        render_resource_structural_type(output, resource, &long_fields);
         output.push_str(", client: workflow.NexusServiceClient<typeof ");
         output.push_str(&service.attr_name);
         output.push_str(">): ");
@@ -5800,7 +5858,7 @@ fn typescript_resource_method_result_annotation(method: &PlannedResourceMethod) 
     let annotation = match &result.kind {
         PlannedResourceMethodResultKind::Resource { type_name } => type_name.clone(),
         PlannedResourceMethodResultKind::Value(kind) => {
-            typescript_resource_field_annotation(kind, result.optional, None)
+            typescript_resource_field_annotation(kind, result.optional, None, false)
         }
     };
     if result.optional && !annotation.contains(" | undefined") {
@@ -5814,6 +5872,7 @@ fn typescript_resource_field_annotation(
     kind: &PlannedType,
     optional: bool,
     function: Option<&FunctionFieldSpec<PlannedFamily>>,
+    long: bool,
 ) -> String {
     let base = if let Some(function) = function {
         typescript_function_value_annotation(
@@ -5827,14 +5886,14 @@ fn typescript_resource_field_annotation(
     } else {
         match kind {
             PlannedType::List(value) => {
-                typescript_array_annotation(&typescript_resource_value_annotation(value))
+                typescript_array_annotation(&typescript_resource_value_annotation(value, long))
             }
             PlannedType::Map(key, value) => format!(
                 "Record<{}, {}>",
-                typescript_resource_value_annotation(key),
-                typescript_resource_value_annotation(value)
+                typescript_resource_map_key_annotation(key, long),
+                typescript_resource_value_annotation(value, long)
             ),
-            value => typescript_resource_value_annotation(value),
+            value => typescript_resource_value_annotation(value, long),
         }
     };
     if optional {
@@ -5844,8 +5903,10 @@ fn typescript_resource_field_annotation(
     }
 }
 
-fn typescript_resource_value_annotation(value: &PlannedType) -> String {
+// A `long` value is part of a proto-backed request, which holds a 64-bit integer as a `Long`.
+fn typescript_resource_value_annotation(value: &PlannedType, long: bool) -> String {
     match value {
+        PlannedType::Int(IntSpec::I64 | IntSpec::U64) if long => "Long".to_string(),
         PlannedType::Int(_) => "number".to_string(),
         PlannedType::Float => "number".to_string(),
         PlannedType::Bool => "boolean".to_string(),
@@ -5873,30 +5934,30 @@ fn typescript_resource_value_annotation(value: &PlannedType) -> String {
         PlannedType::Option(inner) => {
             format!(
                 "{} | undefined",
-                typescript_resource_value_annotation(inner)
+                typescript_resource_value_annotation(inner, long)
             )
         }
         PlannedType::List(inner) => {
-            typescript_array_annotation(&typescript_resource_value_annotation(inner))
+            typescript_array_annotation(&typescript_resource_value_annotation(inner, long))
         }
         PlannedType::Map(key, value) => format!(
             "Record<{}, {}>",
-            typescript_resource_value_annotation(key),
-            typescript_resource_value_annotation(value)
+            typescript_resource_map_key_annotation(key, long),
+            typescript_resource_value_annotation(value, long)
         ),
         PlannedType::Tuple(items) => format!(
             "[{}]",
             items
                 .iter()
-                .map(typescript_resource_value_annotation)
+                .map(|item| typescript_resource_value_annotation(item, long))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
         PlannedType::Result { ok, err } => typescript_result_annotation(
             ok.as_ref()
-                .map(|ok| typescript_resource_value_annotation(ok).to_string()),
+                .map(|ok| typescript_resource_value_annotation(ok, long).to_string()),
             err.as_ref()
-                .map(|err| typescript_resource_value_annotation(err).to_string()),
+                .map(|err| typescript_resource_value_annotation(err, long).to_string()),
         ),
         PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name,
@@ -5905,20 +5966,50 @@ fn typescript_resource_value_annotation(value: &PlannedType) -> String {
         })) => type_name
             .value()
             .map(str::to_string)
-            .unwrap_or_else(|| typescript_resource_value_annotation(fallback)),
+            .unwrap_or_else(|| typescript_resource_value_annotation(fallback, long)),
+    }
+}
+
+// protobufjs keys a 64-bit proto map by the decimal string, as the request model does.
+fn typescript_resource_map_key_annotation(key: &PlannedType, long: bool) -> String {
+    if long && typescript_holds_64_bit_int(key) {
+        "string".to_string()
+    } else {
+        typescript_resource_value_annotation(key, false)
     }
 }
 
 fn typescript_resource_field_requirements(
     kind: &PlannedType,
     function: Option<&FunctionFieldSpec<PlannedFamily>>,
+    long: bool,
 ) -> TypeScriptRequirements {
     if let Some(function) = function {
         return typescript_function_requirements(function);
     }
     let mut requirements = TypeScriptRequirements::default();
     collect_typescript_value_requirements(kind, &mut requirements);
+    requirements.long |= long && typescript_holds_64_bit_int(kind);
     requirements
+}
+
+fn typescript_holds_64_bit_int(kind: &PlannedType) -> bool {
+    match kind {
+        PlannedType::Int(IntSpec::I64 | IntSpec::U64) => true,
+        PlannedType::Option(inner) | PlannedType::List(inner) => typescript_holds_64_bit_int(inner),
+        PlannedType::Map(_, value) => typescript_holds_64_bit_int(value),
+        PlannedType::Tuple(items) => items.iter().any(typescript_holds_64_bit_int),
+        PlannedType::Result { ok, err } => {
+            ok.as_deref().is_some_and(typescript_holds_64_bit_int)
+                || err.as_deref().is_some_and(typescript_holds_64_bit_int)
+        }
+        PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec {
+            type_name,
+            target: fallback,
+            ..
+        })) => type_name.value().is_none() && typescript_holds_64_bit_int(fallback),
+        _ => false,
+    }
 }
 
 fn collect_typescript_value_requirements(
@@ -5983,6 +6074,7 @@ fn branchable_request_method_params(
                     &param.kind,
                     param.optional,
                     param.function.as_ref(),
+                    false,
                 )
                 .trim_start()
                 .starts_with("string | ")
@@ -6648,7 +6740,11 @@ fn render_resource_constructor(
     output.push(')');
 }
 
-fn render_resource_structural_type(output: &mut String, resource: &PlannedResource) {
+fn render_resource_structural_type(
+    output: &mut String,
+    resource: &PlannedResource,
+    long_fields: &BTreeSet<String>,
+) {
     output.push_str("{ ");
     for field in &resource.fields {
         output.push_str("readonly ");
@@ -6658,6 +6754,7 @@ fn render_resource_structural_type(output: &mut String, resource: &PlannedResour
             &field.kind,
             field.optional,
             field.function.as_ref(),
+            long_fields.contains(&field.name),
         ));
         output.push_str("; ");
     }
@@ -6801,6 +6898,26 @@ mod tests {
     use crate::generator::generate_source;
     use crate::language::Language;
     use crate::nexgen_config::{NexgenConfig, current, scope};
+
+    #[test]
+    fn a_64_bit_map_key_in_a_proto_request_is_a_string() {
+        use crate::planning::PlannedType;
+        use crate::spec::IntSpec;
+
+        let labels = PlannedType::Map(
+            Box::new(PlannedType::Int(IntSpec::I64)),
+            Box::new(PlannedType::Int(IntSpec::I64)),
+        );
+
+        assert_eq!(
+            super::typescript_resource_field_annotation(&labels, false, None, true),
+            "Record<string, Long>"
+        );
+        assert_eq!(
+            super::typescript_resource_field_annotation(&labels, false, None, false),
+            "Record<number, number>"
+        );
+    }
 
     #[test]
     fn helper_calls_ignore_prose_literals_and_qualified_calls() {

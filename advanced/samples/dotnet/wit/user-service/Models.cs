@@ -40,6 +40,7 @@ namespace Nexgen.UserService
         public string? Reason { get; init; }
         public IReadOnlyList<string> Channels { get; init; }
         public string Sender { get; init; }
+        public long? Attempt { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]

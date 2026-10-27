@@ -9,7 +9,12 @@ interface user-service {
     constructor(user-id: string, email: string);
 
     update-email: func(email: string) -> user-result;
-    notify: func(reason: option<string>, channels: list<string>, sender: string);
+    notify: func(
+      reason: option<string>,
+      channels: list<string>,
+      sender: string,
+      attempt: option<s64>,
+    );
   }
 
   type user-result = own<user>;
@@ -28,6 +33,8 @@ interface user-service {
     reason: option<string>,
     channels: list<string>,
     sender: string,
+    // A plain record holds a 64-bit integer as a number, so the resource method takes a number.
+    attempt: option<s64>,
   }
 
   get-user: func(request: get-user-request) -> user-result;

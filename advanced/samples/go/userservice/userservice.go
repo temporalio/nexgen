@@ -34,6 +34,7 @@ type notifyRequest struct {
 	Reason   *string
 	Channels []string
 	Sender   string
+	Attempt  *int64
 }
 
 func (m notifyRequest) GetUserID() string {
@@ -50,6 +51,10 @@ func (m notifyRequest) GetChannels() []string {
 
 func (m notifyRequest) GetSender() string {
 	return m.Sender
+}
+
+func (m notifyRequest) GetAttempt() *int64 {
+	return m.Attempt
 }
 
 // --- Resources ---
@@ -72,12 +77,16 @@ func (u *User) UpdateEmail(ctx workflow.Context, email string) workflow.Future {
 	return updateEmail(ctx, updateEmailRequest{UserID: u.UserID, Email: email})
 }
 
-func (u *User) Notify(ctx workflow.Context, reason string, channels []string, sender string) workflow.Future {
+func (u *User) Notify(ctx workflow.Context, reason string, channels []string, sender string, attempt int64) workflow.Future {
 	var reasonPtr *string
 	if reason != "" {
 		reasonPtr = &reason
 	}
-	return notify(ctx, notifyRequest{UserID: u.UserID, Reason: reasonPtr, Channels: channels, Sender: sender})
+	var attemptPtr *int64
+	if attempt != 0 {
+		attemptPtr = &attempt
+	}
+	return notify(ctx, notifyRequest{UserID: u.UserID, Reason: reasonPtr, Channels: channels, Sender: sender, Attempt: attemptPtr})
 }
 
 // --- Operations (internal) ---
@@ -136,6 +145,8 @@ type NotifyOptions struct {
 	Channels []string
 	// Sender - Required.
 	Sender string
+	// Attempt - Optional.
+	Attempt int64
 }
 
 func Notify(ctx workflow.Context, opts NotifyOptions) workflow.Future {
@@ -143,10 +154,15 @@ func Notify(ctx workflow.Context, opts NotifyOptions) workflow.Future {
 	if opts.Reason != "" {
 		reason = &opts.Reason
 	}
+	var attempt *int64
+	if opts.Attempt != 0 {
+		attempt = &opts.Attempt
+	}
 	return notify(ctx, notifyRequest{
 		UserID:   opts.UserID,
 		Reason:   reason,
 		Channels: opts.Channels,
 		Sender:   opts.Sender,
+		Attempt:  attempt,
 	})
 }

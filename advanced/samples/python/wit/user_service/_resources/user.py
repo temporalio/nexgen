@@ -42,12 +42,14 @@ class User:
         reason: str | None = None,
         channels: list[str] | None = None,
         sender: str,
+        attempt: int | None = None,
     ) -> None:
         request = NotifyRequest(
             user_id=self.user_id,
             reason=reason,
             channels=channels or [],
             sender=sender,
+            attempt=attempt,
         )
         nexus_client = getattr(self, "_nexus_client")
         handle = await nexus_client.start_operation(

@@ -156,9 +156,7 @@ the WIT's `@nexus.poll` directive or the `--targets` flag of its header yet, so
 it ignores them. The header's proto paths are the crate's.
 
 The Stream protos set the `nexus.python_module` file option, so Python imports
-them from the sample's own `streamprotos` package. TypeScript passes a `number`
-where a resource method's proto request wants a `Long`. So `tsc` skips the
-service, but the test still checks its models.
+them from the sample's own `streamprotos` package.
 
 - WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
 - .NET: [`dotnet/wit/stream-service/`](dotnet/wit/stream-service/),

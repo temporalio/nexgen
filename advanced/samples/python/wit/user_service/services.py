@@ -86,12 +86,14 @@ class UserServiceClient:
         reason: str | None = None,
         channels: list[str] | None = None,
         sender: str,
+        attempt: int | None = None,
     ) -> temporalio.workflow.NexusOperationHandle[None]:
         request = NotifyRequest(
             user_id=user_id,
             reason=reason,
             channels=channels or [],
             sender=sender,
+            attempt=attempt,
         )
         return await self._nexus_client.start_operation(
             operation="Notify",

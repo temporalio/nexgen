@@ -14,4 +14,5 @@ export interface NotifyRequest {
   reason?: string;
   channels?: string[];
   sender: string;
+  attempt?: number;
 }

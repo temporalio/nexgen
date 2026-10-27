@@ -27,12 +27,14 @@ export class User {
     reason: string | undefined,
     channels: string[],
     sender: string,
+    attempt?: number,
   ): Promise<void> {
     const request = {
       userId: this.userId,
       reason: reason,
       channels: channels,
       sender: sender,
+      attempt: attempt,
     };
     const handle = await requireUserClient(this).startOperation(
       userService.operations.notify,

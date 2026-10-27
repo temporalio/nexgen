@@ -27,6 +27,7 @@ where
         RequestPlan::Construct {
             message_name,
             fields,
+            ..
         } => {
             let rendered_fields = fields
                 .iter()

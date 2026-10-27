@@ -824,6 +824,11 @@ enum's name and members, even when its name differs from the protobuf enum's.
 Converters bridge the model and protobuf enum by number, and `@nexus.default`
 continues to name a WIT case.
 
+In TypeScript, a 64-bit integer is a `Long` in a proto-backed model, and a
+`number` in other models. A resource field or method parameter that a
+proto-backed request reads is a `Long` too, and a 64-bit map key there is a
+`string`, as protobufjs keys the map.
+
 ### Proto Modules
 
 Python imports each bound proto message or enum from the `_pb2` module of its

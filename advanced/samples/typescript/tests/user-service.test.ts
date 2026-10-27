@@ -29,7 +29,9 @@ describe("user-service generated output", () => {
           calls.push(["UpdateEmail", input]);
           return new User(input.userId, input.email);
         },
-        async notify() {},
+        async notify(_ctx, input) {
+          calls.push(["Notify", input]);
+        },
       });
 
       const result = await executeWorkflowWithNexus<{
@@ -59,6 +61,15 @@ describe("user-service generated output", () => {
           "UpdateEmail",
           {
             email: "new@example.com",
+            userId: "user-123",
+          },
+        ],
+        [
+          "Notify",
+          {
+            attempt: 3,
+            channels: ["email"],
+            sender: "ops",
             userId: "user-123",
           },
         ],
