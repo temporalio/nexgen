@@ -1712,7 +1712,7 @@ where
     pub(crate) fn record_type_parameters(&self, record_name: &str) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_record_type_parameters(record_name, &mut visiting, &mut parameters);
+        self.collect_record_type_parameters(record_name, &mut visiting, &mut parameters, &|_| None);
         parameters.into_values().collect()
     }
 
@@ -1721,14 +1721,16 @@ where
     pub(crate) fn variant_type_parameters(&self, variant_name: &str) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_variant_type_parameters(variant_name, &mut visiting, &mut parameters);
+        self.collect_variant_type_parameters(variant_name, &mut visiting, &mut parameters, &|_| {
+            None
+        });
         parameters.into_values().collect()
     }
 
     pub(crate) fn type_parameters(&self, value: &TypeSpec<F>) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_type_parameters(value, &mut visiting, &mut parameters);
+        self.collect_type_parameters(value, &mut visiting, &mut parameters, &|_| None);
         parameters.into_values().collect()
     }
 
@@ -1737,6 +1739,7 @@ where
         record_name: &str,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
+        proto_record: &dyn Fn(&F::Proto) -> Option<String>,
     ) {
         if !visiting.insert(record_name.to_string()) {
             return;
@@ -1751,7 +1754,7 @@ where
                 {
                     continue;
                 }
-                self.collect_type_parameters(&field.field_type, visiting, parameters);
+                self.collect_type_parameters(&field.field_type, visiting, parameters, proto_record);
             }
         }
         visiting.remove(record_name);
@@ -1762,6 +1765,7 @@ where
         variant_name: &str,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
+        proto_record: &dyn Fn(&F::Proto) -> Option<String>,
     ) {
         if !visiting.insert(variant_name.to_string()) {
             return;
@@ -1769,7 +1773,7 @@ where
         if let Some(variant) = self.variant(variant_name) {
             for case in &variant.cases {
                 if let Some(payload) = &case.payload {
-                    self.collect_type_parameters(payload, visiting, parameters);
+                    self.collect_type_parameters(payload, visiting, parameters, proto_record);
                 }
             }
         }
@@ -1781,6 +1785,7 @@ where
         value: &TypeSpec<F>,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
+        proto_record: &dyn Fn(&F::Proto) -> Option<String>,
     ) {
         match value {
             TypeSpec::TypeParameter(parameter) => {
@@ -1794,33 +1799,49 @@ where
                 }
             }
             TypeSpec::Option(inner) | TypeSpec::List(inner) => {
-                self.collect_type_parameters(inner, visiting, parameters)
+                self.collect_type_parameters(inner, visiting, parameters, proto_record)
             }
             TypeSpec::Tuple(items) => {
                 for item in items {
-                    self.collect_type_parameters(item, visiting, parameters);
+                    self.collect_type_parameters(item, visiting, parameters, proto_record);
                 }
             }
             TypeSpec::Map(key, value) => {
-                self.collect_type_parameters(key, visiting, parameters);
-                self.collect_type_parameters(value, visiting, parameters);
+                self.collect_type_parameters(key, visiting, parameters, proto_record);
+                self.collect_type_parameters(value, visiting, parameters, proto_record);
             }
             TypeSpec::Result { ok, err } => {
                 if let Some(ok) = ok {
-                    self.collect_type_parameters(ok, visiting, parameters);
+                    self.collect_type_parameters(ok, visiting, parameters, proto_record);
                 }
                 if let Some(err) = err {
-                    self.collect_type_parameters(err, visiting, parameters);
+                    self.collect_type_parameters(err, visiting, parameters, proto_record);
                 }
             }
-            TypeSpec::Record(record) => {
-                self.collect_record_type_parameters(record.as_ref(), visiting, parameters)
-            }
-            TypeSpec::Variant(variant) => {
-                self.collect_variant_type_parameters(variant.as_ref(), visiting, parameters)
-            }
+            TypeSpec::Record(record) => self.collect_record_type_parameters(
+                record.as_ref(),
+                visiting,
+                parameters,
+                proto_record,
+            ),
+            TypeSpec::Variant(variant) => self.collect_variant_type_parameters(
+                variant.as_ref(),
+                visiting,
+                parameters,
+                proto_record,
+            ),
             TypeSpec::External(ExternalTypeSpec::Alias(alias)) => {
-                self.collect_type_parameters(&alias.target, visiting, parameters)
+                self.collect_type_parameters(&alias.target, visiting, parameters, proto_record)
+            }
+            TypeSpec::External(ExternalTypeSpec::Proto(proto)) => {
+                if let Some(record_name) = proto_record(proto) {
+                    self.collect_record_type_parameters(
+                        &record_name,
+                        visiting,
+                        parameters,
+                        proto_record,
+                    );
+                }
             }
             TypeSpec::Bool
             | TypeSpec::Int(_)
@@ -1830,9 +1851,32 @@ where
             | TypeSpec::Enum(_)
             | TypeSpec::Flags(_)
             | TypeSpec::Resource(_)
-            | TypeSpec::External(ExternalTypeSpec::Proto(_))
             | TypeSpec::External(ExternalTypeSpec::Json(_)) => {}
         }
+    }
+}
+
+impl<F> ApiSpec<F>
+where
+    F: TypeFamily,
+    F::Proto: AsRef<str>,
+    F::Record: AsRef<str>,
+    F::Variant: AsRef<str>,
+{
+    /// Like `type_parameters`, but also walks the record behind each proto type. Before planning, a
+    /// proto-backed record is named by its proto type, so the plain walk stops there.
+    pub(crate) fn type_parameters_through_protos(
+        &self,
+        value: &TypeSpec<F>,
+    ) -> Vec<TypeParameterUsage> {
+        let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
+        let mut visiting = std::collections::BTreeSet::new();
+        let proto_record = |proto: &F::Proto| {
+            self.record_for_proto(proto.as_ref())
+                .map(|record| record.full_name.clone())
+        };
+        self.collect_type_parameters(value, &mut visiting, &mut parameters, &proto_record);
+        parameters.into_values().collect()
     }
 }
 

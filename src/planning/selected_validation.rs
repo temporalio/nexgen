@@ -106,18 +106,20 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
             }
         }
         for resource in &service.resources {
+            let is_generic = |value| !spec.type_parameters_through_protos(value).is_empty();
             let resource_is_generic = resource
                 .fields
                 .iter()
-                .any(|field| !spec.type_parameters(&field.field_type).is_empty())
+                .any(|field| is_generic(&field.field_type))
                 || resource.methods.iter().any(|method| {
                     method
                         .params
                         .iter()
-                        .any(|param| !spec.type_parameters(&param.field_type).is_empty())
-                        || method.result.as_ref().is_some_and(|result| {
-                            !spec.type_parameters(&result.result_type).is_empty()
-                        })
+                        .any(|param| is_generic(&param.field_type))
+                        || method
+                            .result
+                            .as_ref()
+                            .is_some_and(|result| is_generic(&result.result_type))
                 });
             if resource_is_generic {
                 return Err(invalid(format!(
@@ -133,12 +135,8 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
                 let Some(operation) = service.operation(operation_name) else {
                     continue;
                 };
-                let operation_is_generic = operation
-                    .input_type()
-                    .is_some_and(|input| !spec.type_parameters(input).is_empty())
-                    || operation
-                        .output_type()
-                        .is_some_and(|output| !spec.type_parameters(output).is_empty());
+                let operation_is_generic = operation.input_type().is_some_and(is_generic)
+                    || operation.output_type().is_some_and(is_generic);
                 if operation_is_generic {
                     return Err(invalid(format!(
                         "resource-bound operation `{operation_name}` cannot use generic type parameters"
