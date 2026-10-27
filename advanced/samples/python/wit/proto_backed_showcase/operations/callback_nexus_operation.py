@@ -24,10 +24,10 @@ async def _callback_nexus_operation(
 async def callback_nexus_operation(
     *,
     url: str,
-    header: dict[str, str] | None = None,
+    header: dict[str, str],
 ) -> temporalio.workflow.NexusOperationHandle[CallbackNexus,]:
     request = CallbackNexus(
         url=url,
-        header=header or {},
+        header=header,
     )
     return await _callback_nexus_operation(request)

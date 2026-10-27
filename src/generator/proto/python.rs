@@ -1421,12 +1421,6 @@ fn field_read_policy(model_name: &str, rendered_field: &RenderedField) -> WireRe
             WireReadPolicy::Required { missing_error }
         }
         PythonFieldDefaultKind::None => WireReadPolicy::Optional,
-        PythonFieldDefaultKind::EmptyDict => WireReadPolicy::Default {
-            default_expr: "{}".to_string(),
-        },
-        PythonFieldDefaultKind::EmptyList => WireReadPolicy::Default {
-            default_expr: "[]".to_string(),
-        },
         PythonFieldDefaultKind::Expression(default_expr) => WireReadPolicy::Default {
             default_expr: default_expr.clone(),
         },
@@ -1450,12 +1444,7 @@ fn field_write_for_rendered_field(
             ),
         );
     }
-    let optional_guard = matches!(
-        rendered_field.default_kind,
-        PythonFieldDefaultKind::None
-            | PythonFieldDefaultKind::EmptyDict
-            | PythonFieldDefaultKind::EmptyList
-    );
+    let optional_guard = matches!(rendered_field.default_kind, PythonFieldDefaultKind::None);
     let converter = planned_field
         .function
         .as_ref()

@@ -790,6 +790,89 @@ fn assert_python_script_succeeds(script: &str, args: &[&str]) {
     );
 }
 
+#[test]
+fn python_wit_collections_require_arguments_and_preserve_absence() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let output = temp_dir.path().join("collection_probe");
+    generate_to_file(&GenerateRequest {
+        config: NexgenConfig {
+            mode: GenerationMode::NativeApi,
+            ..Default::default()
+        },
+        language: Language::Python,
+        input_paths: vec![project_root().join("tests/fixtures/collection-optionality.wit")],
+        support_package: Some("temporal_support".into()),
+        descriptor_paths: vec![],
+        output_path: output,
+        format: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
+    })
+    .unwrap();
+    assert_python_script_succeeds(
+        r#"
+import asyncio
+import dataclasses
+import importlib
+import inspect
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from collection_probe.models import UpdateRequest
+from collection_probe._resources.bucket import Bucket
+
+resource = importlib.import_module("collection_probe._resources.bucket")
+
+fields = {field.name: field for field in dataclasses.fields(UpdateRequest)}
+for name in ("items", "labels"):
+    assert fields[name].default is dataclasses.MISSING
+    assert fields[name].default_factory is dataclasses.MISSING
+    for call in (resource.update, Bucket.update):
+        assert inspect.signature(call).parameters[name].default is inspect.Parameter.empty
+
+try:
+    UpdateRequest(id="bucket")
+except TypeError:
+    pass
+else:
+    raise AssertionError("required collection arguments were accepted as missing")
+
+items, labels = [], {}
+request = UpdateRequest(id="bucket", items=items, labels=labels)
+assert request.items is items and request.labels is labels
+assert request.maybe_items is None and request.maybe_labels is None
+
+class Captured(Exception):
+    pass
+
+async def capture(request):
+    raise Captured(request)
+
+resource._update = capture
+
+async def check():
+    for call, kwargs in (
+        (resource.update, {"id": "bucket"}),
+        (Bucket(id="bucket").update, {}),
+    ):
+        for optional in (None, []):
+            try:
+                await call(items=items, labels=labels, maybe_items=optional, **kwargs)
+            except Captured as error:
+                request = error.args[0]
+                assert request.items is items and request.labels is labels
+                assert request.maybe_items is optional
+                assert request.maybe_labels is None
+            else:
+                raise AssertionError("generated wrapper did not call the operation")
+
+asyncio.run(check())
+"#,
+        &[temp_dir.path().to_str().unwrap()],
+    );
+}
+
 fn unique_output_path(label: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

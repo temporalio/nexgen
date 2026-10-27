@@ -27,10 +27,10 @@ async def _task_queue_partitions_operation(
 async def task_queue_partitions_operation(
     *,
     workflow_task_queue_partitions: list[TaskQueuePartition] | None = None,
-    activity_task_queue_partitions: list[TaskQueuePartition] | None = None,
+    activity_task_queue_partitions: list[TaskQueuePartition],
 ) -> temporalio.workflow.NexusOperationHandle[TaskQueuePartitions,]:
     request = TaskQueuePartitions(
-        workflow_task_queue_partitions=workflow_task_queue_partitions or [],
-        activity_task_queue_partitions=activity_task_queue_partitions or [],
+        workflow_task_queue_partitions=workflow_task_queue_partitions,
+        activity_task_queue_partitions=activity_task_queue_partitions,
     )
     return await _task_queue_partitions_operation(request)

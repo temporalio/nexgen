@@ -29,6 +29,6 @@ async def bad_binaries_operation(
     binaries: dict[str, BadBinary] | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[BadBinaries,]:
     request = BadBinaries(
-        binaries=binaries or {},
+        binaries=binaries,
     )
     return await _bad_binaries_operation(request)

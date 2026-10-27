@@ -40,8 +40,8 @@ async def _complete(
 async def complete(
     *,
     context: ContextT,
-    contexts: list[ContextT] | None = None,
-    by_name: dict[str, ContextT] | None = None,
+    contexts: list[ContextT],
+    by_name: dict[str, ContextT],
     nested: Inner[ContextT],
     probe: GetterProbe[ContextT] | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[
@@ -49,8 +49,8 @@ async def complete(
 ]:
     request = GenericRequest(
         context=context,
-        contexts=contexts or [],
-        by_name=by_name or {},
+        contexts=contexts,
+        by_name=by_name,
         nested=nested,
         probe=probe,
     )

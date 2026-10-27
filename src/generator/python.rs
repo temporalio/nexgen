@@ -985,9 +985,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("        self,\n");
         // Python refuses a parameter without a default after one with a default, and WIT
         // allows any order, so such a method takes keyword arguments only.
-        let has_default = |param: &PlannedResourceField| {
-            param.optional || resource_method_list_param(param).is_some()
-        };
+        let has_default = |param: &PlannedResourceField| param.optional;
         if method
             .params
             .iter()
@@ -1000,20 +998,26 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("        ");
             output.push_str(&python_field_name(&param.name));
             output.push_str(": ");
-            if let Some(value) = resource_method_list_param(param) {
-                // A list request field defaults to empty, as in the standalone wrapper.
-                output.push_str("list[");
-                output.push_str(&self.python_resource_value_annotation(value));
-                output.push_str("] | None = None");
-            } else {
-                output.push_str(&self.python_resource_field_annotation(
-                    &param.kind,
-                    param.optional,
-                    param.function.as_ref(),
-                ));
-                if param.optional {
-                    output.push_str(" = None");
+            // Request models store concrete collections; method parameters use the
+            // same types and preserve their authored optionality without coercion.
+            let annotation = match &param.kind {
+                PlannedType::List(value) if param.function.is_none() => {
+                    format!("list[{}]", self.python_resource_value_annotation(value))
                 }
+                PlannedType::Map(key, value) if param.function.is_none() => format!(
+                    "dict[{}, {}]",
+                    self.python_resource_value_annotation(key),
+                    self.python_resource_value_annotation(value)
+                ),
+                _ => self.python_resource_field_annotation(
+                    &param.kind,
+                    false,
+                    param.function.as_ref(),
+                ),
+            };
+            output.push_str(&annotation);
+            if param.optional {
+                output.push_str(" | None = None");
             }
             output.push_str(",\n");
         }
@@ -1442,7 +1446,6 @@ impl<'a> ApiPlanner<'a> {
                 request_fields.push(RenderedUnpackedRequestField {
                     attr_name: flattened.local_name.clone(),
                     value_expr: flattened.local_name.clone(),
-                    default_kind: PythonFieldDefaultKind::Required,
                 });
                 for child in &flattened.fields {
                     register_unpacked_parameter_name(
@@ -1494,7 +1497,6 @@ impl<'a> ApiPlanner<'a> {
             request_fields.push(RenderedUnpackedRequestField {
                 attr_name: rendered_field.attr_name.clone(),
                 value_expr: python_input_default_expr(planned_field, &rendered_field.attr_name),
-                default_kind: rendered_field.default_kind.clone(),
             });
         }
 
@@ -1763,93 +1765,26 @@ impl<'a> ApiPlanner<'a> {
     ) -> Result<RenderedField> {
         let attr_name = python_field_name(&field.name);
 
-        if let PlannedType::Map(key, value) = &field.field_type {
-            let key_type = self.resolve_planned_value_type(key)?;
-            let value_type = self.resolve_planned_value_type(value)?;
-            let mut imports = key_type.imports.clone();
-            imports.extend(&value_type.imports);
-            return Ok(RenderedField {
-                attr_name: attr_name.clone(),
-                annotation: python_field_annotation(
-                    record,
-                    field_name,
-                    field,
-                    format!("dict[{}, {}]", key_type.annotation, value_type.annotation),
-                    false,
-                ),
-                default_kind: if field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
-                    if field.required {
-                        PythonFieldDefaultKind::Required
-                    } else {
-                        PythonFieldDefaultKind::None
-                    }
-                } else {
-                    PythonFieldDefaultKind::EmptyDict
-                },
-                default_expr: if field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
-                    (!field.required).then(|| "None".to_string())
-                } else {
-                    Some("dataclasses.field(default_factory=dict)".to_string())
-                },
-                wire_value_type: value_type,
-                imports,
-            });
-        }
-
-        let (resolved_type, repeated) = match &field.field_type {
-            PlannedType::List(value) => (self.resolve_planned_value_type(value)?, true),
-            PlannedType::Map(_, _) => unreachable!("handled above"),
-            value => (self.resolve_planned_value_type(value)?, false),
+        let (resolved_type, base_annotation) = match &field.field_type {
+            PlannedType::Map(key, value) => {
+                let key_type = self.resolve_planned_value_type(key)?;
+                let mut value_type = self.resolve_planned_value_type(value)?;
+                value_type.imports.extend(&key_type.imports);
+                let annotation =
+                    format!("dict[{}, {}]", key_type.annotation, value_type.annotation);
+                (value_type, annotation)
+            }
+            PlannedType::List(value) => {
+                let value_type = self.resolve_planned_value_type(value)?;
+                let annotation = format!("list[{}]", value_type.annotation);
+                (value_type, annotation)
+            }
+            value => {
+                let value_type = self.resolve_planned_value_type(value)?;
+                let annotation = value_type.annotation.clone();
+                (value_type, annotation)
+            }
         };
-
-        if repeated {
-            return Ok(RenderedField {
-                attr_name: attr_name.clone(),
-                annotation: python_field_annotation(
-                    record,
-                    field_name,
-                    field,
-                    format!("list[{}]", resolved_type.annotation),
-                    false,
-                ),
-                default_kind: if field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
-                    if field.required {
-                        PythonFieldDefaultKind::Required
-                    } else {
-                        PythonFieldDefaultKind::None
-                    }
-                } else {
-                    PythonFieldDefaultKind::EmptyList
-                },
-                default_expr: if field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
-                    (!field.required).then(|| "None".to_string())
-                } else {
-                    Some("dataclasses.field(default_factory=list)".to_string())
-                },
-                wire_value_type: resolved_type.clone(),
-                imports: resolved_type.imports,
-            });
-        }
 
         let imports = resolved_type.imports.clone();
 
@@ -1860,7 +1795,7 @@ impl<'a> ApiPlanner<'a> {
                     record,
                     field_name,
                     field,
-                    resolved_type.annotation.clone(),
+                    base_annotation,
                     false,
                 ),
                 default_kind: PythonFieldDefaultKind::Required,
@@ -1872,13 +1807,7 @@ impl<'a> ApiPlanner<'a> {
 
         Ok(RenderedField {
             attr_name: attr_name.clone(),
-            annotation: python_field_annotation(
-                record,
-                field_name,
-                field,
-                resolved_type.annotation.clone(),
-                true,
-            ),
+            annotation: python_field_annotation(record, field_name, field, base_annotation, true),
             default_kind: PythonFieldDefaultKind::None,
             default_expr: Some("None".to_string()),
             wire_value_type: resolved_type.clone(),
@@ -2336,10 +2265,7 @@ fn render_record_model(
         output.push_str("    ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
-        output.push_str(&python_parameter_annotation(
-            &field.annotation,
-            &field.default_kind,
-        ));
+        output.push_str(&field.annotation);
         if let Some(default_expr) = &field.default_expr {
             render_python_default_expr(output, default_expr, "    ");
         }
@@ -2786,8 +2712,6 @@ pub(in crate::generator) struct RenderedRecordWireBlock {
 pub(in crate::generator) enum PythonFieldDefaultKind {
     Required,
     None,
-    EmptyList,
-    EmptyDict,
     Expression(String),
 }
 
@@ -2812,7 +2736,6 @@ struct RenderedUnpackedInputField {
 struct RenderedUnpackedRequestField {
     attr_name: String,
     value_expr: String,
-    default_kind: PythonFieldDefaultKind,
 }
 
 #[derive(Debug)]
@@ -5083,10 +5006,7 @@ fn render_endpoint_service_object_unpacked_method(
         output.push_str("        ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
-        output.push_str(&python_parameter_annotation(
-            &field.annotation,
-            &field.default_kind,
-        ));
+        output.push_str(&field.annotation);
         if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
             render_python_default_expr(output, &default_expr, "        ");
         }
@@ -5481,7 +5401,7 @@ fn render_resource_method_inline_operation_body(
         return;
     };
 
-    render_resource_method_request(output, method, operation, request_plan, api_plan);
+    render_resource_method_request(output, operation, request_plan, api_plan);
     output.push_str("        nexus_client = getattr(self, \"_nexus_client\")\n");
     let returns_direct = operation.output_transform_expr.is_some()
         || operation.output_resource_return.is_some()
@@ -5584,12 +5504,11 @@ fn render_resource_method_inline_operation_body(
 
 fn render_resource_method_request(
     output: &mut String,
-    method: &PlannedResourceMethod,
     operation: &RenderedOperation<'_>,
     request_plan: &RequestPlan,
     api_plan: &PlannedSpec,
 ) {
-    let request_expr = render_request_plan_python(method, request_plan, api_plan);
+    let request_expr = render_request_plan_python(request_plan, api_plan);
     output.push_str("        request = ");
     if let Some(unpacked_input) = &operation.unpacked_input {
         output.push_str(&unpacked_input.model_name);
@@ -5606,7 +5525,7 @@ fn render_resource_method_request(
                 output.push_str("            ");
                 output.push_str(&python_field_name(&field.field_name));
                 output.push('=');
-                output.push_str(&render_request_plan_python(method, &field.value, api_plan));
+                output.push_str(&render_request_plan_python(&field.value, api_plan));
                 output.push_str(",\n");
             }
             for (name, expression) in
@@ -5662,7 +5581,7 @@ fn render_resource_method_operation_body(
     };
 
     let operation_attr_name = request_operation_function_name(service, operation);
-    render_resource_method_request(output, method, operation, request_plan, api_plan);
+    render_resource_method_request(output, operation, request_plan, api_plan);
     if *direct_return {
         if result_annotation == "None" {
             output.push_str("        await ");
@@ -5733,22 +5652,7 @@ fn python_missing_request_defaults<'a>(
         .collect()
 }
 
-fn render_request_plan_python(
-    method: &PlannedResourceMethod,
-    plan: &RequestPlan,
-    api_plan: &PlannedSpec,
-) -> String {
-    let render_method_param = |name: &str| {
-        let is_list = method
-            .params
-            .iter()
-            .any(|param| param.name == name && resource_method_list_param(param).is_some());
-        if is_list {
-            format!("{} or []", python_field_name(name))
-        } else {
-            python_field_name(name)
-        }
-    };
+fn render_request_plan_python(plan: &RequestPlan, api_plan: &PlannedSpec) -> String {
     render_request_plan(
         plan,
         python_field_name,
@@ -5767,15 +5671,8 @@ fn render_request_plan_python(
             }
         },
         |name| format!("self.{}", python_field_name(name)),
-        render_method_param,
+        python_field_name,
     )
-}
-
-fn resource_method_list_param(param: &PlannedResourceField) -> Option<&PlannedType> {
-    match &param.kind {
-        PlannedType::List(value) if !param.optional && param.function.is_none() => Some(value),
-        _ => None,
-    }
 }
 
 /// A response model field is always optional, so a required resource field that the response
@@ -6475,10 +6372,7 @@ fn render_function_unpacked_overload(
         output.push_str("    ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
-        output.push_str(&python_parameter_annotation(
-            &field.annotation,
-            &field.default_kind,
-        ));
+        output.push_str(&field.annotation);
         if field.default_kind != PythonFieldDefaultKind::Required {
             output.push_str(" = ...");
         }
@@ -7438,10 +7332,7 @@ fn render_unpacked_operation_function(
         output.push_str("    ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
-        output.push_str(&python_parameter_annotation(
-            &field.annotation,
-            &field.default_kind,
-        ));
+        output.push_str(&field.annotation);
         if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
             render_python_default_expr(output, &default_expr, "    ");
         }
@@ -7603,10 +7494,7 @@ fn render_function_unpacked_implementation(
                 primary_args,
             ));
         } else {
-            output.push_str(&python_parameter_annotation(
-                &field.annotation,
-                &field.default_kind,
-            ));
+            output.push_str(&field.annotation);
         }
         if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
             render_python_default_expr(output, &default_expr, "    ");
@@ -7822,9 +7710,6 @@ fn python_parameter_default_expr(default_kind: &PythonFieldDefaultKind) -> Optio
     match default_kind {
         PythonFieldDefaultKind::Required => None,
         PythonFieldDefaultKind::None => Some("None".to_string()),
-        PythonFieldDefaultKind::EmptyList | PythonFieldDefaultKind::EmptyDict => {
-            Some("None".to_string())
-        }
         PythonFieldDefaultKind::Expression(expr) => Some(expr.clone()),
     }
 }
@@ -7864,29 +7749,8 @@ pub(in crate::generator) fn render_python_default_expr(
     output.push(')');
 }
 
-pub(in crate::generator) fn python_parameter_annotation(
-    annotation: &str,
-    default_kind: &PythonFieldDefaultKind,
-) -> String {
-    if matches!(
-        default_kind,
-        PythonFieldDefaultKind::EmptyList | PythonFieldDefaultKind::EmptyDict
-    ) && !annotation.contains("| None")
-    {
-        format!("{annotation} | None")
-    } else {
-        annotation.to_string()
-    }
-}
-
 fn unpacked_request_field_value_expr(field: &RenderedUnpackedRequestField) -> String {
-    match &field.default_kind {
-        PythonFieldDefaultKind::EmptyList => format!("{} or []", field.value_expr),
-        PythonFieldDefaultKind::EmptyDict => format!("{} or {{}}", field.value_expr),
-        PythonFieldDefaultKind::Required
-        | PythonFieldDefaultKind::None
-        | PythonFieldDefaultKind::Expression(_) => field.value_expr.clone(),
-    }
+    field.value_expr.clone()
 }
 
 fn python_ident(name: &str) -> String {

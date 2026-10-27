@@ -12,6 +12,6 @@ export interface UpdateEmailRequest {
 export interface NotifyRequest {
   userId: string;
   reason?: string;
-  channels?: string[];
+  channels: string[];
   sender: string;
 }

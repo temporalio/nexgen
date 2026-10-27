@@ -896,6 +896,13 @@ impl<'a> ApiPlanner<'a> {
             .as_ref()
             .and_then(|doc| doc.value())
             .map(str::to_string);
+        let collection_value_expr = |value: &str| {
+            if field.required {
+                required_field_expr(value, &record.name, generated_field_name)
+            } else {
+                value.to_string()
+            }
+        };
 
         if let PlannedType::Map(_, value) = &field.field_type {
             let value_type = self.resolve_planned_value_type(value);
@@ -907,16 +914,14 @@ impl<'a> ApiPlanner<'a> {
                     format!("Record<string, {}>", value_type.annotation),
                 ),
                 doc,
-                optional: !field.required
-                    || field
-                        .default_value
-                        .as_ref()
-                        .and_then(|text| text.value())
-                        .is_none(),
-                from_wire_expr: map_value_from_wire_expr(&value_type, wire_field_expr),
+                optional: !field.required,
+                from_wire_expr: map_value_from_wire_expr(
+                    &value_type,
+                    &collection_value_expr(wire_field_expr),
+                ),
                 to_wire_expr: map_value_to_wire_expr_from_expr(
                     &value_type,
-                    &format!("model.{generated_field_name}"),
+                    &collection_value_expr(&format!("model.{generated_field_name}")),
                 ),
                 flattened_fields: Vec::new(),
                 requirements: value_type.requirements,
@@ -1081,14 +1086,15 @@ impl<'a> ApiPlanner<'a> {
                     typescript_array_annotation(&resolved_type.annotation),
                 ),
                 doc,
-                optional: !field.required
-                    || field
-                        .default_value
-                        .as_ref()
-                        .and_then(|text| text.value())
-                        .is_none(),
-                from_wire_expr: repeated_from_wire_expr(&resolved_type, wire_field_expr),
-                to_wire_expr: repeated_to_wire_expr(&resolved_type, &generated_field_name),
+                optional: !field.required,
+                from_wire_expr: repeated_from_wire_expr(
+                    &resolved_type,
+                    &collection_value_expr(wire_field_expr),
+                ),
+                to_wire_expr: repeated_to_wire_expr_from_expr(
+                    &resolved_type,
+                    &collection_value_expr(&format!("model.{generated_field_name}")),
+                ),
                 flattened_fields: Vec::new(),
                 requirements: resolved_type.requirements,
             };

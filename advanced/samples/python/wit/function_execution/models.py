@@ -53,7 +53,7 @@ class ExecuteNamedFunctionResult:
 @dataclasses.dataclass(slots=True)
 class ExecuteVarargsFunctionRequest:
     function: collections.abc.Callable[..., str]
-    args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    args: list[typing.Any] | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -64,7 +64,7 @@ class ExecuteVarargsFunctionResult:
 @dataclasses.dataclass(slots=True)
 class ExecuteNamedVarargsFunctionRequest:
     function: str | collections.abc.Callable[..., str]
-    args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    args: list[typing.Any] | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -75,10 +75,10 @@ class ExecuteNamedVarargsFunctionResult:
 @dataclasses.dataclass(slots=True, kw_only=True)
 class ExecuteDescriptorsRequest:
     function: str | collections.abc.Callable[..., str]
-    args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    args: list[typing.Any] | None = None
     durations: collections.abc.Callable[..., str]
-    duration_values: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    duration_values: list[typing.Any] | None = None
     callback: collections.abc.Callable[..., str]
-    callback_values: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    callback_values: list[typing.Any] | None = None
     callable: collections.abc.Callable[..., str]
-    callable_values: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    callable_values: list[typing.Any] | None = None
