@@ -27,30 +27,30 @@ namespace Nexgen.StreamService
         public StreamStatus? Status { get; }
 
         [GeneratedCode("nexgen", null)]
-        public Task<AppendRecordsResponse> AppendRecordsAsync(IReadOnlyList<AppendRecord> records)
+        public Task<AppendRecordsResponse> PublishAsync(Producer? producer, long? sequence, IReadOnlyList<AppendRecord> records, WorkflowTaskEpoch? previousCompletedTask, IReadOnlyList<long> failedTasks, string? withdrawRun)
         {
-            var request = new AppendRecordsOptions(records) { Stream = StreamValue };
+            var request = new AppendRecordsOptions(StreamValue, records, failedTasks) { Producer = producer, Sequence = sequence, PreviousCompletedTask = previousCompletedTask, WithdrawRun = withdrawRun };
             return Operations.AppendRecordsAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
-        public Task CloseAsync(object? result)
+        public Task CloseAsync(Producer? producer, object? result, System.Exception? failure, StreamCloseStatus? status, WorkflowTaskEpoch? previousCompletedTask, IReadOnlyList<long> failedTasks)
         {
-            var request = new CloseStreamOptions() { Stream = StreamValue, Result = result };
+            var request = new CloseStreamOptions(StreamValue, failedTasks) { Producer = producer, Result = result, Failure = failure, PreviousCompletedTask = previousCompletedTask, Status = status };
             return Operations.CloseStreamAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
-        public Task<ReadRecordsResponse> ReadRecordsAsync(IReadOnlyList<string> topics, int? maxRecords, System.TimeSpan? wait)
+        public Task<ReadRecordsResponse> ReadAsync(long? fromOffset, StreamReadStart? start, int? maxRecords, System.TimeSpan? wait, System.TimeSpan? createWait)
         {
-            var request = new ReadRecordsOptions(topics) { Stream = StreamValue, MaxRecords = maxRecords, Wait = wait };
+            var request = new ReadRecordsOptions(StreamValue) { FromOffset = fromOffset, Start = start, MaxRecords = maxRecords, Wait = wait, CreateWait = createWait };
             return Operations.ReadRecordsAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task<DescribeStreamResponse> DescribeAsync()
         {
-            var request = new DescribeStreamOptions() { Stream = StreamValue };
+            var request = new DescribeStreamOptions(StreamValue);
             return Operations.DescribeStreamAsync(request);
         }
 

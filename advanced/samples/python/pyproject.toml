@@ -21,11 +21,11 @@ pythonpath = ["."]
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-# The protoc output of the stream-service sample proto.
-extend-exclude = ["streamsample"]
+# The protoc output of the stream protos.
+extend-exclude = ["streamprotos"]
 
 [tool.basedpyright]
-exclude = [".venv", "streamsample"]
+exclude = [".venv", "streamprotos"]
 reportAny = false
 reportExplicitAny = false
 reportPrivateUsage = false

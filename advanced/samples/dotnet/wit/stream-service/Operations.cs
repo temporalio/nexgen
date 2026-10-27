@@ -18,66 +18,176 @@ namespace Nexgen.StreamService
     [GeneratedCode("nexgen", null)]
     public class CreateStreamOptions
     {
-        public StreamRef? Ref { get; set; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CreateStreamOptions"/> class.
+        /// </summary>
+        public CreateStreamOptions(string streamId)
+        {
+            StreamId = streamId;
+        }
+
+        /// <summary>
+        /// Required on Redis and memory. On native, empty asks the server for an id.
+        /// </summary>
+        public string StreamId { get; set; }
+        /// <summary>
+        /// The age after which a Record is dropped. Empty is the Store default.
+        /// </summary>
         public System.TimeSpan? Retention { get; set; }
+        /// <summary>
+        /// Retry run only. The previous run, whose Records this withdraws.
+        /// </summary>
+        public string? WithdrawRun { get; set; }
+        /// <summary>
+        /// The Workflow run that owns the Stream. The Workflow transport sets it.
+        /// </summary>
+        public Producer? Owner { get; set; }
+        /// <summary>
+        /// The Stream's ref, with the owner fields.
+        /// </summary>
+        public StreamRef? Ref { get; set; }
     }
 
+    /// <summary>
+    /// Append one batch. Workflow code makes the call from a Local Activity.
+    /// </summary>
     [GeneratedCode("nexgen", null)]
     public class AppendRecordsOptions
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsOptions"/> class.
         /// </summary>
-        public AppendRecordsOptions(IReadOnlyList<AppendRecord> records)
+        public AppendRecordsOptions(StreamRef stream, IReadOnlyList<AppendRecord> records, IReadOnlyList<long> failedTasks)
         {
+            Stream = stream;
             Records = records;
+            FailedTasks = failedTasks;
         }
 
-        public StreamRef? Stream { get; set; }
-        public long? Sequence { get; set; }
+        public StreamRef Stream { get; set; }
         public IReadOnlyList<AppendRecord> Records { get; set; }
+        /// <summary>
+        /// Local Activity only. The run's failed or timed out Workflow Tasks.
+        /// </summary>
+        public IReadOnlyList<long> FailedTasks { get; set; }
+        /// <summary>
+        /// Required outside a Workflow. In a Workflow the transport sets it.
+        /// </summary>
+        public Producer? Producer { get; set; }
+        /// <summary>
+        /// The batch number in this epoch, 1 or more. It is part of the dedupe key.
+        /// </summary>
+        public long? Sequence { get; set; }
+        /// <summary>
+        /// Local Activity only. The run's last completed Workflow Task.
+        /// </summary>
+        public WorkflowTaskEpoch? PreviousCompletedTask { get; set; }
+        /// <summary>
+        /// Retry run only. The previous run, whose Records this withdraws.
+        /// </summary>
+        public string? WithdrawRun { get; set; }
     }
 
     [GeneratedCode("nexgen", null)]
     public class CloseStreamOptions
     {
-        public StreamRef? Stream { get; set; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CloseStreamOptions"/> class.
+        /// </summary>
+        public CloseStreamOptions(StreamRef stream, IReadOnlyList<long> failedTasks)
+        {
+            Stream = stream;
+            FailedTasks = failedTasks;
+        }
+
+        public StreamRef Stream { get; set; }
+        /// <summary>
+        /// Workflow only. The run's failed or timed out Workflow Tasks.
+        /// </summary>
+        public IReadOnlyList<long> FailedTasks { get; set; }
+        public Producer? Producer { get; set; }
         public object? Result { get; set; }
+        public System.Exception? Failure { get; set; }
+        /// <summary>
+        /// Empty is completed, or failed with a failure. A caller may set canceled.
+        /// </summary>
+        public StreamCloseStatus? Status { get; set; }
+        /// <summary>
+        /// Workflow only. The previous completed Workflow Task of the run.
+        /// </summary>
+        public WorkflowTaskEpoch? PreviousCompletedTask { get; set; }
     }
 
+    /// <summary>
+    /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
+    /// </summary>
     [GeneratedCode("nexgen", null)]
     public class ReadRecordsOptions
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ReadRecordsOptions"/> class.
         /// </summary>
-        public ReadRecordsOptions(IReadOnlyList<string> topics)
+        public ReadRecordsOptions(StreamRef stream)
         {
-            Topics = topics;
+            Stream = stream;
         }
 
-        public StreamRef? Stream { get; set; }
+        public StreamRef Stream { get; set; }
+        /// <summary>
+        /// Start offset. Empty uses start. INVALID_ARGUMENT past the newest offset + 1.
+        /// </summary>
         public long? FromOffset { get; set; }
-        public IReadOnlyList<string> Topics { get; set; }
+        /// <summary>
+        /// Where to start when from-offset is empty. Unspecified is the beginning.
+        /// </summary>
+        public StreamReadStart? Start { get; set; }
+        /// <summary>
+        /// At most this many Records. 1 to 1000.
+        /// </summary>
         public int? MaxRecords { get; set; }
+        /// <summary>
+        /// How long to wait for a new Record before an empty answer. At most 60 s.
+        /// </summary>
         public System.TimeSpan? Wait { get; set; }
+        /// <summary>
+        /// How long to wait for an uncreated Stream. Empty fails at once. At most 60 s.
+        /// </summary>
+        public System.TimeSpan? CreateWait { get; set; }
+        /// <summary>
+        /// Read the newest this many Records, oldest first. No from-offset. No wait.
+        /// </summary>
+        public int? Last { get; set; }
+        /// <summary>
+        /// The maximum Record bytes in a page. A larger Record is still returned alone.
+        /// </summary>
+        public long? MaxBytes { get; set; }
     }
 
     [GeneratedCode("nexgen", null)]
     public class DescribeStreamOptions
     {
-        public StreamRef? Stream { get; set; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DescribeStreamOptions"/> class.
+        /// </summary>
+        public DescribeStreamOptions(StreamRef stream)
+        {
+            Stream = stream;
+        }
+
+        public StreamRef Stream { get; set; }
     }
 
     /// <summary>
     /// Provides generated workflow operation helpers.
     /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public static class Operations
     {
         [GeneratedCode("nexgen", null)]
-        private const string StreamServiceEndpoint = "streams";
+        private const string StreamServiceEndpoint = "__temporal_system";
 
+        /// <param name="request">Create a Stream, or get the one that exists, which keeps its Retention.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<Stream> CreateStreamAsync(CreateStreamRequest request)
         {
@@ -86,18 +196,24 @@ namespace Nexgen.StreamService
             return new Stream((result.Stream ?? throw new System.InvalidOperationException("CreateStream answered without `stream`")), result.Created, result.Status);
         }
 
-        /// <param name="options">Options for the operation.</param>
+        /// <param name="options">Create a Stream, or get the one that exists, which keeps its Retention.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<Stream> CreateStreamAsync(CreateStreamOptions? options = null)
+        public static Task<Stream> CreateStreamAsync(CreateStreamOptions options)
         {
-            var request = new CreateStreamRequest()
+            var request = new CreateStreamRequest(options.StreamId)
             {
-                Ref = options?.Ref,
-                Retention = options?.Retention,
+                Retention = options.Retention,
+                WithdrawRun = options.WithdrawRun,
+                Owner = options.Owner,
+                Ref = options.Ref,
             };
             return CreateStreamAsync(request);
         }
 
+        /// <summary>
+        /// Append one batch. Workflow code makes the call from a Local Activity.
+        /// </summary>
+        /// <param name="request">Append. FAILED_PRECONDITION if closed, fenced or format too new. NOT_FOUND if absent.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<AppendRecordsResponse> AppendRecordsAsync(AppendRecordsRequest request)
         {
@@ -106,18 +222,24 @@ namespace Nexgen.StreamService
             return result;
         }
 
-        /// <param name="options">Options for the operation.</param>
+        /// <summary>
+        /// Append one batch. Workflow code makes the call from a Local Activity.
+        /// </summary>
+        /// <param name="options">Append. FAILED_PRECONDITION if closed, fenced or format too new. NOT_FOUND if absent.</param>
         [GeneratedCode("nexgen", null)]
         public static Task<AppendRecordsResponse> AppendRecordsAsync(AppendRecordsOptions options)
         {
-            var request = new AppendRecordsRequest(options.Records)
+            var request = new AppendRecordsRequest(options.Stream, options.Records, options.FailedTasks)
             {
-                Stream = options.Stream,
+                Producer = options.Producer,
                 Sequence = options.Sequence,
+                PreviousCompletedTask = options.PreviousCompletedTask,
+                WithdrawRun = options.WithdrawRun,
             };
             return AppendRecordsAsync(request);
         }
 
+        /// <param name="request">Close a Stream. Readers drain what is left, then end. Later appends are refused.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<CloseStreamResponse> CloseStreamAsync(CloseStreamRequest request)
         {
@@ -126,18 +248,25 @@ namespace Nexgen.StreamService
             return result;
         }
 
-        /// <param name="options">Options for the operation.</param>
+        /// <param name="options">Close a Stream. Readers drain what is left, then end. Later appends are refused.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<CloseStreamResponse> CloseStreamAsync(CloseStreamOptions? options = null)
+        public static Task<CloseStreamResponse> CloseStreamAsync(CloseStreamOptions options)
         {
-            var request = new CloseStreamRequest()
+            var request = new CloseStreamRequest(options.Stream, options.FailedTasks)
             {
-                Stream = options?.Stream,
-                Result = options?.Result,
+                Producer = options.Producer,
+                Result = options.Result,
+                Failure = options.Failure,
+                Status = options.Status,
+                PreviousCompletedTask = options.PreviousCompletedTask,
             };
             return CloseStreamAsync(request);
         }
 
+        /// <summary>
+        /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
+        /// </summary>
+        /// <param name="request">Read Records from an offset.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<ReadRecordsResponse> ReadRecordsAsync(ReadRecordsRequest request)
         {
@@ -146,16 +275,22 @@ namespace Nexgen.StreamService
             return result;
         }
 
-        /// <param name="options">Options for the operation.</param>
+        /// <summary>
+        /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
+        /// </summary>
+        /// <param name="options">Read Records from an offset.</param>
         [GeneratedCode("nexgen", null)]
         public static Task<ReadRecordsResponse> ReadRecordsAsync(ReadRecordsOptions options)
         {
-            var request = new ReadRecordsRequest(options.Topics)
+            var request = new ReadRecordsRequest(options.Stream)
             {
-                Stream = options.Stream,
                 FromOffset = options.FromOffset,
+                Start = options.Start,
                 MaxRecords = options.MaxRecords,
                 Wait = options.Wait,
+                CreateWait = options.CreateWait,
+                Last = options.Last,
+                MaxBytes = options.MaxBytes,
             };
             return ReadRecordsAsync(request);
         }
@@ -170,12 +305,9 @@ namespace Nexgen.StreamService
 
         /// <param name="options">Options for the operation.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<DescribeStreamResponse> DescribeStreamAsync(DescribeStreamOptions? options = null)
+        public static Task<DescribeStreamResponse> DescribeStreamAsync(DescribeStreamOptions options)
         {
-            var request = new DescribeStreamRequest()
-            {
-                Stream = options?.Stream,
-            };
+            var request = new DescribeStreamRequest(options.Stream);
             return DescribeStreamAsync(request);
         }
 
