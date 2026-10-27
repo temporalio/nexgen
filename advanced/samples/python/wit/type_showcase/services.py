@@ -5,11 +5,14 @@ from __future__ import annotations
 from nexusrpc import Operation, service
 from .models import (
     DeactivateRequest,
+    GetSyncSettingsRequest,
     GetUserRequest,
     RecordSyncRequest,
     RenameRequest,
     SetProfileRequest,
+    SyncSettings,
     UpdateEmailRequest,
+    UpdateNotificationSettingsRequest,
 )
 from ._resources.user import User
 
@@ -51,3 +54,13 @@ class TypeShowcase:
         DeactivateRequest,
         None,
     ] = Operation(name="Deactivate")
+
+    update_notification_settings: Operation[
+        UpdateNotificationSettingsRequest,
+        None,
+    ] = Operation(name="UpdateNotificationSettings")
+
+    get_sync_settings: Operation[
+        GetSyncSettingsRequest,
+        SyncSettings,
+    ] = Operation(name="GetSyncSettings")

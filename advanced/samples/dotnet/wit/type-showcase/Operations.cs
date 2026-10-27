@@ -113,6 +113,40 @@ namespace Nexgen.TypeShowcase
         public string? Reason { get; set; }
     }
 
+    [GeneratedCode("nexgen", null)]
+    public class UpdateNotificationSettingsOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateNotificationSettingsOptions"/> class.
+        /// </summary>
+        public UpdateNotificationSettingsOptions(string userId, bool emailEnabled, bool smsEnabled)
+        {
+            UserId = userId;
+            EmailEnabled = emailEnabled;
+            SmsEnabled = smsEnabled;
+        }
+
+        public string UserId { get; set; }
+        public bool EmailEnabled { get; set; }
+        public bool SmsEnabled { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class GetSyncSettingsOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GetSyncSettingsOptions"/> class.
+        /// </summary>
+        public GetSyncSettingsOptions(string userId)
+        {
+            UserId = userId;
+        }
+
+        public string UserId { get; set; }
+        public string? Region { get; set; }
+        public string? Checkpoint { get; set; }
+    }
+
     /// <summary>
     /// Provides generated workflow operation helpers.
     /// </summary>
@@ -231,6 +265,40 @@ namespace Nexgen.TypeShowcase
                 Reason = options.Reason,
             };
             return DeactivateAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task UpdateNotificationSettingsAsync(UpdateNotificationSettingsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeShowcase>(TypeShowcaseEndpoint);
+            await client.ExecuteNexusOperationAsync(svc => svc.UpdateNotificationSettings(request)).ConfigureAwait(true);
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task UpdateNotificationSettingsAsync(UpdateNotificationSettingsOptions options)
+        {
+            var request = new UpdateNotificationSettingsRequest(options.UserId, new NotificationSettings(options.EmailEnabled, options.SmsEnabled));
+            return UpdateNotificationSettingsAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<SyncSettings> GetSyncSettingsAsync(GetSyncSettingsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeShowcase>(TypeShowcaseEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<SyncSettings>(svc => svc.GetSyncSettings(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<SyncSettings> GetSyncSettingsAsync(GetSyncSettingsOptions options)
+        {
+            var request = new GetSyncSettingsRequest(options.UserId)
+            {
+                Settings = options.Region != null || options.Checkpoint != null ? new SyncSettings() { Region = options.Region, Checkpoint = options.Checkpoint } : null,
+            };
+            return GetSyncSettingsAsync(request);
         }
 
     }

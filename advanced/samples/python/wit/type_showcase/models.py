@@ -101,6 +101,30 @@ class DeactivateRequest:
     reason: str | None = None
 
 
+@dataclasses.dataclass(slots=True)
+class UpdateNotificationSettingsRequest:
+    user_id: str
+    settings: NotificationSettings
+
+
+@dataclasses.dataclass(slots=True)
+class NotificationSettings:
+    email_enabled: bool
+    sms_enabled: bool
+
+
+@dataclasses.dataclass(slots=True)
+class GetSyncSettingsRequest:
+    user_id: str
+    settings: SyncSettings | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class SyncSettings:
+    region: str | None = None
+    checkpoint: str | None = None
+
+
 NotificationTarget = (
     # Python payload.
     tuple[typing.Literal["email"], str]

@@ -121,6 +121,21 @@ namespace Nexgen.TypeShowcase
         public string? Reason { get; init; }
     }
 
+    [GeneratedCode("nexgen", null)]
+    public record GetSyncSettingsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GetSyncSettingsRequest"/> class.
+        /// </summary>
+        public GetSyncSettingsRequest(string userId)
+        {
+            UserId = userId;
+        }
+
+        public string UserId { get; init; }
+        public SyncSettings? Settings { get; init; }
+    }
+
     /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public record GetUserRequest
@@ -135,6 +150,22 @@ namespace Nexgen.TypeShowcase
 
         public string UserId { get; init; }
         public string? ConsistencyToken { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record NotificationSettings
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NotificationSettings"/> class.
+        /// </summary>
+        public NotificationSettings(bool emailEnabled, bool smsEnabled)
+        {
+            EmailEnabled = emailEnabled;
+            SmsEnabled = smsEnabled;
+        }
+
+        public bool EmailEnabled { get; init; }
+        public bool SmsEnabled { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -233,6 +264,13 @@ namespace Nexgen.TypeShowcase
     }
 
     [GeneratedCode("nexgen", null)]
+    public record SyncSettings
+    {
+        public string? Region { get; init; }
+        public string? Checkpoint { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record UpdateEmailRequest
     {
         /// <summary>
@@ -246,6 +284,22 @@ namespace Nexgen.TypeShowcase
 
         public string UserId { get; init; }
         public string Email { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record UpdateNotificationSettingsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateNotificationSettingsRequest"/> class.
+        /// </summary>
+        public UpdateNotificationSettingsRequest(string userId, NotificationSettings settings)
+        {
+            UserId = userId;
+            Settings = settings;
+        }
+
+        public string UserId { get; init; }
+        public NotificationSettings Settings { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]

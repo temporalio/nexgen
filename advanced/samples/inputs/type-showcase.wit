@@ -117,6 +117,31 @@ interface type-showcase {
     reason: option<string>,
   }
 
+  // Required input models remain public even when marked for flattening.
+  /// @nexus.flatten-in-api
+  record notification-settings {
+    email-enabled: bool,
+    sms-enabled: bool,
+  }
+
+  record update-notification-settings-request {
+    user-id: string,
+    settings: notification-settings,
+  }
+
+  // Optional input fields flatten into options, but the returned model must
+  // still be public.
+  /// @nexus.flatten-in-api
+  record sync-settings {
+    region: option<string>,
+    checkpoint: option<string>,
+  }
+
+  record get-sync-settings-request {
+    user-id: string,
+    settings: option<sync-settings>,
+  }
+
   /// @nexus.doc "Get a user." returns="The matching user."
   /// @nexus.experimental
   get-user: func(request: get-user-request) -> user-result;
@@ -125,4 +150,6 @@ interface type-showcase {
   set-profile: func(request: set-profile-request) -> user-result;
   record-sync: func(request: record-sync-request);
   deactivate: func(request: deactivate-request);
+  update-notification-settings: func(request: update-notification-settings-request);
+  get-sync-settings: func(request: get-sync-settings-request) -> sync-settings;
 }

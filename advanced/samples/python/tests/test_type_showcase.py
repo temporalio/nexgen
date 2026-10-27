@@ -147,6 +147,22 @@ class TypeShowcaseHandler:
         assert input.user_id == "user-123"
         assert input.reason == "requested"
 
+    @sync_operation
+    async def update_notification_settings(
+        self,
+        _ctx: StartOperationContext,
+        _input: type_showcase_models.UpdateNotificationSettingsRequest,
+    ) -> None:
+        pass
+
+    @sync_operation
+    async def get_sync_settings(
+        self,
+        _ctx: StartOperationContext,
+        input: type_showcase_models.GetSyncSettingsRequest,
+    ) -> type_showcase_models.SyncSettings:
+        return input.settings or type_showcase_models.SyncSettings()
+
 
 @workflow.defn
 class TypeShowcaseCallerWorkflow:

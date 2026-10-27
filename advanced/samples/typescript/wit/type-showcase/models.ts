@@ -124,3 +124,25 @@ export interface DeactivateRequest {
   userId: string;
   reason?: string;
 }
+
+export interface UpdateNotificationSettingsRequest {
+  userId: string;
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+}
+
+export interface NotificationSettings {
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+}
+
+export interface SyncSettings {
+  region?: string;
+  checkpoint?: string;
+}
+
+export interface GetSyncSettingsRequest {
+  userId: string;
+  region?: string;
+  checkpoint?: string;
+}

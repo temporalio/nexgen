@@ -86,6 +86,32 @@ func (m deactivateRequest) GetReason() *string {
 	return m.Reason
 }
 
+type updateNotificationSettingsRequest struct {
+	UserID   string
+	Settings NotificationSettings
+}
+
+func (m updateNotificationSettingsRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m updateNotificationSettingsRequest) GetSettings() NotificationSettings {
+	return m.Settings
+}
+
+type getSyncSettingsRequest struct {
+	UserID   string
+	Settings *SyncSettings
+}
+
+func (m getSyncSettingsRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m getSyncSettingsRequest) GetSettings() *SyncSettings {
+	return m.Settings
+}
+
 // --- Resources ---
 
 type User struct {
@@ -162,6 +188,18 @@ func recordSync(ctx workflow.Context, request recordSyncRequest) workflow.Future
 func deactivate(ctx workflow.Context, request deactivateRequest) workflow.Future {
 	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
 	fut := c.ExecuteOperation(ctx, "Deactivate", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func updateNotificationSettings(ctx workflow.Context, request updateNotificationSettingsRequest) workflow.Future {
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "UpdateNotificationSettings", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func getSyncSettings(ctx workflow.Context, request getSyncSettingsRequest) workflow.Future {
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "GetSyncSettings", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
@@ -386,6 +424,36 @@ func (m SyncReport) GetClockSkewMs() int64 {
 	return m.ClockSkewMs
 }
 
+type NotificationSettings struct {
+	// EmailEnabled - Required.
+	EmailEnabled bool
+	// SmsEnabled - Required.
+	SmsEnabled bool
+}
+
+func (m NotificationSettings) GetEmailEnabled() bool {
+	return m.EmailEnabled
+}
+
+func (m NotificationSettings) GetSmsEnabled() bool {
+	return m.SmsEnabled
+}
+
+type SyncSettings struct {
+	// Region - Optional.
+	Region *string
+	// Checkpoint - Optional.
+	Checkpoint *string
+}
+
+func (m SyncSettings) GetRegion() *string {
+	return m.Region
+}
+
+func (m SyncSettings) GetCheckpoint() *string {
+	return m.Checkpoint
+}
+
 type GetUserOptions struct {
 	// UserID - Required.
 	UserID string
@@ -478,5 +546,45 @@ func Deactivate(ctx workflow.Context, opts DeactivateOptions) workflow.Future {
 	return deactivate(ctx, deactivateRequest{
 		UserID: opts.UserID,
 		Reason: reason,
+	})
+}
+
+type UpdateNotificationSettingsOptions struct {
+	// UserID - Required.
+	UserID string
+	// Settings - Required.
+	Settings NotificationSettings
+}
+
+func UpdateNotificationSettings(ctx workflow.Context, opts UpdateNotificationSettingsOptions) workflow.Future {
+	return updateNotificationSettings(ctx, updateNotificationSettingsRequest{
+		UserID:   opts.UserID,
+		Settings: opts.Settings,
+	})
+}
+
+type GetSyncSettingsOptions struct {
+	// UserID - Required.
+	UserID string
+	// Region - Optional.
+	Region string
+	// Checkpoint - Optional.
+	Checkpoint string
+}
+
+func GetSyncSettings(ctx workflow.Context, opts GetSyncSettingsOptions) workflow.Future {
+	var settingsValue *SyncSettings
+	if opts.Region != "" || opts.Checkpoint != "" {
+		settingsValue = &SyncSettings{}
+		if opts.Region != "" {
+			settingsValue.Region = &opts.Region
+		}
+		if opts.Checkpoint != "" {
+			settingsValue.Checkpoint = &opts.Checkpoint
+		}
+	}
+	return getSyncSettings(ctx, getSyncSettingsRequest{
+		UserID:   opts.UserID,
+		Settings: settingsValue,
 	})
 }

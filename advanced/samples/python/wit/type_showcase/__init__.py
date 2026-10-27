@@ -14,14 +14,18 @@ from ._resources.user import rename
 from .operations.set_profile import set_profile
 from .operations.record_sync import record_sync
 from ._resources.user import deactivate
+from .operations.update_notification_settings import update_notification_settings
+from .operations.get_sync_settings import get_sync_settings
 
 __all__ = [
     "deactivate",
+    "get_sync_settings",
     "get_user",
     "record_sync",
     "rename",
     "set_profile",
     "update_email",
+    "update_notification_settings",
 ]
 
 
@@ -85,5 +89,17 @@ __nexus_operation_registry__: dict[
         "Deactivate",
     ): _NexusOperationInfo(
         operation=_services.TypeShowcase.deactivate,
+    ),
+    (
+        "TypeShowcase",
+        "UpdateNotificationSettings",
+    ): _NexusOperationInfo(
+        operation=_services.TypeShowcase.update_notification_settings,
+    ),
+    (
+        "TypeShowcase",
+        "GetSyncSettings",
+    ): _NexusOperationInfo(
+        operation=_services.TypeShowcase.get_sync_settings,
     ),
 }

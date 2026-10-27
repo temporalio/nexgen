@@ -50,6 +50,9 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
 
 ### `type-showcase`
 
+Includes flattened records that remain public because they are used as a
+required input model or returned by an operation.
+
 - WIT: [`inputs/type-showcase.wit`](inputs/type-showcase.wit)
 - .NET: [`dotnet/wit/type-showcase/`](dotnet/wit/type-showcase/)
 - Go: [`go/typeshowcase/`](go/typeshowcase/),
