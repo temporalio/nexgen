@@ -35,9 +35,6 @@ enum WireReadPolicy {
         check_empty: bool,
     },
     Optional,
-    Default {
-        default_expr: String,
-    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -720,10 +717,6 @@ fn field_read(
             setup_lines: Vec::new(),
             expr: optional_from_proto_expr(field, resolved_value_type, proto_name, value_expr),
         },
-        WireReadPolicy::Default { default_expr } => RenderedWireRead {
-            setup_lines: Vec::new(),
-            expr: defaulted_from_proto_expr(field, proto_name, value_expr, default_expr),
-        },
     };
     if generic_carrier == Some(ProtoGenericCarrier::Payloads) {
         let mut checks =
@@ -926,19 +919,6 @@ fn no_presence_default_value_present_expr(
             _ => None,
         },
         _ => None,
-    }
-}
-
-fn defaulted_from_proto_expr(
-    field: &RecordFieldSpec<PlannedFamily>,
-    proto_name: &str,
-    value_expr: String,
-    default_expr: String,
-) -> String {
-    if field_has_proto_presence(field) {
-        format!("{value_expr} if value.HasField(\"{proto_name}\") else {default_expr}")
-    } else {
-        value_expr
     }
 }
 
@@ -1451,12 +1431,6 @@ fn field_read_policy(
             }
         }
         PythonFieldDefaultKind::None => WireReadPolicy::Optional,
-        PythonFieldDefaultKind::EmptyDict => WireReadPolicy::Default {
-            default_expr: "{}".to_string(),
-        },
-        PythonFieldDefaultKind::EmptyList => WireReadPolicy::Default {
-            default_expr: "[]".to_string(),
-        },
     }
 }
 
@@ -1477,12 +1451,7 @@ fn field_write_for_rendered_field(
             ),
         );
     }
-    let optional_guard = matches!(
-        rendered_field.default_kind,
-        PythonFieldDefaultKind::None
-            | PythonFieldDefaultKind::EmptyDict
-            | PythonFieldDefaultKind::EmptyList
-    );
+    let optional_guard = matches!(rendered_field.default_kind, PythonFieldDefaultKind::None);
     let converter = planned_field
         .function
         .as_ref()

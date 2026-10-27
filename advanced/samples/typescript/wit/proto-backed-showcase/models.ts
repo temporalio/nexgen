@@ -209,7 +209,7 @@ export const workflowExecutionTransferTypeConverter = {
 };
 export interface TaskQueuePartitions {
   workflowTaskQueuePartitions?: TaskQueuePartition[];
-  activityTaskQueuePartitions?: TaskQueuePartition[];
+  activityTaskQueuePartitions: TaskQueuePartition[];
 }
 
 function taskQueuePartitionsFromProto(
@@ -219,9 +219,11 @@ function taskQueuePartitionsFromProto(
     workflowTaskQueuePartitions: proto.workflowTaskQueuePartitions?.map((value: any) =>
       taskQueuePartitionFromProto(value),
     ),
-    activityTaskQueuePartitions: proto.activityTaskQueuePartitions?.map((value: any) =>
-      taskQueuePartitionFromProto(value),
-    ),
+    activityTaskQueuePartitions: requiredField(
+      proto.activityTaskQueuePartitions,
+      "TaskQueuePartitions",
+      "activityTaskQueuePartitions",
+    )?.map((value: any) => taskQueuePartitionFromProto(value)),
   };
 }
 
@@ -232,9 +234,11 @@ function taskQueuePartitionsToProto(
     workflowTaskQueuePartitions: model.workflowTaskQueuePartitions?.map((value) =>
       taskQueuePartitionToProto(value),
     ),
-    activityTaskQueuePartitions: model.activityTaskQueuePartitions?.map((value) =>
-      taskQueuePartitionToProto(value),
-    ),
+    activityTaskQueuePartitions: requiredField(
+      model.activityTaskQueuePartitions,
+      "TaskQueuePartitions",
+      "activityTaskQueuePartitions",
+    )?.map((value) => taskQueuePartitionToProto(value)),
   };
 }
 
@@ -451,7 +455,7 @@ export const callbackInternalTransferTypeConverter = {
 };
 export interface CallbackNexus {
   url: string;
-  header?: Record<string, string>;
+  header: Record<string, string>;
 }
 
 function callbackNexusFromProto(
@@ -464,12 +468,15 @@ function callbackNexusFromProto(
       "url",
     ),
     header:
-      proto.header == null
+      requiredField(proto.header, "CallbackNexus", "header") == null
         ? undefined
         : (Object.fromEntries(
-            Object.entries(proto.header as Record<string, any>).map(
-              ([key, value]: [string, any]) => [key, value as string],
-            ),
+            Object.entries(
+              requiredField(proto.header, "CallbackNexus", "header") as Record<
+                string,
+                any
+              >,
+            ).map(([key, value]: [string, any]) => [key, value as string]),
           ) as Record<string, string>),
   };
 }
@@ -480,12 +487,15 @@ function callbackNexusToProto(
   return {
     url: requiredField(model.url, "CallbackNexus", "url"),
     header:
-      model.header == null
+      requiredField(model.header, "CallbackNexus", "header") == null
         ? undefined
         : Object.fromEntries(
-            Object.entries(model.header as Record<string, any>).map(
-              ([key, value]: [string, any]) => [key, value],
-            ),
+            Object.entries(
+              requiredField(model.header, "CallbackNexus", "header") as Record<
+                string,
+                any
+              >,
+            ).map(([key, value]: [string, any]) => [key, value]),
           ),
   };
 }

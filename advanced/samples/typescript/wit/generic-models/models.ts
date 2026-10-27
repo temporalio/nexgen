@@ -22,15 +22,15 @@ export interface OperationCompletionFailure {
 export interface GetterPair<ContextT, OutputT> {
   value: ContextT;
   other?: OutputT;
-  history?: ContextT[];
+  history: ContextT[];
   tupleValue: [ContextT, OutputT];
   resultValue: { tag: "ok"; value: ContextT } | { tag: "err"; value: OutputT };
 }
 
 export interface GenericRequest<ContextT> {
   context: ContextT;
-  contexts?: ContextT[];
-  byName?: Record<string, ContextT>;
+  contexts: ContextT[];
+  byName: Record<string, ContextT>;
   nested: Inner<ContextT>;
   probe?: GetterProbe<ContextT>;
 }
@@ -42,10 +42,10 @@ export interface Inner<ContextT> {
 export interface GetterProbe<ContextT> {
   value: ContextT;
   other?: ContextT;
-  history?: ContextT[];
+  history: ContextT[];
   tupleValue: [ContextT, ContextT];
   resultValue: { tag: "ok"; value: ContextT } | { tag: "err"; value: ContextT };
-  lookup?: [string, number][];
+  lookup: [string, number][];
   elapsed: number;
   namespace: string;
   type: string;

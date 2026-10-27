@@ -20,5 +20,5 @@ class UpdateEmailRequest:
 class NotifyRequest:
     user_id: str
     reason: str | None = None
-    channels: list[str] | None = dataclasses.field(default_factory=list)
+    channels: list[str]
     sender: str
