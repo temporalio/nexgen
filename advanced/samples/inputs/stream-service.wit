@@ -41,7 +41,7 @@ interface stream-service {
 
   /// @nexus.proto "streamsample.v1.CreateStreamRequest" typescript-import="#streamsample"
   record create-stream-request {
-    %ref: option<stream-ref>,
+    %ref: stream-ref,
     retention: option<duration>,
     /// @nexus.omit
     namespace: placeholder,
@@ -49,9 +49,9 @@ interface stream-service {
 
   /// @nexus.proto "streamsample.v1.AppendRecordsRequest" typescript-import="#streamsample"
   record append-records-request {
-    %stream: option<stream-ref>,
-    sequence: option<s64>,
+    %stream: stream-ref,
     records: list<append-record>,
+    sequence: option<s64>,
     /// @nexus.omit
     namespace: placeholder,
   }
@@ -64,7 +64,7 @@ interface stream-service {
 
   /// @nexus.proto "streamsample.v1.CloseStreamRequest" typescript-import="#streamsample"
   record close-stream-request {
-    %stream: option<stream-ref>,
+    %stream: stream-ref,
     %result: option<payload>,
     /// @nexus.omit
     namespace: placeholder,
@@ -76,9 +76,9 @@ interface stream-service {
 
   /// @nexus.proto "streamsample.v1.ReadRecordsRequest" typescript-import="#streamsample"
   record read-records-request {
-    %stream: option<stream-ref>,
-    from-offset: option<s64>,
+    %stream: stream-ref,
     topics: list<string>,
+    from-offset: option<s64>,
     max-records: option<s32>,
     wait: option<duration>,
     /// @nexus.omit
@@ -94,7 +94,7 @@ interface stream-service {
 
   /// @nexus.proto "streamsample.v1.DescribeStreamRequest" typescript-import="#streamsample"
   record describe-stream-request {
-    %stream: option<stream-ref>,
+    %stream: stream-ref,
     /// @nexus.omit
     namespace: placeholder,
   }

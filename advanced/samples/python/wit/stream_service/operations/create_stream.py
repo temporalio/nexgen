@@ -37,7 +37,7 @@ async def _create_stream(
 
 async def create_stream(
     *,
-    ref: StreamRef | None = None,
+    ref: StreamRef,
     retention: datetime.timedelta | None = None,
 ) -> Stream:
     request = CreateStreamRequest(

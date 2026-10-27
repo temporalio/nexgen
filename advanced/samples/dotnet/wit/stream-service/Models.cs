@@ -72,20 +72,20 @@ namespace Nexgen.StreamService
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsRequest"/> class.
         /// </summary>
-        public AppendRecordsRequest(IReadOnlyList<AppendRecord> records)
+        public AppendRecordsRequest(StreamRef stream, IReadOnlyList<AppendRecord> records)
         {
+            Stream = stream;
             Records = records;
         }
 
-        public StreamRef? Stream { get; init; }
-        public long? Sequence { get; init; }
+        public StreamRef Stream { get; init; }
         public IReadOnlyList<AppendRecord> Records { get; init; }
+        public long? Sequence { get; init; }
 
         internal static AppendRecordsRequest FromTransferType(StreamSample.V1.AppendRecordsRequest wire)
         {
-            return new AppendRecordsRequest(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord.FromTransferType(item))))
+            return new AppendRecordsRequest(StreamRef.FromTransferType(wire.Stream), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord.FromTransferType(item))))
             {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
                 Sequence = wire.Sequence == 0 ? null : wire.Sequence,
             };
         }
@@ -93,15 +93,12 @@ namespace Nexgen.StreamService
         internal StreamSample.V1.AppendRecordsRequest ToTransferType()
         {
             var proto = new StreamSample.V1.AppendRecordsRequest();
-            if (Stream is { } stream)
-            {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
-            }
+            proto.Stream = (StreamSample.V1.StreamRef)Stream.ToTransferType();
+            proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (StreamSample.V1.AppendRecord)item.ToTransferType()));
             if (Sequence is { } sequence)
             {
                 proto.Sequence = sequence;
             }
-            proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (StreamSample.V1.AppendRecord)item.ToTransferType()));
             return proto;
         }
 
@@ -173,14 +170,21 @@ namespace Nexgen.StreamService
     [GeneratedCode("nexgen", null)]
     public record CloseStreamRequest
     {
-        public StreamRef? Stream { get; init; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CloseStreamRequest"/> class.
+        /// </summary>
+        public CloseStreamRequest(StreamRef stream)
+        {
+            Stream = stream;
+        }
+
+        public StreamRef Stream { get; init; }
         public object? Result { get; init; }
 
         internal static CloseStreamRequest FromTransferType(StreamSample.V1.CloseStreamRequest wire)
         {
-            return new CloseStreamRequest()
+            return new CloseStreamRequest(StreamRef.FromTransferType(wire.Stream))
             {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
                 Result = wire.Result == null ? null : Nexgen.Support.ProtoExtensions.FromPayload(wire.Result),
             };
         }
@@ -188,10 +192,7 @@ namespace Nexgen.StreamService
         internal StreamSample.V1.CloseStreamRequest ToTransferType()
         {
             var proto = new StreamSample.V1.CloseStreamRequest();
-            if (Stream is { } stream)
-            {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
-            }
+            proto.Stream = (StreamSample.V1.StreamRef)Stream.ToTransferType();
             if (Result is { } result)
             {
                 proto.Result = Nexgen.Support.ProtoExtensions.ToPayload(result);
@@ -252,14 +253,21 @@ namespace Nexgen.StreamService
     [GeneratedCode("nexgen", null)]
     public record CreateStreamRequest
     {
-        public StreamRef? Ref { get; init; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CreateStreamRequest"/> class.
+        /// </summary>
+        public CreateStreamRequest(StreamRef @ref)
+        {
+            Ref = @ref;
+        }
+
+        public StreamRef Ref { get; init; }
         public System.TimeSpan? Retention { get; init; }
 
         internal static CreateStreamRequest FromTransferType(StreamSample.V1.CreateStreamRequest wire)
         {
-            return new CreateStreamRequest()
+            return new CreateStreamRequest(StreamRef.FromTransferType(wire.Ref))
             {
-                Ref = wire.Ref == null ? null : StreamRef.FromTransferType(wire.Ref),
                 Retention = wire.Retention == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Retention),
             };
         }
@@ -267,10 +275,7 @@ namespace Nexgen.StreamService
         internal StreamSample.V1.CreateStreamRequest ToTransferType()
         {
             var proto = new StreamSample.V1.CreateStreamRequest();
-            if (Ref is { } @ref)
-            {
-                proto.Ref = (StreamSample.V1.StreamRef)@ref.ToTransferType();
-            }
+            proto.Ref = (StreamSample.V1.StreamRef)Ref.ToTransferType();
             if (Retention is { } retention)
             {
                 proto.Retention = retention.ToProto();
@@ -352,23 +357,25 @@ namespace Nexgen.StreamService
     [GeneratedCode("nexgen", null)]
     public record DescribeStreamRequest
     {
-        public StreamRef? Stream { get; init; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DescribeStreamRequest"/> class.
+        /// </summary>
+        public DescribeStreamRequest(StreamRef stream)
+        {
+            Stream = stream;
+        }
+
+        public StreamRef Stream { get; init; }
 
         internal static DescribeStreamRequest FromTransferType(StreamSample.V1.DescribeStreamRequest wire)
         {
-            return new DescribeStreamRequest()
-            {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
-            };
+            return new DescribeStreamRequest(StreamRef.FromTransferType(wire.Stream));
         }
 
         internal StreamSample.V1.DescribeStreamRequest ToTransferType()
         {
             var proto = new StreamSample.V1.DescribeStreamRequest();
-            if (Stream is { } stream)
-            {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
-            }
+            proto.Stream = (StreamSample.V1.StreamRef)Stream.ToTransferType();
             return proto;
         }
 
@@ -443,22 +450,22 @@ namespace Nexgen.StreamService
         /// <summary>
         /// Initializes a new instance of the <see cref="ReadRecordsRequest"/> class.
         /// </summary>
-        public ReadRecordsRequest(IReadOnlyList<string> topics)
+        public ReadRecordsRequest(StreamRef stream, IReadOnlyList<string> topics)
         {
+            Stream = stream;
             Topics = topics;
         }
 
-        public StreamRef? Stream { get; init; }
-        public long? FromOffset { get; init; }
+        public StreamRef Stream { get; init; }
         public IReadOnlyList<string> Topics { get; init; }
+        public long? FromOffset { get; init; }
         public int? MaxRecords { get; init; }
         public System.TimeSpan? Wait { get; init; }
 
         internal static ReadRecordsRequest FromTransferType(StreamSample.V1.ReadRecordsRequest wire)
         {
-            return new ReadRecordsRequest(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Topics, item => item)))
+            return new ReadRecordsRequest(StreamRef.FromTransferType(wire.Stream), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Topics, item => item)))
             {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
                 FromOffset = wire.FromOffset == 0 ? null : wire.FromOffset,
                 MaxRecords = wire.MaxRecords == 0 ? null : wire.MaxRecords,
                 Wait = wire.Wait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Wait),
@@ -468,15 +475,12 @@ namespace Nexgen.StreamService
         internal StreamSample.V1.ReadRecordsRequest ToTransferType()
         {
             var proto = new StreamSample.V1.ReadRecordsRequest();
-            if (Stream is { } stream)
-            {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
-            }
+            proto.Stream = (StreamSample.V1.StreamRef)Stream.ToTransferType();
+            proto.Topics.Add(System.Linq.Enumerable.Select(Topics, item => item));
             if (FromOffset is { } fromOffset)
             {
                 proto.FromOffset = fromOffset;
             }
-            proto.Topics.Add(System.Linq.Enumerable.Select(Topics, item => item));
             if (MaxRecords is { } maxRecords)
             {
                 proto.MaxRecords = maxRecords;

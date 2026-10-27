@@ -90,7 +90,7 @@ export const streamRefTransferTypeConverter = {
   },
 };
 export interface CreateStreamRequest {
-  ref?: StreamRef;
+  ref: StreamRef;
   retention?: common.Duration;
 }
 
@@ -98,7 +98,7 @@ function createStreamRequestFromProto(
   proto: streamsample.v1.ICreateStreamRequest,
 ): CreateStreamRequest {
   return {
-    ref: proto.ref == null ? undefined : streamRefFromProto(proto.ref),
+    ref: streamRefFromProto(requiredField(proto.ref, "CreateStreamRequest", "ref")),
     retention:
       proto.retention == null ? undefined : support.durationFromProto(proto.retention),
   };
@@ -108,7 +108,7 @@ function createStreamRequestToProto(
   model: CreateStreamRequest,
 ): streamsample.v1.ICreateStreamRequest {
   return {
-    ref: model.ref == null ? undefined : streamRefToProto(model.ref),
+    ref: streamRefToProto(requiredField(model.ref, "CreateStreamRequest", "ref")),
     retention:
       model.retention == null ? undefined : support.durationToProto(model.retention),
   };
@@ -158,18 +158,20 @@ export const appendRecordsResponseTransferTypeConverter = {
   },
 };
 export interface AppendRecordsRequest {
-  stream?: StreamRef;
-  sequence?: Long;
+  stream: StreamRef;
   records?: AppendRecord[];
+  sequence?: Long;
 }
 
 function appendRecordsRequestFromProto(
   proto: streamsample.v1.IAppendRecordsRequest,
 ): AppendRecordsRequest {
   return {
-    stream: proto.stream == null ? undefined : streamRefFromProto(proto.stream),
-    sequence: proto.sequence ?? undefined,
+    stream: streamRefFromProto(
+      requiredField(proto.stream, "AppendRecordsRequest", "stream"),
+    ),
     records: proto.records?.map((value: any) => appendRecordFromProto(value)),
+    sequence: proto.sequence ?? undefined,
   };
 }
 
@@ -177,9 +179,11 @@ function appendRecordsRequestToProto(
   model: AppendRecordsRequest,
 ): streamsample.v1.IAppendRecordsRequest {
   return {
-    stream: model.stream == null ? undefined : streamRefToProto(model.stream),
-    sequence: model.sequence,
+    stream: streamRefToProto(
+      requiredField(model.stream, "AppendRecordsRequest", "stream"),
+    ),
     records: model.records?.map((value) => appendRecordToProto(value)),
+    sequence: model.sequence,
   };
 }
 
@@ -252,7 +256,7 @@ export const closeStreamResponseTransferTypeConverter = {
   },
 };
 export interface CloseStreamRequest {
-  stream?: StreamRef;
+  stream: StreamRef;
   result?: common.Payload;
 }
 
@@ -260,7 +264,9 @@ function closeStreamRequestFromProto(
   proto: streamsample.v1.ICloseStreamRequest,
 ): CloseStreamRequest {
   return {
-    stream: proto.stream == null ? undefined : streamRefFromProto(proto.stream),
+    stream: streamRefFromProto(
+      requiredField(proto.stream, "CloseStreamRequest", "stream"),
+    ),
     result: proto.result == null ? undefined : support.payloadFromProto(proto.result),
   };
 }
@@ -269,7 +275,9 @@ function closeStreamRequestToProto(
   model: CloseStreamRequest,
 ): streamsample.v1.ICloseStreamRequest {
   return {
-    stream: model.stream == null ? undefined : streamRefToProto(model.stream),
+    stream: streamRefToProto(
+      requiredField(model.stream, "CloseStreamRequest", "stream"),
+    ),
     result: model.result == null ? undefined : support.payloadToProto(model.result),
   };
 }
@@ -350,9 +358,9 @@ export const streamRecordTransferTypeConverter = {
   },
 };
 export interface ReadRecordsRequest {
-  stream?: StreamRef;
-  fromOffset?: Long;
+  stream: StreamRef;
   topics?: string[];
+  fromOffset?: Long;
   maxRecords?: number;
   wait?: common.Duration;
 }
@@ -361,9 +369,11 @@ function readRecordsRequestFromProto(
   proto: streamsample.v1.IReadRecordsRequest,
 ): ReadRecordsRequest {
   return {
-    stream: proto.stream == null ? undefined : streamRefFromProto(proto.stream),
-    fromOffset: proto.fromOffset ?? undefined,
+    stream: streamRefFromProto(
+      requiredField(proto.stream, "ReadRecordsRequest", "stream"),
+    ),
     topics: proto.topics?.slice(),
+    fromOffset: proto.fromOffset ?? undefined,
     maxRecords: proto.maxRecords ?? undefined,
     wait: proto.wait == null ? undefined : support.durationFromProto(proto.wait),
   };
@@ -373,9 +383,11 @@ function readRecordsRequestToProto(
   model: ReadRecordsRequest,
 ): streamsample.v1.IReadRecordsRequest {
   return {
-    stream: model.stream == null ? undefined : streamRefToProto(model.stream),
-    fromOffset: model.fromOffset,
+    stream: streamRefToProto(
+      requiredField(model.stream, "ReadRecordsRequest", "stream"),
+    ),
     topics: model.topics?.slice(),
+    fromOffset: model.fromOffset,
     maxRecords: model.maxRecords,
     wait: model.wait == null ? undefined : support.durationToProto(model.wait),
   };
@@ -429,14 +441,16 @@ export const describeStreamResponseTransferTypeConverter = {
   },
 };
 export interface DescribeStreamRequest {
-  stream?: StreamRef;
+  stream: StreamRef;
 }
 
 function describeStreamRequestFromProto(
   proto: streamsample.v1.IDescribeStreamRequest,
 ): DescribeStreamRequest {
   return {
-    stream: proto.stream == null ? undefined : streamRefFromProto(proto.stream),
+    stream: streamRefFromProto(
+      requiredField(proto.stream, "DescribeStreamRequest", "stream"),
+    ),
   };
 }
 
@@ -444,7 +458,9 @@ function describeStreamRequestToProto(
   model: DescribeStreamRequest,
 ): streamsample.v1.IDescribeStreamRequest {
   return {
-    stream: model.stream == null ? undefined : streamRefToProto(model.stream),
+    stream: streamRefToProto(
+      requiredField(model.stream, "DescribeStreamRequest", "stream"),
+    ),
   };
 }
 

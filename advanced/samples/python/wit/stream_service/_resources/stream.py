@@ -95,14 +95,14 @@ async def _append_records(
 
 async def append_records(
     *,
-    stream: StreamRef | None = None,
-    sequence: int | None = None,
+    stream: StreamRef,
     records: list[AppendRecord] | None = None,
+    sequence: int | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     request = AppendRecordsRequest(
         stream=stream,
-        sequence=sequence,
         records=records or [],
+        sequence=sequence,
     )
     return await _append_records(request)
 
@@ -123,7 +123,7 @@ async def _close_stream(
 
 async def close_stream(
     *,
-    stream: StreamRef | None = None,
+    stream: StreamRef,
     result: typing.Any | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     request = CloseStreamRequest(
@@ -149,16 +149,16 @@ async def _read_records(
 
 async def read_records(
     *,
-    stream: StreamRef | None = None,
-    from_offset: int | None = None,
+    stream: StreamRef,
     topics: list[str] | None = None,
+    from_offset: int | None = None,
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse,]:
     request = ReadRecordsRequest(
         stream=stream,
-        from_offset=from_offset,
         topics=topics or [],
+        from_offset=from_offset,
         max_records=max_records,
         wait=wait,
     )
@@ -181,7 +181,7 @@ async def _describe_stream(
 
 async def describe_stream(
     *,
-    stream: StreamRef | None = None,
+    stream: StreamRef,
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     request = DescribeStreamRequest(
         stream=stream,

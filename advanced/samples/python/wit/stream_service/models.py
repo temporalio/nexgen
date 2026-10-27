@@ -22,7 +22,7 @@ class StreamStatus(enum.IntEnum):
 
 @dataclasses.dataclass(slots=True)
 class CreateStreamRequest:
-    ref: StreamRef | None = None
+    ref: StreamRef
     retention: datetime.timedelta | None = None
 
 
@@ -41,12 +41,11 @@ class _CreateStreamRequestTransferTypeConverter(
         value: streamsample.v1.stream_service_pb2.CreateStreamRequest,
         type_hint: type[CreateStreamRequest],
     ) -> CreateStreamRequest:
+        if not value.HasField("ref"):
+            raise ValueError("missing required field CreateStreamRequest.ref")
+        ref = _StreamRefTransferTypeConverter().from_transfer_type(value.ref, StreamRef)
         return CreateStreamRequest(
-            ref=_StreamRefTransferTypeConverter().from_transfer_type(
-                value.ref, StreamRef
-            )
-            if value.HasField("ref")
-            else None,
+            ref=ref,
             retention=_support.duration_from_proto(value.retention)
             if value.HasField("retention")
             else None,
@@ -58,10 +57,9 @@ class _CreateStreamRequestTransferTypeConverter(
         value: CreateStreamRequest,
     ) -> streamsample.v1.stream_service_pb2.CreateStreamRequest:
         message = streamsample.v1.stream_service_pb2.CreateStreamRequest()
-        if value.ref is not None:
-            message.ref.CopyFrom(
-                _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
-            )
+        message.ref.CopyFrom(
+            _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
+        )
         if value.retention is not None:
             message.retention.CopyFrom(_support.duration_to_proto(value.retention))
         return message
@@ -178,9 +176,9 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class AppendRecordsRequest:
-    stream: StreamRef | None = None
-    sequence: int | None = None
+    stream: StreamRef
     records: list[AppendRecord] | None = dataclasses.field(default_factory=list)
+    sequence: int | None = None
 
 
 class _AppendRecordsRequestTransferTypeConverter(
@@ -198,19 +196,20 @@ class _AppendRecordsRequestTransferTypeConverter(
         value: streamsample.v1.stream_service_pb2.AppendRecordsRequest,
         type_hint: type[AppendRecordsRequest],
     ) -> AppendRecordsRequest:
+        if not value.HasField("stream"):
+            raise ValueError("missing required field AppendRecordsRequest.stream")
+        stream = _StreamRefTransferTypeConverter().from_transfer_type(
+            value.stream, StreamRef
+        )
         return AppendRecordsRequest(
-            stream=_StreamRefTransferTypeConverter().from_transfer_type(
-                value.stream, StreamRef
-            )
-            if value.HasField("stream")
-            else None,
-            sequence=value.sequence if value.sequence != 0 else None,
+            stream=stream,
             records=[
                 _AppendRecordTransferTypeConverter().from_transfer_type(
                     item, AppendRecord
                 )
                 for item in value.records
             ],
+            sequence=value.sequence if value.sequence != 0 else None,
         )
 
     @typing_extensions.override
@@ -219,18 +218,17 @@ class _AppendRecordsRequestTransferTypeConverter(
         value: AppendRecordsRequest,
     ) -> streamsample.v1.stream_service_pb2.AppendRecordsRequest:
         message = streamsample.v1.stream_service_pb2.AppendRecordsRequest()
-        if value.stream is not None:
-            message.stream.CopyFrom(
-                _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
-            )
-        if value.sequence is not None:
-            message.sequence = value.sequence
+        message.stream.CopyFrom(
+            _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        )
         if value.records:
             for element in value.records:
                 item = message.records.add()
                 item.CopyFrom(
                     _AppendRecordTransferTypeConverter().to_transfer_type(element)
                 )
+        if value.sequence is not None:
+            message.sequence = value.sequence
         return message
 
 
@@ -333,7 +331,7 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class CloseStreamRequest:
-    stream: StreamRef | None = None
+    stream: StreamRef
     result: typing.Any | None = None
 
 
@@ -352,12 +350,13 @@ class _CloseStreamRequestTransferTypeConverter(
         value: streamsample.v1.stream_service_pb2.CloseStreamRequest,
         type_hint: type[CloseStreamRequest],
     ) -> CloseStreamRequest:
+        if not value.HasField("stream"):
+            raise ValueError("missing required field CloseStreamRequest.stream")
+        stream = _StreamRefTransferTypeConverter().from_transfer_type(
+            value.stream, StreamRef
+        )
         return CloseStreamRequest(
-            stream=_StreamRefTransferTypeConverter().from_transfer_type(
-                value.stream, StreamRef
-            )
-            if value.HasField("stream")
-            else None,
+            stream=stream,
             result=_support.payload_from_proto(value.result)
             if value.HasField("result")
             else None,
@@ -369,10 +368,9 @@ class _CloseStreamRequestTransferTypeConverter(
         value: CloseStreamRequest,
     ) -> streamsample.v1.stream_service_pb2.CloseStreamRequest:
         message = streamsample.v1.stream_service_pb2.CloseStreamRequest()
-        if value.stream is not None:
-            message.stream.CopyFrom(
-                _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
-            )
+        message.stream.CopyFrom(
+            _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        )
         if value.result is not None:
             message.result.CopyFrom(_support.payload_to_proto(value.result))
         return message
@@ -421,9 +419,9 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class ReadRecordsRequest:
-    stream: StreamRef | None = None
-    from_offset: int | None = None
+    stream: StreamRef
     topics: list[str] | None = dataclasses.field(default_factory=list)
+    from_offset: int | None = None
     max_records: int | None = None
     wait: datetime.timedelta | None = None
 
@@ -443,14 +441,15 @@ class _ReadRecordsRequestTransferTypeConverter(
         value: streamsample.v1.stream_service_pb2.ReadRecordsRequest,
         type_hint: type[ReadRecordsRequest],
     ) -> ReadRecordsRequest:
+        if not value.HasField("stream"):
+            raise ValueError("missing required field ReadRecordsRequest.stream")
+        stream = _StreamRefTransferTypeConverter().from_transfer_type(
+            value.stream, StreamRef
+        )
         return ReadRecordsRequest(
-            stream=_StreamRefTransferTypeConverter().from_transfer_type(
-                value.stream, StreamRef
-            )
-            if value.HasField("stream")
-            else None,
-            from_offset=value.from_offset if value.from_offset != 0 else None,
+            stream=stream,
             topics=list(value.topics),
+            from_offset=value.from_offset if value.from_offset != 0 else None,
             max_records=value.max_records if value.max_records != 0 else None,
             wait=_support.duration_from_proto(value.wait)
             if value.HasField("wait")
@@ -463,14 +462,13 @@ class _ReadRecordsRequestTransferTypeConverter(
         value: ReadRecordsRequest,
     ) -> streamsample.v1.stream_service_pb2.ReadRecordsRequest:
         message = streamsample.v1.stream_service_pb2.ReadRecordsRequest()
-        if value.stream is not None:
-            message.stream.CopyFrom(
-                _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
-            )
-        if value.from_offset is not None:
-            message.from_offset = value.from_offset
+        message.stream.CopyFrom(
+            _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        )
         if value.topics:
             message.topics.extend(value.topics)
+        if value.from_offset is not None:
+            message.from_offset = value.from_offset
         if value.max_records is not None:
             message.max_records = value.max_records
         if value.wait is not None:
@@ -592,7 +590,7 @@ temporalio.converter.transfer_type_convertible(_StreamRecordTransferTypeConverte
 
 @dataclasses.dataclass(slots=True)
 class DescribeStreamRequest:
-    stream: StreamRef | None = None
+    stream: StreamRef
 
 
 class _DescribeStreamRequestTransferTypeConverter(
@@ -610,12 +608,13 @@ class _DescribeStreamRequestTransferTypeConverter(
         value: streamsample.v1.stream_service_pb2.DescribeStreamRequest,
         type_hint: type[DescribeStreamRequest],
     ) -> DescribeStreamRequest:
+        if not value.HasField("stream"):
+            raise ValueError("missing required field DescribeStreamRequest.stream")
+        stream = _StreamRefTransferTypeConverter().from_transfer_type(
+            value.stream, StreamRef
+        )
         return DescribeStreamRequest(
-            stream=_StreamRefTransferTypeConverter().from_transfer_type(
-                value.stream, StreamRef
-            )
-            if value.HasField("stream")
-            else None,
+            stream=stream,
         )
 
     @typing_extensions.override
@@ -624,10 +623,9 @@ class _DescribeStreamRequestTransferTypeConverter(
         value: DescribeStreamRequest,
     ) -> streamsample.v1.stream_service_pb2.DescribeStreamRequest:
         message = streamsample.v1.stream_service_pb2.DescribeStreamRequest()
-        if value.stream is not None:
-            message.stream.CopyFrom(
-                _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
-            )
+        message.stream.CopyFrom(
+            _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        )
         return message
 
 
