@@ -1,0 +1,21 @@
+package temporal:users@1.0.0;
+
+world system { export user-service; }
+
+// The user's email has the name of the request's required flag, with another type.
+/// @nexus.endpoint "__user_service"
+interface user-service {
+  resource user {
+    constructor(user-id: string, email: string);
+
+    /// @nexus.operation "notify"
+    notify: func();
+  }
+
+  record notify-request {
+    user-id: string,
+    email: bool,
+  }
+
+  notify: func(request: notify-request);
+}

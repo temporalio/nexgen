@@ -122,7 +122,7 @@ func (u *User) Notify(ctx workflow.Context, reason string, channels []string, se
 	if attempt != 0 {
 		attemptPtr = &attempt
 	}
-	return notify(ctx, notifyRequest{UserID: u.UserID, Reason: reasonPtr, Channels: channels, Sender: sender, Attempt: attemptPtr, Email: u.Email})
+	return notify(ctx, notifyRequest{UserID: u.UserID, Reason: reasonPtr, Channels: channels, Sender: sender, Attempt: attemptPtr})
 }
 
 // --- Operations (internal) ---

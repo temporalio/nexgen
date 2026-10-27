@@ -582,7 +582,9 @@ For each resource method, the generator builds a **name environment** from:
 
 It then tries every operation in the service as a candidate. For each candidate
 operation, it checks whether every **required** field in the operation's input
-record can be satisfied by a name in the environment.
+record can be satisfied by a name of the same type in the environment. An
+optional field also takes a source of its inner type, but a required field
+doesn't take an optional source.
 
 **Example walkthrough:**
 
@@ -755,7 +757,8 @@ resource user {
 Here `email` appears in both the constructor and the method. The method
 parameter wins, so the generated code passes the new email value (from the
 argument), not the old one (from `self`). The `user-id` field still comes from
-`self.user_id`.
+`self.user_id`. A parameter of another type also hides the constructor field, so
+then neither one fills the request field.
 
 #### No matching operation found
 
@@ -786,8 +789,10 @@ operation's input record so fewer candidates match.
 #### Required field in operation input has no match
 
 If an operation's input record has a required field whose name does not appear
-in the resource constructor or method parameters, that operation will silently
-be skipped as a candidate. So watch out for typos!
+in the resource constructor or method parameters with the same type, that
+operation will silently be skipped as a candidate. So watch out for typos! A
+method with `@nexus.operation` fails generation with `InvalidResourceMethod`
+instead.
 
 #### Resource field cannot be bound from input or output
 

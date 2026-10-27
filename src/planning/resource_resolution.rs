@@ -183,7 +183,12 @@ struct MessageFieldInfo {
     required: bool,
     hidden: bool,
     message_name: Option<String>,
+    /// The authored type, when a WIT record declares the field.
+    field_type: Option<TypeSpec<SelectedFamily>>,
 }
+
+/// The resource fields and method params that can fill a request field, with their types.
+type RequestEnvironment = BTreeMap<String, (RequestPlanSource, TypeSpec<SelectedFamily>)>;
 
 pub(crate) fn resolve_service_resources(
     spec: &ApiSpec<SelectedFamily>,
@@ -335,17 +340,23 @@ fn resolve_resource_method(
     method: &ResourceMethodSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
 ) -> Result<ResolvedResourceMethodSpec> {
-    let mut environment = BTreeMap::new();
+    let mut environment = RequestEnvironment::new();
     for field in &resource.fields {
         environment.insert(
             field.name.clone(),
-            RequestPlanSource::ResourceField(field.name.clone()),
+            (
+                RequestPlanSource::ResourceField(field.name.clone()),
+                field.field_type.clone(),
+            ),
         );
     }
     for param in &method.params {
         environment.insert(
             param.name.clone(),
-            RequestPlanSource::MethodParam(param.name.clone()),
+            (
+                RequestPlanSource::MethodParam(param.name.clone()),
+                param.field_type.clone(),
+            ),
         );
     }
 
@@ -469,7 +480,7 @@ fn synthesize_operation_request_plan(
     spec: &ApiSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
     operation: &OperationSpec<SelectedFamily>,
-    environment: &BTreeMap<String, RequestPlanSource>,
+    environment: &RequestEnvironment,
 ) -> Result<Option<RequestPlan>> {
     if let Some(TypeSpec::External(ExternalTypeSpec::Proto(input_ref))) = operation.input_type() {
         synthesize_request_plan(spec, descriptors, input_ref.as_str(), environment)
@@ -517,11 +528,11 @@ fn synthesize_request_plan(
     spec: &ApiSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
     message_name: &str,
-    environment: &BTreeMap<String, RequestPlanSource>,
+    environment: &RequestEnvironment,
 ) -> Result<Option<RequestPlan>> {
     let mut fields = Vec::new();
     for field in visible_message_fields(spec, descriptors, message_name)? {
-        if let Some(source) = environment.get(&field.api_name) {
+        if let Some(source) = bound_source(environment, &field) {
             fields.push(RequestPlanField {
                 field_name: field.api_name,
                 value: RequestPlan::Source(source.clone()),
@@ -558,11 +569,11 @@ fn synthesize_record_request_plan(
     spec: &ApiSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
     record_name: &str,
-    environment: &BTreeMap<String, RequestPlanSource>,
+    environment: &RequestEnvironment,
 ) -> Result<Option<RequestPlan>> {
     let mut fields = Vec::new();
     for field in visible_record_fields(spec, record_name)? {
-        if let Some(source) = environment.get(&field.api_name) {
+        if let Some(source) = bound_source(environment, &field) {
             fields.push(RequestPlanField {
                 field_name: field.api_name,
                 value: RequestPlan::Source(source.clone()),
@@ -605,6 +616,20 @@ fn synthesize_record_request_plan(
         proto: false,
         fields,
     }))
+}
+
+/// The source that fills a request field. A source binds by name only when its type is the field's
+/// type, or the inner type of an optional field. So a resource field of another type, such as
+/// another enum, or an optional source of a required field, doesn't fill the field.
+fn bound_source<'a>(
+    environment: &'a RequestEnvironment,
+    field: &MessageFieldInfo,
+) -> Option<&'a RequestPlanSource> {
+    let (source, source_type) = environment.get(&field.api_name)?;
+    let matches = field.field_type.as_ref().is_none_or(|field_type| {
+        source_type == field_type || source_type == field_type.without_option()
+    });
+    matches.then_some(source)
 }
 
 fn visible_message_fields(
@@ -702,6 +727,7 @@ fn build_record_field_info(
         required,
         hidden,
         message_name,
+        field_type: Some(field.field_type.clone()),
     })
 }
 
@@ -738,12 +764,16 @@ fn build_message_field_info(
         record.field_omitted(proto_name) || record.field_source(proto_name).is_some()
     });
     let message_name = field_message_name(field, descriptors);
+    let field_type = record
+        .and_then(|record| record.field_type(proto_name))
+        .cloned();
     Ok(MessageFieldInfo {
         proto_name: proto_name.to_string(),
         api_name,
         required,
         hidden,
         message_name,
+        field_type,
     })
 }
 
@@ -1174,5 +1204,51 @@ interface user-service {
             method.binding,
             ResolvedResourceMethodBinding::Stub
         ));
+    }
+
+    #[test]
+    fn resource_method_does_not_bind_operation_when_required_request_field_type_differs() {
+        let wit = r#"
+package temporal:users@1.0.0;
+
+world system {
+  export user-service;
+}
+
+/// @nexus.endpoint "__user_service"
+interface user-service {
+  resource user {
+    constructor(user-id: string, email: string, run-id: option<string>);
+
+    notify: func();
+    restart: func();
+  }
+
+  record notify-request {
+    user-id: string,
+    email: bool,
+  }
+
+  record restart-request {
+    user-id: string,
+    run-id: string,
+  }
+
+  notify: func(request: notify-request);
+  restart: func(request: restart-request);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let service = &spec.services[0];
+        let resolved = resolve_service_resources(&spec, service, &empty_descriptors()).unwrap();
+
+        // A source of another type, or an optional source, doesn't fill a required field.
+        for method in &resolved.resources[0].methods {
+            assert!(
+                matches!(method.binding, ResolvedResourceMethodBinding::Stub),
+                "{} should be a stub",
+                method.name
+            );
+        }
     }
 }

@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-resource-method"
+contains = [
+  "UserService.User.notify",
+  "bound operation `Notify` cannot be called from resource fields and method parameters",
+]
