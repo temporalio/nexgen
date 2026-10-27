@@ -149,6 +149,12 @@ pub enum Error {
     )]
     MissingSupportPackage { language: Language },
 
+    #[error("{feature} on {context} requires System Nexus mode (--system-nexus)")]
+    SystemNexusRequired {
+        feature: &'static str,
+        context: String,
+    },
+
     #[error("{language} protobuf conversion does not yet support oneof group `{message}.{oneof}`")]
     UnsupportedProtoOneofConversion {
         language: Language,

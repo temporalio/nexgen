@@ -1625,6 +1625,17 @@ occur.
 
 ---
 
+### @nexus.delay-load-temporalio-workflow
+
+**Placement:** Interface **Syntax:** `@nexus.delay-load-temporalio-workflow`
+
+Delays Python workflow imports until an operation is called. This annotation is
+supported only in System Nexus mode (`--system-nexus`), where it avoids eagerly
+importing the workflow module from SDK-generated services. It is rejected
+outside that mode, whether or not the interface declares an endpoint.
+
+---
+
 ### @nexus.proto-field
 
 **Placement:** Record field (within a `@nexus.proto` record) **Syntax:**

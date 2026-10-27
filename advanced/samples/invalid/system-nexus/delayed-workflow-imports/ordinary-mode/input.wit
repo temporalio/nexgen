@@ -1,0 +1,14 @@
+package test:delayed-workflow-imports;
+
+world example {
+  export example-service;
+}
+
+/// @nexus.delay-load-temporalio-workflow
+interface example-service {
+  record request {
+    id: string,
+  }
+
+  send: func(request: request);
+}
