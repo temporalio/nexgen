@@ -7,7 +7,7 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using Nexgen.Support;
 
-namespace Nexgen.ProtoOneof
+namespace Nexgen.AuthoredProtoOneof
 {
 
     [GeneratedCode("nexgen", null)]

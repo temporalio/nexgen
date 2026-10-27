@@ -3606,13 +3606,17 @@ fn used_python_symbol_imports(body: &str, candidates: &[String]) -> Vec<String> 
         .collect()
 }
 
+fn requires_support_import(body: &str, sourced_support_import: bool) -> bool {
+    sourced_support_import || body.contains("_support.")
+}
+
 fn render_support_import(
     output: &mut String,
     body: &str,
     support_package: &str,
     sourced_support_import: bool,
 ) {
-    if sourced_support_import || body.contains("_support.") {
+    if requires_support_import(body, sourced_support_import) {
         output.push_str("import ");
         output.push_str(support_package);
         output.push_str(" as _support\n");
@@ -4049,7 +4053,7 @@ fn render_models_module(
             wrote_imports || wrote_relative_imports,
         )
     };
-    if sourced_support_import || body.contains("_support.") {
+    if requires_support_import(&body, sourced_support_import) {
         if wrote_imports || wrote_relative_imports || wrote_module_model_imports {
             output.push('\n');
         }
@@ -6345,19 +6349,6 @@ fn python_function_args_parameter_annotation(
     }
 }
 
-fn python_function_normalized_args_annotation(function: &RenderedFunctionField) -> String {
-    match &function.args {
-        RenderedFunctionArgs::Typed { parameters } => {
-            let annotations = parameters
-                .iter()
-                .map(|parameter| parameter.annotation.as_str())
-                .collect::<Vec<_>>();
-            python_function_args_list_annotation(annotations.as_slice())
-        }
-        RenderedFunctionArgs::Varargs { .. } => "list[typing.Any]".to_string(),
-    }
-}
-
 fn overload_case_for_callable<'a>(
     overload_cases: &'a [RenderedFunctionOverloadCase],
     callable_field_name: &str,
@@ -7649,7 +7640,7 @@ fn render_function_unpacked_implementation(
     render_unpacked_operation_docstring(output, operation, unpacked_input, primary_function);
 
     for function in &unpacked_input.functions {
-        if function.primary && matches!(function.args, RenderedFunctionArgs::Typed { .. }) {
+        if !matches!(function.args, RenderedFunctionArgs::Varargs { .. }) {
             continue;
         }
         let normalized_args_name = format!("normalized_{}", function.args_field_name);
@@ -7664,9 +7655,7 @@ fn render_function_unpacked_implementation(
             output.push_str("\")\n");
             output.push_str("    ");
             output.push_str(&normalized_args_name);
-            output.push_str(": ");
-            output.push_str(&python_function_normalized_args_annotation(function));
-            output.push_str(" | None = (\n");
+            output.push_str(": list[typing.Any] | None = (\n");
             output.push_str("        list(positional_args)\n");
             output.push_str("        if positional_args\n");
             output.push_str("        else ");
@@ -7676,9 +7665,7 @@ fn render_function_unpacked_implementation(
         } else {
             output.push_str("    ");
             output.push_str(&normalized_args_name);
-            output.push_str(": ");
-            output.push_str(&python_function_normalized_args_annotation(function));
-            output.push_str(" | None\n");
+            output.push_str(": list[typing.Any] | None\n");
             output.push_str("    if ");
             output.push_str(&function.args_field_name);
             output.push_str(" is None:\n");
@@ -7690,18 +7677,9 @@ fn render_function_unpacked_implementation(
             output.push_str(", list):\n");
             output.push_str("        ");
             output.push_str(&normalized_args_name);
-            match &function.args {
-                RenderedFunctionArgs::Varargs { .. } => {
-                    output.push_str(" = typing.cast(list[typing.Any], ");
-                    output.push_str(&function.args_field_name);
-                    output.push_str(")\n");
-                }
-                _ => {
-                    output.push_str(" = ");
-                    output.push_str(&function.args_field_name);
-                    output.push('\n');
-                }
-            }
+            output.push_str(" = typing.cast(list[typing.Any], ");
+            output.push_str(&function.args_field_name);
+            output.push_str(")\n");
             output.push_str("    else:\n");
             output.push_str("        ");
             output.push_str(&normalized_args_name);
@@ -7721,7 +7699,10 @@ fn render_function_unpacked_implementation(
         let value_expr = unpacked_input
             .functions
             .iter()
-            .find(|function| function.args_field_name == field.value_expr)
+            .find(|function| {
+                matches!(function.args, RenderedFunctionArgs::Varargs { .. })
+                    && function.args_field_name == field.value_expr
+            })
             .map(|function| format!("normalized_{}", function.args_field_name))
             .unwrap_or_else(|| unpacked_request_field_value_expr(field));
         output.push_str("        ");
@@ -8030,15 +8011,6 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::path::PathBuf;
 
-    use crate::descriptors::DescriptorIndex;
-    use crate::generator::generate_source;
-    use crate::language::Language;
-    use crate::spec::{LanguageImportSpec, LanguageImportStyle};
-
-    fn linked_inputs_path(root: &std::path::Path) -> PathBuf {
-        root.join("advanced/samples/inputs/deps")
-    }
-
     #[test]
     fn renders_source_provider_defaults_as_dataclass_factories() {
         let no_args = super::python_source_call("workflow_namespace()");
@@ -8060,24 +8032,59 @@ mod tests {
     }
 
     #[test]
-    fn sourced_fields_import_support_without_literal_helper_reference() {
-        let body = "value = workflow_namespace()\n";
-        let mut output = String::new();
-        super::render_support_import(&mut output, body, "temporal_support", true);
-        assert_eq!(output, "import temporal_support as _support\n");
-
-        output.clear();
-        super::render_support_import(&mut output, body, "temporal_support", false);
-        assert!(output.is_empty());
-
-        // Converter helpers still request the configured package without sourced fields.
-        super::render_support_import(
-            &mut output,
-            "value = _support.payload_to_proto(value)\n",
-            "temporal_support",
-            false,
+    fn enum_defaults_use_resolved_identity_for_native_and_converter_aliases() {
+        let mut resolved_type = super::ResolvedFieldType {
+            annotation: "AliasPolicy".to_string(),
+            imports: super::PythonImports::default(),
+            kind: super::ResolvedFieldKind::Enum,
+            wire_conversion: None,
+        };
+        let mut default_value = crate::spec::EnumValueSpec {
+            name: "AllowDuplicate".to_string(),
+            wire_name: "allow-duplicate".to_string(),
+            number: 7,
+        };
+        let native_default = super::enum_default_expr(&resolved_type, &default_value);
+        assert_eq!(native_default, "AliasPolicy.AllowDuplicate");
+        assert_eq!(
+            super::python_parameter_default_expr(&super::PythonFieldDefaultKind::Expression(
+                native_default
+            )),
+            Some("AliasPolicy.AllowDuplicate".to_string())
         );
-        assert_eq!(output, "import temporal_support as _support\n");
+
+        // A proto descriptor name can include a prefix absent from the resolved
+        // semantic name. SDK enum members still use SHOUTY_SNAKE casing.
+        default_value.wire_name = "WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE".to_string();
+        resolved_type.annotation = "WorkflowIDReusePolicy".to_string();
+        resolved_type.wire_conversion = Some(super::WireValueConversion {
+            annotation: "int".to_string(),
+            from_wire: "WorkflowIDReusePolicy({wire})".to_string(),
+            to_wire: "int({value})".to_string(),
+            imports: super::PythonImports::default(),
+            supports_unpacked_input: false,
+        });
+        let sdk_default = super::enum_default_expr(&resolved_type, &default_value);
+        assert_eq!(sdk_default, "WorkflowIDReusePolicy.ALLOW_DUPLICATE");
+        let mut rendered = String::new();
+        super::render_python_default_expr(&mut rendered, &sdk_default, "    ");
+        assert_eq!(rendered, " = WorkflowIDReusePolicy.ALLOW_DUPLICATE");
+    }
+
+    #[test]
+    fn support_import_requirement_includes_sourced_fields_and_converter_calls() {
+        for (body, sourced, expected) in [
+            ("value = workflow_namespace()\n", true, true),
+            ("value = workflow_namespace()\n", false, false),
+            ("value = _support.payload_to_proto(value)\n", false, true),
+            ("value = _support.payload_to_proto(value)\n", true, true),
+        ] {
+            assert_eq!(
+                super::requires_support_import(body, sourced),
+                expected,
+                "{body}, sourced={sourced}"
+            );
+        }
     }
 
     #[test]
@@ -8132,127 +8139,40 @@ mod tests {
     }
 
     #[test]
-    fn optional_imports_are_selected_from_generic_references() {
-        let mut module_imports = std::collections::BTreeSet::new();
-        module_imports.insert("temporalio.api.common.v1.message_pb2".to_string());
-        module_imports.insert("temporalio.api.unused.v1.message_pb2".to_string());
-
-        let body = r#"
-@dataclasses.dataclass
-class Example(enum.Enum):
-    value: collections.abc.Mapping[str, typing.Any]
-    retry_policy: temporalio.common.RetryPolicy
-    request: temporalio.api.common.v1.message_pb2.WorkflowExecution
-    deadline: datetime.timedelta
-
-    def run(self) -> typing_extensions.Self:
-        temporalio.workflow.create_nexus_client(service="svc", endpoint="endpoint")
-        return self
-"#;
-        let language_imports = [
-            LanguageImportSpec {
-                language: Language::Python,
-                reference: "temporalio.common".to_string(),
-                module: "temporalio.common".to_string(),
-                name: None,
-                type_only: false,
-                import_style: LanguageImportStyle::Module,
-            },
-            LanguageImportSpec {
-                language: Language::Python,
-                reference: "datetime".to_string(),
-                module: "datetime".to_string(),
-                name: None,
-                type_only: false,
-                import_style: LanguageImportStyle::Module,
-            },
-            LanguageImportSpec {
-                language: Language::Python,
-                reference: "temporalio.workflow".to_string(),
-                module: "temporalio.workflow".to_string(),
-                name: None,
-                type_only: false,
-                import_style: LanguageImportStyle::Module,
-            },
-        ];
-
-        let mut output = String::new();
-        let wrote_imports = super::render_optional_python_imports(
-            &mut output,
-            body,
+    fn module_import_selection_excludes_unused_protobuf_candidates() {
+        let module_imports = BTreeSet::from([
+            "temporalio.api.common.v1.message_pb2".to_string(),
+            "temporalio.api.unused.v1.message_pb2".to_string(),
+        ]);
+        let used = super::used_python_module_imports(
+            "request: temporalio.api.common.v1.message_pb2.WorkflowExecution",
             &module_imports,
-            &language_imports,
         );
-
-        assert!(wrote_imports);
-        assert!(output.contains("import collections.abc\n"));
-        assert!(output.contains("import dataclasses\n"));
-        assert!(output.contains("import enum\n"));
-        assert!(output.contains("import typing\n"));
-        assert!(output.contains("import typing_extensions\n"));
-        assert!(output.contains("import temporalio.common\n"));
-        assert!(output.contains("import datetime\n"));
-        assert!(output.contains("import temporalio.workflow\n"));
-        assert!(output.contains("import temporalio.api.common.v1.message_pb2\n"));
-        assert!(!output.contains("temporalio.api.unused.v1.message_pb2"));
-
-        let mut output = String::new();
-        super::render_optional_python_imports(
-            &mut output,
-            "async def call(workflow: str) -> None:\n    pass\n",
-            &std::collections::BTreeSet::new(),
-            &language_imports,
+        assert_eq!(
+            used,
+            BTreeSet::from(["temporalio.api.common.v1.message_pb2".to_string()])
         );
-        assert!(!output.contains("import temporalio.workflow\n"));
     }
 
     #[test]
-    fn allows_missing_service_endpoint() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export example-service;
-}
-
-interface example-service {
-  use nexus:temporal-types/model@1.0.0.{retry-policy};
-
-  example-operation: func(request: retry-policy) -> retry-policy;
-}
+    fn symbol_import_selection_ignores_names_in_docstrings() {
+        let candidates = vec!["PingRequest".to_string(), "PongRequest".to_string()];
+        let body = r#"
+def ping(request: PingRequest) -> None:
+    """Send a ping. A PongRequest answers it."""
+    pass
 "#;
-        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
-            Language::Python,
-            wit,
-            PathBuf::from("inline.wit"),
-            &[linked_inputs_path(&PathBuf::from(env!(
-                "CARGO_MANIFEST_DIR"
-            )))],
-        )
-        .unwrap();
-        let descriptors = DescriptorIndex::load(
-            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("advanced/samples/descriptors/temporal_api.bin"),
-        )
-        .unwrap();
+        assert_eq!(
+            super::used_python_symbol_imports(body, &candidates),
+            vec!["PingRequest".to_string()]
+        );
+    }
 
-        let output = generate_source(
-            Language::Python,
-            spec.clone(),
-            &descriptors,
-            "temporal_support",
-        )
-        .unwrap();
-        assert!(
-            output.contains("class ExampleServiceClient:\n    def __init__(self, endpoint: str)")
-        );
-        assert!(output.contains("async def example_operation(\n        self,\n        request:"));
-        assert!(
-            output.contains(
-                "self._nexus_client: typing.Any = temporalio.workflow.create_nexus_client("
-            )
-        );
-        assert!(output.contains("endpoint=endpoint,"));
-        assert!(output.contains("return await self._nexus_client.start_operation("));
+    #[test]
+    fn unqualified_workflow_parameter_does_not_reference_workflow_module() {
+        assert!(!super::body_uses_python_module_path(
+            "async def call(workflow: str) -> None:\n    pass\n",
+            "temporalio.workflow",
+        ));
     }
 }

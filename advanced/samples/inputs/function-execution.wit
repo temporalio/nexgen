@@ -22,6 +22,10 @@ interface functions {
   type executable-function = placeholder;
 
   /// @nexus.function
+  ///   signature="function-call"
+  type callback-function = placeholder;
+
+  /// @nexus.function
   ///   primary=true
   ///   signature="counted-function-call"
   type counted-function = placeholder;
@@ -81,7 +85,16 @@ interface functions {
 /// @nexus.endpoint "function-execution"
 interface function-execution {
   use functions.{counted-function, executable-function, named-function, named-varargs-function, varargs-function};
-  use functions.{duration-descriptor, context-descriptor, callable-descriptor};
+  use functions.{duration-descriptor, context-descriptor, callable-descriptor, callback-function};
+
+  record execute-collision-request {
+    function: callback-function,
+    function-name: string,
+    rv: string,
+    full-name: string,
+    elements: string,
+    short-name: string,
+  }
 
   record execute-function-request {
     function: executable-function,
@@ -131,6 +144,10 @@ interface function-execution {
   }
 
   execute-function: func(request: execute-function-request) -> execute-function-result;
+  execute-collision: func(request: execute-collision-request) -> execute-function-result;
+  /// @nexus.output-transform
+  ///   go-type="go.temporal.io/sdk/advanced/samples/go/support/handles:handles.FunctionResult"
+  ///   go="handles.NewFunctionResult(request.Function, result.Value)"
   execute-counted-function: func(request: execute-counted-function-request) -> execute-counted-function-result;
   execute-named-function: func(request: execute-named-function-request) -> execute-named-function-result;
   execute-varargs-function: func(request: execute-varargs-function-request) -> execute-varargs-function-result;

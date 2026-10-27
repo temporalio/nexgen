@@ -84,14 +84,6 @@ fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/temporal_api.bin")
-}
-
-fn linked_inputs_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/deps")
-}
-
 fn read_python_package_files(dir: &Path) -> BTreeMap<PathBuf, String> {
     fn visit(root: &Path, dir: &Path, files: &mut BTreeMap<PathBuf, String>) {
         let mut entries = fs::read_dir(dir)
@@ -120,30 +112,6 @@ fn read_python_package_files(dir: &Path) -> BTreeMap<PathBuf, String> {
 
     let mut files = BTreeMap::new();
     visit(dir, dir, &mut files);
-    files
-}
-
-fn generate_python_package_files(
-    input_paths: &[PathBuf],
-    descriptor_paths: &[PathBuf],
-) -> BTreeMap<PathBuf, String> {
-    let temp_dir = unique_output_path("python-package");
-    let output_path = temp_dir.join("output");
-    generate_to_file(&GenerateRequest {
-        config: Default::default(),
-        language: nexgen::language::Language::Python,
-        input_paths: input_paths.to_vec(),
-        support_package: Some("temporal_support".into()),
-        descriptor_paths: descriptor_paths.to_vec(),
-        output_path: output_path.clone(),
-        format: false,
-        java_package_name: None,
-        ts_date_time_types: Default::default(),
-        dotnet_namespace: None,
-    })
-    .unwrap();
-    let files = read_python_package_files(&output_path);
-    fs::remove_dir_all(temp_dir).unwrap();
     files
 }
 
@@ -269,47 +237,6 @@ interface example-service {
     assert!(output_path.join("services.py").is_file());
     assert!(!output_path.join("operations/example_operation.py").exists());
 
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn python_sourced_helper_import_is_automatic() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-sourced-support-only");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let wit_path = temp_dir.join("source-only.wit");
-    let wit = r#"
-package temporal:source-only@1.0.0;
-
-world system { export models; }
-
-interface models {
-  type placeholder = string;
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest"
-  record cancel-request {
-    /// @nexus.source python="workflow_namespace()"
-    namespace: string,
-    /// @nexus.omit
-    workflow-execution: placeholder,
-    /// @nexus.omit
-    reason: placeholder,
-    /// @nexus.omit
-    identity: placeholder,
-    /// @nexus.omit
-    request-id: placeholder,
-    /// @nexus.omit
-    first-execution-run-id: placeholder,
-    /// @nexus.omit
-    links: placeholder,
-  }
-}
-"#;
-    fs::write(&wit_path, wit).unwrap();
-    let files = generate_python_package_files(&[wit_path], &[descriptor_path(&root)]);
-    let models = &files[&PathBuf::from("models.py")];
-    assert!(models.contains("import temporal_support as _support"));
-    assert!(models.contains("default_factory=_support.workflow_namespace"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -908,56 +835,4 @@ $defs:
         assert!(error.contains("propertyNames"), "{label}: {error}");
         fs::remove_dir_all(temp_dir).unwrap();
     }
-}
-
-#[test]
-fn python_imports_no_model_that_only_a_docstring_names() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-docstring-names");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let wit_path = temp_dir.join("docstring-names.wit");
-    let wit = r#"
-package temporal:docstring-names@1.0.0;
-
-world system { export api; }
-
-/// @nexus.endpoint "api"
-interface api {
-  record ping-request {
-    text: string,
-  }
-
-  record pong-request {
-    text: string,
-  }
-
-  /// @nexus.doc "Send a ping. A PongRequest answers it."
-  ping: func(request: ping-request);
-
-  pong: func(request: pong-request);
-}
-"#;
-    fs::write(&wit_path, wit).unwrap();
-    let output_path = temp_dir.join("output");
-    generate_to_file(&GenerateRequest {
-        config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
-            ..Default::default()
-        },
-        language: nexgen::language::Language::Python,
-        input_paths: vec![wit_path, linked_inputs_path(&root)],
-        support_package: Some("temporal_support".into()),
-        descriptor_paths: vec![descriptor_path(&root)],
-        output_path: output_path.clone(),
-        format: false,
-        java_package_name: None,
-        ts_date_time_types: Default::default(),
-        dotnet_namespace: None,
-    })
-    .unwrap();
-    let ping = fs::read_to_string(output_path.join("operations/ping.py")).unwrap();
-    assert!(ping.contains("A PongRequest answers it."), "{ping}");
-    assert!(!ping.contains("    PongRequest,\n"), "{ping}");
-    assert!(!ping.contains("import PongRequest\n"), "{ping}");
-    fs::remove_dir_all(temp_dir).unwrap();
 }

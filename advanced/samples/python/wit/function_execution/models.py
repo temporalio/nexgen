@@ -20,6 +20,18 @@ class ExecuteFunctionResult:
 
 
 @dataclasses.dataclass(slots=True)
+class ExecuteCollisionRequest:
+    function: collections.abc.Callable[[str, bool], str]
+    name: str
+    enabled: bool
+    function_name: str
+    rv: str
+    full_name: str
+    elements: str
+    short_name: str
+
+
+@dataclasses.dataclass(slots=True)
 class ExecuteCountedFunctionRequest:
     function: collections.abc.Callable[[str, int], str]
     name: str

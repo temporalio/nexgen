@@ -5,6 +5,7 @@ world system {
   export proto-oneof;
 }
 
+/// @nexus.namespace dotnet="Nexgen.AuthoredProtoOneof"
 interface proto-oneof {
   use nexus:temporal-types/model@1.0.0.{
     failure,

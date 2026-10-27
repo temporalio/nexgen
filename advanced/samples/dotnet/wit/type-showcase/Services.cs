@@ -10,7 +10,7 @@ using NexusRpc;
 using Temporalio.Converters;
 using Nexgen.Support;
 
-namespace Nexgen.TypeShowcase
+namespace Nexgen.AuthoredTypeShowcase
 {
 
     /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>

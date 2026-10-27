@@ -1507,10 +1507,23 @@ interface alerts {
             "temporal.api.enums.v1.Severity",
             &mut planner,
         );
-        assert!(matches!(
-            planned,
-            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(_)))
-        ));
+        let TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(enumeration))) =
+            planned
+        else {
+            panic!("descriptor-only enum must retain its protobuf binding");
+        };
+        assert_eq!(
+            enumeration.proto.full_name,
+            "temporal.api.enums.v1.Severity"
+        );
+        assert_eq!(
+            enumeration
+                .proto
+                .file_options
+                .as_ref()
+                .and_then(|options| options.go_package.as_deref()),
+            Some("go.temporal.io/api/enums/v1;enums")
+        );
     }
 
     #[test]

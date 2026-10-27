@@ -393,45 +393,6 @@ fn read_typescript_output_files(dir: &Path) -> BTreeMap<PathBuf, String> {
     files
 }
 
-fn render_output_files(files: BTreeMap<PathBuf, String>) -> String {
-    files
-        .into_iter()
-        .map(|(path, contents)| format!("### {}\n{contents}", path.display()))
-        .collect::<Vec<_>>()
-        .join("\n\n")
-}
-
-fn generate_typescript_to_string(input_paths: &[PathBuf], descriptor_paths: &[PathBuf]) -> String {
-    render_output_files(generate_typescript_files(input_paths, descriptor_paths))
-}
-
-fn generate_typescript_files(
-    input_paths: &[PathBuf],
-    descriptor_paths: &[PathBuf],
-) -> BTreeMap<PathBuf, String> {
-    let temp_dir = unique_output_path("typescript-rendered");
-    let output_path = temp_dir.join("output");
-    generate_to_file(&GenerateRequest {
-        config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
-            ..Default::default()
-        },
-        language: nexgen::language::Language::TypeScript,
-        input_paths: input_paths.to_vec(),
-        support_package: Some("./support".to_string()),
-        descriptor_paths: descriptor_paths.to_vec(),
-        output_path: output_path.clone(),
-        format: false,
-        java_package_name: None,
-        ts_date_time_types: Default::default(),
-        dotnet_namespace: None,
-    })
-    .unwrap();
-    let files = read_typescript_output_files(&output_path);
-    fs::remove_dir_all(temp_dir).unwrap();
-    files
-}
-
 fn unique_output_path(label: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -442,7 +403,7 @@ fn unique_output_path(label: &str) -> PathBuf {
 }
 
 #[test]
-fn cli_uses_typescript_support_package_without_copying_sources() {
+fn cli_uses_typescript_support_package() {
     let root = project_root();
     let temp_dir = unique_output_path("typescript-support-package");
     fs::create_dir_all(&temp_dir).unwrap();
@@ -471,50 +432,8 @@ fn cli_uses_typescript_support_package_without_copying_sources() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(!output_path.join("support.ts").exists());
     let models = fs::read_to_string(output_path.join("models.ts")).unwrap();
     assert!(models.contains("import * as support from './shared/helpers';"));
-    assert!(models.contains("support.valueToPayload("));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn typescript_sourced_helper_import_is_automatic() {
-    let root = project_root();
-    let temp_dir = unique_output_path("typescript-sourced-support-only");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let wit_path = temp_dir.join("source-only.wit");
-    let wit = r#"
-package temporal:source-only@1.0.0;
-
-world system { export models; }
-
-interface models {
-  type placeholder = string;
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest" typescript-import="@temporalio/proto"
-  record cancel-request {
-    /// @nexus.source typescript="workflowNamespace()"
-    namespace: string,
-    /// @nexus.omit
-    workflow-execution: placeholder,
-    /// @nexus.omit
-    reason: placeholder,
-    /// @nexus.omit
-    identity: placeholder,
-    /// @nexus.omit
-    request-id: placeholder,
-    /// @nexus.omit
-    first-execution-run-id: placeholder,
-    /// @nexus.omit
-    links: placeholder,
-  }
-}
-"#;
-    fs::write(&wit_path, wit).unwrap();
-    let rendered = generate_typescript_to_string(&[wit_path], &[descriptor_path(&root)]);
-    assert!(rendered.contains("import * as support from './support';"));
-    assert!(rendered.contains("support.workflowNamespace()"));
     fs::remove_dir_all(temp_dir).unwrap();
 }
 

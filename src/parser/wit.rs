@@ -3763,6 +3763,70 @@ interface generic-service {
     }
 
     #[test]
+    fn function_name_extractors_are_selected_for_the_target_language() {
+        let wit = r#"package test:extractor-selection;
+world system { export api; }
+interface functions {
+  /// @nexus.function-args varargs=true
+  call: func(args: list<string>) -> string;
+  /// @nexus.function
+  ///   signature="call"
+  ///   typescript-name-extractor="signalFunctionName"
+  ///   typescript-value-type="Signal"
+  ///   typescript-args-type="SignalArgs"
+  ///   typescript-import="@temporalio/common"
+  type callback = string;
+}
+interface api {
+  use functions.{callback};
+  record request { callback: callback }
+}
+"#;
+        for (language, extractor) in [
+            (Language::Go, None),
+            (Language::TypeScript, Some("signalFunctionName")),
+        ] {
+            let spec = parse(language, wit);
+            assert_eq!(
+                spec.record("api.request")
+                    .unwrap()
+                    .function("callback")
+                    .unwrap()
+                    .name_extractor
+                    .as_deref(),
+                extractor
+            );
+        }
+    }
+
+    #[test]
+    fn proto_alias_replacement_is_only_applied_for_its_target_language() {
+        let proto_name = "temporal.api.enums.v1.NamespaceState";
+        let wit = r#"package test:enum-override;
+world system { export models; }
+interface models {
+  /// @nexus.proto "temporal.api.enums.v1.NamespaceState"
+  /// @nexus.type python="int"
+  type namespace-state = string;
+}
+"#;
+        for (language, replacement) in [(Language::Go, None), (Language::Python, Some("int"))] {
+            let spec = parse(language, wit);
+            let binding = spec.external_type_binding(proto_name).unwrap();
+            assert_eq!(
+                binding.reference().unwrap().default.as_deref(),
+                Some(proto_name)
+            );
+            assert_eq!(
+                binding
+                    .replacement()
+                    .and_then(|value| value.type_name.for_language(language)),
+                replacement
+            );
+        }
+    }
+
+    #[test]
     fn language_type_overrides_and_omitted_fields_do_not_infer_parameters() {
         let wit = GENERIC_WIT.replace(
             "record inner { value: context-t, }",

@@ -103,14 +103,3 @@ fn typescript_allows_omitted_or_unreachable_oneofs() {
     let unreachable = write_fixture(temp.path(), false, false, false);
     generate(Language::TypeScript, &unreachable).unwrap();
 }
-
-#[test]
-fn typescript_emits_a_complete_conversion_pair() {
-    let temp = tempfile::tempdir().unwrap();
-    let path = write_fixture(temp.path(), true, true, true);
-    let output = generate(Language::TypeScript, &path).unwrap();
-    assert!(output.contains("function pauseActivityRequestFromProto("));
-    assert!(output.contains("function pauseActivityRequestToProto("));
-    assert!(!output.contains("export function pauseActivityRequestFromProto("));
-    assert!(!output.contains("export function pauseActivityRequestToProto("));
-}

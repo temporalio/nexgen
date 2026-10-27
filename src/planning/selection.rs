@@ -365,16 +365,15 @@ mod tests {
                 .type_descriptor
                 .is_none()
         );
-        let python = select_spec(spec.clone(), Language::Python);
-        assert!(
-            python
+        for language in [Language::Python, Language::Go] {
+            let selected = select_spec(spec.clone(), language);
+            let function = selected
                 .record("request")
                 .unwrap()
                 .function("callback")
-                .unwrap()
-                .type_descriptor
-                .is_none()
-        );
+                .unwrap();
+            assert!(function.type_descriptor.is_none());
+        }
         let typescript = select_spec(spec, Language::TypeScript);
         let descriptor = typescript
             .record("request")

@@ -10,6 +10,40 @@ namespace Nexgen.FunctionExecution
 {
 
     [GeneratedCode("nexgen", null)]
+    public record ExecuteCollisionRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExecuteCollisionRequest"/> class.
+        /// </summary>
+        public ExecuteCollisionRequest(string function, string name, bool enabled, string functionName, string rv, string fullName, string elements, string shortName)
+        {
+            Function = function;
+            Name = name;
+            Enabled = enabled;
+            FunctionName = functionName;
+            Rv = rv;
+            FullName = fullName;
+            Elements = elements;
+            ShortName = shortName;
+        }
+
+        public string Function { get; init; }
+        /// <summary>
+        /// The name argument for the function.
+        /// </summary>
+        public string Name { get; init; }
+        /// <summary>
+        /// The enabled argument for the function.
+        /// </summary>
+        public bool Enabled { get; init; }
+        public string FunctionName { get; init; }
+        public string Rv { get; init; }
+        public string FullName { get; init; }
+        public string Elements { get; init; }
+        public string ShortName { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record ExecuteCountedFunctionRequest
     {
         /// <summary>

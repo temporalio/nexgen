@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from nexusrpc import Operation, service
 from .models import (
+    ExecuteCollisionRequest,
     ExecuteCountedFunctionRequest,
     ExecuteCountedFunctionResult,
     ExecuteDescriptorsRequest,
@@ -24,6 +25,11 @@ class FunctionExecution:
         ExecuteFunctionRequest,
         ExecuteFunctionResult,
     ] = Operation(name="ExecuteFunction")
+
+    execute_collision: Operation[
+        ExecuteCollisionRequest,
+        ExecuteFunctionResult,
+    ] = Operation(name="ExecuteCollision")
 
     execute_counted_function: Operation[
         ExecuteCountedFunctionRequest,

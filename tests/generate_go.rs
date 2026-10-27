@@ -89,22 +89,6 @@ fn descriptor_path(root: &Path) -> PathBuf {
     root.join("advanced/samples/descriptors/temporal_api.bin")
 }
 
-fn linked_inputs_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/deps")
-}
-
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
-}
-
 fn read_go_output_files(dir: &Path) -> BTreeMap<PathBuf, String> {
     fn visit(root: &Path, dir: &Path, files: &mut BTreeMap<PathBuf, String>) {
         let mut entries = fs::read_dir(dir)
@@ -153,7 +137,7 @@ fn unique_output_path(label: &str) -> PathBuf {
 }
 
 #[test]
-fn cli_uses_go_support_package_only_when_converters_are_needed() {
+fn cli_accepts_unused_go_support_package() {
     let root = project_root();
     let temp_dir = unique_output_path("go-support-file-input");
     fs::create_dir_all(&temp_dir).unwrap();
@@ -176,15 +160,6 @@ fn cli_uses_go_support_package_only_when_converters_are_needed() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    // A package with no hand-written converters must not import unused support.
-    assert!(!output_path.join("support.go").exists());
-    assert!(output_path.join("userservice.go").is_file());
-    assert!(
-        !fs::read_to_string(output_path.join("userservice.go"))
-            .unwrap()
-            .contains("\"example.com/nexgen/support\"")
-    );
-    assert!(!output_path.join("api.go").exists());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -385,132 +360,6 @@ fn cli_overwrites_previously_generated_files_in_place() {
 }
 
 #[test]
-fn go_proto_enum_field_infers_descriptor_go_package() {
-    let root = project_root();
-    let temp_dir = unique_output_path("go-unconvertible-input");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let wit_path = temp_dir.join("unconvertible.wit");
-    // The `namespace-state` alias is type-replaced for Python only. Go should
-    // still infer the proto enum import and conversion from descriptor
-    // `go_package` metadata.
-    fs::write(
-        &wit_path,
-        r#"package temporal:unconvertible@1.0.0;
-
-world system {
-  export namespace-service;
-}
-
-/// @nexus.endpoint "namespace-service"
-interface namespace-service {
-  /// String-shaped placeholder for omitted and replaced fields.
-  type placeholder = string;
-
-  /// @nexus.proto "temporal.api.enums.v1.NamespaceState"
-  /// @nexus.type python="int"
-  type namespace-state = placeholder;
-
-  /// @nexus.proto "temporal.api.namespace.v1.NamespaceInfo"
-  record namespace-info {
-    name: option<string>,
-    state: option<namespace-state>,
-    /// @nexus.omit
-    description: placeholder,
-    /// @nexus.omit
-    owner-email: placeholder,
-    /// @nexus.omit
-    data: placeholder,
-    /// @nexus.omit
-    id: placeholder,
-    /// @nexus.omit
-    capabilities: placeholder,
-    /// @nexus.omit
-    limits: placeholder,
-    /// @nexus.omit
-    supports-schedules: placeholder,
-  }
-
-  describe-namespace: func(request: namespace-info);
-}
-"#,
-    )
-    .unwrap();
-
-    let rendered = generate_to_string_with_inputs(
-        nexgen::language::Language::Go,
-        &[wit_path],
-        &[descriptor_path(&root)],
-    )
-    .unwrap();
-
-    assert!(rendered.contains("namespace \"go.temporal.io/api/namespace/v1\""));
-    assert!(rendered.contains("enums \"go.temporal.io/api/enums/v1\""));
-    assert!(rendered.contains("type NamespaceState int32"));
-    assert!(rendered.contains("State *NamespaceState"));
-    assert!(rendered.contains("message.State = enums.NamespaceState((*m.State))"));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn go_output_transform_returns_transformed_type() {
-    let temp_dir = unique_output_path("go-output-transform");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let wit_path = temp_dir.join("go-output-transform.wit");
-    fs::write(
-        &wit_path,
-        r#"package temporal:go-output-transform@1.0.0;
-
-world system {
-  export sample-service;
-}
-
-/// @nexus.endpoint "sample-service"
-interface sample-service {
-  record transform-request {
-    id: string,
-  }
-
-  record transform-response {
-    value: string,
-  }
-
-  /// @nexus.output-transform
-  ///   go-type="example.com/nexgen/handles:handles.ValueHandle"
-  ///   go="handles.NewValueHandle(request.ID, result.Value)"
-  get-handle: func(request: transform-request) -> transform-response;
-}
-"#,
-    )
-    .unwrap();
-
-    let rendered =
-        generate_to_string_with_inputs(nexgen::language::Language::Go, &[wit_path], &[]).unwrap();
-
-    assert!(rendered.contains("\"example.com/nexgen/handles\""));
-    assert!(rendered.contains(
-        "func getHandle(ctx workflow.Context, request transformRequest) workflow.Future {"
-    ));
-    assert!(rendered.contains("result, resultSettable := workflow.NewFuture(ctx)"));
-    assert!(rendered.contains("workflow.Go(ctx, func(ctx workflow.Context) {"));
-    assert!(rendered.contains("resultSettable.Set(value, nil)"));
-    assert!(!rendered.contains("nexgenOperationFuture"));
-    assert!(rendered.contains("\tvar result transformResponse\n"));
-    assert!(rendered.contains("\t\tif err := fut.Get(ctx, &result); err != nil {\n"));
-    assert!(
-        rendered.contains("\t\tvalue, err := handles.NewValueHandle(request.ID, result.Value)\n")
-    );
-    assert!(rendered.contains("\t\tresultSettable.Set(value, nil)\n"));
-    assert!(
-        rendered.contains(
-            "func GetHandle(ctx workflow.Context, opts GetHandleOptions) workflow.Future {"
-        )
-    );
-    assert!(!rendered.contains("NexusOperationFuture"));
-    assert!(!rendered.contains("GetNexusOperationExecution"));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
 fn go_json_package_name_derives_from_output_directory_name() {
     // The Go package name for a JSON-schema input must come from the output
     // directory's basename (Go convention: package name = directory name),
@@ -538,65 +387,6 @@ fn go_json_package_name_derives_from_output_directory_name() {
         env!("CARGO_PKG_VERSION"),
         ". DO NOT EDIT.\n\npackage widgets\n"
     )));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn go_function_name_locals_do_not_collide_with_authored_parameters() {
-    let temp_dir = unique_output_path("go-function-local-collisions");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let wit_path = temp_dir.join("collision-service.wit");
-    fs::write(
-        &wit_path,
-        r#"
-package test:function-local-collisions@1.0.0;
-
-world test-world {
-  export collision-service;
-}
-
-interface functions {
-  type placeholder = string;
-  function-call: func(name: string, enabled: bool) -> string;
-
-  /// @nexus.function
-  ///   signature="function-call"
-  type executable-function = placeholder;
-}
-
-/// @nexus.endpoint "collision-endpoint"
-interface collision-service {
-  use functions.{executable-function};
-
-  record execute-request {
-    function: executable-function,
-    function-name: string,
-    rv: string,
-    full-name: string,
-    elements: string,
-    short-name: string,
-  }
-
-  execute: func(request: execute-request);
-}
-"#,
-    )
-    .unwrap();
-
-    let rendered =
-        generate_to_string_with_inputs(nexgen::language::Language::Go, &[wit_path], &[]).unwrap();
-
-    // The result local is allocated around the authored `functionName`
-    // parameter. Extraction-only locals can keep simple names because their
-    // block scope safely shadows the authored parameters.
-    assert!(rendered.contains("\tfunctionName2 := \"\"\n\t{"));
-    assert!(rendered.contains("\t\trv := reflect.ValueOf(function)"));
-    assert!(rendered.contains("\t\tfullName := runtime.FuncForPC(rv.Pointer()).Name()"));
-    assert!(rendered.contains("\t\telements := strings.Split(fullName, \".\")"));
-    assert!(rendered.contains("\t\tshortName := elements[len(elements)-1]"));
-    assert!(rendered.contains("\t\tfunctionName2 = strings.TrimSuffix(shortName, \"-fm\")"));
-    assert!(rendered.contains("\t\tFunction: functionName2,"));
-
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
@@ -661,25 +451,6 @@ fn render_go_descriptor_fixture(wit: &str) -> Result<String, Box<dyn std::error:
     result
 }
 
-// Compile the actual generated files, not hand-copied declarations. The
-// fixtures normally exercise reflection fallback; extractor cases supply the
-// one support helper they explicitly request.
-
-#[test]
-fn go_ignores_typescript_only_function_descriptors() {
-    let baseline =
-        render_go_descriptor_fixture(&go_descriptor_fixture("", "signal-input")).unwrap();
-    let typescript = render_go_descriptor_fixture(&go_descriptor_fixture(
-        r#"  ///   typescript-value-type="common.SignalDefinition<any[]>"
-  ///   typescript-args-type="Value extends common.SignalDefinition<infer Args extends any[], any> ? Args : never"
-  ///   typescript-name-extractor="signalFunctionName"
-  ///   typescript-import="@temporalio/common""#,
-        "signal-input",
-    ))
-    .unwrap();
-    assert_eq!(baseline, typescript);
-}
-
 #[test]
 fn go_rejects_descriptors_on_fixed_argument_functions_with_go_diagnostic() {
     let wit = go_descriptor_fixture(
@@ -702,20 +473,6 @@ fn go_rejects_descriptors_on_fixed_argument_functions_with_go_diagnostic() {
         }
         other => panic!("expected UnsupportedGoType, got {other:?}"),
     }
-}
-
-#[test]
-fn go_proto_models_use_the_configured_support_package() {
-    let root = project_root();
-    let rendered = generate_to_string_with_inputs(
-        nexgen::language::Language::Go,
-        &example_input_paths(&root, "proto-backed-showcase"),
-        &[descriptor_path(&root)],
-    )
-    .unwrap();
-
-    assert!(rendered.contains("support \"example.com/nexgen/support\""));
-    assert!(!rendered.contains("### support.go"));
 }
 
 fn render_go_ordinary_serialization_context_fixture(

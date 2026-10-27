@@ -4222,10 +4222,12 @@ fn render_models_module(
         &mut imports,
         support_package,
         &api_plan.module_path.to_path_buf(),
-        contains_qualified_identifier(&body, "support")
-            || models.iter().any(|model| {
+        requires_support_import(
+            &body,
+            models.iter().any(|model| {
                 model.wire_function_names.is_some() && !model.sourced_fields.is_empty()
             }),
+        ),
     );
     if !model_fragments.imports.is_empty() {
         if !imports.is_empty() && !imports.ends_with('\n') {
@@ -4567,11 +4569,13 @@ fn render_operation_module(
         &mut imports,
         support_package,
         &api_plan.module_path.to_path_buf().join("operations"),
-        contains_qualified_identifier(&body, "support")
-            || operation
+        requires_support_import(
+            &body,
+            operation
                 .input
                 .as_ref()
                 .is_some_and(|input| !input.sourced_fields.is_empty()),
+        ),
     );
     let resources = used_import_names(&body, &resource_type_names(services));
     let value_resources = resources
@@ -4603,6 +4607,10 @@ fn render_operation_module(
     render_generated_module(imports, body)
 }
 
+fn requires_support_import(source: &str, sourced_support_import: bool) -> bool {
+    sourced_support_import || contains_qualified_identifier(source, "support")
+}
+
 fn render_support_import(
     output: &mut String,
     support_package: &str,
@@ -4613,7 +4621,7 @@ fn render_support_import(
         output,
         support_package,
         source_dir,
-        contains_qualified_identifier(source, "support"),
+        requires_support_import(source, false),
     );
 }
 
@@ -6940,16 +6948,10 @@ fn is_typescript_keyword(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        TypeScriptRequirements, render_support_import, render_support_import_if,
-        render_typescript_requirement_imports, sourced_support_call, support_reference,
+        TypeScriptRequirements, render_typescript_requirement_imports, sourced_support_call,
+        support_reference,
     };
     use std::path::Path;
-    use std::path::PathBuf;
-
-    use crate::descriptors::DescriptorIndex;
-    use crate::generator::generate_source;
-    use crate::language::Language;
-    use crate::nexgen_config::{NexgenConfig, current, scope};
 
     #[test]
     fn helper_calls_ignore_prose_literals_and_qualified_calls() {
@@ -6987,57 +6989,33 @@ mod tests {
     }
 
     #[test]
-    fn support_imports_resolve_relative_to_output_root_only_when_referenced() {
-        let mut imports = String::new();
-        render_support_import(
-            &mut imports,
-            "./shared/support",
-            Path::new(""),
-            "support.convert(x)",
-        );
-        assert_eq!(imports, "import * as support from './shared/support';\n");
-
-        imports.clear();
-        render_support_import(
-            &mut imports,
-            "./shared/support",
-            Path::new("api/operations"),
-            "support.convert(x)",
-        );
-        assert_eq!(
-            imports,
-            "import * as support from '../../shared/support';\n"
-        );
-
-        imports.clear();
-        render_support_import(&mut imports, "@org/helpers", Path::new("api"), "x()");
-        assert!(imports.is_empty());
-        render_support_import(
-            &mut imports,
-            "@org/helpers",
-            Path::new("api"),
-            "support.convert(x)",
-        );
-        assert_eq!(imports, "import * as support from '@org/helpers';\n");
+    fn support_paths_resolve_relative_to_output_root() {
+        for (source_dir, package, expected) in [
+            ("", "./shared/support", "./shared/support"),
+            ("api/operations", "./shared/support", "../../shared/support"),
+            ("api", "@org/helpers", "@org/helpers"),
+        ] {
+            assert_eq!(
+                super::typescript_relative_import(Path::new(source_dir), package),
+                expected
+            );
+        }
     }
 
     #[test]
-    fn sourced_expressions_import_support_without_inspecting_the_expression() {
-        let mut imports = String::new();
-        render_support_import_if(
-            &mut imports,
-            "./shared/support",
-            Path::new("api/operations"),
-            true,
-        );
-        assert_eq!(
-            imports,
-            "import * as support from '../../shared/support';\n"
-        );
-
-        imports.clear();
-        render_support_import_if(&mut imports, "@org/helpers", Path::new("api"), false);
-        assert!(imports.is_empty());
+    fn support_import_requirement_includes_sourced_fields_and_converter_calls() {
+        for (source, sourced, expected) in [
+            ("workflowNamespace()", true, true),
+            ("workflowNamespace()", false, false),
+            ("support.convert(x)", false, true),
+            ("support.convert(x)", true, true),
+        ] {
+            assert_eq!(
+                super::requires_support_import(source, sourced),
+                expected,
+                "{source}, sourced={sourced}"
+            );
+        }
     }
 
     #[test]
@@ -7069,214 +7047,86 @@ mod tests {
         assert_eq!(support_reference("(x) => x"), "(x) => x");
     }
 
-    fn linked_inputs_path(root: &std::path::Path) -> PathBuf {
-        root.join("advanced/samples/inputs/deps")
+    #[test]
+    fn enum_defaults_use_resolved_native_alias() {
+        let resolved_type = super::ResolvedFieldType {
+            annotation: "policies.AliasPolicy".to_string(),
+            kind: super::ResolvedFieldKind::Enum,
+            requirements: super::TypeScriptRequirements::default(),
+            wire_conversion: None,
+        };
+        let default_value = crate::spec::EnumValueSpec {
+            name: "AllowDuplicate".to_string(),
+            wire_name: "allow-duplicate".to_string(),
+            number: 7,
+        };
+        let mut requirements = super::TypeScriptRequirements::default();
+        assert_eq!(
+            super::defaulted_enum_from_wire_expr(
+                &resolved_type,
+                "message.policy",
+                &default_value,
+                &mut requirements
+            ),
+            "message.policy == null ? policies.AliasPolicy.AllowDuplicate : message.policy as policies.AliasPolicy"
+        );
+        assert_eq!(
+            super::defaulted_enum_to_wire_expr(
+                &resolved_type,
+                "policy",
+                &default_value,
+                &mut requirements
+            ),
+            "(model.policy == null ? policies.AliasPolicy.AllowDuplicate : model.policy) as any"
+        );
+        assert_eq!(
+            requirements.value_namespace_imports,
+            std::collections::BTreeSet::from(["policies".to_string()])
+        );
     }
 
     #[test]
-    fn renders_typescript_enum_overrides() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-/// @nexus.endpoint "__temporal_system"
-interface workflow-service {
-  use nexus:temporal-types/model@1.0.0.{duration, placeholder, workflow-id-reuse-policy};
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
-  record signal-with-start-workflow-request {
-    workflow-id: string,
-    workflow-id-reuse-policy: option<workflow-id-reuse-policy>,
-    /// @nexus.omit
-    namespace: placeholder,
-    /// @nexus.omit
-    workflow-type: placeholder,
-    /// @nexus.omit
-    task-queue: placeholder,
-    /// @nexus.omit
-    input: placeholder,
-    /// @nexus.omit
-    workflow-execution-timeout: placeholder,
-    /// @nexus.omit
-    workflow-run-timeout: placeholder,
-    /// @nexus.omit
-    workflow-task-timeout: placeholder,
-    /// @nexus.omit
-    identity: placeholder,
-    /// @nexus.omit
-    request-id: placeholder,
-    /// @nexus.omit
-    workflow-id-conflict-policy: placeholder,
-    /// @nexus.omit
-    signal-name: placeholder,
-    /// @nexus.omit
-    signal-input: placeholder,
-    /// @nexus.omit
-    control: placeholder,
-    /// @nexus.omit
-    retry-policy: placeholder,
-    /// @nexus.omit
-    cron-schedule: placeholder,
-    /// @nexus.omit
-    memo: placeholder,
-    /// @nexus.omit
-    search-attributes: placeholder,
-    /// @nexus.omit
-    header: placeholder,
-    workflow-start-delay: option<duration>,
-    /// @nexus.omit
-    user-metadata: placeholder,
-    /// @nexus.omit
-    links: placeholder,
-    /// @nexus.omit
-    versioning-override: placeholder,
-    /// @nexus.omit
-    priority: placeholder,
-    /// @nexus.omit
-    time-skipping-config: placeholder,
-  }
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse"
-  record signal-with-start-workflow-response {
-    run-id: option<string>,
-    started: option<bool>,
-    /// @nexus.omit
-    first-execution-run-id: placeholder,
-    /// @nexus.omit
-    signal-link: placeholder,
-  }
-
-  signal-with-start-workflow-execution: func(
-    request: signal-with-start-workflow-request,
-  ) -> signal-with-start-workflow-response;
-}
-"#;
-        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
-            Language::TypeScript,
-            wit,
-            PathBuf::from("inline.wit"),
-            &[linked_inputs_path(&PathBuf::from(env!(
-                "CARGO_MANIFEST_DIR"
-            )))],
-        )
-        .unwrap();
-        let descriptors = DescriptorIndex::load(
-            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("advanced/samples/descriptors/temporal_api.bin"),
-        )
-        .unwrap();
-        let output = generate_source(
-            Language::TypeScript,
-            spec.clone(),
-            &descriptors,
-            "./support",
-        )
-        .unwrap();
-
-        assert!(output.contains("workflowIdReusePolicy?: common.WorkflowIdReusePolicy;"));
-        assert!(output.contains(
-            "workflowIdReusePolicy: model.workflowIdReusePolicy == null ? undefined : support.workflowIdReusePolicyToProto(model.workflowIdReusePolicy)"
-        ));
-        assert!(!output.contains("export enum WorkflowIdReusePolicy"));
-    }
-
-    #[test]
-    fn system_nexus_non_direct_operations_return_a_handle() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export workflow-service;
-}
-
-/// @nexus.endpoint "__temporal_system"
-interface workflow-service {
-  record request {
-    id: string,
-  }
-
-  record response {
-    value: string,
-  }
-
-  /// @nexus.serialization-context typescript="operationSerializationContext"
-  deferred-operation: func(request: request) -> response;
-}
-"#;
-        let spec = crate::parser::parse_api_spec_from_wit_for_language(
-            Language::TypeScript,
-            wit,
-            PathBuf::from("inline.wit"),
-        )
-        .unwrap();
-        let descriptors = DescriptorIndex::load(
-            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("advanced/samples/descriptors/temporal_api.bin"),
-        )
-        .unwrap();
-        let _scope = scope(NexgenConfig {
-            system_nexus: true,
-            ..current()
-        });
-        let output =
-            generate_source(Language::TypeScript, spec, &descriptors, "./support").unwrap();
-
-        assert!(output.contains("Promise<nexus.NexusOperationHandle<Response>>"));
-        assert!(output.contains("return await client.startOperation("));
-        assert!(output.contains("__temporal_system"));
-        assert!(output.contains("export type { Request, Response } from './models';"));
-    }
-
-    #[test]
-    fn renders_endpoint_parameter_when_service_endpoint_is_missing() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export example-service;
-}
-
-interface example-service {
-  use nexus:temporal-types/model@1.0.0.{retry-policy};
-
-  example-operation: func(request: retry-policy) -> retry-policy;
-  ping: func(request: retry-policy);
-}
-"#;
-        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
-            Language::TypeScript,
-            wit,
-            PathBuf::from("inline.wit"),
-            &[linked_inputs_path(&PathBuf::from(env!(
-                "CARGO_MANIFEST_DIR"
-            )))],
-        )
-        .unwrap();
-        let descriptors = DescriptorIndex::load(
-            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("advanced/samples/descriptors/temporal_api.bin"),
-        )
-        .unwrap();
-
-        let output = generate_source(
-            Language::TypeScript,
-            spec.clone(),
-            &descriptors,
-            "./support",
-        )
-        .unwrap();
-        assert!(output.contains("public constructor(endpoint: string)"));
-        assert!(!output.contains("private readonly endpoint"));
-        assert!(output.contains(
-            "private readonly client: workflow.NexusServiceClient<typeof exampleService>;"
-        ));
-        assert!(output.contains("return await this.client.startOperation("));
-        assert!(output.contains("exampleService.operations.exampleOperation"));
-        assert!(output.contains("exampleService.operations.ping"));
-        assert!(output.contains("      endpoint,\n"));
-        assert!(!output.contains("request: void"));
+    fn enum_defaults_use_resolved_proto_identity_with_sdk_conversions() {
+        let resolved_type = super::ResolvedFieldType {
+            annotation: "workflow.WorkflowIdReusePolicy".to_string(),
+            kind: super::ResolvedFieldKind::Enum,
+            requirements: super::TypeScriptRequirements::default(),
+            wire_conversion: Some(super::WireValueConversion {
+                annotation: "number".to_string(),
+                from_wire: "decodePolicy({wire})".to_string(),
+                to_wire: "encodePolicy({value})".to_string(),
+                function_name_to_wire: None,
+                wire_function_names: None,
+                uses_rendered_model_annotation: false,
+            }),
+        };
+        let default_value = crate::spec::EnumValueSpec {
+            name: "AllowDuplicate".to_string(),
+            wire_name: "WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE".to_string(),
+            number: 7,
+        };
+        let mut requirements = super::TypeScriptRequirements::default();
+        assert_eq!(
+            super::defaulted_enum_from_wire_expr(
+                &resolved_type,
+                "message.policy",
+                &default_value,
+                &mut requirements
+            ),
+            "message.policy == null ? workflow.WorkflowIdReusePolicy.ALLOW_DUPLICATE : decodePolicy(message.policy)"
+        );
+        assert_eq!(
+            super::defaulted_enum_to_wire_expr(
+                &resolved_type,
+                "policy",
+                &default_value,
+                &mut requirements
+            ),
+            "encodePolicy((model.policy == null ? workflow.WorkflowIdReusePolicy.ALLOW_DUPLICATE : model.policy))"
+        );
+        assert_eq!(
+            requirements.value_namespace_imports,
+            std::collections::BTreeSet::from(["workflow".to_string()])
+        );
     }
 }

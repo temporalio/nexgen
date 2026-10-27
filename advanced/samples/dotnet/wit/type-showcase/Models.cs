@@ -6,7 +6,7 @@ using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 
-namespace Nexgen.TypeShowcase
+namespace Nexgen.AuthoredTypeShowcase
 {
 
     [GeneratedCode("nexgen", null)]

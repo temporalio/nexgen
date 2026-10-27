@@ -10,6 +10,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"go.temporal.io/sdk/advanced/samples/go/functionexecution"
+	"go.temporal.io/sdk/advanced/samples/go/support/handles"
 )
 
 const functionExecutionServiceName = "FunctionExecution"
@@ -31,13 +32,15 @@ func validVarargsFunction(args ...string) string {
 type FunctionExecutionIntegrationSuite struct {
 	suite.Suite
 	testsuite.WorkflowTestSuite
-	env   *testsuite.TestWorkflowEnvironment
-	calls []nexusCall
+	env          *testsuite.TestWorkflowEnvironment
+	calls        []nexusCall
+	countedValue string
 }
 
 func (s *FunctionExecutionIntegrationSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
 	s.calls = nil
+	s.countedValue = "counted"
 
 	executeFunction := nexus.NewSyncOperation("ExecuteFunction",
 		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (functionexecution.ExecuteFunctionResult, error) {
@@ -46,9 +49,10 @@ func (s *FunctionExecutionIntegrationSuite) SetupTest() {
 		})
 
 	executeCountedFunction := nexus.NewSyncOperation("ExecuteCountedFunction",
-		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (functionexecution.ExecuteCountedFunctionResult, error) {
+		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (map[string]string, error) {
 			s.calls = append(s.calls, nexusCall{"ExecuteCountedFunction", input})
-			return functionexecution.ExecuteCountedFunctionResult{Value: "counted"}, nil
+			// Return the wire result, before the generated Go output transform.
+			return map[string]string{"Value": s.countedValue}, nil
 		})
 
 	executeNamedFunction := nexus.NewSyncOperation("ExecuteNamedFunction",
@@ -69,6 +73,12 @@ func (s *FunctionExecutionIntegrationSuite) SetupTest() {
 			return functionexecution.ExecuteNamedVarargsFunctionResult{Value: "named-varargs"}, nil
 		})
 
+	executeCollision := nexus.NewSyncOperation("ExecuteCollision",
+		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (functionexecution.ExecuteFunctionResult, error) {
+			s.calls = append(s.calls, nexusCall{"ExecuteCollision", input})
+			return functionexecution.ExecuteFunctionResult{Value: "collision"}, nil
+		})
+
 	service := nexus.NewService(functionExecutionServiceName)
 	s.NoError(service.Register(
 		executeFunction,
@@ -76,6 +86,7 @@ func (s *FunctionExecutionIntegrationSuite) SetupTest() {
 		executeNamedFunction,
 		executeVarargsFunction,
 		executeNamedVarargsFunction,
+		executeCollision,
 	))
 	s.env.RegisterNexusService(service)
 }
@@ -85,6 +96,7 @@ func TestFunctionExecutionIntegrationSuite(t *testing.T) {
 }
 
 func (s *FunctionExecutionIntegrationSuite) TestFunctionArgumentForms() {
+	var countedFunctionName string
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) ([]string, error) {
 		values := make([]string, 0, 6)
 
@@ -97,13 +109,14 @@ func (s *FunctionExecutionIntegrationSuite) TestFunctionArgumentForms() {
 		}
 		values = append(values, direct.Value)
 
-		var counted functionexecution.ExecuteCountedFunctionResult
+		var counted handles.FunctionResult
 		if err := functionexecution.ExecuteCountedFunction(
 			ctx, functionexecution.ExecuteCountedFunctionOptions{}, validCountedFunction, "one", 7,
 		).Get(ctx, &counted); err != nil {
 			return nil, err
 		}
 		values = append(values, counted.Value)
+		countedFunctionName = counted.FunctionName
 
 		var named functionexecution.ExecuteNamedFunctionResult
 		if err := functionexecution.ExecuteNamedFunction(
@@ -143,6 +156,7 @@ func (s *FunctionExecutionIntegrationSuite) TestFunctionArgumentForms() {
 	var values []string
 	s.NoError(s.env.GetWorkflowResult(&values))
 	s.Equal([]string{"executed", "counted", "named", "varargs", "named-varargs", "named-varargs"}, values)
+	s.Equal("validCountedFunction", countedFunctionName)
 
 	s.Require().Len(s.calls, 6)
 	s.Equal([]string{
@@ -157,4 +171,49 @@ func (s *FunctionExecutionIntegrationSuite) TestFunctionArgumentForms() {
 	s.Equal([]string{"one", "two"}, stringSliceField(s.calls[3].Input, "Args"))
 	s.Equal("named-varargs-function", stringField(s.calls[4].Input, "Function"))
 	s.Equal("validVarargsFunction", stringField(s.calls[5].Input, "Function"))
+}
+
+func (s *FunctionExecutionIntegrationSuite) TestOutputTransformError() {
+	s.countedValue = ""
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		var result handles.FunctionResult
+		return functionexecution.ExecuteCountedFunction(
+			ctx, functionexecution.ExecuteCountedFunctionOptions{}, validCountedFunction, "one", 1,
+		).Get(ctx, &result)
+	})
+	s.True(s.env.IsWorkflowCompleted())
+	s.Require().Error(s.env.GetWorkflowError())
+	s.Contains(s.env.GetWorkflowError().Error(), "function result is empty")
+}
+
+func (s *FunctionExecutionIntegrationSuite) TestAuthoredNamesSurviveFunctionExtraction() {
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) (functionexecution.ExecuteFunctionResult, error) {
+		var result functionexecution.ExecuteFunctionResult
+		err := functionexecution.ExecuteCollision(ctx, functionexecution.ExecuteCollisionOptions{
+			FunctionName: "authored-function-name",
+			Rv:           "authored-rv",
+			FullName:     "authored-full-name",
+			Elements:     "authored-elements",
+			ShortName:    "authored-short-name",
+		}, validFunction, "one", true).Get(ctx, &result)
+		return result, err
+	})
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+	var result functionexecution.ExecuteFunctionResult
+	s.NoError(s.env.GetWorkflowResult(&result))
+	s.Equal("collision", result.Value)
+	s.Require().Len(s.calls, 1)
+	input := s.calls[0].Input
+	for field, expected := range map[string]string{
+		"Function":     "validFunction",
+		"Name":         "one",
+		"FunctionName": "authored-function-name",
+		"Rv":           "authored-rv",
+		"FullName":     "authored-full-name",
+		"Elements":     "authored-elements",
+		"ShortName":    "authored-short-name",
+	} {
+		s.Equal(expected, stringField(input, field), field)
+	}
 }
