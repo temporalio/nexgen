@@ -5,12 +5,6 @@ WIT-generated packages live in directories such as `protobackedshowcase/` and
 ordinary Nexus samples and [`systemsupport/`](systemsupport/) for system Nexus
 samples, outside the regenerated directories.
 
-`functionexecution/` exercises callable descriptors, authored names that collide
-with function-name extraction locals, and Go output transforms. Its counted
-operation combines request and response data into
-`support/handles.FunctionResult`; native tests cover successful transforms and
-transform errors.
-
 ## Using the support package
 
 In your own project, create a

@@ -19,12 +19,6 @@ snapshot-only native-api form of the JSON-Schema inputs.
 Regenerate WIT output with `cargo build-examples --format wit --lang dotnet`
 from the repo root.
 
-`type-showcase` uses the authored namespace `Nexgen.AuthoredTypeShowcase` and
-operations class `TypeShowcaseApi`. `TypeShowcaseCompileChecks.cs` extends that
-partial class and references a generated operation, so compilation checks both
-overrides. The model-only `proto-oneof` sample uses `Nexgen.AuthoredProtoOneof`;
-its native conversion tests consume that namespace.
-
 ```bash
 dotnet build Nexgen.DotNetExamples.csproj
 dotnet test tests/
