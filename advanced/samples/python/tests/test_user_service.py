@@ -78,7 +78,7 @@ class UserServiceCallerWorkflow:
     async def run(self) -> User:
         service = user_service.UserServiceClient("user-service")
         user = await service.get_user(user_id="user-123")
-        await user.notify(sender="ops")
+        await user.notify(channels=[], sender="ops")
         return await user.update_email("new@example.com")
 
 
