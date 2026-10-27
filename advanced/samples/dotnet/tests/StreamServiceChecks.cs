@@ -1,6 +1,8 @@
+extern alias Streams;
+
 using Temporalio.Converters;
 using Xunit;
-using StreamServiceExample = Nexgen.StreamService;
+using StreamServiceExample = Streams::Temporalio.Workflows;
 
 namespace Nexgen.DotNetExamples.Tests
 {
@@ -10,7 +12,7 @@ namespace Nexgen.DotNetExamples.Tests
         public void StreamWithItsOwnFieldNameRoundTrips()
         {
             var converter = DataConverter.Default.PayloadConverter;
-            var stream = new StreamServiceExample.Stream(new StreamServiceExample.StreamRef("stream-1"), null, null);
+            var stream = new StreamServiceExample.Stream(new StreamServiceExample.StreamRef("stream-1"), null);
 
             var decoded = converter.ToValue<StreamServiceExample.Stream>(converter.ToPayload(stream));
 

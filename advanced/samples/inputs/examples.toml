@@ -26,10 +26,12 @@ descriptors = "temporal"
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
+# The Stream service WIT of temporalio-streams, on the Stream protos of temporalio/api#895 at
+# 44519d8a. Its .NET output builds in Nexgen.DotNetStreamService.csproj.
 [stream-service]
-languages = ["python", "typescript", "dotnet"]
-# The sample proto imports the Temporal API messages, so it needs both sets.
-descriptors = ["temporal_api.bin", "stream_service.bin"]
+languages = ["dotnet"]
+system_nexus = true
+descriptors = ["temporal_api.bin", "streams.bin"]
 
 # A System Nexus operation that returns a resource.
 [workflow-handle]

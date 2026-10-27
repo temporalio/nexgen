@@ -7,8 +7,36 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using Nexgen.Support;
 
-namespace Nexgen.StreamService
+namespace Temporalio.Workflows
 {
+
+    [GeneratedCode("nexgen", null)]
+    public enum ExecutionType
+    {
+        ExecutionTypeUnspecified = 0,
+        ExecutionTypeWorkflow = 1,
+        ExecutionTypeActivity = 2,
+        ExecutionTypeNexusOperation = 3,
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public enum StreamProducerKind
+    {
+        StreamProducerKindUnspecified = 0,
+        StreamProducerKindWorkflow = 1,
+        StreamProducerKindLocalActivity = 2,
+        StreamProducerKindActivity = 3,
+        StreamProducerKindClient = 4,
+        StreamProducerKindStandaloneActivity = 5,
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public enum StreamReadStart
+    {
+        StreamReadStartUnspecified = 0,
+        StreamReadStartBeginning = 1,
+        StreamReadStartEnd = 2,
+    }
 
     [GeneratedCode("nexgen", null)]
     public enum StreamStatus
@@ -19,6 +47,27 @@ namespace Nexgen.StreamService
         StreamStatusExpired = 3,
     }
 
+    /// <summary>
+    /// A read item: a Record, a Superseded item or the close.
+    /// </summary>
+    [GeneratedCode("nexgen", null)]
+    public abstract record StreamItem
+    {
+        private StreamItem() { }
+
+        [GeneratedCode("nexgen", null)]
+        public sealed record Data(Temporalio.Api.Stream.V1.StreamData Value) : StreamItem;
+
+        [GeneratedCode("nexgen", null)]
+        public sealed record Superseded(Temporalio.Api.Stream.V1.Supersession Value) : StreamItem;
+
+        [GeneratedCode("nexgen", null)]
+        public sealed record Close(Temporalio.Api.Stream.V1.StreamClose Value) : StreamItem;
+    }
+
+    /// <summary>
+    /// One Record to append.
+    /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(AppendRecord.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record AppendRecord
@@ -26,24 +75,24 @@ namespace Nexgen.StreamService
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecord"/> class.
         /// </summary>
-        public AppendRecord(string topic, object? body)
+        public AppendRecord(object? body)
         {
-            Topic = topic;
             Body = body;
         }
 
-        public string Topic { get; init; }
+        /// <summary>
+        /// The value.
+        /// </summary>
         public object? Body { get; init; }
 
-        internal static AppendRecord FromTransferType(StreamSample.V1.AppendRecord wire)
+        internal static AppendRecord FromTransferType(Temporalio.Api.Stream.V1.AppendRecord wire)
         {
-            return new AppendRecord(wire.Topic, Nexgen.Support.ProtoExtensions.FromPayload(wire.Body));
+            return new AppendRecord(Nexgen.Support.ProtoExtensions.FromPayload(wire.Body));
         }
 
-        internal StreamSample.V1.AppendRecord ToTransferType()
+        internal Temporalio.Api.Stream.V1.AppendRecord ToTransferType()
         {
-            var proto = new StreamSample.V1.AppendRecord();
-            proto.Topic = Topic;
+            var proto = new Temporalio.Api.Stream.V1.AppendRecord();
             proto.Body = Nexgen.Support.ProtoExtensions.ToPayload(Body);
             return proto;
         }
@@ -54,17 +103,20 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.AppendRecord);
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.AppendRecord);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((AppendRecord)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : AppendRecord.FromTransferType((StreamSample.V1.AppendRecord)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : AppendRecord.FromTransferType((Temporalio.Api.Stream.V1.AppendRecord)transferType);
         }
 
     }
 
+    /// <summary>
+    /// Append. FAILED_PRECONDITION if closed, fenced or format too new. NOT_FOUND if absent.
+    /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(AppendRecordsRequest.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record AppendRecordsRequest
@@ -72,36 +124,36 @@ namespace Nexgen.StreamService
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsRequest"/> class.
         /// </summary>
-        public AppendRecordsRequest(IReadOnlyList<AppendRecord> records)
+        public AppendRecordsRequest(StreamRef stream, IReadOnlyList<AppendRecord> records)
         {
+            Stream = stream;
             Records = records;
         }
 
-        public StreamRef? Stream { get; init; }
-        public long? Sequence { get; init; }
+        public StreamRef Stream { get; init; }
         public IReadOnlyList<AppendRecord> Records { get; init; }
+        /// <summary>
+        /// Required outside a Workflow. In a Workflow the transport sets it.
+        /// </summary>
+        public Producer? Producer { get; init; }
 
-        internal static AppendRecordsRequest FromTransferType(StreamSample.V1.AppendRecordsRequest wire)
+        internal static AppendRecordsRequest FromTransferType(Temporalio.Api.StreamService.V1.AppendRecordsRequest wire)
         {
-            return new AppendRecordsRequest(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord.FromTransferType(item))))
+            return new AppendRecordsRequest(StreamRef.FromTransferType(wire.Stream), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord.FromTransferType(item))))
             {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
-                Sequence = wire.Sequence == 0 ? null : wire.Sequence,
+                Producer = wire.Producer == null ? null : Producer.FromTransferType(wire.Producer),
             };
         }
 
-        internal StreamSample.V1.AppendRecordsRequest ToTransferType()
+        internal Temporalio.Api.StreamService.V1.AppendRecordsRequest ToTransferType()
         {
-            var proto = new StreamSample.V1.AppendRecordsRequest();
-            if (Stream is { } stream)
+            var proto = new Temporalio.Api.StreamService.V1.AppendRecordsRequest();
+            proto.Stream = (Temporalio.Api.Stream.V1.StreamRef)Stream.ToTransferType();
+            proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (Temporalio.Api.Stream.V1.AppendRecord)item.ToTransferType()));
+            if (Producer is { } producer)
             {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
+                proto.Producer = (Temporalio.Api.Stream.V1.Producer)producer.ToTransferType();
             }
-            if (Sequence is { } sequence)
-            {
-                proto.Sequence = sequence;
-            }
-            proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (StreamSample.V1.AppendRecord)item.ToTransferType()));
             return proto;
         }
 
@@ -111,13 +163,13 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.AppendRecordsRequest);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.AppendRecordsRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((AppendRecordsRequest)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : AppendRecordsRequest.FromTransferType((StreamSample.V1.AppendRecordsRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : AppendRecordsRequest.FromTransferType((Temporalio.Api.StreamService.V1.AppendRecordsRequest)transferType);
         }
 
     }
@@ -129,7 +181,7 @@ namespace Nexgen.StreamService
         public long? FirstOffset { get; init; }
         public long? LastOffset { get; init; }
 
-        internal static AppendRecordsResponse FromTransferType(StreamSample.V1.AppendRecordsResponse wire)
+        internal static AppendRecordsResponse FromTransferType(Temporalio.Api.StreamService.V1.AppendRecordsResponse wire)
         {
             return new AppendRecordsResponse()
             {
@@ -138,9 +190,9 @@ namespace Nexgen.StreamService
             };
         }
 
-        internal StreamSample.V1.AppendRecordsResponse ToTransferType()
+        internal Temporalio.Api.StreamService.V1.AppendRecordsResponse ToTransferType()
         {
-            var proto = new StreamSample.V1.AppendRecordsResponse();
+            var proto = new Temporalio.Api.StreamService.V1.AppendRecordsResponse();
             if (FirstOffset is { } firstOffset)
             {
                 proto.FirstOffset = firstOffset;
@@ -158,43 +210,62 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.AppendRecordsResponse);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.AppendRecordsResponse);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((AppendRecordsResponse)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : AppendRecordsResponse.FromTransferType((StreamSample.V1.AppendRecordsResponse)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : AppendRecordsResponse.FromTransferType((Temporalio.Api.StreamService.V1.AppendRecordsResponse)transferType);
         }
 
     }
 
+    /// <summary>
+    /// Close a Stream. Readers drain what is left, then end. Later appends are refused.
+    /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CloseStreamRequest.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record CloseStreamRequest
     {
-        public StreamRef? Stream { get; init; }
-        public object? Result { get; init; }
-
-        internal static CloseStreamRequest FromTransferType(StreamSample.V1.CloseStreamRequest wire)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CloseStreamRequest"/> class.
+        /// </summary>
+        public CloseStreamRequest(StreamRef stream)
         {
-            return new CloseStreamRequest()
+            Stream = stream;
+        }
+
+        public StreamRef Stream { get; init; }
+        public Producer? Producer { get; init; }
+        public object? Result { get; init; }
+        public System.Exception? Failure { get; init; }
+
+        internal static CloseStreamRequest FromTransferType(Temporalio.Api.StreamService.V1.CloseStreamRequest wire)
+        {
+            return new CloseStreamRequest(StreamRef.FromTransferType(wire.Stream))
             {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
+                Producer = wire.Producer == null ? null : Producer.FromTransferType(wire.Producer),
                 Result = wire.Result == null ? null : Nexgen.Support.ProtoExtensions.FromPayload(wire.Result),
+                Failure = wire.Failure == null ? null : Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure),
             };
         }
 
-        internal StreamSample.V1.CloseStreamRequest ToTransferType()
+        internal Temporalio.Api.StreamService.V1.CloseStreamRequest ToTransferType()
         {
-            var proto = new StreamSample.V1.CloseStreamRequest();
-            if (Stream is { } stream)
+            var proto = new Temporalio.Api.StreamService.V1.CloseStreamRequest();
+            proto.Stream = (Temporalio.Api.Stream.V1.StreamRef)Stream.ToTransferType();
+            if (Producer is { } producer)
             {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
+                proto.Producer = (Temporalio.Api.Stream.V1.Producer)producer.ToTransferType();
             }
             if (Result is { } result)
             {
                 proto.Result = Nexgen.Support.ProtoExtensions.ToPayload(result);
+            }
+            if (Failure is { } failure)
+            {
+                proto.Failure = Nexgen.Support.ProtoExtensions.ToFailureProto(failure);
             }
             return proto;
         }
@@ -205,13 +276,13 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.CloseStreamRequest);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.CloseStreamRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((CloseStreamRequest)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CloseStreamRequest.FromTransferType((StreamSample.V1.CloseStreamRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CloseStreamRequest.FromTransferType((Temporalio.Api.StreamService.V1.CloseStreamRequest)transferType);
         }
 
     }
@@ -220,14 +291,14 @@ namespace Nexgen.StreamService
     [GeneratedCode("nexgen", null)]
     public record CloseStreamResponse
     {
-        internal static CloseStreamResponse FromTransferType(StreamSample.V1.CloseStreamResponse wire)
+        internal static CloseStreamResponse FromTransferType(Temporalio.Api.StreamService.V1.CloseStreamResponse wire)
         {
             return new CloseStreamResponse();
         }
 
-        internal StreamSample.V1.CloseStreamResponse ToTransferType()
+        internal Temporalio.Api.StreamService.V1.CloseStreamResponse ToTransferType()
         {
-            var proto = new StreamSample.V1.CloseStreamResponse();
+            var proto = new Temporalio.Api.StreamService.V1.CloseStreamResponse();
             return proto;
         }
 
@@ -237,43 +308,83 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.CloseStreamResponse);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.CloseStreamResponse);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((CloseStreamResponse)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CloseStreamResponse.FromTransferType((StreamSample.V1.CloseStreamResponse)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CloseStreamResponse.FromTransferType((Temporalio.Api.StreamService.V1.CloseStreamResponse)transferType);
         }
 
     }
 
+    /// <summary>
+    /// Create a Stream, or get the open one. A closed, expired or another owner's Stream fails.
+    /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamRequest.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record CreateStreamRequest
     {
-        public StreamRef? Ref { get; init; }
-        public System.TimeSpan? Retention { get; init; }
-
-        internal static CreateStreamRequest FromTransferType(StreamSample.V1.CreateStreamRequest wire)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CreateStreamRequest"/> class.
+        /// </summary>
+        public CreateStreamRequest(string id)
         {
-            return new CreateStreamRequest()
+            Id = id;
+        }
+
+        /// <summary>
+        /// The Stream id. Required, and never empty.
+        /// </summary>
+        public string Id { get; init; }
+        /// <summary>
+        /// The age after which a Record is dropped. Empty is the Store default.
+        /// </summary>
+        public System.TimeSpan? Retention { get; init; }
+        /// <summary>
+        /// Retry run only. The previous run, whose Records this withdraws.
+        /// </summary>
+        public string? WithdrawRun { get; init; }
+        /// <summary>
+        /// The Workflow run that owns the Stream. The Workflow transport sets it.
+        /// </summary>
+        public Producer? Owner { get; init; }
+        /// <summary>
+        /// The ref, whose id is stream-id. A create with an owner needs the ref's owner.
+        /// </summary>
+        public StreamRef? Ref { get; init; }
+
+        internal static CreateStreamRequest FromTransferType(Temporalio.Api.StreamService.V1.CreateStreamRequest wire)
+        {
+            return new CreateStreamRequest(wire.StreamId)
             {
-                Ref = wire.Ref == null ? null : StreamRef.FromTransferType(wire.Ref),
                 Retention = wire.Retention == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Retention),
+                WithdrawRun = string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun,
+                Owner = wire.Owner == null ? null : Producer.FromTransferType(wire.Owner),
+                Ref = wire.Ref == null ? null : StreamRef.FromTransferType(wire.Ref),
             };
         }
 
-        internal StreamSample.V1.CreateStreamRequest ToTransferType()
+        internal Temporalio.Api.StreamService.V1.CreateStreamRequest ToTransferType()
         {
-            var proto = new StreamSample.V1.CreateStreamRequest();
-            if (Ref is { } @ref)
-            {
-                proto.Ref = (StreamSample.V1.StreamRef)@ref.ToTransferType();
-            }
+            var proto = new Temporalio.Api.StreamService.V1.CreateStreamRequest();
+            proto.StreamId = Id;
             if (Retention is { } retention)
             {
                 proto.Retention = retention.ToProto();
+            }
+            if (WithdrawRun is { } withdrawRun)
+            {
+                proto.WithdrawRun = withdrawRun;
+            }
+            if (Owner is { } owner)
+            {
+                proto.Owner = (Temporalio.Api.Stream.V1.Producer)owner.ToTransferType();
+            }
+            if (Ref is { } @ref)
+            {
+                proto.Ref = (Temporalio.Api.Stream.V1.StreamRef)@ref.ToTransferType();
             }
             return proto;
         }
@@ -284,13 +395,13 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.CreateStreamRequest);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.CreateStreamRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamRequest)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamRequest.FromTransferType((StreamSample.V1.CreateStreamRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamRequest.FromTransferType((Temporalio.Api.StreamService.V1.CreateStreamRequest)transferType);
         }
 
     }
@@ -301,32 +412,26 @@ namespace Nexgen.StreamService
     {
         public StreamRef? Stream { get; init; }
         public bool? Created { get; init; }
-        public StreamStatus? Status { get; init; }
 
-        internal static CreateStreamResult FromTransferType(StreamSample.V1.CreateStreamResponse wire)
+        internal static CreateStreamResult FromTransferType(Temporalio.Api.StreamService.V1.CreateStreamResponse wire)
         {
             return new CreateStreamResult()
             {
                 Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
                 Created = wire.Created == false ? null : wire.Created,
-                Status = (int)wire.Status == 0 ? null : (StreamStatus)wire.Status,
             };
         }
 
-        internal StreamSample.V1.CreateStreamResponse ToTransferType()
+        internal Temporalio.Api.StreamService.V1.CreateStreamResponse ToTransferType()
         {
-            var proto = new StreamSample.V1.CreateStreamResponse();
+            var proto = new Temporalio.Api.StreamService.V1.CreateStreamResponse();
             if (Stream is { } stream)
             {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
+                proto.Stream = (Temporalio.Api.Stream.V1.StreamRef)stream.ToTransferType();
             }
             if (Created is { } created)
             {
                 proto.Created = created;
-            }
-            if (Status is { } status)
-            {
-                proto.Status = (StreamSample.V1.StreamStatus)status;
             }
             return proto;
         }
@@ -337,13 +442,13 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.CreateStreamResponse);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.CreateStreamResponse);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamResult)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamResult.FromTransferType((StreamSample.V1.CreateStreamResponse)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamResult.FromTransferType((Temporalio.Api.StreamService.V1.CreateStreamResponse)transferType);
         }
 
     }
@@ -352,23 +457,25 @@ namespace Nexgen.StreamService
     [GeneratedCode("nexgen", null)]
     public record DescribeStreamRequest
     {
-        public StreamRef? Stream { get; init; }
-
-        internal static DescribeStreamRequest FromTransferType(StreamSample.V1.DescribeStreamRequest wire)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DescribeStreamRequest"/> class.
+        /// </summary>
+        public DescribeStreamRequest(StreamRef stream)
         {
-            return new DescribeStreamRequest()
-            {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
-            };
+            Stream = stream;
         }
 
-        internal StreamSample.V1.DescribeStreamRequest ToTransferType()
+        public StreamRef Stream { get; init; }
+
+        internal static DescribeStreamRequest FromTransferType(Temporalio.Api.StreamService.V1.DescribeStreamRequest wire)
         {
-            var proto = new StreamSample.V1.DescribeStreamRequest();
-            if (Stream is { } stream)
-            {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
-            }
+            return new DescribeStreamRequest(StreamRef.FromTransferType(wire.Stream));
+        }
+
+        internal Temporalio.Api.StreamService.V1.DescribeStreamRequest ToTransferType()
+        {
+            var proto = new Temporalio.Api.StreamService.V1.DescribeStreamRequest();
+            proto.Stream = (Temporalio.Api.Stream.V1.StreamRef)Stream.ToTransferType();
             return proto;
         }
 
@@ -378,13 +485,13 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.DescribeStreamRequest);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.DescribeStreamRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((DescribeStreamRequest)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : DescribeStreamRequest.FromTransferType((StreamSample.V1.DescribeStreamRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : DescribeStreamRequest.FromTransferType((Temporalio.Api.StreamService.V1.DescribeStreamRequest)transferType);
         }
 
     }
@@ -393,21 +500,30 @@ namespace Nexgen.StreamService
     [GeneratedCode("nexgen", null)]
     public record DescribeStreamResponse
     {
+        public StreamStatus? Status { get; init; }
+        /// <summary>
+        /// The newest offset, of a Record, a Superseded item or the close. Empty for none.
+        /// </summary>
         public long? LastOffset { get; init; }
         public System.TimeSpan? Retention { get; init; }
 
-        internal static DescribeStreamResponse FromTransferType(StreamSample.V1.DescribeStreamResponse wire)
+        internal static DescribeStreamResponse FromTransferType(Temporalio.Api.StreamService.V1.DescribeStreamResponse wire)
         {
             return new DescribeStreamResponse()
             {
+                Status = (int)wire.Status == 0 ? null : (StreamStatus)wire.Status,
                 LastOffset = wire.LastOffset == 0 ? null : wire.LastOffset,
                 Retention = wire.Retention == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Retention),
             };
         }
 
-        internal StreamSample.V1.DescribeStreamResponse ToTransferType()
+        internal Temporalio.Api.StreamService.V1.DescribeStreamResponse ToTransferType()
         {
-            var proto = new StreamSample.V1.DescribeStreamResponse();
+            var proto = new Temporalio.Api.StreamService.V1.DescribeStreamResponse();
+            if (Status is { } status)
+            {
+                proto.Status = (Temporalio.Api.Enums.V1.StreamStatus)status;
+            }
             if (LastOffset is { } lastOffset)
             {
                 proto.LastOffset = lastOffset;
@@ -425,65 +541,58 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.DescribeStreamResponse);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.DescribeStreamResponse);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((DescribeStreamResponse)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : DescribeStreamResponse.FromTransferType((StreamSample.V1.DescribeStreamResponse)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : DescribeStreamResponse.FromTransferType((Temporalio.Api.StreamService.V1.DescribeStreamResponse)transferType);
         }
 
     }
 
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ReadRecordsRequest.TransferTypeConverter))]
+    /// <summary>
+    /// A Workflow run chain or a Standalone Activity run.
+    /// </summary>
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(Execution.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record ReadRecordsRequest
+    public record Execution
     {
+        public ExecutionType? Type { get; init; }
         /// <summary>
-        /// Initializes a new instance of the <see cref="ReadRecordsRequest"/> class.
+        /// The Workflow id, or the Standalone Activity's id.
         /// </summary>
-        public ReadRecordsRequest(IReadOnlyList<string> topics)
-        {
-            Topics = topics;
-        }
+        public string? BusinessId { get; init; }
+        /// <summary>
+        /// The run chain's first run id, or the Standalone Activity's run id.
+        /// </summary>
+        public string? RunId { get; init; }
 
-        public StreamRef? Stream { get; init; }
-        public long? FromOffset { get; init; }
-        public IReadOnlyList<string> Topics { get; init; }
-        public int? MaxRecords { get; init; }
-        public System.TimeSpan? Wait { get; init; }
-
-        internal static ReadRecordsRequest FromTransferType(StreamSample.V1.ReadRecordsRequest wire)
+        internal static Execution FromTransferType(Temporalio.Api.Common.V1.Execution wire)
         {
-            return new ReadRecordsRequest(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Topics, item => item)))
+            return new Execution()
             {
-                Stream = wire.Stream == null ? null : StreamRef.FromTransferType(wire.Stream),
-                FromOffset = wire.FromOffset == 0 ? null : wire.FromOffset,
-                MaxRecords = wire.MaxRecords == 0 ? null : wire.MaxRecords,
-                Wait = wire.Wait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Wait),
+                Type = (int)wire.Type == 0 ? null : (ExecutionType)wire.Type,
+                BusinessId = string.IsNullOrEmpty(wire.BusinessId) ? null : wire.BusinessId,
+                RunId = string.IsNullOrEmpty(wire.RunId) ? null : wire.RunId,
             };
         }
 
-        internal StreamSample.V1.ReadRecordsRequest ToTransferType()
+        internal Temporalio.Api.Common.V1.Execution ToTransferType()
         {
-            var proto = new StreamSample.V1.ReadRecordsRequest();
-            if (Stream is { } stream)
+            var proto = new Temporalio.Api.Common.V1.Execution();
+            if (Type is { } type)
             {
-                proto.Stream = (StreamSample.V1.StreamRef)stream.ToTransferType();
+                proto.Type = (Temporalio.Api.Enums.V1.ExecutionType)type;
             }
-            if (FromOffset is { } fromOffset)
+            if (BusinessId is { } businessId)
             {
-                proto.FromOffset = fromOffset;
+                proto.BusinessId = businessId;
             }
-            proto.Topics.Add(System.Linq.Enumerable.Select(Topics, item => item));
-            if (MaxRecords is { } maxRecords)
+            if (RunId is { } runId)
             {
-                proto.MaxRecords = maxRecords;
-            }
-            if (Wait is { } wait)
-            {
-                proto.Wait = wait.ToProto();
+                proto.RunId = runId;
             }
             return proto;
         }
@@ -494,13 +603,279 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.ReadRecordsRequest);
+            public System.Type TransferType => typeof(Temporalio.Api.Common.V1.Execution);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((Execution)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : Execution.FromTransferType((Temporalio.Api.Common.V1.Execution)transferType);
+        }
+
+    }
+
+    /// <summary>
+    /// The Producer of a batch.
+    /// </summary>
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(Producer.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record Producer
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Producer"/> class.
+        /// </summary>
+        public Producer(string id)
+        {
+            Id = id;
+        }
+
+        /// <summary>
+        /// Stable across attempts. The proposal gives the form per kind.
+        /// </summary>
+        public string Id { get; init; }
+        public StreamProducerKind? Kind { get; init; }
+        public ProducerEpoch? Epoch { get; init; }
+        /// <summary>
+        /// The run of the Producer, so nobody parses the id. Empty for a client.
+        /// </summary>
+        public string? RunId { get; init; }
+
+        internal static Producer FromTransferType(Temporalio.Api.Stream.V1.Producer wire)
+        {
+            return new Producer(wire.Id)
+            {
+                Kind = (int)wire.Kind == 0 ? null : (StreamProducerKind)wire.Kind,
+                Epoch = wire.Epoch == null ? null : ProducerEpoch.FromTransferType(wire.Epoch),
+                RunId = string.IsNullOrEmpty(wire.RunId) ? null : wire.RunId,
+            };
+        }
+
+        internal Temporalio.Api.Stream.V1.Producer ToTransferType()
+        {
+            var proto = new Temporalio.Api.Stream.V1.Producer();
+            proto.Id = Id;
+            if (Kind is { } kind)
+            {
+                proto.Kind = (Temporalio.Api.Enums.V1.StreamProducerKind)kind;
+            }
+            if (Epoch is { } epoch)
+            {
+                proto.Epoch = (Temporalio.Api.Stream.V1.ProducerEpoch)epoch.ToTransferType();
+            }
+            if (RunId is { } runId)
+            {
+                proto.RunId = runId;
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.Producer);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((Producer)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : Producer.FromTransferType((Temporalio.Api.Stream.V1.Producer)transferType);
+        }
+
+    }
+
+    /// <summary>
+    /// The ordered attempt of a Producer. A higher epoch supersedes a lower one.
+    /// </summary>
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ProducerEpoch.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record ProducerEpoch
+    {
+        /// <summary>
+        /// The started event id of the Workflow Task.
+        /// </summary>
+        public long? TaskStartedEventId { get; init; }
+        /// <summary>
+        /// The attempt of the Workflow Task.
+        /// </summary>
+        public int? TaskAttempt { get; init; }
+        /// <summary>
+        /// When the Workflow Task attempt started. It tells a reused started id apart.
+        /// </summary>
+        public Timestamp? TaskStartedTime { get; init; }
+        /// <summary>
+        /// When the server scheduled this Activity attempt. A reset makes it later.
+        /// </summary>
+        public Timestamp? AttemptScheduledTime { get; init; }
+        /// <summary>
+        /// The Activity, Local Activity or client attempt.
+        /// </summary>
+        public int? Attempt { get; init; }
+
+        internal static ProducerEpoch FromTransferType(Temporalio.Api.Stream.V1.ProducerEpoch wire)
+        {
+            return new ProducerEpoch()
+            {
+                TaskStartedEventId = wire.TaskStartedEventId == 0 ? null : wire.TaskStartedEventId,
+                TaskAttempt = wire.TaskAttempt == 0 ? null : wire.TaskAttempt,
+                TaskStartedTime = wire.TaskStartedTime == null ? null : Timestamp.FromTransferType(wire.TaskStartedTime),
+                AttemptScheduledTime = wire.AttemptScheduledTime == null ? null : Timestamp.FromTransferType(wire.AttemptScheduledTime),
+                Attempt = wire.Attempt == 0 ? null : wire.Attempt,
+            };
+        }
+
+        internal Temporalio.Api.Stream.V1.ProducerEpoch ToTransferType()
+        {
+            var proto = new Temporalio.Api.Stream.V1.ProducerEpoch();
+            if (TaskStartedEventId is { } taskStartedEventId)
+            {
+                proto.TaskStartedEventId = taskStartedEventId;
+            }
+            if (TaskAttempt is { } taskAttempt)
+            {
+                proto.TaskAttempt = taskAttempt;
+            }
+            if (TaskStartedTime is { } taskStartedTime)
+            {
+                proto.TaskStartedTime = (Google.Protobuf.WellKnownTypes.Timestamp)taskStartedTime.ToTransferType();
+            }
+            if (AttemptScheduledTime is { } attemptScheduledTime)
+            {
+                proto.AttemptScheduledTime = (Google.Protobuf.WellKnownTypes.Timestamp)attemptScheduledTime.ToTransferType();
+            }
+            if (Attempt is { } attempt)
+            {
+                proto.Attempt = attempt;
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.ProducerEpoch);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((ProducerEpoch)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : ProducerEpoch.FromTransferType((Temporalio.Api.Stream.V1.ProducerEpoch)transferType);
+        }
+
+    }
+
+    /// <summary>
+    /// Read Records from an offset.
+    /// </summary>
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ReadRecordsRequest.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record ReadRecordsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReadRecordsRequest"/> class.
+        /// </summary>
+        public ReadRecordsRequest(StreamRef stream)
+        {
+            Stream = stream;
+        }
+
+        public StreamRef Stream { get; init; }
+        /// <summary>
+        /// Start offset. Empty uses start. OUT_OF_RANGE past the newest offset + 1.
+        /// </summary>
+        public long? FromOffset { get; init; }
+        /// <summary>
+        /// Where to start when from-offset is empty. Unspecified is the beginning.
+        /// </summary>
+        public StreamReadStart? Start { get; init; }
+        /// <summary>
+        /// About this many items per page, 1 to 1000. A Superseded item stays with its Record.
+        /// </summary>
+        public int? MaxRecords { get; init; }
+        /// <summary>
+        /// How long to wait for a new Record before an empty answer. At most 60 s.
+        /// </summary>
+        public System.TimeSpan? Wait { get; init; }
+        /// <summary>
+        /// How long to wait for an uncreated Stream. Empty fails at once. At most 60 s.
+        /// </summary>
+        public System.TimeSpan? CreateWait { get; init; }
+        /// <summary>
+        /// Read the newest this many Records, oldest first. No from-offset. No wait.
+        /// </summary>
+        public int? Last { get; init; }
+        /// <summary>
+        /// The maximum Record bytes in a page. A larger Record is still returned alone.
+        /// </summary>
+        public long? MaxBytes { get; init; }
+
+        internal static ReadRecordsRequest FromTransferType(Temporalio.Api.StreamService.V1.ReadRecordsRequest wire)
+        {
+            return new ReadRecordsRequest(StreamRef.FromTransferType(wire.Stream))
+            {
+                FromOffset = wire.FromOffset == 0 ? null : wire.FromOffset,
+                Start = (int)wire.Start == 0 ? null : (StreamReadStart)wire.Start,
+                MaxRecords = wire.MaxRecords == 0 ? null : wire.MaxRecords,
+                Wait = wire.Wait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Wait),
+                CreateWait = wire.CreateWait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.CreateWait),
+                Last = wire.Last == 0 ? null : wire.Last,
+                MaxBytes = wire.MaxBytes == 0 ? null : wire.MaxBytes,
+            };
+        }
+
+        internal Temporalio.Api.StreamService.V1.ReadRecordsRequest ToTransferType()
+        {
+            var proto = new Temporalio.Api.StreamService.V1.ReadRecordsRequest();
+            proto.Stream = (Temporalio.Api.Stream.V1.StreamRef)Stream.ToTransferType();
+            if (FromOffset is { } fromOffset)
+            {
+                proto.FromOffset = fromOffset;
+            }
+            if (Start is { } start)
+            {
+                proto.Start = (Temporalio.Api.Enums.V1.StreamReadStart)start;
+            }
+            if (MaxRecords is { } maxRecords)
+            {
+                proto.MaxRecords = maxRecords;
+            }
+            if (Wait is { } wait)
+            {
+                proto.Wait = wait.ToProto();
+            }
+            if (CreateWait is { } createWait)
+            {
+                proto.CreateWait = createWait.ToProto();
+            }
+            if (Last is { } last)
+            {
+                proto.Last = last;
+            }
+            if (MaxBytes is { } maxBytes)
+            {
+                proto.MaxBytes = maxBytes;
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.ReadRecordsRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((ReadRecordsRequest)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : ReadRecordsRequest.FromTransferType((StreamSample.V1.ReadRecordsRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : ReadRecordsRequest.FromTransferType((Temporalio.Api.StreamService.V1.ReadRecordsRequest)transferType);
         }
 
     }
@@ -518,10 +893,16 @@ namespace Nexgen.StreamService
         }
 
         public IReadOnlyList<StreamRecord> Records { get; init; }
+        /// <summary>
+        /// The from-offset of the next read, which is the newest offset read + 1.
+        /// </summary>
         public long? NextOffset { get; init; }
+        /// <summary>
+        /// True after the close Record. No later read gives a Record.
+        /// </summary>
         public bool? Done { get; init; }
 
-        internal static ReadRecordsResponse FromTransferType(StreamSample.V1.ReadRecordsResponse wire)
+        internal static ReadRecordsResponse FromTransferType(Temporalio.Api.StreamService.V1.ReadRecordsResponse wire)
         {
             return new ReadRecordsResponse(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => StreamRecord.FromTransferType(item))))
             {
@@ -530,10 +911,10 @@ namespace Nexgen.StreamService
             };
         }
 
-        internal StreamSample.V1.ReadRecordsResponse ToTransferType()
+        internal Temporalio.Api.StreamService.V1.ReadRecordsResponse ToTransferType()
         {
-            var proto = new StreamSample.V1.ReadRecordsResponse();
-            proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (StreamSample.V1.StreamRecord)item.ToTransferType()));
+            var proto = new Temporalio.Api.StreamService.V1.ReadRecordsResponse();
+            proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (Temporalio.Api.Stream.V1.StreamRecord)item.ToTransferType()));
             if (NextOffset is { } nextOffset)
             {
                 proto.NextOffset = nextOffset;
@@ -551,49 +932,74 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.ReadRecordsResponse);
+            public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.ReadRecordsResponse);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((ReadRecordsResponse)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : ReadRecordsResponse.FromTransferType((StreamSample.V1.ReadRecordsResponse)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : ReadRecordsResponse.FromTransferType((Temporalio.Api.StreamService.V1.ReadRecordsResponse)transferType);
         }
 
     }
 
+    /// <summary>
+    /// One item that a read gives.
+    /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(StreamRecord.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
     public record StreamRecord
     {
+        public StreamItem? Item { get; init; }
+        /// <summary>
+        /// The place of this item in the Stream. Ordered and unique, with gaps.
+        /// </summary>
         public long? Offset { get; init; }
-        public string? Topic { get; init; }
-        public object? Body { get; init; }
 
-        internal static StreamRecord FromTransferType(StreamSample.V1.StreamRecord wire)
+        internal static StreamRecord FromTransferType(Temporalio.Api.Stream.V1.StreamRecord wire)
         {
+            StreamItem? itemOneof;
+            switch (wire.ItemCase)
+            {
+                case Temporalio.Api.Stream.V1.StreamRecord.ItemOneofCase.Data:
+                    itemOneof = new StreamItem.Data(wire.Data);
+                    break;
+                case Temporalio.Api.Stream.V1.StreamRecord.ItemOneofCase.Superseded:
+                    itemOneof = new StreamItem.Superseded(wire.Superseded);
+                    break;
+                case Temporalio.Api.Stream.V1.StreamRecord.ItemOneofCase.Close:
+                    itemOneof = new StreamItem.Close(wire.Close);
+                    break;
+                default:
+                    itemOneof = null;
+                    break;
+            }
+
             return new StreamRecord()
             {
+                Item = itemOneof,
                 Offset = wire.Offset == 0 ? null : wire.Offset,
-                Topic = string.IsNullOrEmpty(wire.Topic) ? null : wire.Topic,
-                Body = wire.Body == null ? null : Nexgen.Support.ProtoExtensions.FromPayload(wire.Body),
             };
         }
 
-        internal StreamSample.V1.StreamRecord ToTransferType()
+        internal Temporalio.Api.Stream.V1.StreamRecord ToTransferType()
         {
-            var proto = new StreamSample.V1.StreamRecord();
+            var proto = new Temporalio.Api.Stream.V1.StreamRecord();
+            switch (Item)
+            {
+                case StreamItem.Data dataCase:
+                    proto.Data = dataCase.Value;
+                    break;
+                case StreamItem.Superseded supersededCase:
+                    proto.Superseded = supersededCase.Value;
+                    break;
+                case StreamItem.Close closeCase:
+                    proto.Close = closeCase.Value;
+                    break;
+            }
             if (Offset is { } offset)
             {
                 proto.Offset = offset;
-            }
-            if (Topic is { } topic)
-            {
-                proto.Topic = topic;
-            }
-            if (Body is { } body)
-            {
-                proto.Body = Nexgen.Support.ProtoExtensions.ToPayload(body);
             }
             return proto;
         }
@@ -604,19 +1010,19 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.StreamRecord);
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.StreamRecord);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((StreamRecord)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : StreamRecord.FromTransferType((StreamSample.V1.StreamRecord)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : StreamRecord.FromTransferType((Temporalio.Api.Stream.V1.StreamRecord)transferType);
         }
 
     }
 
     /// <summary>
-    /// Identifies one stream.
+    /// Identifies one Stream. The id is opaque to callers.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(StreamRef.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -630,24 +1036,39 @@ namespace Nexgen.StreamService
             Id = id;
         }
 
+        /// <summary>
+        /// The Stream id, 1 to 4096 bytes.
+        /// </summary>
         public string Id { get; init; }
-        public string? WorkflowId { get; init; }
+        /// <summary>
+        /// The owning Workflow run chain or Standalone Activity. Empty on a client ref.
+        /// </summary>
+        public Execution? Owner { get; init; }
+        /// <summary>
+        /// Registered backend name, empty for the default. The Store never reads it.
+        /// </summary>
+        public string? Backend { get; init; }
 
-        internal static StreamRef FromTransferType(StreamSample.V1.StreamRef wire)
+        internal static StreamRef FromTransferType(Temporalio.Api.Stream.V1.StreamRef wire)
         {
             return new StreamRef(wire.Id)
             {
-                WorkflowId = string.IsNullOrEmpty(wire.WorkflowId) ? null : wire.WorkflowId,
+                Owner = wire.Owner == null ? null : Execution.FromTransferType(wire.Owner),
+                Backend = string.IsNullOrEmpty(wire.Backend) ? null : wire.Backend,
             };
         }
 
-        internal StreamSample.V1.StreamRef ToTransferType()
+        internal Temporalio.Api.Stream.V1.StreamRef ToTransferType()
         {
-            var proto = new StreamSample.V1.StreamRef();
+            var proto = new Temporalio.Api.Stream.V1.StreamRef();
             proto.Id = Id;
-            if (WorkflowId is { } workflowId)
+            if (Owner is { } owner)
             {
-                proto.WorkflowId = workflowId;
+                proto.Owner = (Temporalio.Api.Common.V1.Execution)owner.ToTransferType();
+            }
+            if (Backend is { } backend)
+            {
+                proto.Backend = backend;
             }
             return proto;
         }
@@ -658,13 +1079,60 @@ namespace Nexgen.StreamService
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(StreamSample.V1.StreamRef);
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.StreamRef);
 
             /// <summary>Converts a model value to its transfer type.</summary>
             public object? ToTransferType(object? value) => value is null ? null : ((StreamRef)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : StreamRef.FromTransferType((StreamSample.V1.StreamRef)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : StreamRef.FromTransferType((Temporalio.Api.Stream.V1.StreamRef)transferType);
+        }
+
+    }
+
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(Timestamp.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record Timestamp
+    {
+        public long? Seconds { get; init; }
+        public int? Nanos { get; init; }
+
+        internal static Timestamp FromTransferType(Google.Protobuf.WellKnownTypes.Timestamp wire)
+        {
+            return new Timestamp()
+            {
+                Seconds = wire.Seconds == 0 ? null : wire.Seconds,
+                Nanos = wire.Nanos == 0 ? null : wire.Nanos,
+            };
+        }
+
+        internal Google.Protobuf.WellKnownTypes.Timestamp ToTransferType()
+        {
+            var proto = new Google.Protobuf.WellKnownTypes.Timestamp();
+            if (Seconds is { } seconds)
+            {
+                proto.Seconds = seconds;
+            }
+            if (Nanos is { } nanos)
+            {
+                proto.Nanos = nanos;
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Google.Protobuf.WellKnownTypes.Timestamp);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((Timestamp)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : Timestamp.FromTransferType((Google.Protobuf.WellKnownTypes.Timestamp)transferType);
         }
 
     }

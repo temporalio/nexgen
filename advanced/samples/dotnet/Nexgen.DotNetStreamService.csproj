@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>Nexgen.DotNetStreamService</AssemblyName>
+    <!-- Build the XML documentation so that the compiler checks every generated cref. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Generated code does not document every public member. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- A cref that does not resolve gives a broken link in the generated documentation. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS1574;CS1580;CS1584;CS1658</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The generated interceptor partial requires matching SDK changes. -->
+    <Compile Include="wit/stream-service/**/*.cs"
+             Exclude="wit/stream-service/SystemNexusWorkflowOutboundInterceptor.cs" />
+    <Compile Include="proto/streams/**/*.cs" />
+    <Compile Include="TemporalSupport/TemporalSupport.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.26.1" />
+    <PackageReference Include="NexusRpc" Version="0.4.0" />
+    <PackageReference Include="Temporalio" Version="1.20.0" />
+  </ItemGroup>
+</Project>
