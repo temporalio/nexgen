@@ -35,6 +35,7 @@ type notifyRequest struct {
 	Channels []string
 	Sender   string
 	Attempt  *int64
+	Email    *bool
 }
 
 func (m notifyRequest) GetUserID() string {
@@ -55,6 +56,10 @@ func (m notifyRequest) GetSender() string {
 
 func (m notifyRequest) GetAttempt() *int64 {
 	return m.Attempt
+}
+
+func (m notifyRequest) GetEmail() *bool {
+	return m.Email
 }
 
 type updateProfileRequest struct {
@@ -117,7 +122,7 @@ func (u *User) Notify(ctx workflow.Context, reason string, channels []string, se
 	if attempt != 0 {
 		attemptPtr = &attempt
 	}
-	return notify(ctx, notifyRequest{UserID: u.UserID, Reason: reasonPtr, Channels: channels, Sender: sender, Attempt: attemptPtr})
+	return notify(ctx, notifyRequest{UserID: u.UserID, Reason: reasonPtr, Channels: channels, Sender: sender, Attempt: attemptPtr, Email: u.Email})
 }
 
 // --- Operations (internal) ---
@@ -199,6 +204,8 @@ type NotifyOptions struct {
 	Sender string
 	// Attempt - Optional.
 	Attempt int64
+	// Email - Optional.
+	Email bool
 }
 
 func Notify(ctx workflow.Context, opts NotifyOptions) workflow.Future {
@@ -210,12 +217,17 @@ func Notify(ctx workflow.Context, opts NotifyOptions) workflow.Future {
 	if opts.Attempt != 0 {
 		attempt = &opts.Attempt
 	}
+	var email *bool
+	if opts.Email != false {
+		email = &opts.Email
+	}
 	return notify(ctx, notifyRequest{
 		UserID:   opts.UserID,
 		Reason:   reason,
 		Channels: opts.Channels,
 		Sender:   opts.Sender,
 		Attempt:  attempt,
+		Email:    email,
 	})
 }
 

@@ -83,6 +83,7 @@ namespace Nexgen.UserService
         public IReadOnlyList<string> Channels { get; set; }
         public string Sender { get; set; }
         public long? Attempt { get; set; }
+        public bool? Email { get; set; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -165,6 +166,7 @@ namespace Nexgen.UserService
             {
                 Reason = options.Reason,
                 Attempt = options.Attempt,
+                Email = options.Email,
             };
             return NotifyAsync(request);
         }

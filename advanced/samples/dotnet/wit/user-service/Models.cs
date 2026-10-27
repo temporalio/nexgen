@@ -63,6 +63,7 @@ namespace Nexgen.UserService
         public IReadOnlyList<string> Channels { get; init; }
         public string Sender { get; init; }
         public long? Attempt { get; init; }
+        public bool? Email { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]

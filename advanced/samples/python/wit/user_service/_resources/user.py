@@ -50,6 +50,7 @@ class User:
             channels=channels or [],
             sender=sender,
             attempt=attempt,
+            email=self.email,
         )
         nexus_client = getattr(self, "_nexus_client")
         handle = await nexus_client.start_operation(

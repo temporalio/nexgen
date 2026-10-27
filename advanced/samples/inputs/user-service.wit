@@ -35,6 +35,8 @@ interface user-service {
     sender: string,
     // A plain record holds a 64-bit integer as a number, so the resource method takes a number.
     attempt: option<s64>,
+    // The user's own email has the same name and another type, so it must not fill this field.
+    email: option<bool>,
   }
 
   // The client flattens both records. One has a required field, and the other has only optional

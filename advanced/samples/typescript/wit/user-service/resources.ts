@@ -35,6 +35,7 @@ export class User {
       channels: channels,
       sender: sender,
       attempt: attempt,
+      email: this.email,
     };
     const handle = await requireUserClient(this).startOperation(
       userService.operations.notify,

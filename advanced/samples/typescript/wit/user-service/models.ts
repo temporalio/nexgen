@@ -15,6 +15,7 @@ export interface NotifyRequest {
   channels?: string[];
   sender: string;
   attempt?: number;
+  email?: boolean;
 }
 
 export interface UpdateProfileRequest {
