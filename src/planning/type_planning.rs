@@ -520,7 +520,47 @@ impl<'a> TypePlanningContext<'a> {
             planner: self,
         });
         self.resolve_planned_record_field_types(&source_spec, &mut planned_spec);
+        self.resolve_planned_variant_case_types(&source_spec, &mut planned_spec);
         planned_spec
+    }
+
+    // `map_names` keeps a oneof case payload as its proto message. Re-plan it as the bound record.
+    fn resolve_planned_variant_case_types(
+        &mut self,
+        source_spec: &ApiSpec<OperationLoweredFamily>,
+        planned_spec: &mut PlannedSpec,
+    ) {
+        for (variant_name, planned_entry) in &mut planned_spec.types {
+            let TypeDeclSpec::Variant(planned_variant) = &mut planned_entry.declaration else {
+                continue;
+            };
+            let Some(source_variant) = source_spec.variant(variant_name).filter(|variant| {
+                variant
+                    .source
+                    .as_ref()
+                    .is_some_and(|source| source.proto_oneof().is_some())
+            }) else {
+                continue;
+            };
+            for (case, source_case) in planned_variant.cases.iter_mut().zip(&source_variant.cases) {
+                let Some(payload) = source_case.payload.as_ref() else {
+                    continue;
+                };
+                let TypeSpec::External(ExternalTypeSpec::Proto(proto_name)) =
+                    payload.without_option()
+                else {
+                    continue;
+                };
+                if self.spec.record_for_proto(proto_name.as_str()).is_none() {
+                    continue;
+                }
+                let record = self.planned_type_from_authored(payload);
+                case.payload = Some(match payload {
+                    TypeSpec::Option(_) => TypeSpec::Option(Box::new(record)),
+                    _ => record,
+                });
+            }
+        }
     }
 
     fn resolve_planned_record_field_types(

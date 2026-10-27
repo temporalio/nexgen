@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
@@ -143,7 +143,7 @@ impl<'a> ApiPlanner<'a> {
             render_flags(&mut output, flag_set);
         }
         for variant in self.api_plan.variants().map(|(_, variant)| variant) {
-            self.render_variant(&mut output, variant);
+            self.render_variant(&mut output, variant, namespace);
         }
         for model in models {
             self.render_model(&mut output, model);
@@ -628,7 +628,7 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
-    fn render_variant(&self, output: &mut String, variant: &PlannedVariant) {
+    fn render_variant(&self, output: &mut String, variant: &PlannedVariant, namespace: &str) {
         let type_parameters = self.api_plan.variant_type_parameters(&variant.full_name);
         let type_arguments = type_parameters
             .iter()
@@ -649,6 +649,11 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    private ");
         output.push_str(&csharp_type_name(&variant.name));
         output.push_str("() { }\n\n");
+        let case_names = variant
+            .cases
+            .iter()
+            .map(|case| csharp_type_name(&case.name))
+            .collect::<BTreeSet<_>>();
         for (index, case) in variant.cases.iter().enumerate() {
             let case_name = csharp_type_name(&case.name);
             render_xml_summary(output, "    ", case.doc.value(), variant.experimental);
@@ -658,7 +663,12 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("    public sealed record ");
             output.push_str(&case_name);
             if let Some(payload) = &case.payload {
-                let payload_type = self.dotnet_value_type(payload);
+                // Inside the variant, a case record hides the model of the same name.
+                let payload_type = qualify_csharp_type_names(
+                    &self.dotnet_value_type(payload),
+                    &case_names,
+                    namespace,
+                );
                 output.push('(');
                 output.push_str(&payload_type);
                 output.push_str(" Value) : ");
@@ -2706,6 +2716,30 @@ fn dotnet_source_expr(source_expr: &str, support_namespace: Option<&str>) -> Str
     )
 }
 
+/// Writes each bare type name of `type_expr` that is in `names` as `global::<namespace>.<name>`.
+fn qualify_csharp_type_names(type_expr: &str, names: &BTreeSet<String>, namespace: &str) -> String {
+    let mut output = String::with_capacity(type_expr.len());
+    let mut rest = type_expr;
+    while let Some(start) = rest.find(|c: char| c.is_ascii_alphabetic() || c == '_' || c == '@') {
+        let (before, from_start) = rest.split_at(start);
+        output.push_str(before);
+        let end = from_start
+            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '@'))
+            .unwrap_or(from_start.len());
+        let (ident, after) = from_start.split_at(end);
+        let qualified = output.ends_with('.') || output.ends_with("::");
+        if !qualified && names.contains(ident) {
+            output.push_str("global::");
+            output.push_str(namespace);
+            output.push('.');
+        }
+        output.push_str(ident);
+        rest = after;
+    }
+    output.push_str(rest);
+    output
+}
+
 fn generated_file_prelude(namespace: &str, imports: &[&str]) -> String {
     let mut output = String::new();
     output.push_str(GENERATED_HEADER);
@@ -4453,7 +4487,27 @@ const CSHARP_KEYWORDS: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::{csharp_type_parameter_name, dotnet_source_expr};
+    use std::collections::BTreeSet;
+
+    use super::{csharp_type_parameter_name, dotnet_source_expr, qualify_csharp_type_names};
+
+    #[test]
+    fn a_case_payload_names_a_model_of_a_case_name_in_full() {
+        let cases = BTreeSet::from(["Superseded".to_string()]);
+        let qualify =
+            |type_expr| qualify_csharp_type_names(type_expr, &cases, "Temporalio.Workflows");
+
+        assert_eq!(
+            qualify("Superseded"),
+            "global::Temporalio.Workflows.Superseded"
+        );
+        assert_eq!(
+            qualify("IReadOnlyList<Superseded>?"),
+            "IReadOnlyList<global::Temporalio.Workflows.Superseded>?"
+        );
+        assert_eq!(qualify("Proto.Superseded"), "Proto.Superseded");
+        assert_eq!(qualify("StreamClose"), "StreamClose");
+    }
 
     #[test]
     fn sourced_helper_is_qualified_without_changing_its_arguments() {
