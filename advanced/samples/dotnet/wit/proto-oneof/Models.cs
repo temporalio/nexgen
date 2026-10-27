@@ -28,10 +28,10 @@ namespace Nexgen.ProtoOneof
         private EndpointTargetVariant() { }
 
         [GeneratedCode("nexgen", null)]
-        public sealed record Worker(Temporalio.Api.Nexus.V1.EndpointTarget.Types.Worker Value) : EndpointTargetVariant;
+        public sealed record Worker(global::Nexgen.ProtoOneof.Worker Value) : EndpointTargetVariant;
 
         [GeneratedCode("nexgen", null)]
-        public sealed record External(Temporalio.Api.Nexus.V1.EndpointTarget.Types.External Value) : EndpointTargetVariant;
+        public sealed record External(EndpointExternalTarget Value) : EndpointTargetVariant;
     }
 
     [GeneratedCode("nexgen", null)]
@@ -101,10 +101,10 @@ namespace Nexgen.ProtoOneof
             switch (wire.VariantCase)
             {
                 case Temporalio.Api.Nexus.V1.EndpointTarget.VariantOneofCase.Worker:
-                    variantOneof = new EndpointTargetVariant.Worker(wire.Worker);
+                    variantOneof = new EndpointTargetVariant.Worker(Worker.FromTransferType(wire.Worker));
                     break;
                 case Temporalio.Api.Nexus.V1.EndpointTarget.VariantOneofCase.External:
-                    variantOneof = new EndpointTargetVariant.External(wire.External);
+                    variantOneof = new EndpointTargetVariant.External(EndpointExternalTarget.FromTransferType(wire.External));
                     break;
                 default:
                     variantOneof = null;
@@ -123,10 +123,10 @@ namespace Nexgen.ProtoOneof
             switch (Variant)
             {
                 case EndpointTargetVariant.Worker workerCase:
-                    proto.Worker = workerCase.Value;
+                    proto.Worker = (Temporalio.Api.Nexus.V1.EndpointTarget.Types.Worker)workerCase.Value.ToTransferType();
                     break;
                 case EndpointTargetVariant.External externalCase:
-                    proto.External = externalCase.Value;
+                    proto.External = (Temporalio.Api.Nexus.V1.EndpointTarget.Types.External)externalCase.Value.ToTransferType();
                     break;
             }
             return proto;

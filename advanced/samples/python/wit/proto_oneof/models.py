@@ -6,6 +6,7 @@ import dataclasses
 import typing
 import typing_extensions
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.nexus.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
 import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.converter
@@ -14,6 +15,165 @@ import temporal_support as _support
 
 
 OutputT = typing.TypeVar("OutputT")
+
+
+@dataclasses.dataclass(slots=True)
+class EndpointExternalTarget:
+    url: str
+
+
+class _EndpointExternalTargetTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        EndpointExternalTarget,
+        temporalio.api.nexus.v1.message_pb2.EndpointTarget.External,
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.nexus.v1.message_pb2.EndpointTarget.External] | None
+    ) = temporalio.api.nexus.v1.message_pb2.EndpointTarget.External
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.nexus.v1.message_pb2.EndpointTarget.External,
+        type_hint: type[EndpointExternalTarget],
+    ) -> EndpointExternalTarget:
+        if not value.url:
+            raise ValueError("missing required field EndpointExternalTarget.url")
+        url = value.url
+        return EndpointExternalTarget(
+            url=url,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: EndpointExternalTarget,
+    ) -> temporalio.api.nexus.v1.message_pb2.EndpointTarget.External:
+        message = temporalio.api.nexus.v1.message_pb2.EndpointTarget.External()
+        message.url = value.url
+        return message
+
+
+temporalio.converter.transfer_type_convertible(
+    _EndpointExternalTargetTransferTypeConverter
+)(EndpointExternalTarget)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class EndpointTarget:
+    variant: EndpointTargetVariant | None = None
+
+
+class _EndpointTargetTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        EndpointTarget, temporalio.api.nexus.v1.message_pb2.EndpointTarget
+    ]
+):
+    transfer_type: type[temporalio.api.nexus.v1.message_pb2.EndpointTarget] | None = (
+        temporalio.api.nexus.v1.message_pb2.EndpointTarget
+    )
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.nexus.v1.message_pb2.EndpointTarget,
+        type_hint: type[EndpointTarget],
+    ) -> EndpointTarget:
+        _oneof_variant: (
+            EndpointTargetVariantWorker | EndpointTargetVariantExternal | None
+        )
+        match value.WhichOneof("variant"):
+            case "worker":
+                _oneof_variant = EndpointTargetVariantWorker(
+                    _WorkerTransferTypeConverter().from_transfer_type(
+                        value.worker, Worker
+                    )
+                )
+            case "external":
+                _oneof_variant = EndpointTargetVariantExternal(
+                    _EndpointExternalTargetTransferTypeConverter().from_transfer_type(
+                        value.external, EndpointExternalTarget
+                    )
+                )
+            case None:
+                _oneof_variant = None
+        return EndpointTarget(
+            variant=_oneof_variant,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: EndpointTarget,
+    ) -> temporalio.api.nexus.v1.message_pb2.EndpointTarget:
+        message = temporalio.api.nexus.v1.message_pb2.EndpointTarget()
+        if value.variant is not None:
+            match value.variant:
+                case EndpointTargetVariantWorker():
+                    message.worker.CopyFrom(
+                        _WorkerTransferTypeConverter().to_transfer_type(
+                            value.variant.value
+                        )
+                    )
+                case EndpointTargetVariantExternal():
+                    message.external.CopyFrom(
+                        _EndpointExternalTargetTransferTypeConverter().to_transfer_type(
+                            value.variant.value
+                        )
+                    )
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_EndpointTargetTransferTypeConverter)(
+    EndpointTarget
+)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class Worker:
+    namespace: str
+    task_queue: str
+
+
+class _WorkerTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        Worker, temporalio.api.nexus.v1.message_pb2.EndpointTarget.Worker
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.nexus.v1.message_pb2.EndpointTarget.Worker] | None
+    ) = temporalio.api.nexus.v1.message_pb2.EndpointTarget.Worker
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.nexus.v1.message_pb2.EndpointTarget.Worker,
+        type_hint: type[Worker],
+    ) -> Worker:
+        if not value.namespace:
+            raise ValueError("missing required field Worker.namespace")
+        namespace = value.namespace
+        if not value.task_queue:
+            raise ValueError("missing required field Worker.task_queue")
+        task_queue = value.task_queue
+        return Worker(
+            namespace=namespace,
+            task_queue=task_queue,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: Worker,
+    ) -> temporalio.api.nexus.v1.message_pb2.EndpointTarget.Worker:
+        message = temporalio.api.nexus.v1.message_pb2.EndpointTarget.Worker()
+        message.namespace = value.namespace
+        message.task_queue = value.task_queue
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_WorkerTransferTypeConverter)(Worker)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -225,6 +385,19 @@ class _WorkflowExecutionTransferTypeConverter(
 temporalio.converter.transfer_type_convertible(_WorkflowExecutionTransferTypeConverter)(
     WorkflowExecution
 )  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
+class EndpointTargetVariantWorker:
+    value: Worker
+
+
+@dataclasses.dataclass(slots=True)
+class EndpointTargetVariantExternal:
+    value: EndpointExternalTarget
+
+
+EndpointTargetVariant = EndpointTargetVariantWorker | EndpointTargetVariantExternal
 
 
 @dataclasses.dataclass(slots=True)

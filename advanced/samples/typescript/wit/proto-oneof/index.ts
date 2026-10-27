@@ -2,11 +2,18 @@
 
 export type {
   ActivitySelection,
+  EndpointExternalTarget,
+  EndpointTarget,
+  EndpointTargetVariant,
   Outcome,
   OutcomeValue,
   PauseActivityRequest,
+  Worker,
   WorkflowExecution,
 } from "./models";
+export { endpointExternalTargetTransferTypeConverter } from "./models";
+export { endpointTargetTransferTypeConverter } from "./models";
+export { workerTransferTypeConverter } from "./models";
 export { outcomeTransferTypeConverter } from "./models";
 export { pauseActivityRequestTransferTypeConverter } from "./models";
 export { workflowExecutionTransferTypeConverter } from "./models";

@@ -13,12 +13,18 @@ from temporalio.converter import DataConverter, PayloadConverter
 import temporalio.nexus.system
 
 from wit.proto_oneof import (
+    EndpointExternalTarget,
+    EndpointTarget,
+    EndpointTargetVariantExternal,
+    EndpointTargetVariantWorker,
     Outcome,
     OutcomeValueFailure,
     OutcomeValueSuccess,
     PauseActivityRequest,
+    Worker,
 )
 from wit.proto_oneof.models import (
+    _EndpointTargetTransferTypeConverter,
     _OutcomeTransferTypeConverter,
     _PauseActivityRequestTransferTypeConverter,
 )
@@ -147,3 +153,31 @@ def test_optional_proto_oneof_round_trips_unset_as_none() -> None:
         request_id="request-id",
     )
     assert converter.from_transfer_type(proto, PauseActivityRequest) == model
+
+
+@pytest.mark.parametrize(
+    ("variant", "case"),
+    [
+        (
+            EndpointTargetVariantWorker(Worker(namespace="ns", task_queue="tq")),
+            "worker",
+        ),
+        (
+            EndpointTargetVariantExternal(
+                EndpointExternalTarget(url="https://example.com")
+            ),
+            "external",
+        ),
+    ],
+)
+def test_proto_oneof_case_round_trips_as_its_record(
+    variant: EndpointTargetVariantWorker | EndpointTargetVariantExternal, case: str
+) -> None:
+    converter = _EndpointTargetTransferTypeConverter()
+    model = EndpointTarget(variant=variant)
+
+    wire = converter.to_transfer_type(model)
+    assert wire.WhichOneof("variant") == case
+
+    # Dataclass equality also compares the classes of the case and of its record.
+    assert converter.from_transfer_type(wire, EndpointTarget) == model

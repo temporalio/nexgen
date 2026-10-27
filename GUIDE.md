@@ -1509,6 +1509,9 @@ record response {
 }
 ```
 
+A case may name a proto-bound record. Its payload is that record's model, which
+converts with the record's own converter.
+
 Python represents a protobuf oneof-backed variant as a union of slotted case
 dataclasses. Each case contains its payload in a `value` field. For example, the
 variant above generates `OutcomeSuccess(value)` and `OutcomeFailure(value)`. The

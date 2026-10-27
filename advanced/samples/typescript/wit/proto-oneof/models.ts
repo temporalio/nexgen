@@ -15,6 +15,10 @@ function requiredField<T>(
   return value;
 }
 
+export type EndpointTargetVariant =
+  | { tag: "worker"; value: Worker }
+  | { tag: "external"; value: EndpointExternalTarget };
+
 export type OutcomeValue<OutputT> =
   | { tag: "success"; value: OutputT }
   | { tag: "failure"; value: Error };
@@ -23,6 +27,146 @@ export type ActivitySelection =
   | { tag: "id"; value: string }
   | { tag: "type"; value: string };
 
+export interface EndpointExternalTarget {
+  url: string;
+}
+
+function endpointExternalTargetFromProto(
+  proto: temporal.api.nexus.v1.EndpointTarget.IExternal,
+): EndpointExternalTarget {
+  return {
+    url: requiredField(
+      proto.url === "" ? undefined : proto.url,
+      "EndpointExternalTarget",
+      "url",
+    ),
+  };
+}
+
+function endpointExternalTargetToProto(
+  model: EndpointExternalTarget,
+): temporal.api.nexus.v1.EndpointTarget.IExternal {
+  return {
+    url: requiredField(model.url, "EndpointExternalTarget", "url"),
+  };
+}
+
+export const endpointExternalTargetTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.nexus.v1.EndpointTarget.IExternal,
+  ): EndpointExternalTarget {
+    return endpointExternalTargetFromProto(value);
+  },
+
+  toTransferType(
+    value: EndpointExternalTarget,
+  ): temporal.api.nexus.v1.EndpointTarget.IExternal {
+    return endpointExternalTargetToProto(value);
+  },
+};
+export interface EndpointTarget {
+  variant?: EndpointTargetVariant;
+}
+
+function endpointTargetFromProto(
+  proto: temporal.api.nexus.v1.IEndpointTarget,
+): EndpointTarget {
+  let result: EndpointTargetVariant | undefined;
+  switch (proto.variant) {
+    case "worker":
+      result = {
+        tag: "worker",
+        value: workerFromProto(requiredField(proto.worker, "EndpointTarget", "worker")),
+      };
+      break;
+    case "external":
+      result = {
+        tag: "external",
+        value: endpointExternalTargetFromProto(
+          requiredField(proto.external, "EndpointTarget", "external"),
+        ),
+      };
+      break;
+    case undefined:
+      result = undefined;
+      break;
+    default:
+      proto.variant satisfies never;
+      throw new Error("invalid oneof discriminator for EndpointTarget.variant");
+  }
+  return {
+    variant: result,
+  };
+}
+
+function endpointTargetToProto(
+  model: EndpointTarget,
+): temporal.api.nexus.v1.IEndpointTarget {
+  const proto: temporal.api.nexus.v1.IEndpointTarget = {};
+  const result = model.variant;
+  if (result != null) {
+    switch (result.tag) {
+      case "worker":
+        proto.variant = "worker";
+        proto.worker = workerToProto(result.value);
+        break;
+      case "external":
+        proto.variant = "external";
+        proto.external = endpointExternalTargetToProto(result.value);
+        break;
+      default:
+        result satisfies never;
+        throw new Error("invalid oneof tag for EndpointTarget.variant");
+    }
+  }
+  return proto;
+}
+
+export const endpointTargetTransferTypeConverter = {
+  fromTransferType(value: temporal.api.nexus.v1.IEndpointTarget): EndpointTarget {
+    return endpointTargetFromProto(value);
+  },
+
+  toTransferType(value: EndpointTarget): temporal.api.nexus.v1.IEndpointTarget {
+    return endpointTargetToProto(value);
+  },
+};
+export interface Worker {
+  namespace: string;
+  taskQueue: string;
+}
+
+function workerFromProto(proto: temporal.api.nexus.v1.EndpointTarget.IWorker): Worker {
+  return {
+    namespace: requiredField(
+      proto.namespace === "" ? undefined : proto.namespace,
+      "Worker",
+      "namespace",
+    ),
+    taskQueue: requiredField(
+      proto.taskQueue === "" ? undefined : proto.taskQueue,
+      "Worker",
+      "taskQueue",
+    ),
+  };
+}
+
+function workerToProto(model: Worker): temporal.api.nexus.v1.EndpointTarget.IWorker {
+  return {
+    namespace: requiredField(model.namespace, "Worker", "namespace"),
+    taskQueue: requiredField(model.taskQueue, "Worker", "taskQueue"),
+  };
+}
+
+export const workerTransferTypeConverter = {
+  fromTransferType(value: temporal.api.nexus.v1.EndpointTarget.IWorker): Worker {
+    return workerFromProto(value);
+  },
+
+  toTransferType(value: Worker): temporal.api.nexus.v1.EndpointTarget.IWorker {
+    return workerToProto(value);
+  },
+};
 export interface Outcome<OutputT> {
   value: OutcomeValue<OutputT>;
 }
