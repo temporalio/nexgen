@@ -40,6 +40,29 @@ interface proto-oneof {
     run-id: string,
   }
 
+  /// @nexus.proto "temporal.api.nexus.v1.EndpointTarget.Worker"
+  record worker {
+    namespace: string,
+    task-queue: string,
+  }
+
+  /// @nexus.proto "temporal.api.nexus.v1.EndpointTarget.External"
+  record endpoint-external-target {
+    url: string,
+  }
+
+  // Each case names a proto-bound record, and one case has its record's name.
+  /// @nexus.proto "temporal.api.nexus.v1.EndpointTarget.variant"
+  variant endpoint-target-variant {
+    worker(worker),
+    external(endpoint-external-target),
+  }
+
+  /// @nexus.proto "temporal.api.nexus.v1.EndpointTarget"
+  record endpoint-target {
+    %variant: option<endpoint-target-variant>,
+  }
+
   /// @nexus.proto "temporal.api.workflowservice.v1.PauseActivityRequest"
   record pause-activity-request {
     namespace: string,
