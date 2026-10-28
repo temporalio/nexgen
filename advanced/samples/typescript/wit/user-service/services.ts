@@ -7,6 +7,7 @@ import type {
   UpdateEmailRequest,
   NotifyRequest,
   UpdateProfileRequest,
+  NotifyAllRequest,
 } from "./models";
 import type { User } from "./resources";
 import { bindUserClient } from "./resources";
@@ -16,6 +17,7 @@ export const userService = nexus.service("UserService", {
   updateEmail: nexus.operation<UpdateEmailRequest, User>({ name: "UpdateEmail" }),
   notify: nexus.operation<NotifyRequest, void>({ name: "Notify" }),
   updateProfile: nexus.operation<UpdateProfileRequest, void>({ name: "UpdateProfile" }),
+  notifyAll: nexus.operation<NotifyAllRequest, void>({ name: "NotifyAll" }),
 });
 
 export class UserServiceClient {
@@ -71,5 +73,14 @@ export class UserServiceClient {
       userService.operations.updateProfile,
       request,
     );
+  }
+
+  /**
+   * @param request - Request for the operation.
+   */
+  public async notifyAll(
+    request: NotifyAllRequest,
+  ): Promise<workflow.NexusOperationHandle<void>> {
+    return await this.client.startOperation(userService.operations.notifyAll, request);
   }
 }

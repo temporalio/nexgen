@@ -93,6 +93,9 @@ func (m contactPreferences) GetTimezone() *string {
 	return m.Timezone
 }
 
+type notifyAllRequest struct {
+}
+
 // --- Resources ---
 
 type User struct {
@@ -148,6 +151,12 @@ func notify(ctx workflow.Context, request notifyRequest) workflow.Future {
 func updateProfile(ctx workflow.Context, request updateProfileRequest) workflow.Future {
 	c := workflow.NewNexusClient("user-service", "UserService")
 	fut := c.ExecuteOperation(ctx, "UpdateProfile", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func notifyAll(ctx workflow.Context, request notifyAllRequest) workflow.Future {
+	c := workflow.NewNexusClient("user-service", "UserService")
+	fut := c.ExecuteOperation(ctx, "NotifyAll", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
@@ -258,4 +267,11 @@ func UpdateProfile(ctx workflow.Context, opts UpdateProfileOptions) workflow.Fut
 		Address:     opts.Address,
 		Preferences: preferencesValue,
 	})
+}
+
+type NotifyAllOptions struct {
+}
+
+func NotifyAll(ctx workflow.Context, opts NotifyAllOptions) workflow.Future {
+	return notifyAll(ctx, notifyAllRequest{})
 }

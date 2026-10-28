@@ -59,8 +59,13 @@ interface user-service {
     preferences: option<contact-preferences>,
   }
 
+  // No field, so a caller method takes no parameter.
+  record notify-all-request {
+  }
+
   get-user: func(request: get-user-request) -> user-result;
   update-email: func(request: update-email-request) -> user-result;
   notify: func(request: notify-request);
   update-profile: func(request: update-profile-request);
+  notify-all: func(request: notify-all-request);
 }

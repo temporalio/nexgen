@@ -301,6 +301,13 @@ namespace Nexgen.TypeShowcase
             return GetSyncSettingsAsync(request);
         }
 
+        [GeneratedCode("nexgen", null)]
+        public static async Task PingAsync()
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeShowcase>(TypeShowcaseEndpoint);
+            await client.ExecuteNexusOperationAsync(svc => svc.Ping()).ConfigureAwait(true);
+        }
+
     }
 
 }

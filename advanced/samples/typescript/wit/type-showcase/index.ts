@@ -8,10 +8,12 @@ export { recordSync } from "./operations/record-sync";
 export { deactivate } from "./operations/deactivate";
 export { updateNotificationSettings } from "./operations/update-notification-settings";
 export { getSyncSettings } from "./operations/get-sync-settings";
+export { ping } from "./operations/ping";
 export type {
   DeactivateRequest,
   GetSyncSettingsRequest,
   GetUserRequest,
+  PingRequest,
   RecordSyncRequest,
   RenameRequest,
   SetProfileRequest,

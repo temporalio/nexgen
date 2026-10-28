@@ -142,6 +142,10 @@ interface type-showcase {
     settings: option<sync-settings>,
   }
 
+  // No field, so the operation function takes no parameter.
+  record ping-request {
+  }
+
   /// @nexus.doc "Get a user." returns="The matching user."
   /// @nexus.experimental
   get-user: func(request: get-user-request) -> user-result;
@@ -152,4 +156,5 @@ interface type-showcase {
   deactivate: func(request: deactivate-request);
   update-notification-settings: func(request: update-notification-settings-request);
   get-sync-settings: func(request: get-sync-settings-request) -> sync-settings;
+  ping: func(request: ping-request);
 }

@@ -146,3 +146,5 @@ export interface GetSyncSettingsRequest {
   region?: string;
   checkpoint?: string;
 }
+
+export type PingRequest = Record<string, never>;

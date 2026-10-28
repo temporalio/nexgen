@@ -35,3 +35,5 @@ export interface ContactPreferences {
   locale?: string;
   timezone?: string;
 }
+
+export type NotifyAllRequest = Record<string, never>;

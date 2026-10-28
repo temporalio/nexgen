@@ -11,6 +11,7 @@ import type {
   UpdateNotificationSettingsRequest,
   SyncSettings,
   GetSyncSettingsRequest,
+  PingRequest,
 } from "./models";
 import type { User } from "./resources";
 
@@ -35,4 +36,5 @@ export const typeShowcase = nexus.service("TypeShowcase", {
   getSyncSettings: nexus.operation<GetSyncSettingsRequest, SyncSettings>({
     name: "GetSyncSettings",
   }),
+  ping: nexus.operation<PingRequest, void>({ name: "Ping" }),
 });

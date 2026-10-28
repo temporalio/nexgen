@@ -73,6 +73,7 @@ describe("type-showcase generated output", () => {
         async getSyncSettings(_ctx, input) {
           return { region: input.region, checkpoint: input.checkpoint };
         },
+        async ping() {},
       });
 
       const result = await executeWorkflowWithNexus<{

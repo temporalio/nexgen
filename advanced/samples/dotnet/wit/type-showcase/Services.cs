@@ -55,6 +55,10 @@ namespace Nexgen.TypeShowcase
         [NexusOperation("GetSyncSettings")]
         SyncSettings GetSyncSettings(GetSyncSettingsRequest request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("Ping")]
+        void Ping();
+
     }
 
     internal interface INexgenOperationInfo
@@ -105,6 +109,8 @@ namespace Nexgen.TypeShowcase
                 TypeShowcaseServiceDefinition.Operations["UpdateNotificationSettings"]),
             [("TypeShowcase", "GetSyncSettings")] = new NexgenOperationInfo<GetSyncSettingsRequest, SyncSettings>(
                 TypeShowcaseServiceDefinition.Operations["GetSyncSettings"]),
+            [("TypeShowcase", "Ping")] = new NexgenOperationInfo<object, object>(
+                TypeShowcaseServiceDefinition.Operations["Ping"]),
         };
     }
 

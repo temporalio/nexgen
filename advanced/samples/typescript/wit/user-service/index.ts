@@ -3,6 +3,7 @@
 export { userService, UserServiceClient } from "./services";
 export type {
   GetUserRequest,
+  NotifyAllRequest,
   NotifyRequest,
   UpdateEmailRequest,
   UpdateProfileRequest,

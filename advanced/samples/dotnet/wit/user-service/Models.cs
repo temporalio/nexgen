@@ -46,6 +46,11 @@ namespace Nexgen.UserService
     }
 
     [GeneratedCode("nexgen", null)]
+    public record NotifyAllRequest
+    {
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record NotifyRequest
     {
         /// <summary>

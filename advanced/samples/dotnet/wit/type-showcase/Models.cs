@@ -169,6 +169,11 @@ namespace Nexgen.TypeShowcase
     }
 
     [GeneratedCode("nexgen", null)]
+    public record PingRequest
+    {
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record PostalAddress
     {
         /// <summary>

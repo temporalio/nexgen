@@ -112,6 +112,9 @@ func (m getSyncSettingsRequest) GetSettings() *SyncSettings {
 	return m.Settings
 }
 
+type pingRequest struct {
+}
+
 // --- Resources ---
 
 type User struct {
@@ -200,6 +203,12 @@ func updateNotificationSettings(ctx workflow.Context, request updateNotification
 func getSyncSettings(ctx workflow.Context, request getSyncSettingsRequest) workflow.Future {
 	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
 	fut := c.ExecuteOperation(ctx, "GetSyncSettings", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func ping(ctx workflow.Context, request pingRequest) workflow.Future {
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "Ping", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
@@ -587,4 +596,11 @@ func GetSyncSettings(ctx workflow.Context, opts GetSyncSettingsOptions) workflow
 		UserID:   opts.UserID,
 		Settings: settingsValue,
 	})
+}
+
+type PingOptions struct {
+}
+
+func Ping(ctx workflow.Context, opts PingOptions) workflow.Future {
+	return ping(ctx, pingRequest{})
 }

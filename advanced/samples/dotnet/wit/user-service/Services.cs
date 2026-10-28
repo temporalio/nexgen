@@ -33,6 +33,10 @@ namespace Nexgen.UserService
         [NexusOperation("UpdateProfile")]
         void UpdateProfile(UpdateProfileRequest request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("NotifyAll")]
+        void NotifyAll();
+
     }
 
     [GeneratedCode("nexgen", null)]
@@ -186,6 +190,12 @@ namespace Nexgen.UserService
                 Preferences = options.Locale != null || options.Timezone != null ? new ContactPreferences() { Locale = options.Locale, Timezone = options.Timezone } : null,
             };
             return UpdateProfileAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        public async Task NotifyAllAsync()
+        {
+            await _client.ExecuteNexusOperationAsync(svc => svc.NotifyAll()).ConfigureAwait(true);
         }
 
     }
