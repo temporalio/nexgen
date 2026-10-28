@@ -471,6 +471,7 @@ pub(crate) fn generate_files_from_planned_tree(
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     let mode = crate::nexgen_config::current().mode;
+    validate_targets(language)?;
     let mut generated = match language {
         Language::Dotnet => dotnet::generate(
             tree,
@@ -495,6 +496,25 @@ pub(crate) fn generate_files_from_planned_tree(
         Vec::new()
     };
     Ok(generated)
+}
+
+/// So far the client target is only for some languages, only for the native API, and only next
+/// to the Workflow target.
+fn validate_targets(language: Language) -> Result<()> {
+    let config = crate::nexgen_config::current();
+    if !config.targets.client {
+        return Ok(());
+    }
+    let reason = if !language.has_client_target() {
+        format!("isn't for {language} yet")
+    } else if config.mode != GenerationMode::NativeApi {
+        "needs `--native-api`".to_string()
+    } else if !config.targets.workflow {
+        "needs the `workflow` target too, so far".to_string()
+    } else {
+        return Ok(());
+    };
+    Err(Error::UnsupportedClientTarget { reason })
 }
 
 fn generate_go_tree(
@@ -611,6 +631,27 @@ mod tests {
         generate_files_for_tree_with_mode_and_options,
     };
     use crate::spec::ApiSpecTree;
+
+    #[test]
+    fn the_python_client_target_needs_the_native_api() {
+        use crate::nexgen_config::{GenerationTargets, NexgenConfig, scope};
+
+        let _config = scope(NexgenConfig {
+            mode: GenerationMode::DefinitionsOnly,
+            system_nexus: false,
+            targets: GenerationTargets {
+                workflow: false,
+                client: true,
+            },
+        });
+
+        let error = super::validate_targets(Language::Python).unwrap_err();
+        assert!(
+            matches!(&error, crate::error::Error::UnsupportedClientTarget { reason }
+                if reason == "needs `--native-api`"),
+            "{error}"
+        );
+    }
 
     #[test]
     fn output_directory_named_origin_uses_its_target_language() {

@@ -1,0 +1,11 @@
+package temporal:client-package-name-clash@1.0.0;
+
+world system { export job-service; }
+
+// The package exports the operation `client`, which has the name of the client package.
+/// @nexus.endpoint "jobs"
+interface job-service {
+  record client-request { id: string }
+
+  client: func(request: client-request);
+}

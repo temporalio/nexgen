@@ -8,10 +8,12 @@ use crate::error::{Error, Result};
 use crate::generator::json_schema::python as python_json;
 use crate::generator::proto::python as python_proto;
 use crate::generator::render_request_plan;
+use crate::generator::resource_plan::validate_client_resource_sources;
 use crate::generator::{
     ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
 };
 use crate::language::Language;
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedOperationResourceReturn,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedRecordType, PlannedResource,
@@ -526,6 +528,33 @@ impl<'a> ApiPlanner<'a> {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
+        let mut services = services;
+        let bound_resources = services
+            .iter()
+            .flat_map(|service| &service.resources)
+            .filter(|resource| {
+                resource.methods.iter().any(|method| {
+                    matches!(
+                        method.binding,
+                        PlannedResourceMethodBindingSpec::Operation { .. }
+                    )
+                })
+            })
+            .map(|resource| resource.type_name.clone())
+            .collect::<BTreeSet<_>>();
+        for operation in services
+            .iter_mut()
+            .flat_map(|service| service.operations.iter_mut())
+        {
+            let resource_type = match &operation.output_resource_return {
+                Some(resource_return) => Some(resource_return.resource_type_name.as_str()),
+                None => operation
+                    .output_direct_result
+                    .then_some(operation.output_ref.as_str()),
+            };
+            operation.client_binds_resource =
+                resource_type.is_some_and(|resource_type| bound_resources.contains(resource_type));
+        }
 
         for service in &services {
             for resource in &service.resources {
@@ -576,6 +605,8 @@ impl<'a> ApiPlanner<'a> {
         module_origin: GeneratedFileOrigin,
     ) -> Result<(GeneratedFileMap, BTreeSet<String>)> {
         let mode = crate::nexgen_config::current().mode;
+        let client_api =
+            mode == GenerationMode::NativeApi && crate::nexgen_config::current().targets.client;
         let mut files = GeneratedFileMap::default();
         files.insert_multi(
             self.external_models.render_support_files()?,
@@ -745,6 +776,14 @@ impl<'a> ApiPlanner<'a> {
                 GeneratedFileOrigin::fixed("generated Python system Nexus interceptor"),
             )?;
         }
+        if client_api && !services.is_empty() {
+            self.render_client_package(
+                &mut files,
+                services,
+                &operation_model_names,
+                &resource_names,
+            )?;
+        }
 
         for service in services {
             for resource in &service.resources {
@@ -756,12 +795,12 @@ impl<'a> ApiPlanner<'a> {
                 files.insert(
                     format!("_resources/{}.py", resource_module_name(resource)),
                     self.render_resource_module_file(
+                        PythonTarget::Workflow,
                         service,
                         resource,
                         &bound_operations,
                         &operation_model_names,
                         &resource_names,
-                        self.support_package,
                     ),
                     GeneratedFileOrigin::resource(Language::Python, service.name, &resource.name),
                 )?;
@@ -801,14 +840,204 @@ impl<'a> ApiPlanner<'a> {
         Ok((files, exported_names))
     }
 
+    /// Renders the package of the client target, with its own resource classes and a client
+    /// extension for each service. It imports the models of the parent package.
+    fn render_client_package(
+        &self,
+        files: &mut GeneratedFileMap,
+        services: &[RenderedService<'_>],
+        model_names: &[String],
+        resource_names: &[String],
+    ) -> Result<()> {
+        let dir = PythonTarget::Client
+            .package_dir()
+            .expect("the client target should have a package directory");
+        let origin = || GeneratedFileOrigin::fixed("generated Python client package");
+        let extensions = self.render_client_module(services, model_names, resource_names)?;
+        let resources = services
+            .iter()
+            .flat_map(|service| service.resources.iter())
+            .collect::<Vec<_>>();
+        files.insert(
+            format!("{dir}/__init__.py"),
+            render_client_package_init(services, self.api_plan),
+            origin(),
+        )?;
+        files.insert(format!("{dir}/_extensions.py"), extensions, origin())?;
+        if !resources.is_empty() {
+            files.insert(
+                format!("{dir}/_resources/__init__.py"),
+                render_resources_package_init(services, self.api_plan),
+                origin(),
+            )?;
+        }
+        for service in services {
+            for resource in &service.resources {
+                files.insert(
+                    format!("{dir}/_resources/{}.py", resource_module_name(resource)),
+                    self.render_resource_module_file(
+                        PythonTarget::Client,
+                        service,
+                        resource,
+                        &resource_bound_operations(service, resource),
+                        model_names,
+                        resource_names,
+                    ),
+                    GeneratedFileOrigin::resource(Language::Python, service.name, &resource.name),
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Renders the module of the client extensions.
+    fn render_client_module(
+        &self,
+        services: &[RenderedService<'_>],
+        model_names: &[String],
+        resource_names: &[String],
+    ) -> Result<String> {
+        if let Some(service) = services.iter().find(|service| service.endpoint.is_none()) {
+            return Err(Error::UnsupportedClientTarget {
+                reason: format!(
+                    "doesn't take service `{}` yet, which has no endpoint",
+                    service.name
+                ),
+            });
+        }
+        let package = PythonTarget::Client
+            .package_dir()
+            .expect("the client target should have a package directory");
+        // The parent package exports each operation, and an import of the client package sets
+        // the attribute of the same name.
+        if let Some((service, operation)) = services
+            .iter()
+            .flat_map(|service| {
+                service
+                    .operations
+                    .iter()
+                    .map(move |operation| (service, operation))
+            })
+            .find(|(_, operation)| operation.attr_name == package)
+        {
+            return Err(Error::PythonGeneratedNameConflict {
+                name: package.to_string(),
+                generated_by: "the package of the client target".to_string(),
+                conflicting_declaration: format!("operation `{}.{}`", service.name, operation.name),
+            });
+        }
+        validate_client_names(services)?;
+        validate_client_resource_sources(
+            self.api_plan,
+            services.iter().flat_map(|service| &service.resources),
+        )?;
+        let operations = services
+            .iter()
+            .flat_map(|service| service.operations.iter())
+            .collect::<Vec<_>>();
+        let mut body = String::new();
+        let type_parameters = operations
+            .iter()
+            .flat_map(|operation| operation.model_input_type_parameters.iter())
+            .collect::<BTreeSet<_>>();
+        for parameter in &type_parameters {
+            body.push_str(parameter);
+            body.push_str(" = typing.TypeVar(");
+            body.push_str(&python_string_literal(parameter));
+            body.push_str(")\n");
+        }
+        let function_fields = operations
+            .iter()
+            .filter_map(|operation| operation.target_unpacked_input(PythonTarget::Client))
+            .flat_map(|unpacked_input| unpacked_input.functions.iter().cloned())
+            .collect::<Vec<_>>();
+        let output_type_parameters = operations
+            .iter()
+            .flat_map(|operation| operation.output_type_parameters.iter())
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        render_function_type_parameter_definitions(
+            &mut body,
+            &function_fields,
+            &output_type_parameters,
+        );
+        if !body.is_empty() {
+            body.push_str("\n\n");
+        }
+        body.push_str(PYTHON_CLIENT_NEXUS_PROTOCOL);
+        for service in services {
+            body.push_str("\n\n");
+            render_client_extension(&mut body, service);
+        }
+
+        let module_imports = operations
+            .iter()
+            .flat_map(|operation| {
+                [
+                    operation
+                        .input
+                        .as_ref()
+                        .and_then(|input| input.module_path.clone()),
+                    operation.output_module_path.clone(),
+                ]
+            })
+            .flatten()
+            .chain(std::iter::once("abc".to_string()))
+            .collect::<BTreeSet<_>>();
+        let mut output = String::new();
+        render_generated_file_header(&mut output);
+        output.push('\n');
+        if render_optional_python_imports(
+            &mut output,
+            &body,
+            &module_imports,
+            &self.language_imports,
+        ) {
+            output.push('\n');
+        }
+        let used_model_names = used_python_symbol_imports(&body, model_names);
+        if !used_model_names.is_empty() {
+            render_model_name_imports(
+                &mut output,
+                "..models",
+                &self.api_plan.module_path.child(
+                    PythonTarget::Client
+                        .package_dir()
+                        .expect("the client target should have a package directory"),
+                ),
+                self.api_plan,
+                &used_model_names,
+                self.model_hoists,
+            );
+        }
+        let used_resource_names = used_python_symbol_imports(&body, resource_names);
+        if !used_resource_names.is_empty() {
+            render_named_python_import(&mut output, "._resources", &used_resource_names);
+        }
+        for resource in services.iter().flat_map(|service| service.resources.iter()) {
+            let binder = resource_operations_bind_function_name(resource);
+            if !used_python_symbol_imports(&body, std::slice::from_ref(&binder)).is_empty() {
+                render_named_python_import(
+                    &mut output,
+                    &format!("._resources.{}", resource_module_name(resource)),
+                    &[binder],
+                );
+            }
+        }
+        render_support_import(&mut output, &body, self.support_package, false);
+        output.push_str("\n\n");
+        output.push_str(&body);
+        Ok(output)
+    }
+
     fn render_resource_module_file(
         &self,
+        target: PythonTarget,
         service: &RenderedService<'_>,
         resource: &PlannedResource,
         bound_operations: &[ResourceBoundOperation<'_>],
         model_names: &[String],
         resource_names: &[String],
-        support_package: &str,
     ) -> String {
         let mut module_imports = bound_operations
             .iter()
@@ -844,7 +1073,19 @@ impl<'a> ApiPlanner<'a> {
             );
             body.push_str("\n\n");
         }
-        self.render_resource(&mut body, service, resource, bound_operations);
+        // The client resource calls its operations through the client that made it.
+        let operations_object = target == PythonTarget::Client && !bound_operations.is_empty();
+        self.render_resource(
+            &mut body,
+            service,
+            resource,
+            bound_operations,
+            operations_object,
+        );
+        if operations_object {
+            body.push_str("\n\n");
+            render_resource_operations_binder(&mut body, service, resource);
+        }
         for (full_name, (_, resource_type)) in resource_holders(self.api_plan) {
             if resource_type != resource.type_name {
                 continue;
@@ -856,20 +1097,35 @@ impl<'a> ApiPlanner<'a> {
                 module_imports.extend(field.imports.module_imports.iter().cloned());
             }
         }
-        if !bound_operations.is_empty() && service.endpoint.is_some() {
+        if operations_object {
+            body.push_str("\n\n");
+            render_operations_protocol(
+                &mut body,
+                service,
+                resource,
+                &unique_bound_operations(bound_operations),
+            );
+        }
+        let workflow = target == PythonTarget::Workflow;
+        if workflow && !bound_operations.is_empty() && service.endpoint.is_some() {
             body.push_str("\n\n");
             for (index, bound_operation) in bound_operations.iter().enumerate() {
-                render_operation_functions(&mut body, service, bound_operation.operation);
+                render_operation_functions(
+                    &mut body,
+                    PythonTarget::Workflow,
+                    service,
+                    bound_operation.operation,
+                );
                 if index + 1 != bound_operations.len() {
                     body.push_str("\n\n");
                 }
             }
         }
-        if service.endpoint.is_none() {
+        if workflow && service.endpoint.is_none() {
             body.push_str("\n\n");
             render_resource_client_binder(&mut body, resource);
         }
-        if !service.delay_load_temporalio_workflow {
+        if workflow && !service.delay_load_temporalio_workflow {
             module_imports.insert("temporalio.workflow".to_string());
         }
 
@@ -905,10 +1161,17 @@ impl<'a> ApiPlanner<'a> {
         }
         let used_model_names = used_python_symbol_imports(&body, model_names);
         if !used_model_names.is_empty() {
+            let (models, module_path) = match target.package_dir() {
+                None => ("..models", self.api_plan.module_path.child("_resources")),
+                Some(dir) => (
+                    "...models",
+                    self.api_plan.module_path.child(dir).child("_resources"),
+                ),
+            };
             render_model_name_imports(
                 &mut output,
-                "..models",
-                &self.api_plan.module_path.child("_resources"),
+                models,
+                &module_path,
                 self.api_plan,
                 &used_model_names,
                 self.model_hoists,
@@ -927,7 +1190,7 @@ impl<'a> ApiPlanner<'a> {
         if !used_resource_names.is_empty() {
             render_named_python_import(&mut output, ".", &used_resource_names);
         }
-        render_support_import(&mut output, &body, support_package, false);
+        render_support_import(&mut output, &body, self.support_package, false);
         if !body.is_empty() {
             output.push('\n');
             output.push('\n');
@@ -942,6 +1205,7 @@ impl<'a> ApiPlanner<'a> {
         service: &RenderedService<'_>,
         resource: &PlannedResource,
         bound_operations: &[ResourceBoundOperation<'_>],
+        operations_object: bool,
     ) {
         output.push_str("@dataclasses.dataclass\n");
         output.push_str("class ");
@@ -959,14 +1223,26 @@ impl<'a> ApiPlanner<'a> {
             ));
             output.push('\n');
         }
+        if operations_object {
+            render_resource_operations_slot(output, service);
+        }
         if resource.methods.is_empty() {
-            output.push_str("\n    pass\n");
+            if !operations_object {
+                output.push_str("\n    pass\n");
+            }
             return;
         }
 
         for method in &resource.methods {
             output.push_str("\n");
-            self.render_resource_class_method(output, service, resource, method, bound_operations);
+            self.render_resource_class_method(
+                output,
+                service,
+                resource,
+                method,
+                bound_operations,
+                operations_object,
+            );
         }
     }
 
@@ -977,6 +1253,7 @@ impl<'a> ApiPlanner<'a> {
         resource: &PlannedResource,
         method: &PlannedResourceMethod,
         bound_operations: &[ResourceBoundOperation<'_>],
+        operations_object: bool,
     ) {
         let result_annotation = self.python_resource_method_result_annotation(method);
         output.push_str("    async def ");
@@ -1029,7 +1306,15 @@ impl<'a> ApiPlanner<'a> {
                     .find(|bound_operation| bound_operation.operation.name == operation_name)
                     .map(|bound_operation| bound_operation.operation)
                     .expect("bound resource operation should be rendered in the same module");
-                if service.endpoint.is_none() {
+                if operations_object {
+                    render_resource_method_operations_body(
+                        output,
+                        service,
+                        method,
+                        operation,
+                        &result_annotation,
+                    );
+                } else if service.endpoint.is_none() {
                     render_resource_method_inline_operation_body(
                         output,
                         service,
@@ -1041,7 +1326,6 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     render_resource_method_operation_body(
                         output,
-                        service,
                         method,
                         operation,
                         &result_annotation,
@@ -1311,18 +1595,30 @@ impl<'a> ApiPlanner<'a> {
                 })
             })
             .unwrap_or_else(|| output_annotation_default.clone());
-        let unpacked_input = if let (Some(input), Some(rendered_input)) = (input, &rendered_input) {
-            if rendered_input.supports_unpacked {
-                Some(self.build_unpacked_input(match input {
-                    PlannedType::Record(record) => &record.full_name,
+        let unpacked_input_name = match (input, &rendered_input) {
+            (Some(input), Some(rendered_input)) if rendered_input.supports_unpacked => {
+                Some(match input {
+                    PlannedType::Record(record) => record.full_name.as_str(),
                     _ => panic!("unpacked operation input should be a record"),
-                })?)
-            } else {
-                None
+                })
             }
-        } else {
-            None
+            _ => None,
         };
+        let unpacked_input = unpacked_input_name
+            .map(|name| self.build_unpacked_input(name, false))
+            .transpose()?;
+        let client_unpacked_input = unpacked_input_name
+            .filter(|name| {
+                crate::nexgen_config::current().targets.client
+                    && planned_record(self.api_plan, name)
+                        .fields
+                        .values()
+                        .any(|field| {
+                            matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
+                        })
+            })
+            .map(|name| self.build_unpacked_input(name, true))
+            .transpose()?;
         let output_type_parameters = unpacked_input
             .iter()
             .flat_map(|unpacked_input| &unpacked_input.functions)
@@ -1370,8 +1666,10 @@ impl<'a> ApiPlanner<'a> {
                 .map(|helper| format!("_support.{helper}")),
             output_resource_return,
             output_direct_result,
+            client_binds_resource: false,
             output_none: operation.output_type().is_none(),
             unpacked_input,
+            client_unpacked_input,
             model_input_type_parameters: model_input_parameters
                 .into_iter()
                 .map(|usage| usage.parameter.name)
@@ -1418,7 +1716,11 @@ impl<'a> ApiPlanner<'a> {
         panic!("message conversion should be model-shaped")
     }
 
-    fn build_unpacked_input(&self, input_full_name: &str) -> Result<RenderedUnpackedInput> {
+    fn build_unpacked_input(
+        &self,
+        input_full_name: &str,
+        sourced_fields_as_parameters: bool,
+    ) -> Result<RenderedUnpackedInput> {
         let model = self
             .models
             .get(input_full_name)
@@ -1435,9 +1737,27 @@ impl<'a> ApiPlanner<'a> {
             .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
             .zip(model.fields.iter())
         {
-            if planned_field.visibility != RecordFieldVisibility::Public {
+            let sourced = matches!(
+                planned_field.visibility,
+                RecordFieldVisibility::Sourced { .. }
+            );
+            if planned_field.visibility != RecordFieldVisibility::Public
+                && !(sourced && sourced_fields_as_parameters)
+            {
                 continue;
             }
+            // The model default of a sourced field calls its source, so the parameter takes the
+            // default of the field type.
+            let default_kind = if sourced {
+                match &planned_field.field_type {
+                    PlannedType::List(_) => PythonFieldDefaultKind::EmptyList,
+                    PlannedType::Map(_, _) => PythonFieldDefaultKind::EmptyDict,
+                    _ if planned_field.required => PythonFieldDefaultKind::Required,
+                    _ => PythonFieldDefaultKind::None,
+                }
+            } else {
+                rendered_field.default_kind.clone()
+            };
             if let Some(flattened) = self.build_flattened_message(planned_field, rendered_field) {
                 request_fields.push(RenderedUnpackedRequestField {
                     attr_name: flattened.local_name.clone(),
@@ -1483,7 +1803,7 @@ impl<'a> ApiPlanner<'a> {
                 {
                     PythonFieldDefaultKind::None
                 } else {
-                    rendered_field.default_kind.clone()
+                    default_kind.clone()
                 },
                 doc: planned_field
                     .doc
@@ -1494,7 +1814,7 @@ impl<'a> ApiPlanner<'a> {
             request_fields.push(RenderedUnpackedRequestField {
                 attr_name: rendered_field.attr_name.clone(),
                 value_expr: python_input_default_expr(planned_field, &rendered_field.attr_name),
-                default_kind: rendered_field.default_kind.clone(),
+                default_kind,
             });
         }
 
@@ -2672,10 +2992,28 @@ struct RenderedOperation<'a> {
     serialization_context_expr: Option<String>,
     output_resource_return: Option<PlannedOperationResourceReturn>,
     output_direct_result: bool,
+    /// Whether the client binds the returned resource to itself, which it does for a resource of
+    /// this package with bound operations.
+    client_binds_resource: bool,
     output_none: bool,
     unpacked_input: Option<RenderedUnpackedInput>,
+    /// The unpacked input of the client target, when it differs. That target has no sources, so a
+    /// sourced field is a parameter.
+    client_unpacked_input: Option<RenderedUnpackedInput>,
     model_input_type_parameters: Vec<String>,
     generic_model_types: bool,
+}
+
+impl RenderedOperation<'_> {
+    fn target_unpacked_input(&self, target: PythonTarget) -> Option<&RenderedUnpackedInput> {
+        match target {
+            PythonTarget::Workflow => self.unpacked_input.as_ref(),
+            PythonTarget::Client => self
+                .client_unpacked_input
+                .as_ref()
+                .or(self.unpacked_input.as_ref()),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -3514,6 +3852,17 @@ fn resource_module_name(resource: &PlannedResource) -> String {
     python_ident(&resource.name.to_snake_case())
 }
 
+fn resource_operations_bind_function_name(resource: &PlannedResource) -> String {
+    resource_operations_bind_function_name_for_type(&resource.type_name)
+}
+
+fn resource_operations_bind_function_name_for_type(type_name: &str) -> String {
+    format!(
+        "bind_{}_operations",
+        python_ident(&type_name.to_snake_case())
+    )
+}
+
 fn resource_client_bind_function_name(resource: &PlannedResource) -> String {
     format!(
         "bind_{}_client",
@@ -4096,6 +4445,42 @@ fn resource_holders(api_plan: &PlannedSpec) -> BTreeMap<String, (String, String)
         .collect()
 }
 
+/// Exports the client extensions and the client resource classes.
+fn render_client_package_init(services: &[RenderedService<'_>], api_plan: &PlannedSpec) -> String {
+    let extensions = services
+        .iter()
+        .map(client_extension_class_name)
+        .collect::<Vec<_>>();
+    let holders = resource_holders(api_plan);
+    let resources = services
+        .iter()
+        .flat_map(|service| service.resources.iter())
+        .flat_map(|resource| {
+            std::iter::once(resource.type_name.clone()).chain(
+                holders
+                    .values()
+                    .filter(|(_, resource_type)| *resource_type == resource.type_name)
+                    .map(|(model_name, _)| model_name.clone()),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut output = String::new();
+    render_generated_file_header(&mut output);
+    output.push('\n');
+    render_named_python_import(&mut output, "._extensions", &extensions);
+    if !resources.is_empty() {
+        render_named_python_import(&mut output, "._resources", &resources);
+    }
+    output.push_str("\n__all__ = [\n");
+    for name in extensions.iter().chain(&resources) {
+        output.push_str("    ");
+        output.push_str(&python_string_literal(name));
+        output.push_str(",\n");
+    }
+    output.push_str("]\n");
+    output
+}
+
 fn render_resources_package_init(
     services: &[RenderedService<'_>],
     api_plan: &PlannedSpec,
@@ -4467,7 +4852,7 @@ fn render_operation_module(
         );
         body.push_str("\n\n");
     }
-    render_operation_functions(&mut body, service, operation);
+    render_operation_functions(&mut body, PythonTarget::Workflow, service, operation);
     if !service.delay_load_temporalio_workflow {
         module_imports.insert("temporalio.workflow".to_string());
     }
@@ -5102,9 +5487,9 @@ fn render_endpoint_service_object_unpacked_method(
     output.push_str("    ) -> ");
     output.push_str(&operation_public_return_annotation(service, operation));
     output.push_str(":\n");
-    render_unpacked_operation_docstring(output, operation, unpacked_input, None);
+    render_unpacked_operation_docstring(output, "    ", operation, unpacked_input, None);
     for flattened_message in &unpacked_input.flattened_messages {
-        render_flattened_message_setup(output, flattened_message);
+        render_flattened_message_setup(output, "    ", flattened_message);
     }
     output.push_str("        request = ");
     output.push_str(&unpacked_input.model_name);
@@ -5220,6 +5605,121 @@ fn render_endpoint_service_object_operation_body(
         output.push_str(",\n");
     }
     output.push_str("        )\n");
+}
+
+fn client_extension_class_name(service: &RenderedService<'_>) -> String {
+    format!("{}ClientExtension", service.name)
+}
+
+/// Each method of the package's client extensions, private ones too, has one service, so one
+/// client class can inherit them all.
+fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
+    let mut owners = BTreeMap::<String, &str>::new();
+    for service in services {
+        for operation in &service.operations {
+            let names = [
+                operation.attr_name.clone(),
+                client_operation_name(service, operation),
+            ];
+            for name in names {
+                if let Some(first_service) = owners.insert(name.clone(), service.name) {
+                    return Err(Error::ClientTargetNameConflict {
+                        name,
+                        first_service: first_service.to_string(),
+                        second_service: service.name.to_string(),
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The Nexus client that a client extension starts operations with. It has the
+/// `start_operation` of the Workflow Nexus client.
+const PYTHON_CLIENT_NEXUS_PROTOCOL: &str = r#"_OutputT = typing.TypeVar("_OutputT")
+
+
+class _NexusClient(typing.Protocol):
+    """Starts the Nexus operations of one service."""
+
+    @typing.overload
+    async def start_operation(
+        self,
+        operation: str,
+        input: typing.Any,
+        *,
+        output_type: type[_OutputT],
+    ) -> collections.abc.Awaitable[_OutputT]: ...
+
+    @typing.overload
+    async def start_operation(
+        self,
+        operation: str,
+        input: typing.Any,
+    ) -> collections.abc.Awaitable[None]: ...
+"#;
+
+const PYTHON_CLIENT_EXTENSION_HOOK: &str = r#"
+    @abc.abstractmethod
+    def _create_nexus_client(
+        self,
+        *,
+        service: str,
+        endpoint: str,
+    ) -> _NexusClient:
+        """Return the Nexus client that starts the operations of ``service``."""
+        ...
+"#;
+
+fn render_client_extension(output: &mut String, service: &RenderedService<'_>) {
+    let class_name = client_extension_class_name(service);
+    output.push_str("class ");
+    output.push_str(&class_name);
+    output.push_str("(abc.ABC):\n");
+    render_python_docstring(
+        output,
+        "    ",
+        Some(&format!(
+            "Starts the operations of ``{}`` from code outside a Workflow.\n\nA client class \
+             inherits this class and implements ``_create_nexus_client``.",
+            service.name
+        )),
+        &[],
+        None,
+        service.experimental,
+    );
+    if !service.operations.is_empty() {
+        output.push_str("\n    def __init_subclass__(cls, **kwargs: typing.Any) -> None:\n");
+        output.push_str("        super().__init_subclass__(**kwargs)\n");
+        output.push_str(
+            "        # The MRO picks one base for a name that two bases have, with no error.\n",
+        );
+        output.push_str("        for base in cls.__mro__:\n");
+        // `issubclass` on an ABC isn't reliable while Python builds the subclass.
+        output.push_str("            if ");
+        output.push_str(&class_name);
+        output.push_str(" in base.__mro__:\n");
+        output.push_str("                continue\n");
+        output.push_str("            for name in (");
+        for operation in &service.operations {
+            output.push_str(&python_string_literal(&operation.attr_name));
+            output.push_str(", ");
+        }
+        output.push_str("):\n");
+        output.push_str("                if name in base.__dict__:\n");
+        output.push_str("                    raise TypeError(\n");
+        output.push_str("                        f\"{cls.__qualname__} gets {name} from ");
+        output.push_str("{base.__qualname__} and from ");
+        output.push_str(&class_name);
+        output.push_str("\"\n");
+        output.push_str("                    )\n");
+    }
+    output.push_str(PYTHON_CLIENT_EXTENSION_HOOK);
+    for operation in &service.operations {
+        output.push('\n');
+        render_operation_functions(output, PythonTarget::Client, service, operation);
+    }
 }
 
 fn endpoint_service_object_name(service: &RenderedService<'_>) -> String {
@@ -5484,6 +5984,135 @@ fn render_resource_client_binder(output: &mut String, resource: &PlannedResource
     output.push_str("    return resource\n");
 }
 
+/// Copies a resource and gives the copy its operations, which aren't a dataclass field.
+fn render_resource_operations_binder(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    resource: &PlannedResource,
+) {
+    let protocol = operations_protocol_name(service);
+    output.push_str("def ");
+    output.push_str(&resource_operations_bind_function_name(resource));
+    output.push_str("(\n    resource: ");
+    output.push_str(&resource.type_name);
+    output.push_str(",\n    operations: ");
+    output.push_str(&protocol);
+    output.push_str(",\n) -> ");
+    output.push_str(&resource.type_name);
+    output.push_str(":\n");
+    output.push_str("    bound = dataclasses.replace(resource)\n");
+    output.push_str("    object.__setattr__(bound, \"_operations\", operations)\n");
+    output.push_str("    return bound\n");
+}
+
+/// The operations of a resource's bound methods, each once, in method order.
+fn unique_bound_operations<'a>(
+    bound_operations: &[ResourceBoundOperation<'a>],
+) -> Vec<&'a RenderedOperation<'a>> {
+    let mut seen = BTreeSet::new();
+    bound_operations
+        .iter()
+        .map(|bound_operation| bound_operation.operation)
+        .filter(|operation| seen.insert(operation.name))
+        .collect()
+}
+
+fn operations_protocol_name(service: &RenderedService<'_>) -> String {
+    format!("_{}Operations", service.name)
+}
+
+/// The private slot of a resource's operations, and the method that returns them.
+fn render_resource_operations_slot(output: &mut String, service: &RenderedService<'_>) {
+    let protocol = operations_protocol_name(service);
+    output.push_str("    # Not a dataclass field, so the default converter doesn't\n");
+    output.push_str("    # encode it, and equality ignores it.\n");
+    output.push_str("    _operations: typing.ClassVar[");
+    output.push_str(&protocol);
+    output.push_str(" | None] = None\n");
+    output.push_str("\n    def _ops(self) -> ");
+    output.push_str(&protocol);
+    output.push_str(":\n");
+    output.push_str("        # A handle built by hand, or decoded from data, takes the\n");
+    output.push_str("        # current client.\n");
+    output.push_str("        if self._operations is not None:\n");
+    output.push_str("            return self._operations\n");
+    output.push_str("        return _support.current_operations()\n");
+}
+
+fn render_resource_method_operations_body(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    method: &PlannedResourceMethod,
+    operation: &RenderedOperation<'_>,
+    result_annotation: &str,
+) {
+    let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } = &method.binding else {
+        return;
+    };
+    render_resource_method_request(output, method, operation, request_plan);
+    if result_annotation != "None" {
+        output.push_str("        return await self._ops().");
+    } else if operation.output_none {
+        output.push_str("        await self._ops().");
+    } else {
+        output.push_str("        _ = await self._ops().");
+    }
+    output.push_str(&client_operation_name(service, operation));
+    output.push_str("(request)\n");
+}
+
+/// The operations that a resource's methods call, as a `typing.Protocol` that each target's
+/// operations object meets.
+fn render_operations_protocol(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    resource: &PlannedResource,
+    operations: &[&RenderedOperation<'_>],
+) {
+    output.push_str("class ");
+    output.push_str(&operations_protocol_name(service));
+    output.push_str("(typing.Protocol):\n");
+    render_python_docstring(
+        output,
+        "    ",
+        Some(&format!(
+            "The operations of ``{}`` that ``{}`` calls.",
+            service.name, resource.type_name
+        )),
+        &[],
+        None,
+        false,
+    );
+    for operation in operations {
+        output.push('\n');
+        render_operations_method_signature(output, service, operation);
+        output.push_str(" ...\n");
+    }
+}
+
+/// The signature of an operations object method. It returns the result annotation.
+fn render_operations_method_signature(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) -> String {
+    let result_annotation =
+        temporalio_workflow_type_annotation(service, &operation_result_annotation(operation));
+    output.push_str("    async def ");
+    output.push_str(&client_operation_name(service, operation));
+    output.push_str("(\n");
+    output.push_str("        self,\n");
+    if operation.input.is_some() {
+        output.push_str("        request: ");
+        output.push_str(operation_input_annotation(operation));
+        output.push_str(",\n");
+    }
+    output.push_str("    ) -> ");
+    output.push_str(&result_annotation);
+    output.push(':');
+    result_annotation
+}
+
 fn render_resource_method_inline_operation_body(
     output: &mut String,
     service: &RenderedService<'_>,
@@ -5666,7 +6295,6 @@ fn render_resource_nexus_start_operation(
 
 fn render_resource_method_operation_body(
     output: &mut String,
-    service: &RenderedService<'_>,
     method: &PlannedResourceMethod,
     operation: &RenderedOperation<'_>,
     result_annotation: &str,
@@ -5681,39 +6309,27 @@ fn render_resource_method_operation_body(
         return;
     };
 
-    let operation_attr_name = request_operation_function_name(service, operation);
+    let operation_attr_name = request_operation_function_name(operation);
     render_resource_method_request(output, method, operation, request_plan, api_plan);
     if *direct_return {
         if result_annotation == "None" {
             output.push_str("        await ");
             output.push_str(&operation_attr_name);
-            output.push('(');
-            render_resource_operation_call_args(output, service);
-            output.push_str("request)\n");
+            output.push_str("(request)\n");
         } else {
             output.push_str("        return await ");
             output.push_str(&operation_attr_name);
-            output.push('(');
-            render_resource_operation_call_args(output, service);
-            output.push_str("request)\n");
+            output.push_str("(request)\n");
         }
     } else {
         output.push_str("        handle = await ");
         output.push_str(&operation_attr_name);
-        output.push('(');
-        render_resource_operation_call_args(output, service);
-        output.push_str("request)\n");
+        output.push_str("(request)\n");
         if result_annotation == "None" {
             output.push_str("        await handle\n");
         } else {
             output.push_str("        return await handle\n");
         }
-    }
-}
-
-fn render_resource_operation_call_args(output: &mut String, service: &RenderedService<'_>) {
-    if service.endpoint.is_none() {
-        output.push_str("typing.cast(str, getattr(self, \"_endpoint\")), ");
     }
 }
 
@@ -5889,6 +6505,7 @@ enum PythonTypeParameter {
 
 fn render_function_unpacked_overloads(
     output: &mut String,
+    target: PythonTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
@@ -5901,6 +6518,7 @@ fn render_function_unpacked_overloads(
     for (index, overload_cases) in overload_combinations.iter().enumerate() {
         render_function_unpacked_overload(
             output,
+            target,
             service,
             operation,
             unpacked_input,
@@ -6380,35 +6998,35 @@ fn overload_case_for_callable<'a>(
 
 fn render_function_unpacked_overload(
     output: &mut String,
+    target: PythonTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
     overload_cases: &[RenderedFunctionOverloadCase],
 ) {
-    render_function_unpacked_overload_case_doc(output, unpacked_input, overload_cases);
-    output.push_str("@typing.overload\n");
+    render_function_unpacked_overload_case_doc(output, target, unpacked_input, overload_cases);
+    start_line(output, target, "@typing.overload\n");
     if operation.deprecated {
-        output.push_str(
+        start_line(
+            output,
+            target,
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    output.push_str("async def ");
-    output.push_str(&operation.attr_name);
-    output.push_str("(\n");
-    render_endpoint_parameter(output, service);
+    render_operation_signature_start(output, target, &operation.attr_name);
 
     let primary_function = primary_function(&unpacked_input.functions);
     let primary_case = primary_function.and_then(|function| {
         overload_case_for_callable(overload_cases, &function.callable_field_name)
     });
     if let (Some(function), Some(function_case)) = (primary_function, primary_case) {
-        output.push_str("    ");
+        start_line(output, target, "    ");
         output.push_str(&function.callable_field_name);
         output.push_str(": ");
         output.push_str(&function_case.callable_annotation);
         output.push_str(",\n");
         for positional_arg in &function_case.positional_args {
-            output.push_str("    ");
+            start_line(output, target, "    ");
             if positional_arg.variadic {
                 output.push('*');
             }
@@ -6426,7 +7044,7 @@ fn render_function_unpacked_overload(
     }
 
     if !primary_case.is_some_and(|function_case| !function_case.positional_args.is_empty()) {
-        output.push_str("    *,\n");
+        start_line(output, target, "    *,\n");
     }
 
     for field in &unpacked_input.parameters {
@@ -6447,7 +7065,7 @@ fn render_function_unpacked_overload(
         if primary_function.is_some_and(|function| function.args_field_name == field.attr_name) {
             if let Some(function_case) = primary_case {
                 if let Some(args_annotation) = &function_case.args_annotation {
-                    output.push_str("    ");
+                    start_line(output, target, "    ");
                     output.push_str(&field.attr_name);
                     output.push_str(": ");
                     output.push_str(args_annotation);
@@ -6464,7 +7082,7 @@ fn render_function_unpacked_overload(
             .iter()
             .find(|function_case| function_case.callable_field_name == field.attr_name)
         {
-            output.push_str("    ");
+            start_line(output, target, "    ");
             output.push_str(&field.attr_name);
             output.push_str(": ");
             output.push_str(&function_case.callable_annotation);
@@ -6480,7 +7098,7 @@ fn render_function_unpacked_overload(
             .find(|function_case| function_case.args_field_name == field.attr_name)
         {
             if let Some(args_annotation) = &function_case.args_annotation {
-                output.push_str("    ");
+                start_line(output, target, "    ");
                 output.push_str(&field.attr_name);
                 output.push_str(": ");
                 output.push_str(args_annotation);
@@ -6492,7 +7110,7 @@ fn render_function_unpacked_overload(
             continue;
         }
 
-        output.push_str("    ");
+        start_line(output, target, "    ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
         output.push_str(&python_parameter_annotation(
@@ -6505,8 +7123,9 @@ fn render_function_unpacked_overload(
         output.push_str(",\n");
     }
 
-    output.push_str(") -> ");
+    start_line(output, target, ") -> ");
     output.push_str(&function_unpacked_overload_return_annotation(
+        target,
         service,
         operation,
         overload_cases,
@@ -6610,12 +7229,13 @@ fn function_unpacked_overload_renders_parameter_name(
 
 fn render_function_unpacked_overload_case_doc(
     output: &mut String,
+    target: PythonTarget,
     unpacked_input: &RenderedUnpackedInput,
     overload_cases: &[RenderedFunctionOverloadCase],
 ) {
-    output.push_str("# Overload case:\n");
+    start_line(output, target, "# Overload case:\n");
     for overload_case in ordered_function_overload_cases(unpacked_input, overload_cases) {
-        output.push_str("# - ");
+        start_line(output, target, "# - ");
         output.push_str(&function_overload_case_doc(&overload_case));
         output.push('\n');
     }
@@ -6716,6 +7336,7 @@ fn function_overload_args_doc(
 }
 
 fn function_unpacked_overload_return_annotation(
+    target: PythonTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     overload_cases: &[RenderedFunctionOverloadCase],
@@ -6745,11 +7366,11 @@ fn function_unpacked_overload_return_annotation(
             );
         }
     }
+    if target == PythonTarget::Client {
+        return output_annotation;
+    }
     let output_annotation = temporalio_workflow_type_annotation(service, &output_annotation);
-    if operation.output_transform_expr.is_some()
-        || operation.output_resource_return.is_some()
-        || operation.output_direct_result
-    {
+    if operation_returns_direct(operation) {
         output_annotation
     } else {
         format!(
@@ -6817,22 +7438,241 @@ fn replace_python_identifier(source: &str, identifier: &str, replacement: &str) 
     output
 }
 
+/// The target of the operation code. The renderers take it, since the target sets the form of the
+/// code, such as its indent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PythonTarget {
+    /// Module functions that Workflow code calls.
+    Workflow,
+    /// Methods of a client extension, which code outside a Workflow calls.
+    Client,
+}
+
+impl PythonTarget {
+    fn package_dir(self) -> Option<&'static str> {
+        match self {
+            Self::Workflow => GenerationTarget::Workflow,
+            Self::Client => GenerationTarget::Client,
+        }
+        .package_dir()
+    }
+
+    /// The indent of each line at the level of the target's `def`.
+    fn indent(self) -> &'static str {
+        match self {
+            Self::Workflow => "",
+            Self::Client => "    ",
+        }
+    }
+
+    /// The indent one level deeper than `indent`, as in the target's function bodies.
+    fn body_indent(self) -> &'static str {
+        const SPACES: &str = "        ";
+        &SPACES[..self.indent().len() + 4]
+    }
+}
+
+/// Starts the `def` line of an operation, with `self` for a method.
+fn render_operation_signature_start(output: &mut String, target: PythonTarget, name: &str) {
+    start_line(output, target, "async def ");
+    output.push_str(name);
+    output.push_str("(\n");
+    if target == PythonTarget::Client {
+        start_line(output, target, "    self,\n");
+    }
+}
+
+fn start_line(output: &mut String, target: PythonTarget, text: &str) {
+    output.push_str(target.indent());
+    output.push_str(text);
+}
+
 fn render_operation_functions(
+    output: &mut String,
+    target: PythonTarget,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) {
+    match target {
+        PythonTarget::Workflow => {
+            render_request_only_operation_function(output, service, operation)
+        }
+        PythonTarget::Client => render_client_operation_method(output, service, operation),
+    }
+    if let Some(unpacked_input) = operation.target_unpacked_input(target) {
+        output.push('\n');
+        if function_unpacked_needs_overloads(&unpacked_input.functions) {
+            render_function_unpacked_overloads(output, target, service, operation, unpacked_input);
+            output.push('\n');
+        }
+        render_unpacked_operation_function(output, target, service, operation, unpacked_input);
+    } else if target == PythonTarget::Client {
+        output.push('\n');
+        render_client_request_method(output, service, operation);
+    }
+}
+
+/// The name of the private client method that starts the operation and awaits the result.
+fn client_operation_name(
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) -> String {
+    format!("_{}_{}", service.name.to_snake_case(), operation.attr_name)
+}
+
+/// The type of the awaited result of an operation.
+fn operation_result_annotation(operation: &RenderedOperation<'_>) -> String {
+    if operation_returns_direct(operation) {
+        erase_python_type_parameters_with_replacement(
+            &operation.overload_output_annotation,
+            &operation.output_type_parameters,
+            "typing.Any",
+        )
+    } else {
+        operation.output_annotation.clone()
+    }
+}
+
+/// Whether a Workflow function awaits the handle itself, to transform the result or build a
+/// resource.
+fn operation_returns_direct(operation: &RenderedOperation<'_>) -> bool {
+    operation.output_transform_expr.is_some()
+        || operation.output_resource_return.is_some()
+        || operation.output_direct_result
+}
+
+fn render_client_operation_method(
     output: &mut String,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
-    render_request_only_operation_function(output, service, operation);
-    if service.endpoint.is_none() {
-        return;
+    let target = PythonTarget::Client;
+    render_operation_signature_start(output, target, &client_operation_name(service, operation));
+    if let Some(input) = &operation.input {
+        start_line(output, target, "    request: ");
+        output.push_str(&input.annotation);
+        output.push_str(",\n");
     }
-    if let Some(unpacked_input) = &operation.unpacked_input {
+    start_line(output, target, ") -> ");
+    output.push_str(&operation_result_annotation(operation));
+    output.push_str(":\n");
+    render_inline_nexus_client(output, target, service);
+    // `output_type` names the generic model with no type arguments, so the cast adds them.
+    let cast_handle = operation.generic_model_types && !operation_returns_direct(operation);
+    if cast_handle {
+        start_line(output, target, "    handle = typing.cast(\n");
+        start_line(output, target, "        collections.abc.Awaitable[");
+        output.push_str(&operation.output_annotation);
+        output.push_str("],\n");
+        start_line(
+            output,
+            target,
+            "        await nexus_client.start_operation(\n",
+        );
+    } else {
+        start_line(
+            output,
+            target,
+            "    handle = await nexus_client.start_operation(\n",
+        );
+    }
+    start_line(output, target, "        operation=");
+    output.push_str(&python_string_literal(operation.wire_name));
+    output.push_str(",\n");
+    start_line(output, target, "        input=");
+    output.push_str(operation_input_wire_expr(operation));
+    output.push_str(",\n");
+    if !operation.output_none {
+        start_line(output, target, "        output_type=");
+        output.push_str(&operation.output_type_expr);
+        output.push_str(",\n");
+    }
+    if cast_handle {
+        start_line(output, target, "        ),\n");
+    }
+    start_line(output, target, "    )\n");
+    if let Some(transform_expr) = &operation.output_transform_expr {
+        start_line(output, target, "    result = await handle\n");
+        start_line(output, target, "    return ");
+        output.push_str(transform_expr);
         output.push('\n');
-        if function_unpacked_needs_overloads(&unpacked_input.functions) {
-            render_function_unpacked_overloads(output, service, operation, unpacked_input);
-            output.push('\n');
+    } else if let Some(resource_return) = &operation.output_resource_return {
+        start_line(output, target, "    result = await handle\n");
+        render_resource_return_guards(output, target.body_indent(), operation, resource_return);
+        if let Some(holder) = &resource_return.holder {
+            render_resource_holder_return(
+                output,
+                target,
+                resource_return,
+                holder,
+                operation.client_binds_resource,
+            );
+            return;
         }
-        render_unpacked_operation_function(output, service, operation, unpacked_input);
+        start_line(output, target, "    resource = ");
+        output.push_str(&resource_return.resource_type_name);
+        output.push_str("(\n");
+        for binding in &resource_return.bindings {
+            start_line(output, target, "        ");
+            output.push_str(&python_field_name(&binding.field_name));
+            output.push('=');
+            output.push_str(&resource_return_binding_expr_python(binding));
+            output.push_str(",\n");
+        }
+        start_line(output, target, "    )\n");
+        start_line(output, target, "    return ");
+        if operation.client_binds_resource {
+            output.push_str(&resource_operations_bind_function_name_for_type(
+                &resource_return.resource_type_name,
+            ));
+            output.push_str("(resource, self)\n");
+        } else {
+            output.push_str("resource\n");
+        }
+    } else if operation.output_direct_result && operation.client_binds_resource {
+        start_line(output, target, "    resource = await handle\n");
+        start_line(output, target, "    return ");
+        output.push_str(&resource_operations_bind_function_name_for_type(
+            &operation.output_ref,
+        ));
+        output.push_str("(resource, self)\n");
+    } else if operation.output_none {
+        start_line(output, target, "    await handle\n");
+    } else {
+        start_line(output, target, "    return await handle\n");
+    }
+}
+
+/// The public method of an operation whose request isn't unpacked.
+fn render_client_request_method(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) {
+    let target = PythonTarget::Client;
+    if operation.deprecated {
+        start_line(
+            output,
+            target,
+            "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
+    render_operation_signature_start(output, target, &operation.attr_name);
+    if operation.input.is_some() {
+        start_line(output, target, "    request: ");
+        output.push_str(operation_input_annotation(operation));
+        output.push_str(",\n");
+    }
+    start_line(output, target, ") -> ");
+    output.push_str(&operation_result_annotation(operation));
+    output.push_str(":\n");
+    render_operation_docstring(output, target.body_indent(), operation, &[], None);
+    start_line(output, target, "    return await self.");
+    output.push_str(&client_operation_name(service, operation));
+    if operation.input.is_some() {
+        output.push_str("(request)\n");
+    } else {
+        output.push_str("()\n");
     }
 }
 
@@ -6843,13 +7683,8 @@ fn function_unpacked_needs_overloads(functions: &[RenderedFunctionField]) -> boo
     })
 }
 
-fn request_operation_function_name(
-    service: &RenderedService<'_>,
-    operation: &RenderedOperation<'_>,
-) -> String {
-    if service.endpoint.is_none() {
-        format!("{}_request", operation.attr_name)
-    } else if operation.unpacked_input.is_some() {
+fn request_operation_function_name(operation: &RenderedOperation<'_>) -> String {
+    if operation.unpacked_input.is_some() {
         format!("_{}", operation.attr_name)
     } else {
         operation.attr_name.clone()
@@ -6903,26 +7738,12 @@ fn planned_record_type(record: &RecordSpec<PlannedFamily>) -> PlannedType {
     })
 }
 
-fn render_endpoint_parameter(output: &mut String, service: &RenderedService<'_>) {
-    if service.endpoint.is_none() {
-        output.push_str("    endpoint: str,\n");
-    }
-}
-
-fn endpoint_forward_args(service: &RenderedService<'_>) -> &'static str {
-    if service.endpoint.is_none() {
-        "endpoint, request"
-    } else {
-        "request"
-    }
-}
-
 fn render_request_only_operation_function(
     output: &mut String,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
-    let function_name = request_operation_function_name(service, operation);
+    let function_name = request_operation_function_name(operation);
     let render_request_doc = operation.unpacked_input.is_none();
     if operation.deprecated {
         output.push_str(
@@ -6932,7 +7753,6 @@ fn render_request_only_operation_function(
     output.push_str("async def ");
     output.push_str(&function_name);
     output.push_str("(\n");
-    render_endpoint_parameter(output, service);
     if let Some(input) = &operation.input {
         output.push_str("    request: ");
         output.push_str(&input.annotation);
@@ -6962,7 +7782,7 @@ fn render_request_only_operation_function(
         output.push_str(",\n");
         output.push_str("]:\n");
         if render_request_doc {
-            render_operation_docstring(output, operation, &[], None);
+            render_operation_docstring(output, "    ", operation, &[], None);
         }
         render_temporalio_workflow_runtime_imports(
             output,
@@ -6970,7 +7790,7 @@ fn render_request_only_operation_function(
             &temporalio_workflow_operation_runtime_names(service, operation),
             "    ",
         );
-        render_inline_nexus_client(output, service, "    ");
+        render_inline_nexus_client(output, PythonTarget::Workflow, service);
         if operation.generic_model_types {
             output.push_str("    return typing.cast(\n");
             output.push_str("        ");
@@ -7022,7 +7842,7 @@ fn render_request_only_operation_function(
     }
 
     if render_request_doc {
-        render_operation_docstring(output, operation, &[], None);
+        render_operation_docstring(output, "    ", operation, &[], None);
     }
 
     render_temporalio_workflow_runtime_imports(
@@ -7033,7 +7853,7 @@ fn render_request_only_operation_function(
     );
 
     if operation.output_direct_result {
-        render_inline_nexus_client(output, service, "    ");
+        render_inline_nexus_client(output, PythonTarget::Workflow, service);
         output.push_str("    handle = await nexus_client.start_operation(\n");
         output.push_str("        operation=");
         output.push_str(&python_string_literal(operation.wire_name));
@@ -7046,19 +7866,11 @@ fn render_request_only_operation_function(
         output.push_str(&operation.output_type_expr);
         output.push_str(",\n");
         output.push_str("    )\n");
-        if service.endpoint.is_none()
-            && operation.output_module_path.as_deref() == Some("._resources")
-        {
-            output.push_str("    resource = await handle\n");
-            output.push_str("    setattr(resource, \"_endpoint\", endpoint)\n");
-            output.push_str("    return resource\n");
-        } else {
-            output.push_str("    return await handle\n");
-        }
+        output.push_str("    return await handle\n");
         return;
     }
 
-    render_inline_nexus_client(output, service, "    ");
+    render_inline_nexus_client(output, PythonTarget::Workflow, service);
     output.push_str("    handle = await nexus_client.start_operation(\n");
     output.push_str("        operation=");
     output.push_str(&python_string_literal(operation.wire_name));
@@ -7081,14 +7893,16 @@ fn render_request_only_operation_function(
         output.push_str("    result = await handle\n");
         render_resource_return_guards(output, "    ", operation, resource_return);
         if let Some(holder) = &resource_return.holder {
-            render_resource_holder_return(output, resource_return, holder);
+            render_resource_holder_return(
+                output,
+                PythonTarget::Workflow,
+                resource_return,
+                holder,
+                false,
+            );
             return;
         }
-        if service.endpoint.is_none() {
-            output.push_str("    resource = ");
-        } else {
-            output.push_str("    return ");
-        }
+        output.push_str("    return ");
         output.push_str(&resource_return.resource_type_name);
         output.push_str("(\n");
         for binding in &resource_return.bindings {
@@ -7099,10 +7913,6 @@ fn render_request_only_operation_function(
             output.push_str(",\n");
         }
         output.push_str("    )\n");
-        if service.endpoint.is_none() {
-            output.push_str("    setattr(resource, \"_endpoint\", endpoint)\n");
-            output.push_str("    return resource\n");
-        }
     }
 }
 
@@ -7110,15 +7920,17 @@ fn render_request_only_operation_function(
 /// field of the same name in the wire record.
 fn render_resource_holder_return(
     output: &mut String,
+    target: PythonTarget,
     resource_return: &PlannedOperationResourceReturn,
     holder: &PlannedResourceHolder,
+    bind: bool,
 ) {
-    output.push_str("    return ");
+    start_line(output, target, "    return ");
     output.push_str(&holder.model_name);
     output.push_str("(\n");
     for field in &holder.fields {
         let name = python_field_name(&field.name);
-        output.push_str("        ");
+        start_line(output, target, "        ");
         output.push_str(&name);
         if !field.resource {
             output.push_str("=result.");
@@ -7127,22 +7939,34 @@ fn render_resource_holder_return(
             continue;
         }
         output.push('=');
+        let client = target == PythonTarget::Client && bind;
+        if client {
+            output.push_str(&resource_operations_bind_function_name_for_type(
+                &resource_return.resource_type_name,
+            ));
+            output.push('(');
+        }
         output.push_str(&resource_return.resource_type_name);
         output.push_str("(\n");
         for binding in &resource_return.bindings {
-            output.push_str("            ");
+            start_line(output, target, "            ");
             output.push_str(&python_field_name(&binding.field_name));
             output.push('=');
             output.push_str(&resource_return_binding_expr_python(binding));
             output.push_str(",\n");
         }
-        output.push_str("        ),\n");
+        start_line(output, target, "        )");
+        if client {
+            output.push_str(", self)");
+        }
+        output.push_str(",\n");
     }
-    output.push_str("    )\n");
+    start_line(output, target, "    )\n");
 }
 
 fn render_unpacked_operation_docstring(
     output: &mut String,
+    indent: &str,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
     primary_function: Option<&RenderedFunctionField>,
@@ -7224,7 +8048,13 @@ fn render_unpacked_operation_docstring(
         }
     }
 
-    render_operation_docstring(output, operation, &args, operation.return_doc.as_deref());
+    render_operation_docstring(
+        output,
+        indent,
+        operation,
+        &args,
+        operation.return_doc.as_deref(),
+    );
 }
 
 fn python_field_doc_rendered_as_function_arg(
@@ -7242,13 +8072,14 @@ fn python_field_doc_rendered_as_function_arg(
 
 fn render_operation_docstring(
     output: &mut String,
+    indent: &str,
     operation: &RenderedOperation<'_>,
     args: &[(String, String)],
     returns: Option<&str>,
 ) {
     render_python_docstring(
         output,
-        "    ",
+        indent,
         operation.doc.as_deref(),
         args,
         returns,
@@ -7435,27 +8266,28 @@ fn python_docstring_literal_text(value: &str) -> String {
 
 fn render_unpacked_operation_function(
     output: &mut String,
+    target: PythonTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
 ) {
     if !unpacked_input.functions.is_empty() {
-        render_function_unpacked_implementation(output, service, operation, unpacked_input);
+        render_function_unpacked_implementation(output, target, service, operation, unpacked_input);
         return;
     }
 
+    let body_indent = target.body_indent();
     if operation.deprecated {
-        output.push_str(
+        start_line(
+            output,
+            target,
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    output.push_str("async def ");
-    output.push_str(&operation.attr_name);
-    output.push_str("(\n");
-    render_endpoint_parameter(output, service);
-    output.push_str("    *,\n");
+    render_operation_signature_start(output, target, &operation.attr_name);
+    start_line(output, target, "    *,\n");
     for field in &unpacked_input.parameters {
-        output.push_str("    ");
+        start_line(output, target, "    ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
         output.push_str(&python_parameter_annotation(
@@ -7463,53 +8295,77 @@ fn render_unpacked_operation_function(
             &field.default_kind,
         ));
         if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
-            render_python_default_expr(output, &default_expr, "    ");
+            render_python_default_expr(output, &default_expr, body_indent);
         }
         output.push_str(",\n");
     }
-    if operation.output_transform_expr.is_some()
-        || operation.output_resource_return.is_some()
-        || operation.output_direct_result
-    {
-        output.push_str(") -> ");
-        output.push_str(&function_unpacked_implementation_return_annotation(
-            service, operation,
-        ));
-        output.push_str(":\n");
-    } else {
-        output.push_str(") -> ");
-        output.push_str(&temporalio_workflow_type_ref(
-            service,
-            "NexusOperationHandle",
-        ));
-        output.push_str("[\n");
-        output.push_str("    ");
-        output.push_str(&function_unpacked_implementation_return_annotation(
-            service, operation,
-        ));
-        output.push_str(",\n");
-        output.push_str("]:\n");
-    }
-    render_unpacked_operation_docstring(output, operation, unpacked_input, None);
+    render_unpacked_return_annotation(output, target, service, operation);
+    render_unpacked_operation_docstring(output, body_indent, operation, unpacked_input, None);
     for flattened_message in &unpacked_input.flattened_messages {
-        render_flattened_message_setup(output, flattened_message);
+        render_flattened_message_setup(output, body_indent, flattened_message);
     }
-    output.push_str("    request = ");
+    start_line(output, target, "    request = ");
     output.push_str(&unpacked_input.model_name);
     output.push_str("(\n");
     for field in &unpacked_input.request_fields {
-        output.push_str("        ");
+        start_line(output, target, "        ");
         output.push_str(&field.attr_name);
         output.push('=');
         output.push_str(&unpacked_request_field_value_expr(field));
         output.push_str(",\n");
     }
-    output.push_str("    )\n");
-    output.push_str("    return await ");
-    output.push_str(&request_operation_function_name(service, operation));
-    output.push('(');
-    output.push_str(endpoint_forward_args(service));
-    output.push_str(")\n");
+    start_line(output, target, "    )\n");
+    start_line(output, target, "    return await ");
+    output.push_str(&operation_call_target(target, service, operation));
+    output.push_str("(request)\n");
+}
+
+/// The return annotation of an unpacked operation. A Workflow function returns the operation
+/// handle, unless it awaits the result itself.
+fn render_unpacked_return_annotation(
+    output: &mut String,
+    target: PythonTarget,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) {
+    start_line(output, target, ") -> ");
+    if target == PythonTarget::Client {
+        output.push_str(&erase_python_type_parameters_with_replacement(
+            &operation.overload_output_annotation,
+            &operation.output_type_parameters,
+            "typing.Any",
+        ));
+        output.push_str(":\n");
+    } else if operation_returns_direct(operation) {
+        output.push_str(&function_unpacked_implementation_return_annotation(
+            service, operation,
+        ));
+        output.push_str(":\n");
+    } else {
+        output.push_str(&temporalio_workflow_type_ref(
+            service,
+            "NexusOperationHandle",
+        ));
+        output.push_str("[\n");
+        start_line(output, target, "    ");
+        output.push_str(&function_unpacked_implementation_return_annotation(
+            service, operation,
+        ));
+        output.push_str(",\n");
+        start_line(output, target, "]:\n");
+    }
+}
+
+/// The function or method that an unpacked operation passes its request to.
+fn operation_call_target(
+    target: PythonTarget,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) -> String {
+    match target {
+        PythonTarget::Workflow => request_operation_function_name(operation),
+        PythonTarget::Client => format!("self.{}", client_operation_name(service, operation)),
+    }
 }
 
 fn function_unpacked_implementation_return_annotation(
@@ -7544,37 +8400,37 @@ fn operation_public_return_annotation(
 
 fn render_function_unpacked_implementation(
     output: &mut String,
+    target: PythonTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
 ) {
     if operation.deprecated {
-        output.push_str(
+        start_line(
+            output,
+            target,
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    output.push_str("async def ");
-    output.push_str(&operation.attr_name);
-    output.push_str("(\n");
-    render_endpoint_parameter(output, service);
+    render_operation_signature_start(output, target, &operation.attr_name);
 
     let primary_function = primary_function(&unpacked_input.functions);
     if let Some(function) = primary_function {
-        output.push_str("    ");
+        start_line(output, target, "    ");
         output.push_str(&function.callable_field_name);
         output.push_str(": ");
         output.push_str(&function.callable_annotation);
         output.push_str(",\n");
         if let Some(parameters) = python_function_fixed_positional_args(function) {
             for parameter in parameters {
-                output.push_str("    ");
+                start_line(output, target, "    ");
                 output.push_str(&parameter.name);
                 output.push_str(": ");
                 output.push_str(&parameter.annotation);
                 output.push_str(",\n");
             }
         } else {
-            output.push_str("    *positional_args: ");
+            start_line(output, target, "    *positional_args: ");
             output.push_str(&python_function_positional_args_annotation(function));
             output.push_str(",\n");
         }
@@ -7590,14 +8446,14 @@ fn render_function_unpacked_implementation(
             .is_some()
             && has_keyword_only_parameters)
     {
-        output.push_str("    *,\n");
+        start_line(output, target, "    *,\n");
     }
 
     for field in &unpacked_input.parameters {
         if !rendered_function_implementation_renders_field(field, primary_function) {
             continue;
         }
-        output.push_str("    ");
+        start_line(output, target, "    ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
         if let Some(function) = unpacked_input
@@ -7629,35 +8485,19 @@ fn render_function_unpacked_implementation(
             ));
         }
         if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
-            render_python_default_expr(output, &default_expr, "    ");
+            render_python_default_expr(output, &default_expr, target.body_indent());
         }
         output.push_str(",\n");
     }
 
-    if operation.output_transform_expr.is_some()
-        || operation.output_resource_return.is_some()
-        || operation.output_direct_result
-    {
-        output.push_str(") -> ");
-        output.push_str(&function_unpacked_implementation_return_annotation(
-            service, operation,
-        ));
-        output.push_str(":\n");
-    } else {
-        output.push_str(") -> ");
-        output.push_str(&temporalio_workflow_type_ref(
-            service,
-            "NexusOperationHandle",
-        ));
-        output.push_str("[\n");
-        output.push_str("    ");
-        output.push_str(&function_unpacked_implementation_return_annotation(
-            service, operation,
-        ));
-        output.push_str(",\n");
-        output.push_str("]:\n");
-    }
-    render_unpacked_operation_docstring(output, operation, unpacked_input, primary_function);
+    render_unpacked_return_annotation(output, target, service, operation);
+    render_unpacked_operation_docstring(
+        output,
+        target.body_indent(),
+        operation,
+        unpacked_input,
+        primary_function,
+    );
 
     for function in &unpacked_input.functions {
         if !matches!(function.args, RenderedFunctionArgs::Varargs { .. }) {
@@ -7665,43 +8505,45 @@ fn render_function_unpacked_implementation(
         }
         let normalized_args_name = format!("normalized_{}", function.args_field_name);
         if function.primary {
-            output.push_str("    if positional_args and ");
+            start_line(output, target, "    if positional_args and ");
             output.push_str(&function.args_field_name);
             output.push_str(" is not None:\n");
-            output.push_str(
+            start_line(
+                output,
+                target,
                 "        raise TypeError(\"cannot specify both positional arguments and ",
             );
             output.push_str(&function.args_field_name);
             output.push_str("\")\n");
-            output.push_str("    ");
+            start_line(output, target, "    ");
             output.push_str(&normalized_args_name);
             output.push_str(": list[typing.Any] | None = (\n");
-            output.push_str("        list(positional_args)\n");
-            output.push_str("        if positional_args\n");
-            output.push_str("        else ");
+            start_line(output, target, "        list(positional_args)\n");
+            start_line(output, target, "        if positional_args\n");
+            start_line(output, target, "        else ");
             output.push_str(&function.args_field_name);
             output.push('\n');
-            output.push_str("    )\n");
+            start_line(output, target, "    )\n");
         } else {
-            output.push_str("    ");
+            start_line(output, target, "    ");
             output.push_str(&normalized_args_name);
             output.push_str(": list[typing.Any] | None\n");
-            output.push_str("    if ");
+            start_line(output, target, "    if ");
             output.push_str(&function.args_field_name);
             output.push_str(" is None:\n");
-            output.push_str("        ");
+            start_line(output, target, "        ");
             output.push_str(&normalized_args_name);
             output.push_str(" = None\n");
-            output.push_str("    elif isinstance(");
+            start_line(output, target, "    elif isinstance(");
             output.push_str(&function.args_field_name);
             output.push_str(", list):\n");
-            output.push_str("        ");
+            start_line(output, target, "        ");
             output.push_str(&normalized_args_name);
             output.push_str(" = typing.cast(list[typing.Any], ");
             output.push_str(&function.args_field_name);
             output.push_str(")\n");
-            output.push_str("    else:\n");
-            output.push_str("        ");
+            start_line(output, target, "    else:\n");
+            start_line(output, target, "        ");
             output.push_str(&normalized_args_name);
             output.push_str(" = [");
             output.push_str(&function.args_field_name);
@@ -7709,10 +8551,10 @@ fn render_function_unpacked_implementation(
         }
     }
     for flattened_message in &unpacked_input.flattened_messages {
-        render_flattened_message_setup(output, flattened_message);
+        render_flattened_message_setup(output, target.body_indent(), flattened_message);
     }
 
-    output.push_str("    request = ");
+    start_line(output, target, "    request = ");
     output.push_str(&unpacked_input.model_name);
     output.push_str("(\n");
     for field in &unpacked_input.request_fields {
@@ -7725,18 +8567,16 @@ fn render_function_unpacked_implementation(
             })
             .map(|function| format!("normalized_{}", function.args_field_name))
             .unwrap_or_else(|| unpacked_request_field_value_expr(field));
-        output.push_str("        ");
+        start_line(output, target, "        ");
         output.push_str(&field.attr_name);
         output.push('=');
         output.push_str(&value_expr);
         output.push_str(",\n");
     }
-    output.push_str("    )\n");
-    output.push_str("    return await ");
-    output.push_str(&request_operation_function_name(service, operation));
-    output.push('(');
-    output.push_str(endpoint_forward_args(service));
-    output.push_str(")\n");
+    start_line(output, target, "    )\n");
+    start_line(output, target, "    return await ");
+    output.push_str(&operation_call_target(target, service, operation));
+    output.push_str("(request)\n");
 }
 
 fn rendered_function_implementation_renders_field(
@@ -7761,6 +8601,7 @@ fn rendered_function_implementation_renders_field(
 
 fn render_flattened_message_setup(
     output: &mut String,
+    indent: &str,
     flattened_message: &RenderedFlattenedMessage,
 ) {
     let always_construct = flattened_message.required
@@ -7769,26 +8610,30 @@ fn render_flattened_message_setup(
             .iter()
             .any(|field| field.default_kind == PythonFieldDefaultKind::Required);
 
-    output.push_str("    ");
+    output.push_str(indent);
     output.push_str(&flattened_message.local_name);
     output.push_str(" = ");
     if always_construct {
         output.push_str(&flattened_message.model_name);
         output.push_str("(\n");
         for field in &flattened_message.fields {
-            output.push_str("        ");
+            output.push_str(indent);
+            output.push_str("    ");
             output.push_str(&field.attr_name);
             output.push('=');
             output.push_str(&field.initialized_expr);
             output.push_str(",\n");
         }
-        output.push_str("    )\n");
+        output.push_str(indent);
+        output.push_str(")\n");
         return;
     }
 
     output.push_str("(\n");
-    output.push_str("        None\n");
-    output.push_str("        if ");
+    output.push_str(indent);
+    output.push_str("    None\n");
+    output.push_str(indent);
+    output.push_str("    if ");
     for (index, field) in flattened_message.fields.iter().enumerate() {
         if index > 0 {
             output.push_str(" and ");
@@ -7797,45 +8642,57 @@ fn render_flattened_message_setup(
         output.push_str(" is None");
     }
     output.push_str("\n");
-    output.push_str("        else ");
+    output.push_str(indent);
+    output.push_str("    else ");
     output.push_str(&flattened_message.model_name);
     output.push_str("(\n");
     for field in &flattened_message.fields {
-        output.push_str("            ");
+        output.push_str(indent);
+        output.push_str("        ");
         output.push_str(&field.attr_name);
         output.push('=');
         output.push_str(&field.initialized_expr);
         output.push_str(",\n");
     }
-    output.push_str("        )\n");
+    output.push_str(indent);
     output.push_str("    )\n");
-}
-
-fn render_inline_nexus_client(output: &mut String, service: &RenderedService<'_>, indent: &str) {
-    output.push_str(indent);
-    if service.delay_load_temporalio_workflow {
-        output.push_str("nexus_client = create_nexus_client(\n");
-    } else {
-        output.push_str("nexus_client = temporalio.workflow.create_nexus_client(\n");
-    }
-    output.push_str(indent);
-    output.push_str("    service=");
-    output.push_str(&python_string_literal(service.wire_name));
-    output.push_str(",\n");
-    output.push_str(indent);
-    output.push_str("    endpoint=");
-    output.push_str(&python_service_endpoint_expr(service));
-    output.push_str(",\n");
     output.push_str(indent);
     output.push_str(")\n");
 }
 
-fn python_service_endpoint_expr(service: &RenderedService<'_>) -> String {
-    service
-        .endpoint
-        .as_ref()
-        .map(|endpoint| python_string_literal(endpoint))
-        .unwrap_or_else(|| "endpoint".to_string())
+fn render_inline_nexus_client(
+    output: &mut String,
+    target: PythonTarget,
+    service: &RenderedService<'_>,
+) {
+    let endpoint = python_string_literal(
+        service
+            .endpoint
+            .as_deref()
+            .expect("an operation function should have a service endpoint"),
+    );
+    match target {
+        PythonTarget::Client => start_line(
+            output,
+            target,
+            "    nexus_client = self._create_nexus_client(\n",
+        ),
+        PythonTarget::Workflow if service.delay_load_temporalio_workflow => {
+            start_line(output, target, "    nexus_client = create_nexus_client(\n")
+        }
+        PythonTarget::Workflow => start_line(
+            output,
+            target,
+            "    nexus_client = temporalio.workflow.create_nexus_client(\n",
+        ),
+    }
+    start_line(output, target, "        service=");
+    output.push_str(&python_string_literal(service.wire_name));
+    output.push_str(",\n");
+    start_line(output, target, "        endpoint=");
+    output.push_str(&endpoint);
+    output.push_str(",\n");
+    start_line(output, target, "    )\n");
 }
 
 fn python_parameter_default_expr(default_kind: &PythonFieldDefaultKind) -> Option<String> {

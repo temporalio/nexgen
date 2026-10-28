@@ -1,0 +1,1 @@
+`--targets workflow,client` also generates a Python `client` package, with its own resource classes and a client extension for each service. The client methods start the operations from code outside a Workflow and return the result. The models are shared, and the Workflow package doesn't change.

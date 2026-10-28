@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["workflow", "client"]
+
+[error]
+kind = "client-target-name-conflict"
+contains = ["`_order_service_cancel`", "`Order`", "`OrderService`"]

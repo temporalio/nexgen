@@ -1,0 +1,6 @@
+languages = ["typescript", "go", "dotnet"]
+targets = ["client"]
+
+[error]
+kind = "unsupported-client-target"
+contains = ["the client target isn't for", "yet"]

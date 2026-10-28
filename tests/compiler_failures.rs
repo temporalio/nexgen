@@ -20,7 +20,26 @@ struct Expectation {
     descriptors: Option<Descriptors>,
     #[serde(default)]
     system_nexus: bool,
+    #[serde(default)]
+    targets: Vec<Target>,
     error: ExpectedError,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum Target {
+    Workflow,
+    Client,
+}
+
+fn generation_targets(targets: &[Target]) -> nexgen::nexgen_config::GenerationTargets {
+    if targets.is_empty() {
+        return Default::default();
+    }
+    nexgen::nexgen_config::GenerationTargets {
+        workflow: targets.contains(&Target::Workflow),
+        client: targets.contains(&Target::Client),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -161,6 +180,7 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
             config: nexgen::nexgen_config::NexgenConfig {
                 mode: GenerationMode::NativeApi,
                 system_nexus: expected.system_nexus,
+                targets: generation_targets(&expected.targets),
             },
             language,
             input_paths: inputs.clone(),
