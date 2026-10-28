@@ -59,7 +59,7 @@ async def _start_system_nexus_operation(
         and input.operation_name == "ValueOperation"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.ValueRequest, models.ValueResponse]",
+            "StartNexusOperationInput[models.ValueRequest[typing.Any], models.ValueResponse[typing.Any]]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
@@ -101,8 +101,8 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
         )
 
     async def start_value_operation(
-        self, request: models.ValueRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.ValueResponse]:
+        self, request: models.ValueRequest[typing.Any]
+    ) -> temporalio.workflow.NexusOperationHandle[models.ValueResponse[typing.Any]]:
         """Intercept the ValueOperation operation."""
         return await self._next_system_nexus_interceptor().start_value_operation(
             request
@@ -163,8 +163,8 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         )
 
     async def start_value_operation(
-        self, request: models.ValueRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.ValueResponse]:
+        self, request: models.ValueRequest[typing.Any]
+    ) -> temporalio.workflow.NexusOperationHandle[models.ValueResponse[typing.Any]]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
@@ -175,7 +175,9 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
                 service="InterceptorService",
                 operation="ValueOperation",
                 input=request,
-                output_type=models.ValueResponse,
+                output_type=typing.cast(
+                    "type[models.ValueResponse[typing.Any]]", models.ValueResponse
+                ),
                 schedule_to_close_timeout=None,
                 schedule_to_start_timeout=None,
                 start_to_close_timeout=None,
