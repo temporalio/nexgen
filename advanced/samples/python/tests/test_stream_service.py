@@ -4,6 +4,7 @@ import pytest
 from temporalio.converter import PayloadConverter
 import temporalio.nexus.system
 
+from streamprotos.temporal.api.enums.v1 import stream_pb2
 from streamprotos.temporal.api.stream.v1 import message_pb2
 from streamprotos.temporal.api.streamservice.v1 import request_response_pb2
 from wit.stream_service import models
@@ -89,3 +90,14 @@ def test_a_request_without_its_stream_is_refused() -> None:
         ValueError, match="missing required field AppendRecordsRequest.stream"
     ):
         _ = converter.from_transfer_type(wire, AppendRecordsRequest)
+
+
+def test_an_unknown_enum_number_fails_the_message() -> None:
+    converter = models._DescribeStreamResponseTransferTypeConverter()
+    # A newer server can send a Stream status that this code doesn't know.
+    wire = request_response_pb2.DescribeStreamResponse(
+        status=stream_pb2.StreamStatus.ValueType(9)
+    )
+
+    with pytest.raises(ValueError, match="9 is not a valid StreamStatus"):
+        _ = converter.from_transfer_type(wire, models.DescribeStreamResponse)

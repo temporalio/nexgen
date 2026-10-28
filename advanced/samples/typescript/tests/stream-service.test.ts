@@ -6,6 +6,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
   type ReadRecordsResponse,
   StreamCloseStatus,
+  describeStreamResponseTransferTypeConverter,
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/models.ts";
@@ -110,5 +111,19 @@ describe("stream-service generated output", () => {
     expect(String(startOperation.mock.calls[1][1].fromOffset)).toBe(
       "1880158843699200006",
     );
+  });
+
+  test("passes an enum number that it doesn't know through", () => {
+    // A newer server can send a Stream status that this code doesn't know.
+    const proto: temporal.api.streamservice.v1.IDescribeStreamResponse = {
+      status: 9 as temporal.api.enums.v1.StreamStatus,
+    };
+
+    const model = describeStreamResponseTransferTypeConverter.fromTransferType(proto);
+
+    expect(model.status).toBe(9);
+    expect(
+      describeStreamResponseTransferTypeConverter.toTransferType(model).status,
+    ).toBe(9);
   });
 });
