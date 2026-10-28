@@ -155,13 +155,15 @@ A System Nexus .NET output takes the `Temporalio.Workflows` namespace, which
 the WIT's `@nexus.poll` directive or the `--targets` flag of its header yet, so
 it ignores them. The header's proto paths are the crate's.
 
-Python doesn't generate the service, since it can't import the protos.
+Some of the output doesn't type-check. Python imports the Stream protos from
+`temporalio`, which doesn't have them, so basedpyright skips the service.
 TypeScript passes a `number` where a resource method's proto request wants a
 `Long`. So `tsc` skips the service, but the test still checks its models.
 
 - WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
 - .NET: [`dotnet/wit/stream-service/`](dotnet/wit/stream-service/),
   [`dotnet/tests/StreamServiceChecks.cs`](dotnet/tests/StreamServiceChecks.cs)
+- Python: [`python/wit/stream_service/`](python/wit/stream_service/)
 - TypeScript:
   [`typescript/wit/stream-service/`](typescript/wit/stream-service/),
   [`typescript/tests/stream-service.test.ts`](typescript/tests/stream-service.test.ts)
