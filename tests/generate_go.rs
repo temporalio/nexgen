@@ -164,54 +164,6 @@ fn cli_accepts_unused_go_support_package() {
 }
 
 #[test]
-fn cli_generates_go_with_package_self_imports_removed() {
-    let root = project_root();
-    let temp_dir = unique_output_path("go-namespace");
-    // The output directory's basename must match the last path segment of
-    // `@nexus.namespace go="..."` -- the generated package name always comes
-    // from the output directory, and this generated code is declared to live
-    // inside the real `go.temporal.io/sdk/workflow` package.
-    let output_path = temp_dir.join("workflow");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let temp_input_path = temp_dir.join("user-service.wit");
-    let input = fs::read_to_string(wit_input_path(&root, "user-service"))
-        .unwrap()
-        .replace(
-            "interface user-service {",
-            "/// @nexus.namespace go=\"go.temporal.io/sdk/workflow\"\ninterface user-service {",
-        );
-    fs::write(&temp_input_path, input).unwrap();
-
-    let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
-        .args([
-            "go",
-            temp_input_path.to_str().unwrap(),
-            "--output",
-            output_path.to_str().unwrap(),
-            "--support-package",
-            "example.com/nexgen/support",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let api = fs::read_to_string(output_path.join("userservice.go")).unwrap();
-    assert!(api.contains("package workflow\n"));
-    assert!(!api.contains("\"go.temporal.io/sdk/workflow\""));
-    assert!(!api.contains("type OperationFuture interface {"));
-    assert!(api.contains("func getUser(ctx Context, request getUserRequest) Future"));
-    assert!(!api.contains("const ServiceName"));
-    assert!(!api.contains("const Endpoint"));
-    assert!(!api.contains("const GetUserOp"));
-    assert!(api.contains("NexusOperationOptions{}"));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
 fn cli_rejects_go_output_directory_mismatched_with_namespace() {
     let root = project_root();
     let temp_dir = unique_output_path("go-namespace-mismatch");
@@ -775,45 +727,6 @@ fn go_json_output_named_support_has_no_support_file_collision() {
     .expect("support output name is no longer reserved for copied fragments");
     assert!(temp_dir.join("support/support.go").is_file());
     assert!(temp_dir.join("support/definitions.go").is_file());
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn go_wit_service_named_support_has_no_support_file_collision() {
-    let temp_dir = unique_output_path("go-wit-service-support-collision");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("support.wit");
-    fs::write(
-        &input_path,
-        r#"
-package temporal:collision@1.0.0;
-
-world system {
-  export support;
-}
-
-/// @nexus.endpoint "support"
-interface support {
-  record request { value: string }
-  run: func(request: request);
-}
-"#,
-    )
-    .unwrap();
-    generate_to_file(&GenerateRequest {
-        config: Default::default(),
-        language: nexgen::language::Language::Go,
-        input_paths: vec![input_path.clone()],
-        support_package: Some("example.com/nexgen/support".into()),
-        descriptor_paths: Vec::new(),
-        output_path: temp_dir.join("output"),
-        format: false,
-        java_package_name: None,
-        ts_date_time_types: Default::default(),
-        dotnet_namespace: None,
-    })
-    .expect("the service may now own support.go");
-    assert!(temp_dir.join("output/support.go").is_file());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 

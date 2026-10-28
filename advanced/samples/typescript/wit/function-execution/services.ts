@@ -14,6 +14,9 @@ import type {
   ExecuteNamedVarargsFunctionResult,
   ExecuteNamedVarargsFunctionRequest,
   ExecuteDescriptorsRequest,
+  ExecuteSecondaryGroupsRequest,
+  ExecuteFixedSecondaryRequest,
+  ExecuteDescriptorSecondaryRequest,
 } from "./models";
 
 export const functionExecution = nexus.service("FunctionExecution", {
@@ -42,4 +45,16 @@ export const functionExecution = nexus.service("FunctionExecution", {
   executeDescriptors: nexus.operation<ExecuteDescriptorsRequest, ExecuteFunctionResult>(
     { name: "ExecuteDescriptors" },
   ),
+  executeSecondaryGroups: nexus.operation<
+    ExecuteSecondaryGroupsRequest,
+    ExecuteFunctionResult
+  >({ name: "ExecuteSecondaryGroups" }),
+  executeFixedSecondary: nexus.operation<
+    ExecuteFixedSecondaryRequest,
+    ExecuteFunctionResult
+  >({ name: "ExecuteFixedSecondary" }),
+  executeDescriptorSecondary: nexus.operation<
+    ExecuteDescriptorSecondaryRequest,
+    ExecuteFunctionResult
+  >({ name: "ExecuteDescriptorSecondary" }),
 });

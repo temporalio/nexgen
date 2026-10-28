@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import wit.function_execution as function_execution
-from wit.function_execution.models import ExecuteCallbackRequest, ExecuteFunctionResult
+from wit.function_execution.models import (
+    ExecuteCallbackRequest,
+    ExecuteFixedSecondaryRequest,
+    ExecuteFunctionResult,
+)
 
 
 def valid_function(name: str, enabled: bool) -> str:
@@ -51,6 +55,38 @@ async def test_secondary_fixed_argument_callable_builds_request() -> None:
             function=valid_function,
             name="one",
             enabled=True,
+        ),
+        output_type=ExecuteFunctionResult,
+    )
+
+
+@pytest.mark.asyncio
+async def test_fixed_primary_with_secondary_callable_arguments() -> None:
+    handle = object()
+    start_operation = AsyncMock(return_value=handle)
+    client = Mock(start_operation=start_operation)
+    with patch("temporalio.workflow.create_nexus_client", return_value=client):
+        result = await function_execution.execute_fixed_secondary(
+            valid_function,
+            "fixed-name",
+            True,
+            signal="signal-name",
+            signal_args=["signal-value"],
+            other="other-name",
+            other_args=["other-value"],
+        )
+
+    assert result is handle
+    start_operation.assert_awaited_once_with(
+        operation="ExecuteFixedSecondary",
+        input=ExecuteFixedSecondaryRequest(
+            function=valid_function,
+            name="fixed-name",
+            enabled=True,
+            signal="signal-name",
+            signal_args=["signal-value"],
+            other="other-name",
+            other_args=["other-value"],
         ),
         output_type=ExecuteFunctionResult,
     )

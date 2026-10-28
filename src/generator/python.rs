@@ -6405,7 +6405,21 @@ fn render_function_unpacked_overload(
         }
     }
 
-    if !primary_case.is_some_and(|function_case| !function_case.positional_args.is_empty()) {
+    let has_keyword_only_parameters = unpacked_input.parameters.iter().any(|field| {
+        function_parameter_is_keyword_only(field, primary_function)
+            && function_unpacked_overload_renders_parameter_name(
+                unpacked_input,
+                primary_function,
+                primary_case,
+                overload_cases,
+                &field.attr_name,
+            )
+    });
+    if has_keyword_only_parameters
+        && !primary_case.is_some_and(|function_case| {
+            function_case.positional_args.iter().any(|arg| arg.variadic)
+        })
+    {
         output.push_str("    *,\n");
     }
 
@@ -7563,7 +7577,7 @@ fn render_function_unpacked_implementation(
     let has_keyword_only_parameters = unpacked_input
         .parameters
         .iter()
-        .any(|field| rendered_function_implementation_renders_field(field, primary_function));
+        .any(|field| function_parameter_is_keyword_only(field, primary_function));
     if primary_function.is_none()
         || (primary_function
             .and_then(python_function_fixed_positional_args)
@@ -7574,7 +7588,7 @@ fn render_function_unpacked_implementation(
     }
 
     for field in &unpacked_input.parameters {
-        if !rendered_function_implementation_renders_field(field, primary_function) {
+        if !function_parameter_is_keyword_only(field, primary_function) {
             continue;
         }
         output.push_str("    ");
@@ -7719,7 +7733,7 @@ fn render_function_unpacked_implementation(
     output.push_str(")\n");
 }
 
-fn rendered_function_implementation_renders_field(
+fn function_parameter_is_keyword_only(
     field: &RenderedUnpackedInputField,
     primary_function: Option<&RenderedFunctionField>,
 ) -> bool {

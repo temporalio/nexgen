@@ -7,12 +7,18 @@ export { executeNamedFunction } from "./operations/execute-named-function";
 export { executeVarargsFunction } from "./operations/execute-varargs-function";
 export { executeNamedVarargsFunction } from "./operations/execute-named-varargs-function";
 export { executeDescriptors } from "./operations/execute-descriptors";
+export { executeSecondaryGroups } from "./operations/execute-secondary-groups";
+export { executeFixedSecondary } from "./operations/execute-fixed-secondary";
+export { executeDescriptorSecondary } from "./operations/execute-descriptor-secondary";
 export type {
   ExecuteCallbackRequest,
   ExecuteCountedFunctionRequest,
+  ExecuteDescriptorSecondaryRequest,
   ExecuteDescriptorsRequest,
+  ExecuteFixedSecondaryRequest,
   ExecuteFunctionRequest,
   ExecuteNamedFunctionRequest,
   ExecuteNamedVarargsFunctionRequest,
+  ExecuteSecondaryGroupsRequest,
   ExecuteVarargsFunctionRequest,
 } from "./models";

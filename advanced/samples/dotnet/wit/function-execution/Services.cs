@@ -45,6 +45,18 @@ namespace Nexgen.FunctionExecution
         [NexusOperation("ExecuteDescriptors")]
         ExecuteFunctionResult ExecuteDescriptors(ExecuteDescriptorsRequest request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("ExecuteSecondaryGroups")]
+        ExecuteFunctionResult ExecuteSecondaryGroups(ExecuteSecondaryGroupsRequest request);
+
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("ExecuteFixedSecondary")]
+        ExecuteFunctionResult ExecuteFixedSecondary(ExecuteFixedSecondaryRequest request);
+
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("ExecuteDescriptorSecondary")]
+        ExecuteFunctionResult ExecuteDescriptorSecondary(ExecuteDescriptorSecondaryRequest request);
+
     }
 
     internal interface INexgenOperationInfo
@@ -93,6 +105,12 @@ namespace Nexgen.FunctionExecution
                 FunctionExecutionServiceDefinition.Operations["ExecuteNamedVarargsFunction"]),
             [("FunctionExecution", "ExecuteDescriptors")] = new NexgenOperationInfo<ExecuteDescriptorsRequest, ExecuteFunctionResult>(
                 FunctionExecutionServiceDefinition.Operations["ExecuteDescriptors"]),
+            [("FunctionExecution", "ExecuteSecondaryGroups")] = new NexgenOperationInfo<ExecuteSecondaryGroupsRequest, ExecuteFunctionResult>(
+                FunctionExecutionServiceDefinition.Operations["ExecuteSecondaryGroups"]),
+            [("FunctionExecution", "ExecuteFixedSecondary")] = new NexgenOperationInfo<ExecuteFixedSecondaryRequest, ExecuteFunctionResult>(
+                FunctionExecutionServiceDefinition.Operations["ExecuteFixedSecondary"]),
+            [("FunctionExecution", "ExecuteDescriptorSecondary")] = new NexgenOperationInfo<ExecuteDescriptorSecondaryRequest, ExecuteFunctionResult>(
+                FunctionExecutionServiceDefinition.Operations["ExecuteDescriptorSecondary"]),
         };
     }
 

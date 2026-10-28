@@ -82,3 +82,32 @@ class ExecuteDescriptorsRequest:
     callback_values: list[typing.Any] | None = dataclasses.field(default_factory=list)
     callable: collections.abc.Callable[..., str]
     callable_values: list[typing.Any] | None = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class ExecuteSecondaryGroupsRequest:
+    function: str | collections.abc.Callable[..., str]
+    args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    other: str | collections.abc.Callable[..., str]
+    other_args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    signal: str | collections.abc.Callable[..., str]
+    signal_args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class ExecuteFixedSecondaryRequest:
+    function: collections.abc.Callable[[str, bool], str]
+    name: str
+    enabled: bool
+    signal: str | collections.abc.Callable[..., str]
+    signal_args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    other: str | collections.abc.Callable[..., str]
+    other_args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class ExecuteDescriptorSecondaryRequest:
+    function: collections.abc.Callable[..., str]
+    primary_args: list[typing.Any] | None = dataclasses.field(default_factory=list)
+    signal: str | collections.abc.Callable[..., str]
+    signal_args: list[typing.Any] | None = dataclasses.field(default_factory=list)
