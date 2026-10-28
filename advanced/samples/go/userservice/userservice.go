@@ -272,6 +272,7 @@ func UpdateProfile(ctx workflow.Context, opts UpdateProfileOptions) workflow.Fut
 type NotifyAllOptions struct {
 }
 
+// Notify every user.
 func NotifyAll(ctx workflow.Context, opts NotifyAllOptions) workflow.Future {
 	return notifyAll(ctx, notifyAllRequest{})
 }

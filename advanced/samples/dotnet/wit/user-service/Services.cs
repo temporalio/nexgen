@@ -33,6 +33,9 @@ namespace Nexgen.UserService
         [NexusOperation("UpdateProfile")]
         void UpdateProfile(UpdateProfileRequest request);
 
+        /// <summary>
+        /// Notify every user.
+        /// </summary>
         [GeneratedCode("nexgen", null)]
         [NexusOperation("NotifyAll")]
         void NotifyAll();
@@ -192,6 +195,9 @@ namespace Nexgen.UserService
             return UpdateProfileAsync(request);
         }
 
+        /// <summary>
+        /// Notify every user.
+        /// </summary>
         [GeneratedCode("nexgen", null)]
         public async Task NotifyAllAsync()
         {
