@@ -43,6 +43,22 @@ namespace Temporalio.Workflows
         public string Id { get; set; }
     }
 
+    [GeneratedCode("nexgen", null)]
+    public class ValueOperationOptions<TValue>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ValueOperationOptions{TValue}"/> class.
+        /// </summary>
+        public ValueOperationOptions(string id, TValue value)
+        {
+            Id = id;
+            Value = value;
+        }
+
+        public string Id { get; set; }
+        public TValue Value { get; set; }
+    }
+
     /// <summary>
     /// Provides generated workflow operation helpers.
     /// </summary>
@@ -82,6 +98,22 @@ namespace Temporalio.Workflows
         {
             var request = new Request(options.Id);
             return SecondOperationAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<ValueResponse<TValue>> ValueOperationAsync<TValue>(ValueRequest<TValue> request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient("InterceptorService", InterceptorServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<ValueResponse<TValue>>("ValueOperation", request).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<ValueResponse<TValue>> ValueOperationAsync<TValue>(ValueOperationOptions<TValue> options)
+        {
+            var request = new ValueRequest<TValue>(options.Id, options.Value);
+            return ValueOperationAsync(request);
         }
 
     }

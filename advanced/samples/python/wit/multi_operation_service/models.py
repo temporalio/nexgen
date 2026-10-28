@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import dataclasses
+import typing
+
+
+ValueT = typing.TypeVar("ValueT")
 
 
 @dataclasses.dataclass(slots=True)
@@ -13,3 +17,14 @@ class Request:
 @dataclasses.dataclass(slots=True)
 class Response:
     value: str
+
+
+@dataclasses.dataclass(slots=True)
+class ValueRequest(typing.Generic[ValueT]):
+    id: str
+    value: ValueT
+
+
+@dataclasses.dataclass(slots=True)
+class ValueResponse(typing.Generic[ValueT]):
+    values: list[ValueT] | None = dataclasses.field(default_factory=list)

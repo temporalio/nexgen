@@ -17,6 +17,19 @@ func (m request) GetID() string {
 	return m.ID
 }
 
+type valueRequest[ValueT any] struct {
+	ID    string
+	Value ValueT
+}
+
+func (m valueRequest[ValueT]) GetID() string {
+	return m.ID
+}
+
+func (m valueRequest[ValueT]) GetValue() ValueT {
+	return m.Value
+}
+
 // --- Operations (internal) ---
 
 func firstOperation(ctx workflow.Context, request request) workflow.Future {
@@ -31,6 +44,12 @@ func secondOperation(ctx workflow.Context, request request) workflow.Future {
 	return fut
 }
 
+func valueOperation[ValueT any](ctx workflow.Context, request valueRequest[ValueT]) workflow.Future {
+	c := internal.NewSystemNexusClient("InterceptorService")
+	fut := c.ExecuteOperation(ctx, "ValueOperation", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
 // --- Operations (public API) ---
 
 type Response struct {
@@ -40,6 +59,15 @@ type Response struct {
 
 func (m Response) GetValue() string {
 	return m.Value
+}
+
+type ValueResponse[ValueT any] struct {
+	// Values - Required.
+	Values []ValueT
+}
+
+func (m ValueResponse[ValueT]) GetValues() []ValueT {
+	return m.Values
 }
 
 type FirstOperationOptions struct {
@@ -61,5 +89,19 @@ type SecondOperationOptions struct {
 func SecondOperation(ctx workflow.Context, opts SecondOperationOptions) workflow.Future {
 	return secondOperation(ctx, request{
 		ID: opts.ID,
+	})
+}
+
+type ValueOperationOptions[ValueT any] struct {
+	// ID - Required.
+	ID string
+	// Value - Required.
+	Value ValueT
+}
+
+func ValueOperation[ValueT any](ctx workflow.Context, opts ValueOperationOptions[ValueT]) workflow.Future {
+	return valueOperation(ctx, valueRequest[ValueT]{
+		ID:    opts.ID,
+		Value: opts.Value,
 	})
 }

@@ -27,6 +27,14 @@ namespace Temporalio.Worker.Interceptors
         [GeneratedCode("nexgen", null)]
         public virtual Task<NexusWorkflowOperationHandle<Response>> SecondOperationAsync(Request request) => Next.SecondOperationAsync(request);
 
+        /// <summary>
+        /// Intercept the ValueOperation operation.
+        /// </summary>
+        /// <param name="request">Request for the operation.</param>
+        /// <returns>Operation handle.</returns>
+        [GeneratedCode("nexgen", null)]
+        public virtual Task<NexusWorkflowOperationHandle<ValueResponse<object>>> ValueOperationAsync(ValueRequest<object> request) => Next.ValueOperationAsync(request);
+
     }
 
 }
@@ -70,6 +78,20 @@ namespace Temporalio.Worker
                 var handle = outbound.Value.SecondOperationAsync(request);
                 return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
             }
+            if (service == "InterceptorService" &&
+                operationName == "ValueOperation")
+            {
+                if (arg is not ValueRequest<object> request)
+                {
+                    throw new System.ArgumentException("System Nexus operation expects a ValueRequest<object> request.", nameof(arg));
+                }
+                if (typeof(TResult) != typeof(ValueResponse<object>))
+                {
+                    throw new System.ArgumentException("System Nexus operation expects a ValueResponse<object> result.");
+                }
+                var handle = outbound.Value.ValueOperationAsync(request);
+                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
+            }
             return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
                 Service: service,
                 Operation: new(
@@ -99,6 +121,16 @@ namespace Temporalio.Worker
                     "SecondOperation",
                     typeof(Request),
                     typeof(Response)),
+                Arg: request,
+                Headers: null));
+
+            [GeneratedCode("nexgen", null)]
+            public override Task<NexusWorkflowOperationHandle<ValueResponse<object>>> ValueOperationAsync(ValueRequest<object> request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<ValueResponse<object>>(new(
+                Service: "InterceptorService",
+                Operation: new(
+                    "ValueOperation",
+                    typeof(ValueRequest<object>),
+                    typeof(ValueResponse<object>)),
                 Arg: request,
                 Headers: null));
 

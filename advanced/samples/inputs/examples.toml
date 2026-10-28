@@ -4,6 +4,7 @@ descriptors = "temporal"
 
 [multi-operation-service]
 system_nexus = true
+descriptors = "temporal"
 
 [generic-models]
 descriptors = "temporal"

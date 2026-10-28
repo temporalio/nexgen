@@ -9,4 +9,8 @@ export const operationRegistry = [
     service: "InterceptorService",
     operation: "SecondOperation",
   },
+  {
+    service: "InterceptorService",
+    operation: "ValueOperation",
+  },
 ] as const;

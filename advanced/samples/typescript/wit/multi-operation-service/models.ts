@@ -7,3 +7,12 @@ export interface Response {
 export interface Request {
   id: string;
 }
+
+export interface ValueResponse<ValueT> {
+  values?: ValueT[];
+}
+
+export interface ValueRequest<ValueT> {
+  id: string;
+  value: ValueT;
+}

@@ -2,4 +2,5 @@
 
 export { firstOperation } from "./operations/first-operation";
 export { secondOperation } from "./operations/second-operation";
-export type { Request, Response } from "./models";
+export { valueOperation } from "./operations/value-operation";
+export type { Request, Response, ValueRequest, ValueResponse } from "./models";

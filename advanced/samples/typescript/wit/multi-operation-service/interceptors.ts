@@ -2,7 +2,7 @@
 
 import { composeInterceptors } from "../../../interceptor-composition";
 import type * as nexus from "../../../nexus";
-import type { Response, Request } from "./models";
+import type { Response, Request, ValueResponse, ValueRequest } from "./models";
 
 export interface SystemNexusWorkflowOutboundCallsInterceptor {
   firstOperation?: (
@@ -13,6 +13,12 @@ export interface SystemNexusWorkflowOutboundCallsInterceptor {
     input: Request,
     next: (input: Request) => Promise<nexus.NexusOperationHandle<Response>>,
   ) => Promise<nexus.NexusOperationHandle<Response>>;
+  valueOperation?: (
+    input: ValueRequest,
+    next: (
+      input: ValueRequest,
+    ) => Promise<nexus.NexusOperationHandle<ValueResponse<ValueT>>>,
+  ) => Promise<nexus.NexusOperationHandle<ValueResponse<ValueT>>>;
 }
 
 /** Dispatches the operation-specific interceptor chain selected by service and operation. */
@@ -34,6 +40,10 @@ export function dispatchSystemNexusSpecificInterceptors(
           return composeInterceptors(interceptors, "secondOperation", (request) =>
             next<Request, Response>(request),
           )(input as Request) as Promise<nexus.NexusOperationHandle<unknown>>;
+        case "ValueOperation":
+          return composeInterceptors(interceptors, "valueOperation", (request) =>
+            next<ValueRequest, ValueResponse<ValueT>>(request),
+          )(input as ValueRequest) as Promise<nexus.NexusOperationHandle<unknown>>;
         default:
           return next(input);
       }

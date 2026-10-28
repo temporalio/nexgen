@@ -10,10 +10,12 @@ import temporalio.converter
 from . import services as _services
 from .operations.first_operation import first_operation
 from .operations.second_operation import second_operation
+from .operations.value_operation import value_operation
 
 __all__ = [
     "first_operation",
     "second_operation",
+    "value_operation",
 ]
 
 
@@ -53,5 +55,11 @@ __nexus_operation_registry__: dict[
         "SecondOperation",
     ): _NexusOperationInfo(
         operation=_services.InterceptorService.second_operation,
+    ),
+    (
+        "InterceptorService",
+        "ValueOperation",
+    ): _NexusOperationInfo(
+        operation=_services.InterceptorService.value_operation,
     ),
 }

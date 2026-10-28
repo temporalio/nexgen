@@ -54,6 +54,19 @@ async def _start_system_nexus_operation(
             "temporalio.workflow.NexusOperationHandle[_OutputT]",
             await interceptor.start_second_operation(typed_input.input),
         )
+    if (
+        input.service == "InterceptorService"
+        and input.operation_name == "ValueOperation"
+    ):
+        typed_input = typing.cast(
+            "StartNexusOperationInput[models.ValueRequest, models.ValueResponse]",
+            input,
+        )
+        # The dispatch check above establishes that this operation's response type is _OutputT.
+        return typing.cast(
+            "temporalio.workflow.NexusOperationHandle[_OutputT]",
+            await interceptor.start_value_operation(typed_input.input),
+        )
     return await interceptor.start_system_nexus_operation(input)
 
 
@@ -84,6 +97,14 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
     ) -> temporalio.workflow.NexusOperationHandle[models.Response]:
         """Intercept the SecondOperation operation."""
         return await self._next_system_nexus_interceptor().start_second_operation(
+            request
+        )
+
+    async def start_value_operation(
+        self, request: models.ValueRequest
+    ) -> temporalio.workflow.NexusOperationHandle[models.ValueResponse]:
+        """Intercept the ValueOperation operation."""
+        return await self._next_system_nexus_interceptor().start_value_operation(
             request
         )
 
@@ -132,6 +153,29 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
                 operation="SecondOperation",
                 input=request,
                 output_type=models.Response,
+                schedule_to_close_timeout=None,
+                schedule_to_start_timeout=None,
+                start_to_close_timeout=None,
+                cancellation_type=NexusOperationCancellationType.WAIT_COMPLETED,
+                headers=None,
+                summary=None,
+            )
+        )
+
+    async def start_value_operation(
+        self, request: models.ValueRequest
+    ) -> temporalio.workflow.NexusOperationHandle[models.ValueResponse]:
+        from temporalio.worker._interceptor import StartNexusOperationInput
+        from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
+        from temporalio.workflow import NexusOperationCancellationType
+
+        return await self._intercept_system_nexus_operation(
+            StartNexusOperationInput(
+                endpoint=TEMPORAL_SYSTEM_ENDPOINT,
+                service="InterceptorService",
+                operation="ValueOperation",
+                input=request,
+                output_type=models.ValueResponse,
                 schedule_to_close_timeout=None,
                 schedule_to_start_timeout=None,
                 start_to_close_timeout=None,

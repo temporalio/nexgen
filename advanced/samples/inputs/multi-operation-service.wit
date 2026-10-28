@@ -6,6 +6,11 @@ world system {
 
 /// @nexus.endpoint "__temporal_system"
 interface interceptor-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+
   record request {
     id: string,
   }
@@ -14,9 +19,22 @@ interface interceptor-service {
     value: string,
   }
 
+  // The records are generic, so the interceptor handles every type argument of the operation.
+  record value-request {
+    id: string,
+    value: value-t,
+  }
+
+  record value-response {
+    values: list<value-t>,
+  }
+
   /// @nexus.operation name="FirstOperation"
   first-operation: func(request: request) -> response;
 
   /// @nexus.operation name="SecondOperation"
   second-operation: func(request: request) -> response;
+
+  /// @nexus.operation name="ValueOperation"
+  value-operation: func(request: value-request) -> value-response;
 }

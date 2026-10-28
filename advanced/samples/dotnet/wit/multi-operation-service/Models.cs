@@ -37,4 +37,34 @@ namespace Temporalio.Workflows
         public string Value { get; init; }
     }
 
+    [GeneratedCode("nexgen", null)]
+    public record ValueRequest<TValue>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ValueRequest{TValue}"/> class.
+        /// </summary>
+        public ValueRequest(string id, TValue value)
+        {
+            Id = id;
+            Value = value;
+        }
+
+        public string Id { get; init; }
+        public TValue Value { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record ValueResponse<TValue>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ValueResponse{TValue}"/> class.
+        /// </summary>
+        public ValueResponse(IReadOnlyList<TValue> values)
+        {
+            Values = values;
+        }
+
+        public IReadOnlyList<TValue> Values { get; init; }
+    }
+
 }

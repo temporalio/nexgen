@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
+import typing
+
 from .models import (
     Request,
     Response,
+    ValueRequest,
+    ValueResponse,
 )
 
 
@@ -20,3 +24,8 @@ class InterceptorService:
         Request,
         Response,
     ] = Operation(name="SecondOperation")
+
+    value_operation: Operation[
+        ValueRequest[typing.Any],
+        ValueResponse[typing.Any],
+    ] = Operation(name="ValueOperation")

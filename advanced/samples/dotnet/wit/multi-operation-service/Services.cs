@@ -25,6 +25,10 @@ namespace Temporalio.Workflows
         [NexusOperation("SecondOperation")]
         Response SecondOperation(Request request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("ValueOperation")]
+        ValueResponse<object> ValueOperation(ValueRequest<object> request);
+
     }
 
     internal interface INexgenOperationInfo
@@ -63,6 +67,8 @@ namespace Temporalio.Workflows
                 InterceptorServiceServiceDefinition.Operations["FirstOperation"]),
             [("InterceptorService", "SecondOperation")] = new NexgenOperationInfo<Request, Response>(
                 InterceptorServiceServiceDefinition.Operations["SecondOperation"]),
+            [("InterceptorService", "ValueOperation")] = new NexgenOperationInfo<ValueRequest<object>, ValueResponse<object>>(
+                InterceptorServiceServiceDefinition.Operations["ValueOperation"]),
         };
     }
 
