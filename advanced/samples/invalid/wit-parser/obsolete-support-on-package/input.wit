@@ -1,4 +1,0 @@
-/// @nexus.support python="extra_support.py"
-package test:obsolete-support-package;
-
-world system {}

@@ -6,49 +6,39 @@ import collections.abc
 import temporalio.workflow
 
 from ..models import (
-    ExecuteCollisionRequest,
+    ExecuteCallbackRequest,
     ExecuteFunctionResult,
 )
 
 
-async def _execute_collision(
-    request: ExecuteCollisionRequest,
+async def _execute_callback(
+    request: ExecuteCallbackRequest,
 ) -> temporalio.workflow.NexusOperationHandle[ExecuteFunctionResult,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="FunctionExecution",
         endpoint="function-execution",
     )
     return await nexus_client.start_operation(
-        operation="ExecuteCollision",
+        operation="ExecuteCallback",
         input=request,
         output_type=ExecuteFunctionResult,
     )
 
 
-async def execute_collision(
+async def execute_callback(
     *,
     function: collections.abc.Callable[[str, bool], str],
     name: str,
     enabled: bool,
-    function_name: str,
-    rv: str,
-    full_name: str,
-    elements: str,
-    short_name: str,
 ) -> temporalio.workflow.NexusOperationHandle[ExecuteFunctionResult,]:
     """
     Args:
         name: The name argument for the function.
         enabled: The enabled argument for the function.
     """
-    request = ExecuteCollisionRequest(
+    request = ExecuteCallbackRequest(
         function=function,
         name=name,
         enabled=enabled,
-        function_name=function_name,
-        rv=rv,
-        full_name=full_name,
-        elements=elements,
-        short_name=short_name,
     )
-    return await _execute_collision(request)
+    return await _execute_callback(request)

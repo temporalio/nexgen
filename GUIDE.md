@@ -88,6 +88,11 @@ directive selects the .NET namespace or Go import path, and .NET otherwise uses
 `Nexgen.<InterfaceName>`, such as `Nexgen.NotificationService` for
 `interface notification-service`.
 
+.NET `@nexus.namespace` and `@nexus.operations-class` overrides are reserved for
+SDK integration and require `--system-nexus`. Ordinary .NET WIT output uses the
+derived namespace and the `Operations` class. Go namespace overrides and the C#
+JSON Schema `--namespace` option are unaffected.
+
 ---
 
 ## Integrating a Support Package

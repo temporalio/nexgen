@@ -2,25 +2,25 @@
 
 import * as workflow from "@temporalio/workflow";
 import { functionExecution } from "../services";
-import type { ExecuteFunctionResult, ExecuteCollisionRequest } from "../models";
+import type { ExecuteFunctionResult, ExecuteCallbackRequest } from "../models";
 
 /**
  * @param request - Request for the operation.
  */
-export async function executeCollision<
+export async function executeCallback<
   FunctionFn extends (name: string, enabled: boolean) => string = (
     name: string,
     enabled: boolean,
   ) => string,
 >(
-  request: ExecuteCollisionRequest<FunctionFn>,
+  request: ExecuteCallbackRequest<FunctionFn>,
 ): Promise<workflow.NexusOperationHandle<ExecuteFunctionResult>> {
   const client = workflow.createNexusServiceClient({
     service: functionExecution,
     endpoint: "function-execution",
   });
   return await client.startOperation(
-    functionExecution.operations.executeCollision,
+    functionExecution.operations.executeCallback,
     request,
   );
 }

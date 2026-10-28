@@ -1,0 +1,7 @@
+package test:namespace-service;
+world system { export api; }
+/// @nexus.namespace dotnet="Acme.Api"
+interface api {
+  record request { value: string }
+  send: func(request: request);
+}

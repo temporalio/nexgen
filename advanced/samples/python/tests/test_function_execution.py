@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import wit.function_execution as function_execution
-from wit.function_execution.models import ExecuteCollisionRequest, ExecuteFunctionResult
+from wit.function_execution.models import ExecuteCallbackRequest, ExecuteFunctionResult
 
 
 def valid_function(name: str, enabled: bool) -> str:
@@ -38,29 +38,19 @@ async def test_secondary_fixed_argument_callable_builds_request() -> None:
     start_operation = AsyncMock(return_value=handle)
     client = Mock(start_operation=start_operation)
     with patch("temporalio.workflow.create_nexus_client", return_value=client):
-        result = await function_execution.execute_collision(
+        result = await function_execution.execute_callback(
             function=valid_function,
             name="one",
             enabled=True,
-            function_name="authored-function-name",
-            rv="authored-rv",
-            full_name="authored-full-name",
-            elements="authored-elements",
-            short_name="authored-short-name",
         )
 
     assert result is handle
     start_operation.assert_awaited_once_with(
-        operation="ExecuteCollision",
-        input=ExecuteCollisionRequest(
+        operation="ExecuteCallback",
+        input=ExecuteCallbackRequest(
             function=valid_function,
             name="one",
             enabled=True,
-            function_name="authored-function-name",
-            rv="authored-rv",
-            full_name="authored-full-name",
-            elements="authored-elements",
-            short_name="authored-short-name",
         ),
         output_type=ExecuteFunctionResult,
     )

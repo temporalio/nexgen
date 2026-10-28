@@ -10,21 +10,16 @@ namespace Nexgen.FunctionExecution
 {
 
     [GeneratedCode("nexgen", null)]
-    public record ExecuteCollisionRequest
+    public record ExecuteCallbackRequest
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ExecuteCollisionRequest"/> class.
+        /// Initializes a new instance of the <see cref="ExecuteCallbackRequest"/> class.
         /// </summary>
-        public ExecuteCollisionRequest(string function, string name, bool enabled, string functionName, string rv, string fullName, string elements, string shortName)
+        public ExecuteCallbackRequest(string function, string name, bool enabled)
         {
             Function = function;
             Name = name;
             Enabled = enabled;
-            FunctionName = functionName;
-            Rv = rv;
-            FullName = fullName;
-            Elements = elements;
-            ShortName = shortName;
         }
 
         public string Function { get; init; }
@@ -36,11 +31,6 @@ namespace Nexgen.FunctionExecution
         /// The enabled argument for the function.
         /// </summary>
         public bool Enabled { get; init; }
-        public string FunctionName { get; init; }
-        public string Rv { get; init; }
-        public string FullName { get; init; }
-        public string Elements { get; init; }
-        public string ShortName { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]

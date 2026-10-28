@@ -22,8 +22,8 @@ namespace Nexgen.FunctionExecution
         ExecuteFunctionResult ExecuteFunction(ExecuteFunctionRequest request);
 
         [GeneratedCode("nexgen", null)]
-        [NexusOperation("ExecuteCollision")]
-        ExecuteFunctionResult ExecuteCollision(ExecuteCollisionRequest request);
+        [NexusOperation("ExecuteCallback")]
+        ExecuteFunctionResult ExecuteCallback(ExecuteCallbackRequest request);
 
         [GeneratedCode("nexgen", null)]
         [NexusOperation("ExecuteCountedFunction")]
@@ -81,8 +81,8 @@ namespace Nexgen.FunctionExecution
         {
             [("FunctionExecution", "ExecuteFunction")] = new NexgenOperationInfo<ExecuteFunctionRequest, ExecuteFunctionResult>(
                 FunctionExecutionServiceDefinition.Operations["ExecuteFunction"]),
-            [("FunctionExecution", "ExecuteCollision")] = new NexgenOperationInfo<ExecuteCollisionRequest, ExecuteFunctionResult>(
-                FunctionExecutionServiceDefinition.Operations["ExecuteCollision"]),
+            [("FunctionExecution", "ExecuteCallback")] = new NexgenOperationInfo<ExecuteCallbackRequest, ExecuteFunctionResult>(
+                FunctionExecutionServiceDefinition.Operations["ExecuteCallback"]),
             [("FunctionExecution", "ExecuteCountedFunction")] = new NexgenOperationInfo<ExecuteCountedFunctionRequest, ExecuteCountedFunctionResult>(
                 FunctionExecutionServiceDefinition.Operations["ExecuteCountedFunction"]),
             [("FunctionExecution", "ExecuteNamedFunction")] = new NexgenOperationInfo<ExecuteNamedFunctionRequest, ExecuteNamedFunctionResult>(

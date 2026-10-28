@@ -5,8 +5,6 @@ world system {
 }
 
 /// @nexus.endpoint "type-showcase"
-/// @nexus.namespace dotnet="Nexgen.AuthoredTypeShowcase"
-/// @nexus.operations-class dotnet="TypeShowcaseApi"
 /// @nexus.experimental
 interface type-showcase {
   enum user-status {

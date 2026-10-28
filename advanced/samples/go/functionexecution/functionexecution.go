@@ -10,7 +10,6 @@ import (
 	"time"
 
 	support "go.temporal.io/sdk/advanced/samples/go/support"
-	"go.temporal.io/sdk/advanced/samples/go/support/handles"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -34,47 +33,22 @@ func (m executeFunctionRequest) GetEnabled() bool {
 	return m.Enabled
 }
 
-type executeCollisionRequest struct {
-	Function     string
-	Name         string
-	Enabled      bool
-	FunctionName string
-	Rv           string
-	FullName     string
-	Elements     string
-	ShortName    string
+type executeCallbackRequest struct {
+	Function string
+	Name     string
+	Enabled  bool
 }
 
-func (m executeCollisionRequest) GetFunction() string {
+func (m executeCallbackRequest) GetFunction() string {
 	return m.Function
 }
 
-func (m executeCollisionRequest) GetName() string {
+func (m executeCallbackRequest) GetName() string {
 	return m.Name
 }
 
-func (m executeCollisionRequest) GetEnabled() bool {
+func (m executeCallbackRequest) GetEnabled() bool {
 	return m.Enabled
-}
-
-func (m executeCollisionRequest) GetFunctionName() string {
-	return m.FunctionName
-}
-
-func (m executeCollisionRequest) GetRv() string {
-	return m.Rv
-}
-
-func (m executeCollisionRequest) GetFullName() string {
-	return m.FullName
-}
-
-func (m executeCollisionRequest) GetElements() string {
-	return m.Elements
-}
-
-func (m executeCollisionRequest) GetShortName() string {
-	return m.ShortName
 }
 
 type executeCountedFunctionRequest struct {
@@ -93,14 +67,6 @@ func (m executeCountedFunctionRequest) GetName() string {
 
 func (m executeCountedFunctionRequest) GetCount() int32 {
 	return m.Count
-}
-
-type executeCountedFunctionResult struct {
-	Value string
-}
-
-func (m executeCountedFunctionResult) GetValue() string {
-	return m.Value
 }
 
 type executeNamedFunctionRequest struct {
@@ -198,30 +164,16 @@ func executeFunction(ctx workflow.Context, request executeFunctionRequest) workf
 	return fut
 }
 
-func executeCollision(ctx workflow.Context, request executeCollisionRequest) workflow.Future {
+func executeCallback(ctx workflow.Context, request executeCallbackRequest) workflow.Future {
 	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
-	fut := c.ExecuteOperation(ctx, "ExecuteCollision", request, workflow.NexusOperationOptions{})
+	fut := c.ExecuteOperation(ctx, "ExecuteCallback", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
 func executeCountedFunction(ctx workflow.Context, request executeCountedFunctionRequest) workflow.Future {
 	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
 	fut := c.ExecuteOperation(ctx, "ExecuteCountedFunction", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var result executeCountedFunctionResult
-		if err := fut.Get(ctx, &result); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		value, err := handles.NewFunctionResult(request.Function, result.Value)
-		if err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
+	return fut
 }
 
 func executeNamedFunction(ctx workflow.Context, request executeNamedFunctionRequest) workflow.Future {
@@ -256,6 +208,15 @@ type ExecuteFunctionResult struct {
 }
 
 func (m ExecuteFunctionResult) GetValue() string {
+	return m.Value
+}
+
+type ExecuteCountedFunctionResult struct {
+	// Value - Required.
+	Value string
+}
+
+func (m ExecuteCountedFunctionResult) GetValue() string {
 	return m.Value
 }
 
@@ -313,45 +274,30 @@ func ExecuteFunction(
 	})
 }
 
-type ExecuteCollisionOptions struct {
-	// FunctionName - Required.
-	FunctionName string
-	// Rv - Required.
-	Rv string
-	// FullName - Required.
-	FullName string
-	// Elements - Required.
-	Elements string
-	// ShortName - Required.
-	ShortName string
+type ExecuteCallbackOptions struct {
 }
 
 // Input name: The name argument for the function.
 // Input enabled: The enabled argument for the function.
-func ExecuteCollision(
+func ExecuteCallback(
 	ctx workflow.Context,
-	opts ExecuteCollisionOptions,
+	opts ExecuteCallbackOptions,
 	function func(string, bool) string,
 	name string,
 	enabled bool,
 ) workflow.Future {
-	functionName2 := ""
+	functionName := ""
 	{
 		rv := reflect.ValueOf(function)
 		fullName := runtime.FuncForPC(rv.Pointer()).Name()
 		elements := strings.Split(fullName, ".")
 		shortName := elements[len(elements)-1]
-		functionName2 = strings.TrimSuffix(shortName, "-fm")
+		functionName = strings.TrimSuffix(shortName, "-fm")
 	}
-	return executeCollision(ctx, executeCollisionRequest{
-		Function:     functionName2,
-		Name:         name,
-		Enabled:      enabled,
-		FunctionName: opts.FunctionName,
-		Rv:           opts.Rv,
-		FullName:     opts.FullName,
-		Elements:     opts.Elements,
-		ShortName:    opts.ShortName,
+	return executeCallback(ctx, executeCallbackRequest{
+		Function: functionName,
+		Name:     name,
+		Enabled:  enabled,
 	})
 }
 

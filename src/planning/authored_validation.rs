@@ -10,7 +10,7 @@ use prost_types::field_descriptor_proto::{Label, Type};
 use crate::descriptors::{DescriptorIndex, MessageMetadata, ProtoOneofGroup, real_oneof_groups};
 use crate::error::{Error, Result};
 use crate::generator::proto::typescript as typescript_proto;
-use crate::generator::python;
+use crate::generator::{dotnet, python};
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, AuthoredFamily, ExternalTypeBindingSpec, ExternalTypeSourceSpec, ExternalTypeSpec,
@@ -44,6 +44,7 @@ impl<'a> AuthoredValidationPass<'a> {
 
     pub(crate) fn validate_spec(&self, spec: &ApiSpec) -> Result<()> {
         python::validate_service_configuration(spec)?;
+        dotnet::validate_service_configuration(spec, self.language)?;
         validate_external_type_bindings(spec, self.descriptors, self.language)
     }
 }

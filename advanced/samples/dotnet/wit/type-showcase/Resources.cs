@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Temporalio.Workflows;
 using Nexgen.Support;
 
-namespace Nexgen.AuthoredTypeShowcase
+namespace Nexgen.TypeShowcase
 {
 
     [GeneratedCode("nexgen", null)]
@@ -34,21 +34,21 @@ namespace Nexgen.AuthoredTypeShowcase
         public Task<User> UpdateEmailAsync(string email)
         {
             var request = new UpdateEmailOptions(UserId, email);
-            return TypeShowcaseApi.UpdateEmailAsync(request);
+            return Operations.UpdateEmailAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task<User> RenameAsync(string displayName)
         {
             var request = new RenameOptions(UserId, displayName);
-            return TypeShowcaseApi.RenameAsync(request);
+            return Operations.RenameAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task DeactivateAsync(string? reason)
         {
             var request = new DeactivateOptions(UserId) { Reason = reason };
-            return TypeShowcaseApi.DeactivateAsync(request);
+            return Operations.DeactivateAsync(request);
         }
 
     }

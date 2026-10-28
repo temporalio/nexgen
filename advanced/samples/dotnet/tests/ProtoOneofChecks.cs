@@ -1,5 +1,5 @@
 using System;
-using Nexgen.AuthoredProtoOneof;
+using Nexgen.ProtoOneof;
 using NexusRpc.Handlers;
 using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;

@@ -114,54 +114,11 @@ mod tests {
     use crate::language::Language;
     use crate::spec::{
         AliasTypeSpec, ApiSpec, ApiSpecTransform, AuthoredResourceType, ExternalTypeSpec,
-        FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, FunctionTypeDescriptorSpec,
-        LanguageStringSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec, ServiceSpec,
-        Symbol, TypeDeclSpec, TypeSpec,
+        FunctionTypeDescriptorSpec, LanguageStringSpec, ServiceSpec, Symbol, TypeSpec,
     };
     use crate::spec::{ApiSpecNode, ApiSpecTree, CompilerPass};
 
-    use super::{LanguageSelectionPass, Selector, select_spec};
-
-    struct Identity;
-
-    impl ApiSpecTransform<crate::spec::AuthoredFamily, crate::spec::AuthoredFamily> for Identity {
-        fn map_spec_data(&mut self, _data: ()) {}
-        fn map_record(&mut self, name: Symbol) -> Symbol {
-            name
-        }
-        fn map_enum(&mut self, name: Symbol) -> Symbol {
-            name
-        }
-        fn map_flags(&mut self, name: Symbol) -> Symbol {
-            name
-        }
-        fn map_variant(&mut self, name: Symbol) -> Symbol {
-            name
-        }
-        fn map_resource(&mut self, name: AuthoredResourceType) -> AuthoredResourceType {
-            name
-        }
-        fn map_proto(&mut self, name: Symbol) -> Symbol {
-            name
-        }
-        fn map_json(
-            &mut self,
-            name: crate::spec::JsonModelSpec<Symbol>,
-        ) -> crate::spec::JsonModelSpec<Symbol> {
-            name
-        }
-        fn map_alias(&mut self, name: Symbol) -> Symbol {
-            name
-        }
-        fn map_service_data(&mut self, _name: &str, _data: ()) {}
-        fn map_record_data(&mut self, _name: &str, _data: ()) {}
-        fn map_resource_data(&mut self, _name: &str, _data: ()) {}
-        fn map_operation_data(&mut self, _name: &str, _data: ()) {}
-        fn map_field_data(&mut self, _record: &str, _field: &str, _data: ()) {}
-        fn map_text(&mut self, text: LanguageStringSpec) -> LanguageStringSpec {
-            text
-        }
-    }
+    use super::{LanguageSelectionPass, Selector};
 
     #[test]
     fn selects_default_or_target_override_once() {
@@ -272,118 +229,30 @@ mod tests {
     }
 
     #[test]
-    fn drops_function_descriptors_not_selected_for_the_target() {
-        let text = |value: &str| LanguageStringSpec {
-            by_language: BTreeMap::from([(Language::TypeScript, value.to_string())]),
-            ..Default::default()
-        };
-        let spec = ApiSpec {
-            module_path: Default::default(),
-            data: (),
-            version: "1".to_string(),
-            services: vec![],
-            model_scope: None,
-            types: BTreeMap::from([(
-                "request".to_string(),
-                TypeDeclSpec::Record(RecordSpec {
-                    name: "Request".to_string(),
-                    full_name: "request".to_string(),
-                    doc: Default::default(),
-                    source: None,
-                    experimental: false,
-                    flatten_in_api: false,
-                    fields: indexmap::IndexMap::from([(
-                        "callback".to_string(),
-                        RecordFieldSpec {
-                            name: "callback".to_string(),
-                            doc: None,
-                            annotation: None,
-                            flattened_annotation: None,
-                            field_type: TypeSpec::String,
-                            default_value: None,
-                            required: true,
-                            visibility: RecordFieldVisibility::Public,
-                            function: Some(FunctionFieldSpec {
-                                primary: false,
-                                result: FunctionResultSpec::Authored(TypeSpec::String),
-                                args_field: "args".to_string(),
-                                arg_fields: vec![],
-                                args: FunctionArgsSpec::Fixed(vec![]),
-                                alternate_type: None,
-                                converter: None,
-                                name_extractor: None,
-                                call_extractor: None,
-                                result_type_parameter: None,
-                                type_descriptor: Some(FunctionTypeDescriptorSpec {
-                                    value_type: text("Callback"),
-                                    args_type: text("CallbackArgs"),
-                                }),
-                            }),
-                            data: (),
-                        },
-                    )]),
-                    data: (),
-                })
-                .into(),
-            )]),
-        };
-        // Universal mapping preserves even incomplete descriptors; only target
-        // selection is allowed to drop them.
-        let mut incomplete = spec.clone();
-        let TypeDeclSpec::Record(record) =
-            &mut incomplete.types.get_mut("request").unwrap().declaration
-        else {
-            panic!("request record");
-        };
-        record
-            .fields
-            .get_mut("callback")
-            .unwrap()
-            .function
-            .as_mut()
-            .unwrap()
-            .type_descriptor
-            .as_mut()
-            .unwrap()
-            .args_type = Default::default();
-        let preserved = incomplete.map_names(Identity);
-        assert!(
-            preserved
-                .record("request")
-                .unwrap()
-                .function("callback")
-                .unwrap()
-                .type_descriptor
-                .is_some()
-        );
-        assert!(
-            select_spec(preserved, Language::TypeScript)
-                .record("request")
-                .unwrap()
-                .function("callback")
-                .unwrap()
-                .type_descriptor
-                .is_none()
-        );
-        for language in [Language::Python, Language::Go] {
-            let selected = select_spec(spec.clone(), language);
-            let function = selected
-                .record("request")
-                .unwrap()
-                .function("callback")
-                .unwrap();
-            assert!(function.type_descriptor.is_none());
+    fn function_descriptor_requires_both_value_and_argument_types() {
+        for (value, args, complete) in [
+            (Some("Callback"), None, false),
+            (None, Some("CallbackArgs"), false),
+            (Some("Callback"), Some("CallbackArgs"), true),
+        ] {
+            let descriptor = FunctionTypeDescriptorSpec {
+                value_type: LanguageStringSpec {
+                    default: value.map(str::to_string),
+                    ..Default::default()
+                },
+                args_type: LanguageStringSpec {
+                    default: args.map(str::to_string),
+                    ..Default::default()
+                },
+            };
+            assert_eq!(
+                Selector {
+                    language: Language::Go
+                }
+                .map_function_type_descriptor(descriptor)
+                .is_some(),
+                complete
+            );
         }
-        let typescript = select_spec(spec, Language::TypeScript);
-        let descriptor = typescript
-            .record("request")
-            .unwrap()
-            .function("callback")
-            .unwrap()
-            .type_descriptor
-            .as_ref()
-            .unwrap();
-        assert_eq!(descriptor.value_type.value(), Some("Callback"));
-        assert_eq!(descriptor.args_type.value(), Some("CallbackArgs"));
     }
 }

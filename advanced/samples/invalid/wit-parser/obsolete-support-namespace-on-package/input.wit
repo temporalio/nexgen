@@ -1,4 +1,0 @@
-/// @nexus.support-namespace dotnet="Nexgen.Support"
-package test:obsolete-namespace-package;
-
-world system {}

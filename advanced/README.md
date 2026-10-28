@@ -225,6 +225,10 @@ Input WIT files can set generated service namespaces/packages with
 `go="go.temporal.io/sdk/workflow"`. For Go, the import path's final segment is
 used as the package name and the full path is used to remove self-imports.
 
+The .NET namespace and `@nexus.operations-class` overrides are SDK integration
+settings and require `--system-nexus`. Ordinary .NET output uses its derived
+namespace and the default `Operations` class.
+
 Go, Python, TypeScript and .NET WIT generation require one `--support-package`
 import path or namespace per invocation; JSON Schema generation does not. The
 package is hand-written and stays in the user's project; nexgen imports its

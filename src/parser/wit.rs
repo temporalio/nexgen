@@ -63,26 +63,18 @@ pub(crate) fn parse_api_spec_from_wit_for_language_with_inputs(
     linked_input_paths: &[PathBuf],
 ) -> Result<ApiSpec> {
     let parsed = parse_wit_with_inputs(input, &path, linked_input_paths)?;
-    api_spec_from_wit(
-        &parsed.resolve,
-        parsed.package_id,
-        &parsed.package_origins,
-        path,
-        language,
-    )
+    api_spec_from_wit(&parsed.resolve, parsed.package_id, path, language)
 }
 
 fn api_spec_from_wit(
     resolve: &Resolve,
     package_id: PackageId,
-    package_origins: &PackageOrigins,
     path: PathBuf,
     language: Language,
 ) -> Result<ApiSpec> {
     let package = &resolve.packages[package_id];
     let world_id = select_world(resolve, package_id, &path)?;
     let world = &resolve.worlds[world_id];
-    reject_obsolete_support_directives(resolve, package_origins)?;
 
     let mut types = BTreeMap::new();
     for (_, dependency_package) in resolve.packages.iter() {
@@ -181,30 +173,6 @@ fn parse_prepared_wit_workspace(
 
 fn format_error_chain(error: &impl std::fmt::Display) -> String {
     format!("{error:#}")
-}
-
-fn reject_obsolete_support_directives(
-    resolve: &Resolve,
-    package_origins: &PackageOrigins,
-) -> Result<()> {
-    for (package_id, origin_path) in package_origins {
-        let package = &resolve.packages[*package_id];
-        let package_name = format!("package `{}:{}`", package.name.namespace, package.name.name);
-        reject_obsolete_support_docs(package.docs.contents.as_deref(), origin_path, &package_name)?;
-        for (world_name, world_id) in &package.worlds {
-            reject_obsolete_support_docs(
-                resolve.worlds[*world_id].docs.contents.as_deref(),
-                origin_path,
-                &format!("{package_name} world `{world_name}`"),
-            )?;
-        }
-    }
-    Ok(())
-}
-
-fn reject_obsolete_support_docs(docs: Option<&str>, path: &Path, context: &str) -> Result<()> {
-    parse_directives(docs, path, context)?;
-    Ok(())
 }
 
 struct PreparedWitWorkspace {
@@ -3489,14 +3457,6 @@ fn parse_directive_line(line: &str, path: &Path, context: &str) -> Result<Direct
 
     let name_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
     let name = &rest[..name_end];
-    if matches!(name, "support" | "support-namespace") {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.to_string(),
-            directive: format!("@nexus.{name}"),
-            reason: "this directive is obsolete; use `--support-package` instead".to_string(),
-        });
-    }
     let mut tail = rest[name_end..].trim_start();
     let mut args = BTreeMap::new();
 
@@ -3760,70 +3720,6 @@ interface generic-service {
                 .collect::<Vec<_>>(),
             ["ContextT", "OutputT"]
         );
-    }
-
-    #[test]
-    fn function_name_extractors_are_selected_for_the_target_language() {
-        let wit = r#"package test:extractor-selection;
-world system { export api; }
-interface functions {
-  /// @nexus.function-args varargs=true
-  call: func(args: list<string>) -> string;
-  /// @nexus.function
-  ///   signature="call"
-  ///   typescript-name-extractor="signalFunctionName"
-  ///   typescript-value-type="Signal"
-  ///   typescript-args-type="SignalArgs"
-  ///   typescript-import="@temporalio/common"
-  type callback = string;
-}
-interface api {
-  use functions.{callback};
-  record request { callback: callback }
-}
-"#;
-        for (language, extractor) in [
-            (Language::Go, None),
-            (Language::TypeScript, Some("signalFunctionName")),
-        ] {
-            let spec = parse(language, wit);
-            assert_eq!(
-                spec.record("api.request")
-                    .unwrap()
-                    .function("callback")
-                    .unwrap()
-                    .name_extractor
-                    .as_deref(),
-                extractor
-            );
-        }
-    }
-
-    #[test]
-    fn proto_alias_replacement_is_only_applied_for_its_target_language() {
-        let proto_name = "temporal.api.enums.v1.NamespaceState";
-        let wit = r#"package test:enum-override;
-world system { export models; }
-interface models {
-  /// @nexus.proto "temporal.api.enums.v1.NamespaceState"
-  /// @nexus.type python="int"
-  type namespace-state = string;
-}
-"#;
-        for (language, replacement) in [(Language::Go, None), (Language::Python, Some("int"))] {
-            let spec = parse(language, wit);
-            let binding = spec.external_type_binding(proto_name).unwrap();
-            assert_eq!(
-                binding.reference().unwrap().default.as_deref(),
-                Some(proto_name)
-            );
-            assert_eq!(
-                binding
-                    .replacement()
-                    .and_then(|value| value.type_name.for_language(language)),
-                replacement
-            );
-        }
     }
 
     #[test]

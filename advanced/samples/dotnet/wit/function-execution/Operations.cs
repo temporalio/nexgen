@@ -33,10 +33,10 @@ namespace Nexgen.FunctionExecution
         }
 
         [GeneratedCode("nexgen", null)]
-        public static async Task<ExecuteFunctionResult> ExecuteCollisionAsync(ExecuteCollisionRequest request)
+        public static async Task<ExecuteFunctionResult> ExecuteCallbackAsync(ExecuteCallbackRequest request)
         {
             var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<ExecuteFunctionResult>(svc => svc.ExecuteCollision(request)).ConfigureAwait(true);
+            var result = await client.ExecuteNexusOperationAsync<ExecuteFunctionResult>(svc => svc.ExecuteCallback(request)).ConfigureAwait(true);
             return result;
         }
 

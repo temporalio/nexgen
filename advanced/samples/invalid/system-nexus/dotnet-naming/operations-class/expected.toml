@@ -1,0 +1,5 @@
+languages = ["dotnet"]
+
+[error]
+kind = "system-nexus-required"
+contains = [".NET operations-class overrides", "service `Api`", "--system-nexus"]

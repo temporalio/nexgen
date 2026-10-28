@@ -12,7 +12,7 @@ using Google.Protobuf.WellKnownTypes;
 using Temporalio.Workflows;
 using Nexgen.Support;
 
-namespace Nexgen.AuthoredTypeShowcase
+namespace Nexgen.TypeShowcase
 {
 
     /// <summary>
@@ -151,7 +151,8 @@ namespace Nexgen.AuthoredTypeShowcase
     /// Provides generated workflow operation helpers.
     /// </summary>
     /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
-    public static partial class TypeShowcaseApi
+    [GeneratedCode("nexgen", null)]
+    public static class Operations
     {
         [GeneratedCode("nexgen", null)]
         private const string TypeShowcaseEndpoint = "type-showcase";

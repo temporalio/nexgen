@@ -43,7 +43,7 @@ export interface ExecuteFunctionRequest<
   enabled: boolean;
 }
 
-export interface ExecuteCollisionRequest<
+export interface ExecuteCallbackRequest<
   FunctionFn extends (name: string, enabled: boolean) => string = (
     name: string,
     enabled: boolean,
@@ -58,11 +58,6 @@ export interface ExecuteCollisionRequest<
    * The enabled argument for the function.
    */
   enabled: boolean;
-  functionName: string;
-  rv: string;
-  fullName: string;
-  elements: string;
-  shortName: string;
 }
 
 export interface ExecuteCountedFunctionResult {

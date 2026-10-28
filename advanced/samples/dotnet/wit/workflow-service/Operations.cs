@@ -100,8 +100,7 @@ namespace Temporalio.Workflows
     /// Provides generated workflow operation helpers.
     /// </summary>
     /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
-    [GeneratedCode("nexgen", null)]
-    public static class Operations
+    public static partial class SystemNexusWorkflowOperations
     {
         [GeneratedCode("nexgen", null)]
         private const string WorkflowServiceEndpoint = "temporal-system";

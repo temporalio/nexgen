@@ -24,7 +24,7 @@ namespace Nexgen.DotNetExamples.Tests
             [WorkflowRun]
             public async Task<WorkflowHandleResult> RunAsync(string taskQueue)
             {
-                var handle = await Operations.SignalWithStartWorkflowAsync(
+                var handle = await SystemNexusWorkflowOperations.SignalWithStartWorkflowAsync(
                     "StartedWorkflow",
                     new object?[] { "workflow-input" },
                     "WakeUp",
