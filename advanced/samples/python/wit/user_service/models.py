@@ -43,3 +43,8 @@ class Address:
 class ContactPreferences:
     locale: str | None = None
     timezone: str | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class NotifyAllRequest:
+    pass

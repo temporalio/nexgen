@@ -7,6 +7,7 @@ from .models import (
     DeactivateRequest,
     GetSyncSettingsRequest,
     GetUserRequest,
+    PingRequest,
     RecordSyncRequest,
     RenameRequest,
     SetProfileRequest,
@@ -64,3 +65,8 @@ class TypeShowcase:
         GetSyncSettingsRequest,
         SyncSettings,
     ] = Operation(name="GetSyncSettings")
+
+    ping: Operation[
+        PingRequest,
+        None,
+    ] = Operation(name="Ping")

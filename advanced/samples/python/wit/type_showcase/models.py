@@ -125,6 +125,11 @@ class SyncSettings:
     checkpoint: str | None = None
 
 
+@dataclasses.dataclass(slots=True)
+class PingRequest:
+    pass
+
+
 NotificationTarget = (
     # Python payload.
     tuple[typing.Literal["email"], str]

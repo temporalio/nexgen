@@ -163,6 +163,14 @@ class TypeShowcaseHandler:
     ) -> type_showcase_models.SyncSettings:
         return input.settings or type_showcase_models.SyncSettings()
 
+    @sync_operation
+    async def ping(
+        self,
+        _ctx: StartOperationContext,
+        input: type_showcase_models.PingRequest,
+    ) -> None:
+        self.calls.append(("Ping", input))
+
 
 @workflow.defn
 class TypeShowcaseCallerWorkflow:
@@ -180,6 +188,8 @@ class TypeShowcaseCallerWorkflow:
             report=sync_report(),
         )
         await record_sync_handle
+        ping_handle = await type_showcase.ping()
+        await ping_handle
         return renamed_user
 
 
@@ -269,7 +279,7 @@ async def test_get_user_returns_wit_user_resource_through_real_nexus_client(
         user.profile.capabilities & type_showcase_models.UserCapabilityReadProfile
     ) == type_showcase_models.UserCapabilityReadProfile
 
-    assert len(service_handler.calls) == 5
+    assert len(service_handler.calls) == 6
     get_user_operation, get_user_request = service_handler.calls[0]
     assert get_user_operation == "GetUser"
     assert isinstance(get_user_request, type_showcase_models.GetUserRequest)
@@ -299,3 +309,5 @@ async def test_get_user_returns_wit_user_resource_through_real_nexus_client(
     assert isinstance(record_sync_request, type_showcase_models.RecordSyncRequest)
     assert record_sync_request.user_id == "user-123"
     assert record_sync_request.report == sync_report()
+
+    assert service_handler.calls[5] == ("Ping", type_showcase_models.PingRequest())

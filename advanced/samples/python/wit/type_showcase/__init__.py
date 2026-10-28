@@ -16,11 +16,13 @@ from .operations.record_sync import record_sync
 from ._resources.user import deactivate
 from .operations.update_notification_settings import update_notification_settings
 from .operations.get_sync_settings import get_sync_settings
+from .operations.ping import ping
 
 __all__ = [
     "deactivate",
     "get_sync_settings",
     "get_user",
+    "ping",
     "record_sync",
     "rename",
     "set_profile",
@@ -101,5 +103,11 @@ __nexus_operation_registry__: dict[
         "GetSyncSettings",
     ): _NexusOperationInfo(
         operation=_services.TypeShowcase.get_sync_settings,
+    ),
+    (
+        "TypeShowcase",
+        "Ping",
+    ): _NexusOperationInfo(
+        operation=_services.TypeShowcase.ping,
     ),
 }

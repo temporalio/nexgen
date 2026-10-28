@@ -79,6 +79,14 @@ class UserServiceHandler:
     ) -> None:
         self.calls.append(("UpdateProfile", input))
 
+    @sync_operation
+    async def notify_all(
+        self,
+        _ctx: StartOperationContext,
+        input: user_service_models.NotifyAllRequest,
+    ) -> None:
+        self.calls.append(("NotifyAll", input))
+
 
 @workflow.defn
 class UserServiceCallerWorkflow:
@@ -87,6 +95,8 @@ class UserServiceCallerWorkflow:
         service = user_service.UserServiceClient("user-service")
         user = await service.get_user(user_id="user-123")
         await user.notify(sender="ops")
+        notify_all = await service.notify_all()
+        await notify_all
         return await user.update_email("new@example.com")
 
 
@@ -134,7 +144,7 @@ async def test_get_user_returns_user_resource(env: WorkflowEnvironment) -> None:
     assert user.user_id == "user-123"
     assert user.email == "new@example.com"
 
-    assert len(service_handler.calls) == 3
+    assert len(service_handler.calls) == 4
     get_user_operation, get_user_request = service_handler.calls[0]
     assert get_user_operation == "GetUser"
     assert isinstance(get_user_request, user_service_models.GetUserRequest)
@@ -146,7 +156,12 @@ async def test_get_user_returns_user_resource(env: WorkflowEnvironment) -> None:
         user_id="user-123", reason=None, channels=[], sender="ops"
     )
 
-    update_operation, update_request = service_handler.calls[2]
+    assert service_handler.calls[2] == (
+        "NotifyAll",
+        user_service_models.NotifyAllRequest(),
+    )
+
+    update_operation, update_request = service_handler.calls[3]
     assert update_operation == "UpdateEmail"
     assert isinstance(update_request, user_service_models.UpdateEmailRequest)
     assert update_request.user_id == "user-123"

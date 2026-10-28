@@ -10,6 +10,7 @@ from .models import (
     Address,
     ContactPreferences,
     GetUserRequest,
+    NotifyAllRequest,
     NotifyRequest,
     UpdateEmailRequest,
     UpdateProfileRequest,
@@ -44,6 +45,11 @@ class UserService:
         UpdateProfileRequest,
         None,
     ] = Operation(name="UpdateProfile")
+
+    notify_all: Operation[
+        NotifyAllRequest,
+        None,
+    ] = Operation(name="NotifyAll")
 
 
 class UserServiceClient:
@@ -138,5 +144,14 @@ class UserServiceClient:
         )
         return await self._nexus_client.start_operation(
             operation="UpdateProfile",
+            input=request,
+        )
+
+    async def notify_all(
+        self,
+    ) -> temporalio.workflow.NexusOperationHandle[None]:
+        request = NotifyAllRequest()
+        return await self._nexus_client.start_operation(
+            operation="NotifyAll",
             input=request,
         )
