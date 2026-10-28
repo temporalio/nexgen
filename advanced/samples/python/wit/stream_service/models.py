@@ -26,6 +26,16 @@ class StreamProducerKind(enum.IntEnum):
     StreamProducerKindClient = 4
     StreamProducerKindStandaloneActivity = 5
 
+    @classmethod
+    @typing_extensions.override
+    def _missing_(cls, value: object) -> StreamProducerKind | None:
+        if not isinstance(value, int):
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"Unknown{value}"
+        member._value_ = value
+        return member
+
 
 class ExecutionType(enum.IntEnum):
     ExecutionTypeUnspecified = 0
@@ -33,12 +43,32 @@ class ExecutionType(enum.IntEnum):
     ExecutionTypeActivity = 2
     ExecutionTypeNexusOperation = 3
 
+    @classmethod
+    @typing_extensions.override
+    def _missing_(cls, value: object) -> ExecutionType | None:
+        if not isinstance(value, int):
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"Unknown{value}"
+        member._value_ = value
+        return member
+
 
 class StreamStatus(enum.IntEnum):
     StreamStatusUnspecified = 0
     StreamStatusOpen = 1
     StreamStatusClosed = 2
     StreamStatusExpired = 3
+
+    @classmethod
+    @typing_extensions.override
+    def _missing_(cls, value: object) -> StreamStatus | None:
+        if not isinstance(value, int):
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"Unknown{value}"
+        member._value_ = value
+        return member
 
 
 class StreamCloseStatus(enum.IntEnum):
@@ -49,11 +79,31 @@ class StreamCloseStatus(enum.IntEnum):
     StreamCloseStatusTerminated = 4
     StreamCloseStatusTimedOut = 5
 
+    @classmethod
+    @typing_extensions.override
+    def _missing_(cls, value: object) -> StreamCloseStatus | None:
+        if not isinstance(value, int):
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"Unknown{value}"
+        member._value_ = value
+        return member
+
 
 class StreamReadStart(enum.IntEnum):
     StreamReadStartUnspecified = 0
     StreamReadStartBeginning = 1
     StreamReadStartEnd = 2
+
+    @classmethod
+    @typing_extensions.override
+    def _missing_(cls, value: object) -> StreamReadStart | None:
+        if not isinstance(value, int):
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"Unknown{value}"
+        member._value_ = value
+        return member
 
 
 @dataclasses.dataclass(slots=True)

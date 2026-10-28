@@ -92,12 +92,16 @@ def test_a_request_without_its_stream_is_refused() -> None:
         _ = converter.from_transfer_type(wire, AppendRecordsRequest)
 
 
-def test_an_unknown_enum_number_fails_the_message() -> None:
+def test_an_unknown_enum_number_keeps_its_value() -> None:
     converter = models._DescribeStreamResponseTransferTypeConverter()
     # A newer server can send a Stream status that this code doesn't know.
     wire = request_response_pb2.DescribeStreamResponse(
         status=stream_pb2.StreamStatus.ValueType(9)
     )
 
-    with pytest.raises(ValueError, match="9 is not a valid StreamStatus"):
-        _ = converter.from_transfer_type(wire, models.DescribeStreamResponse)
+    decoded = converter.from_transfer_type(wire, models.DescribeStreamResponse)
+
+    assert decoded.status == 9
+    assert isinstance(decoded.status, models.StreamStatus)
+    assert decoded.status.name == "Unknown9"
+    assert converter.to_transfer_type(decoded).status == 9
