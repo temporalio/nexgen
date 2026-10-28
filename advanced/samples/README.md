@@ -163,13 +163,15 @@ crate omits from the API of a resource method's request is left out of the
 model. nexgen ignores the directives that it doesn't know yet, such as
 `@nexus.varargs` and `@nexus.close`.
 
-Python doesn't generate the service, since it can't import the protos.
+Some of the output doesn't type-check. Python imports the Stream protos from
+`temporalio`, which doesn't have them, so basedpyright skips the service.
 TypeScript passes a `number` where a resource method's proto request wants a
 `Long`. So `tsc` skips the service, but the test still checks its models.
 
 - WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
 - .NET: [`dotnet/wit/stream-service/`](dotnet/wit/stream-service/),
   [`dotnet/tests/StreamServiceChecks.cs`](dotnet/tests/StreamServiceChecks.cs)
+- Python: [`python/wit/stream_service/`](python/wit/stream_service/)
 - TypeScript:
   [`typescript/wit/stream-service/`](typescript/wit/stream-service/),
   [`typescript/tests/stream-service.test.ts`](typescript/tests/stream-service.test.ts)

@@ -29,7 +29,7 @@ descriptors = "temporal"
 # The Stream service WIT of temporalio-streams, on the Stream protos of temporalio/api#895 at
 # 44519d8a. Its .NET output builds in Nexgen.DotNetStreamService.csproj.
 [stream-service]
-languages = ["typescript", "dotnet"]
+languages = ["python", "typescript", "dotnet"]
 system_nexus = true
 descriptors = ["temporal_api.bin", "streams.bin"]
 
