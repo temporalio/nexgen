@@ -113,6 +113,7 @@ def test_generated_metadata() -> None:
     assert registry[("UserService", "UpdateEmail")].operation is UPDATE_EMAIL_OPERATION
     assert registry[("UserService", "UpdateEmail")].serialization_context is None
     assert hasattr(user_service, "UserServiceClient")
+    assert user_service.UserServiceClient.notify_all.__doc__ == "Notify every user."
     assert not hasattr(user_service, "get_user")
     assert not hasattr(user_service, "update_email")
     assert not hasattr(user_service, "User")

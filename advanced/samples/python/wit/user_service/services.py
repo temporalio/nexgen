@@ -150,6 +150,7 @@ class UserServiceClient:
     async def notify_all(
         self,
     ) -> temporalio.workflow.NexusOperationHandle[None]:
+        """Notify every user."""
         request = NotifyAllRequest()
         return await self._nexus_client.start_operation(
             operation="NotifyAll",
