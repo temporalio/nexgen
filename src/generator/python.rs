@@ -5304,6 +5304,20 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
         output.push_str(&value.number.to_string());
         output.push('\n');
     }
+
+    // A newer peer can send a case that this enum doesn't know. Keep its number, as TypeScript and
+    // .NET do, so one case doesn't fail the whole message.
+    output.push_str("\n    @classmethod\n");
+    output.push_str("    @typing_extensions.override\n");
+    output.push_str("    def _missing_(cls, value: object) -> ");
+    output.push_str(&enumeration.name);
+    output.push_str(" | None:\n");
+    output.push_str("        if not isinstance(value, int):\n");
+    output.push_str("            return None\n");
+    output.push_str("        member = int.__new__(cls, value)\n");
+    output.push_str("        member._name_ = f\"Unknown{value}\"\n");
+    output.push_str("        member._value_ = value\n");
+    output.push_str("        return member\n");
 }
 
 fn render_flags(output: &mut String, flags: &RenderedFlags) {

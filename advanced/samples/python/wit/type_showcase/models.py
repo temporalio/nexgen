@@ -5,12 +5,23 @@ from __future__ import annotations
 import dataclasses
 import enum
 import typing
+import typing_extensions
 
 
 class UserStatus(enum.IntEnum):
     Active = 0
     Suspended = 1
     Deleted = 2
+
+    @classmethod
+    @typing_extensions.override
+    def _missing_(cls, value: object) -> UserStatus | None:
+        if not isinstance(value, int):
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"Unknown{value}"
+        member._value_ = value
+        return member
 
 
 UserCapability: typing.TypeAlias = int

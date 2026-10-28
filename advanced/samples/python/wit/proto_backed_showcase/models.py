@@ -28,12 +28,32 @@ class AlertLevel(enum.IntEnum):
     SeverityMedium = 2
     SeverityLow = 3
 
+    @classmethod
+    @typing_extensions.override
+    def _missing_(cls, value: object) -> AlertLevel | None:
+        if not isinstance(value, int):
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"Unknown{value}"
+        member._value_ = value
+        return member
+
 
 class NamespaceState(enum.IntEnum):
     NamespaceStateUnspecified = 0
     NamespaceStateRegistered = 1
     NamespaceStateDeprecated = 2
     NamespaceStateDeleted = 3
+
+    @classmethod
+    @typing_extensions.override
+    def _missing_(cls, value: object) -> NamespaceState | None:
+        if not isinstance(value, int):
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"Unknown{value}"
+        member._value_ = value
+        return member
 
 
 @dataclasses.dataclass(slots=True, kw_only=True)
