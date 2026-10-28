@@ -5,6 +5,7 @@ using Temporalio.Converters;
 using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;
 using StreamServiceExample = Streams::Temporalio.Workflows;
+using WireDescribeStreamResponse = Streams::Temporalio.Api.StreamService.V1.DescribeStreamResponse;
 using WireReadRecordsResponse = Streams::Temporalio.Api.StreamService.V1.ReadRecordsResponse;
 using WireStreamRecord = Streams::Temporalio.Api.Stream.V1.StreamRecord;
 
@@ -70,6 +71,24 @@ namespace Nexgen.DotNetExamples.Tests
                 StreamServiceExample.StreamCloseStatus.StreamCloseStatusCompleted,
                 close.Value.Status);
             Assert.Equal(3, decoded.Records[1].Offset);
+        }
+
+        // A newer server can send a Stream status that this code doesn't know.
+        [Fact]
+        public void UnknownEnumNumberPassesThrough()
+        {
+            var converter = CreateSdkConverter(typeof(StreamServiceExample.DescribeStreamResponse));
+            var wire = new WireDescribeStreamResponse
+            {
+                Status = (Streams::Temporalio.Api.Enums.V1.StreamStatus)9,
+            };
+
+            var decoded = Assert.IsType<StreamServiceExample.DescribeStreamResponse>(
+                converter.FromTransferType(wire));
+            Assert.Equal((StreamServiceExample.StreamStatus)9, decoded.Status);
+            var encoded = Assert.IsType<WireDescribeStreamResponse>(
+                converter.ToTransferType(decoded));
+            Assert.Equal((Streams::Temporalio.Api.Enums.V1.StreamStatus)9, encoded.Status);
         }
     }
 }
