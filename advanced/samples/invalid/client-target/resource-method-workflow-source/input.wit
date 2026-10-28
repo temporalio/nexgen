@@ -1,0 +1,21 @@
+package temporal:client-workflow-source@1.0.0;
+
+world system { export job-service; }
+
+// The restart request takes its namespace from a Workflow source, which a client doesn't have.
+/// @nexus.endpoint "jobs"
+interface job-service {
+  resource job {
+    constructor(job-id: string);
+
+    restart: func();
+  }
+
+  record restart-request {
+    job-id: string,
+    /// @nexus.source python="workflow_namespace()"
+    namespace: string,
+  }
+
+  restart: func(request: restart-request);
+}

@@ -6,6 +6,7 @@ use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use crate::error::{Error, Result};
 use crate::generator::json_schema::dotnet as dotnet_json;
 use crate::generator::proto::dotnet as dotnet_proto;
+use crate::generator::resource_plan::record_for_request_name;
 use crate::generator::{
     ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
 };
@@ -20,9 +21,8 @@ use crate::planning::{
     ResolvedResourceBindingSource,
 };
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec,
-    FunctionFieldSpec, IntSpec, OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
-    VariantSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionFieldSpec, IntSpec,
+    OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -3599,7 +3599,7 @@ fn resource_method_operation_call_args(
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
 ) -> Option<Vec<String>> {
-    let model = api_plan_record_for_request_name(
+    let model = record_for_request_name(
         api_plan,
         match operation.input_model() {
             PlannedType::Record(record) => &record.full_name,
@@ -3714,7 +3714,7 @@ fn resource_method_request_model_init_expr(
     else {
         return None;
     };
-    let model = api_plan_record_for_request_name(api_plan, message_name)?;
+    let model = record_for_request_name(api_plan, message_name)?;
     let mut field_exprs = Vec::new();
     for field in fields {
         let (model_field_name, model_field) =
@@ -3742,22 +3742,6 @@ fn resource_method_request_model_init_expr(
         field_exprs,
         sourced_field_exprs.unwrap_or_default(),
     ))
-}
-
-fn api_plan_record_for_request_name<'a>(
-    api_plan: &'a PlannedSpec,
-    name: &str,
-) -> Option<&'a PlannedModel> {
-    api_plan.record(name).or_else(|| {
-        let name = name.trim_start_matches('.');
-        api_plan.records().map(|(_, record)| record).find(|record| {
-            matches!(
-                record.source.as_ref().and_then(ExternalTypeSourceSpec::proto_type),
-                Some(PlannedProtoType::Message(message))
-                    if message.proto.full_name == name
-            )
-        })
-    })
 }
 
 fn resource_method_request_field_exprs(

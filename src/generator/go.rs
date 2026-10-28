@@ -5757,6 +5757,7 @@ mod tests {
             config: crate::nexgen_config::NexgenConfig {
                 mode: crate::generator::GenerationMode::NativeApi,
                 system_nexus,
+                targets: Default::default(),
             },
             language: crate::language::Language::Go,
             input_paths: vec![input],

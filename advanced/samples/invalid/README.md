@@ -83,6 +83,8 @@ contains = ["does not match proto field type `bytes`"]
 - `system_nexus` defaults to `false`. Set it to `true` for cases requiring
   system-Nexus generation. Category names are organizational only and never
   enable compiler settings implicitly.
+- `targets` defaults to the workflow target. Set a list such as
+  `["workflow", "client"]` for a case about another generation target.
 - `descriptors` defaults to no descriptors. Set `"temporal"` to use the
   repository's checked-in `advanced/samples/descriptors/temporal_api.bin`,
   independent of the case directory or working directory. For custom descriptor

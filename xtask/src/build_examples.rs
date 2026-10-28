@@ -6,7 +6,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use nexgen::error::Error as NexgenError;
 use nexgen::generator::{GenerationMode, TsDateTimeTypes};
 use nexgen::language::Language;
-use nexgen::nexgen_config::NexgenConfig;
+use nexgen::nexgen_config::{GenerationTargets, NexgenConfig};
 use nexgen::{GenerateRequest, format_generated_files, generate_to_file};
 use serde::Deserialize;
 
@@ -23,6 +23,10 @@ struct ExampleConfig {
     languages: Option<Vec<String>>,
     #[serde(default)]
     system_nexus: bool,
+    /// The targets of a language with the client target. The other languages get the workflow
+    /// target.
+    #[serde(default)]
+    targets: Vec<ExampleTarget>,
     // Each example plans against only the protos it declares, so one sample's protos can't
     // change how another example resolves a proto name.
     descriptors: Option<ExampleDescriptors>,
@@ -43,7 +47,24 @@ enum DescriptorPreset {
     Temporal,
 }
 
+#[derive(Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum ExampleTarget {
+    Workflow,
+    Client,
+}
+
 impl ExampleConfig {
+    fn targets(&self, language: Language) -> GenerationTargets {
+        if !language.has_client_target() || self.targets.is_empty() {
+            return GenerationTargets::default();
+        }
+        GenerationTargets {
+            workflow: self.targets.contains(&ExampleTarget::Workflow),
+            client: self.targets.contains(&ExampleTarget::Client),
+        }
+    }
+
     fn supports(&self, language: Language) -> bool {
         self.languages
             .as_ref()
@@ -497,14 +518,15 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
     let output_path = example_output_path(repo_root, language, example_id);
     let language_root = advanced_language_root(repo_root, language);
     reset_example_output_directory(&language_root, &output_path)?;
-    let system_nexus = config
-        .examples
-        .get(example_id)
-        .is_some_and(|example| example.system_nexus);
+    let example = config.examples.get(example_id);
+    let system_nexus = example.is_some_and(|example| example.system_nexus);
     let generate_request = GenerateRequest {
         config: NexgenConfig {
             mode: GenerationMode::NativeApi,
             system_nexus,
+            targets: example
+                .map(|example| example.targets(language))
+                .unwrap_or_default(),
         },
         language,
         input_paths,

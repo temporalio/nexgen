@@ -167,11 +167,15 @@ Python imports the Stream protos from `temporalio.api`, where a `temporalio`
 release with the protos will have them. Until then, the sample installs them
 there from its own `temporalio-stream-protos` package.
 
+Python generates both targets. The client target writes the `client` package,
+with its own `Stream` class, and imports the models of the parent package.
+
 - WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
 - .NET: [`dotnet/wit/stream-service/`](dotnet/wit/stream-service/),
   [`dotnet/tests/StreamServiceChecks.cs`](dotnet/tests/StreamServiceChecks.cs)
 - Python: [`python/wit/stream_service/`](python/wit/stream_service/),
-  [`python/tests/test_stream_service.py`](python/tests/test_stream_service.py)
+  [`python/tests/test_stream_service.py`](python/tests/test_stream_service.py),
+  [`python/tests/test_client_target.py`](python/tests/test_client_target.py)
 - TypeScript:
   [`typescript/wit/stream-service/`](typescript/wit/stream-service/),
   [`typescript/tests/stream-service.test.ts`](typescript/tests/stream-service.test.ts)

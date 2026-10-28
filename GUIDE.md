@@ -30,6 +30,7 @@ of `@nexus` directives.
   - [Flattened Records](#flattened-records)
   - [Output Transforms](#output-transforms)
 - [Function References](#function-references)
+- [Generation Targets](#generation-targets)
 - [Directive Glossary](#directive-glossary)
 
 ---
@@ -963,9 +964,11 @@ own nullable contracts.
 ### Sourced Fields
 
 Fields annotated with `@nexus.source` are not exposed in operation convenience
-APIs. Each value is a helper call relative to the project's support package,
-supplied with `--support-package`. Include the call and its arguments in WIT.
-Nexgen adds the package prefix and imports support for the generated field.
+APIs, except in the Python client target, where the client call takes them as
+parameters. Each value is a helper call relative to the project's support
+package, supplied with `--support-package`. Include the call and its arguments
+in WIT. Nexgen adds the package prefix and imports support for the generated
+field.
 
 ```wit
 record start-workflow-request {
@@ -1456,6 +1459,72 @@ descriptor replaces signature-derived typing.
 | `varargs`                | Treat a final list-shaped signature parameter as `*args`.              | Generates positional overloads plus list-form `args`.      |
 | `param`                  | Disambiguate which final parameter is the varargs list.                | Required when the signature has more than one parameter.   |
 | `typescript-drop-prefix` | Remove implicit receiver/context parameters from TypeScript inference. | TypeScript omits the prefix from inferred argument tuples. |
+
+---
+
+## Generation Targets
+
+`--targets` sets the code that calls the generated API. Repeat the flag, or
+separate the targets with commas.
+
+- `workflow`, the default, is the API for Workflow code.
+- `client` writes the same API for code outside a Workflow, in a `client`
+  package inside the output directory. So far only Python has it, only with
+  `--native-api`, and only next to `workflow`. nexgen refuses it for a service
+  with no `@nexus.endpoint`.
+
+The `client` package has its own resource classes and a
+`<Service>ClientExtension` for each service, with the names of the Workflow
+package. It imports the models of the parent package, so both targets share
+them. A resource crosses the targets as data, and each side decodes it as its
+own class.
+
+```text
+stream_service/
+  models.py, services.py, _resources/  # the Workflow target
+  client/
+    __init__.py, _extensions.py, _resources/  # the client target
+```
+
+A client class inherits one or more extensions and implements
+`_create_nexus_client`. That method returns an object with the `start_operation`
+of the Workflow Nexus client. A call returns the result of the operation.
+
+```python
+from stream_service.client import StreamServiceClientExtension
+
+class Client(StreamServiceClientExtension):
+    def _create_nexus_client(self, *, service, endpoint):
+        ...  # for example, start a standalone Nexus operation
+
+stream = await Client().create_stream(id="s1")
+await stream.publish(records=records)
+```
+
+Each operation also has a private method that takes the request, such as
+`_stream_service_create_stream`. Its name has the service name. Two services of
+one package can't have methods of the same name, private or public, and nexgen
+refuses them. An extension also refuses a client class that gets one of its
+public names from another base, because Python would use one of the two with no
+error.
+
+nexgen also refuses an operation named `client`. The parent package exports each
+operation, and an import of the client package sets the attribute of that name.
+
+A client resource calls its operations through the client in its private
+`_operations` attribute. It isn't a dataclass field, so a resource still
+converts as data. A client call puts the client there with the generated
+`bind_<resource>_operations`. A resource whose methods bind no operation has
+neither the attribute nor the binder. A handle with no `_operations`, such as
+one that you build from its fields or decode from data, raises `RuntimeError`
+when you call one of its methods. With only a ref, call the operation on the
+client, for example `client.describe_stream(stream=ref)`. The Workflow resource
+classes don't change.
+
+The client target has no sources yet, so a `@nexus.source` field is a parameter
+of the client call. A resource method has no such parameter, so nexgen refuses
+the client target when a bound method's request leaves a sourced field to its
+source.
 
 ---
 
