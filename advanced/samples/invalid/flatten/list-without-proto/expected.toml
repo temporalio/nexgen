@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit"
+contains = ["record `batch-service.add-items-request` field `items` is a list of `batch-service.batch-item`, which flattens with no `@nexus.proto`. A list flattens a proto-backed record only"]

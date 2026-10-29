@@ -57,14 +57,14 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsOptions{TBody}"/> class.
         /// </summary>
-        public AppendRecordsOptions(StreamRef @ref, IReadOnlyList<AppendRecord<TBody>> records)
+        public AppendRecordsOptions(StreamRef @ref, IReadOnlyList<TBody> records)
         {
             Ref = @ref;
             Records = records;
         }
 
         public StreamRef Ref { get; set; }
-        public IReadOnlyList<AppendRecord<TBody>> Records { get; set; }
+        public IReadOnlyList<TBody> Records { get; set; }
         /// <summary>
         /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
         /// </summary>
@@ -194,7 +194,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {
-            var request = new AppendRecordsRequest<TBody>(options.Ref, options.Records, Nexgen.Support.StreamWorkflowContext.Producer(), Nexgen.Support.StreamWorkflowContext.WithdrawRun())
+            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Producer(), Nexgen.Support.StreamWorkflowContext.WithdrawRun())
             {
                 Sequence = options.Sequence,
             };

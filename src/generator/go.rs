@@ -962,6 +962,23 @@ fn generate_in_tree(
             resource: resource.name.clone(),
         });
     }
+    if let Some((resource, method)) = api_plan
+        .services
+        .iter()
+        .flat_map(|service| &service.resources)
+        .find_map(|resource| {
+            resource
+                .methods
+                .iter()
+                .find(|method| method.varargs.is_some())
+                .map(|method| (resource, method))
+        })
+    {
+        return Err(Error::UnsupportedGoType {
+            context: format!("resource method `{}.{}`", resource.name, method.name),
+            reason: "Go doesn't support `@nexus.varargs`".to_string(),
+        });
+    }
     if let Some((record, field_name)) = api_plan.records().find_map(|(_, record)| {
         record
             .fields
@@ -972,6 +989,21 @@ fn generate_in_tree(
         return Err(Error::UnsupportedGoType {
             context: format!("record `{}` field `{field_name}`", record.full_name),
             reason: "Go doesn't flatten the record of one field".to_string(),
+        });
+    }
+    if let Some((record, field_name)) = api_plan.records().find_map(|(_, record)| {
+        record
+            .fields
+            .iter()
+            .find(|(_, field)| {
+                matches!(&field.field_type, crate::planning::PlannedType::List(item)
+                    if crate::planning::flattened_list_field(api_plan, item).is_some())
+            })
+            .map(|(field_name, _)| (record, field_name))
+    }) {
+        return Err(Error::UnsupportedGoType {
+            context: format!("record `{}` field `{field_name}`", record.full_name),
+            reason: "Go doesn't flatten a list of a record".to_string(),
         });
     }
     ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin, file_name)
