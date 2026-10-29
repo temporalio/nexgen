@@ -2970,6 +2970,15 @@ fn build_resource(
         .map(|function| build_resource_method(resolve, function, path, &context, language))
         .collect::<Result<Vec<_>>>()?;
 
+    if methods.iter().filter(|method| method.close).count() > 1 {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context,
+            directive: "@nexus.close".to_string(),
+            reason: "marks more than one method of the resource".to_string(),
+        });
+    }
+
     for function in interface.functions.values() {
         match function.kind {
             FunctionKind::Static(id) | FunctionKind::AsyncStatic(id) if id == resource_id => {
@@ -3033,6 +3042,7 @@ fn build_resource_method(
         .as_ref()
         .map(|ty| build_resource_result(resolve, ty, path, &context, language))
         .transpose()?;
+    let close = build_resource_method_close(&params, &directives, path, &context)?;
     let varargs = build_resource_method_varargs(&params, &directives, path, &context)?;
 
     Ok(ResourceMethodSpec {
@@ -3043,8 +3053,33 @@ fn build_resource_method(
         params,
         result,
         operation_name: build_resource_method_operation_name(&directives, path, &context)?,
+        close,
         varargs,
     })
+}
+
+/// A scope's end calls the close method with no arguments, so its parameters must be optional.
+fn build_resource_method_close(
+    params: &[ResourceFieldSpec],
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<bool> {
+    if directive(directives, "close", path, context)?.is_none() {
+        return Ok(false);
+    }
+    if let Some(param) = params.iter().find(|param| !param.optional) {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.close".to_string(),
+            reason: format!(
+                "needs optional parameters, but `{}` is required",
+                param.name
+            ),
+        });
+    }
+    Ok(true)
 }
 
 fn build_resource_method_varargs(

@@ -356,6 +356,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "close",
+            sites: &[Method],
+            keys: &[],
+            language_keys: &[],
+            repeatable: false,
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
             name: "varargs",
             sites: &[Method],
             keys: &["value"],
