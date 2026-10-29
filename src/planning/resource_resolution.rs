@@ -112,6 +112,7 @@ pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) doc: SelectedTextSpec,
     pub(crate) params: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
+    pub(crate) varargs: Option<String>,
     pub(crate) binding: ResolvedResourceMethodBinding,
 }
 
@@ -409,6 +410,7 @@ fn resolve_resource_method(
             doc: method.doc.clone(),
             params: method.params.clone(),
             result: method.result.clone(),
+            varargs: method.varargs.clone(),
             binding: ResolvedResourceMethodBinding::Operation {
                 operation_name: operation.name.clone(),
                 request_plan,
@@ -464,6 +466,7 @@ fn resolve_resource_method(
         doc: method.doc.clone(),
         params: method.params.clone(),
         result: method.result.clone(),
+        varargs: method.varargs.clone(),
         binding,
     })
 }
@@ -483,6 +486,9 @@ fn resource_method_result_matches_operation(
         TypeSpec::External(ExternalTypeSpec::Proto(proto_name)) => {
             operation_output_ref(operation) == Some(proto_name.as_str())
                 || operation_output_resource_message_name(operation) == Some(proto_name.as_str())
+        }
+        TypeSpec::Record(record) => {
+            matches!(operation.output_type(), Some(TypeSpec::Record(output)) if output == record)
         }
         _ => false,
     }
