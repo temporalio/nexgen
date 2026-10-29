@@ -1,0 +1,26 @@
+package test:go-generic-resource;
+
+world system { export holder-service; }
+
+/// @nexus.endpoint "holders"
+interface holder-service {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+
+  record set-request {
+    id: string,
+    value: value-t,
+  }
+
+  /// @nexus.type-parameter "value-t"
+  resource holder {
+    constructor(id: string);
+
+    /// @nexus.operation "set"
+    set: func(value: value-t);
+  }
+
+  set: func(request: set-request);
+}

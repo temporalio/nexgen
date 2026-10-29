@@ -1,0 +1,15 @@
+package test:resource-unused-parameter;
+
+world system { export models; }
+
+interface models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type context-t = placeholder;
+
+  /// @nexus.type-parameter "context-t"
+  resource holder {
+    constructor(id: string);
+  }
+}

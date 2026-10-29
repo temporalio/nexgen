@@ -1,0 +1,16 @@
+package test:resource-type-parameter-twice;
+
+world system { export models; }
+
+interface models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+
+  /// @nexus.type-parameter "value-t"
+  /// @nexus.type-parameter "value-t"
+  resource holder {
+    constructor(value: value-t);
+  }
+}

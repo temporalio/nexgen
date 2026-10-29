@@ -1,0 +1,30 @@
+package test:resource-bound-operation-parameter;
+
+world system { export holder-service; }
+
+// The method names no field that uses extra-t, but its operation's request does.
+/// @nexus.endpoint "holders"
+interface holder-service {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type extra-t = placeholder;
+
+  record get-request {
+    id: string,
+    extra: option<extra-t>,
+  }
+
+  record get-response {
+    value: string,
+  }
+
+  resource holder {
+    constructor(id: string);
+
+    /// @nexus.operation "get"
+    get: func() -> get-response;
+  }
+
+  get: func(request: get-request) -> get-response;
+}

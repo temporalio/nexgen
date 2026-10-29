@@ -51,7 +51,7 @@ def user_payload_converter(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> None:
-    converter = models._ReadRecordsResponseTransferTypeConverter()
+    converter = models._ReadRecordsResponseTransferTypeConverter[dict[str, str]]()
     model = models.ReadRecordsResponse(
         records=[
             models.StreamRecord(
@@ -101,7 +101,7 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
 
 
 def test_a_record_of_an_unknown_item_kind_has_no_item(models: types.ModuleType) -> None:
-    converter = models._StreamRecordTransferTypeConverter()
+    converter = models._StreamRecordTransferTypeConverter[object]()
     # Offset 1, and an item in field 5, which only a newer server knows.
     wire = message_pb2.StreamRecord.FromString(b"\x08\x01\x2a\x00")
 
@@ -111,7 +111,7 @@ def test_a_record_of_an_unknown_item_kind_has_no_item(models: types.ModuleType) 
 
 
 def test_a_request_without_its_handle_is_refused(models: types.ModuleType) -> None:
-    converter = models._AppendRecordsRequestTransferTypeConverter()
+    converter = models._AppendRecordsRequestTransferTypeConverter[object]()
     wire = converter.to_transfer_type(
         models.AppendRecordsRequest(ref=models.StreamRef(id="s-1"), records=[])
     )
@@ -194,7 +194,7 @@ async def test_workflow_apis_call_the_stream_service(
     monkeypatch.setattr(temporalio.workflow, "in_workflow", lambda: True)
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
-    stream = await api.create_stream(stream_ref=ref)
+    stream = await api.create_stream(str, stream_ref=ref)
     response = await stream.publish(records=[])
     assert response.last_offset == 3
     # The Workflow API fills the request id and the producer from its sources.

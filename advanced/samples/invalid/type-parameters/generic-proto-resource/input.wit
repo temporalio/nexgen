@@ -1,0 +1,27 @@
+package temporal:nexus@1.0.0;
+
+world system { export compute-service; }
+
+// The resource reaches the type parameter only through a proto-backed record.
+/// @nexus.endpoint "compute"
+interface compute-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.proto "temporal.api.compute.v1.ComputeProvider"
+  record provider {
+    /// @nexus.omit
+    %type: placeholder,
+    details: output-t,
+    /// @nexus.omit
+    nexus-endpoint: placeholder,
+  }
+
+  resource holder {
+    constructor(id: string);
+
+    update: func(provider: provider);
+  }
+}

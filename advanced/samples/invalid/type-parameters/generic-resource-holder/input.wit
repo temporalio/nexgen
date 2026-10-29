@@ -1,0 +1,38 @@
+package test:generic-resource-holder;
+
+world system { export job-service; }
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  use nexus:temporal-types/model@1.0.0.{payload, placeholder};
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.proto "temporal.api.compute.v1.ComputeProvider"
+  record provider {
+    /// @nexus.omit
+    %type: placeholder,
+    details: output-t,
+    /// @nexus.omit
+    nexus-endpoint: placeholder,
+  }
+
+  /// @nexus.type-parameter "output-t"
+  resource job {
+    constructor(id: string);
+
+    update: func(provider: provider);
+  }
+
+  record create-job-request {
+    id: string,
+  }
+
+  // A record that holds the resource builds it from its message, with no type argument.
+  record create-job-result {
+    job: own<job>,
+  }
+
+  create-job: func(request: create-job-request) -> create-job-result;
+}

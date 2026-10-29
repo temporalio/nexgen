@@ -572,6 +572,9 @@ Resources are the most complex feature of the code generator. They produce
 classes whose constructor fields represent the resource's identity, and whose
 methods delegate to Nexus operations.
 
+A resource can declare type parameters. See
+[Generic resources](#generic-resources).
+
 ### Resource Declaration
 
 ```wit
@@ -1677,7 +1680,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.service-name`                   | interface                                                                                     |
 | `@nexus.delay-load-temporalio-workflow` | interface                                                                                     |
 | `@nexus.proto`                          | record, enum, flags, variant, type alias, resource                                            |
-| `@nexus.type-parameter`                 | type alias                                                                                    |
+| `@nexus.type-parameter`                 | type alias, resource                                                                          |
 | `@nexus.proto-field`                    | record field                                                                                  |
 | `@nexus.name`                           | record field                                                                                  |
 | `@nexus.type`                           | record field, type alias, resource                                                            |
@@ -1706,16 +1709,17 @@ type-alias prose can be written as ordinary documentation comments, but
 `@nexus.doc` there has no generated documentation consumer and is rejected.
 
 `add-rpc-compatible-with` may be repeated to declare multiple compatibility
-targets. `source` and `default` may be repeated with disjoint `targets` sets;
-all other annotations are singletons. For language-specific arguments, the
-recognized prefixes are `dotnet`, `go`, `java`, `python`, `ruby`, and
-`typescript`. Prefixes are accepted only for options that the annotation
-actually consumes, not arbitrarily on every directive. For example, `name` takes
-language names, `proto` takes `<lang>-type` and `<lang>-import`, and `type` on
-an external binding also takes `<lang>-from` and `<lang>-to`. Field `type`
-annotations do not take conversion helpers. `doc` return overrides are only
-valid on freestanding functions, and `function` signatures belong on type
-aliases, not record fields.
+targets. `source` and `default` may be repeated with disjoint `targets` sets. A
+resource repeats `type-parameter`, once for each type parameter. All other
+annotations are singletons. For language-specific arguments, the recognized
+prefixes are `dotnet`, `go`, `java`, `python`, `ruby`, and `typescript`.
+Prefixes are accepted only for options that the annotation actually consumes,
+not arbitrarily on every directive. For example, `name` takes language names,
+`proto` takes `<lang>-type` and `<lang>-import`, and `type` on an external
+binding also takes `<lang>-from` and `<lang>-to`. Field `type` annotations do
+not take conversion helpers. `doc` return overrides are only valid on
+freestanding functions, and `function` signatures belong on type aliases, not
+record fields.
 
 ### Language and System Nexus restrictions
 
@@ -1921,7 +1925,8 @@ Unreachable declarations and omitted oneofs remain valid.
 
 ### @nexus.type-parameter
 
-**Placement:** Type alias **Syntax:** `@nexus.type-parameter` (no arguments)
+**Placement:** Type alias or resource **Syntax:** `@nexus.type-parameter` on a
+type alias, `@nexus.type-parameter "<alias>"` on a resource
 
 Declares an opaque model type parameter. Records and variants infer their
 ordered generic parameters from public fields and case payloads, including
@@ -1989,14 +1994,70 @@ const inputType = {
 };
 ```
 
-Type parameters are also unsupported in resources, map keys, function-signature
-metadata, or resource-bound generic operations.
+Type parameters are also unsupported in map keys and in function-signature
+metadata.
 
 Python represents generic variants as tagged tuples and protobuf oneof-backed
 generic variants as unions of generic case dataclasses. TypeScript uses tagged
 object unions, Go uses sealed interfaces and case structs, and .NET uses nested
 records. References to generic variants are closed automatically wherever they
 occur.
+
+#### Generic resources
+
+A resource declares each type parameter that it uses with
+`@nexus.type-parameter "<alias>"`, in order. The alias can come from another
+interface through `use`. The fields, method parameters and method results of the
+resource can use only these parameters. A method result that is a generic
+resource takes its type arguments from the resource of the method.
+
+```wit
+/// @nexus.type-parameter
+type body-t = placeholder;
+
+/// @nexus.proto "temporal.api.stream.v1.AppendRecord"
+record append-record {
+  body: body-t,
+}
+
+/// @nexus.type-parameter "body-t"
+resource %stream { ... }
+```
+
+The resource keeps a runtime type for each parameter. An operation that returns
+the resource takes one runtime type for each parameter, since its request can't
+give one. An operation that a method binds takes one for each parameter that its
+output uses, since a request value doesn't give its type at runtime. The method
+passes the runtime types of its resource. The data converter decodes the generic
+values of the response with these types.
+
+- Python. The class is `Stream(typing.Generic[BodyT])`, and its `__init__` takes
+  the keyword `body_type: type[BodyT]`. The runtime type isn't a dataclass
+  field, so the data converter doesn't encode it, and a decoded handle decodes
+  its values as `typing.Any`. An unpacked call takes the runtime type as its
+  first positional parameter, so `create_stream(Turn, ...)` returns a
+  `Stream[Turn]`. A call that takes a request takes the runtime type after the
+  request.
+- TypeScript. The class is `Stream<BodyT>`, and its constructor takes
+  `bodyType?: common.TypeInfo<BodyT>` after the fields. The runtime type is a
+  private field with a getter, so the data converter doesn't encode it. A call
+  takes the type info after the request, and it converts the response with the
+  model's `create<Model>TransferTypeConverter` factory.
+- .NET. The class is `Stream<TBody>`, and a call takes the type argument, such
+  as `CreateStreamAsync<Turn>(options)`.
+
+The factory of a client resource takes the runtime types too, as
+`get_stream(ref=ref, created=None, body_type=Turn)`,
+`getStream(ref, undefined, turnType)` or `GetStream<Turn>(ref, null)`.
+
+Go and Java refuse a generic resource. nexgen refuses a resource that uses a
+parameter that it doesn't declare, also through a proto-backed record or a
+returned generic resource, and a declared parameter that the resource doesn't
+use. An operation that a method binds can use only the parameters of the
+resource. A generic resource can't be the result of an operation with no
+`@nexus.proto` message, or a field of a record. Python refuses a resource field
+or a request field with the name of a runtime type, such as `body-type` for
+`body-t`. TypeScript refuses such a resource field.
 
 ---
 

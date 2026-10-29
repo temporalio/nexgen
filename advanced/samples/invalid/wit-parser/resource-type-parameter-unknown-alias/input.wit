@@ -1,0 +1,15 @@
+package test:resource-type-parameter-unknown-alias;
+
+world system { export models; }
+
+interface models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+
+  /// @nexus.type-parameter "body-t"
+  resource holder {
+    constructor(value: value-t);
+  }
+}

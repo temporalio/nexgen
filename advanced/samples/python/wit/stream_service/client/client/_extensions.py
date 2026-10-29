@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import collections.abc
 import typing
 import temporalio.client
 import temporalio.nexus.system
 import uuid as _uuid
-import abc
 import datetime
+import abc
 
 from ..services import StreamService
 from ..models import (
@@ -21,6 +20,7 @@ import temporal_support as _support
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
+BodyT = typing.TypeVar("BodyT")
 
 
 class StreamServiceClientExtension(abc.ABC):
@@ -47,7 +47,8 @@ class StreamServiceClientExtension(abc.ABC):
         *,
         ref: StreamRef,
         created: bool | None,
-    ) -> Stream:
+        body_type: type[BodyT] | None = None,
+    ) -> Stream[BodyT]:
         """Return the ``Stream`` handle that has these identity fields."""
         return Stream(
             self.create_nexus_client(
@@ -56,15 +57,14 @@ class StreamServiceClientExtension(abc.ABC):
             ),
             ref=ref,
             created=created,
+            body_type=body_type,
         )
 
     async def _stream_service_create_stream(
         self,
         request: CreateStreamRequest,
-        *,
-        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
-        rpc_timeout: datetime.timedelta | None = None,
-    ) -> Stream:
+        body_type: type[BodyT],
+    ) -> Stream[BodyT]:
         nexus_client = self.create_nexus_client(
             service=StreamService,
             endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -73,14 +73,13 @@ class StreamServiceClientExtension(abc.ABC):
             operation=StreamService.create_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",
-            rpc_metadata=rpc_metadata or {},
-            rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
         if result.ref is None:
             raise RuntimeError("CreateStream answered without `ref`")
         resource = Stream(
             nexus_client,
+            body_type=body_type,
             ref=result.ref,
             created=result.created or None,
         )
@@ -88,13 +87,12 @@ class StreamServiceClientExtension(abc.ABC):
 
     async def create_stream(
         self,
+        body_type: type[BodyT],
         *,
         stream_ref: StreamRef,
         retention: datetime.timedelta | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
-        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
-        rpc_timeout: datetime.timedelta | None = None,
-    ) -> Stream:
+    ) -> Stream[BodyT]:
         """
         Args:
             stream_ref: The ref of the Stream to create. Its id is the Stream id.
@@ -110,6 +108,4 @@ class StreamServiceClientExtension(abc.ABC):
             id_conflict_policy=id_conflict_policy,
             request_id=_support.request_id(),
         )
-        return await self._stream_service_create_stream(
-            request, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
-        )
+        return await self._stream_service_create_stream(request, body_type)

@@ -240,14 +240,25 @@ fn nested_generic_expressions(
         .as_ref()?
         .wire_function_names
         .as_ref()?;
+    // A required collection stays required after the conversion, as in a non-generic record.
+    let collection = |value: String| {
+        if field.required {
+            required_field_expr(&value, &record.name, name)
+        } else {
+            value
+        }
+    };
     Some(match &field.field_type {
         PlannedType::List(_) => (
-            repeated_from_wire_expr(&resolved, wire),
-            repeated_to_wire_expr(&resolved, name),
+            collection(repeated_from_wire_expr(&resolved, wire)),
+            collection(repeated_to_wire_expr(&resolved, name)),
         ),
         PlannedType::Map(_, _) => (
-            map_value_from_wire_expr(&resolved, wire),
-            map_value_to_wire_expr_from_expr(&resolved, &format!("model.{name}")),
+            collection(map_value_from_wire_expr(&resolved, wire)),
+            collection(map_value_to_wire_expr_from_expr(
+                &resolved,
+                &format!("model.{name}"),
+            )),
         ),
         _ if field.required => (
             required_from_wire_expr(&resolved, &record.name, wire, name, field),

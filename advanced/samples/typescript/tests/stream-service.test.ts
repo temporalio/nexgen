@@ -1,7 +1,7 @@
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import Long from "long";
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type ReadRecordsResponse,
@@ -11,18 +11,25 @@ import {
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/workflow/models.ts";
 
+// A body goes through the payload converter of the Workflow.
+beforeEach(() => {
+  vi.stubGlobal("__TEMPORAL_ACTIVATOR__", {
+    payloadConverter: common.defaultPayloadConverter,
+  });
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
 describe("stream-service generated output", () => {
   // No SDK has these protos yet, so proto/streams.d.ts declares them. The converters fail to
   // compile when those declarations drift from what they read and write.
   test("maps each read item kind through the proto oneof", () => {
-    const model: ReadRecordsResponse = {
+    const model: ReadRecordsResponse<string> = {
       records: [
         {
           item: {
             tag: "data",
-            value: {
-              body: common.defaultPayloadConverter.toPayload("hi"),
-            },
+            value: { body: "hi" },
           },
           offset: Long.fromNumber(1),
         },

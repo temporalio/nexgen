@@ -46,7 +46,7 @@ async def _start_system_nexus_operation(
         and input.operation_name == "AppendRecords"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.AppendRecordsRequest, models.AppendRecordsResponse]",
+            "StartNexusOperationInput[models.AppendRecordsRequest[typing.Any], models.AppendRecordsResponse]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
@@ -72,7 +72,7 @@ async def _start_system_nexus_operation(
         and input.operation_name == "ReadRecords"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.ReadRecordsRequest, models.ReadRecordsResponse]",
+            "StartNexusOperationInput[models.ReadRecordsRequest, models.ReadRecordsResponse[typing.Any]]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
@@ -117,7 +117,7 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
         return await self._next_system_nexus_interceptor().start_create_stream(request)
 
     async def start_append_records(
-        self, request: models.AppendRecordsRequest
+        self, request: models.AppendRecordsRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.AppendRecordsResponse]:
         """Intercept the AppendRecords operation."""
         return await self._next_system_nexus_interceptor().start_append_records(request)
@@ -130,7 +130,9 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
 
     async def start_read_records(
         self, request: models.ReadRecordsRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.ReadRecordsResponse]:
+    ) -> temporalio.workflow.NexusOperationHandle[
+        models.ReadRecordsResponse[typing.Any]
+    ]:
         """Intercept the ReadRecords operation."""
         return await self._next_system_nexus_interceptor().start_read_records(request)
 
@@ -174,7 +176,7 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         )
 
     async def start_append_records(
-        self, request: models.AppendRecordsRequest
+        self, request: models.AppendRecordsRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.AppendRecordsResponse]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
@@ -221,7 +223,9 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
 
     async def start_read_records(
         self, request: models.ReadRecordsRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.ReadRecordsResponse]:
+    ) -> temporalio.workflow.NexusOperationHandle[
+        models.ReadRecordsResponse[typing.Any]
+    ]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
@@ -232,7 +236,10 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
                 service="temporal.api.streamservice.v1.StreamService",
                 operation="ReadRecords",
                 input=request,
-                output_type=models.ReadRecordsResponse,
+                output_type=typing.cast(
+                    "type[models.ReadRecordsResponse[typing.Any]]",
+                    models.ReadRecordsResponse,
+                ),
                 schedule_to_close_timeout=None,
                 schedule_to_start_timeout=None,
                 start_to_close_timeout=None,

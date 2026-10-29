@@ -1,0 +1,5 @@
+languages = ["java"]
+
+[error]
+kind = "unsupported-generic-resource"
+contains = ["the generic resource `holder` isn't supported in java"]

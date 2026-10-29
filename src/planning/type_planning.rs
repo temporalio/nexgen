@@ -459,6 +459,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
                 name: name.to_string(),
                 doc: None,
                 type_name: name.to_upper_camel_case(),
+                type_parameters: Vec::new(),
                 fields: Vec::new(),
                 methods: Vec::new(),
             })
@@ -667,6 +668,9 @@ impl<'a> TypePlanningContext<'a> {
                     &self.spec,
                     operation.data.output_resource_return.as_ref(),
                 ),
+                runtime_type_parameters: operation_runtime_type_parameters(
+                    &self.spec, service, operation,
+                ),
             },
         })
     }
@@ -852,7 +856,7 @@ impl<'a> TypePlanningContext<'a> {
                     result: method
                         .result
                         .as_ref()
-                        .map(|result| self.planned_resource_method_result(result)),
+                        .map(|result| self.planned_resource_method_result(service, result)),
                     binding,
                 })
             })
@@ -862,6 +866,7 @@ impl<'a> TypePlanningContext<'a> {
             name: resource.name.clone(),
             doc: resource.doc.value().map(str::to_string),
             type_name: resource.name.to_upper_camel_case(),
+            type_parameters: resource.type_parameters.clone(),
             fields: resource
                 .fields
                 .iter()
@@ -873,12 +878,17 @@ impl<'a> TypePlanningContext<'a> {
 
     fn planned_resource_method_result(
         &mut self,
+        service: &ServiceSpec<OperationLoweredFamily>,
         result: &ResourceResultSpec<SelectedFamily>,
     ) -> PlannedResourceMethodResult {
         let optional = matches!(result.result_type, TypeSpec::Option(_));
         let kind = match result.result_type.without_option() {
             TypeSpec::Resource(resource) => PlannedResourceMethodResultKind::Resource {
                 type_name: resource.as_str().to_upper_camel_case(),
+                type_parameters: service
+                    .resource(resource.as_str())
+                    .map(|resource| resource.type_parameters.clone())
+                    .unwrap_or_default(),
             },
             _ => PlannedResourceMethodResultKind::Value(
                 self.planned_selected_type_from_authored(&result.result_type),
@@ -1314,6 +1324,44 @@ fn plan_operation_resource_return(
     })
 }
 
+/// An operation that returns a generic resource takes each of the resource's type parameters. One
+/// that a method of a generic resource binds takes each parameter that its output uses, since a
+/// request value doesn't give its type at runtime and the handle has them all.
+fn operation_runtime_type_parameters(
+    spec: &ApiSpec<OperationLoweredFamily>,
+    service: &ServiceSpec<OperationLoweredFamily>,
+    operation: &OperationSpec<OperationLoweredFamily>,
+) -> Vec<crate::spec::TypeParameterSpec> {
+    if let Some(resource_return) = &operation.data.output_resource_return {
+        return service
+            .resource(&resource_return.resource_name)
+            .map(|resource| resource.type_parameters.clone())
+            .unwrap_or_default();
+    }
+    let bound = service.resources.iter().any(|resource| {
+        !resource.type_parameters.is_empty()
+            && resource.data.resolved.as_ref().is_some_and(|resolved| {
+                resolved.methods.iter().any(|method| {
+                    matches!(
+                        &method.binding,
+                        ResolvedResourceMethodBinding::Operation { operation_name, .. }
+                            if *operation_name == operation.name
+                    )
+                })
+            })
+    });
+    if !bound {
+        return Vec::new();
+    }
+    operation
+        .output_type()
+        .map(|output| spec.type_parameters_through_protos(output))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|usage| usage.parameter)
+        .collect()
+}
+
 pub(crate) struct TypePlanningPass<'a> {
     imports: BTreeMap<ModulePath, BTreeMap<ModulePath, BTreeSet<String>>>,
     descriptors: &'a DescriptorIndex,
@@ -1678,6 +1726,150 @@ interface alerts {
     }
 
     #[test]
+    fn operations_of_a_generic_resource_take_the_types_that_their_requests_cant_give() {
+        // The stream sample polls, and a poll needs System Nexus.
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let spec = crate::parser::load_api_spec_from_wit_for_language_with_inputs(
+            Language::Python,
+            &[
+                root.join("advanced/samples/inputs/stream-service.wit"),
+                root.join("advanced/samples/inputs/deps"),
+            ],
+        )
+        .unwrap();
+        let plan =
+            plan_single_leaf_for(spec, vec![crate::nexgen_config::GenerationTarget::Workflow]);
+        let runtime_type_parameters = |name: &str| {
+            plan.services[0]
+                .operation(name)
+                .expect("the stream service has the operation")
+                .data
+                .runtime_type_parameters
+                .iter()
+                .map(|parameter| parameter.full_name.clone())
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(
+            runtime_type_parameters("CreateStream"),
+            ["stream-service.body-t"]
+        );
+        assert_eq!(
+            runtime_type_parameters("ReadRecords"),
+            ["stream-service.body-t"]
+        );
+        // An append or describe response has no generic value, so the call takes no runtime type.
+        assert!(runtime_type_parameters("AppendRecords").is_empty());
+        assert!(runtime_type_parameters("DescribeStream").is_empty());
+    }
+
+    #[test]
+    fn a_bound_operation_takes_each_type_parameter_of_its_output() {
+        // The stream sample polls, and a poll needs System Nexus.
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        // The request holds bodies too, but a request value doesn't give its type at runtime.
+        let spec = stream_service_spec_with(
+            r#"/// @nexus.operation "echo-records"
+    echo: func(
+      producer: option<producer>,
+      sequence: option<s64>,
+      records: list<append-record>,
+      previous-completed-task: option<workflow-task-epoch>,
+      failed-tasks: list<s64>,
+      withdraw-run: option<string>,
+    ) -> read-records-response;"#,
+            r#"/// @nexus.operation name="EchoRecords"
+  echo-records: func(request: append-records-request) -> read-records-response;"#,
+        );
+        let plan =
+            plan_single_leaf_for(spec, vec![crate::nexgen_config::GenerationTarget::Workflow]);
+        let echo = plan.services[0]
+            .operation("EchoRecords")
+            .expect("the stream service has the operation");
+
+        assert_eq!(
+            echo.data
+                .runtime_type_parameters
+                .iter()
+                .map(|parameter| parameter.full_name.as_str())
+                .collect::<Vec<_>>(),
+            ["stream-service.body-t"]
+        );
+    }
+
+    #[test]
+    fn a_method_result_names_the_type_parameters_of_its_generic_resource() {
+        // The stream sample polls, and a poll needs System Nexus.
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        let spec = stream_service_spec_with(
+            r#"/// @nexus.operation "reopen-stream"
+    sibling: func() -> create-stream-result;"#,
+            r#"/// @nexus.operation name="ReopenStream"
+  reopen-stream: func(request: describe-stream-request) -> create-stream-result;"#,
+        );
+        let plan =
+            plan_single_leaf_for(spec, vec![crate::nexgen_config::GenerationTarget::Workflow]);
+        let sibling = plan.services[0].resources[0]
+            .data
+            .methods
+            .iter()
+            .find(|method| method.name == "sibling")
+            .expect("the stream has the method");
+        let Some(PlannedResourceMethodResult {
+            kind:
+                PlannedResourceMethodResultKind::Resource {
+                    type_parameters, ..
+                },
+            ..
+        }) = &sibling.result
+        else {
+            panic!("the method returns a resource: {:?}", sibling.result);
+        };
+
+        assert_eq!(
+            type_parameters
+                .iter()
+                .map(|parameter| parameter.full_name.as_str())
+                .collect::<Vec<_>>(),
+            ["stream-service.body-t"]
+        );
+    }
+
+    /// The stream sample with one more method on the stream, and one more operation.
+    fn stream_service_spec_with(method: &str, operation: &str) -> ApiSpec {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join("advanced/samples/inputs/stream-service.wit");
+        let describe = "    describe: func() -> describe-stream-response;\n";
+        let describe_operation = "  /// @nexus.operation name=\"DescribeStream\"\n";
+        let wit = std::fs::read_to_string(&path).unwrap();
+        assert!(wit.contains(describe) && wit.contains(describe_operation));
+        let wit = wit
+            .replacen(describe, &format!("{describe}\n    {method}\n"), 1)
+            .replacen(
+                describe_operation,
+                &format!("  {operation}\n\n{describe_operation}"),
+                1,
+            );
+        crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
+            Language::Python,
+            &wit,
+            path,
+            &[root.join("advanced/samples/inputs/deps")],
+        )
+        .unwrap()
+    }
+
+    #[test]
     fn grouped_oneof_plans_as_an_ordinary_variant_field() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let spec = crate::parser::load_api_spec_from_wit_for_language_with_inputs(
@@ -1791,10 +1983,19 @@ interface alerts {
     }
 
     fn plan_single_leaf(spec: ApiSpec) -> PlannedSpec {
-        let descriptors = DescriptorIndex::load(
-            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("advanced/samples/descriptors/temporal_api.bin"),
-        )
+        plan_single_leaf_for(spec, vec![])
+    }
+
+    fn plan_single_leaf_for(
+        spec: ApiSpec,
+        targets: Vec<crate::nexgen_config::GenerationTarget>,
+    ) -> PlannedSpec {
+        let descriptors_root =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("advanced/samples/descriptors");
+        let descriptors = DescriptorIndex::load_many(&[
+            descriptors_root.join("temporal_api.bin"),
+            descriptors_root.join("streams.bin"),
+        ])
         .unwrap();
         let authored_tree = ApiSpecTree {
             root: ApiSpecNode::Leaf(ApiSpecLeaf {
@@ -1804,7 +2005,7 @@ interface alerts {
                 spec: super::super::select_spec(spec, Language::Python),
             }),
         };
-        let resource_resolved = super::super::ResourceResolutionPass::new(&descriptors, vec![])
+        let resource_resolved = super::super::ResourceResolutionPass::new(&descriptors, targets)
             .apply(authored_tree)
             .unwrap();
         let operation_bound = super::super::OperationBindingPass::new()
