@@ -915,14 +915,14 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 optional: !field.required,
-                from_wire_expr: map_value_from_wire_expr(
+                from_wire_expr: collection_value_expr(&map_value_from_wire_expr(
                     &value_type,
-                    &collection_value_expr(wire_field_expr),
-                ),
-                to_wire_expr: map_value_to_wire_expr_from_expr(
+                    wire_field_expr,
+                )),
+                to_wire_expr: collection_value_expr(&map_value_to_wire_expr_from_expr(
                     &value_type,
-                    &collection_value_expr(&format!("model.{generated_field_name}")),
-                ),
+                    &format!("model.{generated_field_name}"),
+                )),
                 flattened_fields: Vec::new(),
                 requirements: value_type.requirements,
             };
@@ -1087,14 +1087,14 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 optional: !field.required,
-                from_wire_expr: repeated_from_wire_expr(
+                from_wire_expr: collection_value_expr(&repeated_from_wire_expr(
                     &resolved_type,
-                    &collection_value_expr(wire_field_expr),
-                ),
-                to_wire_expr: repeated_to_wire_expr_from_expr(
+                    wire_field_expr,
+                )),
+                to_wire_expr: collection_value_expr(&repeated_to_wire_expr_from_expr(
                     &resolved_type,
-                    &collection_value_expr(&format!("model.{generated_field_name}")),
-                ),
+                    &format!("model.{generated_field_name}"),
+                )),
                 flattened_fields: Vec::new(),
                 requirements: resolved_type.requirements,
             };
