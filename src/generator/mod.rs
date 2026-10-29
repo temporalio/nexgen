@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 
 pub(crate) mod dotnet;
 pub(crate) mod go;
-mod initialization;
 pub(crate) mod java;
 pub(crate) mod json_schema;
 pub(crate) mod proto;

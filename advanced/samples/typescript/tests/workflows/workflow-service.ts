@@ -11,12 +11,12 @@ const wakeUpSignal = workflow.defineSignal<[number, string]>("wake-up");
 export async function workflowServiceCaller(): Promise<{
   runId: string | undefined;
   workflowId: string;
+  taskQueue: string;
 }> {
   const handle = await signalWithStartWorkflow({
     workflow: exampleWorkflow,
     args: [3, "nexus"],
     id: "workflow-id",
-    taskQueue: "demo-task-queue",
     signal: wakeUpSignal,
     signalArgs: [7, "hello"],
     cronSchedule: "",
@@ -27,5 +27,6 @@ export async function workflowServiceCaller(): Promise<{
   return {
     runId: handle.runId,
     workflowId: handle.workflowId,
+    taskQueue: workflow.workflowInfo().taskQueue,
   };
 }

@@ -522,9 +522,10 @@ type SignalWithStartWorkflowOptions struct {
 	//
 	// Required.
 	ID string
-	// TaskQueue - Task queue to run the workflow on.
+	// TaskQueue - Task queue to run the workflow on. Defaults to the calling workflow's
+	// task queue.
 	//
-	// Required.
+	// Optional.
 	TaskQueue string
 	// WorkflowExecutionTimeout - Total workflow execution timeout, including retries and
 	// continue-as-new. Defaults to unlimited.
@@ -598,7 +599,7 @@ type SignalWithStartWorkflowOptions struct {
 //
 // Input signal: Signal name to send with the start request.
 // Input signalArg: Arguments for the signal.
-// Input workflow: Workflow function identifying the workflow to start.
+// Input workflowValue: Workflow function identifying the workflow to start.
 // Input args: Arguments for the workflow.
 //
 // Returns: A workflow handle to the started workflow.
@@ -607,9 +608,15 @@ func SignalWithStartWorkflow(
 	opts SignalWithStartWorkflowOptions,
 	signal string,
 	signalArg any,
-	workflow any,
+	workflowValue any,
 	args ...any,
 ) workflow.Future {
+	var taskQueue string
+	if opts.TaskQueue != "" {
+		taskQueue = opts.TaskQueue
+	} else {
+		taskQueue = workflow.GetInfo(ctx).TaskQueueName
+	}
 	var workflowExecutionTimeout *time.Duration
 	if opts.WorkflowExecutionTimeout != 0 {
 		workflowExecutionTimeout = &opts.WorkflowExecutionTimeout
@@ -655,12 +662,12 @@ func SignalWithStartWorkflow(
 			StaticDetails: staticDetails,
 		}
 	}
-	workflowName := support.WorkflowFunctionName(ctx, workflow)
+	workflowValueName := support.WorkflowFunctionName(ctx, workflowValue)
 	return signalWithStartWorkflow(ctx, signalWithStartWorkflowRequest{
-		Workflow:                 workflowName,
+		Workflow:                 workflowValueName,
 		Args:                     args,
 		ID:                       opts.ID,
-		TaskQueue:                opts.TaskQueue,
+		TaskQueue:                taskQueue,
 		Signal:                   signal,
 		SignalArgs:               []any{signalArg},
 		WorkflowExecutionTimeout: workflowExecutionTimeout,

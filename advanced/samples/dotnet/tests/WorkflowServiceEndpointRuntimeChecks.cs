@@ -29,7 +29,7 @@ namespace Nexgen.DotNetExamples.Tests
                     new object?[] { "workflow-input" },
                     "WakeUp",
                     new object?[] { "signal-input" },
-                    new SignalWithStartWorkflowOptions("started-workflow-id", taskQueue)
+                    new SignalWithStartWorkflowOptions("started-workflow-id")
                     {
                         ExecutionTimeout = TimeSpan.FromSeconds(30),
                         RetryPolicy = new RetryPolicy

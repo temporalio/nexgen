@@ -359,7 +359,11 @@ pub(in crate::generator) fn planned_field(
         flattened_annotation_override: field.flattened_annotation.clone(),
         required: field.required,
         api_required: field.api_required(),
-        default_expression: super::initialization::default_expression(field).map(str::to_string),
+        default_expression: field
+            .default_value
+            .as_ref()
+            .and_then(|text| text.value())
+            .map(str::to_string),
         role,
         kind: planned_field_kind(&field.field_type, spec),
     }
@@ -1601,7 +1605,9 @@ impl<'a> ApiPlanner<'a> {
                     Some(RenderedUnpackedParam {
                         field_name: field.name.clone(),
                         doc: field.doc.clone(),
-                        param_name: if flatten_in_options {
+                        param_name: if flatten_in_options
+                            || go_unexported_name(&field.name) == "workflow"
+                        {
                             format!("{}Value", go_unexported_name(&field.name))
                         } else {
                             go_unexported_name(&field.name)
@@ -4695,7 +4701,7 @@ fn render_resource_methods(
                         if let Some(record) = record_for_model_key(api_plan, msg_name) {
                             for (_, field) in record.model_fields() {
                                 let Some(default) =
-                                    super::initialization::default_expression(field)
+                                    field.default_value.as_ref().and_then(|text| text.value())
                                 else {
                                     continue;
                                 };

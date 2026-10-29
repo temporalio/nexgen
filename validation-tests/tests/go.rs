@@ -690,7 +690,7 @@ fn go_explicit_descriptors_control_signal_api_and_packing_independent_of_wire_na
                     .unwrap();
             assert!(
                 rendered.contains(&format!(
-                    "\tsignal string,\n\t{public_args},\n\tworkflow any,\n\targs ...any,\n"
+                    "\tsignal string,\n\t{public_args},\n\tworkflowValue any,\n\targs ...any,\n"
                 )),
                 "{args_field}/{args_type}:\n{rendered}"
             );
@@ -729,7 +729,7 @@ fn go_primary_variadic_group_is_last_and_secondary_groups_keep_authored_order() 
     let rendered = render_go_descriptor_fixture(&wit).unwrap();
     assert!(
         rendered.contains(
-            "\tsignal SignalF,\n\tsignalArgs []any,\n\tother OtherF,\n\totherArgs []any,\n\tworkflow any,\n\targs ...any,"
+            "\tsignal SignalF,\n\tsignalArgs []any,\n\tother OtherF,\n\totherArgs []any,\n\tworkflowValue any,\n\targs ...any,"
         ),
         "{rendered}"
     );
@@ -747,7 +747,7 @@ fn go_primary_variadic_group_is_last_and_secondary_groups_keep_authored_order() 
     let rendered = render_go_descriptor_fixture(&swapped).unwrap();
     assert!(
         rendered.contains(
-            "\tother OtherF,\n\totherArgs []any,\n\tsignal SignalF,\n\tsignalArgs []any,\n\tworkflow any,\n\targs ...any,"
+            "\tother OtherF,\n\totherArgs []any,\n\tsignal SignalF,\n\tsignalArgs []any,\n\tworkflowValue any,\n\targs ...any,"
         ),
         "{rendered}"
     );
@@ -766,8 +766,12 @@ fn go_final_secondary_signature_args_are_variadic_without_primary_signature_vara
         "  ///   primary=true\n  ///   go-value-type=\"any\"\n  ///   go-args-type=\"[]string\"\n  ///   go-name-extractor=\"DescriptorName\"",
     );
     for (name, wit, primary_params) in [
-        ("fixed", fixed, "\tworkflow WorkflowF,\n\tname string,"),
-        ("descriptor", descriptor, "\tworkflow any,\n\targ []string,"),
+        ("fixed", fixed, "\tworkflowValue WorkflowF,\n\tname string,"),
+        (
+            "descriptor",
+            descriptor,
+            "\tworkflowValue any,\n\targ []string,",
+        ),
     ] {
         let rendered = render_go_descriptor_fixture(&wit).unwrap();
         assert!(

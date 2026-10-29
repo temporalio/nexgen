@@ -351,7 +351,6 @@ class WorkflowServiceCallerWorkflow:
         minimal_handle = await workflow_service.signal_with_start_workflow(
             workflow="ExampleWorkflow",
             id=MINIMAL_WORKFLOW_ID,
-            task_queue=task_queue,
             signal="wake_up",
             cron_schedule=CRON_SCHEDULE,
         )

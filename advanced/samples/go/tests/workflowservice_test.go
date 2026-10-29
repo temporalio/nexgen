@@ -118,7 +118,7 @@ func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
 	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
 		var response ws.SignalWithStartWorkflowResponse
 		err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("minimal"), TaskQueue: s.taskQueue},
+			ws.SignalWithStartWorkflowOptions{ID: s.targetID("minimal")},
 			"wake-up", "signal-value", emptyArgsWorkflow,
 		).Get(ctx, &response)
 		return response.RunID, err

@@ -41,7 +41,12 @@ interface workflow-service {
     /// @nexus.doc "Unique identifier for the workflow execution. Must be nonempty."
     /// @nexus.proto-field "workflow_id"
     id: string,
-    /// @nexus.doc "Task queue to run the workflow on."
+    /// @nexus.doc "Task queue to run the workflow on. Defaults to the calling workflow's task queue."
+    /// @nexus.default
+    ///   python="_support.workflow_task_queue()"
+    ///   typescript="workflow.workflowInfo().taskQueue"
+    ///   go="workflow.GetInfo(ctx).TaskQueueName"
+    ///   dotnet="Temporalio.Workflows.Workflow.Info.TaskQueue"
     task-queue: task-queue,
     /// @nexus.doc
     ///   python="Signal name or callable to send with the start request."

@@ -102,7 +102,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; init; }
         /// <summary>
-        /// Task queue to run the workflow on.
+        /// Task queue to run the workflow on. Defaults to the calling workflow's task queue.
         /// </summary>
         public string TaskQueue { get; init; }
         /// <summary>

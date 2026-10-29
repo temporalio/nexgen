@@ -908,7 +908,11 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 optional: !field.required
-                    || super::initialization::default_expression(field).is_none(),
+                    || field
+                        .default_value
+                        .as_ref()
+                        .and_then(|text| text.value())
+                        .is_none(),
                 from_wire_expr: map_value_from_wire_expr(&value_type, wire_field_expr),
                 to_wire_expr: map_value_to_wire_expr_from_expr(
                     &value_type,
@@ -1078,7 +1082,11 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 optional: !field.required
-                    || super::initialization::default_expression(field).is_none(),
+                    || field
+                        .default_value
+                        .as_ref()
+                        .and_then(|text| text.value())
+                        .is_none(),
                 from_wire_expr: repeated_from_wire_expr(&resolved_type, wire_field_expr),
                 to_wire_expr: repeated_to_wire_expr(&resolved_type, &generated_field_name),
                 flattened_fields: Vec::new(),
@@ -5526,7 +5534,7 @@ fn typescript_operation_defaults(
     let mut overrides = Vec::new();
     let mut assignments = Vec::new();
     for (field_name, field) in record.model_fields() {
-        let default = super::initialization::default_expression(field);
+        let default = field.default_value.as_ref().and_then(|text| text.value());
         let Some(rendered) = model.fields.iter().find(|rendered| {
             rendered.wire_name == field_name
                 || rendered.name == typescript_generated_field_name(&field.name)
@@ -5556,7 +5564,11 @@ fn typescript_operation_defaults(
                     .find(|(_, spec)| typescript_generated_field_name(&spec.name) == child.name)
                     .map(|(_, spec)| spec)
                     .expect("flattened child exists");
-                let Some(default) = super::initialization::default_expression(child_spec) else {
+                let Some(default) = child_spec
+                    .default_value
+                    .as_ref()
+                    .and_then(|text| text.value())
+                else {
                     continue;
                 };
                 overrides.push((child.name.clone(), child.annotation.clone()));

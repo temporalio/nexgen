@@ -16,7 +16,8 @@ type SignalWithStartWorkflowInput<
 > =
   SignalWithStartWorkflowRequest<WorkflowFn, SignalValue> extends infer Input
     ? Input extends unknown
-      ? Omit<Input, "idReusePolicy" | "headers" | "namespace"> & {
+      ? Omit<Input, "taskQueue" | "idReusePolicy" | "headers" | "namespace"> & {
+          taskQueue?: string;
           idReusePolicy?: common.WorkflowIdReusePolicy;
           headers?: never;
           namespace?: never;
@@ -42,6 +43,9 @@ export async function signalWithStartWorkflow<
   const request = {
     ...requestInput,
     namespace: support.workflowNamespace(),
+    taskQueue: (requestInput.taskQueue !== undefined
+      ? requestInput.taskQueue
+      : workflow.workflowInfo().taskQueue) satisfies string,
     idReusePolicy: (requestInput.idReusePolicy !== undefined
       ? requestInput.idReusePolicy
       : common.WorkflowIdReusePolicy

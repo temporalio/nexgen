@@ -126,10 +126,13 @@ impl<'a> ApiPlanner<'a> {
             self.external_models
                 .model_uses_support_extensions(model, self.api_plan)
                 || model.sourced_fields().next().is_some()
-                || model
-                    .fields
-                    .values()
-                    .any(|field| super::initialization::default_expression(field).is_some())
+                || model.fields.values().any(|field| {
+                    field
+                        .default_value
+                        .as_ref()
+                        .and_then(|text| text.value())
+                        .is_some()
+                })
         }) && let Some(support_namespace) = self.support_namespace
         {
             imports.push(support_namespace);
@@ -2053,7 +2056,7 @@ impl<'a> ApiPlanner<'a> {
 
 fn dotnet_input_default_expr(field: &RecordFieldSpec<PlannedFamily>, value: &str) -> String {
     if field.required
-        && let Some(default) = super::initialization::default_expression(field)
+        && let Some(default) = field.default_value.as_ref().and_then(|text| text.value())
     {
         format!("(({value}) ?? ({default}))")
     } else {
@@ -3735,7 +3738,7 @@ fn resource_method_request_model_init_expr(
                 && !field_exprs
                     .iter()
                     .any(|(provided, _)| provided.name == field.name)
-                && let Some(default) = super::initialization::default_expression(field)
+                && let Some(default) = field.default_value.as_ref().and_then(|text| text.value())
             {
                 field_exprs.push((field, format!("({default})")));
             }

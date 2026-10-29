@@ -16,6 +16,7 @@ from ..models import (
     SignalWithStartWorkflowResponse,
     UserMetadata,
 )
+import temporal_support as _support
 
 
 SelfType = typing.TypeVar("SelfType")
@@ -53,7 +54,7 @@ async def signal_with_start_workflow(
     workflow: str,
     *args: object,
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: str,
     signal_args: list[typing.Any] | None = ...,
     execution_timeout: datetime.timedelta | None = ...,
@@ -81,7 +82,7 @@ async def signal_with_start_workflow(
     workflow: str,
     *args: object,
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[
         [SelfType], None | collections.abc.Awaitable[None]
     ],
@@ -110,7 +111,7 @@ async def signal_with_start_workflow(
     workflow: str,
     *args: object,
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[
         [SelfType, SignalArg], None | collections.abc.Awaitable[None]
     ],
@@ -140,7 +141,7 @@ async def signal_with_start_workflow(
     workflow: str,
     *args: object,
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[..., None | collections.abc.Awaitable[None]],
     signal_args: list[typing.Any],
     execution_timeout: datetime.timedelta | None = ...,
@@ -169,7 +170,7 @@ async def signal_with_start_workflow(
     *,
     args: list[typing.Any] | None = ...,
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: str,
     signal_args: list[typing.Any] | None = ...,
     execution_timeout: datetime.timedelta | None = ...,
@@ -198,7 +199,7 @@ async def signal_with_start_workflow(
     *,
     args: list[typing.Any] | None = ...,
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[
         [SelfType], None | collections.abc.Awaitable[None]
     ],
@@ -228,7 +229,7 @@ async def signal_with_start_workflow(
     *,
     args: list[typing.Any] | None = ...,
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[
         [SelfType, SignalArg], None | collections.abc.Awaitable[None]
     ],
@@ -259,7 +260,7 @@ async def signal_with_start_workflow(
     *,
     args: list[typing.Any] | None = ...,
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[..., None | collections.abc.Awaitable[None]],
     signal_args: list[typing.Any],
     execution_timeout: datetime.timedelta | None = ...,
@@ -290,7 +291,7 @@ async def signal_with_start_workflow(
     ],
     *args: typing_extensions.Unpack[WorkflowArgs],
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: str,
     signal_args: list[typing.Any] | None = ...,
     execution_timeout: datetime.timedelta | None = ...,
@@ -321,7 +322,7 @@ async def signal_with_start_workflow(
     ],
     *args: typing_extensions.Unpack[WorkflowArgs],
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[
         [SelfType], None | collections.abc.Awaitable[None]
     ],
@@ -353,7 +354,7 @@ async def signal_with_start_workflow(
     ],
     *args: typing_extensions.Unpack[WorkflowArgs],
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[
         [SelfType, SignalArg], None | collections.abc.Awaitable[None]
     ],
@@ -386,7 +387,7 @@ async def signal_with_start_workflow(
     ],
     *args: typing_extensions.Unpack[WorkflowArgs],
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[..., None | collections.abc.Awaitable[None]],
     signal_args: list[typing.Any],
     execution_timeout: datetime.timedelta | None = ...,
@@ -418,7 +419,7 @@ async def signal_with_start_workflow(
     *,
     args: list[typing.Any],
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: str,
     signal_args: list[typing.Any] | None = ...,
     execution_timeout: datetime.timedelta | None = ...,
@@ -450,7 +451,7 @@ async def signal_with_start_workflow(
     *,
     args: list[typing.Any],
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[
         [SelfType], None | collections.abc.Awaitable[None]
     ],
@@ -483,7 +484,7 @@ async def signal_with_start_workflow(
     *,
     args: list[typing.Any],
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[
         [SelfType, SignalArg], None | collections.abc.Awaitable[None]
     ],
@@ -517,7 +518,7 @@ async def signal_with_start_workflow(
     *,
     args: list[typing.Any],
     id: str,
-    task_queue: str,
+    task_queue: str | None = ...,
     signal: collections.abc.Callable[..., None | collections.abc.Awaitable[None]],
     signal_args: list[typing.Any],
     execution_timeout: datetime.timedelta | None = ...,
@@ -542,7 +543,7 @@ async def signal_with_start_workflow(
     *positional_args: object,
     args: list[typing.Any] | None = None,
     id: str,
-    task_queue: str,
+    task_queue: str | None = None,
     signal: str | collections.abc.Callable[..., None | collections.abc.Awaitable[None]],
     signal_args: object | list[typing.Any] | None = None,
     execution_timeout: datetime.timedelta | None = None,
@@ -573,7 +574,8 @@ async def signal_with_start_workflow(
             set. For typed workflow callables, list contents are not statically
             typechecked; pass workflow arguments positionally for precise typechecking.
         id: Unique identifier for the workflow execution. Must be nonempty.
-        task_queue: Task queue to run the workflow on.
+        task_queue: Task queue to run the workflow on. Defaults to the calling
+            workflow's task queue.
         signal: Signal name or callable to send with the start request.
         signal_args: Argument value, or list of argument values, for signal. For typed
             single-argument signals, scalar signal_args values are statically
@@ -632,7 +634,9 @@ async def signal_with_start_workflow(
         workflow=workflow,
         args=normalized_args,
         id=id,
-        task_queue=task_queue,
+        task_queue=(
+            (_support.workflow_task_queue()) if task_queue is None else task_queue
+        ),
         signal=signal,
         signal_args=normalized_signal_args,
         execution_timeout=execution_timeout,

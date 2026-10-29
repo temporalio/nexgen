@@ -114,7 +114,7 @@ export type SignalWithStartWorkflowRequest<
      */
     id: string;
     /**
-     * Task queue to run the workflow on.
+     * Task queue to run the workflow on. Defaults to the calling workflow's task queue.
      */
     taskQueue: string;
     /**

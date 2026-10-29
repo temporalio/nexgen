@@ -1475,7 +1475,11 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     rendered_field.annotation.clone()
                 },
-                default_kind: if super::initialization::default_expression(planned_field).is_some()
+                default_kind: if planned_field
+                    .default_value
+                    .as_ref()
+                    .and_then(|text| text.value())
+                    .is_some()
                 {
                     PythonFieldDefaultKind::None
                 } else {
@@ -1597,10 +1601,11 @@ impl<'a> ApiPlanner<'a> {
                             ),
                             default_kind: if nested_planned_field.api_required() {
                                 PythonFieldDefaultKind::Required
-                            } else if super::initialization::default_expression(
-                                nested_planned_field,
-                            )
-                            .is_some()
+                            } else if nested_planned_field
+                                .default_value
+                                .as_ref()
+                                .and_then(|text| text.value())
+                                .is_some()
                             {
                                 PythonFieldDefaultKind::None
                             } else {
@@ -1772,7 +1777,12 @@ impl<'a> ApiPlanner<'a> {
                     format!("dict[{}, {}]", key_type.annotation, value_type.annotation),
                     false,
                 ),
-                default_kind: if super::initialization::default_expression(field).is_some() {
+                default_kind: if field
+                    .default_value
+                    .as_ref()
+                    .and_then(|text| text.value())
+                    .is_some()
+                {
                     if field.required {
                         PythonFieldDefaultKind::Required
                     } else {
@@ -1781,7 +1791,12 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     PythonFieldDefaultKind::EmptyDict
                 },
-                default_expr: if super::initialization::default_expression(field).is_some() {
+                default_expr: if field
+                    .default_value
+                    .as_ref()
+                    .and_then(|text| text.value())
+                    .is_some()
+                {
                     (!field.required).then(|| "None".to_string())
                 } else {
                     Some("dataclasses.field(default_factory=dict)".to_string())
@@ -1807,7 +1822,12 @@ impl<'a> ApiPlanner<'a> {
                     format!("list[{}]", resolved_type.annotation),
                     false,
                 ),
-                default_kind: if super::initialization::default_expression(field).is_some() {
+                default_kind: if field
+                    .default_value
+                    .as_ref()
+                    .and_then(|text| text.value())
+                    .is_some()
+                {
                     if field.required {
                         PythonFieldDefaultKind::Required
                     } else {
@@ -1816,7 +1836,12 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     PythonFieldDefaultKind::EmptyList
                 },
-                default_expr: if super::initialization::default_expression(field).is_some() {
+                default_expr: if field
+                    .default_value
+                    .as_ref()
+                    .and_then(|text| text.value())
+                    .is_some()
+                {
                     (!field.required).then(|| "None".to_string())
                 } else {
                     Some("dataclasses.field(default_factory=list)".to_string())
@@ -2333,7 +2358,7 @@ fn render_record_wire_block_lines(output: &mut String, lines: &[String]) {
 
 fn python_input_default_expr(field: &RecordFieldSpec<PlannedFamily>, value: &str) -> String {
     if field.required
-        && let Some(default) = super::initialization::default_expression(field)
+        && let Some(default) = field.default_value.as_ref().and_then(|text| text.value())
     {
         format!("(({default}) if {value} is None else {value})")
     } else {
@@ -5693,7 +5718,10 @@ fn python_missing_request_defaults<'a>(
                     .iter()
                     .any(|field| python_field_name(&field.field_name) == name))
             .then(|| {
-                super::initialization::default_expression(field)
+                field
+                    .default_value
+                    .as_ref()
+                    .and_then(|text| text.value())
                     .map(|expression| (name, expression))
             })
             .flatten()
