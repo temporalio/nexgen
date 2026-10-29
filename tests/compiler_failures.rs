@@ -5,7 +5,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use nexgen::error::{Error, ErrorKind};
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
 use nexgen::{GenerateRequest, generate_to_file};
 use serde::Deserialize;
@@ -20,7 +19,7 @@ struct Expectation {
     descriptors: Option<Descriptors>,
     #[serde(default)]
     system_nexus: bool,
-    #[serde(default)]
+    #[serde(default = "default_targets")]
     targets: Vec<Target>,
     error: ExpectedError,
 }
@@ -33,13 +32,14 @@ enum Target {
 }
 
 fn generation_targets(targets: &[Target]) -> nexgen::nexgen_config::GenerationTargets {
-    if targets.is_empty() {
-        return Default::default();
-    }
     nexgen::nexgen_config::GenerationTargets {
         workflow: targets.contains(&Target::Workflow),
         client: targets.contains(&Target::Client),
     }
+}
+
+fn default_targets() -> Vec<Target> {
+    vec![Target::Workflow]
 }
 
 #[derive(Debug, Deserialize)]
@@ -178,7 +178,6 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
         let output = tempfile::tempdir().map_err(|error| error.to_string())?;
         let result = generate_to_file(&GenerateRequest {
             config: nexgen::nexgen_config::NexgenConfig {
-                mode: GenerationMode::NativeApi,
                 system_nexus: expected.system_nexus,
                 targets: generation_targets(&expected.targets),
             },

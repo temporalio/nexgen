@@ -4,7 +4,7 @@ use std::process::Command as ProcessCommand;
 
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use nexgen::error::Error as NexgenError;
-use nexgen::generator::{GenerationMode, TsDateTimeTypes};
+use nexgen::generator::TsDateTimeTypes;
 use nexgen::language::Language;
 use nexgen::nexgen_config::{GenerationTargets, NexgenConfig};
 use nexgen::{GenerateRequest, format_generated_files, generate_to_file};
@@ -27,6 +27,9 @@ struct ExampleConfig {
     /// target.
     #[serde(default)]
     targets: Vec<ExampleTarget>,
+    /// Generate the same authored input under several API selections.
+    #[serde(default)]
+    variants: std::collections::BTreeMap<String, Vec<ExampleTarget>>,
     // Each example plans against only the protos it declares, so one sample's protos can't
     // change how another example resolves a proto name.
     descriptors: Option<ExampleDescriptors>,
@@ -57,7 +60,7 @@ enum ExampleTarget {
 impl ExampleConfig {
     fn targets(&self, language: Language) -> GenerationTargets {
         if !language.has_client_target() || self.targets.is_empty() {
-            return GenerationTargets::default();
+            return GenerationTargets::WORKFLOW;
         }
         GenerationTargets {
             workflow: self.targets.contains(&ExampleTarget::Workflow),
@@ -514,22 +517,51 @@ fn reset_example_output_directory(language_root: &Path, output_path: &Path) -> R
 }
 
 fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Result<()> {
+    let config = load_examples_config(&repo_root.join("advanced/samples/inputs"))?;
+    if let Some(example) = config.examples.get(example_id)
+        && !example.variants.is_empty()
+    {
+        for (name, targets) in &example.variants {
+            build_example_variant(
+                repo_root,
+                language,
+                example_id,
+                &format!("{example_id}-{name}"),
+                Some(GenerationTargets {
+                    workflow: targets.contains(&ExampleTarget::Workflow),
+                    client: targets.contains(&ExampleTarget::Client),
+                }),
+            )?;
+        }
+        return Ok(());
+    }
+    build_example_variant(repo_root, language, example_id, example_id, None)
+}
+
+fn build_example_variant(
+    repo_root: &Path,
+    language: Language,
+    example_id: &str,
+    output_id: &str,
+    targets: Option<GenerationTargets>,
+) -> Result<()> {
     let input_path = example_input_path(repo_root, example_id);
     let config = load_examples_config(&repo_root.join("advanced/samples/inputs"))?;
     let mut input_paths = vec![input_path.clone()];
     input_paths.extend(example_linked_input_paths(repo_root, &input_path)?);
-    let output_path = example_output_path(repo_root, language, example_id);
+    let output_path = example_output_path(repo_root, language, output_id);
     let language_root = advanced_language_root(repo_root, language);
     reset_example_output_directory(&language_root, &output_path)?;
     let example = config.examples.get(example_id);
     let system_nexus = example.is_some_and(|example| example.system_nexus);
     let generate_request = GenerateRequest {
         config: NexgenConfig {
-            mode: GenerationMode::NativeApi,
             system_nexus,
-            targets: example
-                .map(|example| example.targets(language))
-                .unwrap_or_default(),
+            targets: targets.unwrap_or_else(|| {
+                example
+                    .map(|example| example.targets(language))
+                    .unwrap_or(GenerationTargets::WORKFLOW)
+            }),
         },
         language,
         input_paths,
@@ -583,21 +615,21 @@ fn build_json_example_variant(
 ) -> Result<()> {
     let input_path = json_example_input_path(repo_root, input_id);
     let dir_name = example_directory_name(language, output_id);
-    for (mode, root) in [
+    for (targets, root) in [
         (
-            GenerationMode::DefinitionsOnly,
+            GenerationTargets::NONE,
             samples_language_root(repo_root, language),
         ),
         (
-            GenerationMode::NativeApi,
+            GenerationTargets::WORKFLOW,
             advanced_language_root(repo_root, language),
         ),
     ] {
-        let output_path = json_example_output_path(repo_root, language, output_id, mode);
+        let output_path = json_example_output_path(repo_root, language, output_id, targets);
         reset_example_output_directory(&root, &output_path)?;
         generate_to_file(&GenerateRequest {
             config: NexgenConfig {
-                mode,
+                targets,
                 ..Default::default()
             },
             language,
@@ -607,7 +639,7 @@ fn build_json_example_variant(
             output_path: output_path.clone(),
             format: false,
             java_package_name: (language == Language::Java)
-                .then(|| json_example_java_package(&dir_name, mode)),
+                .then(|| json_example_java_package(&dir_name, targets)),
             ts_date_time_types,
             dotnet_namespace: (language == Language::Dotnet)
                 .then(|| json_example_csharp_namespace(output_id)),
@@ -709,32 +741,29 @@ fn json_example_output_path(
     root: &Path,
     language: Language,
     id: &str,
-    mode: GenerationMode,
+    targets: GenerationTargets,
 ) -> PathBuf {
     let name = example_directory_name(language, id);
-    match mode {
-        GenerationMode::DefinitionsOnly if language == Language::Java => {
-            samples_language_root(root, language)
-                .join("src/main/java/json_schema/definitions")
-                .join(name)
-        }
-        GenerationMode::DefinitionsOnly => samples_language_root(root, language).join(name),
-        GenerationMode::NativeApi if language == Language::Java => {
-            advanced_language_root(root, language)
-                .join("src/main/java/json_schema/api")
-                .join(name)
-        }
-        GenerationMode::NativeApi => advanced_language_root(root, language)
+    match (targets.workflow, language) {
+        (false, Language::Java) => samples_language_root(root, language)
+            .join("src/main/java/json_schema/definitions")
+            .join(name),
+        (false, _) => samples_language_root(root, language).join(name),
+        (true, Language::Java) => advanced_language_root(root, language)
+            .join("src/main/java/json_schema/api")
+            .join(name),
+        (true, _) => advanced_language_root(root, language)
             .join("json_schema/api")
             .join(name),
     }
 }
-fn json_example_java_package(name: &str, mode: GenerationMode) -> String {
+fn json_example_java_package(name: &str, targets: GenerationTargets) -> String {
     format!(
         "json_schema.{}.{name}",
-        match mode {
-            GenerationMode::DefinitionsOnly => "definitions",
-            GenerationMode::NativeApi => "api",
+        if targets.workflow {
+            "api"
+        } else {
+            "definitions"
         }
     )
 }

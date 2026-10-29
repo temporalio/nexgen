@@ -1,0 +1,31 @@
+package temporal:target-sources@1.0.0;
+
+world system { export source-service; }
+
+/// @nexus.endpoint "sources"
+interface source-service {
+  record submit-request {
+    id: string,
+    /// @nexus.source python="shared_source()"
+    shared: string,
+    /// @nexus.source targets="workflow" python="workflow_source()"
+    workflow: string,
+    /// @nexus.source targets="client" python="client_source()"
+    client: string,
+  }
+
+  submit: func(request: submit-request);
+
+  resource job {
+    constructor(job-id: string);
+    restart: func();
+  }
+
+  record restart-request {
+    job-id: string,
+    /// @nexus.source python="shared_source()"
+    shared: string,
+  }
+
+  restart: func(request: restart-request);
+}

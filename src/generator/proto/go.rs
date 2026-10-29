@@ -1056,7 +1056,7 @@ impl ModelBackend {
                 let input_sourced_assignments = record_for_message(api_plan, &input)
                     .map(|planned_model| {
                         planned_model
-                            .sourced_fields()
+                            .sources_for(crate::nexgen_config::GenerationTarget::Workflow)
                             .map(|(field_name, _, source_expr)| {
                                 let source_expr = self.support_converter(source_expr.to_string());
                                 format!("request.{} = {source_expr}", go_field_name(field_name))

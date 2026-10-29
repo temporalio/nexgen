@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use heck::ToSnakeCase;
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
+use nexgen::nexgen_config::GenerationTargets;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -660,7 +660,7 @@ fn generate_formatted_json_python_output(
     root: &Path,
     example_id: &str,
     output_path: &Path,
-    generate_native_api: bool,
+    targets: GenerationTargets,
 ) {
     let input_path = json_input_path(root, example_id);
     let mut args = vec![
@@ -671,8 +671,11 @@ fn generate_formatted_json_python_output(
         "--support-package",
         "temporal_support",
     ];
-    if generate_native_api {
-        args.push("--native-api");
+    for target in targets.iter() {
+        args.push(match target {
+            nexgen::nexgen_config::GenerationTarget::Workflow => "--targets=workflow",
+            nexgen::nexgen_config::GenerationTarget::Client => "--targets=client",
+        });
     }
 
     let status = Command::new(support::nexgen_binary())
@@ -812,7 +815,12 @@ fn python_json_examples_expose_expected_runtime_features() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
         let output_path = unique_output_path(&format!("python-json-{example_id}"));
-        generate_formatted_json_python_output(&root, example_id, &output_path, false);
+        generate_formatted_json_python_output(
+            &root,
+            example_id,
+            &output_path,
+            GenerationTargets::NONE,
+        );
         assert_python_310_syntax_compatible(&output_path);
         let rendered = read_python_package_files(&output_path);
         assert_no_generated_python_diagnostic_suppressions(&rendered);
@@ -885,7 +893,12 @@ fn python_json_api_examples_expose_validation_exports() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
         let output_path = unique_output_path(&format!("python-json-api-{example_id}"));
-        generate_formatted_json_python_output(&root, example_id, &output_path, true);
+        generate_formatted_json_python_output(
+            &root,
+            example_id,
+            &output_path,
+            GenerationTargets::WORKFLOW,
+        );
         assert_python_310_syntax_compatible(&output_path);
         let rendered = read_python_package_files(&output_path);
         assert_no_generated_python_diagnostic_suppressions(&rendered);
@@ -1750,7 +1763,7 @@ fn renders_sample_with_versioned_header() {
     let output_path = temp.path().join("output");
     generate_to_file(&GenerateRequest {
         config: NexgenConfig {
-            mode: GenerationMode::NativeApi,
+            targets: GenerationTargets::WORKFLOW,
             ..Default::default()
         },
         language: Language::Python,

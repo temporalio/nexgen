@@ -7,6 +7,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use nexgen::nexgen_config::GenerationTargets;
 use nexgen::{GenerateRequest, generate_to_file};
 
 mod support;
@@ -196,7 +197,7 @@ fn generate_to_string_with_inputs(
     let output_path = temp_dir.join("output");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
+            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
             ..Default::default()
         },
         language,
@@ -350,7 +351,7 @@ interface namespace-service {
     let output_path = module_root.join("generated");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
+            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
             ..Default::default()
         },
         language: nexgen::language::Language::Go,
@@ -382,7 +383,10 @@ interface namespace-service {
 fn go_json_examples_render_expected_language_features() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
-        for (mode, native_api) in [("definitions", false), ("api", true)] {
+        for (mode, targets) in [
+            ("definitions", GenerationTargets::NONE),
+            ("api", GenerationTargets::WORKFLOW),
+        ] {
             let temp_dir = unique_output_path(&format!("go-json-{example_id}-{mode}"));
             fs::create_dir_all(&temp_dir).unwrap();
             fs::write(temp_dir.join("go.mod"), "module examples/go\n\ngo 1.24.0\n").unwrap();
@@ -390,7 +394,7 @@ fn go_json_examples_render_expected_language_features() {
                 .join("json_schema")
                 .join(mode)
                 .join(go_package_name(example_id));
-            generate_formatted_go_json_output(&root, example_id, &output_path, native_api);
+            generate_formatted_go_json_output(&root, example_id, &output_path, targets);
 
             let actual = read_go_output_files(&output_path);
 
@@ -401,7 +405,7 @@ fn go_json_examples_render_expected_language_features() {
             let definitions = actual
                 .get(&PathBuf::from("definitions.go"))
                 .expect("JSON generation emits package definitions");
-            if native_api {
+            if targets.workflow {
                 match example_id {
                     "chat" => {
                         assert!(generated.contains("var ChatService = struct"));
@@ -841,7 +845,7 @@ fn generate_formatted_go_json_output(
     root: &Path,
     example_id: &str,
     output_path: &Path,
-    native_api: bool,
+    targets: GenerationTargets,
 ) {
     let mut command = Command::new(support::nexgen_binary());
     command.args([
@@ -852,8 +856,11 @@ fn generate_formatted_go_json_output(
         "--support-package",
         "example.com/nexgen/support",
     ]);
-    if native_api {
-        command.arg("--native-api");
+    for target in targets.iter() {
+        command.arg(match target {
+            nexgen::nexgen_config::GenerationTarget::Workflow => "--targets=workflow",
+            nexgen::nexgen_config::GenerationTarget::Client => "--targets=client",
+        });
     }
     let status = command.status().unwrap();
     assert!(status.success());

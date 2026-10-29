@@ -1385,7 +1385,10 @@ fn build_fields_from_record(
                 default_value: field_default,
                 required,
                 visibility: source
-                    .map(|source_expr| RecordFieldVisibility::Sourced { source_expr })
+                    .map(|(source_expr, targets)| RecordFieldVisibility::Sourced {
+                        source_expr,
+                        targets,
+                    })
                     .unwrap_or_else(|| {
                         if api_omit_directive.is_some() {
                             RecordFieldVisibility::ApiOmitted
@@ -1857,10 +1860,31 @@ fn build_source_call(
     path: &Path,
     context: &str,
     language: Language,
-) -> Result<Option<String>> {
+) -> Result<Option<(String, crate::nexgen_config::GenerationTargets)>> {
     let Some(directive) = directive(directives, "source", path, context)? else {
         return Ok(None);
     };
+
+    let mut targets = crate::nexgen_config::GenerationTargets::ALL;
+    if let Some(value) = directive.value("targets") {
+        targets = crate::nexgen_config::GenerationTargets::NONE;
+        for name in value.split(',').map(str::trim) {
+            match name {
+                "workflow" => targets.workflow = true,
+                "client" => targets.client = true,
+                _ => {
+                    return Err(Error::InvalidWitDirective {
+                        path: path.to_path_buf(),
+                        context: context.to_string(),
+                        directive: "@nexus.source".to_string(),
+                        reason: format!(
+                            "unknown source target `{name}`; expected `workflow` or `client`"
+                        ),
+                    });
+                }
+            }
+        }
+    }
 
     for key in [
         "go-support-import",
@@ -1918,7 +1942,7 @@ fn build_source_call(
         });
     }
 
-    Ok(Some(source_expr.to_string()))
+    Ok(Some((source_expr.to_string(), targets)))
 }
 
 fn is_support_helper_invocation(source_expr: &str) -> bool {
@@ -3693,6 +3717,10 @@ mod tests {
     }
 
     fn validate(language: Language, wit: &str) -> Result<(), Error> {
+        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            targets: crate::nexgen_config::GenerationTargets::WORKFLOW,
+            ..crate::nexgen_config::current()
+        });
         let spec = parse_result(language, wit)?;
         let descriptors = descriptors();
         crate::planning::AuthoredValidationPass::new(&descriptors, language)
@@ -3994,7 +4022,7 @@ interface workflow-service {
             .1;
         assert!(matches!(
             go_record.fields["workflow_id_reuse_policy"].visibility,
-            crate::spec::RecordFieldVisibility::Sourced { ref source_expr }
+            crate::spec::RecordFieldVisibility::Sourced { ref source_expr, .. }
                 if source_expr == "WorkflowIDReusePolicy(ctx)"
         ));
 
@@ -4057,7 +4085,7 @@ interface workflow-service {
                 .1;
             assert!(matches!(
                 &record.fields["namespace"].visibility,
-                RecordFieldVisibility::Sourced { source_expr } if source_expr == expression
+                RecordFieldVisibility::Sourced { source_expr, .. } if source_expr == expression
             ));
             assert_eq!(record.field_source("namespace"), Some(expression));
         }

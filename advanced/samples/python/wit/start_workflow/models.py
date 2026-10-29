@@ -12,13 +12,13 @@ import temporalio.converter
 import temporal_support as _support
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(slots=True, kw_only=True)
 class StartWorkflowRequest:
     workflow: str
     workflow_id: str
     task_queue: str
     workflow_start_delay: datetime.timedelta | None = None
-    namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
+    namespace: str
 
 
 class _StartWorkflowRequestTransferTypeConverter(
@@ -49,6 +49,9 @@ class _StartWorkflowRequestTransferTypeConverter(
         if not value.HasField("task_queue"):
             raise ValueError("missing required field StartWorkflowRequest.task_queue")
         task_queue = _support.task_queue_from_proto(value.task_queue)
+        if not value.namespace:
+            raise ValueError("missing required field StartWorkflowRequest.namespace")
+        namespace = value.namespace
         return StartWorkflowRequest(
             workflow=workflow,
             workflow_id=workflow_id,
@@ -58,7 +61,7 @@ class _StartWorkflowRequestTransferTypeConverter(
             )
             if value.HasField("workflow_start_delay")
             else None,
-            namespace=value.namespace,
+            namespace=namespace,
         )
 
     @typing_extensions.override
@@ -127,9 +130,9 @@ temporalio.converter.transfer_type_convertible(
 )(StartWorkflowResult)  # pyright: ignore[reportUnusedCallResult]
 
 
-@dataclasses.dataclass(slots=True, kw_only=True)
+@dataclasses.dataclass(slots=True)
 class CancelWorkflowRequest:
-    namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
+    namespace: str
     workflow_execution: WorkflowExecution
     reason: str | None = None
 
@@ -153,6 +156,9 @@ class _CancelWorkflowRequestTransferTypeConverter(
         value: temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
         type_hint: type[CancelWorkflowRequest],
     ) -> CancelWorkflowRequest:
+        if not value.namespace:
+            raise ValueError("missing required field CancelWorkflowRequest.namespace")
+        namespace = value.namespace
         if not value.HasField("workflow_execution"):
             raise ValueError(
                 "missing required field CancelWorkflowRequest.workflow_execution"
@@ -163,7 +169,7 @@ class _CancelWorkflowRequestTransferTypeConverter(
             )
         )
         return CancelWorkflowRequest(
-            namespace=value.namespace,
+            namespace=namespace,
             workflow_execution=workflow_execution,
             reason=value.reason if bool(value.reason) else None,
         )

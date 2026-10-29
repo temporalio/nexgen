@@ -28,10 +28,7 @@ class User:
         self,
         email: str,
     ) -> User:
-        request = UpdateEmailRequest(
-            user_id=self.user_id,
-            email=email,
-        )
+        request = UpdateEmailRequest(user_id=self.user_id, email=email)
         return await _update_email(request)
 
     async def rename(
@@ -39,20 +36,14 @@ class User:
         display_name: str,
     ) -> User:
         """Python rename."""
-        request = RenameRequest(
-            user_id=self.user_id,
-            display_name=display_name,
-        )
+        request = RenameRequest(user_id=self.user_id, display_name=display_name)
         return await _rename(request)
 
     async def deactivate(
         self,
         reason: str | None = None,
     ) -> None:
-        request = DeactivateRequest(
-            user_id=self.user_id,
-            reason=reason,
-        )
+        request = DeactivateRequest(user_id=self.user_id, reason=reason)
         handle = await _deactivate(request)
         await handle
 

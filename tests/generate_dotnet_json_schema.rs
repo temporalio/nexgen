@@ -14,8 +14,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
+use nexgen::nexgen_config::GenerationTargets;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -33,11 +33,11 @@ fn project_root() -> PathBuf {
 
 /// Generates a `samples/schemas` example the way `cargo build-examples` does,
 /// minus the sample namespace, so the checks below see the derived defaults.
-fn generate_sample(example: &str, mode: GenerationMode) -> (PathBuf, Output) {
+fn generate_sample(example: &str, targets: GenerationTargets) -> (PathBuf, Output) {
     let output_path = unique_output_path(&format!("dotnet-json-sample-{example}"));
     generate_to_file(&GenerateRequest {
         config: NexgenConfig {
-            mode,
+            targets,
             ..Default::default()
         },
         language: Language::Dotnet,
@@ -57,8 +57,8 @@ fn generate_sample(example: &str, mode: GenerationMode) -> (PathBuf, Output) {
 
 #[test]
 fn csharp_json_examples_render_expected_language_features() {
-    for mode in [GenerationMode::DefinitionsOnly, GenerationMode::NativeApi] {
-        let (dir, showcase) = generate_sample("showcase", mode);
+    for targets in [GenerationTargets::NONE, GenerationTargets::WORKFLOW] {
+        let (dir, showcase) = generate_sample("showcase", targets);
         let models = showcase.file("Models.cs");
         assert_has(
             models,
@@ -97,7 +97,7 @@ fn csharp_json_examples_render_expected_language_features() {
         // The contract is the API without `--native-api`, so it is public;
         // with it, callers use the generated client and the contract stays
         // internal.
-        let contract = if mode == GenerationMode::NativeApi {
+        let contract = if targets.workflow {
             "internal interface IShowcaseServiceCs"
         } else {
             "public interface IShowcaseServiceCs"
@@ -112,14 +112,14 @@ fn csharp_json_examples_render_expected_language_features() {
             ],
         );
         let client = "public class ShowcaseServiceCsClient";
-        if mode == GenerationMode::NativeApi {
+        if targets.workflow {
             assert_has(services, &[client, "GetShowcaseCsAsync("]);
         } else {
             assert_lacks(services, &[client, "Temporalio.Workflows"]);
         }
         fs::remove_dir_all(dir).unwrap();
 
-        let (dir, temporal) = generate_sample("temporal", mode);
+        let (dir, temporal) = generate_sample("temporal", targets);
         assert_has(
             temporal.file("Models.cs"),
             &["global::System.DateTimeOffset", "global::System.TimeSpan"],

@@ -7,9 +7,10 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::generator::render_request_plan;
 use crate::generator::{
-    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
+    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
 use crate::language::Language;
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedJsonType, PlannedProtoType, PlannedProtoTypeInfo, PlannedResource,
     PlannedResourceMethodBindingSpec as PlannedResourceMethodBinding,
@@ -947,7 +948,7 @@ impl GoExternalModels {
     ) -> Self {
         if plan_uses_json_models(api_plan) {
             Self::Json(json::ModelBackend::new(
-                crate::nexgen_config::current().mode == GenerationMode::NativeApi,
+                crate::nexgen_config::current().targets.workflow,
             ))
         } else {
             Self::Proto(proto::ModelBackend::new(
@@ -1315,7 +1316,7 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
         }
-        if crate::nexgen_config::current().mode == GenerationMode::NativeApi
+        if crate::nexgen_config::current().targets.workflow
             && self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
             && !self.package.is_self_import("go.temporal.io/sdk/workflow")
@@ -1498,7 +1499,7 @@ impl<'a> ApiPlanner<'a> {
             let planned_record = record_for_message(self.api_plan, &input);
             let planned_fields = planned_record.map(|record| {
                 record
-                    .public_fields()
+                    .api_fields(GenerationTarget::Workflow)
                     .map(|(field_name, field)| {
                         planned_field(record, field_name, field, self.api_plan)
                     })
@@ -1507,10 +1508,12 @@ impl<'a> ApiPlanner<'a> {
             model
                 .fields
                 .iter()
-                .enumerate()
-                .filter_map(|(index, field)| {
-                    let planned_field =
-                        planned_fields.as_ref().and_then(|fields| fields.get(index));
+                .filter_map(|field| {
+                    let planned_field = planned_fields.as_ref().and_then(|fields| {
+                        fields
+                            .iter()
+                            .find(|planned| go_field_name(&planned.authored_name) == field.name)
+                    });
                     let planned_field = planned_field?;
                     let function = match &planned_field.role {
                         PlannedFieldRole::Function(function) if planned_field.required => {
@@ -3721,7 +3724,8 @@ fn render_file(
         return output;
     }
 
-    let has_operations = services.iter().any(|s| !s.operations.is_empty());
+    let has_operations = crate::nexgen_config::current().targets.workflow
+        && services.iter().any(|s| !s.operations.is_empty());
 
     // --- Datatypes ---
     let private_enums = enums
@@ -3791,14 +3795,16 @@ fn render_file(
                     visibility,
                     constructor_returns_value,
                 );
-                render_resource_methods(
-                    &mut output,
-                    service,
-                    resource,
-                    api_plan,
-                    package,
-                    visibility,
-                );
+                if crate::nexgen_config::current().targets.workflow {
+                    render_resource_methods(
+                        &mut output,
+                        service,
+                        resource,
+                        api_plan,
+                        package,
+                        visibility,
+                    );
+                }
             }
         }
     }
@@ -3840,9 +3846,10 @@ fn render_file(
         || !public_variants.is_empty()
         || !public_models.is_empty();
 
-    let has_endpoint_operations = services
-        .iter()
-        .any(|service| service.endpoint.is_some() && !service.operations.is_empty());
+    let has_endpoint_operations = crate::nexgen_config::current().targets.workflow
+        && services
+            .iter()
+            .any(|service| service.endpoint.is_some() && !service.operations.is_empty());
 
     if has_endpoint_operations || has_public_datatypes {
         output.push_str("\n// --- Operations (public API) ---\n");
@@ -3863,6 +3870,9 @@ fn render_file(
             render_model(&mut output, key, model, external_models, true);
         }
         for service in services {
+            if !crate::nexgen_config::current().targets.workflow {
+                continue;
+            }
             if service.endpoint.is_none() {
                 continue;
             }

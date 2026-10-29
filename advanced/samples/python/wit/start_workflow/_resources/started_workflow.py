@@ -13,6 +13,7 @@ from ..models import (
     StartWorkflowResult,
     WorkflowExecution,
 )
+import temporal_support as _support
 
 
 @dataclasses.dataclass
@@ -30,6 +31,7 @@ class StartedWorkflow:
                 workflow_id=self.workflow_id, run_id=self.run_id
             ),
             reason=reason,
+            namespace=_support.workflow_namespace(),
         )
         handle = await _cancel_workflow(request)
         await handle
@@ -43,6 +45,7 @@ class StartedWorkflow:
             workflow_id=self.workflow_id,
             workflow=workflow,
             task_queue=task_queue,
+            namespace=_support.workflow_namespace(),
         )
         return await _restart_workflow(request)
 
@@ -72,6 +75,7 @@ async def cancel_workflow(
     reason: str | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[CancelWorkflowResponse,]:
     request = CancelWorkflowRequest(
+        namespace=_support.workflow_namespace(),
         workflow_execution=workflow_execution,
         reason=reason,
     )
@@ -110,5 +114,6 @@ async def restart_workflow(
         workflow_id=workflow_id,
         task_queue=task_queue,
         workflow_start_delay=workflow_start_delay,
+        namespace=_support.workflow_namespace(),
     )
     return await _restart_workflow(request)

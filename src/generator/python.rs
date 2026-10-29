@@ -7,10 +7,9 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::generator::json_schema::python as python_json;
 use crate::generator::proto::python as python_proto;
-use crate::generator::render_request_plan;
-use crate::generator::resource_plan::validate_client_resource_sources;
+use crate::generator::resource_plan::render_request_plan_with_sources;
 use crate::generator::{
-    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
+    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
 use crate::language::Language;
 use crate::nexgen_config::GenerationTarget;
@@ -604,9 +603,10 @@ impl<'a> ApiPlanner<'a> {
         services: &[RenderedService<'_>],
         module_origin: GeneratedFileOrigin,
     ) -> Result<(GeneratedFileMap, BTreeSet<String>)> {
-        let mode = crate::nexgen_config::current().mode;
-        let client_api =
-            mode == GenerationMode::NativeApi && crate::nexgen_config::current().targets.client;
+        let targets = crate::nexgen_config::current().targets;
+        if targets.client {
+            validate_client_names(services)?;
+        }
         let mut files = GeneratedFileMap::default();
         files.insert_multi(
             self.external_models.render_support_files()?,
@@ -643,14 +643,6 @@ impl<'a> ApiPlanner<'a> {
             .into_iter()
             .collect::<Vec<_>>();
         let resource_operation_owners = resource_operation_owners(services);
-        let has_standalone_operations = mode == GenerationMode::NativeApi
-            && services.iter().any(|service| {
-                service.endpoint.is_some()
-                    && service.operations.iter().any(|operation| {
-                        !resource_operation_owners
-                            .contains_key(&operation_key(service.name, operation.name))
-                    })
-            });
         let resource_names = services
             .iter()
             .flat_map(|service| {
@@ -687,7 +679,7 @@ impl<'a> ApiPlanner<'a> {
         let mut package_model_names = package_model_names.into_iter().collect::<Vec<_>>();
         sort_python_model_names(&mut package_model_names, &self.variants, model_fragments);
         let render_init = |root_package_imports: &RootPackageImports| {
-            if mode == GenerationMode::NativeApi {
+            if targets.workflow {
                 render_package_init(
                     services,
                     &package_model_names,
@@ -710,7 +702,7 @@ impl<'a> ApiPlanner<'a> {
         };
         let exported_names = package_export_names(
             services,
-            if mode == GenerationMode::NativeApi {
+            if targets.workflow {
                 &package_model_names
             } else {
                 &model_names
@@ -722,27 +714,42 @@ impl<'a> ApiPlanner<'a> {
             render_init(root_package_imports),
             module_origin.clone(),
         )?;
-        // A module that declares nothing emits no models file. Emitting the file
-        // anyway leaves a header and unused imports behind.
-        if let Some(models_source) = render_models_module(
-            self.enums.values().collect::<Vec<_>>().as_slice(),
-            self.flags.values().collect::<Vec<_>>().as_slice(),
-            variants.as_slice(),
-            model_fragments,
-            self.support_package,
-            &self.language_imports,
-            self.api_plan,
-            self.inline_model_rebuilds,
-            self.model_hoists,
-            self.models.values().any(|model| {
-                planned_record(self.api_plan, &model.full_name)
-                    .fields
-                    .values()
-                    .any(|field| matches!(field.visibility, RecordFieldVisibility::Sourced { .. }))
-            }),
-        )? {
-            files.insert("models.py", models_source, module_origin.clone())?;
-        }
+        super::emit_package(
+            &mut files,
+            targets,
+            |files| {
+                // A module that declares nothing emits no models file.
+                if let Some(models_source) = render_models_module(
+                    self.enums.values().collect::<Vec<_>>().as_slice(),
+                    self.flags.values().collect::<Vec<_>>().as_slice(),
+                    variants.as_slice(),
+                    model_fragments,
+                    self.support_package,
+                    &self.language_imports,
+                    self.api_plan,
+                    self.inline_model_rebuilds,
+                    self.model_hoists,
+                    false,
+                )? {
+                    files.insert("models.py", models_source, module_origin.clone())?;
+                }
+                Ok(())
+            },
+            |files, target| match target {
+                GenerationTarget::Workflow => self.render_workflow_package(
+                    files,
+                    services,
+                    &operation_model_names,
+                    &resource_names,
+                ),
+                GenerationTarget::Client => self.render_client_package(
+                    files,
+                    services,
+                    &operation_model_names,
+                    &resource_names,
+                ),
+            },
+        )?;
         if !resource_names.is_empty() {
             files.insert(
                 "_resources/__init__.py",
@@ -753,15 +760,52 @@ impl<'a> ApiPlanner<'a> {
         if !services.is_empty() {
             files.insert(
                 "services.py",
-                render_service_module(
-                    services,
-                    self.api_plan,
-                    self.model_hoists,
-                    mode == GenerationMode::NativeApi,
-                ),
+                render_service_module(services, self.api_plan, self.model_hoists, targets.workflow),
                 module_origin.clone(),
             )?;
         }
+        // Data-only resource declarations remain available to service definitions
+        // when no workflow API was requested. They have no runtime API imports.
+        if !targets.workflow {
+            for service in services {
+                for resource in &service.resources {
+                    files.insert(
+                        format!("_resources/{}.py", resource_module_name(resource)),
+                        self.render_resource_module_file(
+                            None,
+                            service,
+                            resource,
+                            &[],
+                            &operation_model_names,
+                            &resource_names,
+                        ),
+                        GeneratedFileOrigin::resource(
+                            Language::Python,
+                            service.name,
+                            &resource.name,
+                        ),
+                    )?;
+                }
+            }
+        }
+        Ok((files, exported_names))
+    }
+
+    fn render_workflow_package(
+        &self,
+        files: &mut GeneratedFileMap,
+        services: &[RenderedService<'_>],
+        model_names: &[String],
+        resource_names: &[String],
+    ) -> Result<()> {
+        let resource_operation_owners = resource_operation_owners(services);
+        let has_standalone_operations = services.iter().any(|service| {
+            service.endpoint.is_some()
+                && service.operations.iter().any(|operation| {
+                    !resource_operation_owners
+                        .contains_key(&operation_key(service.name, operation.name))
+                })
+        });
         if has_standalone_operations {
             files.insert(
                 "operations/__init__.py",
@@ -769,43 +813,30 @@ impl<'a> ApiPlanner<'a> {
                 GeneratedFileOrigin::fixed("generated Python operations package initializer"),
             )?;
         }
-        if crate::nexgen_config::current().system_nexus && mode == GenerationMode::NativeApi {
+        if crate::nexgen_config::current().system_nexus {
             files.insert(
                 "_system_nexus_interceptor.py",
                 render_system_nexus_interceptor(services),
                 GeneratedFileOrigin::fixed("generated Python system Nexus interceptor"),
             )?;
         }
-        if client_api && !services.is_empty() {
-            self.render_client_package(
-                &mut files,
-                services,
-                &operation_model_names,
-                &resource_names,
-            )?;
-        }
-
         for service in services {
             for resource in &service.resources {
-                let bound_operations = if mode == GenerationMode::NativeApi {
-                    resource_bound_operations(service, resource)
-                } else {
-                    Vec::new()
-                };
+                let bound_operations = resource_bound_operations(service, resource);
                 files.insert(
                     format!("_resources/{}.py", resource_module_name(resource)),
                     self.render_resource_module_file(
-                        PythonTarget::Workflow,
+                        Some(PythonTarget::Workflow),
                         service,
                         resource,
                         &bound_operations,
-                        &operation_model_names,
-                        &resource_names,
+                        model_names,
+                        resource_names,
                     ),
                     GeneratedFileOrigin::resource(Language::Python, service.name, &resource.name),
                 )?;
             }
-            if mode == GenerationMode::NativeApi {
+            {
                 if service.endpoint.is_none() {
                     continue;
                 }
@@ -820,8 +851,8 @@ impl<'a> ApiPlanner<'a> {
                         render_operation_module(
                             service,
                             operation,
-                            &operation_model_names,
-                            &resource_names,
+                            model_names,
+                            resource_names,
                             self.support_package,
                             &self.language_imports,
                             self.api_plan,
@@ -837,7 +868,7 @@ impl<'a> ApiPlanner<'a> {
             }
         }
 
-        Ok((files, exported_names))
+        Ok(())
     }
 
     /// Renders the package of the client target, with its own resource classes and a client
@@ -849,6 +880,9 @@ impl<'a> ApiPlanner<'a> {
         model_names: &[String],
         resource_names: &[String],
     ) -> Result<()> {
+        if services.is_empty() {
+            return Ok(());
+        }
         let dir = PythonTarget::Client
             .package_dir()
             .expect("the client target should have a package directory");
@@ -876,7 +910,7 @@ impl<'a> ApiPlanner<'a> {
                 files.insert(
                     format!("{dir}/_resources/{}.py", resource_module_name(resource)),
                     self.render_resource_module_file(
-                        PythonTarget::Client,
+                        Some(PythonTarget::Client),
                         service,
                         resource,
                         &resource_bound_operations(service, resource),
@@ -927,10 +961,6 @@ impl<'a> ApiPlanner<'a> {
             });
         }
         validate_client_names(services)?;
-        validate_client_resource_sources(
-            self.api_plan,
-            services.iter().flat_map(|service| &service.resources),
-        )?;
         let operations = services
             .iter()
             .flat_map(|service| service.operations.iter())
@@ -1032,7 +1062,7 @@ impl<'a> ApiPlanner<'a> {
 
     fn render_resource_module_file(
         &self,
-        target: PythonTarget,
+        target: Option<PythonTarget>,
         service: &RenderedService<'_>,
         resource: &PlannedResource,
         bound_operations: &[ResourceBoundOperation<'_>],
@@ -1053,7 +1083,16 @@ impl<'a> ApiPlanner<'a> {
             })
             .flatten()
             .collect::<BTreeSet<_>>();
-
+        let mut data_resource;
+        let resource = if target.is_none() {
+            data_resource = resource.clone();
+            for method in &mut data_resource.methods {
+                method.binding = PlannedResourceMethodBindingSpec::Stub;
+            }
+            &data_resource
+        } else {
+            resource
+        };
         let mut body = String::new();
         let function_fields = bound_operations
             .iter()
@@ -1074,7 +1113,8 @@ impl<'a> ApiPlanner<'a> {
             body.push_str("\n\n");
         }
         // The client resource calls its operations through the client that made it.
-        let operations_object = target == PythonTarget::Client && !bound_operations.is_empty();
+        let operations_object =
+            target == Some(PythonTarget::Client) && !bound_operations.is_empty();
         self.render_resource(
             &mut body,
             service,
@@ -1106,7 +1146,7 @@ impl<'a> ApiPlanner<'a> {
                 &unique_bound_operations(bound_operations),
             );
         }
-        let workflow = target == PythonTarget::Workflow;
+        let workflow = target == Some(PythonTarget::Workflow);
         if workflow && !bound_operations.is_empty() && service.endpoint.is_some() {
             body.push_str("\n\n");
             for (index, bound_operation) in bound_operations.iter().enumerate() {
@@ -1161,7 +1201,7 @@ impl<'a> ApiPlanner<'a> {
         }
         let used_model_names = used_python_symbol_imports(&body, model_names);
         if !used_model_names.is_empty() {
-            let (models, module_path) = match target.package_dir() {
+            let (models, module_path) = match target.and_then(PythonTarget::package_dir) {
                 None => ("..models", self.api_plan.module_path.child("_resources")),
                 Some(dir) => (
                     "...models",
@@ -1300,19 +1340,30 @@ impl<'a> ApiPlanner<'a> {
         render_python_docstring(output, "        ", method.doc.as_deref(), &[], None, false);
 
         match &method.binding {
-            PlannedResourceMethodBindingSpec::Operation { operation_name, .. } => {
+            PlannedResourceMethodBindingSpec::Operation {
+                operation_name,
+                request_plan,
+                ..
+            } => {
                 let operation = bound_operations
                     .iter()
                     .find(|bound_operation| bound_operation.operation.name == operation_name)
                     .map(|bound_operation| bound_operation.operation)
                     .expect("bound resource operation should be rendered in the same module");
+                let target = if operations_object {
+                    GenerationTarget::Client
+                } else {
+                    GenerationTarget::Workflow
+                };
+                let request_expr =
+                    render_request_plan_python(method, request_plan, self.api_plan, target);
                 if operations_object {
                     render_resource_method_operations_body(
                         output,
                         service,
-                        method,
                         operation,
                         &result_annotation,
+                        &request_expr,
                     );
                 } else if service.endpoint.is_none() {
                     render_resource_method_inline_operation_body(
@@ -1321,7 +1372,7 @@ impl<'a> ApiPlanner<'a> {
                         method,
                         operation,
                         &result_annotation,
-                        self.api_plan,
+                        &request_expr,
                     );
                 } else {
                     render_resource_method_operation_body(
@@ -1329,7 +1380,7 @@ impl<'a> ApiPlanner<'a> {
                         method,
                         operation,
                         &result_annotation,
-                        self.api_plan,
+                        &request_expr,
                     );
                 }
             }
@@ -1605,19 +1656,11 @@ impl<'a> ApiPlanner<'a> {
             _ => None,
         };
         let unpacked_input = unpacked_input_name
-            .map(|name| self.build_unpacked_input(name, false))
+            .map(|name| self.build_unpacked_input(name, GenerationTarget::Workflow))
             .transpose()?;
         let client_unpacked_input = unpacked_input_name
-            .filter(|name| {
-                crate::nexgen_config::current().targets.client
-                    && planned_record(self.api_plan, name)
-                        .fields
-                        .values()
-                        .any(|field| {
-                            matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
-                        })
-            })
-            .map(|name| self.build_unpacked_input(name, true))
+            .filter(|_| crate::nexgen_config::current().targets.client)
+            .map(|name| self.build_unpacked_input(name, GenerationTarget::Client))
             .transpose()?;
         let output_type_parameters = unpacked_input
             .iter()
@@ -1719,7 +1762,7 @@ impl<'a> ApiPlanner<'a> {
     fn build_unpacked_input(
         &self,
         input_full_name: &str,
-        sourced_fields_as_parameters: bool,
+        target: GenerationTarget,
     ) -> Result<RenderedUnpackedInput> {
         let model = self
             .models
@@ -1737,27 +1780,18 @@ impl<'a> ApiPlanner<'a> {
             .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
             .zip(model.fields.iter())
         {
-            let sourced = matches!(
-                planned_field.visibility,
-                RecordFieldVisibility::Sourced { .. }
-            );
-            if planned_field.visibility != RecordFieldVisibility::Public
-                && !(sourced && sourced_fields_as_parameters)
-            {
+            if let Some(source_expr) = planned_field.visibility.source_for(target) {
+                request_fields.push(RenderedUnpackedRequestField {
+                    attr_name: rendered_field.attr_name.clone(),
+                    value_expr: python_source_call(source_expr),
+                    default_kind: PythonFieldDefaultKind::Required,
+                });
                 continue;
             }
-            // The model default of a sourced field calls its source, so the parameter takes the
-            // default of the field type.
-            let default_kind = if sourced {
-                match &planned_field.field_type {
-                    PlannedType::List(_) => PythonFieldDefaultKind::EmptyList,
-                    PlannedType::Map(_, _) => PythonFieldDefaultKind::EmptyDict,
-                    _ if planned_field.required => PythonFieldDefaultKind::Required,
-                    _ => PythonFieldDefaultKind::None,
-                }
-            } else {
-                rendered_field.default_kind.clone()
-            };
+            if planned_field.visibility == RecordFieldVisibility::ApiOmitted {
+                continue;
+            }
+            let default_kind = rendered_field.default_kind.clone();
             if let Some(flattened) = self.build_flattened_message(planned_field, rendered_field) {
                 request_fields.push(RenderedUnpackedRequestField {
                     attr_name: flattened.local_name.clone(),
@@ -1975,13 +2009,7 @@ impl<'a> ApiPlanner<'a> {
             .fields
             .iter()
             .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
-            .map(|(field_name, field)| {
-                if let RecordFieldVisibility::Sourced { source_expr } = &field.visibility {
-                    self.build_public_sourced_field(planned_model, field_name, field, source_expr)
-                } else {
-                    self.build_field(planned_model, field_name, field)
-                }
-            })
+            .map(|(field_name, field)| self.build_field(planned_model, field_name, field))
             .collect::<Result<Vec<_>>>()?;
 
         self.models
@@ -2209,20 +2237,6 @@ impl<'a> ApiPlanner<'a> {
             wire_value_type: resolved_type.clone(),
             imports,
         })
-    }
-
-    fn build_public_sourced_field(
-        &mut self,
-        record: &RecordSpec<PlannedFamily>,
-        field_name: &str,
-        field: &RecordFieldSpec<PlannedFamily>,
-        source_expr: &str,
-    ) -> Result<RenderedField> {
-        let mut rendered = self.build_field(record, field_name, field)?;
-        let source_call = python_source_call(source_expr);
-        rendered.default_kind = PythonFieldDefaultKind::Expression(source_call.clone());
-        rendered.default_expr = Some(python_dataclass_source_default_expr(&source_call));
-        Ok(rendered)
     }
 
     fn resolve_planned_value_type(
@@ -2997,8 +3011,7 @@ struct RenderedOperation<'a> {
     client_binds_resource: bool,
     output_none: bool,
     unpacked_input: Option<RenderedUnpackedInput>,
-    /// The unpacked input of the client target, when it differs. That target has no sources, so a
-    /// sourced field is a parameter.
+    /// Target-specific source applicability changes the convenience parameters.
     client_unpacked_input: Option<RenderedUnpackedInput>,
     model_input_type_parameters: Vec<String>,
     generic_model_types: bool,
@@ -3133,7 +3146,6 @@ pub(in crate::generator) enum PythonFieldDefaultKind {
     None,
     EmptyList,
     EmptyDict,
-    Expression(String),
 }
 
 #[derive(Debug)]
@@ -3817,11 +3829,11 @@ fn package_export_names(
 ) -> BTreeSet<String> {
     let mut names = root_package_export_names(root_package_imports);
     names.extend(model_names.iter().cloned());
-    match crate::nexgen_config::current().mode {
-        GenerationMode::DefinitionsOnly => {
+    match crate::nexgen_config::current().targets.workflow {
+        false => {
             names.extend(services.iter().map(|service| service.name.to_string()));
         }
-        GenerationMode::NativeApi => {
+        true => {
             names.extend(
                 services
                     .iter()
@@ -6042,14 +6054,11 @@ fn render_resource_operations_slot(output: &mut String, service: &RenderedServic
 fn render_resource_method_operations_body(
     output: &mut String,
     service: &RenderedService<'_>,
-    method: &PlannedResourceMethod,
     operation: &RenderedOperation<'_>,
     result_annotation: &str,
+    request_expr: &str,
 ) {
-    let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } = &method.binding else {
-        return;
-    };
-    render_resource_method_request(output, method, operation, request_plan);
+    render_resource_method_request(output, request_expr);
     if result_annotation != "None" {
         output.push_str("        return await self._ops().");
     } else if operation.output_none {
@@ -6119,18 +6128,13 @@ fn render_resource_method_inline_operation_body(
     method: &PlannedResourceMethod,
     operation: &RenderedOperation<'_>,
     result_annotation: &str,
-    api_plan: &PlannedSpec,
+    request_expr: &str,
 ) {
-    let PlannedResourceMethodBindingSpec::Operation {
-        request_plan,
-        direct_return,
-        ..
-    } = &method.binding
-    else {
+    let PlannedResourceMethodBindingSpec::Operation { direct_return, .. } = &method.binding else {
         return;
     };
 
-    render_resource_method_request(output, method, operation, request_plan, api_plan);
+    render_resource_method_request(output, request_expr);
     output.push_str("        nexus_client = getattr(self, \"_nexus_client\")\n");
     let returns_direct = operation.output_transform_expr.is_some()
         || operation.output_resource_return.is_some()
@@ -6231,46 +6235,10 @@ fn render_resource_method_inline_operation_body(
     }
 }
 
-fn render_resource_method_request(
-    output: &mut String,
-    method: &PlannedResourceMethod,
-    operation: &RenderedOperation<'_>,
-    request_plan: &RequestPlan,
-    api_plan: &PlannedSpec,
-) {
-    let request_expr = render_request_plan_python(method, request_plan, api_plan);
+fn render_resource_method_request(output: &mut String, request_expr: &str) {
     output.push_str("        request = ");
-    if let Some(unpacked_input) = &operation.unpacked_input {
-        output.push_str(&unpacked_input.model_name);
-    } else {
-        output.push_str(operation_input_annotation(operation));
-    }
-    output.push_str("(\n");
-    match request_plan {
-        RequestPlan::Construct {
-            fields,
-            message_name,
-        } => {
-            for field in fields {
-                output.push_str("            ");
-                output.push_str(&python_field_name(&field.field_name));
-                output.push('=');
-                output.push_str(&render_request_plan_python(method, &field.value, api_plan));
-                output.push_str(",\n");
-            }
-            for (name, expression) in
-                python_missing_request_defaults(api_plan, message_name, fields)
-            {
-                output.push_str(&format!("            {name}=({expression}),\n"));
-            }
-        }
-        RequestPlan::Source(_) => {
-            output.push_str("            value=");
-            output.push_str(&request_expr);
-            output.push_str(",\n");
-        }
-    }
-    output.push_str("        )\n");
+    output.push_str(request_expr);
+    output.push('\n');
 }
 
 fn render_resource_nexus_start_operation(
@@ -6298,19 +6266,14 @@ fn render_resource_method_operation_body(
     method: &PlannedResourceMethod,
     operation: &RenderedOperation<'_>,
     result_annotation: &str,
-    api_plan: &PlannedSpec,
+    request_expr: &str,
 ) {
-    let PlannedResourceMethodBindingSpec::Operation {
-        request_plan,
-        direct_return,
-        ..
-    } = &method.binding
-    else {
+    let PlannedResourceMethodBindingSpec::Operation { direct_return, .. } = &method.binding else {
         return;
     };
 
     let operation_attr_name = request_operation_function_name(operation);
-    render_resource_method_request(output, method, operation, request_plan, api_plan);
+    render_resource_method_request(output, request_expr);
     if *direct_return {
         if result_annotation == "None" {
             output.push_str("        await ");
@@ -6373,6 +6336,7 @@ fn render_request_plan_python(
     method: &PlannedResourceMethod,
     plan: &RequestPlan,
     api_plan: &PlannedSpec,
+    target: GenerationTarget,
 ) -> String {
     let render_method_param = |name: &str| {
         let is_list = method
@@ -6385,7 +6349,7 @@ fn render_request_plan_python(
             python_field_name(name)
         }
     };
-    render_request_plan(
+    render_request_plan_with_sources(
         plan,
         python_field_name,
         |name, value| format!("{name}={value}"),
@@ -6395,7 +6359,11 @@ fn render_request_plan_python(
                     .into_iter()
                     .map(|(name, expression)| format!("{name}=({expression})")),
             );
-            let model_name = message_model_name(message_name);
+            let record =
+                crate::generator::resource_plan::record_for_request_name(api_plan, message_name);
+            let model_name = record
+                .map(|record| record.name.clone())
+                .unwrap_or_else(|| message_model_name(message_name));
             if fields.is_empty() {
                 format!("{model_name}()")
             } else {
@@ -6404,6 +6372,16 @@ fn render_request_plan_python(
         },
         |name| format!("self.{}", python_field_name(name)),
         render_method_param,
+        |message_name| {
+            crate::generator::resource_plan::record_for_request_name(api_plan, message_name)
+                .map(|record| {
+                    record
+                        .sources_for(target)
+                        .map(|(_, field, source)| (field.name.clone(), python_source_call(source)))
+                        .collect()
+                })
+                .unwrap_or_default()
+        },
     )
 }
 
@@ -8702,23 +8680,11 @@ fn python_parameter_default_expr(default_kind: &PythonFieldDefaultKind) -> Optio
         PythonFieldDefaultKind::EmptyList | PythonFieldDefaultKind::EmptyDict => {
             Some("None".to_string())
         }
-        PythonFieldDefaultKind::Expression(expr) => Some(expr.clone()),
     }
 }
 
 fn python_source_call(source_expr: &str) -> String {
     format!("_support.{source_expr}")
-}
-
-fn python_dataclass_source_default_expr(source_expr: &str) -> String {
-    let source_provider = source_expr.strip_suffix("()").unwrap_or(source_expr);
-    if source_provider
-        .chars()
-        .all(|character| is_python_identifier_char(character) || character == '.')
-    {
-        return format!("dataclasses.field(default_factory={source_provider})");
-    }
-    source_expr.to_string()
 }
 
 pub(in crate::generator) fn render_python_default_expr(
@@ -8760,9 +8726,7 @@ fn unpacked_request_field_value_expr(field: &RenderedUnpackedRequestField) -> St
     match &field.default_kind {
         PythonFieldDefaultKind::EmptyList => format!("{} or []", field.value_expr),
         PythonFieldDefaultKind::EmptyDict => format!("{} or {{}}", field.value_expr),
-        PythonFieldDefaultKind::Required
-        | PythonFieldDefaultKind::None
-        | PythonFieldDefaultKind::Expression(_) => field.value_expr.clone(),
+        PythonFieldDefaultKind::Required | PythonFieldDefaultKind::None => field.value_expr.clone(),
     }
 }
 
@@ -8889,21 +8853,13 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn renders_source_provider_defaults_as_dataclass_factories() {
+    fn qualifies_source_calls_without_changing_arguments() {
         let no_args = super::python_source_call("workflow_namespace()");
         assert_eq!(no_args, "_support.workflow_namespace()");
-        assert_eq!(
-            super::python_dataclass_source_default_expr(&no_args),
-            "dataclasses.field(default_factory=_support.workflow_namespace)"
-        );
         let with_args =
             super::python_source_call("Helpers.namespace(request.id, fallback='default')");
         assert_eq!(
             with_args,
-            "_support.Helpers.namespace(request.id, fallback='default')"
-        );
-        assert_eq!(
-            super::python_dataclass_source_default_expr(&with_args),
             "_support.Helpers.namespace(request.id, fallback='default')"
         );
     }

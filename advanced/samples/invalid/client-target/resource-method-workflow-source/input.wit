@@ -13,7 +13,7 @@ interface job-service {
 
   record restart-request {
     job-id: string,
-    /// @nexus.source python="workflow_namespace()"
+    /// @nexus.source targets="workflow" python="workflow_namespace()"
     namespace: string,
   }
 

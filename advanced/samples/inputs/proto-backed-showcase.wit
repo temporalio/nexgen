@@ -159,7 +159,7 @@ interface proto-backed-showcase-service {
   /// @nexus.proto "temporal.api.namespace.v1.NamespaceInfo" typescript-import="@temporalio/proto"
   record namespace-info {
     name: option<string>,
-    /// @nexus.source go="NamespaceData(ctx)"
+    /// @nexus.source targets="workflow" go="NamespaceData(ctx)"
     data: option<map<string, string>>,
     /// @nexus.default
     ///   python="NamespaceState.NamespaceStateRegistered"

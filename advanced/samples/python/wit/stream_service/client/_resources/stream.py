@@ -44,10 +44,7 @@ class Stream:
         records: list[AppendRecord] | None = None,
     ) -> AppendRecordsResponse:
         """Publish values, and return the offset of the last one."""
-        request = AppendRecordsRequest(
-            stream=self.stream,
-            records=records or [],
-        )
+        request = AppendRecordsRequest(stream=self.stream, records=records or [])
         return await self._ops()._stream_service_append_records(request)
 
     async def close(
@@ -56,11 +53,7 @@ class Stream:
         failure: BaseException | None = None,
     ) -> None:
         """Close the Stream. Readers drain what is left, then end."""
-        request = CloseStreamRequest(
-            stream=self.stream,
-            result=result,
-            failure=failure,
-        )
+        request = CloseStreamRequest(stream=self.stream, result=result, failure=failure)
         _ = await self._ops()._stream_service_close_stream(request)
 
     async def read(
@@ -88,9 +81,7 @@ class Stream:
         self,
     ) -> DescribeStreamResponse:
         """Describe the Stream's status, newest offset and Retention."""
-        request = DescribeStreamRequest(
-            stream=self.stream,
-        )
+        request = DescribeStreamRequest(stream=self.stream)
         return await self._ops()._stream_service_describe_stream(request)
 
 

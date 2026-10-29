@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use indexmap::IndexMap;
 
 use crate::language::Language;
+use crate::nexgen_config::{GenerationTarget, GenerationTargets};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ApiSpec<F: TypeFamily = AuthoredFamily> {
@@ -848,7 +849,27 @@ pub enum RecordFieldVisibility {
     Omitted,
     Sourced {
         source_expr: String,
+        targets: GenerationTargets,
     },
+}
+
+impl RecordFieldVisibility {
+    pub fn source_targets(&self) -> GenerationTargets {
+        match self {
+            Self::Sourced { targets, .. } => *targets,
+            _ => GenerationTargets::NONE,
+        }
+    }
+
+    pub fn source_for(&self, target: GenerationTarget) -> Option<&str> {
+        match self {
+            Self::Sourced {
+                source_expr,
+                targets,
+            } if targets.contains(target) => Some(source_expr),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -936,6 +957,30 @@ impl<F: TypeFamily> RecordSpec<F> {
             .iter()
             .filter(|(_, field)| field.visibility == RecordFieldVisibility::Public)
             .map(|(name, field)| (name.as_str(), field))
+    }
+
+    /// Caller-supplied convenience fields for one API. This is a view of the
+    /// authored policy; it never changes the shared model's field metadata.
+    pub fn api_fields(
+        &self,
+        target: GenerationTarget,
+    ) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)> {
+        self.fields
+            .iter()
+            .filter(move |(_, field)| {
+                field.visibility == RecordFieldVisibility::Public
+                    || matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
+                        && field.visibility.source_for(target).is_none()
+            })
+            .map(|(name, field)| (name.as_str(), field))
+    }
+
+    pub fn sources_for(
+        &self,
+        target: GenerationTarget,
+    ) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)> {
+        self.sourced_fields()
+            .filter(move |(_, field, _)| field.visibility.source_for(target).is_some())
     }
 
     /// Fields represented by the generated model, including fields hidden from

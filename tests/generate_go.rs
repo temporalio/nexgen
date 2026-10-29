@@ -55,9 +55,8 @@ fn generate_to_string_with_inputs(
     let output_path = temp_dir.join("output");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
             system_nexus: false,
-            targets: Default::default(),
+            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
         },
         language,
         input_paths: input_paths.to_vec(),
@@ -187,6 +186,7 @@ fn cli_generates_go_with_package_self_imports_removed() {
         .args([
             "go",
             temp_input_path.to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",
@@ -500,9 +500,8 @@ interface sample-service {{
     let output_path = temp_dir.join("output");
     let result = generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
             system_nexus: false,
-            targets: Default::default(),
+            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![wit_path],

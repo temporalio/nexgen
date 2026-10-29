@@ -302,7 +302,7 @@ fn read_java_files(dir: &Path) -> BTreeMap<PathBuf, String> {
 }
 
 /// Checks Java-specific rendering details exercised by the showcase schema.
-fn assert_showcase_features(mode: &str, generation_mode: nexgen::generator::GenerationMode) {
+fn assert_showcase_features(mode: &str, targets: nexgen::nexgen_config::GenerationTargets) {
     let root = project_root();
     let example_id = "showcase";
     let temp_dir = unique_output_path(&format!("java-json-{mode}-{example_id}"));
@@ -310,7 +310,7 @@ fn assert_showcase_features(mode: &str, generation_mode: nexgen::generator::Gene
 
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: generation_mode,
+            targets,
             ..Default::default()
         },
         language: nexgen::language::Language::Java,
@@ -364,13 +364,13 @@ fn assert_showcase_features(mode: &str, generation_mode: nexgen::generator::Gene
 fn java_json_definitions_examples_render_expected_features() {
     assert_showcase_features(
         "definitions",
-        nexgen::generator::GenerationMode::DefinitionsOnly,
+        nexgen::nexgen_config::GenerationTargets::NONE,
     );
 }
 
 #[test]
 fn java_json_api_examples_render_expected_features() {
-    assert_showcase_features("api", nexgen::generator::GenerationMode::NativeApi);
+    assert_showcase_features("api", nexgen::nexgen_config::GenerationTargets::WORKFLOW);
 }
 
 /// A structured inline object branch of a property-level union is named

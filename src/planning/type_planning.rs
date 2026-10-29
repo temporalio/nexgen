@@ -1786,7 +1786,7 @@ interface alerts {
         };
         let resource_resolved = super::super::ResourceResolutionPass::new(
             &descriptors,
-            super::super::PlanningMode::DefinitionsOnly,
+            crate::nexgen_config::GenerationTargets::NONE,
         )
         .apply(authored_tree)
         .unwrap();

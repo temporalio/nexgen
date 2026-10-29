@@ -43,6 +43,17 @@ impl<'a> AuthoredValidationPass<'a> {
     }
 
     pub(crate) fn validate_spec(&self, spec: &ApiSpec) -> Result<()> {
+        if crate::nexgen_config::current().targets.is_empty() {
+            for (_, record) in spec.records() {
+                if let Some((name, _, _)) = record.sourced_fields().next() {
+                    return Err(Error::UnsupportedSourcedTypeField {
+                        message: record.full_name.clone(),
+                        field: name.to_string(),
+                        reason: "a sourced field requires at least one API target; its source has no effect with no targets selected".to_string(),
+                    });
+                }
+            }
+        }
         python::validate_service_configuration(spec)?;
         dotnet::validate_service_configuration(spec, self.language)?;
         validate_external_type_bindings(spec, self.descriptors, self.language)

@@ -180,6 +180,7 @@ struct MessageFieldInfo {
     api_name: String,
     required: bool,
     hidden: bool,
+    sourced: bool,
     message_name: Option<String>,
 }
 
@@ -543,7 +544,7 @@ fn synthesize_request_plan(
             }
         }
 
-        if field.required {
+        if field.required && !field.sourced {
             return Ok(None);
         }
     }
@@ -601,7 +602,7 @@ fn synthesize_record_request_plan(
             continue;
         }
 
-        if field.required {
+        if field.required && !field.sourced {
             return Ok(None);
         }
     }
@@ -628,7 +629,7 @@ fn visible_message_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_message_fields(spec, descriptors, message_name)?
         .into_iter()
-        .filter(|field| !field.hidden)
+        .filter(|field| !field.hidden || field.sourced)
         .collect())
 }
 
@@ -638,7 +639,7 @@ fn visible_record_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_record_fields(spec, record_name)?
         .into_iter()
-        .filter(|field| !field.hidden)
+        .filter(|field| !field.hidden || field.sourced)
         .collect())
 }
 
@@ -715,6 +716,7 @@ fn build_record_field_info(
         api_name,
         required,
         hidden,
+        sourced: hidden,
         message_name,
     })
 }
@@ -762,6 +764,7 @@ fn build_message_field_info(
         api_name,
         required,
         hidden,
+        sourced: record.is_some_and(|record| record.field_source(proto_name).is_some()),
         message_name,
     })
 }
@@ -893,12 +896,18 @@ fn operation_output_resource_wire_type(
 /// owning operation and resource nodes by `OperationBindingPass`.
 pub(crate) struct ResourceResolutionPass<'a> {
     descriptors: &'a DescriptorIndex,
-    mode: super::PlanningMode,
+    targets: crate::nexgen_config::GenerationTargets,
 }
 
 impl<'a> ResourceResolutionPass<'a> {
-    pub(crate) fn new(descriptors: &'a DescriptorIndex, mode: super::PlanningMode) -> Self {
-        Self { descriptors, mode }
+    pub(crate) fn new(
+        descriptors: &'a DescriptorIndex,
+        targets: crate::nexgen_config::GenerationTargets,
+    ) -> Self {
+        Self {
+            descriptors,
+            targets,
+        }
     }
 
     pub(super) fn bind_spec(
@@ -906,7 +915,7 @@ impl<'a> ResourceResolutionPass<'a> {
         spec: ApiSpec<SelectedFamily>,
     ) -> Result<ApiSpec<super::ResourceBoundFamily>> {
         ensure_unique_resource_names(&spec)?;
-        let bindings = if self.mode == super::PlanningMode::NativeApi {
+        let bindings = if !self.targets.is_empty() {
             spec.services
                 .iter()
                 .map(|service| {

@@ -2,5 +2,5 @@ languages = ["python"]
 targets = ["workflow", "client"]
 
 [error]
-kind = "unsupported-client-target"
-contains = ["`Job.restart`", "the sourced field `namespace`"]
+kind = "invalid-resource-method"
+contains = ["restart", "the sourced field `namespace`", "`client` target"]

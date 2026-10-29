@@ -109,12 +109,6 @@ pub(crate) fn operation_output_direct_result(operation: &OperationSpec<PlannedFa
     )
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PlanningMode {
-    NativeApi,
-    DefinitionsOnly,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedOperationResourceReturn {
     pub(crate) resource_type_name: String,

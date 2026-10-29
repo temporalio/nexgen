@@ -1,0 +1,12 @@
+package temporal:sources-without-api@1.0.0;
+
+world system { export example; }
+
+interface example {
+  record request {
+    /// @nexus.source "namespace()"
+    namespace: string,
+  }
+
+  submit: func(request: request);
+}

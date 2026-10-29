@@ -1440,9 +1440,6 @@ fn field_read_policy(model_name: &str, rendered_field: &RenderedField) -> WireRe
         PythonFieldDefaultKind::EmptyList => WireReadPolicy::Default {
             default_expr: "[]".to_string(),
         },
-        PythonFieldDefaultKind::Expression(default_expr) => WireReadPolicy::Default {
-            default_expr: default_expr.clone(),
-        },
     }
 }
 

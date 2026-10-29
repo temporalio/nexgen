@@ -40,3 +40,9 @@ descriptors = ["temporal_api.bin", "streams.bin"]
 languages = ["python", "dotnet", "typescript"]
 system_nexus = true
 descriptors = "temporal"
+
+[target-sources]
+languages = ["python"]
+variants.workflow = ["workflow"]
+variants.client = ["client"]
+variants.both = ["workflow", "client"]

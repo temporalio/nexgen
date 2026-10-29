@@ -8,9 +8,10 @@ use crate::generator::json_schema::dotnet as dotnet_json;
 use crate::generator::proto::dotnet as dotnet_proto;
 use crate::generator::resource_plan::record_for_request_name;
 use crate::generator::{
-    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
+    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
 use crate::language::Language;
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedProtoType, PlannedResource,
     PlannedResourceMethod, PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind,
@@ -20,6 +21,7 @@ use crate::planning::{
     PlannedResourceHolderField, RequestPlan, RequestPlanField, RequestPlanSource,
     ResolvedResourceBindingSource,
 };
+use crate::spec::RecordFieldVisibility;
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionFieldSpec, IntSpec,
     OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec, VariantSpec,
@@ -39,11 +41,11 @@ const GENERATED_CODE_ATTRIBUTE: &str = "[GeneratedCode(\"nexgen\", null)]";
 pub(in crate::generator) const OBSOLETE_WARNING_PRAGMA: &str = "// Generated code refers to deprecated ([Obsolete]) declarations it also\n// generates; keep those references from raising CS0618.\n#pragma warning disable CS0618\n\n";
 
 /// The access modifier of a generated `[NexusService]` contract interface.
-/// With `--native-api` the generated `*Client` wrapper is the API callers use,
+/// With the workflow target the generated `*Client` wrapper is the API callers use,
 /// so the contract stays `internal`; without it the contract is the API, which
 /// handlers and callers in other assemblies must be able to name.
-fn service_interface_visibility(include_native_api: bool) -> &'static str {
-    if include_native_api {
+fn service_interface_visibility(targets: crate::nexgen_config::GenerationTargets) -> &'static str {
+    if targets.workflow {
         "internal"
     } else {
         "public"
@@ -188,7 +190,11 @@ impl<'a> ApiPlanner<'a> {
         output
     }
 
-    fn render_service_file(&self, namespace: &str, include_native_api: bool) -> String {
+    fn render_service_file(
+        &self,
+        namespace: &str,
+        targets: crate::nexgen_config::GenerationTargets,
+    ) -> String {
         let module_imports = self.namespaces.module_imports(self.api_plan);
         let has_endpoint_operations = self
             .api_plan
@@ -205,7 +211,7 @@ impl<'a> ApiPlanner<'a> {
         if has_endpoint_operations {
             imports.push("Temporalio.Converters");
         }
-        if include_native_api
+        if targets.workflow
             && self
                 .api_plan
                 .services
@@ -245,7 +251,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("[NexusService(");
             output.push_str(&csharp_string_literal(&service.wire_name));
             output.push_str(")]\n");
-            output.push_str(service_interface_visibility(include_native_api));
+            output.push_str(service_interface_visibility(targets));
             output.push_str(" interface I");
             output.push_str(&csharp_service_ident(service));
             output.push_str("\n{\n");
@@ -253,7 +259,7 @@ impl<'a> ApiPlanner<'a> {
                 self.render_service_operation(&mut output, operation);
             }
             output.push_str("}\n\n");
-            if include_native_api && service.endpoint.is_none() {
+            if targets.workflow && service.endpoint.is_none() {
                 for operation in &service.operations {
                     self.render_operation_options_type(&mut output, operation);
                 }
@@ -1837,10 +1843,12 @@ impl<'a> ApiPlanner<'a> {
         self.render_operation_model_type_parameters(output, operation);
         output.push_str("\n{\n");
         let mut option_fields = Vec::<(&RecordFieldSpec<PlannedFamily>, String, bool)>::new();
-        for (field_name, field) in model.public_fields() {
+        for (field_name, field) in model.api_fields(GenerationTarget::Workflow) {
             if let Some(nested_model) = flattened_nested_model(field, self.api_plan) {
                 let _ = field_name;
-                for (nested_field_name, nested_field) in nested_model.public_fields() {
+                for (nested_field_name, nested_field) in
+                    nested_model.api_fields(GenerationTarget::Workflow)
+                {
                     if !field_is_options_field(nested_model, nested_field_name, nested_field) {
                         continue;
                     }
@@ -2378,7 +2386,7 @@ fn generate_leaf(
     namespaces: &Namespaces,
     json_tree: &Rc<dotnet_json::JsonModelTree>,
 ) -> Result<DotnetGenerationResult> {
-    let mode = crate::nexgen_config::current().mode;
+    let targets = crate::nexgen_config::current().targets;
     if let Some(support_package) = support_package {
         validate_dotnet_support_name(support_package).map_err(|reason| {
             Error::InvalidSupportNamespace {
@@ -2397,34 +2405,45 @@ fn generate_leaf(
     )?;
     validate_dotnet_support_references(api_plan, &generator.external_models, support_package)?;
     let mut files = GeneratedFileMap::default();
-    files.insert(
-        "Models.cs",
-        generator.render_models_file(&namespace),
-        module_origin.clone(),
+    super::emit_package(
+        &mut files,
+        targets,
+        |files| {
+            files.insert(
+                "Models.cs",
+                generator.render_models_file(&namespace),
+                module_origin.clone(),
+            )?;
+            Ok(())
+        },
+        |files, target| {
+            debug_assert_eq!(target, GenerationTarget::Workflow);
+            if api_plan
+                .services
+                .iter()
+                .any(|service| service.endpoint.is_some() && !service.operations.is_empty())
+            {
+                files.insert(
+                    "Operations.cs",
+                    generator.render_operations_file(&namespace),
+                    module_origin.clone(),
+                )?;
+            }
+            if crate::nexgen_config::current().system_nexus {
+                files.insert(
+                    "SystemNexusWorkflowOutboundInterceptor.cs",
+                    generator.render_system_nexus_workflow_outbound_interceptor_file(),
+                    module_origin.clone(),
+                )?;
+            }
+            Ok(())
+        },
     )?;
+    // Assemble files that contain both service contracts and selected API members.
     if !api_plan.services.is_empty() {
         files.insert(
             "Services.cs",
-            generator.render_service_file(&namespace, mode == GenerationMode::NativeApi),
-            module_origin.clone(),
-        )?;
-    }
-    if mode == GenerationMode::NativeApi
-        && api_plan
-            .services
-            .iter()
-            .any(|service| service.endpoint.is_some() && !service.operations.is_empty())
-    {
-        files.insert(
-            "Operations.cs",
-            generator.render_operations_file(&namespace),
-            module_origin.clone(),
-        )?;
-    }
-    if mode == GenerationMode::NativeApi && crate::nexgen_config::current().system_nexus {
-        files.insert(
-            "SystemNexusWorkflowOutboundInterceptor.cs",
-            generator.render_system_nexus_workflow_outbound_interceptor_file(),
+            generator.render_service_file(&namespace, targets),
             module_origin.clone(),
         )?;
     }
@@ -2986,7 +3005,11 @@ fn operation_has_flattened_convenience(
     model: &PlannedModel,
     _api_plan: &PlannedSpec,
 ) -> bool {
-    model.public_fields().next().is_some() && model_function_fields_flattenable(model)
+    model
+        .api_fields(GenerationTarget::Workflow)
+        .next()
+        .is_some()
+        && model_function_fields_flattenable(model)
 }
 
 fn model_function_fields_flattenable(model: &PlannedModel) -> bool {
@@ -3204,7 +3227,7 @@ fn render_flattened_method_body(
     endpoint_expr: Option<&str>,
 ) {
     let options_required = model_options_required(model, api_plan);
-    for (field_name, field) in model.public_fields() {
+    for (field_name, field) in model.api_fields(GenerationTarget::Workflow) {
         if field.function.is_some()
             && matches!(
                 overload.function_mode(field_name),
@@ -3243,7 +3266,7 @@ fn render_flattened_method_body(
         output.push('>');
     }
     let field_exprs = model
-        .public_fields()
+        .api_fields(GenerationTarget::Workflow)
         .map(|(field_name, field)| {
             let value = flattened_request_field_expr(
                 field_name,
@@ -3260,20 +3283,35 @@ fn render_flattened_method_body(
         .collect::<Vec<_>>();
     let mut constructor_args = field_exprs
         .iter()
-        .filter(|(_, field, _)| field.required)
+        .filter(|(_, field, _)| {
+            field.required && !matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
+        })
         .map(|(_, _, expr)| expr.clone())
         .collect::<Vec<_>>();
-    constructor_args.extend(
-        model
-            .sourced_fields()
-            .map(|(_, _, source_expr)| dotnet_source_expr(source_expr, support_namespace)),
-    );
+    constructor_args.extend(model.sourced_fields().map(|(name, field, source_expr)| {
+        if field
+            .visibility
+            .source_for(GenerationTarget::Workflow)
+            .is_some()
+        {
+            dotnet_source_expr(source_expr, support_namespace)
+        } else {
+            field_exprs
+                .iter()
+                .find(|(field_name, _, _)| *field_name == name)
+                .expect("inactive source is a caller-supplied field")
+                .2
+                .clone()
+        }
+    }));
     output.push('(');
     output.push_str(&constructor_args.join(", "));
     output.push(')');
     let optional_field_exprs = field_exprs
         .iter()
-        .filter(|(_, field, _)| !field.required)
+        .filter(|(_, field, _)| {
+            !field.required && !matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
+        })
         .map(|(_, field, expr)| (*field, expr.clone()))
         .collect::<Vec<_>>();
     if optional_field_exprs.is_empty() {
@@ -3430,33 +3468,41 @@ fn service_definition_field_name(service: &PlannedService) -> String {
 }
 
 fn model_has_options_fields(model: &PlannedModel, api_plan: &PlannedSpec) -> bool {
-    model.public_fields().any(|(field_name, field)| {
-        if let Some(nested_model) = flattened_nested_model(field, api_plan) {
-            nested_model
-                .public_fields()
-                .any(|(nested_field_name, nested_field)| {
-                    field_is_options_field(nested_model, nested_field_name, nested_field)
-                })
-        } else {
-            field_is_options_field(model, field_name, field)
-        }
-    })
+    model
+        .api_fields(GenerationTarget::Workflow)
+        .any(|(field_name, field)| {
+            if let Some(nested_model) = flattened_nested_model(field, api_plan) {
+                nested_model.api_fields(GenerationTarget::Workflow).any(
+                    |(nested_field_name, nested_field)| {
+                        field_is_options_field(nested_model, nested_field_name, nested_field)
+                    },
+                )
+            } else {
+                field_is_options_field(model, field_name, field)
+            }
+        })
 }
 
 fn model_options_required(model: &PlannedModel, api_plan: &PlannedSpec) -> bool {
-    model.public_fields().any(|(field_name, field)| {
-        if let Some(nested_model) = flattened_nested_model(field, api_plan) {
-            field.api_required()
-                && nested_model
-                    .public_fields()
-                    .any(|(nested_field_name, nested_field)| {
-                        nested_field.api_required()
-                            && field_is_options_field(nested_model, nested_field_name, nested_field)
-                    })
-        } else {
-            field.api_required() && field_is_options_field(model, field_name, field)
-        }
-    })
+    model
+        .api_fields(GenerationTarget::Workflow)
+        .any(|(field_name, field)| {
+            if let Some(nested_model) = flattened_nested_model(field, api_plan) {
+                field.api_required()
+                    && nested_model.api_fields(GenerationTarget::Workflow).any(
+                        |(nested_field_name, nested_field)| {
+                            nested_field.api_required()
+                                && field_is_options_field(
+                                    nested_model,
+                                    nested_field_name,
+                                    nested_field,
+                                )
+                        },
+                    )
+            } else {
+                field.api_required() && field_is_options_field(model, field_name, field)
+            }
+        })
 }
 
 fn field_is_options_field(
@@ -3473,7 +3519,7 @@ fn nested_model_init_expr(
     options_required: bool,
 ) -> String {
     let option_fields = model
-        .public_fields()
+        .api_fields(GenerationTarget::Workflow)
         .filter(|(nested_field_name, nested_field)| {
             field_is_options_field(model, nested_field_name, nested_field)
         })
@@ -3780,8 +3826,8 @@ fn resource_method_request_model_init_expr(
     let mut field_exprs = Vec::new();
     for field in fields {
         let (model_field_name, model_field) =
-            model.public_fields().find(|(field_name, candidate)| {
-                candidate.name == field.field_name || *field_name == field.field_name
+            model.fields.iter().find(|(field_name, candidate)| {
+                candidate.name == field.field_name || field_name.as_str() == field.field_name
             })?;
         if matches!(init_kind, ResourceMethodRequestInitKind::OptionsFields)
             && !field_is_options_field(model, model_field_name, model_field)
@@ -3809,9 +3855,30 @@ fn resource_method_request_model_init_expr(
     let sourced_field_exprs = type_name_override.is_none().then(|| {
         model
             .sourced_fields()
-            .map(|(_, _, source_expr)| dotnet_source_expr(source_expr, support_namespace))
+            .map(|(_, field, source_expr)| {
+                field_exprs
+                    .iter()
+                    .find(|(candidate, _)| candidate.name == field.name)
+                    .map(|(_, expression)| expression.clone())
+                    .unwrap_or_else(|| {
+                        if field
+                            .visibility
+                            .source_for(GenerationTarget::Workflow)
+                            .is_some()
+                        {
+                            dotnet_source_expr(source_expr, support_namespace)
+                        } else {
+                            "default".to_string()
+                        }
+                    })
+            })
             .collect()
     });
+    if type_name_override.is_none() {
+        field_exprs.retain(|(field, _)| {
+            !matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
+        });
+    }
     Some(model_init_expr(
         type_name_override.unwrap_or(&csharp_type_name(&model.name)),
         field_exprs,
@@ -3832,8 +3899,8 @@ fn resource_method_request_field_exprs(
     let mut source_exprs = BTreeMap::new();
     for field in fields {
         let (model_field_name, model_field) =
-            model.public_fields().find(|(field_name, candidate)| {
-                candidate.name == field.field_name || *field_name == field.field_name
+            model.fields.iter().find(|(field_name, candidate)| {
+                candidate.name == field.field_name || field_name.as_str() == field.field_name
             })?;
         let expr = resource_method_request_value_expr(&field.value, api_plan, support_namespace)?;
         source_exprs.insert(model_field.name.clone(), expr.clone());
@@ -3892,9 +3959,12 @@ fn operation_has_input(operation: &PlannedOperation, api_plan: &PlannedSpec) -> 
         return false;
     };
     match input {
-        PlannedType::Record(record) => api_plan
-            .record(&record.full_name)
-            .is_none_or(|model| model.public_fields().next().is_some()),
+        PlannedType::Record(record) => api_plan.record(&record.full_name).is_none_or(|model| {
+            model
+                .api_fields(GenerationTarget::Workflow)
+                .next()
+                .is_some()
+        }),
         PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(_)))
         | PlannedType::External(ExternalTypeSpec::Json(_)) => true,
         _ => panic!("operation input should be a model"),

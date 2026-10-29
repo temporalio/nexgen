@@ -11,13 +11,13 @@ import temporalio.converter
 import temporal_support as _support
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(slots=True, kw_only=True)
 class StartWorkflowRequest:
     workflow: str
     workflow_id: str
     task_queue: str
     workflow_start_delay: datetime.timedelta | None = None
-    namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
+    namespace: str
 
 
 class _StartWorkflowRequestTransferTypeConverter(
@@ -48,6 +48,9 @@ class _StartWorkflowRequestTransferTypeConverter(
         if not value.HasField("task_queue"):
             raise ValueError("missing required field StartWorkflowRequest.task_queue")
         task_queue = _support.task_queue_from_proto(value.task_queue)
+        if not value.namespace:
+            raise ValueError("missing required field StartWorkflowRequest.namespace")
+        namespace = value.namespace
         return StartWorkflowRequest(
             workflow=workflow,
             workflow_id=workflow_id,
@@ -57,7 +60,7 @@ class _StartWorkflowRequestTransferTypeConverter(
             )
             if value.HasField("workflow_start_delay")
             else None,
-            namespace=value.namespace,
+            namespace=namespace,
         )
 
     @typing_extensions.override

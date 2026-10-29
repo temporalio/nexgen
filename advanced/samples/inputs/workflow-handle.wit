@@ -21,7 +21,7 @@ interface workflow-handle-service {
     workflow-id: string,
     task-queue: task-queue,
     workflow-start-delay: option<duration>,
-    /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
+    /// @nexus.source targets="workflow" python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
     namespace: string,
     /// @nexus.omit
     workflow-execution-timeout: placeholder,

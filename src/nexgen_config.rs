@@ -5,17 +5,14 @@
 
 use std::cell::RefCell;
 
-use crate::generator::GenerationMode;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NexgenConfig {
-    pub mode: GenerationMode,
     pub system_nexus: bool,
     pub targets: GenerationTargets,
 }
 
 /// The code that calls the generated API. The models are the same for each target.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct GenerationTargets {
     /// Workflow code.
     pub workflow: bool,
@@ -41,19 +38,45 @@ impl GenerationTarget {
     }
 }
 
-impl Default for GenerationTargets {
-    fn default() -> Self {
-        Self {
-            workflow: true,
-            client: false,
+impl GenerationTargets {
+    pub const NONE: Self = Self {
+        workflow: false,
+        client: false,
+    };
+    pub const WORKFLOW: Self = Self {
+        workflow: true,
+        client: false,
+    };
+    pub const CLIENT: Self = Self {
+        workflow: false,
+        client: true,
+    };
+    pub const ALL: Self = Self {
+        workflow: true,
+        client: true,
+    };
+
+    pub fn contains(self, target: GenerationTarget) -> bool {
+        match target {
+            GenerationTarget::Workflow => self.workflow,
+            GenerationTarget::Client => self.client,
         }
+    }
+
+    pub fn iter(self) -> impl Iterator<Item = GenerationTarget> {
+        [GenerationTarget::Workflow, GenerationTarget::Client]
+            .into_iter()
+            .filter(move |target| self.contains(*target))
+    }
+
+    pub fn is_empty(self) -> bool {
+        !self.workflow && !self.client
     }
 }
 
 impl Default for NexgenConfig {
     fn default() -> Self {
         Self {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: false,
             targets: GenerationTargets::default(),
         }
@@ -89,12 +112,10 @@ impl Drop for NexgenConfigScope {
 #[cfg(test)]
 mod tests {
     use super::{GenerationTargets, NexgenConfig, current, scope};
-    use crate::generator::GenerationMode;
 
     #[test]
     fn restores_nested_configuration_after_unwinding() {
         let outer = NexgenConfig {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: true,
             targets: GenerationTargets::default(),
         };
@@ -114,7 +135,6 @@ mod tests {
     #[test]
     fn is_isolated_per_thread() {
         let config = NexgenConfig {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: true,
             targets: GenerationTargets::default(),
         };

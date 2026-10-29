@@ -13,6 +13,7 @@ pub(crate) mod typescript;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::language::Language;
+use crate::nexgen_config::{GenerationTarget, GenerationTargets};
 use crate::planning::{PlannedFamily, PlannedSpec, PlannedType};
 use crate::spec::{ApiSpec, RecordSpec};
 use crate::spec::{ApiSpecNode, ApiSpecTree};
@@ -413,11 +414,19 @@ pub(crate) trait ExternalModelBackend<ModelType = PlannedType> {
     ) -> Option<Self::WireConversion>;
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum GenerationMode {
-    #[default]
-    NativeApi,
-    DefinitionsOnly,
+/// Language-independent package emission order. Backends prepare their metadata
+/// once, emit shared definitions once, then emit each selected API independently.
+pub(crate) fn emit_package<C>(
+    context: &mut C,
+    targets: GenerationTargets,
+    models: impl FnOnce(&mut C) -> Result<()>,
+    mut api: impl FnMut(&mut C, GenerationTarget) -> Result<()>,
+) -> Result<()> {
+    models(context)?;
+    for target in targets.iter() {
+        api(context, target)?;
+    }
+    Ok(())
 }
 
 /// The TypeScript in-memory representation of a materialized temporal `format`
@@ -450,15 +459,15 @@ pub(crate) struct GenerateFilesOptions {
     pub(crate) dotnet_namespace: Option<String>,
 }
 
-pub(crate) fn generate_files_for_tree_with_mode_and_options(
+pub(crate) fn generate_files_for_tree_with_targets_and_options(
     language: Language,
     tree: ApiSpecTree,
     descriptors: &DescriptorIndex,
-    mode: GenerationMode,
+    targets: GenerationTargets,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     let config = crate::nexgen_config::NexgenConfig {
-        mode,
+        targets,
         ..crate::nexgen_config::current()
     };
     let _scope = crate::nexgen_config::scope(config);
@@ -470,8 +479,27 @@ pub(crate) fn generate_files_from_planned_tree(
     tree: &ApiSpecTree<PlannedFamily>,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
-    let mode = crate::nexgen_config::current().mode;
+    let targets = crate::nexgen_config::current().targets;
     validate_targets(language)?;
+    fn validate_sources(
+        node: &ApiSpecNode<PlannedFamily>,
+        targets: GenerationTargets,
+    ) -> Result<()> {
+        match node {
+            ApiSpecNode::Leaf(leaf) => {
+                for target in targets.iter() {
+                    resource_plan::validate_resource_sources(&leaf.spec, target)?;
+                }
+            }
+            ApiSpecNode::Branch(branch) => {
+                for child in branch.children.values() {
+                    validate_sources(child, targets)?;
+                }
+            }
+        }
+        Ok(())
+    }
+    validate_sources(&tree.root, targets)?;
     let mut generated = match language {
         Language::Dotnet => dotnet::generate(
             tree,
@@ -490,7 +518,7 @@ pub(crate) fn generate_files_from_planned_tree(
         ),
         language => Err(Error::UnsupportedLanguage { language }),
     }?;
-    generated.warnings = if mode == GenerationMode::NativeApi {
+    generated.warnings = if !targets.is_empty() {
         generation_warnings_for_tree(tree)
     } else {
         Vec::new()
@@ -498,19 +526,13 @@ pub(crate) fn generate_files_from_planned_tree(
     Ok(generated)
 }
 
-/// So far the client target is only for some languages, only for the native API, and only next
-/// to the Workflow target.
-fn validate_targets(language: Language) -> Result<()> {
+pub(crate) fn validate_targets(language: Language) -> Result<()> {
     let config = crate::nexgen_config::current();
     if !config.targets.client {
         return Ok(());
     }
     let reason = if !language.has_client_target() {
         format!("isn't for {language} yet")
-    } else if config.mode != GenerationMode::NativeApi {
-        "needs `--native-api`".to_string()
-    } else if !config.targets.workflow {
-        "needs the `workflow` target too, so far".to_string()
     } else {
         return Ok(());
     };
@@ -537,27 +559,27 @@ pub fn generate_source(
     descriptors: &DescriptorIndex,
     support_package: &str,
 ) -> Result<String> {
-    generate_source_with_mode(
+    generate_source_with_targets(
         language,
         spec,
         descriptors,
         support_package,
-        GenerationMode::NativeApi,
+        GenerationTargets::NONE,
     )
 }
 
-pub fn generate_source_with_mode(
+pub fn generate_source_with_targets(
     language: Language,
     spec: ApiSpec,
     descriptors: &DescriptorIndex,
     support_package: &str,
-    mode: GenerationMode,
+    targets: GenerationTargets,
 ) -> Result<String> {
-    let generated = generate_files_for_tree_with_mode_and_options(
+    let generated = generate_files_for_tree_with_targets_and_options(
         language,
         ApiSpecTree::single(spec),
         descriptors,
-        mode,
+        targets,
         GenerateFilesOptions {
             support_package: Some(support_package.to_string()),
             ..GenerateFilesOptions::default()
@@ -627,17 +649,16 @@ mod tests {
     use crate::language::Language;
 
     use super::{
-        GenerateFilesOptions, GeneratedFileMap, GeneratedFileOrigin, GenerationMode,
-        generate_files_for_tree_with_mode_and_options,
+        GenerateFilesOptions, GeneratedFileMap, GeneratedFileOrigin, GenerationTargets,
+        generate_files_for_tree_with_targets_and_options,
     };
     use crate::spec::ApiSpecTree;
 
     #[test]
-    fn the_python_client_target_needs_the_native_api() {
+    fn the_python_client_target_is_independent() {
         use crate::nexgen_config::{GenerationTargets, NexgenConfig, scope};
 
         let _config = scope(NexgenConfig {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: false,
             targets: GenerationTargets {
                 workflow: false,
@@ -645,12 +666,7 @@ mod tests {
             },
         });
 
-        let error = super::validate_targets(Language::Python).unwrap_err();
-        assert!(
-            matches!(&error, crate::error::Error::UnsupportedClientTarget { reason }
-                if reason == "needs `--native-api`"),
-            "{error}"
-        );
+        super::validate_targets(Language::Python).unwrap();
     }
 
     #[test]
@@ -949,11 +965,11 @@ interface user-service {
         .unwrap();
         let descriptors =
             DescriptorIndex::from_descriptor_set(FileDescriptorSet { file: Vec::new() }).unwrap();
-        let generated = generate_files_for_tree_with_mode_and_options(
+        let generated = generate_files_for_tree_with_targets_and_options(
             Language::Python,
             ApiSpecTree::single(spec),
             &descriptors,
-            GenerationMode::NativeApi,
+            GenerationTargets::WORKFLOW,
             GenerateFilesOptions {
                 support_package: Some("support".to_string()),
                 ..GenerateFilesOptions::default()
@@ -1000,11 +1016,11 @@ interface example-service {
         let descriptors =
             DescriptorIndex::from_descriptor_set(FileDescriptorSet { file: Vec::new() }).unwrap();
 
-        let generated = generate_files_for_tree_with_mode_and_options(
+        let generated = generate_files_for_tree_with_targets_and_options(
             Language::Python,
             ApiSpecTree::single(spec),
             &descriptors,
-            GenerationMode::DefinitionsOnly,
+            GenerationTargets::NONE,
             GenerateFilesOptions {
                 support_package: Some("support".to_string()),
                 ..GenerateFilesOptions::default()

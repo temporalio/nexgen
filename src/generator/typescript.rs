@@ -13,8 +13,7 @@ use crate::generator::proto::typescript::{
 };
 use crate::generator::render_request_plan;
 use crate::generator::{
-    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
-    TsDateTimeTypes,
+    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, TsDateTimeTypes,
 };
 use crate::language::Language;
 use crate::planning::{
@@ -455,14 +454,29 @@ impl<'a> ApiPlanner<'a> {
                             .filter(|field| field.visibility == RecordFieldVisibility::ApiOmitted)
                             .map(|field| field.name.clone())
                             .collect::<Vec<_>>();
-                        fields.extend(record.sourced_fields().map(|(name, _, _)| name.to_string()));
+                        fields.extend(
+                            record
+                                .sources_for(crate::nexgen_config::GenerationTarget::Workflow)
+                                .map(|(name, _, _)| name.to_string()),
+                        );
                         fields.sort();
                         fields.dedup();
                         fields
                     })
                     .unwrap_or_default(),
                 sourced_fields: input_model
-                    .map(|model| model.sourced_fields.clone())
+                    .map(|model| {
+                        model
+                            .sourced_fields
+                            .iter()
+                            .filter(|field| {
+                                field
+                                    .targets
+                                    .contains(crate::nexgen_config::GenerationTarget::Workflow)
+                            })
+                            .cloned()
+                            .collect()
+                    })
                     .unwrap_or_default(),
                 default_initialization,
                 transfer_type_converter: input_conversion
@@ -1240,7 +1254,9 @@ impl<'a> ApiPlanner<'a> {
         let field_name = typescript_generated_field_name(field_name);
 
         let default_source_expr = sourced_support_call(source_expr);
-        let source_expr = format!("model.{field_name} ?? ({default_source_expr})");
+        // Transfer conversion is data-only; sources are evaluated by the API,
+        // never while serializing a shared model.
+        let source_expr = format!("model.{field_name}");
         let doc = field
             .doc
             .as_ref()
@@ -1257,6 +1273,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
+                targets: field.visibility.source_targets(),
                 visible: true,
                 from_wire_expr: map_value_from_wire_expr(
                     &value_type,
@@ -1281,6 +1298,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
+                targets: field.visibility.source_targets(),
                 visible: true,
                 from_wire_expr: format!(
                     "{} ?? []",
@@ -1295,6 +1313,7 @@ impl<'a> ApiPlanner<'a> {
             annotation: Self::typescript_field_annotation(field, resolved_type.annotation.clone()),
             doc,
             source_expr: default_source_expr,
+            targets: field.visibility.source_targets(),
             visible: true,
             from_wire_expr: required_from_wire_expr(
                 &resolved_type,
@@ -3040,6 +3059,7 @@ pub(in crate::generator) struct RenderedSourcedField {
     annotation: String,
     doc: Option<String>,
     source_expr: String,
+    targets: crate::nexgen_config::GenerationTargets,
     visible: bool,
     pub(in crate::generator) from_wire_expr: String,
     pub(in crate::generator) to_wire_expr: String,
@@ -3220,7 +3240,7 @@ fn render_module_files(
     api_plan: &PlannedSpec,
     module_origin: GeneratedFileOrigin,
 ) -> Result<GeneratedFileMap> {
-    let mode = crate::nexgen_config::current().mode;
+    let targets = crate::nexgen_config::current().targets;
     let model_requirements = collect_typescript_model_requirements(variants, models);
     let resource_requirements = collect_typescript_resource_requirements(services);
     let module_model_names = model_fragments
@@ -3258,7 +3278,7 @@ fn render_module_files(
     }
     files.insert(
         "index.ts",
-        if mode == GenerationMode::NativeApi {
+        if targets.workflow {
             render_index_module(services, &index_model_names, &index_exports)
         } else {
             render_definitions_only_index_module(
@@ -3269,9 +3289,85 @@ fn render_module_files(
         },
         module_origin.clone(),
     )?;
-    if has_models_module {
-        files.insert("models.ts", models_source, module_origin.clone())?;
-    }
+    super::emit_package(
+        &mut files,
+        targets,
+        |files| {
+            if has_models_module {
+                files.insert("models.ts", models_source, module_origin.clone())?;
+            }
+            Ok(())
+        },
+        |files, target| {
+            debug_assert_eq!(target, crate::nexgen_config::GenerationTarget::Workflow);
+            if crate::nexgen_config::current().system_nexus && !services.is_empty() {
+                files.insert(
+                    "registry.ts",
+                    render_operation_registry_module(
+                        enums,
+                        flags,
+                        variants,
+                        models,
+                        &module_model_names,
+                        services,
+                        support_package,
+                        api_plan,
+                    ),
+                    GeneratedFileOrigin::fixed(
+                        "generated TypeScript System Nexus operation registry",
+                    ),
+                )?;
+            }
+            if crate::nexgen_config::current().system_nexus && !services.is_empty() {
+                files.insert(
+                    "interceptors.ts",
+                    render_system_nexus_interceptors_module(
+                        enums,
+                        flags,
+                        variants,
+                        models,
+                        &module_model_names,
+                        services,
+                        language_imports,
+                        api_plan,
+                    ),
+                    GeneratedFileOrigin::fixed("generated TypeScript System Nexus interceptors"),
+                )?;
+            }
+            {
+                for service in services {
+                    if service.endpoint.is_none() {
+                        continue;
+                    }
+                    for operation in &service.operations {
+                        files.insert(
+                            format!("operations/{}.ts", operation_file_name(operation)),
+                            render_operation_module(
+                                enums,
+                                flags,
+                                variants,
+                                models,
+                                &module_model_names,
+                                services,
+                                service,
+                                operation,
+                                language_imports,
+                                support_package,
+                                api_plan,
+                            ),
+                            GeneratedFileOrigin::operation(
+                                Language::TypeScript,
+                                service.name,
+                                operation.name,
+                            ),
+                        )?;
+                    }
+                }
+            }
+            Ok(())
+        },
+    )?;
+    // Assemble shared contracts and resource data with the selected API members.
     if !services.is_empty() {
         files.insert(
             "services.ts",
@@ -3284,42 +3380,10 @@ fn render_module_files(
                 services,
                 language_imports,
                 support_package,
-                mode == GenerationMode::NativeApi,
+                targets,
                 api_plan,
             ),
             module_origin.clone(),
-        )?;
-    }
-    if crate::nexgen_config::current().system_nexus && !services.is_empty() {
-        files.insert(
-            "registry.ts",
-            render_operation_registry_module(
-                enums,
-                flags,
-                variants,
-                models,
-                &module_model_names,
-                services,
-                support_package,
-                api_plan,
-            ),
-            GeneratedFileOrigin::fixed("generated TypeScript System Nexus operation registry"),
-        )?;
-    }
-    if crate::nexgen_config::current().system_nexus && !services.is_empty() {
-        files.insert(
-            "interceptors.ts",
-            render_system_nexus_interceptors_module(
-                enums,
-                flags,
-                variants,
-                models,
-                &module_model_names,
-                services,
-                language_imports,
-                api_plan,
-            ),
-            GeneratedFileOrigin::fixed("generated TypeScript System Nexus interceptors"),
         )?;
     }
     if services.iter().any(|service| !service.resources.is_empty()) {
@@ -3339,36 +3403,6 @@ fn render_module_files(
             ),
             module_origin.clone(),
         )?;
-    }
-    if mode == GenerationMode::NativeApi {
-        for service in services {
-            if service.endpoint.is_none() {
-                continue;
-            }
-            for operation in &service.operations {
-                files.insert(
-                    format!("operations/{}.ts", operation_file_name(operation)),
-                    render_operation_module(
-                        enums,
-                        flags,
-                        variants,
-                        models,
-                        &module_model_names,
-                        services,
-                        service,
-                        operation,
-                        language_imports,
-                        support_package,
-                        api_plan,
-                    ),
-                    GeneratedFileOrigin::operation(
-                        Language::TypeScript,
-                        service.name,
-                        operation.name,
-                    ),
-                )?;
-            }
-        }
     }
     files.insert_multi(
         rendered_support.files,
@@ -4122,10 +4156,10 @@ fn render_models_module(
     support_package: &str,
     api_plan: &PlannedSpec,
 ) -> String {
-    let mode = crate::nexgen_config::current().mode;
+    let targets = crate::nexgen_config::current().targets;
     let mut body = String::new();
 
-    let uses_function_payload_helpers = mode == GenerationMode::NativeApi
+    let uses_function_payload_helpers = targets.workflow
         && models.iter().any(|model| {
             model.fields.iter().any(|field| {
                 field.to_wire_expr.contains("requestArgsToPayloads(")
@@ -4350,14 +4384,14 @@ fn render_service_module(
     services: &[RenderedService<'_>],
     language_imports: &[LanguageImportSpec],
     support_package: &str,
-    include_native_api: bool,
+    targets: crate::nexgen_config::GenerationTargets,
     api_plan: &PlannedSpec,
 ) -> String {
     let mut body = String::new();
     for service in services {
         render_service_definition(&mut body, service);
         body.push('\n');
-        if include_native_api && service.endpoint.is_none() {
+        if targets.workflow && service.endpoint.is_none() {
             render_endpoint_service_class(&mut body, service);
             body.push('\n');
         }
@@ -4428,7 +4462,7 @@ fn render_service_module(
     );
     let resource_client_binders = services
         .iter()
-        .filter(|service| include_native_api && service.endpoint.is_none())
+        .filter(|service| targets.workflow && service.endpoint.is_none())
         .flat_map(|service| service.resources.iter())
         .filter(|resource| {
             contains_identifier(&body, &resource_client_bind_function_name(resource))

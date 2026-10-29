@@ -1,6 +1,0 @@
-languages = ["python"]
-targets = ["client"]
-
-[error]
-kind = "unsupported-client-target"
-contains = ["the client target needs the `workflow` target too"]

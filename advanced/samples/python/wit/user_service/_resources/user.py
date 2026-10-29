@@ -20,10 +20,7 @@ class User:
         self,
         email: str,
     ) -> User:
-        request = UpdateEmailRequest(
-            user_id=self.user_id,
-            email=email,
-        )
+        request = UpdateEmailRequest(user_id=self.user_id, email=email)
         nexus_client = getattr(self, "_nexus_client")
         handle = await nexus_client.start_operation(
             operation="UpdateEmail",
@@ -44,10 +41,7 @@ class User:
         sender: str,
     ) -> None:
         request = NotifyRequest(
-            user_id=self.user_id,
-            reason=reason,
-            channels=channels or [],
-            sender=sender,
+            user_id=self.user_id, reason=reason, channels=channels or [], sender=sender
         )
         nexus_client = getattr(self, "_nexus_client")
         handle = await nexus_client.start_operation(
