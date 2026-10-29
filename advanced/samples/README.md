@@ -32,7 +32,7 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
 
 Operation-scoped defaults for scalars, enums, flags, aliases, and nested
 records, including optional parents, flattening, and resource forwarding. See
-the [behavior guide](defaults.md).
+the [default directive](../../GUIDE.md#nexusdefault).
 
 - WIT: [`inputs/defaults.wit`](inputs/defaults.wit)
 - .NET: [`dotnet/wit/defaults/`](dotnet/wit/defaults/)

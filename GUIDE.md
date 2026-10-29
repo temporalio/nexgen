@@ -820,9 +820,7 @@ by the target SDK or generated operation helpers.
 An enum annotated with `@nexus.proto` likewise remains a generated public enum
 unless a type replacement selects an external model. Fields use the authored
 enum's name and members, even when its name differs from the protobuf enum's.
-Converters bridge the model and protobuf enum by number. `@nexus.default` uses
-target-language expressions referring to the API enum, not WIT case names or
-protobuf descriptor names.
+Converters bridge the model and protobuf enum by number.
 
 ### Transfer-Type Conversion
 
@@ -1756,10 +1754,7 @@ Cannot be combined with `@nexus.default`.
 Makes an operation argument omittable and calculates its value when the
 generated operation prepares its outbound request. The field must have a
 non-option type: `@nexus.default` is rejected on `option<T>`, including aliases
-to option types. Use `T` for a value that must be present after initialization.
-Each value is a native expression emitted verbatim, not a support-relative
-helper name or a WIT enum case. Expression syntax, symbols, and types are
-checked by the target language, not by Nexgen.
+to option types.
 
 ```wit
 /// @nexus.default
@@ -1771,58 +1766,18 @@ id-reuse-policy: workflow-id-reuse-policy,
 ```
 
 The operation evaluates an expression only when its argument is missing and only
-once per invocation. Model constructors, transfer-type encoding, inbound
-decoding, and retries using an already prepared request do not evaluate
-defaults. The initialized model retains its authored requiredness; making an
-operation argument optional does not make its wire field optional.
-
-Python uses `None` as the omission marker; TypeScript uses null or undefined,
-and .NET uses null on the options surface. Explicit `None` or null also requests
-the default. Supplied empty strings, false, zero, and empty collections are
-preserved in these languages. For example, the Python operation accepts a
-nullable argument, then constructs a non-nullable model field:
-
-```python
-# In the operation body, not in a Python parameter default:
-effective_policy = (
-    temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE
-    if id_reuse_policy is None
-    else id_reuse_policy
-)
-```
-
-Go retains its public default-punning conventions: empty strings, false, and
-zero select defaults on punned scalar options. Non-nil internal pointers retain
-explicit presence even when pointing to a zero value. Only nil collections
-select defaults; explicitly empty slices and maps are preserved. Non-punned
-required values, such as records, use presence-bearing pointers in public
-options when defaulted.
-
-Generated operations initialize present nested records without modifying
-caller-owned values. Collections are boundaries: defaults do not initialize
-fields of records inside lists or maps. Child defaults never create an absent
-optional parent. Flattened arguments determine parent presence before child
-defaults run.
-
-For incomplete nested records, Python, TypeScript, and .NET expose companion
-`FooInput` types. Their defaulted fields can be omitted; the corresponding
-initialized `Foo` model fields remain non-nullable. Python and TypeScript also
-accept complete models directly. In .NET, use `new FooInput(model)` to reuse a
-complete model. Creating an input object does not evaluate defaults.
-
-Generated API types and their enum/flag values are available by their emitted
-public names. External API types use the reference and imports declared by
-`@nexus.type`. Support helpers must explicitly use `_support` in Python,
+once per invocation. Support helpers must explicitly use `_support` in Python,
 `support` in Go and TypeScript, or a class in the configured .NET support
-namespace. Go expressions can use `ctx`. Do not depend on generator-private
-locals or incidental imports.
+namespace. Go expressions can use `ctx`.
 
-An annotation for another target does not make the current target's argument
-optional. A default cannot be combined with `@nexus.source` for the same target,
-or with `@nexus.omit`.
+Python uses `None` as the omission marker; TypeScript uses null or undefined;
+and .NET uses null on the options surface. Go uses default-punning: empty
+strings, false, zero, and nil represent an omitted argument.
 
-See the [defaults sample](advanced/samples/defaults.md) for scalar,
-nested-record, and forwarding cases.
+Collections are a boundary: a list or map of records with a `@nexus.default`
+annotation will not be default-initialized.
+
+A default cannot be combined with `@nexus.source`.
 
 ---
 

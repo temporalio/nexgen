@@ -100,9 +100,7 @@ flowchart LR
   against the generation mode, with target-specific policies owned by their
   language backends.
 - `LanguageSelectionPass` selects the target-language values from authored
-  language maps, including outbound default expressions. Defaults do not change
-  authored model or wire requiredness; operation surfaces separately account for
-  their ability to fill missing arguments.
+  language maps.
 - `SelectedValidationPass` validates the selected generic surface after
   selection.
 - `ResourceResolutionPass` resolves resource-method and resource-return facts
@@ -111,41 +109,14 @@ flowchart LR
   operations and resources.
 - `OperationLoweringPass` turns wire-backed resource returns into explicit
   result records.
-- `TypePlanningPass` materializes target-ready type metadata. Default
-  expressions remain opaque target-language text rather than resolved enum
-  members. Protobuf messages and enums with native model declarations resolve to
-  ordinary record and enum references unless replaced by an external type. The
-  native declaration owns its protobuf source; field wire bindings retain the
-  separate protobuf type. Reachability and model emission follow native model
-  identity, while language-specific converters use the wire metadata.
+- `TypePlanningPass` materializes target-ready type metadata. Protobuf messages
+  and enums with native model declarations resolve to ordinary record and enum
+  references unless replaced by an external type. The native declaration owns
+  its protobuf source; field wire bindings retain the separate protobuf type.
+  Reachability and model emission follow native model identity, while
+  language-specific converters use the wire metadata.
 - `ReachabilityPass` removes declarations outside the generated surface.
 - `EmittedNameResolutionPass` resolves final emitted JSON model identifiers. Its
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
   the consuming module can only resolve it from the tree-wide manifest.
-
-## Outbound initialization
-
-Language backends prepare operation requests before invoking the SDK. They
-evaluate missing fields' selected default expressions lazily, preserve explicit
-presence according to their language's public API, and construct initialized
-records rather than mutating caller-owned inputs. Collections are passed through
-without recursively initializing their contents. Resource binding treats
-defaulted arguments as omittable; its request construction still feeds the same
-outbound preparation boundary.
-
-`src/generator/initialization.rs` identifies records that directly or
-transitively need preparation through direct record fields. Collections stop
-that traversal. This is shared, input-format-neutral reachability analysis, not
-a new compiler pass. Language-specific code owns presence tests, copying,
-expression bindings, nullable operation inputs, and rendering. Python,
-TypeScript, and .NET companion input types allow incomplete nested values while
-initialized models retain required fields. TypeScript's operation input types
-also preserve invocation unions. Go uses its scalar zero-punning convention. The
-WIT parser rejects defaults on option fields, including aliases to option types;
-the shared model does not need WIT-specific nullability rules.
-
-Constructors and wire converters do not execute default expressions. Inbound
-conversion retains normal wire missing-field behavior, including protobuf's zero
-member for non-optional enum fields. Native language validation checks authored
-expressions; Nexgen does not parse or typecheck their contents.
