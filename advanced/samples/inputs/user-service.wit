@@ -37,7 +37,28 @@ interface user-service {
     attempt: option<s64>,
   }
 
+  // The client flattens both records. One has a required field, and the other has only optional
+  // fields, so its parameters can leave it unset.
+  /// @nexus.flatten-in-api
+  record address {
+    city: string,
+    postal-code: option<string>,
+  }
+
+  /// @nexus.flatten-in-api
+  record contact-preferences {
+    locale: option<string>,
+    timezone: option<string>,
+  }
+
+  record update-profile-request {
+    user-id: string,
+    address: address,
+    preferences: option<contact-preferences>,
+  }
+
   get-user: func(request: get-user-request) -> user-result;
   update-email: func(request: update-email-request) -> user-result;
   notify: func(request: notify-request);
+  update-profile: func(request: update-profile-request);
 }

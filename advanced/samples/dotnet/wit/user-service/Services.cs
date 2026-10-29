@@ -29,6 +29,10 @@ namespace Nexgen.UserService
         [NexusOperation("Notify")]
         void Notify(NotifyRequest request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("UpdateProfile")]
+        void UpdateProfile(UpdateProfileRequest request);
+
     }
 
     [GeneratedCode("nexgen", null)]
@@ -79,6 +83,25 @@ namespace Nexgen.UserService
         public IReadOnlyList<string> Channels { get; set; }
         public string Sender { get; set; }
         public long? Attempt { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class UpdateProfileOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateProfileOptions"/> class.
+        /// </summary>
+        public UpdateProfileOptions(string userId, string city)
+        {
+            UserId = userId;
+            City = city;
+        }
+
+        public string UserId { get; set; }
+        public string City { get; set; }
+        public string? PostalCode { get; set; }
+        public string? Locale { get; set; }
+        public string? Timezone { get; set; }
     }
 
     /// <summary>
@@ -144,6 +167,23 @@ namespace Nexgen.UserService
                 Attempt = options.Attempt,
             };
             return NotifyAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private async Task UpdateProfileAsync(UpdateProfileRequest request)
+        {
+            await _client.ExecuteNexusOperationAsync(svc => svc.UpdateProfile(request)).ConfigureAwait(true);
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public Task UpdateProfileAsync(UpdateProfileOptions options)
+        {
+            var request = new UpdateProfileRequest(options.UserId, new Address(options.City) { PostalCode = options.PostalCode })
+            {
+                Preferences = options.Locale != null || options.Timezone != null ? new ContactPreferences() { Locale = options.Locale, Timezone = options.Timezone } : null,
+            };
+            return UpdateProfileAsync(request);
         }
 
     }

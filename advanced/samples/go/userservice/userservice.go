@@ -57,6 +57,37 @@ func (m notifyRequest) GetAttempt() *int64 {
 	return m.Attempt
 }
 
+type updateProfileRequest struct {
+	UserID      string
+	Address     Address
+	Preferences *contactPreferences
+}
+
+func (m updateProfileRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m updateProfileRequest) GetAddress() Address {
+	return m.Address
+}
+
+func (m updateProfileRequest) GetPreferences() *contactPreferences {
+	return m.Preferences
+}
+
+type contactPreferences struct {
+	Locale   *string
+	Timezone *string
+}
+
+func (m contactPreferences) GetLocale() *string {
+	return m.Locale
+}
+
+func (m contactPreferences) GetTimezone() *string {
+	return m.Timezone
+}
+
 // --- Resources ---
 
 type User struct {
@@ -109,7 +140,28 @@ func notify(ctx workflow.Context, request notifyRequest) workflow.Future {
 	return fut
 }
 
+func updateProfile(ctx workflow.Context, request updateProfileRequest) workflow.Future {
+	c := workflow.NewNexusClient("user-service", "UserService")
+	fut := c.ExecuteOperation(ctx, "UpdateProfile", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
 // --- Operations (public API) ---
+
+type Address struct {
+	// City - Required.
+	City string
+	// PostalCode - Optional.
+	PostalCode *string
+}
+
+func (m Address) GetCity() string {
+	return m.City
+}
+
+func (m Address) GetPostalCode() *string {
+	return m.PostalCode
+}
 
 type GetUserOptions struct {
 	// UserID - Required.
@@ -164,5 +216,34 @@ func Notify(ctx workflow.Context, opts NotifyOptions) workflow.Future {
 		Channels: opts.Channels,
 		Sender:   opts.Sender,
 		Attempt:  attempt,
+	})
+}
+
+type UpdateProfileOptions struct {
+	// UserID - Required.
+	UserID string
+	// Address - Required.
+	Address Address
+	// Locale - Optional.
+	Locale string
+	// Timezone - Optional.
+	Timezone string
+}
+
+func UpdateProfile(ctx workflow.Context, opts UpdateProfileOptions) workflow.Future {
+	var preferencesValue *contactPreferences
+	if opts.Locale != "" || opts.Timezone != "" {
+		preferencesValue = &contactPreferences{}
+		if opts.Locale != "" {
+			preferencesValue.Locale = &opts.Locale
+		}
+		if opts.Timezone != "" {
+			preferencesValue.Timezone = &opts.Timezone
+		}
+	}
+	return updateProfile(ctx, updateProfileRequest{
+		UserID:      opts.UserID,
+		Address:     opts.Address,
+		Preferences: preferencesValue,
 	})
 }

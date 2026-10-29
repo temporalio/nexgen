@@ -16,3 +16,21 @@ export interface NotifyRequest {
   sender: string;
   attempt?: number;
 }
+
+export interface UpdateProfileRequest {
+  userId: string;
+  city: string;
+  postalCode?: string;
+  locale?: string;
+  timezone?: string;
+}
+
+export interface Address {
+  city: string;
+  postalCode?: string;
+}
+
+export interface ContactPreferences {
+  locale?: string;
+  timezone?: string;
+}

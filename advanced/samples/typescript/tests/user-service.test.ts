@@ -32,6 +32,7 @@ describe("user-service generated output", () => {
         async notify(_ctx, input) {
           calls.push(["Notify", input]);
         },
+        async updateProfile() {},
       });
 
       const result = await executeWorkflowWithNexus<{

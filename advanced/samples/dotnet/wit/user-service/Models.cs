@@ -10,6 +10,28 @@ namespace Nexgen.UserService
 {
 
     [GeneratedCode("nexgen", null)]
+    public record Address
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Address"/> class.
+        /// </summary>
+        public Address(string city)
+        {
+            City = city;
+        }
+
+        public string City { get; init; }
+        public string? PostalCode { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record ContactPreferences
+    {
+        public string? Locale { get; init; }
+        public string? Timezone { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record GetUserRequest
     {
         /// <summary>
@@ -57,6 +79,23 @@ namespace Nexgen.UserService
 
         public string UserId { get; init; }
         public string Email { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record UpdateProfileRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateProfileRequest"/> class.
+        /// </summary>
+        public UpdateProfileRequest(string userId, Address address)
+        {
+            UserId = userId;
+            Address = address;
+        }
+
+        public string UserId { get; init; }
+        public Address Address { get; init; }
+        public ContactPreferences? Preferences { get; init; }
     }
 
 }
