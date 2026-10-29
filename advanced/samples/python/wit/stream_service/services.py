@@ -17,8 +17,13 @@ from .models import (
 )
 
 
-@service(name="streamsample.v1.StreamService")
+@service(name="temporal.api.streamservice.v1.StreamService")
 class StreamService:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
     create_stream: Operation[
         CreateStreamRequest,
         CreateStreamResult,

@@ -7,8 +7,13 @@ export { readRecords } from "./operations/read-records";
 export { describeStream } from "./operations/describe-stream";
 export type {
   AppendRecordsRequest,
+  AppendRecordsResponse,
   CloseStreamRequest,
+  CloseStreamResponse,
   CreateStreamRequest,
+  CreateStreamResult,
   DescribeStreamRequest,
+  DescribeStreamResponse,
   ReadRecordsRequest,
+  ReadRecordsResponse,
 } from "./models";

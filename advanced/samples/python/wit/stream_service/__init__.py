@@ -49,31 +49,31 @@ __nexus_operation_registry__: dict[
     tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
 ] = {
     (
-        "streamsample.v1.StreamService",
+        "temporal.api.streamservice.v1.StreamService",
         "CreateStream",
     ): _NexusOperationInfo(
         operation=_services.StreamService.create_stream,
     ),
     (
-        "streamsample.v1.StreamService",
+        "temporal.api.streamservice.v1.StreamService",
         "AppendRecords",
     ): _NexusOperationInfo(
         operation=_services.StreamService.append_records,
     ),
     (
-        "streamsample.v1.StreamService",
+        "temporal.api.streamservice.v1.StreamService",
         "CloseStream",
     ): _NexusOperationInfo(
         operation=_services.StreamService.close_stream,
     ),
     (
-        "streamsample.v1.StreamService",
+        "temporal.api.streamservice.v1.StreamService",
         "ReadRecords",
     ): _NexusOperationInfo(
         operation=_services.StreamService.read_records,
     ),
     (
-        "streamsample.v1.StreamService",
+        "temporal.api.streamservice.v1.StreamService",
         "DescribeStream",
     ): _NexusOperationInfo(
         operation=_services.StreamService.describe_stream,

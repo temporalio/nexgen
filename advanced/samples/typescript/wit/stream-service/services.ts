@@ -25,31 +25,47 @@ import type {
   DescribeStreamResponse,
   DescribeStreamRequest,
 } from "./models";
+import type { Stream } from "./resources";
 
-export const streamService = nexus.service("streamsample.v1.StreamService", {
-  createStream: nexus.operation<CreateStreamRequest, CreateStreamResult>({
-    name: "CreateStream",
-    inputType: { transferTypeConverter: createStreamRequestTransferTypeConverter },
-    outputType: { transferTypeConverter: createStreamResultTransferTypeConverter },
-  }),
-  appendRecords: nexus.operation<AppendRecordsRequest, AppendRecordsResponse>({
-    name: "AppendRecords",
-    inputType: { transferTypeConverter: appendRecordsRequestTransferTypeConverter },
-    outputType: { transferTypeConverter: appendRecordsResponseTransferTypeConverter },
-  }),
-  closeStream: nexus.operation<CloseStreamRequest, CloseStreamResponse>({
-    name: "CloseStream",
-    inputType: { transferTypeConverter: closeStreamRequestTransferTypeConverter },
-    outputType: { transferTypeConverter: closeStreamResponseTransferTypeConverter },
-  }),
-  readRecords: nexus.operation<ReadRecordsRequest, ReadRecordsResponse>({
-    name: "ReadRecords",
-    inputType: { transferTypeConverter: readRecordsRequestTransferTypeConverter },
-    outputType: { transferTypeConverter: readRecordsResponseTransferTypeConverter },
-  }),
-  describeStream: nexus.operation<DescribeStreamRequest, DescribeStreamResponse>({
-    name: "DescribeStream",
-    inputType: { transferTypeConverter: describeStreamRequestTransferTypeConverter },
-    outputType: { transferTypeConverter: describeStreamResponseTransferTypeConverter },
-  }),
-});
+/**
+ * @experimental This API is experimental and subject to change.
+ */
+export const streamService = nexus.service(
+  "temporal.api.streamservice.v1.StreamService",
+  {
+    createStream: nexus.operation<CreateStreamRequest, CreateStreamResult>({
+      name: "CreateStream",
+      inputType: { transferTypeConverter: createStreamRequestTransferTypeConverter },
+      outputType: { transferTypeConverter: createStreamResultTransferTypeConverter },
+    }),
+    /**
+     * Append one batch. Workflow code makes the call from a Local Activity.
+     */
+    appendRecords: nexus.operation<AppendRecordsRequest, AppendRecordsResponse>({
+      name: "AppendRecords",
+      inputType: { transferTypeConverter: appendRecordsRequestTransferTypeConverter },
+      outputType: { transferTypeConverter: appendRecordsResponseTransferTypeConverter },
+    }),
+    closeStream: nexus.operation<CloseStreamRequest, CloseStreamResponse>({
+      name: "CloseStream",
+      inputType: { transferTypeConverter: closeStreamRequestTransferTypeConverter },
+      outputType: { transferTypeConverter: closeStreamResponseTransferTypeConverter },
+    }),
+    /**
+     * A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
+     * Activity.
+     */
+    readRecords: nexus.operation<ReadRecordsRequest, ReadRecordsResponse>({
+      name: "ReadRecords",
+      inputType: { transferTypeConverter: readRecordsRequestTransferTypeConverter },
+      outputType: { transferTypeConverter: readRecordsResponseTransferTypeConverter },
+    }),
+    describeStream: nexus.operation<DescribeStreamRequest, DescribeStreamResponse>({
+      name: "DescribeStream",
+      inputType: { transferTypeConverter: describeStreamRequestTransferTypeConverter },
+      outputType: {
+        transferTypeConverter: describeStreamResponseTransferTypeConverter,
+      },
+    }),
+  },
+);

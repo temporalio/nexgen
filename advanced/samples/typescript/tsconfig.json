@@ -10,5 +10,12 @@
     "allowImportingTsExtensions": true,
     "esModuleInterop": true
   },
-  "include": ["wit/**/*.ts", "json_schema/**/*.ts", "support/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "wit/**/*.ts",
+    "json_schema/**/*.ts",
+    "support/**/*.ts",
+    "tests/**/*.ts",
+    "proto/**/*.d.ts"
+  ],
+  "exclude": ["wit/stream-service/**"]
 }

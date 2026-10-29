@@ -10,17 +10,21 @@ using NexusRpc;
 using Temporalio.Converters;
 using Nexgen.Support;
 
-namespace Nexgen.StreamService
+namespace Temporalio.Workflows
 {
 
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
-    [NexusService("streamsample.v1.StreamService")]
+    [NexusService("temporal.api.streamservice.v1.StreamService")]
     internal interface IStreamService
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("CreateStream")]
         CreateStreamResult CreateStream(CreateStreamRequest request);
 
+        /// <summary>
+        /// Append one batch. Workflow code makes the call from a Local Activity.
+        /// </summary>
         [GeneratedCode("nexgen", null)]
         [NexusOperation("AppendRecords")]
         AppendRecordsResponse AppendRecords(AppendRecordsRequest request);
@@ -29,6 +33,9 @@ namespace Nexgen.StreamService
         [NexusOperation("CloseStream")]
         CloseStreamResponse CloseStream(CloseStreamRequest request);
 
+        /// <summary>
+        /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
+        /// </summary>
         [GeneratedCode("nexgen", null)]
         [NexusOperation("ReadRecords")]
         ReadRecordsResponse ReadRecords(ReadRecordsRequest request);
@@ -71,15 +78,15 @@ namespace Nexgen.StreamService
 
         internal static IReadOnlyDictionary<(string Service, string Operation), INexgenOperationInfo> Operations { get; } = new Dictionary<(string Service, string Operation), INexgenOperationInfo>
         {
-            [("streamsample.v1.StreamService", "CreateStream")] = new NexgenOperationInfo<CreateStreamRequest, CreateStreamResult>(
+            [("temporal.api.streamservice.v1.StreamService", "CreateStream")] = new NexgenOperationInfo<CreateStreamRequest, CreateStreamResult>(
                 StreamServiceServiceDefinition.Operations["CreateStream"]),
-            [("streamsample.v1.StreamService", "AppendRecords")] = new NexgenOperationInfo<AppendRecordsRequest, AppendRecordsResponse>(
+            [("temporal.api.streamservice.v1.StreamService", "AppendRecords")] = new NexgenOperationInfo<AppendRecordsRequest, AppendRecordsResponse>(
                 StreamServiceServiceDefinition.Operations["AppendRecords"]),
-            [("streamsample.v1.StreamService", "CloseStream")] = new NexgenOperationInfo<CloseStreamRequest, CloseStreamResponse>(
+            [("temporal.api.streamservice.v1.StreamService", "CloseStream")] = new NexgenOperationInfo<CloseStreamRequest, CloseStreamResponse>(
                 StreamServiceServiceDefinition.Operations["CloseStream"]),
-            [("streamsample.v1.StreamService", "ReadRecords")] = new NexgenOperationInfo<ReadRecordsRequest, ReadRecordsResponse>(
+            [("temporal.api.streamservice.v1.StreamService", "ReadRecords")] = new NexgenOperationInfo<ReadRecordsRequest, ReadRecordsResponse>(
                 StreamServiceServiceDefinition.Operations["ReadRecords"]),
-            [("streamsample.v1.StreamService", "DescribeStream")] = new NexgenOperationInfo<DescribeStreamRequest, DescribeStreamResponse>(
+            [("temporal.api.streamservice.v1.StreamService", "DescribeStream")] = new NexgenOperationInfo<DescribeStreamRequest, DescribeStreamResponse>(
                 StreamServiceServiceDefinition.Operations["DescribeStream"]),
         };
     }

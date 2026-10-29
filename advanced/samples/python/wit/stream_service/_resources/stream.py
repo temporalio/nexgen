@@ -15,26 +15,26 @@ from ..models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
+    StreamReadStart,
     StreamRef,
-    StreamStatus,
 )
 
 
 @dataclasses.dataclass
 class Stream:
-    """A handle on one stream, built from its ref."""
+    """A handle on one Stream. Build it from a stream-ref, or get it from a create."""
 
     stream: StreamRef
     created: bool | None
-    status: StreamStatus | None
 
-    async def append_records(
+    async def publish(
         self,
         records: list[AppendRecord] | None = None,
     ) -> AppendRecordsResponse:
-        """Append records. The answer has the first and the last offset."""
+        """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             stream=self.stream,
             records=records or [],
@@ -45,26 +45,35 @@ class Stream:
     async def close(
         self,
         result: typing.Any | None = None,
+        failure: BaseException | None = None,
     ) -> None:
+        """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             stream=self.stream,
             result=result,
+            failure=failure,
         )
         handle = await _close_stream(request)
         await handle
 
-    async def read_records(
+    async def read(
         self,
-        topics: list[str] | None = None,
+        from_offset: int | None = None,
+        start: StreamReadStart | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
+        create_wait: datetime.timedelta | None = None,
+        max_bytes: int | None = None,
     ) -> ReadRecordsResponse:
-        """Read one page of records."""
+        """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             stream=self.stream,
-            topics=topics or [],
+            from_offset=from_offset,
+            start=start,
             max_records=max_records,
             wait=wait,
+            create_wait=create_wait,
+            max_bytes=max_bytes,
         )
         handle = await _read_records(request)
         return await handle
@@ -72,6 +81,7 @@ class Stream:
     async def describe(
         self,
     ) -> DescribeStreamResponse:
+        """Describe the Stream's status, newest offset and Retention."""
         request = DescribeStreamRequest(
             stream=self.stream,
         )
@@ -83,8 +93,8 @@ async def _append_records(
     request: AppendRecordsRequest,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="streamsample.v1.StreamService",
-        endpoint="streams",
+        service="temporal.api.streamservice.v1.StreamService",
+        endpoint="__temporal_system",
     )
     return await nexus_client.start_operation(
         operation="AppendRecords",
@@ -95,14 +105,19 @@ async def _append_records(
 
 async def append_records(
     *,
-    stream: StreamRef | None = None,
-    sequence: int | None = None,
+    stream: StreamRef,
     records: list[AppendRecord] | None = None,
+    producer: Producer | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
+    """Append one batch. Workflow code makes the call from a Local Activity.
+
+    Args:
+        producer: Required outside a Workflow. In a Workflow the transport sets it.
+    """
     request = AppendRecordsRequest(
         stream=stream,
-        sequence=sequence,
         records=records or [],
+        producer=producer,
     )
     return await _append_records(request)
 
@@ -111,8 +126,8 @@ async def _close_stream(
     request: CloseStreamRequest,
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="streamsample.v1.StreamService",
-        endpoint="streams",
+        service="temporal.api.streamservice.v1.StreamService",
+        endpoint="__temporal_system",
     )
     return await nexus_client.start_operation(
         operation="CloseStream",
@@ -123,12 +138,16 @@ async def _close_stream(
 
 async def close_stream(
     *,
-    stream: StreamRef | None = None,
+    stream: StreamRef,
+    producer: Producer | None = None,
     result: typing.Any | None = None,
+    failure: BaseException | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     request = CloseStreamRequest(
         stream=stream,
+        producer=producer,
         result=result,
+        failure=failure,
     )
     return await _close_stream(request)
 
@@ -137,8 +156,8 @@ async def _read_records(
     request: ReadRecordsRequest,
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="streamsample.v1.StreamService",
-        endpoint="streams",
+        service="temporal.api.streamservice.v1.StreamService",
+        endpoint="__temporal_system",
     )
     return await nexus_client.start_operation(
         operation="ReadRecords",
@@ -149,18 +168,40 @@ async def _read_records(
 
 async def read_records(
     *,
-    stream: StreamRef | None = None,
+    stream: StreamRef,
     from_offset: int | None = None,
-    topics: list[str] | None = None,
+    start: StreamReadStart | None = None,
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
+    create_wait: datetime.timedelta | None = None,
+    last: int | None = None,
+    max_bytes: int | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse,]:
+    """A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
+    Activity.
+
+    Args:
+        from_offset: Start offset. Empty uses start. OUT_OF_RANGE past the newest offset
+            + 1.
+        start: Where to start when from-offset is empty. Unspecified is the beginning.
+        max_records: About this many items per page, 1 to 1000. A Superseded item stays
+            with its Record.
+        wait: How long to wait for a new Record before an empty answer. At most 60 s.
+        create_wait: How long to wait for an uncreated Stream. Empty fails at once. At
+            most 60 s.
+        last: Read the newest this many Records, oldest first. No from-offset. No wait.
+        max_bytes: The maximum Record bytes in a page. A larger Record is still returned
+            alone.
+    """
     request = ReadRecordsRequest(
         stream=stream,
         from_offset=from_offset,
-        topics=topics or [],
+        start=start,
         max_records=max_records,
         wait=wait,
+        create_wait=create_wait,
+        last=last,
+        max_bytes=max_bytes,
     )
     return await _read_records(request)
 
@@ -169,8 +210,8 @@ async def _describe_stream(
     request: DescribeStreamRequest,
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="streamsample.v1.StreamService",
-        endpoint="streams",
+        service="temporal.api.streamservice.v1.StreamService",
+        endpoint="__temporal_system",
     )
     return await nexus_client.start_operation(
         operation="DescribeStream",
@@ -181,7 +222,7 @@ async def _describe_stream(
 
 async def describe_stream(
     *,
-    stream: StreamRef | None = None,
+    stream: StreamRef,
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     request = DescribeStreamRequest(
         stream=stream,

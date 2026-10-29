@@ -8,6 +8,7 @@ import temporalio.workflow
 from ..models import (
     CreateStreamRequest,
     CreateStreamResult,
+    Producer,
     StreamRef,
 )
 from .._resources import Stream
@@ -17,8 +18,8 @@ async def _create_stream(
     request: CreateStreamRequest,
 ) -> Stream:
     nexus_client = temporalio.workflow.create_nexus_client(
-        service="streamsample.v1.StreamService",
-        endpoint="streams",
+        service="temporal.api.streamservice.v1.StreamService",
+        endpoint="__temporal_system",
     )
     handle = await nexus_client.start_operation(
         operation="CreateStream",
@@ -31,17 +32,31 @@ async def _create_stream(
     return Stream(
         stream=result.stream,
         created=result.created or None,
-        status=result.status or None,
     )
 
 
 async def create_stream(
     *,
-    ref: StreamRef | None = None,
+    id: str,
     retention: datetime.timedelta | None = None,
+    withdraw_run: str | None = None,
+    owner: Producer | None = None,
+    ref: StreamRef | None = None,
 ) -> Stream:
+    """
+    Args:
+        id: The Stream id. Required, and never empty.
+        retention: The age after which a Record is dropped. Empty is the Store default.
+        withdraw_run: Retry run only. The previous run, whose Records this withdraws.
+        owner: The Workflow run that owns the Stream. The Workflow transport sets it.
+        ref: The ref, whose id is stream-id. A create with an owner needs the ref's
+            owner.
+    """
     request = CreateStreamRequest(
-        ref=ref,
+        id=id,
         retention=retention,
+        withdraw_run=withdraw_run,
+        owner=owner,
+        ref=ref,
     )
     return await _create_stream(request)

@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="../Nexgen.DotNetExamples.csproj" />
+    <!-- The stream output takes Temporalio.Workflows, which the workflow-service output also has. -->
+    <ProjectReference Include="../Nexgen.DotNetStreamService.csproj" Aliases="Streams" />
   </ItemGroup>
 
   <ItemGroup>

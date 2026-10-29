@@ -2,7 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type {
-  StreamStatus,
+  StreamReadStart,
   StreamRef,
   AppendRecordsResponse,
   AppendRecord,
@@ -18,31 +18,36 @@ export class Stream {
   public constructor(
     public readonly stream: StreamRef,
     public readonly created: boolean | undefined,
-    public readonly status: StreamStatus | undefined,
   ) {}
 
-  public async appendRecords(records: AppendRecord[]): Promise<AppendRecordsResponse> {
+  public async publish(records: AppendRecord[]): Promise<AppendRecordsResponse> {
     const request = { stream: this.stream, records: records };
     const handle = await appendRecords(request);
     return await handle.result();
   }
 
-  public async close(result?: common.Payload): Promise<void> {
-    const request = { stream: this.stream, result: result };
+  public async close(result?: common.Payload, failure?: Error): Promise<void> {
+    const request = { stream: this.stream, result: result, failure: failure };
     const handle = await closeStream(request);
     await handle.result();
   }
 
-  public async readRecords(
-    topics: string[],
+  public async read(
+    fromOffset?: number,
+    start?: StreamReadStart,
     maxRecords?: number,
     wait?: common.Duration,
+    createWait?: common.Duration,
+    maxBytes?: number,
   ): Promise<ReadRecordsResponse> {
     const request = {
       stream: this.stream,
-      topics: topics,
+      fromOffset: fromOffset,
+      start: start,
       maxRecords: maxRecords,
       wait: wait,
+      createWait: createWait,
+      maxBytes: maxBytes,
     };
     const handle = await readRecords(request);
     return await handle.result();
