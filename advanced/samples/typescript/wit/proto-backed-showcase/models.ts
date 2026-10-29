@@ -560,19 +560,3 @@ export const namespaceInfoTransferTypeConverter = {
     return namespaceInfoToProto(value);
   },
 };
-export type NamespaceInfoInput = NamespaceInfo extends infer Input
-  ? Input extends unknown
-    ? Omit<Input, "state"> & {
-        state?: NamespaceState | null;
-      }
-    : never
-  : never;
-
-export function namespaceInfoWithDefaults(input: NamespaceInfoInput): NamespaceInfo {
-  const value_state: NamespaceState =
-    input.state ?? NamespaceState.NamespaceStateRegistered;
-  return {
-    ...input,
-    state: value_state,
-  } as unknown as NamespaceInfo;
-}

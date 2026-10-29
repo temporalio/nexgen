@@ -610,46 +610,4 @@ namespace Nexgen.ProtoBackedShowcaseService
 
     }
 
-    /// <summary>
-    /// Operation input with omittable defaulted fields. Defaults are evaluated when preparing an outbound request.
-    /// </summary>
-    public sealed class NamespaceInfoInput
-    {
-        /// <summary>
-        /// Initializes input values without evaluating defaults.
-        /// </summary>
-        public NamespaceInfoInput()
-        {
-        }
-        /// <summary>
-        /// Copies a complete model without evaluating defaults.
-        /// </summary>
-        public NamespaceInfoInput(NamespaceInfo value)
-        {
-            Name = value.Name;
-            Data = value.Data;
-            State = value.State;
-        }
-        /// <summary>
-        /// Gets or sets the operation input value.
-        /// </summary>
-        public string? Name { get; set; }
-        /// <summary>
-        /// Gets or sets the operation input value.
-        /// </summary>
-        public IReadOnlyDictionary<string, string>? Data { get; set; }
-        /// <summary>
-        /// Gets or sets the operation input value.
-        /// </summary>
-        public NamespaceState? State { get; set; }
-    }
-
-    internal static class NexgenDefaultInitializers
-    {
-        internal static NamespaceInfo WithNexgenDefaults(this NamespaceInfoInput value)
-        {
-            return new NamespaceInfo(((value.State) ?? (NamespaceState.NamespaceStateRegistered))) { Name = value.Name, Data = value.Data };
-        }
-    }
-
 }

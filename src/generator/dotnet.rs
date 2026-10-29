@@ -152,8 +152,6 @@ impl<'a> ApiPlanner<'a> {
         for model in models {
             self.render_model(&mut output, model);
         }
-        self.render_default_input_types(&mut output);
-        self.render_default_initializers(&mut output);
         output.push_str(&self.external_model_fragments.body);
         close_namespace(&mut output);
         output
@@ -1738,9 +1736,9 @@ impl<'a> ApiPlanner<'a> {
             };
         }
         if field.api_required() {
-            self.default_input_annotation(field, &self.field_type(field))
+            self.field_type(field)
         } else {
-            nullable_type(&self.default_input_annotation(field, &self.field_type(field)))
+            nullable_type(&self.field_type(field))
         }
     }
 
@@ -2026,198 +2024,6 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
-    fn render_default_initializers(&self, output: &mut String) {
-        let records = super::initialization::records_with_defaults(self.api_plan);
-        let inputs = super::initialization::records_with_defaults(self.api_plan);
-        if records.is_empty() {
-            return;
-        }
-        output.push_str("internal static class NexgenDefaultInitializers\n{\n");
-        for (_, record) in self.api_plan.records() {
-            if !records.contains(&record.full_name) {
-                continue;
-            }
-            let parameters = self.api_plan.record_type_parameters(&record.full_name);
-            let generic = if parameters.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    "<{}>",
-                    parameters
-                        .iter()
-                        .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            };
-            let name = format!("{}{generic}", csharp_type_name(&record.name));
-            if inputs.contains(&record.full_name) {
-                output.push_str(&format!(
-                    "    internal static {name} WithNexgenDefaults{generic}(this {}Input{generic} value)\n    {{\n",
-                    csharp_type_name(&record.name)
-                ));
-                let fields = record
-                    .model_fields()
-                    .map(|(_, field)| {
-                        let value = format!("value.{}", field_property_name(field));
-                        (
-                            field,
-                            dotnet_operation_value_expr(field, &value, self.api_plan),
-                        )
-                    })
-                    .collect();
-                let sourced = record
-                    .sourced_fields()
-                    .map(|(_, _, expression)| {
-                        dotnet_source_expr(expression, self.support_namespace)
-                    })
-                    .collect();
-                output.push_str(&format!(
-                    "        return {};\n    }}\n",
-                    model_init_expr(&name, fields, sourced, false)
-                ));
-            }
-        }
-        output.push_str("}\n\n");
-    }
-
-    fn default_input_annotation(
-        &self,
-        field: &RecordFieldSpec<PlannedFamily>,
-        annotation: &str,
-    ) -> String {
-        let inputs = super::initialization::records_with_defaults(self.api_plan);
-        let Some(record) = super::initialization::input_record(&field.field_type, &inputs) else {
-            return annotation.to_string();
-        };
-        let name = csharp_type_name(&record.model_name);
-        annotation.replacen(&name, &format!("{name}Input"), 1)
-    }
-
-    fn render_default_input_types(&self, output: &mut String) {
-        let inputs = super::initialization::records_with_defaults(self.api_plan);
-        for (_, record) in self.api_plan.records() {
-            if !inputs.contains(&record.full_name) {
-                continue;
-            }
-            let parameters = self.api_plan.record_type_parameters(&record.full_name);
-            let generic = if parameters.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    "<{}>",
-                    parameters
-                        .iter()
-                        .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            };
-            let name = csharp_type_name(&record.name);
-            render_xml_summary(
-                output,
-                "",
-                Some(
-                    "Operation input with omittable defaulted fields. Defaults are evaluated when preparing an outbound request.",
-                ),
-                record.experimental,
-            );
-            output.push_str(&format!("public sealed class {name}Input{generic}\n{{\n"));
-            let fields = record.model_fields().collect::<Vec<_>>();
-            let required = fields
-                .iter()
-                .filter(|(_, field)| field.api_required())
-                .collect::<Vec<_>>();
-            let field_type = |field_name: &str, field: &RecordFieldSpec<PlannedFamily>| {
-                let base = self.default_input_annotation(
-                    field,
-                    &self.model_field_type(record, field_name, field),
-                );
-                if field.api_required() {
-                    base
-                } else {
-                    nullable_type(&base)
-                }
-            };
-            render_xml_summary(
-                output,
-                "    ",
-                Some("Initializes input values without evaluating defaults."),
-                false,
-            );
-            output.push_str(&format!(
-                "    public {name}Input({})\n    {{\n",
-                required
-                    .iter()
-                    .map(|(field_name, field)| format!(
-                        "{} {}",
-                        field_type(field_name, field),
-                        csharp_parameter_name(&field.name)
-                    ))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-            for (_, field) in &required {
-                output.push_str(&format!(
-                    "        {} = {};\n",
-                    field_property_name(field),
-                    csharp_parameter_name(&field.name)
-                ));
-            }
-            output.push_str("    }\n");
-            render_xml_summary(
-                output,
-                "    ",
-                Some("Copies a complete model without evaluating defaults."),
-                false,
-            );
-            output.push_str(&format!(
-                "    public {name}Input({name}{generic} value)\n    {{\n"
-            ));
-            for (_, field) in &fields {
-                let property = field_property_name(field);
-                let source = format!("value.{property}");
-                let value =
-                    if super::initialization::input_record(&field.field_type, &inputs).is_some() {
-                        let input_type = self.default_input_annotation(
-                            field,
-                            &self.dotnet_value_type(&field.field_type),
-                        );
-                        let input_type = input_type.trim_end_matches('?');
-                        if field.required {
-                            format!("new {input_type}({source})")
-                        } else {
-                            format!("{source} is null ? null : new {input_type}({source})")
-                        }
-                    } else {
-                        source
-                    };
-                output.push_str(&format!("        {property} = {value};\n"));
-            }
-            output.push_str("    }\n");
-            for (field_name, field) in fields {
-                render_xml_summary(
-                    output,
-                    "    ",
-                    Some(
-                        field
-                            .doc
-                            .as_ref()
-                            .and_then(dotnet_doc)
-                            .unwrap_or("Gets or sets the operation input value."),
-                    ),
-                    false,
-                );
-                output.push_str(&format!(
-                    "    public {} {} {{ get; set; }}\n",
-                    field_type(field_name, field),
-                    field_property_name(field)
-                ));
-            }
-            output.push_str("}\n\n");
-        }
-    }
-
     fn render_function_args_parameters(
         &self,
         output: &mut String,
@@ -2253,23 +2059,6 @@ fn dotnet_input_default_expr(field: &RecordFieldSpec<PlannedFamily>, value: &str
     } else {
         value.to_string()
     }
-}
-
-fn dotnet_operation_value_expr(
-    field: &RecordFieldSpec<PlannedFamily>,
-    value: &str,
-    spec: &PlannedSpec,
-) -> String {
-    let inputs = super::initialization::records_with_defaults(spec);
-    let value = if super::initialization::input_record(&field.field_type, &inputs).is_some() {
-        format!(
-            "({value}){}.WithNexgenDefaults()",
-            if field.api_required() { "" } else { "?" }
-        )
-    } else {
-        value.to_string()
-    };
-    dotnet_input_default_expr(field, &value)
 }
 
 #[derive(Debug, Default)]
@@ -3400,11 +3189,7 @@ fn render_flattened_method_body(
                 support_namespace,
                 options_required,
             );
-            let initialized = if flattened_nested_model(field, api_plan).is_some() {
-                dotnet_input_default_expr(field, &value)
-            } else {
-                dotnet_operation_value_expr(field, &value, api_plan)
-            };
+            let initialized = dotnet_input_default_expr(field, &value);
             (field_name, field, initialized)
         })
         .collect::<Vec<_>>();

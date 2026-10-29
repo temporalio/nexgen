@@ -76,8 +76,9 @@ func TestOperationDefaultsAndGoPresence(t *testing.T) {
 	explicit := calls[2]
 	require.Equal(t, "explicit", explicit.Namespace)
 	require.Equal(t, int32(7), explicit.Attempts)
-	require.Equal(t, int32(3), explicit.Retry.Attempts, "Go puns scalar zero as omission")
-	require.Equal(t, "retry", explicit.Retry.Label)
+	require.Equal(t, retry, explicit.Retry, "supplied nested records pass through unchanged")
+	require.Zero(t, explicit.Retry.Attempts)
+	require.Empty(t, explicit.Retry.Label)
 	require.Equal(t, "untitled", explicit.Metadata.Summary)
 	require.Equal(t, "details", *explicit.Metadata.Details)
 	require.Zero(t, retry.Attempts)

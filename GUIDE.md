@@ -1770,12 +1770,14 @@ once per invocation. Support helpers must explicitly use `_support` in Python,
 `support` in Go and TypeScript, or a class in the configured .NET support
 namespace. Go expressions can use `ctx`.
 
-Python uses `None` as the omission marker; TypeScript uses null or undefined;
-and .NET uses null on the options surface. Go uses default-punning: empty
-strings, false, zero, and nil represent an omitted argument.
+Python uses `None` as the omission marker; TypeScript uses `undefined`; and .NET
+uses null on the options surface. Go uses default-punning: empty strings, false,
+zero, and nil represent an omitted argument.
 
-Collections are a boundary: a list or map of records with a `@nexus.default`
-annotation will not be default-initialized.
+Defaults apply only to exposed operation arguments, including flattened
+arguments. Supplied nested records must be complete and pass through unchanged;
+defaults are not applied to their fields or to records inside lists or maps.
+Constructors and encoding/decoding do not evaluate defaults.
 
 A default cannot be combined with `@nexus.source`.
 

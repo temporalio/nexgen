@@ -7,56 +7,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-func (m Request) withDefaults(ctx workflow.Context) Request {
-	if m.Attempts == 0 {
-		m.Attempts = (3)
-	}
-	if m.Enabled == false {
-		m.Enabled = (true)
-	}
-	if m.Ratio == 0 {
-		m.Ratio = (1.5)
-	}
-	if m.Mode == 0 {
-		m.Mode = (MyEnumStandard)
-	}
-	if m.Permissions == 0 {
-		m.Permissions = (MyFlagsRead | MyFlagsWrite)
-	}
-	if m.Namespace == "" {
-		m.Namespace = (support.WorkflowNamespace(ctx))
-	}
-	if m.AliasLabel == "" {
-		m.AliasLabel = ("alias")
-	}
-	if m.Retry != nil {
-		value := m.Retry.withDefaults(ctx)
-		m.Retry = &value
-	}
-	if m.Metadata != nil {
-		value := m.Metadata.withDefaults(ctx)
-		m.Metadata = &value
-	}
-	return m
-}
-
-func (m RecordWithDefaults) withDefaults(ctx workflow.Context) RecordWithDefaults {
-	if m.Attempts == 0 {
-		m.Attempts = (3)
-	}
-	if m.Label == "" {
-		m.Label = ("retry")
-	}
-	return m
-}
-
-func (m FlattenedRecordWithDefaults) withDefaults(ctx workflow.Context) FlattenedRecordWithDefaults {
-	if m.Summary == "" {
-		m.Summary = ("untitled")
-	}
-	return m
-}
-
 // --- Datatypes ---
 
 type getSenderRequest struct {
@@ -81,13 +31,12 @@ func NewSender(token string) *Sender {
 }
 
 func (u *Sender) Submit(ctx workflow.Context) workflow.Future {
-	return submitFromSender(ctx, Request{})
+	return submitFromSender(ctx, Request{Attempts: 3, Enabled: true, Ratio: 1.5, Mode: MyEnumStandard, Permissions: MyFlagsRead | MyFlagsWrite, Namespace: support.WorkflowNamespace(ctx), AliasLabel: "alias"})
 }
 
 // --- Operations (internal) ---
 
 func submit(ctx workflow.Context, request Request) workflow.Future {
-	request = request.withDefaults(ctx)
 	c := workflow.NewNexusClient("defaults", "DefaultsService")
 	fut := c.ExecuteOperation(ctx, "Submit", request, workflow.NexusOperationOptions{})
 	return fut
@@ -100,7 +49,6 @@ func getSender(ctx workflow.Context, request getSenderRequest) workflow.Future {
 }
 
 func submitFromSender(ctx workflow.Context, request Request) workflow.Future {
-	request = request.withDefaults(ctx)
 	c := workflow.NewNexusClient("defaults", "DefaultsService")
 	fut := c.ExecuteOperation(ctx, "SubmitFromSender", request, workflow.NexusOperationOptions{})
 	return fut
@@ -234,24 +182,73 @@ type SubmitOptions struct {
 }
 
 func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
+	var attempts int32
+	if opts.Attempts != 0 {
+		attempts = opts.Attempts
+	} else {
+		attempts = 3
+	}
+	var enabled bool
+	if opts.Enabled != false {
+		enabled = opts.Enabled
+	} else {
+		enabled = true
+	}
+	var ratio float64
+	if opts.Ratio != 0 {
+		ratio = opts.Ratio
+	} else {
+		ratio = 1.5
+	}
+	var mode MyEnum
+	if opts.Mode != 0 {
+		mode = opts.Mode
+	} else {
+		mode = MyEnumStandard
+	}
+	var permissions MyFlags
+	if opts.Permissions != 0 {
+		permissions = opts.Permissions
+	} else {
+		permissions = MyFlagsRead | MyFlagsWrite
+	}
+	var namespace string
+	if opts.Namespace != "" {
+		namespace = opts.Namespace
+	} else {
+		namespace = support.WorkflowNamespace(ctx)
+	}
+	var aliasLabel string
+	if opts.AliasLabel != "" {
+		aliasLabel = opts.AliasLabel
+	} else {
+		aliasLabel = "alias"
+	}
 	var metadataValue *FlattenedRecordWithDefaults
 	if opts.Summary != "" || opts.Details != "" {
-		metadataValue = &FlattenedRecordWithDefaults{}
+		var summary string
 		if opts.Summary != "" {
-			metadataValue.Summary = opts.Summary
+			summary = opts.Summary
+		} else {
+			summary = "untitled"
 		}
+		var details *string
 		if opts.Details != "" {
-			metadataValue.Details = &opts.Details
+			details = &opts.Details
+		}
+		metadataValue = &FlattenedRecordWithDefaults{
+			Summary: summary,
+			Details: details,
 		}
 	}
 	return submit(ctx, Request{
-		Attempts:    opts.Attempts,
-		Enabled:     opts.Enabled,
-		Ratio:       opts.Ratio,
-		Mode:        opts.Mode,
-		Permissions: opts.Permissions,
-		Namespace:   opts.Namespace,
-		AliasLabel:  opts.AliasLabel,
+		Attempts:    attempts,
+		Enabled:     enabled,
+		Ratio:       ratio,
+		Mode:        mode,
+		Permissions: permissions,
+		Namespace:   namespace,
+		AliasLabel:  aliasLabel,
 		Retry:       opts.Retry,
 		Metadata:    metadataValue,
 	})
@@ -292,24 +289,73 @@ type SubmitFromSenderOptions struct {
 }
 
 func SubmitFromSender(ctx workflow.Context, opts SubmitFromSenderOptions) workflow.Future {
+	var attempts int32
+	if opts.Attempts != 0 {
+		attempts = opts.Attempts
+	} else {
+		attempts = 3
+	}
+	var enabled bool
+	if opts.Enabled != false {
+		enabled = opts.Enabled
+	} else {
+		enabled = true
+	}
+	var ratio float64
+	if opts.Ratio != 0 {
+		ratio = opts.Ratio
+	} else {
+		ratio = 1.5
+	}
+	var mode MyEnum
+	if opts.Mode != 0 {
+		mode = opts.Mode
+	} else {
+		mode = MyEnumStandard
+	}
+	var permissions MyFlags
+	if opts.Permissions != 0 {
+		permissions = opts.Permissions
+	} else {
+		permissions = MyFlagsRead | MyFlagsWrite
+	}
+	var namespace string
+	if opts.Namespace != "" {
+		namespace = opts.Namespace
+	} else {
+		namespace = support.WorkflowNamespace(ctx)
+	}
+	var aliasLabel string
+	if opts.AliasLabel != "" {
+		aliasLabel = opts.AliasLabel
+	} else {
+		aliasLabel = "alias"
+	}
 	var metadataValue *FlattenedRecordWithDefaults
 	if opts.Summary != "" || opts.Details != "" {
-		metadataValue = &FlattenedRecordWithDefaults{}
+		var summary string
 		if opts.Summary != "" {
-			metadataValue.Summary = opts.Summary
+			summary = opts.Summary
+		} else {
+			summary = "untitled"
 		}
+		var details *string
 		if opts.Details != "" {
-			metadataValue.Details = &opts.Details
+			details = &opts.Details
+		}
+		metadataValue = &FlattenedRecordWithDefaults{
+			Summary: summary,
+			Details: details,
 		}
 	}
 	return submitFromSender(ctx, Request{
-		Attempts:    opts.Attempts,
-		Enabled:     opts.Enabled,
-		Ratio:       opts.Ratio,
-		Mode:        opts.Mode,
-		Permissions: opts.Permissions,
-		Namespace:   opts.Namespace,
-		AliasLabel:  opts.AliasLabel,
+		Attempts:    attempts,
+		Enabled:     enabled,
+		Ratio:       ratio,
+		Mode:        mode,
+		Permissions: permissions,
+		Namespace:   namespace,
+		AliasLabel:  aliasLabel,
 		Retry:       opts.Retry,
 		Metadata:    metadataValue,
 	})

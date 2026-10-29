@@ -1149,7 +1149,6 @@ pub(in crate::generator) fn render_operation_function_proto(
     render_operation_future_return_type(output, package);
     output.push_str(" {\n");
 
-    crate::generator::go::render_go_request_initialization(output, operation);
     if binding.requires_data_converter() {
         output.push_str("\tdc := ");
         output.push_str(&package.workflow_data_converter());

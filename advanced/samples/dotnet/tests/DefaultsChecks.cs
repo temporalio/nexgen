@@ -42,15 +42,8 @@ namespace Nexgen.DotNetExamples.Tests
                 Assert.Equal(0u, attempts);
                 Assert.Equal("", decoded.Retry.Label);
             }
-            var input = new Defaults.RecordWithDefaultsInput();
-            Assert.Null(input.Attempts);
-            Assert.Null(input.Label);
-            var copied = new Defaults.RecordWithDefaultsInput(new Defaults.RecordWithDefaults(0, ""));
-            Assert.Equal(0u, copied.Attempts);
-            Assert.Equal("", copied.Label);
             var nullability = new NullabilityInfoContext();
             Assert.Equal(NullabilityState.NotNull, nullability.Create(typeof(Defaults.RecordWithDefaults).GetProperty("Label")!).ReadState);
-            Assert.Equal(NullabilityState.Nullable, nullability.Create(typeof(Defaults.RecordWithDefaultsInput).GetProperty("Label")!).ReadState);
         }
 
         [Workflow]
@@ -66,7 +59,7 @@ namespace Nexgen.DotNetExamples.Tests
                 {
                     throw new InvalidOperationException("caller options were mutated");
                 }
-                var retry = new Defaults.RecordWithDefaultsInput { Label = "" };
+                var retry = new Defaults.RecordWithDefaults(0, "");
                 var third = await Defaults.Operations.SubmitAsync(new Defaults.SubmitOptions
                 {
                     Namespace = "", Attempts = 0, Enabled = false, Ratio = 0,
@@ -75,7 +68,7 @@ namespace Nexgen.DotNetExamples.Tests
                     Retry = retry,
                     Details = "details",
                 });
-                if (retry.Attempts != null)
+                if (retry.Attempts != 0 || retry.Label != "")
                 {
                     throw new InvalidOperationException("caller nested values were mutated");
                 }
@@ -143,7 +136,7 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Equal(0u, explicitValue.Attempts);
             Assert.False(explicitValue.Enabled);
             Assert.Equal(Defaults.MyEnum.Unspecified, explicitValue.Mode);
-            Assert.Equal(3u, explicitValue.Retry!.Attempts);
+            Assert.Equal(0u, explicitValue.Retry!.Attempts);
             Assert.Equal("", explicitValue.Retry.Label);
             Assert.Equal("untitled", explicitValue.Metadata!.Summary);
             Assert.Equal("details", explicitValue.Metadata.Details);

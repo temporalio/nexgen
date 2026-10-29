@@ -25,7 +25,7 @@ namespace Nexgen.DefaultsService
         public MyFlags? Permissions { get; set; }
         public string? Namespace { get; set; }
         public string? AliasLabel { get; set; }
-        public RecordWithDefaultsInput? Retry { get; set; }
+        public RecordWithDefaults? Retry { get; set; }
         public string? Summary { get; set; }
         public string? Details { get; set; }
     }
@@ -54,7 +54,7 @@ namespace Nexgen.DefaultsService
         public MyFlags? Permissions { get; set; }
         public string? Namespace { get; set; }
         public string? AliasLabel { get; set; }
-        public RecordWithDefaultsInput? Retry { get; set; }
+        public RecordWithDefaults? Retry { get; set; }
         public string? Summary { get; set; }
         public string? Details { get; set; }
     }
@@ -82,7 +82,7 @@ namespace Nexgen.DefaultsService
         {
             var request = new Request(((options?.Attempts) ?? (3u)), ((options?.Enabled) ?? (true)), ((options?.Ratio) ?? (1.5)), ((options?.Mode) ?? (MyEnum.Standard)), ((options?.Permissions) ?? (MyFlags.Read | MyFlags.Write)), ((options?.Namespace) ?? (TemporalWorkflowContext.WorkflowNamespace())), ((options?.AliasLabel) ?? ("alias")))
             {
-                Retry = (options?.Retry)?.WithNexgenDefaults(),
+                Retry = options?.Retry,
                 Metadata = options?.Summary != null || options?.Details != null ? new FlattenedRecordWithDefaults(((options?.Summary) ?? ("untitled"))) { Details = options?.Details } : null,
             };
             return SubmitAsync(request);
@@ -118,7 +118,7 @@ namespace Nexgen.DefaultsService
         {
             var request = new Request(((options?.Attempts) ?? (3u)), ((options?.Enabled) ?? (true)), ((options?.Ratio) ?? (1.5)), ((options?.Mode) ?? (MyEnum.Standard)), ((options?.Permissions) ?? (MyFlags.Read | MyFlags.Write)), ((options?.Namespace) ?? (TemporalWorkflowContext.WorkflowNamespace())), ((options?.AliasLabel) ?? ("alias")))
             {
-                Retry = (options?.Retry)?.WithNexgenDefaults(),
+                Retry = options?.Retry,
                 Metadata = options?.Summary != null || options?.Details != null ? new FlattenedRecordWithDefaults(((options?.Summary) ?? ("untitled"))) { Details = options?.Details } : null,
             };
             return SubmitFromSenderAsync(request);

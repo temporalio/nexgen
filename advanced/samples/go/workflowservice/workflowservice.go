@@ -18,13 +18,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-func (m signalWithStartWorkflowRequest) withDefaults(ctx workflow.Context) signalWithStartWorkflowRequest {
-	if m.WorkflowIDReusePolicy == 0 {
-		m.WorkflowIDReusePolicy = (enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE)
-	}
-	return m
-}
-
 // --- Datatypes ---
 
 type signalWithStartWorkflowRequest struct {
@@ -457,7 +450,6 @@ func userMetadataFromProto(cfg *commonconverter.SystemNexusConfig, proto *sdk.Us
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
-	request = request.withDefaults(ctx)
 	request.Namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
@@ -630,6 +622,12 @@ func SignalWithStartWorkflow(
 	if opts.WorkflowTaskTimeout != 0 {
 		workflowTaskTimeout = &opts.WorkflowTaskTimeout
 	}
+	var workflowIDReusePolicy enums.WorkflowIdReusePolicy
+	if opts.WorkflowIDReusePolicy != 0 {
+		workflowIDReusePolicy = opts.WorkflowIDReusePolicy
+	} else {
+		workflowIDReusePolicy = enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
+	}
 	var workflowIDConflictPolicy *enums.WorkflowIdConflictPolicy
 	if opts.WorkflowIDConflictPolicy != 0 {
 		workflowIDConflictPolicy = &opts.WorkflowIDConflictPolicy
@@ -644,12 +642,17 @@ func SignalWithStartWorkflow(
 	}
 	var userMetadataValue *userMetadata
 	if opts.StaticSummary != "" || opts.StaticDetails != "" {
-		userMetadataValue = &userMetadata{}
+		var staticSummary *string
 		if opts.StaticSummary != "" {
-			userMetadataValue.StaticSummary = &opts.StaticSummary
+			staticSummary = &opts.StaticSummary
 		}
+		var staticDetails *string
 		if opts.StaticDetails != "" {
-			userMetadataValue.StaticDetails = &opts.StaticDetails
+			staticDetails = &opts.StaticDetails
+		}
+		userMetadataValue = &userMetadata{
+			StaticSummary: staticSummary,
+			StaticDetails: staticDetails,
 		}
 	}
 	workflowName := support.WorkflowFunctionName(ctx, workflow)
@@ -663,7 +666,7 @@ func SignalWithStartWorkflow(
 		WorkflowExecutionTimeout: workflowExecutionTimeout,
 		WorkflowRunTimeout:       workflowRunTimeout,
 		WorkflowTaskTimeout:      workflowTaskTimeout,
-		WorkflowIDReusePolicy:    opts.WorkflowIDReusePolicy,
+		WorkflowIDReusePolicy:    workflowIDReusePolicy,
 		WorkflowIDConflictPolicy: workflowIDConflictPolicy,
 		RetryPolicy:              opts.RetryPolicy,
 		CronSchedule:             cronSchedule,

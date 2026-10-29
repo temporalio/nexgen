@@ -12,7 +12,6 @@ from ..models import (
     MyFlagsRead,
     MyFlagsWrite,
     RecordWithDefaults,
-    RecordWithDefaultsInput,
     Request,
 )
 import temporal_support as _support
@@ -61,7 +60,7 @@ async def submit_from_sender(
     permissions: MyFlags | None = None,
     namespace: str | None = None,
     alias_label: str | None = None,
-    retry: RecordWithDefaults | RecordWithDefaultsInput | None = None,
+    retry: RecordWithDefaults | None = None,
     summary: str | None = None,
     details: str | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[Request,]:
@@ -83,9 +82,7 @@ async def submit_from_sender(
         ),
         namespace=((_support.workflow_namespace()) if namespace is None else namespace),
         alias_label=(("alias") if alias_label is None else alias_label),
-        retry=(
-            None if retry is None else RecordWithDefaultsInput._nexgen_initialize(retry)
-        ),
+        retry=retry,
         metadata=metadata,
     )
     return await _submit_from_sender(request)

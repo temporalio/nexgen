@@ -6,8 +6,6 @@ import dataclasses
 import enum
 import typing
 
-import temporal_support as _support
-
 
 class MyEnum(enum.IntEnum):
     Unspecified = 0
@@ -34,113 +32,15 @@ class Request:
 
 
 @dataclasses.dataclass(slots=True)
-class RequestInput:
-    """Incomplete operation input; defaults are evaluated when the operation runs."""
-
-    attempts: int | None = None
-    enabled: bool | None = None
-    ratio: float | None = None
-    mode: MyEnum | None = None
-    permissions: MyFlags | None = None
-    namespace: str | None = None
-    alias_label: str | None = None
-    retry: RecordWithDefaults | RecordWithDefaultsInput | None = None
-    metadata: FlattenedRecordWithDefaults | FlattenedRecordWithDefaultsInput | None = (
-        None
-    )
-
-    def with_defaults(self) -> "Request":
-        return Request(
-            attempts=((3) if self.attempts is None else self.attempts),
-            enabled=((True) if self.enabled is None else self.enabled),
-            ratio=((1.5) if self.ratio is None else self.ratio),
-            mode=((MyEnum.Standard) if self.mode is None else self.mode),
-            permissions=(
-                (MyFlagsRead | MyFlagsWrite)
-                if self.permissions is None
-                else self.permissions
-            ),
-            namespace=(
-                (_support.workflow_namespace())
-                if self.namespace is None
-                else self.namespace
-            ),
-            alias_label=(("alias") if self.alias_label is None else self.alias_label),
-            retry=(
-                None
-                if self.retry is None
-                else RecordWithDefaultsInput._nexgen_initialize(self.retry)
-            ),
-            metadata=(
-                None
-                if self.metadata is None
-                else FlattenedRecordWithDefaultsInput._nexgen_initialize(self.metadata)
-            ),
-        )
-
-    @staticmethod
-    def _nexgen_initialize(value: "Request | RequestInput") -> "Request":
-        return value.with_defaults() if isinstance(value, RequestInput) else value
-
-
-@dataclasses.dataclass(slots=True)
 class RecordWithDefaults:
     attempts: int
     label: str
 
 
 @dataclasses.dataclass(slots=True)
-class RecordWithDefaultsInput:
-    """Incomplete operation input; defaults are evaluated when the operation runs."""
-
-    attempts: int | None = None
-    label: str | None = None
-
-    def with_defaults(self) -> "RecordWithDefaults":
-        return RecordWithDefaults(
-            attempts=((3) if self.attempts is None else self.attempts),
-            label=(("retry") if self.label is None else self.label),
-        )
-
-    @staticmethod
-    def _nexgen_initialize(
-        value: "RecordWithDefaults | RecordWithDefaultsInput",
-    ) -> "RecordWithDefaults":
-        return (
-            value.with_defaults()
-            if isinstance(value, RecordWithDefaultsInput)
-            else value
-        )
-
-
-@dataclasses.dataclass(slots=True)
 class FlattenedRecordWithDefaults:
     summary: str
     details: str | None = None
-
-
-@dataclasses.dataclass(slots=True)
-class FlattenedRecordWithDefaultsInput:
-    """Incomplete operation input; defaults are evaluated when the operation runs."""
-
-    summary: str | None = None
-    details: str | None = None
-
-    def with_defaults(self) -> "FlattenedRecordWithDefaults":
-        return FlattenedRecordWithDefaults(
-            summary=(("untitled") if self.summary is None else self.summary),
-            details=self.details,
-        )
-
-    @staticmethod
-    def _nexgen_initialize(
-        value: "FlattenedRecordWithDefaults | FlattenedRecordWithDefaultsInput",
-    ) -> "FlattenedRecordWithDefaults":
-        return (
-            value.with_defaults()
-            if isinstance(value, FlattenedRecordWithDefaultsInput)
-            else value
-        )
 
 
 @dataclasses.dataclass(slots=True)

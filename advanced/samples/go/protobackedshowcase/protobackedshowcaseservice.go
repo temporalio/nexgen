@@ -20,13 +20,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-func (m namespaceInfo) withDefaults(ctx workflow.Context) namespaceInfo {
-	if m.State == 0 {
-		m.State = (NamespaceStateNamespaceStateRegistered)
-	}
-	return m
-}
-
 // --- Datatypes ---
 
 type namespaceInfo struct {
@@ -208,7 +201,6 @@ func callbackNexusOperation(ctx workflow.Context, request CallbackNexus) workflo
 }
 
 func namespaceInfoOperation(ctx workflow.Context, request namespaceInfo) workflow.Future {
-	request = request.withDefaults(ctx)
 	request.Data = support.NamespaceData(ctx)
 	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
 	fut := c.ExecuteOperation(ctx, "NamespaceInfoOperation", request, workflow.NexusOperationOptions{})
@@ -873,8 +865,14 @@ func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOpt
 	if opts.Name != "" {
 		name = &opts.Name
 	}
+	var state NamespaceState
+	if opts.State != 0 {
+		state = opts.State
+	} else {
+		state = NamespaceStateNamespaceStateRegistered
+	}
 	return namespaceInfoOperation(ctx, namespaceInfo{
 		Name:  name,
-		State: opts.State,
+		State: state,
 	})
 }

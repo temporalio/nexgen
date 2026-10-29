@@ -35,8 +35,8 @@ interface defaults-service {
     /// @nexus.default python="'alias'" typescript="'alias'" go="\"alias\"" dotnet="\"alias\""
     alias-label: aliased-string,
 
-    // If retry is not provided, it remains null. If a retry record is provided,
-    // its fields are default-initialized
+    // If retry is not provided, it remains null. Supplied records must be
+    // complete and pass through without applying their field defaults.
     retry: option<record-with-defaults>,
 
     // This field uses flatten-in-api.

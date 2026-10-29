@@ -613,32 +613,6 @@ class NamespaceInfo:
     state: NamespaceState
 
 
-@dataclasses.dataclass(slots=True)
-class NamespaceInfoInput:
-    """Incomplete operation input; defaults are evaluated when the operation runs."""
-
-    name: str | None = None
-    data: dict[str, str] | None = dataclasses.field(default_factory=dict)
-    state: NamespaceState | None = None
-
-    def with_defaults(self) -> "NamespaceInfo":
-        return NamespaceInfo(
-            name=self.name,
-            data=self.data,
-            state=(
-                (NamespaceState.NamespaceStateRegistered)
-                if self.state is None
-                else self.state
-            ),
-        )
-
-    @staticmethod
-    def _nexgen_initialize(
-        value: "NamespaceInfo | NamespaceInfoInput",
-    ) -> "NamespaceInfo":
-        return value.with_defaults() if isinstance(value, NamespaceInfoInput) else value
-
-
 class _NamespaceInfoTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         NamespaceInfo, temporalio.api.namespace.v1.message_pb2.NamespaceInfo

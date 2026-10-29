@@ -431,19 +431,12 @@ impl<'a> ApiPlanner<'a> {
                     input_conversion.annotation.clone()
                 }
             };
-            let default_initializer = input_full_name
-                .filter(|name| {
-                    super::initialization::records_with_defaults(self.api_plan).contains(*name)
-                })
-                .and_then(|_| model_name.as_ref())
-                .map(|name| typescript_default_initializer_name(name));
-            let annotation = if default_initializer.is_some() {
-                generic_model_annotation(
-                    &format!("{}Input", model_name.as_ref().unwrap()),
-                    &type_parameters,
-                )
+            let (annotation, default_initialization) = if let Some((model, record)) =
+                input_model.zip(input_full_name.and_then(|name| self.api_plan.record(name)))
+            {
+                typescript_operation_defaults(model, record, self.api_plan, &annotation)
             } else {
-                annotation
+                (annotation, None)
             };
             RenderedOperationInput {
                 operation_annotation: typescript_erased_model_annotation(
@@ -471,7 +464,7 @@ impl<'a> ApiPlanner<'a> {
                 sourced_fields: input_model
                     .map(|model| model.sourced_fields.clone())
                     .unwrap_or_default(),
-                default_initializer,
+                default_initialization,
                 transfer_type_converter: input_conversion
                     .wire_function_names
                     .as_ref()
@@ -1188,7 +1181,7 @@ impl<'a> ApiPlanner<'a> {
                 wire_name: nested_rendered_field.wire_name,
                 annotation,
                 doc: nested_rendered_field.doc,
-                optional: nested_rendered_field.optional,
+                optional: !field.required || nested_rendered_field.optional,
                 from_wire_expr,
                 to_wire_expr,
             });
@@ -2938,7 +2931,7 @@ struct RenderedOperationInput {
     annotation: String,
     api_omitted_fields: Vec<String>,
     sourced_fields: Vec<RenderedSourcedField>,
-    default_initializer: Option<String>,
+    default_initialization: Option<String>,
     transfer_type_converter: Option<String>,
 }
 
@@ -3796,7 +3789,7 @@ fn render_endpoint_service_operation_method(
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
     if let Some(input) = &operation.input {
-        output.push_str(if input.default_initializer.is_some() {
+        output.push_str(if input.default_initialization.is_some() {
             "    requestInput: "
         } else {
             "    request: "
@@ -3818,14 +3811,12 @@ fn render_endpoint_service_operation_body(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
-    if let Some(initializer) = operation
+    if let Some(initialization) = operation
         .input
         .as_ref()
-        .and_then(|input| input.default_initializer.as_ref())
+        .and_then(|input| input.default_initialization.as_ref())
     {
-        output.push_str(&format!(
-            "    const request = {initializer}(requestInput);\n"
-        ));
+        output.push_str(initialization);
     }
     let returns_direct = operation.output_transform_expr.is_some()
         || operation.output_resource_return.is_some()
@@ -4179,16 +4170,7 @@ fn render_models_module(
     }
     let body = with_private_required_field(body);
     let mut imports = String::new();
-    let default_uses = |name: &str| {
-        api_plan.records().any(|(_, record)| {
-            record.fields.values().any(|field| {
-                super::initialization::default_expression(field)
-                    .is_some_and(|expression| contains_qualified_identifier(expression, name))
-            })
-        })
-    };
-    let mut generated_value_imports =
-        vec![("common", "@temporalio/common", !default_uses("common"))];
+    let mut generated_value_imports = vec![("common", "@temporalio/common", true)];
     if crate::nexgen_config::current().system_nexus
         && contains_qualified_identifier(&body, "workflow")
     {
@@ -4205,7 +4187,7 @@ fn render_models_module(
             && import
                 .name
                 .as_ref()
-                .is_some_and(|name| value_namespace_imports.contains(name) || default_uses(name))
+                .is_some_and(|name| value_namespace_imports.contains(name))
         {
             import.type_only = false;
         }
@@ -4368,7 +4350,7 @@ fn render_service_module(
         &mut imports,
         &body,
         &api_plan.module_path.to_path_buf(),
-        language_imports,
+        &default_language_imports(language_imports, services),
         &[
             ("nexus", "nexus-rpc", false),
             ("workflow", typescript_workflow_module(), false),
@@ -4399,21 +4381,16 @@ fn render_service_module(
                         .iter()
                         .map(|name| typescript_json::ts_transfer_type_converter_name(name)),
                 )
-                .chain(
-                    models
-                        .iter()
-                        .map(|model| typescript_default_initializer_name(&model.name)),
-                )
                 .collect::<Vec<_>>(),
         ),
     );
-    render_type_imports(
+    render_model_type_and_enum_imports(
         &mut imports,
         "./models",
-        &used_import_names(
-            &body,
-            &model_type_names(enums, flags, variants, models, external_model_names),
-        ),
+        &body,
+        &model_type_names(enums, flags, variants, models, external_model_names),
+        enums,
+        flags,
     );
     render_cross_module_model_value_imports(
         &mut imports,
@@ -4475,17 +4452,17 @@ fn render_resources_module(
         &mut imports,
         &body,
         &api_plan.module_path.to_path_buf(),
-        language_imports,
+        &default_language_imports(language_imports, services),
         &[("workflow", typescript_workflow_module(), false)],
     );
     render_typescript_requirement_imports(&mut imports, requirements);
-    render_type_imports(
+    render_model_type_and_enum_imports(
         &mut imports,
         "./models",
-        &used_import_names(
-            &body,
-            &model_type_names(enums, flags, variants, models, external_model_names),
-        ),
+        &body,
+        &model_type_names(enums, flags, variants, models, external_model_names),
+        enums,
+        flags,
     );
     render_cross_module_model_type_imports(
         &mut imports,
@@ -4546,7 +4523,7 @@ fn render_operation_module(
         &mut imports,
         &body,
         &api_plan.module_path.to_path_buf().join("operations"),
-        language_imports,
+        &default_language_imports(language_imports, services),
         &[
             ("workflow", typescript_workflow_module(), false),
             ("nexus", "../../../nexus", false),
@@ -4561,13 +4538,13 @@ fn render_operation_module(
         "../models",
         &used_import_names(&body, &model_values),
     );
-    render_type_imports(
+    render_model_type_and_enum_imports(
         &mut imports,
         "../models",
-        &used_import_names(
-            &body,
-            &model_type_names(enums, flags, variants, models, external_model_names),
-        ),
+        &body,
+        &model_type_names(enums, flags, variants, models, external_model_names),
+        enums,
+        flags,
     );
     render_cross_module_model_type_imports(
         &mut imports,
@@ -4632,6 +4609,53 @@ fn render_support_import(
     );
 }
 
+fn default_language_imports(
+    language_imports: &[LanguageImportSpec],
+    services: &[RenderedService<'_>],
+) -> Vec<LanguageImportSpec> {
+    let mut imports = language_imports.to_vec();
+    for import in &mut imports {
+        if import.name.as_ref().is_some_and(|name| {
+            services
+                .iter()
+                .flat_map(|s| &s.operations)
+                .any(|operation| {
+                    operation
+                        .input
+                        .as_ref()
+                        .and_then(|input| input.default_initialization.as_ref())
+                        .is_some_and(|code| contains_qualified_identifier(code, name))
+                })
+        }) {
+            import.type_only = false;
+        }
+    }
+    imports
+}
+
+fn render_model_type_and_enum_imports(
+    output: &mut String,
+    path: &str,
+    body: &str,
+    names: &[String],
+    enums: &[&RenderedEnum],
+    flags: &[&RenderedFlags],
+) {
+    let values = enums
+        .iter()
+        .map(|enumeration| &enumeration.name)
+        .chain(flags.iter().map(|flags| &flags.name))
+        .filter(|name| contains_qualified_identifier(body, name))
+        .cloned()
+        .collect::<Vec<_>>();
+    render_value_imports(output, path, &values);
+    let types = used_import_names(body, names)
+        .into_iter()
+        .filter(|name| !values.contains(name))
+        .collect::<Vec<_>>();
+    render_type_imports(output, path, &types);
+}
+
 fn render_support_import_if(
     output: &mut String,
     support_package: &str,
@@ -4680,7 +4704,6 @@ fn model_type_names(
         .chain(flags.iter().map(|flags| flags.name.clone()))
         .chain(variants.iter().map(|variant| variant.name.clone()))
         .chain(models.iter().map(|model| model.name.clone()))
-        .chain(models.iter().map(|model| format!("{}Input", model.name)))
         .chain(external_model_names.iter().cloned())
         .collect()
 }
@@ -4706,11 +4729,6 @@ fn model_to_wire_function_names(models: &[&RenderedModel]) -> Vec<String> {
                 .as_ref()
                 .map(|names| names.to_wire.clone())
         })
-        .chain(
-            models
-                .iter()
-                .map(|model| typescript_default_initializer_name(&model.name)),
-        )
         .collect()
 }
 
@@ -5497,92 +5515,18 @@ fn render_model(
         .record(&model.full_name)
         .unwrap_or_else(|| panic!("planned model should exist for {}", model.full_name));
     external_models.render_model_wire_functions(output, model, planned_record, api_plan);
-    render_typescript_default_initializer(output, model, planned_record, api_plan);
 }
 
-fn typescript_default_initializer_name(model: &str) -> String {
-    format!("{}WithDefaults", model.to_lower_camel_case())
-}
-
-fn typescript_defaults_input_annotation(
-    value_type: &PlannedType,
-    annotation: &str,
-    records: &BTreeSet<String>,
-) -> String {
-    if !super::initialization::type_has_defaults(value_type, records) {
-        return annotation.to_string();
-    }
-    match value_type {
-        PlannedType::Record(record) => annotation.replacen(
-            &record.model_name,
-            &format!("{}Input", record.model_name),
-            1,
-        ),
-        PlannedType::Option(inner) => {
-            typescript_defaults_input_annotation(inner, annotation, records)
-        }
-        PlannedType::External(ExternalTypeSpec::Alias(alias)) => {
-            typescript_defaults_input_annotation(&alias.target, annotation, records)
-        }
-        _ => annotation.to_string(),
-    }
-}
-
-fn typescript_nested_defaults_expr(
-    value_type: &PlannedType,
-    value: &str,
-    optional: bool,
-    records: &BTreeSet<String>,
-) -> String {
-    if !super::initialization::type_has_defaults(value_type, records) {
-        return if optional {
-            format!("{value} ?? undefined")
-        } else {
-            value.to_string()
-        };
-    }
-    let initialized = match value_type {
-        PlannedType::Record(record) => format!(
-            "{}({value})",
-            typescript_default_initializer_name(&record.model_name)
-        ),
-        PlannedType::Option(inner) => {
-            return typescript_nested_defaults_expr(inner, value, true, records);
-        }
-        PlannedType::External(ExternalTypeSpec::Alias(alias)) => {
-            return typescript_nested_defaults_expr(&alias.target, value, optional, records);
-        }
-        _ => return value.to_string(),
-    };
-    if optional {
-        format!("({value} == null ? undefined : {initialized})")
-    } else {
-        initialized
-    }
-}
-
-fn render_typescript_default_initializer(
-    output: &mut String,
+fn typescript_operation_defaults(
     model: &RenderedModel,
     record: &RecordSpec<PlannedFamily>,
     api_plan: &PlannedSpec,
-) {
-    let records = super::initialization::records_with_defaults(api_plan);
-    if !records.contains(&record.full_name) {
-        return;
-    }
-    let annotation = generic_model_annotation(&model.name, &model.type_parameters);
-    let input_name = format!("{}Input", model.name);
-    let input_annotation = generic_model_annotation(&input_name, &model.type_parameters);
+    annotation: &str,
+) -> (String, Option<String>) {
     let mut overrides = Vec::new();
-    let mut locals = String::new();
     let mut assignments = Vec::new();
     for (field_name, field) in record.model_fields() {
         let default = super::initialization::default_expression(field);
-        let nested = super::initialization::type_has_defaults(&field.field_type, &records);
-        if default.is_none() && !nested {
-            continue;
-        }
         let Some(rendered) = model.fields.iter().find(|rendered| {
             rendered.wire_name == field_name
                 || rendered.name == typescript_generated_field_name(&field.name)
@@ -5596,95 +5540,97 @@ fn render_typescript_default_initializer(
             let nested_record = api_plan
                 .record(&nested_type.full_name)
                 .expect("flattened record exists");
-            let mut supplied = Vec::new();
-            let mut properties = Vec::new();
+            let present = if field.api_required() {
+                "true".to_string()
+            } else {
+                rendered
+                    .flattened_fields
+                    .iter()
+                    .map(|child| format!("requestInput.{} !== undefined", child.name))
+                    .collect::<Vec<_>>()
+                    .join(" || ")
+            };
             for child in &rendered.flattened_fields {
                 let child_spec = nested_record
                     .public_fields()
                     .find(|(_, spec)| typescript_generated_field_name(&spec.name) == child.name)
                     .map(|(_, spec)| spec)
                     .expect("flattened child exists");
-                overrides.push((
-                    child.name.clone(),
-                    child.annotation.clone(),
-                    field.api_required() && child_spec.api_required(),
+                let Some(default) = super::initialization::default_expression(child_spec) else {
+                    continue;
+                };
+                overrides.push((child.name.clone(), child.annotation.clone()));
+                let child_annotation = if field.required {
+                    child.annotation.clone()
+                } else {
+                    format!("{} | undefined", child.annotation)
+                };
+                assignments.push(format!(
+                    "{}: (({present}) ? (requestInput.{} !== undefined ? requestInput.{} : ({default})) : undefined){}",
+                    child.name, child.name, child.name,
+                    if model.type_parameters.is_empty() { String::new() } else { format!(" satisfies {child_annotation}") },
                 ));
-                supplied.push(format!("input.{} != null", child.name));
-                properties.push(format!("{}: input.{} ?? undefined", child.name, child.name));
-            }
-            let present = if field.api_required() {
-                "true".to_string()
-            } else {
-                supplied.join(" || ")
-            };
-            let local = format!("value_{}", rendered.name);
-            let fallback = default.unwrap_or("undefined");
-            locals.push_str(&format!(
-                "  const {local} = ({present}) ? {{ {} }} : ({fallback});\n",
-                properties.join(", ")
-            ));
-            let initialized = format!("initialized_{}", rendered.name);
-            locals.push_str(&format!(
-                "  const {initialized} = {local} == null ? undefined : {}({local});\n",
-                typescript_default_initializer_name(&nested_type.model_name)
-            ));
-            for child in &rendered.flattened_fields {
-                assignments.push(format!("{}: {initialized}?.{}", child.name, child.name));
             }
             continue;
         }
-        let input_type =
-            typescript_defaults_input_annotation(&field.field_type, &rendered.annotation, &records);
-        overrides.push((
-            rendered.name.clone(),
-            input_type.clone(),
-            field.api_required(),
-        ));
-        let local = format!("value_{}", rendered.name);
-        let source = format!("input.{}", rendered.name);
-        let expression = default
-            .map(|default| format!("{source} ?? ({default})"))
-            .unwrap_or(source);
-        let local_annotation = if field.required {
-            input_type
-        } else {
-            format!("{input_type} | null | undefined")
+        let Some(default) = default else {
+            continue;
         };
-        locals.push_str(&format!(
-            "  const {local}: {local_annotation} = {expression};\n"
-        ));
+        overrides.push((rendered.name.clone(), rendered.annotation.clone()));
+        let source = format!("requestInput.{}", rendered.name);
         assignments.push(format!(
-            "{}: {}",
+            "{}: ({source} !== undefined ? {source} : ({default})){}",
             rendered.name,
-            typescript_nested_defaults_expr(&field.field_type, &local, !field.required, &records,)
+            if model.type_parameters.is_empty() {
+                String::new()
+            } else {
+                format!(" satisfies {}", rendered.annotation)
+            },
         ));
     }
-    output.push_str(&format!(
-        "\nexport type {input_name}{} = {annotation} extends infer Input ? Input extends unknown ? Omit<Input, {}> & {{\n",
-        render_type_parameter_list(&model.type_parameters),
-        overrides.iter().map(|(name, _, _)| typescript_string_literal(name)).collect::<Vec<_>>().join(" | "),
-    ));
-    for (name, annotation, required) in overrides {
-        output.push_str(&format!(
-            "  {name}{}: {annotation}{};\n",
-            if required { "" } else { "?" },
-            if required { "" } else { " | null" }
-        ));
+    if overrides.is_empty() {
+        return (annotation.to_string(), None);
     }
-    output.push_str("} : never : never;\n\n");
-    output.push_str(&format!(
-        "export function {}{}(input: {input_annotation}): {annotation} {{\n",
-        typescript_default_initializer_name(&model.name),
-        render_type_parameter_list(&model.type_parameters),
-    ));
-    output.push_str(&locals);
-    output.push_str("  return {\n    ...input,\n");
+    let omitted = record
+        .fields
+        .values()
+        .filter(|field| field.visibility == RecordFieldVisibility::ApiOmitted)
+        .map(|field| field.name.clone())
+        .chain(record.sourced_fields().map(|(name, _, _)| name.to_string()))
+        .collect::<BTreeSet<_>>();
+    let mut input_annotation = format!(
+        "{annotation} extends infer Input ? Input extends unknown ? Omit<Input, {}> & {{\n",
+        overrides
+            .iter()
+            .map(|(name, _)| name)
+            .chain(omitted.iter())
+            .map(|name| typescript_string_literal(name))
+            .collect::<Vec<_>>()
+            .join(" | "),
+    );
+    for (name, annotation) in overrides {
+        input_annotation.push_str(&format!("  {name}?: {annotation};\n"));
+    }
+    for name in omitted {
+        input_annotation.push_str(&format!("  {name}?: never;\n"));
+    }
+    input_annotation.push_str("} : never : never");
+    let mut initialization = if model.type_parameters.is_empty() {
+        format!("  const request: {annotation} = {{\n    ...requestInput,\n")
+    } else {
+        String::from("  const request = {\n    ...requestInput,\n")
+    };
     for assignment in assignments {
-        output.push_str(&format!("    {assignment},\n"));
+        initialization.push_str(&format!("    {assignment},\n"));
     }
-    // Input distributes over invocation unions. TypeScript cannot prove that
-    // Omit preserves each branch; typed locals above still check every default.
-    output.push_str(&format!("  }} as unknown as {annotation};\n}}\n"));
+    if model.type_parameters.is_empty() {
+        initialization.push_str("  };\n");
+    } else {
+        // The input distributes over generic invocation unions. Each default
+        // is checked above, but TypeScript cannot reconstruct the correlation.
+        initialization.push_str(&format!("  }} as {annotation};\n"));
+    }
+    (input_annotation, Some(initialization))
 }
 
 fn render_service_definition(output: &mut String, service: &RenderedService<'_>) {
@@ -6217,19 +6163,23 @@ fn render_resource_method_operation_body(
 
     let request_expr = render_request_plan_typescript(request_plan);
     let mut output = String::new();
-    output.push_str(&indent_str);
-    output.push_str("const request = ");
     if client_expr.is_some()
-        && let Some(initializer) = operation
+        && let Some(initialization) = operation
             .input
             .as_ref()
-            .and_then(|input| input.default_initializer.as_ref())
+            .and_then(|input| input.default_initialization.as_ref())
     {
-        output.push_str(&format!("{initializer}({request_expr})"));
+        output.push_str(&format!(
+            "{indent_str}const requestInput = {request_expr};\n"
+        ));
+        for line in initialization.lines() {
+            output.push_str(&indent_str);
+            output.push_str(line.trim_start());
+            output.push('\n');
+        }
     } else {
-        output.push_str(&request_expr);
+        output.push_str(&format!("{indent_str}const request = {request_expr};\n"));
     }
-    output.push_str(";\n");
     let Some(client_expr) = client_expr else {
         if direct_return {
             output.push_str(&indent_str);
@@ -6542,13 +6492,13 @@ fn render_operation_function(
     }
     if let Some(input) = &operation.input {
         output.push_str(
-            if input.sourced_fields.is_empty() && input.default_initializer.is_none() {
+            if input.sourced_fields.is_empty() && input.default_initialization.is_none() {
                 "  request: "
             } else {
                 "  requestInput: "
             },
         );
-        if input.api_omitted_fields.is_empty() {
+        if input.api_omitted_fields.is_empty() && input.default_initialization.is_none() {
             output.push_str(&input.annotation);
         } else {
             output.push_str(&operation_input_alias_reference(service, operation, input));
@@ -6567,12 +6517,17 @@ fn render_operation_function(
         output.push_str(">> {\n");
     }
     if let Some(input) = &operation.input {
-        if !input.sourced_fields.is_empty() {
-            output.push_str("  const request = ");
-            if let Some(initializer) = &input.default_initializer {
-                output.push_str(initializer);
-                output.push('(');
+        if let Some(initialization) = &input.default_initialization {
+            let mut sourced = String::new();
+            for field in &input.sourced_fields {
+                sourced.push_str(&format!("    {}: {},\n", field.name, field.source_expr));
             }
+            output.push_str(&initialization.replace(
+                "...requestInput,\n",
+                &format!("...requestInput,\n{sourced}"),
+            ));
+        } else if !input.sourced_fields.is_empty() {
+            output.push_str("  const request = ");
             output.push_str("{\n    ...requestInput,\n");
             for field in &input.sourced_fields {
                 output.push_str("    ");
@@ -6583,12 +6538,7 @@ fn render_operation_function(
             }
             output.push_str("  } as ");
             output.push_str(&input.annotation);
-            if input.default_initializer.is_some() {
-                output.push(')');
-            }
             output.push_str(";\n");
-        } else if let Some(initializer) = &input.default_initializer {
-            output.push_str(&format!("  const request = {initializer}(requestInput);\n"));
         }
     }
     if !returns_direct {
@@ -6779,14 +6729,21 @@ fn render_operation_input_alias(
     let Some(input) = &operation.input else {
         return;
     };
-    if input.api_omitted_fields.is_empty() {
+    if input.api_omitted_fields.is_empty() && input.default_initialization.is_none() {
         return;
     }
     output.push_str("type ");
     output.push_str(&operation_input_alias_name(service, operation));
     output.push_str(&render_type_parameter_list(&input.type_parameters));
     output.push_str(" = ");
+    if input.default_initialization.is_some() {
+        output.push_str(&input.annotation);
+        output.push_str(";\n\n");
+        return;
+    }
+    output.push('(');
     output.push_str(&input.annotation);
+    output.push(')');
     output.push_str(" extends infer Input\n  ? Input extends unknown\n    ? Omit<Input, ");
     output.push_str(
         &input

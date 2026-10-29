@@ -575,12 +575,17 @@ type GetSyncSettingsOptions struct {
 func GetSyncSettings(ctx workflow.Context, opts GetSyncSettingsOptions) workflow.Future {
 	var settingsValue *SyncSettings
 	if opts.Region != "" || opts.Checkpoint != "" {
-		settingsValue = &SyncSettings{}
+		var region *string
 		if opts.Region != "" {
-			settingsValue.Region = &opts.Region
+			region = &opts.Region
 		}
+		var checkpoint *string
 		if opts.Checkpoint != "" {
-			settingsValue.Checkpoint = &opts.Checkpoint
+			checkpoint = &opts.Checkpoint
+		}
+		settingsValue = &SyncSettings{
+			Region:     region,
+			Checkpoint: checkpoint,
 		}
 	}
 	return getSyncSettings(ctx, getSyncSettingsRequest{

@@ -11,7 +11,6 @@ import temporal_support
 from wit.defaults.models import (
     MyEnum,
     RecordWithDefaults,
-    RecordWithDefaultsInput,
     Request,
 )
 from wit.defaults.operations.submit import submit
@@ -109,21 +108,18 @@ async def test_supplied_falsy_values_do_not_invoke_providers(calls: Calls) -> No
     assert calls.namespace_calls == 0
 
 
-async def test_nested_defaults_copy_inputs_and_respect_parent_presence(
+async def test_nested_records_pass_through_and_flattened_arguments_default(
     calls: Calls,
 ) -> None:
-    retry = RecordWithDefaultsInput(label="")
+    retry = RecordWithDefaults(attempts=0, label="")
     _ = await submit(retry=retry, details="details")
     request = calls.requests[-1]
-    assert request.retry == RecordWithDefaults(attempts=3, label="")
-    assert request.retry is not retry
-    assert retry.attempts is None
+    assert request.retry is retry
+    assert retry.attempts == 0
+    assert retry.label == ""
     assert request.metadata is not None
     assert request.metadata.summary == "untitled"
     assert request.metadata.details == "details"
-    model = RecordWithDefaults(attempts=0, label="")
-    _ = await submit(retry=model)
-    assert calls.requests[-1].retry is model
 
 
 async def test_encoding_and_inbound_decoding_never_apply_defaults(calls: Calls) -> None:

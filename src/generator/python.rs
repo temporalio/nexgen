@@ -1429,8 +1429,6 @@ impl<'a> ApiPlanner<'a> {
         let mut request_fields = Vec::new();
         let mut flattened_messages = Vec::new();
         let mut parameter_sources = BTreeMap::<String, String>::new();
-        let input_records = super::initialization::records_with_defaults(self.api_plan);
-
         for ((_field_name, planned_field), rendered_field) in planned_model
             .fields
             .iter()
@@ -1473,20 +1471,9 @@ impl<'a> ApiPlanner<'a> {
             parameters.push(RenderedUnpackedInputField {
                 attr_name: rendered_field.attr_name.clone(),
                 annotation: if !planned_field.api_required() && planned_field.required {
-                    format!(
-                        "{} | None",
-                        python_defaults_input_annotation(
-                            planned_field,
-                            &rendered_field.annotation,
-                            &input_records
-                        )
-                    )
+                    format!("{} | None", rendered_field.annotation)
                 } else {
-                    python_defaults_input_annotation(
-                        planned_field,
-                        &rendered_field.annotation,
-                        &input_records,
-                    )
+                    rendered_field.annotation.clone()
                 },
                 default_kind: if super::initialization::default_expression(planned_field).is_some()
                 {
@@ -1502,11 +1489,7 @@ impl<'a> ApiPlanner<'a> {
             });
             request_fields.push(RenderedUnpackedRequestField {
                 attr_name: rendered_field.attr_name.clone(),
-                value_expr: python_operation_value_expr(
-                    planned_field,
-                    &rendered_field.attr_name,
-                    &input_records,
-                ),
+                value_expr: python_input_default_expr(planned_field, &rendered_field.attr_name),
                 default_kind: rendered_field.default_kind.clone(),
             });
         }
@@ -2239,8 +2222,6 @@ fn render_record_models(
         body.push_str("\n\n");
     }
     let mut wire_blocks = BTreeMap::new();
-    let input_records = super::initialization::records_with_defaults(api_plan);
-    let mut input_names = BTreeSet::new();
     for (index, model) in models.iter().enumerate() {
         let planned_model = api_plan
             .record(&model.full_name)
@@ -2248,10 +2229,6 @@ fn render_record_models(
         let wire_block =
             external_models.render_record_wire_block(api_plan, model, planned_model)?;
         render_record_model(&mut body, model, wire_block.as_ref());
-        if input_records.contains(&model.full_name) {
-            render_python_input_model(&mut body, model, planned_model, &input_records);
-            input_names.insert(format!("{}Input", model.name));
-        }
         if let Some(wire_block) = &wire_block {
             for line in &wire_block.post_class_lines {
                 body.push_str(line);
@@ -2282,11 +2259,7 @@ fn render_record_models(
         module_imports,
         relative_imports: BTreeMap::new(),
         root_package_imports: RootPackageImports::new(),
-        exported_names: models
-            .iter()
-            .map(|model| model.name.clone())
-            .chain(input_names)
-            .collect(),
+        exported_names: models.iter().map(|model| model.name.clone()).collect(),
         module_exported_names: BTreeSet::new(),
         generated_names: Vec::new(),
         export_sort_keys: BTreeMap::new(),
@@ -2366,106 +2339,6 @@ fn python_input_default_expr(field: &RecordFieldSpec<PlannedFamily>, value: &str
     } else {
         value.to_string()
     }
-}
-
-fn python_defaults_input_annotation(
-    field: &RecordFieldSpec<PlannedFamily>,
-    annotation: &str,
-    records: &BTreeSet<String>,
-) -> String {
-    let Some(record) = super::initialization::input_record(&field.field_type, records) else {
-        return annotation.to_string();
-    };
-    let normal = annotation.strip_suffix(" | None").unwrap_or(annotation);
-    let input = normal.replacen(
-        &record.model_name,
-        &format!("{}Input", record.model_name),
-        1,
-    );
-    format!(
-        "{normal} | {input}{}",
-        if annotation.ends_with(" | None") {
-            " | None"
-        } else {
-            ""
-        }
-    )
-}
-
-fn python_operation_value_expr(
-    field: &RecordFieldSpec<PlannedFamily>,
-    value: &str,
-    records: &BTreeSet<String>,
-) -> String {
-    let effective = python_input_default_expr(field, value);
-    let Some(record) = super::initialization::input_record(&field.field_type, records) else {
-        return effective;
-    };
-    let initialize = format!("{}Input._nexgen_initialize({effective})", record.model_name);
-    if field.required {
-        initialize
-    } else {
-        format!("(None if {value} is None else {initialize})")
-    }
-}
-
-fn render_python_input_model(
-    output: &mut String,
-    model: &RenderedModel,
-    record: &RecordSpec<PlannedFamily>,
-    records: &BTreeSet<String>,
-) {
-    let mut input = model.clone();
-    input.name = format!("{}Input", model.name);
-    input.doc = Some(
-        "Incomplete operation input; defaults are evaluated when the operation runs.".to_string(),
-    );
-    input.fields = record
-        .model_fields()
-        .map(|(_, field)| {
-            let name = python_field_name(&field.name);
-            let mut rendered = model
-                .fields
-                .iter()
-                .find(|rendered| rendered.attr_name == name)
-                .expect("input field is rendered")
-                .clone();
-            rendered.annotation =
-                python_defaults_input_annotation(field, &rendered.annotation, records);
-            if super::initialization::default_expression(field).is_some() {
-                rendered.annotation = format!("{} | None", rendered.annotation);
-                rendered.default_kind = PythonFieldDefaultKind::None;
-                rendered.default_expr = Some("None".to_string());
-            }
-            rendered
-        })
-        .collect();
-    output.push_str("\n\n");
-    render_record_model(output, &input, None);
-    let normal = if model.type_parameters.is_empty() {
-        model.name.clone()
-    } else {
-        format!("{}[{}]", model.name, model.type_parameters.join(", "))
-    };
-    let input_annotation = if model.type_parameters.is_empty() {
-        input.name.clone()
-    } else {
-        format!("{}[{}]", input.name, model.type_parameters.join(", "))
-    };
-    output.push_str(&format!(
-        "\n    def with_defaults(self) -> \"{normal}\":\n        return {}(\n",
-        model.name
-    ));
-    for (_, field) in record.model_fields() {
-        let name = python_field_name(&field.name);
-        let expression = python_operation_value_expr(field, &format!("self.{name}"), records);
-        output.push_str(&format!("            {name}={expression},\n"));
-    }
-    output.push_str("        )\n");
-    output.push_str(&format!(
-        "\n    @staticmethod\n    def _nexgen_initialize(value: \"{normal} | {input_annotation}\") -> \"{normal}\":\n        return value.with_defaults() if isinstance(value, {}) else value\n",
-        input.name
-    ));
 }
 
 fn model_needs_keyword_only_dataclass(model: &RenderedModel) -> bool {
@@ -4614,11 +4487,7 @@ fn planned_module_import_names(api_plan: &PlannedSpec) -> BTreeSet<String> {
         .data
         .module_imports
         .values()
-        .flat_map(|names| {
-            names
-                .iter()
-                .flat_map(|name| [name.clone(), format!("{name}Input")])
-        })
+        .flat_map(|names| names.iter().cloned())
         .collect()
 }
 
@@ -4708,12 +4577,7 @@ fn foreign_model_modules_by_name(api_plan: &PlannedSpec) -> BTreeMap<String, Mod
         .flat_map(|(module_path, names)| {
             names
                 .iter()
-                .flat_map(|name| {
-                    [
-                        (name.clone(), module_path.clone()),
-                        (format!("{name}Input"), module_path.clone()),
-                    ]
-                })
+                .map(|name| (name.clone(), module_path.clone()))
                 .collect::<Vec<_>>()
         })
         .collect()

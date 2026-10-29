@@ -12,7 +12,6 @@ import * as support from "../support/temporal_model_converters.ts";
 import {
   MyEnum,
   MyFlags,
-  type RecordWithDefaultsInput,
   type RecordWithDefaults,
   type FlattenedRecordWithDefaults,
   type Request,
@@ -72,7 +71,7 @@ describe("operation-scoped defaults", () => {
     expect(support.workflowNamespace).toHaveBeenCalledTimes(1);
 
     vi.mocked(support.workflowNamespace).mockReturnValue("second-namespace");
-    await submit({ namespace: null });
+    await submit({ namespace: undefined });
     const second = lastRequest();
     expect(second.namespace).toBe("second-namespace");
     expect(support.workflowNamespace).toHaveBeenCalledTimes(2);
@@ -102,15 +101,16 @@ describe("operation-scoped defaults", () => {
     expect(support.workflowNamespace).not.toHaveBeenCalled();
   });
 
-  test("normalizes present parents without mutation", async () => {
-    const retry: RecordWithDefaultsInput = { label: "" };
+  test("passes nested records through and defaults flattened arguments", async () => {
+    const retry: RecordWithDefaults = { attempts: 0, label: "" };
     await submit({ retry, details: "details" });
     expect(lastRequest()).toMatchObject({
-      retry: { attempts: 3, label: "" },
+      retry: { attempts: 0, label: "" },
       summary: "untitled",
       details: "details",
     });
-    expect(retry).toEqual({ label: "" });
+    expect(lastRequest().retry).toBe(retry);
+    expect(retry).toEqual({ attempts: 0, label: "" });
   });
 
   test("serialization and inbound data do not apply defaults", async () => {
@@ -132,3 +132,10 @@ describe("operation-scoped defaults", () => {
 expectTypeOf<RecordWithDefaults["attempts"]>().toEqualTypeOf<number>();
 expectTypeOf<RecordWithDefaults["label"]>().toEqualTypeOf<string>();
 expectTypeOf<FlattenedRecordWithDefaults["summary"]>().toEqualTypeOf<string>();
+expectTypeOf<Request["summary"]>().toEqualTypeOf<string | undefined>();
+expectTypeOf<Parameters<typeof submit>[0]["namespace"]>().toEqualTypeOf<
+  string | undefined
+>();
+expectTypeOf<Parameters<typeof submit>[0]["summary"]>().toEqualTypeOf<
+  string | undefined
+>();
