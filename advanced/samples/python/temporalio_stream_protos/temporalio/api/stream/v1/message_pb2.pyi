@@ -9,7 +9,7 @@ from google.protobuf import message as _message
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf.internal import containers as _containers
 from temporalio.api.common.v1 import message_pb2 as _message_pb2
-from streamprotos.temporal.api.enums.v1 import stream_pb2 as _stream_pb2
+from temporalio.api.enums.v1 import stream_pb2 as _stream_pb2
 from temporalio.api.failure.v1 import message_pb2 as _message_pb2_1
 import builtins as _builtins
 import sys
