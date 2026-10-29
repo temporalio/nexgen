@@ -6235,7 +6235,23 @@ fn render_resource_method_operation_body(
         return output;
     }
 
-    let request_expr = render_request_plan_typescript(request_plan);
+    // A standalone operation wrapper supplies its applicable sources itself;
+    // do not pass those fields through its caller-only convenience signature.
+    // Keep the shared plan intact for APIs that construct the raw model.
+    let mut caller_plan = request_plan.clone();
+    if client_expr.is_none()
+        && let RequestPlan::Construct { fields, .. } = &mut caller_plan
+        && let Some(input) = &operation.input
+    {
+        fields.retain(|field| {
+            let name = typescript_generated_field_name(&field.field_name);
+            input
+                .sourced_fields
+                .iter()
+                .all(|source| source.name != name)
+        });
+    }
+    let request_expr = render_request_plan_typescript(&caller_plan);
     let mut output = String::new();
     if client_expr.is_some()
         && let Some(initialization) = operation

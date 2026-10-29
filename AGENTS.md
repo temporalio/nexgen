@@ -33,7 +33,9 @@
 - Test compiler rejections with file-backed fixtures in
   `advanced/samples/invalid/<category>/<case>/`, rather than embedding input
   text in Rust tests. Add the input and an `expected.toml` that asserts the
-  typed error kind and diagnostic fragments establishing the intended failure.
+  typed error kind and meaningful diagnostic text establishing the intended
+  failure. Prefer a single string in `error.contains` when possible; use
+  multiple fragments when one substring cannot establish the intended failure.
   See the [fixture guide](advanced/samples/invalid/README.md).
 - Use the default language set for shared compiler rules. Restrict `languages`
   only when the rejection is target-specific.

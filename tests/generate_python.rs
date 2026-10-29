@@ -1,5 +1,5 @@
 // Drives the `nexgen` binary over the WIT/proto CLI surface (`--descriptors`,
-// `--native-api`, `--support-package`), all behind the `advanced` feature.
+// `--targets`, `--support-package`), all behind the `advanced` feature.
 #![cfg(feature = "advanced")]
 
 use std::collections::BTreeMap;
@@ -186,7 +186,7 @@ fn cli_requires_support_package_for_wit_but_not_json_schema() {
 }
 
 #[test]
-fn cli_defaults_to_definitions_without_native_api_or_endpoint() {
+fn cli_defaults_to_definitions_without_targets_or_endpoint() {
     let temp_dir = unique_output_path("python-definitions-only");
     fs::create_dir_all(&temp_dir).unwrap();
     let input_path = temp_dir.join("input.wit");

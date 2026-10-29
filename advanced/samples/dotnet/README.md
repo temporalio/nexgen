@@ -47,7 +47,7 @@ cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-sho
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package Nexgen.Support \
-  --native-api --output advanced/samples/dotnet/wit/proto-backed-showcase
+  --targets workflow --output advanced/samples/dotnet/wit/proto-backed-showcase
 ```
 
 If your project disables default compile items or excludes the support

@@ -94,8 +94,8 @@ fn csharp_json_examples_render_expected_language_features() {
             ],
         );
         let services = showcase.file("Services.cs");
-        // The contract is the API without `--native-api`, so it is public;
-        // with it, callers use the generated client and the contract stays
+        // Without a workflow target the contract is the API, so it is public;
+        // with that target, callers use the generated client and the contract stays
         // internal.
         let contract = if targets.workflow {
             "internal interface IShowcaseServiceCs"

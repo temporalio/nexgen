@@ -42,7 +42,7 @@ class SignalWithStartWorkflowRequest:
     versioning_override: temporalio.common.VersioningOverride | None = None
     start_delay: datetime.timedelta | None = None
     user_metadata: UserMetadata | None = None
-    namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
+    namespace: str
     headers: collections.abc.Mapping[str, typing.Any] | None = None
 
 
@@ -86,6 +86,11 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
         id_reuse_policy = _support.workflow_id_reuse_policy_from_proto(
             value.workflow_id_reuse_policy
         )
+        if not value.namespace:
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowRequest.namespace"
+            )
+        namespace = value.namespace
         return SignalWithStartWorkflowRequest(
             workflow=workflow,
             args=_support.payloads_from_proto(value.input)
@@ -142,7 +147,7 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
             )
             if value.HasField("user_metadata")
             else None,
-            namespace=value.namespace,
+            namespace=namespace,
             headers=_support.header_from_proto(value.header)
             if value.HasField("header")
             else None,

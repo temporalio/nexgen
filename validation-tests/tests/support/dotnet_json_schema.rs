@@ -2976,7 +2976,7 @@ fn csharp_json_services_render_docs_deprecation_and_one_sided_io() {
             case.generate(&["legacy.nexusrpc.yaml"])
         };
         let services = output.file("Services.cs");
-        // The contract is public unless `--native-api` puts a client in front.
+        // The contract is public unless a workflow target puts a client in front.
         let visibility = if native { "internal" } else { "public" };
         assert_has(
             services,

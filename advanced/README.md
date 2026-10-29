@@ -18,7 +18,7 @@ The generator picks its input format from the file extension, so the same
 (`.json`/`.yaml`/`.yml`) inputs.
 
 > [!IMPORTANT]
-> The `--descriptors`, `--format`, and `--native-api` flags, and the `add-rpc`,
+> The `--descriptors`, `--format`, and `--targets` flags, and the `add-rpc`,
 > `add-message`, and `debug-wit-dir` subcommands, are gated behind the
 > `advanced` Cargo feature, which is off by default. Build or run with
 > `--features advanced` (as every command below does), or produce a binary that
@@ -183,8 +183,9 @@ cargo run --features advanced -- dotnet \
 
 Inputs are positional; pass more than one path (a file or a directory) to link
 additional WIT into the parser workspace. Generation produces definitions by
-default. Add `--native-api` to also generate native API bindings. Add `--format`
-to run a formatter after generation:
+default. Add `--targets workflow` to generate workflow API bindings, or select
+`--targets client` for Python client APIs. Add `--format` to run a formatter
+after generation:
 
 - Python: `ruff format`
 - TypeScript: `oxfmt --write`
@@ -315,7 +316,7 @@ cargo run --features advanced -- python \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package temporal_support \
-  --native-api \
+  --targets workflow \
   --output /tmp/workflow_service
 ```
 

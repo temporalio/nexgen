@@ -27,11 +27,11 @@ class StartedWorkflow:
         reason: str | None = None,
     ) -> None:
         request = CancelWorkflowRequest(
+            namespace=self.namespace,
             workflow_execution=WorkflowExecution(
                 workflow_id=self.workflow_id, run_id=self.run_id
             ),
             reason=reason,
-            namespace=_support.workflow_namespace(),
         )
         handle = await _cancel_workflow(request)
         await handle
@@ -42,10 +42,10 @@ class StartedWorkflow:
         task_queue: str,
     ) -> StartedWorkflow:
         request = StartWorkflowRequest(
+            namespace=self.namespace,
             workflow_id=self.workflow_id,
             workflow=workflow,
             task_queue=task_queue,
-            namespace=_support.workflow_namespace(),
         )
         return await _restart_workflow(request)
 

@@ -241,11 +241,11 @@ func (u *StartedWorkflow) Cancel(ctx workflow.Context, reason string) workflow.F
 	if reason != "" {
 		reasonPtr = &reason
 	}
-	return cancelWorkflow(ctx, cancelWorkflowRequest{WorkflowExecution: WorkflowExecution{WorkflowID: u.WorkflowID, RunID: u.RunID}, Reason: reasonPtr})
+	return cancelWorkflow(ctx, cancelWorkflowRequest{Namespace: u.Namespace, WorkflowExecution: WorkflowExecution{WorkflowID: u.WorkflowID, RunID: u.RunID}, Reason: reasonPtr})
 }
 
 func (u *StartedWorkflow) RestartWorkflow(ctx workflow.Context, workflow string, taskQueue string) workflow.Future {
-	return restartWorkflow(ctx, startWorkflowRequest{WorkflowID: u.WorkflowID, Workflow: workflow, TaskQueue: taskQueue})
+	return restartWorkflow(ctx, startWorkflowRequest{Namespace: u.Namespace, WorkflowID: u.WorkflowID, Workflow: workflow, TaskQueue: taskQueue})
 }
 
 func (u *StartedWorkflow) GetResult(ctx workflow.Context) workflow.Future {

@@ -19,7 +19,7 @@ struct Expectation {
     descriptors: Option<Descriptors>,
     #[serde(default)]
     system_nexus: bool,
-    #[serde(default = "default_targets")]
+    #[serde(default)]
     targets: Vec<Target>,
     error: ExpectedError,
 }
@@ -36,10 +36,6 @@ fn generation_targets(targets: &[Target]) -> nexgen::nexgen_config::GenerationTa
         workflow: targets.contains(&Target::Workflow),
         client: targets.contains(&Target::Client),
     }
-}
-
-fn default_targets() -> Vec<Target> {
-    vec![Target::Workflow]
 }
 
 #[derive(Debug, Deserialize)]

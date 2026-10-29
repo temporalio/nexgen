@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use heck::ToShoutySnakeCase;
+use heck::{ToShoutySnakeCase, ToUpperCamelCase};
 use prost_types::FieldDescriptorProto;
 use prost_types::field_descriptor_proto::{Label, Type};
 
@@ -50,6 +50,15 @@ impl<'a> AuthoredValidationPass<'a> {
                         message: record.full_name.clone(),
                         field: name.to_string(),
                         reason: "a sourced field requires at least one API target; its source has no effect with no targets selected".to_string(),
+                    });
+                }
+            }
+            for service in &spec.services {
+                if let Some(resource) = service.resources.first() {
+                    return Err(Error::InvalidResource {
+                        service: service.name.clone(),
+                        resource: resource.name.to_upper_camel_case(),
+                        reason: "resource declarations require at least one API target; select `--targets workflow` or another supported API target".to_string(),
                     });
                 }
             }

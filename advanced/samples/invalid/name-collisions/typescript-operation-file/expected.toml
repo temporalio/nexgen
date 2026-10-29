@@ -1,4 +1,5 @@
 languages = ["typescript"]
+targets = ["workflow"]
 
 [error]
 kind = "generated-file-source-conflict"

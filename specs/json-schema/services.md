@@ -255,17 +255,17 @@ rejects.
 - **C#** (`NexusRpc` 0.4.0, a dependency of `Temporalio` 1.19.0):
   `[NexusService(name)]` on an **interface** and `[NexusOperation(name)]` on
   each method; a method takes zero or one parameter (zero ⇒ absent input) and
-  returns `void` (absent output) or the output type. Without `--native-api` the
-  interface is **`public`**, like Java's, so a handler or caller in another
-  assembly can name it; with `--native-api` callers use the generated
+  returns `void` (absent output) or the output type. Without the workflow target
+  the interface is **`public`**, like Java's, so a handler or caller in another
+  assembly can name it; with `--targets workflow` callers use the generated
   `<Name>Client` wrapper, and the interface is `internal`. A handler is a
   `[NexusServiceHandler(typeof(I<Name>))]` class whose `[NexusOperationHandler]`
   methods return `IOperationHandler<In, Out>`, and a workflow calls it through
   `Workflow.CreateNexusWorkflowClient<I<Name>>(new(endpoint))`.
 
-### The Go `--native-api` client
+### The Go workflow-target client
 
-In `--native-api` mode Go emits, beside the `var <Service>` binding, a
+With `--targets workflow` Go emits, beside the `var <Service>` binding, a
 workflow-side client per service:
 
 ```go

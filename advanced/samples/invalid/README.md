@@ -91,8 +91,9 @@ contains = [
 - `system_nexus` defaults to `false`. Set it to `true` for cases requiring
   system-Nexus generation. Category names are organizational only and never
   enable compiler settings implicitly.
-- `targets` defaults to the workflow target. Set a list such as
-  `["workflow", "client"]` for a case about another generation target.
+- `targets` defaults to no API targets, matching the CLI. Set
+  `targets = ["workflow"]` for a case requiring workflow API generation, or
+  another explicit target list such as `["workflow", "client"]`.
 - `descriptors` defaults to no descriptors. Set `"temporal"` to use the
   repository's checked-in `advanced/samples/descriptors/temporal_api.bin`,
   independent of the case directory or working directory. For custom descriptor
@@ -104,7 +105,10 @@ Use representative compiler fixtures for equivalent spelling or syntax
 variations. Keep exhaustive lexical checks, such as Go's disallowed helper
 identifiers and keywords, in focused helper-level unit tests.
 
-Compilation uses native API mode, disables formatting, and supplies a
-target-appropriate support-package name. Each target gets its own temporary
-output directory. The proof of concept does not offer arbitrary CLI arguments or
-exact stderr snapshots; add configuration only when a concrete case needs it.
+Compilation disables formatting and supplies a target-appropriate
+support-package name. Each target gets its own temporary output directory. The
+proof of concept does not offer arbitrary CLI arguments or exact stderr
+snapshots; add configuration only when a concrete case needs it.
+
+An omitted or empty target list selects definitions only. This is used to verify
+that sourced fields are rejected without any API targets.

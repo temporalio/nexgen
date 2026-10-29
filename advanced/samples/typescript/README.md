@@ -80,7 +80,7 @@ cargo run --features advanced -- typescript advanced/samples/inputs/proto-backed
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package ../../support/temporal_model_converters \
-  --native-api --output advanced/samples/typescript/wit/proto-backed-showcase
+  --targets workflow --output advanced/samples/typescript/wit/proto-backed-showcase
 ```
 
 Include both your authored module and generated output in your TypeScript

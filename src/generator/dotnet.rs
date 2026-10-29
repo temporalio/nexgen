@@ -3830,7 +3830,11 @@ fn resource_method_request_model_init_expr(
                 candidate.name == field.field_name || field_name.as_str() == field.field_name
             })?;
         if matches!(init_kind, ResourceMethodRequestInitKind::OptionsFields)
-            && !field_is_options_field(model, model_field_name, model_field)
+            && (model_field
+                .visibility
+                .source_for(GenerationTarget::Workflow)
+                .is_some()
+                || !field_is_options_field(model, model_field_name, model_field))
         {
             continue;
         }

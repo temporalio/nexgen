@@ -216,12 +216,5 @@ mod reject_tests {
                 .unwrap()
                 .success()
         );
-        assert!(
-            !Command::new(binary)
-                .args(["python", "--no-native-api"])
-                .status()
-                .unwrap()
-                .success()
-        );
     }
 }
