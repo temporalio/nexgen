@@ -140,7 +140,8 @@ def test_nested_model_collections_round_trip(populated: bool) -> None:
             ),
         ]
         if populated
-        else None
+        else None,
+        activity_task_queue_partitions=[],
     )
     partition_converter = getattr(partitions, "__temporal_transfer_type_converter")
     wire_partitions = partition_converter.to_transfer_type(partitions)
