@@ -66,7 +66,9 @@ Keep all TypeScript `@temporalio/*` packages on the same version. Python's
 declare `nexus-rpc` directly only if your dependency tooling requires it. The
 same holds for C#: the `Temporalio` NuGet package brings in `NexusRpc`.
 
-Generated C# targets .NET 8 or later (`net8.0`, C# 12).
+Generated C# targets .NET 7 or later (`net7.0`, C# 11). Older platforms need
+workarounds; see
+[Using generated C# on older .NET platforms](docs/dotnet-compat.md).
 
 Generated Java source uses JSpecify's `@NullMarked` and `@Nullable` annotations.
 Add JSpecify 1.0.0 to the compile classpath; it is not needed at runtime. For
