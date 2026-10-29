@@ -165,9 +165,7 @@ model. nexgen ignores the directives that it doesn't know yet, such as
 
 Python imports the Stream protos from `temporalio.api`, where a `temporalio`
 release with the protos will have them. Until then, the sample installs them
-there from its own `temporalio-stream-protos` package. TypeScript passes a
-`number` where a resource method's proto request wants a `Long`. So `tsc` skips
-the service, but the test still checks its models.
+there from its own `temporalio-stream-protos` package.
 
 - WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
 - .NET: [`dotnet/wit/stream-service/`](dotnet/wit/stream-service/),

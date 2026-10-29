@@ -1,0 +1,10 @@
+languages = ["typescript"]
+
+[error]
+kind = "invalid-resource-method"
+contains = [
+  "CounterService.Counter.add",
+  "parameter `amount` goes into record `counter-service.add-request`",
+  "has no `@nexus.proto`",
+  "A TypeScript resource holds it as a `Long`",
+]

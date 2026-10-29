@@ -568,6 +568,14 @@ Key observations:
   2. `_update_email(request)` -- internal standalone, takes request object
   3. `update_email(*, user_id, email)` -- public standalone convenience
 
+In TypeScript, a resource holds a 64-bit integer as a `Long`. A record without
+`@nexus.proto` holds it as a `number`, so nexgen refuses a resource field or
+method parameter of that type that goes into such a request record, also through
+a proto message inside it. It also refuses a resource with such a field that an
+operation returns with no proto wire message. To fix it, bind the record or the
+result type to a proto message, or use another type. nexgen also refuses a
+64-bit map key in any TypeScript resource, since a `Long` can't key a `Record`.
+
 ### Name-Binding: How Resource Methods Find Operations
 
 This is the non-obvious part. The generator does not require you to explicitly
@@ -822,6 +830,9 @@ unless a type replacement selects an external model. Fields use the authored
 enum's name and members, even when its name differs from the protobuf enum's.
 Converters bridge the model and protobuf enum by number, and `@nexus.default`
 continues to name a WIT case.
+
+In TypeScript, a 64-bit integer is a `Long` in a proto-backed model, and a
+`number` in other models.
 
 ### Transfer-Type Conversion
 

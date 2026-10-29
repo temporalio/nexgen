@@ -1,0 +1,1 @@
+A TypeScript resource holds a 64-bit integer as a `Long`, which keeps every digit of a Stream offset. nexgen refuses such a value where it would go into a record without `@nexus.proto`, which holds it as a `number`, and a 64-bit map key in any TypeScript resource, since a `Long` can't key a `Record`.

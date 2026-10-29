@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use heck::{ToKebabCase, ToLowerCamelCase, ToShoutySnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::generator::json_schema::typescript as typescript_json;
 use crate::generator::proto::typescript as typescript_proto;
 use crate::generator::proto::typescript::{
@@ -377,10 +377,45 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
+    // An operation that returns a resource with no proto wire message sends the resource as JSON.
+    fn check_plain_resource_output(&self, operation: &PlannedOperation) -> Result<()> {
+        if !operation.output_direct_result() {
+            return Ok(());
+        }
+        let Some(PlannedType::Resource(output)) = operation.output_type() else {
+            return Ok(());
+        };
+        for service in &self.api_plan.services {
+            for resource in service.resources.iter().map(|resource| &resource.data) {
+                if resource.type_name != output.type_name {
+                    continue;
+                }
+                let field = resource.fields.iter().find(|field| {
+                    field.function.is_none() && typescript_holds_64_bit_int(&field.kind)
+                });
+                if let Some(field) = field {
+                    return Err(Error::InvalidResource {
+                        service: service.name.clone(),
+                        resource: resource.type_name.clone(),
+                        reason: format!(
+                            "operation `{}` returns it with no proto wire message, so its 64-bit \
+                             field `{}` goes over JSON as a `number`. {TYPESCRIPT_RESOURCE_LONG} \
+                             Bind the result type to a proto message with `@nexus.proto`, or use \
+                             another type",
+                            operation.name, field.name
+                        ),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn resolve_operation<'operation>(
         &mut self,
         operation: &'operation PlannedOperation,
     ) -> Result<RenderedOperation<'operation>> {
+        self.check_plain_resource_output(operation)?;
         let input = operation_input_model(operation);
         let output_transform = operation.output_transform.as_ref();
         let output_resource_return = operation.data.output_resource_return.clone();
@@ -2150,6 +2185,8 @@ fn generate_leaf(
 
     for service in &services {
         for resource in &service.resources {
+            check_typescript_resource_map_keys(service.name, resource)?;
+            check_typescript_resource_json_requests(service.name, resource)?;
             planner.ensure_resource_field_types(resource);
         }
     }
@@ -5844,8 +5881,10 @@ fn typescript_resource_field_annotation(
     }
 }
 
+// A resource holds a 64-bit integer as a `Long`, since a number can't hold every value.
 fn typescript_resource_value_annotation(value: &PlannedType) -> String {
     match value {
+        PlannedType::Int(IntSpec::I64 | IntSpec::U64) => "Long".to_string(),
         PlannedType::Int(_) => "number".to_string(),
         PlannedType::Float => "number".to_string(),
         PlannedType::Bool => "boolean".to_string(),
@@ -5918,7 +5957,162 @@ fn typescript_resource_field_requirements(
     }
     let mut requirements = TypeScriptRequirements::default();
     collect_typescript_value_requirements(kind, &mut requirements);
+    requirements.long |= typescript_holds_64_bit_int(kind);
     requirements
+}
+
+fn typescript_holds_64_bit_int(kind: &PlannedType) -> bool {
+    match kind {
+        PlannedType::Int(IntSpec::I64 | IntSpec::U64) => true,
+        PlannedType::Option(inner) | PlannedType::List(inner) => typescript_holds_64_bit_int(inner),
+        PlannedType::Map(key, value) => {
+            typescript_holds_64_bit_int(key) || typescript_holds_64_bit_int(value)
+        }
+        PlannedType::Tuple(items) => items.iter().any(typescript_holds_64_bit_int),
+        PlannedType::Result { ok, err } => {
+            ok.as_deref().is_some_and(typescript_holds_64_bit_int)
+                || err.as_deref().is_some_and(typescript_holds_64_bit_int)
+        }
+        PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec {
+            type_name,
+            target: fallback,
+            ..
+        })) => type_name.value().is_none() && typescript_holds_64_bit_int(fallback),
+        _ => false,
+    }
+}
+
+fn typescript_has_64_bit_map_key(kind: &PlannedType) -> bool {
+    match kind {
+        PlannedType::Map(key, value) => {
+            typescript_holds_64_bit_int(key) || typescript_has_64_bit_map_key(value)
+        }
+        PlannedType::Option(inner) | PlannedType::List(inner) => {
+            typescript_has_64_bit_map_key(inner)
+        }
+        PlannedType::Tuple(items) => items.iter().any(typescript_has_64_bit_map_key),
+        PlannedType::Result { ok, err } => {
+            ok.as_deref().is_some_and(typescript_has_64_bit_map_key)
+                || err.as_deref().is_some_and(typescript_has_64_bit_map_key)
+        }
+        PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec {
+            type_name,
+            target: fallback,
+            ..
+        })) => type_name.value().is_none() && typescript_has_64_bit_map_key(fallback),
+        _ => false,
+    }
+}
+
+const TYPESCRIPT_RESOURCE_LONG: &str = "A TypeScript resource holds it as a `Long`.";
+
+// A `Long` can't key a `Record`.
+fn check_typescript_resource_map_keys(service: &str, resource: &PlannedResource) -> Result<()> {
+    let reason = |what: String| {
+        format!("{what} has a 64-bit map key, which a TypeScript resource would hold as a `Long`")
+    };
+    for field in resource
+        .fields
+        .iter()
+        .filter(|field| field.function.is_none())
+    {
+        if typescript_has_64_bit_map_key(&field.kind) {
+            return Err(Error::InvalidResource {
+                service: service.to_string(),
+                resource: resource.type_name.clone(),
+                reason: reason(format!("field `{}`", field.name)),
+            });
+        }
+    }
+    for method in &resource.methods {
+        let result = method
+            .result
+            .as_ref()
+            .and_then(|result| match &result.kind {
+                PlannedResourceMethodResultKind::Value(kind) => Some(kind),
+                PlannedResourceMethodResultKind::Resource { .. } => None,
+            });
+        let params = method
+            .params
+            .iter()
+            .filter(|param| param.function.is_none())
+            .map(|param| (format!("parameter `{}`", param.name), &param.kind));
+        for (what, kind) in params.chain(result.map(|kind| ("the result".to_string(), kind))) {
+            if typescript_has_64_bit_map_key(kind) {
+                return Err(Error::InvalidResourceMethod {
+                    service: service.to_string(),
+                    resource: resource.type_name.clone(),
+                    method: method.name.clone(),
+                    reason: reason(what),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn check_typescript_resource_json_requests(
+    service: &str,
+    resource: &PlannedResource,
+) -> Result<()> {
+    for method in &resource.methods {
+        let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } = &method.binding
+        else {
+            continue;
+        };
+        if let Some((what, record)) =
+            typescript_plain_request_long(request_plan, resource, method, None)
+        {
+            return Err(Error::InvalidResourceMethod {
+                service: service.to_string(),
+                resource: resource.type_name.clone(),
+                method: method.name.clone(),
+                reason: format!(
+                    "{what} goes into record `{record}`, which has no `@nexus.proto` and holds a \
+                     64-bit integer as a `number`. {TYPESCRIPT_RESOURCE_LONG} Bind the record to \
+                     a proto message, or use another type"
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The resource field or method parameter with a 64-bit integer that goes into a record with no
+/// `@nexus.proto`, also through a proto message inside it, and that record.
+fn typescript_plain_request_long<'a>(
+    plan: &'a RequestPlan,
+    resource: &PlannedResource,
+    method: &PlannedResourceMethod,
+    plain_record: Option<&'a str>,
+) -> Option<(String, &'a str)> {
+    match plan {
+        RequestPlan::Source(source) => {
+            let record = plain_record?;
+            let (what, value) = match source {
+                RequestPlanSource::ResourceField(name) => (
+                    "field",
+                    resource.fields.iter().find(|field| &field.name == name)?,
+                ),
+                RequestPlanSource::MethodParam(name) => (
+                    "parameter",
+                    method.params.iter().find(|param| &param.name == name)?,
+                ),
+            };
+            (value.function.is_none() && typescript_holds_64_bit_int(&value.kind))
+                .then(|| (format!("{what} `{}`", value.name), record))
+        }
+        RequestPlan::Construct {
+            message_name,
+            proto,
+            fields,
+        } => {
+            let plain_record = plain_record.or((!proto).then_some(message_name.as_str()));
+            fields.iter().find_map(|field| {
+                typescript_plain_request_long(&field.value, resource, method, plain_record)
+            })
+        }
+    }
 }
 
 fn collect_typescript_value_requirements(

@@ -3709,6 +3709,7 @@ fn resource_method_request_model_init_expr(
     let RequestPlan::Construct {
         message_name,
         fields,
+        ..
     } = request_plan
     else {
         return None;
@@ -4263,9 +4264,11 @@ fn with_resource_property_names(plan: &RequestPlan, type_name: &str) -> RequestP
         }
         RequestPlan::Construct {
             message_name,
+            proto,
             fields,
         } => RequestPlan::Construct {
             message_name: message_name.clone(),
+            proto: *proto,
             fields: fields
                 .iter()
                 .map(|field| RequestPlanField {

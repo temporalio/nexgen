@@ -1,0 +1,9 @@
+languages = ["typescript"]
+
+[error]
+kind = "invalid-resource"
+contains = [
+  "CounterService.Counter",
+  "operation `GetCounter` returns it with no proto wire message",
+  "64-bit field `total` goes over JSON as a `number`",
+]

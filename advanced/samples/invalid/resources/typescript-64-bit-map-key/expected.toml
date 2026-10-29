@@ -1,0 +1,8 @@
+languages = ["typescript"]
+
+[error]
+kind = "invalid-resource-method"
+contains = [
+  "CounterService.Counter.add",
+  "parameter `totals` has a 64-bit map key",
+]

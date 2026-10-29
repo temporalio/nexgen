@@ -1,0 +1,8 @@
+languages = ["typescript"]
+
+[error]
+kind = "invalid-resource-method"
+contains = [
+  "CounterService.Counter.add",
+  "field `total` goes into record `counter-service.add-request`",
+]

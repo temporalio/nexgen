@@ -1,0 +1,9 @@
+languages = ["typescript"]
+descriptors = "temporal"
+
+[error]
+kind = "invalid-resource-method"
+contains = [
+  "CounterService.Counter.touch",
+  "parameter `seconds` goes into record `counter-service.touch-request`",
+]

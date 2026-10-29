@@ -158,6 +158,8 @@ pub enum RequestPlan {
     Source(RequestPlanSource),
     Construct {
         message_name: String,
+        /// Whether `message_name` is a proto message, not a WIT record.
+        proto: bool,
         fields: Vec<RequestPlanField>,
     },
 }
@@ -547,6 +549,7 @@ fn synthesize_request_plan(
 
     Ok(Some(RequestPlan::Construct {
         message_name: message_name.to_string(),
+        proto: true,
         fields,
     }))
 }
@@ -599,6 +602,7 @@ fn synthesize_record_request_plan(
 
     Ok(Some(RequestPlan::Construct {
         message_name: record_name.to_string(),
+        proto: false,
         fields,
     }))
 }
@@ -1109,6 +1113,7 @@ interface user-service {
                 let RequestPlan::Construct {
                     message_name,
                     fields,
+                    ..
                 } = request_plan
                 else {
                     panic!("request plan should construct update-email-request");

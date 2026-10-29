@@ -1,0 +1,19 @@
+package temporal:counters@1.0.0;
+
+world system { export counter-service; }
+
+/// @nexus.endpoint "__counter_service"
+interface counter-service {
+  resource counter {
+    constructor(counter-id: string);
+
+    add: func(amount: s64);
+  }
+
+  record add-request {
+    counter-id: string,
+    amount: s64,
+  }
+
+  add: func(request: add-request);
+}
