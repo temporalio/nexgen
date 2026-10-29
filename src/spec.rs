@@ -753,6 +753,8 @@ pub struct ResourceMethodSpec<F: TypeFamily = AuthoredFamily> {
     pub params: Vec<ResourceFieldSpec<F>>,
     pub result: Option<ResourceResultSpec<F>>,
     pub operation_name: Option<String>,
+    /// Set by `@nexus.close`. The end of an `async with` block calls this method.
+    pub close: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -816,6 +818,7 @@ impl<F: TypeFamily> ResourceMethodSpec<F> {
                 .collect(),
             result: self.result.map(|result| result.map_names_with(map)),
             operation_name: self.operation_name,
+            close: self.close,
         }
     }
 }

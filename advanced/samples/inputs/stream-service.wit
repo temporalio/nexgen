@@ -387,7 +387,7 @@ interface stream-service {
 
     /// @nexus.doc "Close the Stream. Readers drain what is left, then end."
     /// @nexus.operation "close-stream"
-    // TODO: implement @nexus.close.
+    /// @nexus.close
     close: func();
 
     /// @nexus.doc "Read one page of Records. The poll iterator reads them all."

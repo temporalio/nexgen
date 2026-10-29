@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["workflow"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = ["Python generated name `resource_call` for the function of operation `ResourceCall` conflicts with the decorator of a call that returns a closable resource"]

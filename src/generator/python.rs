@@ -16,8 +16,9 @@ use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedOperationResourceReturn,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedRecordType, PlannedResource,
     PlannedResourceField, PlannedResourceHolder, PlannedResourceMethod,
-    PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind, PlannedSpec, PlannedType,
-    message_model_name, operation_input_model, operation_output_direct_result,
+    PlannedResourceMethodBindingSpec, PlannedResourceMethodResult, PlannedResourceMethodResultKind,
+    PlannedSpec, PlannedType, message_model_name, operation_input_model,
+    operation_output_direct_result,
 };
 use crate::planning::{
     RequestPlan, RequestPlanField, RequestPlanSource, ResolvedResourceBindingSource,
@@ -58,6 +59,14 @@ fn python_api_module_path(api_plan: &PlannedSpec, target: GenerationTarget) -> M
         Some(directory) => api_plan.module_path.child(directory),
         None => api_plan.module_path.clone(),
     }
+}
+
+/// The relative import of a root package module from `depth` packages below the API.
+fn python_api_root_module_import(target: GenerationTarget, depth: usize, module: &str) -> String {
+    format!(
+        "{}{module}",
+        ".".repeat(depth + usize::from(python_api_directory(target).is_some()))
+    )
 }
 
 fn python_api_models_import(target: GenerationTarget, depth: usize) -> String {
@@ -850,6 +859,45 @@ impl<'a> ApiPlanner<'a> {
                 ),
             },
         )?;
+        let returns_closable_resource = !targets.is_empty()
+            && services.iter().any(|service| {
+                service
+                    .operations
+                    .iter()
+                    .any(|operation| operation_returns_closable_resource(service, operation))
+                    || service
+                        .resources
+                        .iter()
+                        .flat_map(|resource| &resource.methods)
+                        .any(|method| resource_method_returns_closable_resource(service, method))
+            });
+        if returns_closable_resource {
+            if let Some(operation) = services
+                .iter()
+                .flat_map(|service| &service.operations)
+                .find(|operation| operation.attr_name == "resource_call")
+            {
+                return Err(Error::PythonGeneratedNameConflict {
+                    name: "resource_call".to_string(),
+                    generated_by: format!("the function of operation `{}`", operation.name),
+                    conflicting_declaration: "the decorator of a call that returns a closable \
+                                              resource"
+                        .to_string(),
+                });
+            }
+            let mut source = String::new();
+            render_generated_file_header(&mut source);
+            source.push_str(
+                "\nimport collections.abc\nimport functools\nimport types\nimport typing\n\n\
+                 import typing_extensions\n\n\n",
+            );
+            source.push_str(PYTHON_RESOURCE_CALL);
+            files.insert(
+                "_resource_call.py",
+                source,
+                GeneratedFileOrigin::fixed("generated Python resource call"),
+            )?;
+        }
         if !definition_services.is_empty() {
             files.insert(
                 "services.py",
@@ -1211,6 +1259,7 @@ impl<'a> ApiPlanner<'a> {
         }
         render_support_import(&mut output, &body, self.support_package, false);
         render_poll_iterator_import(&mut output, &body, "._poll");
+        render_resource_call_import(&mut output, &body, ".._resource_call");
         output.push_str("\n\n");
         output.push_str(&body);
         Ok(output)
@@ -1411,6 +1460,7 @@ impl<'a> ApiPlanner<'a> {
         if workflow && !service.delay_load_temporalio_workflow {
             module_imports.insert("temporalio.workflow".to_string());
         }
+        module_imports.insert("types".to_string());
         if client {
             // The RPC options of a client method.
             module_imports.insert("datetime".to_string());
@@ -1509,6 +1559,13 @@ impl<'a> ApiPlanner<'a> {
         }
         render_support_import(&mut output, &body, self.support_package, false);
         render_poll_iterator_import(&mut output, &body, ".._poll");
+        // A target with its own directory is one level below the shared modules.
+        let shared = if python_api_directory(target).is_some() {
+            "..."
+        } else {
+            ".."
+        };
+        render_resource_call_import(&mut output, &body, &format!("{shared}_resource_call"));
         if !body.is_empty() {
             output.push('\n');
             output.push('\n');
@@ -1580,6 +1637,7 @@ impl<'a> ApiPlanner<'a> {
         }
         if target.is_some() {
             render_runtime_type_properties(output, resource, &type_variables);
+            render_resource_context_manager(output, resource);
         }
         let Some(target) = target else {
             // Identity DTOs have no API methods or client state.
@@ -1686,6 +1744,11 @@ impl<'a> ApiPlanner<'a> {
     ) {
         let client = target == GenerationTarget::Client;
         let result_annotation = self.python_resource_method_result_annotation(method);
+        render_resource_call_decorator(
+            output,
+            "    ",
+            resource_method_returns_closable_resource(service, method),
+        );
         output.push_str("    async def ");
         output.push_str(&python_field_name(&method.name));
         output.push_str("(\n");
@@ -5487,6 +5550,11 @@ fn render_workflow_clients_module(
         render_resource_data_import(&mut output, &body, &service.resources, 1);
     }
     render_support_import(&mut output, &body, support_package, false);
+    render_resource_call_import(
+        &mut output,
+        &body,
+        &python_api_root_module_import(GenerationTarget::Workflow, 1, "_resource_call"),
+    );
     output.push_str("\n\n");
     output.push_str(&body);
     output
@@ -5585,6 +5653,11 @@ fn render_operation_module(
     }
     render_resource_data_import(&mut output, &body, &service.resources, 2);
     render_support_import(&mut output, &body, support_package, false);
+    render_resource_call_import(
+        &mut output,
+        &body,
+        &python_api_root_module_import(GenerationTarget::Workflow, 2, "_resource_call"),
+    );
     output.push('\n');
     output.push('\n');
     output.push_str(&body);
@@ -6194,6 +6267,11 @@ fn render_endpoint_service_object_operation_method(
             "    @typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
+    render_resource_call_decorator(
+        output,
+        "    ",
+        operation_returns_closable_resource(service, operation),
+    );
     output.push_str("    async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
@@ -6227,6 +6305,11 @@ fn render_endpoint_service_object_unpacked_method(
             "    @typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
+    render_resource_call_decorator(
+        output,
+        "    ",
+        operation_returns_closable_resource(service, operation),
+    );
     output.push_str("    async def ");
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
@@ -6693,6 +6776,88 @@ fn validate_runtime_type_argument_names(services: &[RenderedService<'_>]) -> Res
     }
     Ok(())
 }
+
+/// `ResourceCall` is a `Coroutine`, since `asyncio.create_task` takes only a coroutine.
+const PYTHON_RESOURCE_CALL: &str = r#"class _Closable(typing.Protocol):
+    async def __aenter__(self) -> object: ...
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: types.TracebackType | None,
+    ) -> None: ...
+
+
+_ResourceT = typing.TypeVar("_ResourceT", bound=_Closable)
+_P = typing_extensions.ParamSpec("_P")
+
+
+@typing.final
+class ResourceCall(
+    collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT],
+    typing.Generic[_ResourceT],
+):
+    """Await it for the resource, or use ``async with`` to close it at the end."""
+
+    def __init__(
+        self, call: collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT]
+    ) -> None:
+        self._call: collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT] = call
+        self._resource: _ResourceT | None = None
+        self.__name__: str = getattr(call, "__name__", type(self).__name__)
+        self.__qualname__: str = getattr(call, "__qualname__", self.__name__)
+
+    @typing_extensions.override
+    def __await__(self) -> collections.abc.Generator[typing.Any, None, _ResourceT]:
+        return self._call.__await__()
+
+    @typing_extensions.override
+    def send(self, value: typing.Any) -> typing.Any:
+        return self._call.send(value)
+
+    @typing_extensions.override
+    def throw(
+        self,
+        typ: typing.Any,
+        val: typing.Any = None,
+        tb: types.TracebackType | None = None,
+    ) -> typing.Any:
+        return self._call.throw(typ, val, tb)
+
+    @typing_extensions.override
+    def close(self) -> None:
+        self._call.close()
+
+    async def __aenter__(self) -> _ResourceT:
+        resource = await self._call
+        _ = await resource.__aenter__()
+        self._resource = resource
+        return resource
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: types.TracebackType | None,
+    ) -> None:
+        if self._resource is not None:
+            await self._resource.__aexit__(exc_type, exc, tb)
+
+
+def resource_call(
+    function: collections.abc.Callable[
+        _P, collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT]
+    ],
+) -> collections.abc.Callable[_P, ResourceCall[_ResourceT]]:
+    """Wraps a call that returns a closable resource in a ``ResourceCall``."""
+
+    @functools.wraps(function)
+    def call(*args: _P.args, **kwargs: _P.kwargs) -> ResourceCall[_ResourceT]:
+        return ResourceCall(function(*args, **kwargs))
+
+    return call
+"#;
 
 const CLIENT_NEXUS_CLIENT_HOOK: &str = "create_nexus_client";
 
@@ -8202,7 +8367,7 @@ fn render_function_unpacked_overload(
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    render_operation_signature_start(output, target, &operation.attr_name);
+    render_public_operation_signature_start(output, target, service, operation);
 
     let primary_function = primary_function(&unpacked_input.functions);
     let primary_case = primary_function.and_then(|function| {
@@ -9037,6 +9202,89 @@ fn operation_result_annotation(operation: &RenderedOperation<'_>) -> String {
     }
 }
 
+fn render_resource_call_import(output: &mut String, body: &str, module: &str) {
+    if body.contains("@resource_call\n") {
+        output.push_str(&format!("from {module} import resource_call\n"));
+    }
+}
+
+/// The end of an `async with` block calls the `@nexus.close` method.
+fn render_resource_context_manager(output: &mut String, resource: &PlannedResource) {
+    let Some(method) = resource.methods.iter().find(|method| method.close) else {
+        return;
+    };
+    output.push_str("\n    async def __aenter__(self) -> typing_extensions.Self:\n");
+    output.push_str("        return self\n");
+    output.push_str("\n    async def __aexit__(\n");
+    output.push_str("        self,\n");
+    output.push_str("        exc_type: type[BaseException] | None,\n");
+    output.push_str("        exc: BaseException | None,\n");
+    output.push_str("        tb: types.TracebackType | None,\n");
+    output.push_str("    ) -> None:\n");
+    output.push_str(&format!(
+        "        await self.{}()\n",
+        python_field_name(&method.name)
+    ));
+}
+
+/// A record that holds the resource doesn't count, since `async with` enters the call's value.
+fn operation_returns_closable_resource(
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) -> bool {
+    match &operation.output_resource_return {
+        Some(resource_return) if resource_return.holder.is_none() => {
+            closable_resource(service, &resource_return.resource_type_name)
+        }
+        Some(_) => false,
+        None => {
+            operation.output_direct_result
+                && closable_resource(service, &operation.output_annotation)
+        }
+    }
+}
+
+fn resource_method_returns_closable_resource(
+    service: &RenderedService<'_>,
+    method: &PlannedResourceMethod,
+) -> bool {
+    match &method.result {
+        Some(PlannedResourceMethodResult {
+            kind: PlannedResourceMethodResultKind::Resource { type_name, .. },
+            optional: false,
+        }) => closable_resource(service, type_name),
+        _ => false,
+    }
+}
+
+fn closable_resource(service: &RenderedService<'_>, type_name: &str) -> bool {
+    service.resources.iter().any(|resource| {
+        resource.type_name == type_name && resource.methods.iter().any(|method| method.close)
+    })
+}
+
+/// The decorated call returns a `ResourceCall`, so a caller can also enter it with `async with`.
+fn render_resource_call_decorator(output: &mut String, indent: &str, closable: bool) {
+    if closable {
+        output.push_str(indent);
+        output.push_str("@resource_call\n");
+    }
+}
+
+fn render_public_operation_signature_start(
+    output: &mut String,
+    target: GenerationTarget,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) {
+    render_resource_call_decorator(
+        output,
+        target_indent(target),
+        operation_returns_closable_resource(service, operation),
+    );
+    render_operation_signature_start(output, target, &operation.attr_name);
+}
+
 /// Whether a Workflow function awaits the handle itself, to transform the result or build a
 /// resource.
 fn operation_returns_direct(operation: &RenderedOperation<'_>) -> bool {
@@ -9185,7 +9433,7 @@ fn render_client_request_method(
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    render_operation_signature_start(output, target, &operation.attr_name);
+    render_public_operation_signature_start(output, target, service, operation);
     if operation.input.is_some() {
         start_line(output, target, "    request: ");
         output.push_str(operation_input_annotation(operation));
@@ -9288,10 +9536,19 @@ fn render_request_only_operation_function(
     operation: &RenderedOperation<'_>,
 ) {
     let function_name = request_operation_function_name(operation);
-    let render_request_doc = operation.unpacked_input.is_none();
+    // With no unpacked function, this function is the public call.
+    let public = operation.unpacked_input.is_none();
+    let render_request_doc = public;
     if operation.deprecated {
         output.push_str(
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
+    if public {
+        render_resource_call_decorator(
+            output,
+            "",
+            operation_returns_closable_resource(service, operation),
         );
     }
     output.push_str("async def ");
@@ -9900,7 +10157,7 @@ fn render_unpacked_operation_signature(
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    render_operation_signature_start(output, target, &operation.attr_name);
+    render_public_operation_signature_start(output, target, service, operation);
     if !unpacked_input.parameters.is_empty() {
         start_line(output, target, "    *,\n");
     }
@@ -10024,7 +10281,7 @@ fn render_function_unpacked_implementation(
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    render_operation_signature_start(output, target, &operation.attr_name);
+    render_public_operation_signature_start(output, target, service, operation);
 
     let primary_function = primary_function(&unpacked_input.functions);
     if let Some(function) = primary_function {
