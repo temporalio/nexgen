@@ -3,7 +3,5 @@ descriptors = "temporal"
 [error]
 kind = "invalid-proto-enum-binding"
 contains = [
-  "temporal.api.enums.v1.CommandType",
-  "authored case `command-type-modify-workflow-properties` has number 15",
-  "COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES = 16",
+  "invalid binding for protobuf enum `temporal.api.enums.v1.CommandType`: authored case `command-type-modify-workflow-properties` has number 15, but the corresponding protobuf case is `COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES = 16`; case names, order, and numbers must match exactly (reordered and sparse enums are not supported)",
 ]

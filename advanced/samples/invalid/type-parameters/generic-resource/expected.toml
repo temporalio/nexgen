@@ -1,3 +1,5 @@
 [error]
 kind = "invalid-wit"
-contains = ["resource `holder`", "cannot contain generic type parameters"]
+contains = [
+  "resource `holder` cannot contain generic type parameters",
+]

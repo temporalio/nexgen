@@ -1,8 +1,5 @@
 [error]
 kind = "invalid-wit"
 contains = [
-  "variant `generic-service.collision`",
-  "left.value-t",
-  "right.value-t",
-  "both generate the name `ValueT`",
+  "variant `generic-service.collision` uses type parameters `left.value-t` and `right.value-t` that both generate the name `ValueT`",
 ]

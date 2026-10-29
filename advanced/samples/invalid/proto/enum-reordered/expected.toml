@@ -3,7 +3,5 @@ descriptors = "temporal"
 [error]
 kind = "invalid-proto-enum-binding"
 contains = [
-  "temporal.api.enums.v1.Severity",
-  "authored case `severity-low` has number 0",
-  "SEVERITY_UNSPECIFIED = 0",
+  "invalid binding for protobuf enum `temporal.api.enums.v1.Severity`: authored case `severity-low` has number 0, but the corresponding protobuf case is `SEVERITY_UNSPECIFIED = 0`; case names, order, and numbers must match exactly (reordered and sparse enums are not supported)",
 ]

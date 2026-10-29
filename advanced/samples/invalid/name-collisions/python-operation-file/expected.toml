@@ -5,8 +5,5 @@ kind = "generated-file-source-conflict"
 contains = [
   "operations",
   "collide.py",
-  "Python operation `FirstService.Collide`",
-  "Python operation `SecondService.Collide`",
-  "rename operation `Collide` in service `FirstService`",
-  "rename operation `Collide` in service `SecondService`",
+  "is produced by both Python operation `FirstService.Collide` and Python operation `SecondService.Collide`; rename operation `Collide` in service `FirstService` so it generates a different Python path; or rename operation `Collide` in service `SecondService` so it generates a different Python path",
 ]

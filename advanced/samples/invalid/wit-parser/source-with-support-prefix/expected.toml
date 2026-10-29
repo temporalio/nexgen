@@ -2,4 +2,7 @@ languages = ["python"]
 
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.source", "_support.workflow_namespace()", "remove that prefix"]
+contains = [
+  "invalid WIT directive `@nexus.source` on type `models.request` field `namespace`",
+  "`_support.workflow_namespace()` already has the generated support prefix; remove that prefix from the helper call",
+]

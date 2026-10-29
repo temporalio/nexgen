@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.type-parameter", "models.context-t", "cannot be combined with `@nexus.type`"]
+contains = [
+  "invalid WIT directive `@nexus.type-parameter` on type `models.context-t`",
+  "cannot be combined with `@nexus.type`",
+]

@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.source", "relative to `--support-package`", "WorkflowNamespace(ctx)"]
+contains = [
+  "invalid WIT directive `@nexus.source` on type `models.request` field `namespace`",
+  "`workflow.GetInfo(ctx).Namespace` must be a helper call relative to `--support-package`, such as `WorkflowNamespace(ctx)`",
+]

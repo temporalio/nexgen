@@ -3,4 +3,6 @@ system_nexus = true
 
 [error]
 kind = "unsupported-go-proto-conversion"
-contains = ["Cancel", "serialization-context requires a proto-backed operation"]
+contains = [
+  "Go proto conversion for operation `Cancel` is not supported: serialization-context requires a proto-backed operation",
+]

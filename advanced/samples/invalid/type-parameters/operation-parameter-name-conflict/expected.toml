@@ -1,8 +1,5 @@
 [error]
 kind = "invalid-wit"
 contains = [
-  "operation `Execute`",
-  "left.value-t",
-  "right.value-t",
-  "both generate the name `ValueT`",
+  "operation `Execute` uses type parameters `left.value-t` and `right.value-t` that both generate the name `ValueT`",
 ]

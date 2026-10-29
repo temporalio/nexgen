@@ -44,7 +44,9 @@ descriptors = "temporal"
 
 [error]
 kind = "invalid-proto-enum-binding"
-contains = ["authored case `severity-low` has number 0"]
+contains = [
+  "invalid binding for protobuf enum `temporal.api.enums.v1.Severity`: authored case `severity-low` has number 0, but the corresponding protobuf case is `SEVERITY_UNSPECIFIED = 0`; case names, order, and numbers must match exactly (reordered and sparse enums are not supported)",
+]
 ```
 
 `kind` names a compiler `Error` variant in kebab-case. The fieldless `ErrorKind`
@@ -53,9 +55,13 @@ available without a separate test mapping. It identifies the error variant
 without requiring the fixture to provide its payload fields.
 
 `contains` must have at least one nonempty fragment. Every fragment must occur
-in the rendered diagnostic. Assert details that establish the intended failure,
-not the entire message or machine-specific paths. An unexpected success, a
-different error kind, or any missing fragment fails the test.
+in the rendered diagnostic. Prefer the complete message when it is deterministic
+and identical across the fixture's declared targets. Otherwise, use stable
+fragments that establish the intended failure, excluding machine-specific paths
+and other variable details. Prefer complete stable context and reason clauses
+over isolated keywords; relative paths can also have platform-specific
+separators. An unexpected success, a different error kind, or any missing
+fragment fails the test.
 
 Unknown configuration fields and kinds are errors. Missing inputs or descriptor
 paths are fixture errors, not expected compiler failures.
@@ -71,7 +77,9 @@ descriptors = "temporal"
 
 [error]
 kind = "invalid-type-override-field"
-contains = ["does not match proto field type `bytes`"]
+contains = [
+  "type override for `temporal.api.common.v1.Callback.Internal.data` has invalid field `type`: authored field type `list<u32>` does not match proto field type `bytes`; use `@nexus.flattened-type` if only the flattened API should differ",
+]
 ```
 
 - `languages` defaults to Python, TypeScript, Go, and .NET, the supported native

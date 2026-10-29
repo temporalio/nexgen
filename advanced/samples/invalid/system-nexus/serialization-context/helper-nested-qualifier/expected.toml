@@ -4,4 +4,6 @@ system_nexus = true
 
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.serialization-context", "Go support helper `helpers.nested.Context`", "identifier or pkg.Func"]
+contains = [
+  "invalid WIT directive `@nexus.serialization-context` on operation `Send` in `<go-plan>`: Go support helper `helpers.nested.Context` must be an identifier or pkg.Func",
+]

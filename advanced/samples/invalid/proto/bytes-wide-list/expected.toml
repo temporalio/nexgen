@@ -3,6 +3,5 @@ descriptors = "temporal"
 [error]
 kind = "invalid-type-override-field"
 contains = [
-  "temporal.api.common.v1.Callback.Internal.data",
-  "does not match proto field type `bytes`",
+  "type override for `temporal.api.common.v1.Callback.Internal.data` has invalid field `type`: authored field type `list<u32>` does not match proto field type `bytes`; use `@nexus.flattened-type` if only the flattened API should differ",
 ]

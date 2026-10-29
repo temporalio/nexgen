@@ -4,4 +4,6 @@ descriptors = "temporal"
 
 [error]
 kind = "flattened-api-field-conflict"
-contains = ["SignalWithStartWorkflowRequest", "duplicate parameter `static_summary`"]
+contains = [
+  "flattened API for `SignalWithStartWorkflowRequest` would generate duplicate parameter `static_summary` from `static_summary`",
+]

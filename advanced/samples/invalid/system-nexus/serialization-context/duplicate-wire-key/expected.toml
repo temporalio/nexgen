@@ -4,4 +4,6 @@ system_nexus = true
 
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.serialization-context", "duplicate registry key", "SameWireService", "SameWireOperation"]
+contains = [
+  "invalid WIT directive `@nexus.serialization-context` on Go operation registry in `<go-plan>`: duplicate registry key: service `SameWireService`, operation `SameWireOperation`",
+]

@@ -1,6 +1,5 @@
 [error]
 kind = "invalid-resource-method"
 contains = [
-  "UserService.User.update-email",
-  "bound operation `UpdatesEmail` was not found",
+  "resource method `UserService.User.update-email` is invalid: bound operation `UpdatesEmail` was not found",
 ]

@@ -5,8 +5,5 @@ kind = "generated-file-source-conflict"
 contains = [
   "operations",
   "collide.ts",
-  "TypeScript operation `FirstService.Collide`",
-  "TypeScript operation `SecondService.Collide`",
-  "rename operation `Collide` in service `FirstService`",
-  "rename operation `Collide` in service `SecondService`",
+  "is produced by both TypeScript operation `FirstService.Collide` and TypeScript operation `SecondService.Collide`; rename operation `Collide` in service `FirstService` so it generates a different TypeScript path; or rename operation `Collide` in service `SecondService` so it generates a different TypeScript path",
 ]

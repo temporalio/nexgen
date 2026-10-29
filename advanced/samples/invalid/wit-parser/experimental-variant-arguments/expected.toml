@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.experimental", "does not take arguments"]
+contains = [
+  "invalid WIT directive `@nexus.experimental` on type `models.preview`",
+  "does not take arguments",
+]

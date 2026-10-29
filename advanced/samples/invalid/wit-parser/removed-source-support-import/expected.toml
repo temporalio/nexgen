@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.source", "`python-support-import` is no longer supported", "--support-package"]
+contains = [
+  "invalid WIT directive `@nexus.source` on type `models.request` field `namespace`",
+  "`python-support-import` is no longer supported; remove it and call a helper from `--support-package` in the source expression",
+]

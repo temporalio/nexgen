@@ -4,4 +4,6 @@ system_nexus = true
 
 [error]
 kind = "unsupported-go-proto-conversion"
-contains = ["Send", "*temporal.RetryPolicy", "@nexus.serialization-context", "TransferTypeConverter", "locally owned request model"]
+contains = [
+  "Go proto conversion for operation `Send` input `go.temporal.io/sdk/*temporal.RetryPolicy` is not supported: cannot attach a TransferTypeConverter to an external input type for a system operation with @nexus.serialization-context; use a generated, locally owned request model instead",
+]

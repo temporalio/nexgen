@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.type-parameter", "models.value", "is only supported on WIT type aliases"]
+contains = [
+  "invalid WIT directive `@nexus.type-parameter` on type `models.value`",
+  "is only supported on WIT type aliases",
+]

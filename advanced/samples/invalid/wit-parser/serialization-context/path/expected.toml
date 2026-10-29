@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.serialization-context", "invalid `go` support helper `helpers/Context`"]
+contains = [
+  "invalid WIT directive `@nexus.serialization-context` on interface `api` operation `Send`",
+  "invalid `go` support helper `helpers/Context`",
+]

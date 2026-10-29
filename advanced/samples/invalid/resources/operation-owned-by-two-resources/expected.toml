@@ -1,6 +1,5 @@
 [error]
 kind = "invalid-resource-method"
 contains = [
-  "UserService.ArchivedUser.update-name",
-  "bound operation `UpdateName` is already owned by resource `ActiveUser`",
+  "resource method `UserService.ArchivedUser.update-name` is invalid: bound operation `UpdateName` is already owned by resource `ActiveUser`",
 ]

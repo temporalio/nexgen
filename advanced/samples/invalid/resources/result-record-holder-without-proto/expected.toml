@@ -2,4 +2,6 @@ descriptors = "temporal"
 
 [error]
 kind = "invalid-resource"
-contains = ["result record `StartRunResult`", "so it needs `@nexus.proto`"]
+contains = [
+  "resource `Api.WorkflowRun` is invalid: result record `StartRunResult` of operation `StartRun` holds a resource, so it needs `@nexus.proto`",
+]
