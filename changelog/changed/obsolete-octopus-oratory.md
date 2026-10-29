@@ -1,1 +1,0 @@
-Deprecated C# services and operations now carry a reason, `[Obsolete("This service is deprecated.")]`, instead of a bare `[Obsolete]`, and generated files disable only CS0618, with a comment, and only when something is deprecated.

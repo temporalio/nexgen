@@ -1,1 +1,0 @@
-WIT `s64` and `u64` are now 64-bit integers on the WIT path, where they were 32-bit. .NET uses `uint` and `ulong` for `u32` and `u64`, and Go keeps signed types. TypeScript keeps `number`, so the JSON matches the other languages.

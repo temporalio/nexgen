@@ -1,1 +1,0 @@
-Generated Python, TypeScript, Go, and .NET models now use the authored WIT enum type for protobuf-backed enum fields. Generation rejects bindings with missing or reordered cases or gaps in protobuf numbering.

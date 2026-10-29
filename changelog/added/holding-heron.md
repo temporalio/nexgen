@@ -1,1 +1,0 @@
-An operation can return a proto-backed record that holds a resource in one `own<T>` field, in Python, TypeScript, .NET and Go. The resource binds from the record's message, the other fields come from the same message, and the message travels as a wire record with the same name.

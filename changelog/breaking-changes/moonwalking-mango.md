@@ -1,2 +1,0 @@
-Go operation options now promote `flatten-in-api` record fields directly instead of value-embedding the record. Promoted options follow Go's default-punning convention: empty strings mean omitted, and the optional nested record is omitted when none of its fields are supplied.
-Go models used only as flattened operation-input containers are now unexported; models exposed by other public signatures remain exported.
