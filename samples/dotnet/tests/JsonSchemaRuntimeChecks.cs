@@ -231,7 +231,7 @@ namespace Nexgen.DotNetExamples.Tests
                 .OrderBy(member => member.Key, StringComparer.Ordinal)
                 .Select(member => JsonSerializer.Serialize(member.Key) + ":" + Canonical(member.Value))) + "}",
             JsonArray items => "[" + string.Join(",", items.Select(Canonical)) + "]",
-            JsonValue value when value.GetValueKind() == JsonValueKind.Number =>
+            JsonValue value when value.TryGetValue<JsonElement>(out var element) && element.ValueKind == JsonValueKind.Number =>
                 double.Parse(value.ToJsonString(), System.Globalization.CultureInfo.InvariantCulture).ToString("R", System.Globalization.CultureInfo.InvariantCulture),
             _ => node.ToJsonString(),
         };

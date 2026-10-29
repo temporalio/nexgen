@@ -146,7 +146,7 @@ namespace Temporalio.Worker
     .unwrap();
     fs::write(
         project_path.join("GeneratedInterceptor.csproj"),
-        "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>9.0</LangVersion></PropertyGroup></Project>",
+        "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net7.0</TargetFramework><LangVersion>9.0</LangVersion></PropertyGroup></Project>",
     )
     .unwrap();
     let (_dotnet_guard, mut command) = dotnet_command();

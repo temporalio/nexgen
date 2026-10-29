@@ -686,14 +686,15 @@ the non-overridden members every type inherits from `object` (`GetType`,
 of one of those names would hide it (CS0108), so they are reserved in every
 model member scope and closed-value constant scope.
 
-1. **Targets `net8.0` and C# 12.** Generated code may use any API and language
-   feature `net8.0` provides with its default language version, C# 12. Today it
-   needs no more than .NET 7 APIs (`char.IsAsciiDigit` and kin) and C# 11
-   (`required` members). Every sample and test project compiles for `net8.0`,
-   which enforces the floor. The sample test projects also target `net10.0`, so
-   the tests run on both the oldest and newest supported runtimes; the
-   validation probes and conformance harness set `RollForward=LatestMajor` and
-   run on the newest installed runtime.
+1. **Targets `net7.0` and C# 11.** Generated code may use any API and language
+   feature `net7.0` provides with its default language version, C# 11
+   (`char.IsAsciiDigit` and kin, `required` members). Every sample and test
+   project compiles for `net7.0`, which enforces the floor. The sample test
+   projects also target `net8.0` and `net10.0`, so the tests run on the oldest
+   supported runtime and on the oldest and newest LTS runtimes; the validation
+   probes and conformance harness set `RollForward=LatestMajor` and run on the
+   newest installed runtime. Older targets are possible with user-side
+   workarounds; see [the compatibility guide](../../docs/dotnet-compat.md).
 2. **Models emit `sealed record`s with `required` `init` members (P2).** Every
    object model is a `public sealed record` carrying `[GeneratedCode]`. A
    required member is `public required T Name { get; init; }`, so a missing

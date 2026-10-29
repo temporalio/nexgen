@@ -120,7 +120,7 @@ impl JsonCase {
         self.dotnet(Some(&source));
     }
 
-    /// Compiles for net8.0, the generated code's floor (.NET 8, C# 12), and
+    /// Compiles for net7.0, the generated code's floor (.NET 7, C# 11), and
     /// runs on the newest installed runtime.
     fn write_project(&self, executable: bool) {
         fs::write(
@@ -129,7 +129,7 @@ impl JsonCase {
                 r#"<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>{}</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <RollForward>LatestMajor</RollForward>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -1741,9 +1741,16 @@ fn csharp_json_converters_own_the_wire_keys() {
         "type: object\nproperties:\n  firstName: { type: string }\n  zip_code: { type: string }\n",
     );
     case.generate(&["policy.yaml"]);
+    // .NET 7, the generated code's floor, has no built-in renaming policy
+    // besides camelCase, which leaves both keys unchanged.
+    fs::write(
+        case.root.join("ScreamingPolicy.cs"),
+        "internal sealed class ScreamingPolicy : System.Text.Json.JsonNamingPolicy\n{\n    public override string ConvertName(string name) => name.ToUpperInvariant();\n}\n",
+    )
+    .unwrap();
     case.run(
         r#"var value = new Policy { FirstName = "a", ZipCode = "b" };
-foreach (var policy in new[] { System.Text.Json.JsonNamingPolicy.SnakeCaseLower, System.Text.Json.JsonNamingPolicy.KebabCaseUpper })
+foreach (var policy in new System.Text.Json.JsonNamingPolicy[] { new ScreamingPolicy() })
 {
     var options = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = policy };
     Check.Equal("{\"firstName\":\"a\",\"zip_code\":\"b\"}", System.Text.Json.JsonSerializer.Serialize(value, options), "naming policy");
@@ -3248,7 +3255,11 @@ var b = Check.Parse<Showcase>(json);
 var failures = new List<string>();
 if (!a.Equals(b)) failures.Add("equal values compare unequal");
 if (a.GetHashCode() != b.GetHashCode()) failures.Add("equal values hash differently");
-if (!System.Text.Json.Nodes.JsonNode.DeepEquals(System.Text.Json.Nodes.JsonNode.Parse(Check.Write(a)), wire)) failures.Add("round trip changed the value");
+// Member order is free: the schema declares the `z` members first.
+string Sorted(System.Text.Json.Nodes.JsonNode? node) => node is System.Text.Json.Nodes.JsonObject members
+    ? "{" + string.Join(",", members.OrderBy(member => member.Key, StringComparer.Ordinal).Select(member => System.Text.Json.JsonSerializer.Serialize(member.Key) + ":" + Sorted(member.Value))) + "}"
+    : node?.ToJsonString() ?? "null";
+if (Sorted(System.Text.Json.Nodes.JsonNode.Parse(Check.Write(a))) != Sorted(wire)) failures.Add("round trip changed the value");
 string Short(string member) => json.Replace("\"" + member + "\":\"vv\"", "\"" + member + "\":\"v\"");
 "#,
     );
@@ -3259,7 +3270,15 @@ string Short(string member) => json.Replace("\"" + member + "\":\"vv\"", "\"" + 
         ));
     }
     program.push_str("Check.True(failures.Count == 0, string.Join(\"; \", failures));\n");
-    case.run_with_usings(&["Probe", "System.Collections.Generic"], &program);
+    case.run_with_usings(
+        &[
+            "Probe",
+            "System",
+            "System.Collections.Generic",
+            "System.Linq",
+        ],
+        &program,
+    );
 }
 
 /// The lowercase identifiers of `source`, skipping comments and string and
