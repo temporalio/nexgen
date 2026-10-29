@@ -11,11 +11,14 @@ option java_multiple_files = true;
 option java_outer_classname = "RequestResponseProto";
 option ruby_package = "Temporalio::Api::StreamService::V1";
 option csharp_namespace = "Temporalio.Api.StreamService.V1";
+option (nexus.python_module) = "streamprotos.temporal.api.streamservice.v1.request_response_pb2";
 
 // The messages of the Stream service. An SDK Store (Redis or memory) and the server answer the
 // same five operations with them. A field that only the server reads says so.
 
 import "google/protobuf/duration.proto";
+
+import "nexus/options.proto";
 
 import "temporal/api/common/v1/message.proto";
 import "temporal/api/enums/v1/stream.proto";

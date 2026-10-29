@@ -445,8 +445,7 @@ pub(crate) struct PythonReference {
 }
 
 pub(crate) fn message_python_ref(type_info: &PlannedProtoTypeInfo) -> Option<PythonReference> {
-    let module_path =
-        python_module_path_for_file_name(type_info.file_name.as_deref(), &type_info.package)?;
+    let module_path = proto_python_module_path(type_info)?;
     let relative_name = relative_descriptor_name(&type_info.full_name, &type_info.package);
     Some(PythonReference {
         type_ref: format!("{module_path}.{relative_name}"),
@@ -455,8 +454,7 @@ pub(crate) fn message_python_ref(type_info: &PlannedProtoTypeInfo) -> Option<Pyt
 }
 
 pub(crate) fn enum_python_ref(type_info: &PlannedProtoTypeInfo) -> Option<PythonReference> {
-    let module_path =
-        python_module_path_for_file_name(type_info.file_name.as_deref(), &type_info.package)?;
+    let module_path = proto_python_module_path(type_info)?;
     let relative_name = relative_descriptor_name(&type_info.full_name, &type_info.package);
     Some(PythonReference {
         type_ref: format!("{module_path}.{relative_name}.ValueType"),
@@ -1588,6 +1586,14 @@ fn oneof_field_write(oneof: &ProtoOneof, value_expr: &str, required: bool) -> Re
     RenderedWireWrite { lines }
 }
 
+// The file option names the module of protos that the installed SDK doesn't have, such as the
+// protos of an API change that isn't released.
+fn proto_python_module_path(type_info: &PlannedProtoTypeInfo) -> Option<String> {
+    type_info.python_module.clone().or_else(|| {
+        python_module_path_for_file_name(type_info.file_name.as_deref(), &type_info.package)
+    })
+}
+
 fn python_module_path_for_file_name(file_name: Option<&str>, package: &str) -> Option<String> {
     if let Some(file_name) = file_name {
         let mut module_path = file_name.replace('/', ".");
@@ -1606,5 +1612,51 @@ fn python_module_path_for_file_name(file_name: Option<&str>, package: &str) -> O
         Some(format!("temporalio.{suffix}"))
     } else {
         Some(package.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::message_python_ref;
+    use crate::planning::PlannedProtoTypeInfo;
+    use crate::spec::SelectedTextSpec;
+
+    fn stream_ref(python_module: Option<&str>) -> PlannedProtoTypeInfo {
+        PlannedProtoTypeInfo {
+            full_name: "temporal.api.stream.v1.StreamRef".to_string(),
+            package: "temporal.api.stream.v1".to_string(),
+            file_name: Some("temporal/api/stream/v1/message.proto".to_string()),
+            file_options: None,
+            python_module: python_module.map(str::to_string),
+            reference: SelectedTextSpec::default(),
+            type_name: SelectedTextSpec::default(),
+        }
+    }
+
+    #[test]
+    fn a_message_takes_the_module_of_its_file_option() {
+        let reference = message_python_ref(&stream_ref(Some(
+            "streamprotos.temporal.api.stream.v1.message_pb2",
+        )))
+        .unwrap();
+
+        assert_eq!(
+            reference.module_path,
+            "streamprotos.temporal.api.stream.v1.message_pb2"
+        );
+        assert_eq!(
+            reference.type_ref,
+            "streamprotos.temporal.api.stream.v1.message_pb2.StreamRef"
+        );
+    }
+
+    #[test]
+    fn a_message_without_the_file_option_takes_the_temporalio_module() {
+        let reference = message_python_ref(&stream_ref(None)).unwrap();
+
+        assert_eq!(
+            reference.module_path,
+            "temporalio.api.stream.v1.message_pb2"
+        );
     }
 }

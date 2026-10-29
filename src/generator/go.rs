@@ -215,6 +215,7 @@ fn local_type_info(full_name: &str) -> PlannedTypeInfo {
         package: String::new(),
         file_name: None,
         file_options: None,
+        python_module: None,
         reference: SelectedTextSpec::default(),
         type_name: SelectedTextSpec::default(),
     }

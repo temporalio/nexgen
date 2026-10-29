@@ -155,15 +155,16 @@ A System Nexus .NET output takes the `Temporalio.Workflows` namespace, which
 the WIT's `@nexus.poll` directive or the `--targets` flag of its header yet, so
 it ignores them. The header's proto paths are the crate's.
 
-Some of the output doesn't type-check. Python imports the Stream protos from
-`temporalio`, which doesn't have them, so basedpyright skips the service.
-TypeScript passes a `number` where a resource method's proto request wants a
-`Long`. So `tsc` skips the service, but the test still checks its models.
+The Stream protos set the `nexus.python_module` file option, so Python imports
+them from the sample's own `streamprotos` package. TypeScript passes a `number`
+where a resource method's proto request wants a `Long`. So `tsc` skips the
+service, but the test still checks its models.
 
 - WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
 - .NET: [`dotnet/wit/stream-service/`](dotnet/wit/stream-service/),
   [`dotnet/tests/StreamServiceChecks.cs`](dotnet/tests/StreamServiceChecks.cs)
-- Python: [`python/wit/stream_service/`](python/wit/stream_service/)
+- Python: [`python/wit/stream_service/`](python/wit/stream_service/),
+  [`python/tests/test_stream_service.py`](python/tests/test_stream_service.py)
 - TypeScript:
   [`typescript/wit/stream-service/`](typescript/wit/stream-service/),
   [`typescript/tests/stream-service.test.ts`](typescript/tests/stream-service.test.ts)
@@ -209,25 +210,29 @@ directory and leaves everything already there alone.)
 ### The stream proto bindings
 
 The protos in `descriptors/streams/` are the Stream protos of
-`temporalio/api#895` at `482ec010`. After a change to them, rebuild the
-descriptor set and the bindings with `protoc` 33.1 and `mypy-protobuf` 5.1.0.
-`API` is a checkout of the Temporal API protos that has
-`temporal.api.common.v1.Execution`.
+`temporalio/api#895` at `482ec010`, with the `nexus.python_module` option of
+[`../../proto/nexus/options.proto`](../../proto/nexus/options.proto) added.
+After a change to them, rebuild the descriptor set and the bindings with
+`protoc` 33.1 and `mypy-protobuf` 5.1.0. `API` is a checkout of the Temporal API
+protos that has `temporal.api.common.v1.Execution`.
 
 ```sh
 cd advanced/samples
 set -- temporal/api/enums/v1/stream.proto temporal/api/stream/v1/message.proto \
   temporal/api/streamservice/v1/request_response.proto
-protoc -I descriptors/streams -I "$API" \
+protoc -I descriptors/streams -I ../../proto -I "$API" \
   --descriptor_set_out=descriptors/streams.bin "$@"
-protoc -I descriptors/streams -I "$API" --python_out=python/streamprotos \
-  --mypy_out=python/streamprotos "$@"
+protoc -I descriptors/streams -I ../../proto -I "$API" \
+  --python_out=python/streamprotos --mypy_out=python/streamprotos \
+  nexus/options.proto "$@"
 perl -pi -e 's/^from temporal\.api\.(stream|streamservice)\./from streamprotos.temporal.api.$1./;
   s/^from temporal\.api\.enums\.v1 import stream_pb2/from streamprotos.temporal.api.enums.v1 import stream_pb2/;
-  s/^from temporal\.api\./from temporalio.api./' \
+  s/^from temporal\.api\./from temporalio.api./;
+  s/^from nexus import/from streamprotos.nexus import/' \
   $(find python/streamprotos -name '*_pb2.py*')
-protoc -I descriptors/streams -I "$API" --csharp_out=dotnet/proto/streams \
-  --csharp_opt=base_namespace= "$@"
+protoc -I descriptors/streams -I ../../proto -I "$API" \
+  --csharp_out=dotnet/proto/streams --csharp_opt=base_namespace= \
+  nexus/options.proto "$@"
 ```
 
 The TypeScript `typescript/proto/streams.d.ts` mirrors the protos with only the

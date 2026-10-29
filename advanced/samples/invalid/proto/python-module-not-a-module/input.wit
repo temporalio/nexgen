@@ -1,0 +1,13 @@
+package test:fixture@1.0.0;
+
+world system { export ref-service; }
+
+/// @nexus.endpoint "refs"
+interface ref-service {
+  /// @nexus.proto "fixture.v1.Ref"
+  record ref {
+    id: string,
+  }
+
+  get-ref: func(request: ref) -> ref;
+}

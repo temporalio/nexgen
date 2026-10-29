@@ -24,6 +24,7 @@ impl PlannedProtoTypeInfo {
             package: message.package.clone(),
             file_name: message.file_name.clone(),
             file_options: message.file_options.clone(),
+            python_module: message.python_module.clone(),
             reference: proto_reference(spec, &message.full_name),
             type_name: proto_type_name(spec, &message.full_name),
         }
@@ -35,6 +36,7 @@ impl PlannedProtoTypeInfo {
             package: enumeration.package.clone(),
             file_name: enumeration.file_name.clone(),
             file_options: enumeration.file_options.clone(),
+            python_module: enumeration.python_module.clone(),
             reference: proto_reference(spec, &enumeration.full_name),
             type_name: proto_type_name(spec, &enumeration.full_name),
         }

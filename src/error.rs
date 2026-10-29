@@ -141,6 +141,12 @@ pub enum Error {
     #[error("duplicate descriptor {kind} `{name}`")]
     DuplicateDescriptorDefinition { kind: &'static str, name: String },
 
+    #[error(
+        "proto file `{file}` sets `nexus.python_module` to `{module}`, which isn't a dotted Python \
+         module name"
+    )]
+    InvalidPythonModuleOption { file: String, module: String },
+
     #[error("language `{language}` is not implemented yet")]
     UnsupportedLanguage { language: Language },
 

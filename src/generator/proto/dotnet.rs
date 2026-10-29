@@ -1551,6 +1551,7 @@ mod tests {
                 csharp_namespace: Some("Temporalio.Api.Workflow.V1".to_string()),
                 ..Default::default()
             }),
+            python_module: None,
             reference: SelectedTextSpec::default(),
             type_name: SelectedTextSpec::default(),
         };
@@ -1571,6 +1572,7 @@ mod tests {
                 csharp_namespace: Some("Temporalio.Api.Common.V1".to_string()),
                 ..Default::default()
             }),
+            python_module: None,
             reference: SelectedTextSpec::default(),
             type_name: SelectedTextSpec {
                 value: Some("Should.Not.Be.Used.Payload".to_string()),

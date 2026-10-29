@@ -24,6 +24,7 @@ of `@nexus` directives.
   - [Resource Return Binding](#resource-return-binding)
   - [Edge Cases and Error Conditions](#edge-cases-and-error-conditions)
 - [Proto-Backed Models](#proto-backed-models)
+  - [Proto Modules](#proto-modules)
   - [Transfer-Type Conversion](#transfer-type-conversion)
   - [Sourced Fields](#sourced-fields)
   - [Omitted Fields](#omitted-fields)
@@ -823,6 +824,26 @@ enum's name and members, even when its name differs from the protobuf enum's.
 Converters bridge the model and protobuf enum by number, and `@nexus.default`
 continues to name a WIT case.
 
+### Proto Modules
+
+Python imports each bound proto message or enum from the `_pb2` module of its
+`.proto` file. For a `temporal/...` file, that's the same path in the
+`temporalio` package, for example `temporalio.api.common.v1.message_pb2`. A
+proto that the installed SDK doesn't have, such as one of an API change that
+isn't released, needs its own module. The `.proto` file names it with the
+`nexus.python_module` file option, from `proto/nexus/options.proto` in the
+nexgen repository.
+
+```proto
+import "nexus/options.proto";
+
+option (nexus.python_module) = "streamprotos.temporal.api.stream.v1.message_pb2";
+```
+
+Compile the file with `-I <nexgen>/proto`. Each message and enum of the file
+takes the module. Only Python uses it, but nexgen refuses a value that isn't a
+dotted Python module name for every language.
+
 ### Transfer-Type Conversion
 
 ```wit
@@ -1476,7 +1497,9 @@ For variants, use `@nexus.proto "<fully.qualified.proto.MessageName>.<oneof>"`.
 
 Maps a WIT type to a protobuf message or enum. The generator emits
 target-specific transfer-type conversion code and validates field mappings
-against the proto descriptor. Requires `--descriptors` on the CLI.
+against the proto descriptor. Requires `--descriptors` on the CLI. Python
+imports the proto from the module that [Proto Modules](#proto-modules)
+describes.
 
 Native WIT declarations (`record`, `variant`, `enum`, and `flags`) own this
 protobuf source mapping directly. A non-native alias or resource-backed type

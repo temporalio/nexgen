@@ -11,6 +11,28 @@ use prost_types::{
 
 use crate::error::{Error, Result};
 
+// `prost_types::FileOptions` drops extension fields, so a second decode of the same bytes reads
+// `nexus.python_module` from `proto/nexus/options.proto`.
+#[derive(Clone, PartialEq, Message)]
+struct NexgenFileSet {
+    #[prost(message, repeated, tag = "1")]
+    file: Vec<NexgenFile>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct NexgenFile {
+    #[prost(string, optional, tag = "1")]
+    name: Option<String>,
+    #[prost(message, optional, tag = "8")]
+    options: Option<NexgenFileOptions>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct NexgenFileOptions {
+    #[prost(string, optional, tag = "50100")]
+    python_module: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct DescriptorIndex {
     files: Vec<FileDescriptorProto>,
@@ -26,25 +48,22 @@ impl DescriptorIndex {
 
     pub fn load_many(paths: &[PathBuf]) -> Result<Self> {
         let mut files = Vec::new();
+        let mut python_modules = HashMap::new();
         for path in paths {
             let bytes = fs::read(path).map_err(|source| Error::ReadFile {
                 path: path.to_path_buf(),
                 source,
             })?;
-            let set = FileDescriptorSet::decode(bytes.as_slice()).map_err(|source| {
-                Error::DescriptorDecode {
-                    path: path.to_path_buf(),
-                    source,
-                }
-            })?;
+            let (set, modules) = decode_descriptor_set(path, &bytes)?;
             files.extend(set.file);
+            python_modules.extend(modules);
         }
 
-        Self::from_files(files)
+        Self::from_files(files, python_modules)
     }
 
     pub fn from_descriptor_set(set: FileDescriptorSet) -> Result<Self> {
-        Self::from_files(set.file)
+        Self::from_files(set.file, HashMap::new())
     }
 
     pub fn from_descriptor_sets(sets: Vec<FileDescriptorSet>) -> Result<Self> {
@@ -52,10 +71,13 @@ impl DescriptorIndex {
         for set in sets {
             files.extend(set.file);
         }
-        Self::from_files(files)
+        Self::from_files(files, HashMap::new())
     }
 
-    fn from_files(files: Vec<FileDescriptorProto>) -> Result<Self> {
+    fn from_files(
+        files: Vec<FileDescriptorProto>,
+        python_modules: HashMap<String, String>,
+    ) -> Result<Self> {
         let mut messages = HashMap::new();
         let mut enums = HashMap::new();
         let mut rpcs = Vec::new();
@@ -81,6 +103,27 @@ impl DescriptorIndex {
             for message in &file.message_type {
                 index_message(file, package, None, message, &mut messages, &mut enums)?;
             }
+        }
+
+        for (file, module) in &python_modules {
+            if !is_dotted_python_name(module) {
+                return Err(Error::InvalidPythonModuleOption {
+                    file: file.clone(),
+                    module: module.clone(),
+                });
+            }
+        }
+        let python_module = |file_name: &Option<String>| {
+            file_name
+                .as_ref()
+                .and_then(|name| python_modules.get(name))
+                .cloned()
+        };
+        for message in messages.values_mut() {
+            message.python_module = python_module(&message.file_name);
+        }
+        for enumeration in enums.values_mut() {
+            enumeration.python_module = python_module(&enumeration.file_name);
         }
 
         Ok(Self {
@@ -231,6 +274,7 @@ pub struct MessageMetadata {
     pub package: String,
     pub go_package: Option<String>,
     pub file_options: Option<FileOptions>,
+    pub python_module: Option<String>,
     pub descriptor: DescriptorProto,
 }
 
@@ -323,6 +367,7 @@ pub struct EnumMetadata {
     pub package: String,
     pub go_package: Option<String>,
     pub file_options: Option<FileOptions>,
+    pub python_module: Option<String>,
     pub descriptor: EnumDescriptorProto,
 }
 
@@ -401,6 +446,7 @@ fn index_message(
             package: package.to_string(),
             go_package: file_go_package(file),
             file_options: file.options.clone(),
+            python_module: None,
             descriptor: descriptor.clone(),
         },
     );
@@ -449,11 +495,41 @@ fn index_enum(
             package: package.to_string(),
             go_package: file_go_package(file),
             file_options: file.options.clone(),
+            python_module: None,
             descriptor: descriptor.clone(),
         },
     );
 
     Ok(())
+}
+
+/// Decodes a descriptor set, with the `nexus.python_module` of each file that sets it.
+fn decode_descriptor_set(
+    path: &Path,
+    bytes: &[u8],
+) -> Result<(FileDescriptorSet, HashMap<String, String>)> {
+    let decode_error = |source| Error::DescriptorDecode {
+        path: path.to_path_buf(),
+        source,
+    };
+    let set = FileDescriptorSet::decode(bytes).map_err(decode_error)?;
+    let python_modules = NexgenFileSet::decode(bytes)
+        .map_err(decode_error)?
+        .file
+        .into_iter()
+        .filter_map(|file| Some((file.name?, file.options?.python_module?)))
+        .collect();
+    Ok((set, python_modules))
+}
+
+fn is_dotted_python_name(name: &str) -> bool {
+    name.split('.').all(|part| {
+        let mut chars = part.chars();
+        chars
+            .next()
+            .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+            && chars.all(|character| character == '_' || character.is_ascii_alphanumeric())
+    })
 }
 
 /// Reads the `go_package` file option from a proto file descriptor, if present.
@@ -556,7 +632,11 @@ mod tests {
         MethodDescriptorProto, ServiceDescriptorProto,
     };
 
-    use super::DescriptorIndex;
+    use std::path::Path;
+
+    use prost::Message;
+
+    use super::{DescriptorIndex, NexgenFile, NexgenFileOptions, decode_descriptor_set};
     use crate::error::Error;
 
     fn file_with_message(file_name: &str, package: &str, message_name: &str) -> FileDescriptorSet {
@@ -571,6 +651,34 @@ mod tests {
                 ..Default::default()
             }],
         }
+    }
+
+    #[test]
+    fn reads_the_python_module_file_option_from_the_raw_bytes() {
+        #[derive(Clone, PartialEq, Message)]
+        struct RawSet {
+            #[prost(bytes = "vec", repeated, tag = "1")]
+            file: Vec<Vec<u8>>,
+        }
+        // A second encoding of the file merges its options into the first.
+        let mut file = file_with_message("stream.proto", "pkg", "Ref").file[0].encode_to_vec();
+        file.extend(
+            NexgenFile {
+                name: None,
+                options: Some(NexgenFileOptions {
+                    python_module: Some("local.stream_pb2".to_string()),
+                }),
+            }
+            .encode_to_vec(),
+        );
+        let bytes = RawSet { file: vec![file] }.encode_to_vec();
+
+        let (set, python_modules) =
+            decode_descriptor_set(Path::new("streams.bin"), &bytes).unwrap();
+        let index = DescriptorIndex::from_files(set.file, python_modules).unwrap();
+
+        let message = index.message("pkg.Ref").unwrap();
+        assert_eq!(message.python_module.as_deref(), Some("local.stream_pb2"));
     }
 
     #[test]

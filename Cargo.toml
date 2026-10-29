@@ -12,6 +12,8 @@ include = [
     "/LICENSE",
     "/README.md",
     "/src/**",
+    # The proto file options that nexgen reads. Users import them with `-I <nexgen>/proto`.
+    "/proto/**",
     # Pinned RFC 3986 URI grammar bodies pulled in by src/json_schema/format.rs
     # via include_str!; required for the crate to compile from the tarball.
     "/specs/json-schema/corpora/format_uri/*.body",

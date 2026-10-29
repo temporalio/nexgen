@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package fixture.v1;
+
+option (nexus.python_module) = "local-protos/module_pb2";
+
+import "nexus/options.proto";
+
+message Ref {
+  string id = 1;
+}

@@ -1,0 +1,1 @@
+nexgen reads the `nexus.python_module` file option from `proto/nexus/options.proto`. Python imports the messages and enums of a `.proto` file that sets it from that module, for protos that the installed `temporalio` doesn't have.

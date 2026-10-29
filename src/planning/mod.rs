@@ -201,6 +201,7 @@ pub(crate) struct PlannedProtoTypeInfo {
     pub(crate) package: String,
     pub(crate) file_name: Option<String>,
     pub(crate) file_options: Option<FileOptions>,
+    pub(crate) python_module: Option<String>,
     pub(crate) reference: SelectedTextSpec,
     pub(crate) type_name: SelectedTextSpec,
 }

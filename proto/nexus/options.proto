@@ -1,0 +1,12 @@
+// Options that nexgen reads from a proto file. Import this file with `-I <nexgen>/proto`.
+syntax = "proto3";
+
+package nexus;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FileOptions {
+  // The dotted name of the Python module that holds the file's messages and enums, in place of
+  // the module that nexgen derives from the file path.
+  string python_module = 50100;
+}

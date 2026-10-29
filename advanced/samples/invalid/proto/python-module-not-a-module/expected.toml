@@ -1,0 +1,7 @@
+# Rebuild module.bin from this directory with
+# `protoc -I . -I ../../../../../proto --descriptor_set_out=module.bin module.proto`.
+descriptors = ["module.bin"]
+
+[error]
+kind = "invalid-python-module-option"
+contains = ["`module.proto`", "`local-protos/module_pb2`"]

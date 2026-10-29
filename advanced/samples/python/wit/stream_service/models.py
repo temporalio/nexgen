@@ -8,11 +8,11 @@ import typing
 import typing_extensions
 import datetime
 import google.protobuf.timestamp_pb2
+import streamprotos.temporal.api.enums.v1.stream_pb2
+import streamprotos.temporal.api.stream.v1.message_pb2
+import streamprotos.temporal.api.streamservice.v1.request_response_pb2
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.common_pb2
-import temporalio.api.enums.v1.stream_pb2
-import temporalio.api.stream.v1.message_pb2
-import temporalio.api.streamservice.v1.request_response_pb2
 import temporalio.converter
 
 import temporal_support as _support
@@ -70,18 +70,20 @@ class CreateStreamRequest:
 class _CreateStreamRequestTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         CreateStreamRequest,
-        temporalio.api.streamservice.v1.request_response_pb2.CreateStreamRequest,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamRequest,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.CreateStreamRequest]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamRequest
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.CreateStreamRequest
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamRequest
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.CreateStreamRequest,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamRequest,
         type_hint: type[CreateStreamRequest],
     ) -> CreateStreamRequest:
         if not value.stream_id:
@@ -109,10 +111,8 @@ class _CreateStreamRequestTransferTypeConverter(
     def to_transfer_type(
         self,
         value: CreateStreamRequest,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.CreateStreamRequest:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.CreateStreamRequest()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamRequest:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamRequest()
         message.stream_id = value.stream_id
         if value.retention is not None:
             message.retention.CopyFrom(_support.duration_to_proto(value.retention))
@@ -146,17 +146,17 @@ class Producer:
 
 class _ProducerTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        Producer, temporalio.api.stream.v1.message_pb2.Producer
+        Producer, streamprotos.temporal.api.stream.v1.message_pb2.Producer
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.Producer] | None = (
-        temporalio.api.stream.v1.message_pb2.Producer
-    )
+    transfer_type: (
+        type[streamprotos.temporal.api.stream.v1.message_pb2.Producer] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.Producer
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.Producer,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.Producer,
         type_hint: type[Producer],
     ) -> Producer:
         if not value.id:
@@ -177,14 +177,12 @@ class _ProducerTransferTypeConverter(
     def to_transfer_type(
         self,
         value: Producer,
-    ) -> temporalio.api.stream.v1.message_pb2.Producer:
-        message = temporalio.api.stream.v1.message_pb2.Producer()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.Producer:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.Producer()
         message.id = value.id
         if value.kind is not None:
-            message.kind = (
-                temporalio.api.enums.v1.stream_pb2.StreamProducerKind.ValueType(
-                    value.kind
-                )
+            message.kind = streamprotos.temporal.api.enums.v1.stream_pb2.StreamProducerKind.ValueType(
+                value.kind
             )
         if value.epoch is not None:
             message.epoch.CopyFrom(
@@ -211,17 +209,17 @@ class ProducerEpoch:
 
 class _ProducerEpochTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        ProducerEpoch, temporalio.api.stream.v1.message_pb2.ProducerEpoch
+        ProducerEpoch, streamprotos.temporal.api.stream.v1.message_pb2.ProducerEpoch
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.ProducerEpoch] | None = (
-        temporalio.api.stream.v1.message_pb2.ProducerEpoch
-    )
+    transfer_type: (
+        type[streamprotos.temporal.api.stream.v1.message_pb2.ProducerEpoch] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.ProducerEpoch
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.ProducerEpoch,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.ProducerEpoch,
         type_hint: type[ProducerEpoch],
     ) -> ProducerEpoch:
         return ProducerEpoch(
@@ -246,8 +244,8 @@ class _ProducerEpochTransferTypeConverter(
     def to_transfer_type(
         self,
         value: ProducerEpoch,
-    ) -> temporalio.api.stream.v1.message_pb2.ProducerEpoch:
-        message = temporalio.api.stream.v1.message_pb2.ProducerEpoch()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.ProducerEpoch:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.ProducerEpoch()
         if value.task_started_event_id is not None:
             message.task_started_event_id = value.task_started_event_id
         if value.task_attempt is not None:
@@ -329,17 +327,17 @@ class StreamRef:
 
 class _StreamRefTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        StreamRef, temporalio.api.stream.v1.message_pb2.StreamRef
+        StreamRef, streamprotos.temporal.api.stream.v1.message_pb2.StreamRef
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamRef] | None = (
-        temporalio.api.stream.v1.message_pb2.StreamRef
-    )
+    transfer_type: (
+        type[streamprotos.temporal.api.stream.v1.message_pb2.StreamRef] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.StreamRef
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.StreamRef,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.StreamRef,
         type_hint: type[StreamRef],
     ) -> StreamRef:
         if not value.id:
@@ -359,8 +357,8 @@ class _StreamRefTransferTypeConverter(
     def to_transfer_type(
         self,
         value: StreamRef,
-    ) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        message = temporalio.api.stream.v1.message_pb2.StreamRef()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.StreamRef:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.StreamRef()
         message.id = value.id
         if value.owner is not None:
             message.owner.CopyFrom(
@@ -438,18 +436,20 @@ class CreateStreamResult:
 class _CreateStreamResultTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         CreateStreamResult,
-        temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamResponse,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamResponse
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamResponse
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamResponse,
         type_hint: type[CreateStreamResult],
     ) -> CreateStreamResult:
         return CreateStreamResult(
@@ -466,10 +466,8 @@ class _CreateStreamResultTransferTypeConverter(
     def to_transfer_type(
         self,
         value: CreateStreamResult,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamResponse:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.CreateStreamResponse()
         if value.stream is not None:
             message.stream.CopyFrom(
                 _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
@@ -477,8 +475,10 @@ class _CreateStreamResultTransferTypeConverter(
         if value.created is not None:
             message.created = value.created
         if value.status is not None:
-            message.status = temporalio.api.enums.v1.stream_pb2.StreamStatus.ValueType(
-                value.status
+            message.status = (
+                streamprotos.temporal.api.enums.v1.stream_pb2.StreamStatus.ValueType(
+                    value.status
+                )
             )
         return message
 
@@ -506,18 +506,20 @@ class AppendRecordsRequest:
 class _AppendRecordsRequestTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         AppendRecordsRequest,
-        temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsRequest,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsRequest
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsRequest
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsRequest,
         type_hint: type[AppendRecordsRequest],
     ) -> AppendRecordsRequest:
         if not value.HasField("stream"):
@@ -552,10 +554,8 @@ class _AppendRecordsRequestTransferTypeConverter(
     def to_transfer_type(
         self,
         value: AppendRecordsRequest,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsRequest:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsRequest()
         message.stream.CopyFrom(
             _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
         )
@@ -598,17 +598,17 @@ class AppendRecord:
 
 class _AppendRecordTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        AppendRecord, temporalio.api.stream.v1.message_pb2.AppendRecord
+        AppendRecord, streamprotos.temporal.api.stream.v1.message_pb2.AppendRecord
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.AppendRecord] | None = (
-        temporalio.api.stream.v1.message_pb2.AppendRecord
-    )
+    transfer_type: (
+        type[streamprotos.temporal.api.stream.v1.message_pb2.AppendRecord] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.AppendRecord
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.AppendRecord,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.AppendRecord,
         type_hint: type[AppendRecord],
     ) -> AppendRecord:
         if not value.HasField("body"):
@@ -622,8 +622,8 @@ class _AppendRecordTransferTypeConverter(
     def to_transfer_type(
         self,
         value: AppendRecord,
-    ) -> temporalio.api.stream.v1.message_pb2.AppendRecord:
-        message = temporalio.api.stream.v1.message_pb2.AppendRecord()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.AppendRecord:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.AppendRecord()
         message.body.CopyFrom(_support.payload_to_proto(value.body))
         return message
 
@@ -644,17 +644,18 @@ class WorkflowTaskEpoch:
 
 class _WorkflowTaskEpochTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        WorkflowTaskEpoch, temporalio.api.stream.v1.message_pb2.WorkflowTaskEpoch
+        WorkflowTaskEpoch,
+        streamprotos.temporal.api.stream.v1.message_pb2.WorkflowTaskEpoch,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.stream.v1.message_pb2.WorkflowTaskEpoch] | None
-    ) = temporalio.api.stream.v1.message_pb2.WorkflowTaskEpoch
+        type[streamprotos.temporal.api.stream.v1.message_pb2.WorkflowTaskEpoch] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.WorkflowTaskEpoch
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.WorkflowTaskEpoch,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.WorkflowTaskEpoch,
         type_hint: type[WorkflowTaskEpoch],
     ) -> WorkflowTaskEpoch:
         return WorkflowTaskEpoch(
@@ -673,8 +674,8 @@ class _WorkflowTaskEpochTransferTypeConverter(
     def to_transfer_type(
         self,
         value: WorkflowTaskEpoch,
-    ) -> temporalio.api.stream.v1.message_pb2.WorkflowTaskEpoch:
-        message = temporalio.api.stream.v1.message_pb2.WorkflowTaskEpoch()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.WorkflowTaskEpoch:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.WorkflowTaskEpoch()
         if value.started_event_id is not None:
             message.started_event_id = value.started_event_id
         if value.attempt is not None:
@@ -700,18 +701,20 @@ class AppendRecordsResponse:
 class _AppendRecordsResponseTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         AppendRecordsResponse,
-        temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsResponse,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsResponse
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsResponse
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsResponse,
         type_hint: type[AppendRecordsResponse],
     ) -> AppendRecordsResponse:
         return AppendRecordsResponse(
@@ -723,10 +726,8 @@ class _AppendRecordsResponseTransferTypeConverter(
     def to_transfer_type(
         self,
         value: AppendRecordsResponse,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsResponse:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.AppendRecordsResponse()
         if value.first_offset is not None:
             message.first_offset = value.first_offset
         if value.last_offset is not None:
@@ -755,18 +756,20 @@ class CloseStreamRequest:
 class _CloseStreamRequestTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         CloseStreamRequest,
-        temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamRequest,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamRequest
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamRequest
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamRequest,
         type_hint: type[CloseStreamRequest],
     ) -> CloseStreamRequest:
         if not value.HasField("stream"):
@@ -800,10 +803,8 @@ class _CloseStreamRequestTransferTypeConverter(
     def to_transfer_type(
         self,
         value: CloseStreamRequest,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamRequest:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamRequest()
         message.stream.CopyFrom(
             _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
         )
@@ -818,10 +819,8 @@ class _CloseStreamRequestTransferTypeConverter(
         if value.failure is not None:
             message.failure.CopyFrom(_support.failure_to_proto(value.failure))
         if value.status is not None:
-            message.status = (
-                temporalio.api.enums.v1.stream_pb2.StreamCloseStatus.ValueType(
-                    value.status
-                )
+            message.status = streamprotos.temporal.api.enums.v1.stream_pb2.StreamCloseStatus.ValueType(
+                value.status
             )
         if value.previous_completed_task is not None:
             message.previous_completed_task.CopyFrom(
@@ -845,18 +844,20 @@ class CloseStreamResponse:
 class _CloseStreamResponseTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         CloseStreamResponse,
-        temporalio.api.streamservice.v1.request_response_pb2.CloseStreamResponse,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamResponse,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.CloseStreamResponse]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamResponse
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.CloseStreamResponse
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamResponse
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.CloseStreamResponse,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamResponse,
         type_hint: type[CloseStreamResponse],
     ) -> CloseStreamResponse:
         return CloseStreamResponse()
@@ -865,10 +866,8 @@ class _CloseStreamResponseTransferTypeConverter(
     def to_transfer_type(
         self,
         value: CloseStreamResponse,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.CloseStreamResponse:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.CloseStreamResponse()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamResponse:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.CloseStreamResponse()
         return message
 
 
@@ -894,18 +893,20 @@ class ReadRecordsRequest:
 class _ReadRecordsRequestTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         ReadRecordsRequest,
-        temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsRequest,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsRequest
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsRequest
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsRequest,
         type_hint: type[ReadRecordsRequest],
     ) -> ReadRecordsRequest:
         if not value.HasField("stream"):
@@ -932,10 +933,8 @@ class _ReadRecordsRequestTransferTypeConverter(
     def to_transfer_type(
         self,
         value: ReadRecordsRequest,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsRequest:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsRequest()
         message.stream.CopyFrom(
             _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
         )
@@ -943,7 +942,7 @@ class _ReadRecordsRequestTransferTypeConverter(
             message.from_offset = value.from_offset
         if value.start is not None:
             message.start = (
-                temporalio.api.enums.v1.stream_pb2.StreamReadStart.ValueType(
+                streamprotos.temporal.api.enums.v1.stream_pb2.StreamReadStart.ValueType(
                     value.start
                 )
             )
@@ -975,18 +974,20 @@ class ReadRecordsResponse:
 class _ReadRecordsResponseTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         ReadRecordsResponse,
-        temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsResponse,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsResponse,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsResponse]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsResponse
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsResponse
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsResponse
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsResponse,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsResponse,
         type_hint: type[ReadRecordsResponse],
     ) -> ReadRecordsResponse:
         return ReadRecordsResponse(
@@ -1004,10 +1005,8 @@ class _ReadRecordsResponseTransferTypeConverter(
     def to_transfer_type(
         self,
         value: ReadRecordsResponse,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsResponse:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsResponse()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsResponse:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.ReadRecordsResponse()
         if value.records:
             for element in value.records:
                 item = message.records.add()
@@ -1036,17 +1035,17 @@ class StreamRecord:
 
 class _StreamRecordTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        StreamRecord, temporalio.api.stream.v1.message_pb2.StreamRecord
+        StreamRecord, streamprotos.temporal.api.stream.v1.message_pb2.StreamRecord
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamRecord] | None = (
-        temporalio.api.stream.v1.message_pb2.StreamRecord
-    )
+    transfer_type: (
+        type[streamprotos.temporal.api.stream.v1.message_pb2.StreamRecord] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.StreamRecord
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.StreamRecord,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.StreamRecord,
         type_hint: type[StreamRecord],
     ) -> StreamRecord:
         _oneof_item: StreamItemData | StreamItemSuperseded | StreamItemClose
@@ -1080,8 +1079,8 @@ class _StreamRecordTransferTypeConverter(
     def to_transfer_type(
         self,
         value: StreamRecord,
-    ) -> temporalio.api.stream.v1.message_pb2.StreamRecord:
-        message = temporalio.api.stream.v1.message_pb2.StreamRecord()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.StreamRecord:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.StreamRecord()
         match value.item:
             case StreamItemData():
                 message.data.CopyFrom(
@@ -1121,17 +1120,17 @@ class StreamData:
 
 class _StreamDataTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        StreamData, temporalio.api.stream.v1.message_pb2.StreamData
+        StreamData, streamprotos.temporal.api.stream.v1.message_pb2.StreamData
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamData] | None = (
-        temporalio.api.stream.v1.message_pb2.StreamData
-    )
+    transfer_type: (
+        type[streamprotos.temporal.api.stream.v1.message_pb2.StreamData] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.StreamData
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.StreamData,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.StreamData,
         type_hint: type[StreamData],
     ) -> StreamData:
         if not value.HasField("body"):
@@ -1150,8 +1149,8 @@ class _StreamDataTransferTypeConverter(
     def to_transfer_type(
         self,
         value: StreamData,
-    ) -> temporalio.api.stream.v1.message_pb2.StreamData:
-        message = temporalio.api.stream.v1.message_pb2.StreamData()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.StreamData:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.StreamData()
         message.body.CopyFrom(_support.payload_to_proto(value.body))
         if value.producer is not None:
             message.producer.CopyFrom(
@@ -1180,17 +1179,17 @@ class Supersession:
 
 class _SupersessionTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        Supersession, temporalio.api.stream.v1.message_pb2.Supersession
+        Supersession, streamprotos.temporal.api.stream.v1.message_pb2.Supersession
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.Supersession] | None = (
-        temporalio.api.stream.v1.message_pb2.Supersession
-    )
+    transfer_type: (
+        type[streamprotos.temporal.api.stream.v1.message_pb2.Supersession] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.Supersession
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.Supersession,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.Supersession,
         type_hint: type[Supersession],
     ) -> Supersession:
         if not value.producer_id:
@@ -1220,16 +1219,14 @@ class _SupersessionTransferTypeConverter(
     def to_transfer_type(
         self,
         value: Supersession,
-    ) -> temporalio.api.stream.v1.message_pb2.Supersession:
-        message = temporalio.api.stream.v1.message_pb2.Supersession()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.Supersession:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.Supersession()
         message.producer_id = value.producer_id
         if value.failed_tasks:
             message.failed_tasks.extend(value.failed_tasks)
         if value.producer_kind is not None:
-            message.producer_kind = (
-                temporalio.api.enums.v1.stream_pb2.StreamProducerKind.ValueType(
-                    value.producer_kind
-                )
+            message.producer_kind = streamprotos.temporal.api.enums.v1.stream_pb2.StreamProducerKind.ValueType(
+                value.producer_kind
             )
         if value.epoch is not None:
             message.epoch.CopyFrom(
@@ -1265,17 +1262,17 @@ class StreamClose:
 
 class _StreamCloseTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        StreamClose, temporalio.api.stream.v1.message_pb2.StreamClose
+        StreamClose, streamprotos.temporal.api.stream.v1.message_pb2.StreamClose
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamClose] | None = (
-        temporalio.api.stream.v1.message_pb2.StreamClose
-    )
+    transfer_type: (
+        type[streamprotos.temporal.api.stream.v1.message_pb2.StreamClose] | None
+    ) = streamprotos.temporal.api.stream.v1.message_pb2.StreamClose
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.StreamClose,
+        value: streamprotos.temporal.api.stream.v1.message_pb2.StreamClose,
         type_hint: type[StreamClose],
     ) -> StreamClose:
         return StreamClose(
@@ -1297,8 +1294,8 @@ class _StreamCloseTransferTypeConverter(
     def to_transfer_type(
         self,
         value: StreamClose,
-    ) -> temporalio.api.stream.v1.message_pb2.StreamClose:
-        message = temporalio.api.stream.v1.message_pb2.StreamClose()
+    ) -> streamprotos.temporal.api.stream.v1.message_pb2.StreamClose:
+        message = streamprotos.temporal.api.stream.v1.message_pb2.StreamClose()
         if value.producer is not None:
             message.producer.CopyFrom(
                 _ProducerTransferTypeConverter().to_transfer_type(value.producer)
@@ -1308,10 +1305,8 @@ class _StreamCloseTransferTypeConverter(
         if value.failure is not None:
             message.failure.CopyFrom(_support.failure_to_proto(value.failure))
         if value.status is not None:
-            message.status = (
-                temporalio.api.enums.v1.stream_pb2.StreamCloseStatus.ValueType(
-                    value.status
-                )
+            message.status = streamprotos.temporal.api.enums.v1.stream_pb2.StreamCloseStatus.ValueType(
+                value.status
             )
         return message
 
@@ -1329,18 +1324,20 @@ class DescribeStreamRequest:
 class _DescribeStreamRequestTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         DescribeStreamRequest,
-        temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamRequest,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest]
+        type[
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamRequest
+        ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamRequest
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamRequest,
         type_hint: type[DescribeStreamRequest],
     ) -> DescribeStreamRequest:
         if not value.HasField("stream"):
@@ -1356,10 +1353,8 @@ class _DescribeStreamRequestTransferTypeConverter(
     def to_transfer_type(
         self,
         value: DescribeStreamRequest,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest:
-        message = (
-            temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest()
-        )
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamRequest:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamRequest()
         message.stream.CopyFrom(
             _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
         )
@@ -1381,20 +1376,20 @@ class DescribeStreamResponse:
 class _DescribeStreamResponseTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
         DescribeStreamResponse,
-        temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamResponse,
+        streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamResponse,
     ]
 ):
     transfer_type: (
         type[
-            temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamResponse
+            streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamResponse
         ]
         | None
-    ) = temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamResponse
+    ) = streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamResponse
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamResponse,
+        value: streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamResponse,
         type_hint: type[DescribeStreamResponse],
     ) -> DescribeStreamResponse:
         return DescribeStreamResponse(
@@ -1409,11 +1404,13 @@ class _DescribeStreamResponseTransferTypeConverter(
     def to_transfer_type(
         self,
         value: DescribeStreamResponse,
-    ) -> temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamResponse:
-        message = temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamResponse()
+    ) -> streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamResponse:
+        message = streamprotos.temporal.api.streamservice.v1.request_response_pb2.DescribeStreamResponse()
         if value.status is not None:
-            message.status = temporalio.api.enums.v1.stream_pb2.StreamStatus.ValueType(
-                value.status
+            message.status = (
+                streamprotos.temporal.api.enums.v1.stream_pb2.StreamStatus.ValueType(
+                    value.status
+                )
             )
         if value.last_offset is not None:
             message.last_offset = value.last_offset

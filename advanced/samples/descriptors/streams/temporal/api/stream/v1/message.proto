@@ -11,8 +11,11 @@ option java_multiple_files = true;
 option java_outer_classname = "MessageProto";
 option ruby_package = "Temporalio::Api::Stream::V1";
 option csharp_namespace = "Temporalio.Api.Stream.V1";
+option (nexus.python_module) = "streamprotos.temporal.api.stream.v1.message_pb2";
 
 import "google/protobuf/timestamp.proto";
+
+import "nexus/options.proto";
 
 import "temporal/api/common/v1/message.proto";
 import "temporal/api/enums/v1/stream.proto";
