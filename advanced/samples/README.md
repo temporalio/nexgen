@@ -163,15 +163,17 @@ crate omits from the API of a resource method's request is left out of the
 model. nexgen ignores the directives that it doesn't know yet, such as
 `@nexus.varargs` and `@nexus.close`.
 
-Some of the output doesn't type-check. Python imports the Stream protos from
-`temporalio`, which doesn't have them, so basedpyright skips the service.
-TypeScript passes a `number` where a resource method's proto request wants a
-`Long`. So `tsc` skips the service, but the test still checks its models.
+Python imports the Stream protos from `temporalio.api`, where a `temporalio`
+release with the protos will have them. Until then, the sample installs them
+there from its own `temporalio-stream-protos` package. TypeScript passes a
+`number` where a resource method's proto request wants a `Long`. So `tsc` skips
+the service, but the test still checks its models.
 
 - WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
 - .NET: [`dotnet/wit/stream-service/`](dotnet/wit/stream-service/),
   [`dotnet/tests/StreamServiceChecks.cs`](dotnet/tests/StreamServiceChecks.cs)
-- Python: [`python/wit/stream_service/`](python/wit/stream_service/)
+- Python: [`python/wit/stream_service/`](python/wit/stream_service/),
+  [`python/tests/test_stream_service.py`](python/tests/test_stream_service.py)
 - TypeScript:
   [`typescript/wit/stream-service/`](typescript/wit/stream-service/),
   [`typescript/tests/stream-service.test.ts`](typescript/tests/stream-service.test.ts)
@@ -188,7 +190,7 @@ TypeScript passes a `number` where a resource method's proto request wants a
 - [`descriptors/streams.bin`](descriptors/streams.bin): descriptor set of the
   stream protos. Only the stream example lists it in `descriptors`. No SDK has
   these protos yet, so the sample projects hold their bindings:
-  [`python/streamprotos/`](python/streamprotos/),
+  [`python/temporalio_stream_protos/`](python/temporalio_stream_protos/),
   [`dotnet/proto/streams/`](dotnet/proto/streams/) and
   [`typescript/proto/streams.d.ts`](typescript/proto/streams.d.ts).
 - [`wire/proto/`](wire/proto/): proto wire fixtures used by the
@@ -228,12 +230,11 @@ set -- temporal/api/enums/v1/stream.proto temporal/api/stream/v1/message.proto \
   temporal/api/streamservice/v1/request_response.proto
 protoc -I descriptors/streams -I "$API" \
   --descriptor_set_out=descriptors/streams.bin "$@"
-protoc -I descriptors/streams -I "$API" --python_out=python/streamprotos \
-  --mypy_out=python/streamprotos "$@"
-perl -pi -e 's/^from temporal\.api\.(stream|streamservice)\./from streamprotos.temporal.api.$1./;
-  s/^from temporal\.api\.enums\.v1 import stream_pb2/from streamprotos.temporal.api.enums.v1 import stream_pb2/;
-  s/^from temporal\.api\./from temporalio.api./' \
-  $(find python/streamprotos -name '*_pb2.py*')
+out=$(mktemp -d)
+protoc -I descriptors/streams -I "$API" --python_out="$out" --mypy_out="$out" "$@"
+cp -R "$out/temporal/api/." python/temporalio_stream_protos/temporalio/api/
+perl -pi -e 's/^from temporal\.api\./from temporalio.api./' \
+  $(find python/temporalio_stream_protos -name '*_pb2.py*')
 protoc -I descriptors/streams -I "$API" --csharp_out=dotnet/proto/streams \
   --csharp_opt=base_namespace= "$@"
 ```

@@ -1,0 +1,27 @@
+# The Python modules of the Stream protos of temporalio/api#895, at the paths where temporalio
+# will have them. Drop this package once a temporalio release has them.
+[project]
+name = "temporalio-stream-protos"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Only the Stream proto modules, so the wheel adds files to temporalio and replaces none.
+[tool.hatch.build.targets.wheel]
+only-include = [
+    "temporalio/api/enums/v1/stream_pb2.py",
+    "temporalio/api/enums/v1/stream_pb2.pyi",
+    "temporalio/api/stream",
+    "temporalio/api/streamservice",
+]
+
+# A change to a module rebuilds the wheel, not only a change to this file.
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "temporalio/**/*.py" },
+    { file = "temporalio/**/*.pyi" },
+]
