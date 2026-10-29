@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
 from typing_extensions import assert_type
 
@@ -73,12 +75,15 @@ def test_wit_byte_list_is_bytes(data: bytes) -> None:
     )
 
 
-def test_bare_collections_have_independent_defaults_and_round_trip() -> None:
-    first = TaskQueuePartitions()
-    second = TaskQueuePartitions()
+def test_bare_collections_are_required_and_round_trip() -> None:
+    with pytest.raises(TypeError, match="activity_task_queue_partitions"):
+        _ = inspect.signature(TaskQueuePartitions).bind()
+    first = TaskQueuePartitions(activity_task_queue_partitions=[])
+    second = TaskQueuePartitions(activity_task_queue_partitions=[])
+    _ = assert_type(first.activity_task_queue_partitions, list[TaskQueuePartition])
+    assert first.workflow_task_queue_partitions is None
     assert first.activity_task_queue_partitions == []
     assert second.activity_task_queue_partitions == []
-    assert first.activity_task_queue_partitions is not None
     first.activity_task_queue_partitions.append(
         TaskQueuePartition(key="one", owner_host_name="worker")
     )
@@ -96,10 +101,12 @@ def test_bare_collections_have_independent_defaults_and_round_trip() -> None:
         == []
     )
 
-    callback = CallbackNexus(url="https://example.test")
-    other = CallbackNexus(url="https://other.test")
+    with pytest.raises(TypeError, match="header"):
+        _ = inspect.signature(CallbackNexus).bind(url="https://example.test")
+    callback = CallbackNexus(url="https://example.test", header={})
+    other = CallbackNexus(url="https://other.test", header={})
+    _ = assert_type(callback.header, dict[str, str])
     assert callback.header == {}
-    assert callback.header is not None
     callback.header["x-test"] = "value"
     assert other.header == {}
     converter = getattr(CallbackNexus, "__temporal_transfer_type_converter")
