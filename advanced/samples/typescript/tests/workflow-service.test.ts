@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import * as workflow from "@temporalio/workflow";
+import * as common from "@temporalio/common";
 import * as nexus from "nexus-rpc";
 
 import { signalWithStartWorkflow } from "../wit/workflow-service/index.ts";
@@ -100,6 +101,7 @@ if (false) {
     cronSchedule,
     staticSummary: "Workflow summary",
     staticDetails: "Workflow details",
+    idReusePolicy: common.WorkflowIdReusePolicy.ALLOW_DUPLICATE,
     namespace: "default",
   };
 

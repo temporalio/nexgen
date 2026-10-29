@@ -18,6 +18,13 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
+func (m signalWithStartWorkflowRequest) withDefaults(ctx workflow.Context) signalWithStartWorkflowRequest {
+	if m.WorkflowIDReusePolicy == 0 {
+		m.WorkflowIDReusePolicy = (enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE)
+	}
+	return m
+}
+
 // --- Datatypes ---
 
 type signalWithStartWorkflowRequest struct {
@@ -30,7 +37,7 @@ type signalWithStartWorkflowRequest struct {
 	WorkflowExecutionTimeout *time.Duration
 	WorkflowRunTimeout       *time.Duration
 	WorkflowTaskTimeout      *time.Duration
-	WorkflowIDReusePolicy    *enums.WorkflowIdReusePolicy
+	WorkflowIDReusePolicy    enums.WorkflowIdReusePolicy
 	WorkflowIDConflictPolicy *enums.WorkflowIdConflictPolicy
 	RetryPolicy              *temporal.RetryPolicy
 	CronSchedule             *string
@@ -80,7 +87,7 @@ func (m signalWithStartWorkflowRequest) GetWorkflowTaskTimeout() *time.Duration 
 	return m.WorkflowTaskTimeout
 }
 
-func (m signalWithStartWorkflowRequest) GetWorkflowIDReusePolicy() *enums.WorkflowIdReusePolicy {
+func (m signalWithStartWorkflowRequest) GetWorkflowIDReusePolicy() enums.WorkflowIdReusePolicy {
 	return m.WorkflowIDReusePolicy
 }
 
@@ -181,11 +188,7 @@ func signalWithStartWorkflowRequestToProto(cfg *commonconverter.SystemNexusConfi
 		}
 		message.WorkflowTaskTimeout = converted
 	}
-	if m.WorkflowIDReusePolicy != nil {
-		message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy((*m.WorkflowIDReusePolicy))
-	} else {
-		message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy(1)
-	}
+	message.WorkflowIdReusePolicy = enums.WorkflowIdReusePolicy(m.WorkflowIDReusePolicy)
 	if m.WorkflowIDConflictPolicy != nil {
 		message.WorkflowIdConflictPolicy = enums.WorkflowIdConflictPolicy((*m.WorkflowIDConflictPolicy))
 	}
@@ -309,10 +312,7 @@ func signalWithStartWorkflowRequestFromProto(cfg *commonconverter.SystemNexusCon
 		}
 		out.WorkflowTaskTimeout = converted
 	}
-	{
-		converted := enums.WorkflowIdReusePolicy(int32(proto.GetWorkflowIdReusePolicy()))
-		out.WorkflowIDReusePolicy = &converted
-	}
+	out.WorkflowIDReusePolicy = enums.WorkflowIdReusePolicy(int32(proto.GetWorkflowIdReusePolicy()))
 	{
 		converted := enums.WorkflowIdConflictPolicy(int32(proto.GetWorkflowIdConflictPolicy()))
 		out.WorkflowIDConflictPolicy = &converted
@@ -457,6 +457,7 @@ func userMetadataFromProto(cfg *commonconverter.SystemNexusConfig, proto *sdk.Us
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
+	request = request.withDefaults(ctx)
 	request.Namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
@@ -629,10 +630,6 @@ func SignalWithStartWorkflow(
 	if opts.WorkflowTaskTimeout != 0 {
 		workflowTaskTimeout = &opts.WorkflowTaskTimeout
 	}
-	var workflowIDReusePolicy *enums.WorkflowIdReusePolicy
-	if opts.WorkflowIDReusePolicy != 0 {
-		workflowIDReusePolicy = &opts.WorkflowIDReusePolicy
-	}
 	var workflowIDConflictPolicy *enums.WorkflowIdConflictPolicy
 	if opts.WorkflowIDConflictPolicy != 0 {
 		workflowIDConflictPolicy = &opts.WorkflowIDConflictPolicy
@@ -666,7 +663,7 @@ func SignalWithStartWorkflow(
 		WorkflowExecutionTimeout: workflowExecutionTimeout,
 		WorkflowRunTimeout:       workflowRunTimeout,
 		WorkflowTaskTimeout:      workflowTaskTimeout,
-		WorkflowIDReusePolicy:    workflowIDReusePolicy,
+		WorkflowIDReusePolicy:    opts.WorkflowIDReusePolicy,
 		WorkflowIDConflictPolicy: workflowIDConflictPolicy,
 		RetryPolicy:              opts.RetryPolicy,
 		CronSchedule:             cronSchedule,

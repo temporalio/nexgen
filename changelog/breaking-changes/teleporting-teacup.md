@@ -1,0 +1,1 @@
+`@nexus.default` now accepts target-language expressions on non-option fields instead of language-agnostic enum-case names. Generated operations initialize omitted arguments before calling the SDK; constructors and transfer-type encoding/decoding no longer apply defaults. Companion input types represent incomplete nested values while initialized model fields remain non-nullable.

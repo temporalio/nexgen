@@ -721,66 +721,9 @@ fn validate_authored_field_types(
             field,
             descriptors,
         )?;
-        if let Some(default) = &field_spec.default_value {
-            validate_default_enum_case(
-                message_name,
-                field_name,
-                &default.enum_case,
-                field,
-                descriptors,
-            )?;
-        }
     }
 
     Ok(())
-}
-
-fn validate_default_enum_case(
-    message_name: &str,
-    field_name: &str,
-    case_name: &str,
-    field: &FieldDescriptorProto,
-    descriptors: &DescriptorIndex,
-) -> Result<()> {
-    if field_type(field) != Some(Type::Enum) {
-        return Err(Error::InvalidTypeOverrideField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            property: "default",
-            reason: "defaults are only supported on protobuf enum fields".to_string(),
-        });
-    }
-    let Some(enum_name) = field.type_name.as_deref() else {
-        return Err(Error::InvalidTypeOverrideField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            property: "default",
-            reason: "protobuf enum type is unavailable in the descriptors".to_string(),
-        });
-    };
-    let Some(enumeration) = descriptors.enumeration(enum_name) else {
-        return Err(Error::InvalidTypeOverrideField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            property: "default",
-            reason: "protobuf enum type is unavailable in the descriptors".to_string(),
-        });
-    };
-    let expected = case_name.to_shouty_snake_case();
-    if enumeration.descriptor.value.iter().any(|value| {
-        value
-            .name
-            .as_deref()
-            .is_some_and(|name| name == expected || name.ends_with(&format!("_{expected}")))
-    }) {
-        return Ok(());
-    }
-    Err(Error::InvalidTypeOverrideField {
-        message: message_name.to_string(),
-        field: field_name.to_string(),
-        property: "default",
-        reason: format!("unknown protobuf enum case `{case_name}`"),
-    })
 }
 
 fn validate_invocation_fields(
@@ -1259,7 +1202,7 @@ fn validate_model_required_field(
     Err(Error::UnsupportedRequiredTypeField {
         message: message_name.to_string(),
         field: field_name.to_string(),
-        reason: "field must support presence or be a string/bytes scalar".to_string(),
+        reason: "field must support presence or be a string/bytes scalar or enum".to_string(),
     })
 }
 
@@ -1290,7 +1233,9 @@ fn field_has_presence(field: &FieldDescriptorProto, field_type: Option<Type>) ->
 }
 
 fn field_supports_required_without_presence(field_type: Option<Type>) -> bool {
-    matches!(field_type, Some(Type::String | Type::Bytes))
+    // A proto3 enum always has a declared zero member. Preserve that wire value
+    // on required API enums instead of manufacturing an operation default.
+    matches!(field_type, Some(Type::String | Type::Bytes | Type::Enum))
 }
 
 fn field_label(field: &FieldDescriptorProto) -> Option<Label> {

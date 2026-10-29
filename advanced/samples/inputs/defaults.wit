@@ -1,0 +1,89 @@
+package example:defaults@1.0.0;
+
+world system {
+  export defaults-service;
+}
+
+/// @nexus.endpoint "defaults"
+interface defaults-service {
+  record request {
+    /// @nexus.default python="3" typescript="3" go="3" dotnet="3u"
+    attempts: u32,
+    /// @nexus.default python="True" typescript="true" go="true" dotnet="true"
+    enabled: bool,
+    /// @nexus.default python="1.5" typescript="1.5" go="1.5" dotnet="1.5"
+    ratio: f64,
+    /// @nexus.default
+    ///   python="MyEnum.Standard"
+    ///   typescript="MyEnum.Standard"
+    ///   go="MyEnumStandard"
+    ///   dotnet="MyEnum.Standard"
+    mode: my-enum,
+    /// @nexus.default
+    ///   python="MyFlagsRead | MyFlagsWrite"
+    ///   typescript="MyFlags.Read | MyFlags.Write"
+    ///   go="MyFlagsRead | MyFlagsWrite"
+    ///   dotnet="MyFlags.Read | MyFlags.Write"
+    permissions: my-flags,
+    /// @nexus.default
+    ///   python="_support.workflow_namespace()"
+    ///   typescript="support.workflowNamespace()"
+    ///   go="support.WorkflowNamespace(ctx)"
+    ///   dotnet="TemporalWorkflowContext.WorkflowNamespace()"
+    namespace: string,
+
+    /// @nexus.default python="'alias'" typescript="'alias'" go="\"alias\"" dotnet="\"alias\""
+    alias-label: aliased-string,
+
+    // If retry is not provided, it remains null. If a retry record is provided,
+    // its fields are default-initialized
+    retry: option<record-with-defaults>,
+
+    // This field uses flatten-in-api.
+    // If none of the record's fields are provided, metadata will remain null.
+    // If any one of the fields is provided, the remaining fields will be
+    // default-initialized.
+    metadata: option<flattened-record-with-defaults>,
+  }
+
+  enum my-enum {
+    unspecified,
+    standard,
+    express,
+  }
+
+  flags my-flags {
+    read,
+    write,
+  }
+
+  type aliased-string = string;
+
+  record record-with-defaults {
+    /// @nexus.default python="3" typescript="3" go="3" dotnet="3u"
+    attempts: u32,
+    /// @nexus.default python="'retry'" typescript="'retry'" go="\"retry\"" dotnet="\"retry\""
+    label: aliased-string,
+  }
+
+  /// @nexus.flatten-in-api
+  record flattened-record-with-defaults {
+    /// @nexus.default python="'untitled'" typescript="'untitled'" go="\"untitled\"" dotnet="\"untitled\""
+    summary: string,
+    details: option<string>,
+  }
+
+  record get-sender-request {
+    token: string,
+  }
+
+  resource sender {
+    constructor(token: string);
+    /// @nexus.operation "submit-from-sender"
+    submit: func();
+  }
+
+  submit: func(request: request) -> request;
+  get-sender: func(request: get-sender-request) -> own<sender>;
+  submit-from-sender: func(request: request) -> request;
+}

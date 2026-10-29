@@ -32,9 +32,7 @@ class SignalWithStartWorkflowRequest:
     execution_timeout: datetime.timedelta | None = None
     run_timeout: datetime.timedelta | None = None
     task_timeout: datetime.timedelta | None = None
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = (
-        temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE
-    )
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = None
     retry_policy: temporalio.common.RetryPolicy | None = None
     cron_schedule: str | None = None
@@ -46,6 +44,74 @@ class SignalWithStartWorkflowRequest:
     user_metadata: UserMetadata | None = None
     namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
     headers: collections.abc.Mapping[str, typing.Any] | None = None
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class SignalWithStartWorkflowRequestInput:
+    """Incomplete operation input; defaults are evaluated when the operation runs.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[object]]
+    args: list[typing.Any] | None = None
+    id: str
+    task_queue: str
+    signal: str | collections.abc.Callable[..., None | collections.abc.Awaitable[None]]
+    signal_args: list[typing.Any] | None = None
+    execution_timeout: datetime.timedelta | None = None
+    run_timeout: datetime.timedelta | None = None
+    task_timeout: datetime.timedelta | None = None
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy | None = None
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = None
+    retry_policy: temporalio.common.RetryPolicy | None = None
+    cron_schedule: str | None = None
+    memo: collections.abc.Mapping[str, typing.Any] | None = None
+    search_attributes: temporalio.common.TypedSearchAttributes | None = None
+    priority: temporalio.common.Priority | None = None
+    versioning_override: temporalio.common.VersioningOverride | None = None
+    start_delay: datetime.timedelta | None = None
+    user_metadata: UserMetadata | None = None
+    headers: collections.abc.Mapping[str, typing.Any] | None = None
+
+    def with_defaults(self) -> "SignalWithStartWorkflowRequest":
+        return SignalWithStartWorkflowRequest(
+            workflow=self.workflow,
+            args=self.args,
+            id=self.id,
+            task_queue=self.task_queue,
+            signal=self.signal,
+            signal_args=self.signal_args,
+            execution_timeout=self.execution_timeout,
+            run_timeout=self.run_timeout,
+            task_timeout=self.task_timeout,
+            id_reuse_policy=(
+                (temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE)
+                if self.id_reuse_policy is None
+                else self.id_reuse_policy
+            ),
+            id_conflict_policy=self.id_conflict_policy,
+            retry_policy=self.retry_policy,
+            cron_schedule=self.cron_schedule,
+            memo=self.memo,
+            search_attributes=self.search_attributes,
+            priority=self.priority,
+            versioning_override=self.versioning_override,
+            start_delay=self.start_delay,
+            user_metadata=self.user_metadata,
+            headers=self.headers,
+        )
+
+    @staticmethod
+    def _nexgen_initialize(
+        value: "SignalWithStartWorkflowRequest | SignalWithStartWorkflowRequestInput",
+    ) -> "SignalWithStartWorkflowRequest":
+        return (
+            value.with_defaults()
+            if isinstance(value, SignalWithStartWorkflowRequestInput)
+            else value
+        )
 
 
 class _SignalWithStartWorkflowRequestTransferTypeConverter(
@@ -85,6 +151,9 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
                 "missing required field SignalWithStartWorkflowRequest.signal"
             )
         signal = value.signal_name
+        id_reuse_policy = _support.workflow_id_reuse_policy_from_proto(
+            value.workflow_id_reuse_policy
+        )
         return SignalWithStartWorkflowRequest(
             workflow=workflow,
             args=_support.payloads_from_proto(value.input)
@@ -107,9 +176,7 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
             task_timeout=_support.duration_from_proto(value.workflow_task_timeout)
             if value.HasField("workflow_task_timeout")
             else None,
-            id_reuse_policy=_support.workflow_id_reuse_policy_from_proto(
-                value.workflow_id_reuse_policy
-            ),
+            id_reuse_policy=id_reuse_policy,
             id_conflict_policy=_support.workflow_id_conflict_policy_from_proto(
                 value.workflow_id_conflict_policy
             )

@@ -16,7 +16,7 @@ namespace Nexgen.DotNetExamples.Tests
         public sealed record Value(string Message);
 
         [Fact]
-        public void AuthoredEnumMembersAndDefaultRoundTrip()
+        public void AuthoredEnumsRoundTripWithoutApplyingOperationDefaults()
         {
             var converter = new Alert.TransferTypeConverter();
             foreach (var level in Enum.GetValues<AlertLevel>())
@@ -36,8 +36,9 @@ namespace Nexgen.DotNetExamples.Tests
             var optionalWire = Assert.IsType<WireAlert>(converter.ToTransferType(optional));
             Assert.Equal(Temporalio.Api.Enums.V1.Severity.Unspecified, optionalWire.Severity);
             var defaultWire = Assert.IsType<Temporalio.Api.Namespace.V1.NamespaceInfo>(
-                new NamespaceInfo.TransferTypeConverter().ToTransferType(new NamespaceInfo()));
-            Assert.Equal(Temporalio.Api.Enums.V1.NamespaceState.Registered, defaultWire.State);
+                new NamespaceInfo.TransferTypeConverter().ToTransferType(
+                    new NamespaceInfo(NamespaceState.NamespaceStateUnspecified)));
+            Assert.Equal(Temporalio.Api.Enums.V1.NamespaceState.Unspecified, defaultWire.State);
         }
 
         [Fact]

@@ -363,17 +363,24 @@ namespace Nexgen.ProtoBackedShowcaseService
     [GeneratedCode("nexgen", null)]
     public record NamespaceInfo
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NamespaceInfo"/> class.
+        /// </summary>
+        public NamespaceInfo(NamespaceState state)
+        {
+            State = state;
+        }
+
         public string? Name { get; init; }
         public IReadOnlyDictionary<string, string>? Data { get; init; }
-        public NamespaceState? State { get; init; }
+        public NamespaceState State { get; init; }
 
         internal static NamespaceInfo FromTransferType(Temporalio.Api.Namespace.V1.NamespaceInfo wire)
         {
-            return new NamespaceInfo()
+            return new NamespaceInfo((NamespaceState)wire.State)
             {
                 Name = string.IsNullOrEmpty(wire.Name) ? null : wire.Name,
                 Data = System.Linq.Enumerable.ToDictionary(wire.Data, entry => entry.Key, entry => entry.Value),
-                State = (int)wire.State == 0 ? null : (NamespaceState)wire.State,
             };
         }
 
@@ -388,14 +395,7 @@ namespace Nexgen.ProtoBackedShowcaseService
             {
                 proto.Data.Add(System.Linq.Enumerable.ToDictionary(data, entry => entry.Key, entry => entry.Value));
             }
-            if (State is { } state)
-            {
-                proto.State = (Temporalio.Api.Enums.V1.NamespaceState)state;
-            }
-            else
-            {
-                proto.State = (Temporalio.Api.Enums.V1.NamespaceState)1;
-            }
+            proto.State = (Temporalio.Api.Enums.V1.NamespaceState)State;
             return proto;
         }
 
@@ -608,6 +608,48 @@ namespace Nexgen.ProtoBackedShowcaseService
             public object? FromTransferType(object? transferType) => transferType is null ? null : WorkflowExecutionInfo.FromTransferType((Temporalio.Api.Workflow.V1.WorkflowExecutionInfo)transferType);
         }
 
+    }
+
+    /// <summary>
+    /// Operation input with omittable defaulted fields. Defaults are evaluated when preparing an outbound request.
+    /// </summary>
+    public sealed class NamespaceInfoInput
+    {
+        /// <summary>
+        /// Initializes input values without evaluating defaults.
+        /// </summary>
+        public NamespaceInfoInput()
+        {
+        }
+        /// <summary>
+        /// Copies a complete model without evaluating defaults.
+        /// </summary>
+        public NamespaceInfoInput(NamespaceInfo value)
+        {
+            Name = value.Name;
+            Data = value.Data;
+            State = value.State;
+        }
+        /// <summary>
+        /// Gets or sets the operation input value.
+        /// </summary>
+        public string? Name { get; set; }
+        /// <summary>
+        /// Gets or sets the operation input value.
+        /// </summary>
+        public IReadOnlyDictionary<string, string>? Data { get; set; }
+        /// <summary>
+        /// Gets or sets the operation input value.
+        /// </summary>
+        public NamespaceState? State { get; set; }
+    }
+
+    internal static class NexgenDefaultInitializers
+    {
+        internal static NamespaceInfo WithNexgenDefaults(this NamespaceInfoInput value)
+        {
+            return new NamespaceInfo(((value.State) ?? (NamespaceState.NamespaceStateRegistered))) { Name = value.Name, Data = value.Data };
+        }
     }
 
 }

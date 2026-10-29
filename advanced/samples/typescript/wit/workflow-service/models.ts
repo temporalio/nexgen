@@ -142,7 +142,7 @@ export type SignalWithStartWorkflowRequest<
      * Behavior when a closed workflow with the same ID exists. Default is
      * allow-duplicate.
      */
-    idReusePolicy?: common.WorkflowIdReusePolicy;
+    idReusePolicy: common.WorkflowIdReusePolicy;
     /**
      * Behavior when a workflow is currently running with the same ID. Set to use-existing
      * for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is
@@ -314,10 +314,17 @@ function signalWithStartWorkflowRequestFromProto<
       proto.workflowTaskTimeout == null
         ? undefined
         : support.durationFromProto(proto.workflowTaskTimeout),
-    idReusePolicy:
-      proto.workflowIdReusePolicy == null
-        ? common.WorkflowIdReusePolicy.ALLOW_DUPLICATE
-        : support.workflowIdReusePolicyFromProto(proto.workflowIdReusePolicy),
+    idReusePolicy: requiredField(
+      support.workflowIdReusePolicyFromProto(
+        requiredField(
+          proto.workflowIdReusePolicy ?? undefined,
+          "SignalWithStartWorkflowRequest",
+          "idReusePolicy",
+        ),
+      ),
+      "SignalWithStartWorkflowRequest",
+      "idReusePolicy",
+    ),
     idConflictPolicy:
       proto.workflowIdConflictPolicy == null
         ? undefined
@@ -413,9 +420,11 @@ function signalWithStartWorkflowRequestToProto<
         ? undefined
         : support.durationToProto(model.taskTimeout),
     workflowIdReusePolicy: support.workflowIdReusePolicyToProto(
-      model.idReusePolicy == null
-        ? common.WorkflowIdReusePolicy.ALLOW_DUPLICATE
-        : model.idReusePolicy,
+      requiredField(
+        model.idReusePolicy,
+        "SignalWithStartWorkflowRequest",
+        "idReusePolicy",
+      ),
     ),
     workflowIdConflictPolicy:
       model.idConflictPolicy == null
@@ -494,6 +503,52 @@ export const signalWithStartWorkflowRequestTransferTypeConverter = {
     return signalWithStartWorkflowRequestToProto(value);
   },
 };
+export type SignalWithStartWorkflowRequestInput<
+  WorkflowFn extends (...args: any[]) => Promise<any> = (
+    ...args: any[]
+  ) => Promise<any>,
+  SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
+  SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
+    infer Args extends any[],
+    any
+  >
+    ? Args
+    : never,
+> =
+  SignalWithStartWorkflowRequest<
+    WorkflowFn,
+    SignalValue,
+    SignalArgs
+  > extends infer Input
+    ? Input extends unknown
+      ? Omit<Input, "idReusePolicy"> & {
+          idReusePolicy?: common.WorkflowIdReusePolicy | null;
+        }
+      : never
+    : never;
+
+export function signalWithStartWorkflowRequestWithDefaults<
+  WorkflowFn extends (...args: any[]) => Promise<any> = (
+    ...args: any[]
+  ) => Promise<any>,
+  SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
+  SignalArgs extends any[] = SignalValue extends common.SignalDefinition<
+    infer Args extends any[],
+    any
+  >
+    ? Args
+    : never,
+>(
+  input: SignalWithStartWorkflowRequestInput<WorkflowFn, SignalValue, SignalArgs>,
+): SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs> {
+  const value_idReusePolicy: common.WorkflowIdReusePolicy =
+    input.idReusePolicy ?? common.WorkflowIdReusePolicy.ALLOW_DUPLICATE;
+  return {
+    ...input,
+    idReusePolicy: value_idReusePolicy,
+  } as unknown as SignalWithStartWorkflowRequest<WorkflowFn, SignalValue, SignalArgs>;
+}
+
 /**
  * @experimental This API is experimental and subject to change.
  */

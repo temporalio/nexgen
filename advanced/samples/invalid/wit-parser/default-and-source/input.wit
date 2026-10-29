@@ -1,0 +1,12 @@
+package example:defaults@1.0.0;
+
+world system { export defaults-service; }
+
+interface defaults-service {
+  record request {
+    /// @nexus.default python="'fallback'" typescript="'fallback'" go="\"fallback\"" dotnet="\"fallback\""
+    /// @nexus.source python="namespace()" typescript="namespace()" go="Namespace(ctx)" dotnet="Namespace()"
+    namespace: string,
+  }
+  submit: func(request: request);
+}

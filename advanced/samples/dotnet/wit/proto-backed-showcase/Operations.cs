@@ -295,11 +295,10 @@ namespace Nexgen.ProtoBackedShowcaseService
         [GeneratedCode("nexgen", null)]
         public static Task NamespaceInfoOperationAsync(NamespaceInfoOperationOptions? options = null)
         {
-            var request = new NamespaceInfo()
+            var request = new NamespaceInfo(((options?.State) ?? (NamespaceState.NamespaceStateRegistered)))
             {
                 Name = options?.Name,
                 Data = options?.Data,
-                State = options?.State,
             };
             return NamespaceInfoOperationAsync(request);
         }

@@ -1149,6 +1149,7 @@ pub(in crate::generator) fn render_operation_function_proto(
     render_operation_future_return_type(output, package);
     output.push_str(" {\n");
 
+    crate::generator::go::render_go_request_initialization(output, operation);
     if binding.requires_data_converter() {
         output.push_str("\tdc := ");
         output.push_str(&package.workflow_data_converter());
@@ -1867,7 +1868,6 @@ fn build_field_conversion(
             let conversion =
                 go_value_conversion(value, api_plan, backend, &backend.package, Some("cfg"))?;
             let field_is_pointer = native_go_type.starts_with('*');
-            let default_expr = default_enum_proto_expr(field, backend)?;
             let flattened_type = field
                 .flattened_annotation_override
                 .as_ref()
@@ -1880,7 +1880,6 @@ fn build_field_conversion(
                     &format!("(*{receiver})"),
                     &proto_field,
                     false,
-                    default_expr.as_deref(),
                     "return nil, err",
                 );
                 std::iter::once(format!("if {receiver} != nil {{"))
@@ -1893,7 +1892,6 @@ fn build_field_conversion(
                     &receiver,
                     &proto_field,
                     field_is_pointer,
-                    default_expr.as_deref(),
                     "return nil, err",
                 )
             };
@@ -2013,24 +2011,6 @@ fn render_model_transfer_type_converter(
     output.push_str("\t)\n}\n");
 }
 
-fn default_enum_proto_expr(
-    field: &crate::generator::go::PlannedField,
-    backend: &ModelBackend,
-) -> GoConversionResult<Option<String>> {
-    let Some(default) = &field.default_value else {
-        return Ok(None);
-    };
-    let PlannedFieldKind::Singular(value) = &field.kind else {
-        return Err("a default can only be applied to a singular enum field".to_string());
-    };
-    let enum_value = field
-        .default_enum_value
-        .as_ref()
-        .ok_or_else(|| format!("default enum case `{}` was not resolved", default.enum_case))?;
-    let proto_type = backend.value_proto_type(value)?;
-    Ok(Some(format!("{proto_type}({})", enum_value.number)))
-}
-
 /// `ToProto` lines for a singular field.
 ///
 /// `field_is_pointer` indicates whether the native struct field is rendered as
@@ -2042,7 +2022,6 @@ fn singular_to_proto_lines(
     receiver: &str,
     proto_field: &str,
     field_is_pointer: bool,
-    default_expr: Option<&str>,
     error_return: &str,
 ) -> Vec<String> {
     let assign = |converted: &str| format!("message.{proto_field} = {converted}");
@@ -2098,10 +2077,6 @@ fn singular_to_proto_lines(
                         format!("\t{}", assign(&converted)),
                     ]
                 };
-                if let Some(default_expr) = default_expr {
-                    lines.push("} else {".to_string());
-                    lines.push(format!("\t{}", assign(default_expr)));
-                }
                 lines.push("}".to_string());
                 lines
             } else {

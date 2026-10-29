@@ -134,14 +134,13 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<Temporalio.Workflows.ExternalWorkflowHandle> SignalWithStartWorkflowAsync(string workflow, IReadOnlyCollection<object?>? args, string signal, IReadOnlyCollection<object?>? signalArgs, SignalWithStartWorkflowOptions options)
         {
-            var request = new SignalWithStartWorkflowRequest(workflow, options.Id, options.TaskQueue, signal, Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
+            var request = new SignalWithStartWorkflowRequest(workflow, options.Id, options.TaskQueue, signal, ((options.IdReusePolicy) ?? (Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate)), Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
             {
                 Args = args,
                 SignalArgs = signalArgs,
                 ExecutionTimeout = options.ExecutionTimeout,
                 RunTimeout = options.RunTimeout,
                 TaskTimeout = options.TaskTimeout,
-                IdReusePolicy = options.IdReusePolicy,
                 IdConflictPolicy = options.IdConflictPolicy,
                 RetryPolicy = options.RetryPolicy,
                 CronSchedule = options.CronSchedule,
@@ -168,14 +167,13 @@ namespace Temporalio.Workflows
         public static Task<Temporalio.Workflows.ExternalWorkflowHandle> SignalWithStartWorkflowAsync<TWorkflow, TResult>(Expression<Func<TWorkflow, Task<TResult>>> workflow, string signal, IReadOnlyCollection<object?>? signalArgs, SignalWithStartWorkflowOptions options)
         {
             var (workflowMethod, workflowArgs) = Nexgen.Support.TemporalFunctionNames.ExtractCall(workflow);
-            var request = new SignalWithStartWorkflowRequest(Nexgen.Support.TemporalFunctionNames.WorkflowName(workflowMethod), options.Id, options.TaskQueue, signal, Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
+            var request = new SignalWithStartWorkflowRequest(Nexgen.Support.TemporalFunctionNames.WorkflowName(workflowMethod), options.Id, options.TaskQueue, signal, ((options.IdReusePolicy) ?? (Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate)), Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
             {
                 Args = workflowArgs,
                 SignalArgs = signalArgs,
                 ExecutionTimeout = options.ExecutionTimeout,
                 RunTimeout = options.RunTimeout,
                 TaskTimeout = options.TaskTimeout,
-                IdReusePolicy = options.IdReusePolicy,
                 IdConflictPolicy = options.IdConflictPolicy,
                 RetryPolicy = options.RetryPolicy,
                 CronSchedule = options.CronSchedule,
@@ -202,14 +200,13 @@ namespace Temporalio.Workflows
         public static Task<Temporalio.Workflows.ExternalWorkflowHandle> SignalWithStartWorkflowAsync<TWorkflow>(string workflow, IReadOnlyCollection<object?>? args, Expression<Func<TWorkflow, Task>> signal, SignalWithStartWorkflowOptions options)
         {
             var (signalMethod, signalArgs) = Nexgen.Support.TemporalFunctionNames.ExtractCall(signal);
-            var request = new SignalWithStartWorkflowRequest(workflow, options.Id, options.TaskQueue, Nexgen.Support.TemporalFunctionNames.SignalName(signalMethod), Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
+            var request = new SignalWithStartWorkflowRequest(workflow, options.Id, options.TaskQueue, Nexgen.Support.TemporalFunctionNames.SignalName(signalMethod), ((options.IdReusePolicy) ?? (Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate)), Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
             {
                 Args = args,
                 SignalArgs = signalArgs,
                 ExecutionTimeout = options.ExecutionTimeout,
                 RunTimeout = options.RunTimeout,
                 TaskTimeout = options.TaskTimeout,
-                IdReusePolicy = options.IdReusePolicy,
                 IdConflictPolicy = options.IdConflictPolicy,
                 RetryPolicy = options.RetryPolicy,
                 CronSchedule = options.CronSchedule,
@@ -236,14 +233,13 @@ namespace Temporalio.Workflows
         {
             var (workflowMethod, workflowArgs) = Nexgen.Support.TemporalFunctionNames.ExtractCall(workflow);
             var (signalMethod, signalArgs) = Nexgen.Support.TemporalFunctionNames.ExtractCall(signal);
-            var request = new SignalWithStartWorkflowRequest(Nexgen.Support.TemporalFunctionNames.WorkflowName(workflowMethod), options.Id, options.TaskQueue, Nexgen.Support.TemporalFunctionNames.SignalName(signalMethod), Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
+            var request = new SignalWithStartWorkflowRequest(Nexgen.Support.TemporalFunctionNames.WorkflowName(workflowMethod), options.Id, options.TaskQueue, Nexgen.Support.TemporalFunctionNames.SignalName(signalMethod), ((options.IdReusePolicy) ?? (Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate)), Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace())
             {
                 Args = workflowArgs,
                 SignalArgs = signalArgs,
                 ExecutionTimeout = options.ExecutionTimeout,
                 RunTimeout = options.RunTimeout,
                 TaskTimeout = options.TaskTimeout,
-                IdReusePolicy = options.IdReusePolicy,
                 IdConflictPolicy = options.IdConflictPolicy,
                 RetryPolicy = options.RetryPolicy,
                 CronSchedule = options.CronSchedule,

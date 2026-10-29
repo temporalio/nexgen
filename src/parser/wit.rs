@@ -1245,10 +1245,30 @@ fn build_fields_from_record(
             resolve_record_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
             language,
         );
-        let field_default =
-            build_field_default(resolve, &field.ty, default_directive, path, &field_context)?;
-        let required = !is_optional_type(resolve, &field.ty) && field_default.is_none();
+        let field_default = build_field_default(default_directive, path, &field_context)?;
+        let required = !is_optional_type(resolve, &field.ty);
+        if field_default.is_some() && !required {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: field_context.clone(),
+                directive: "@nexus.default".to_string(),
+                reason: "cannot be used on option<T> fields; use T and omit the operation argument instead".to_string(),
+            });
+        }
         let source = build_source_call(&directives, path, &field_context, language)?;
+        if source.is_some()
+            && field_default
+                .as_ref()
+                .and_then(|default| default.for_language(language))
+                .is_some()
+        {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: field_context.clone(),
+                directive: "@nexus.default".to_string(),
+                reason: "cannot be combined with `@nexus.source` for the same language".to_string(),
+            });
+        }
         if let Some(api_omit_directive) = api_omit_directive {
             if !api_omit_directive.args.is_empty() {
                 return Err(Error::InvalidWitDirective {
@@ -1741,99 +1761,24 @@ pub(crate) fn find_proto_name_for_type_def(
 }
 
 fn build_field_default(
-    resolve: &Resolve,
-    ty: &Type,
     directive: Option<&Directive>,
     path: &Path,
     context: &str,
-) -> Result<Option<FieldDefaultSpec>> {
+) -> Result<Option<LanguageStringSpec>> {
     let Some(directive) = directive else {
         return Ok(None);
     };
-    let Some(case_name) = directive.value("value") else {
+    let expression = directive_language_string(directive);
+    if expression.default.is_some() || expression.by_language.is_empty() {
         return Err(Error::InvalidWitDirective {
             path: path.to_path_buf(),
             context: context.to_string(),
             directive: "@nexus.default".to_string(),
-            reason: "missing required default enum case".to_string(),
-        });
-    };
-    if case_name.is_empty() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.to_string(),
-            directive: "@nexus.default".to_string(),
-            reason: "default enum case cannot be empty".to_string(),
+            reason: "provide target-language expressions, such as python=\"3\" or go=\"3\""
+                .to_string(),
         });
     }
-    validate_default_enum_case(resolve, ty, case_name, path, context)?;
-    Ok(Some(FieldDefaultSpec {
-        enum_case: case_name.to_string(),
-    }))
-}
-
-fn validate_default_enum_case(
-    resolve: &Resolve,
-    ty: &Type,
-    case_name: &str,
-    path: &Path,
-    context: &str,
-) -> Result<()> {
-    match ty {
-        Type::Id(id) => validate_default_enum_case_for_type_def(
-            resolve,
-            *id,
-            &resolve.types[*id],
-            case_name,
-            path,
-            context,
-        ),
-        _ => Err(default_on_non_enum_error(path, context)),
-    }
-}
-
-fn validate_default_enum_case_for_type_def(
-    resolve: &Resolve,
-    type_id: TypeId,
-    type_def: &TypeDef,
-    case_name: &str,
-    path: &Path,
-    context: &str,
-) -> Result<()> {
-    if find_proto_name_for_type_def(type_def, path, context)?.is_some() {
-        return Ok(());
-    }
-    match &type_def.kind {
-        TypeDefKind::Enum(enumeration) => {
-            for case in &enumeration.cases {
-                if case.name == case_name {
-                    return Ok(());
-                }
-            }
-            Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: context.to_string(),
-                directive: "@nexus.default".to_string(),
-                reason: format!(
-                    "unknown enum case `{case_name}` for `{}`",
-                    wit_type_full_name(resolve, type_id)
-                ),
-            })
-        }
-        TypeDefKind::Option(inner) | TypeDefKind::Type(inner) => {
-            validate_default_enum_case(resolve, inner, case_name, path, context)
-        }
-        _ => Err(default_on_non_enum_error(path, context)),
-    }
-}
-
-fn default_on_non_enum_error(path: &Path, context: &str) -> Error {
-    Error::InvalidWitDirective {
-        path: path.to_path_buf(),
-        context: context.to_string(),
-        directive: "@nexus.default".to_string(),
-        reason: "only enum field defaults are supported".to_string(),
-    }
+    Ok(Some(expression))
 }
 
 fn build_source_call(
@@ -3881,7 +3826,7 @@ interface generic-service {
     }
 
     #[test]
-    fn parses_enum_field_defaults() {
+    fn preserves_default_expressions_and_wire_requiredness() {
         let wit = r#"
 package temporal:nexus@1.0.0;
 
@@ -3895,7 +3840,7 @@ interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
     /// @nexus.proto-field "workflow_id_reuse_policy"
-    /// @nexus.default "allow-duplicate"
+    /// @nexus.default python="temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE"
     id-reuse-policy: workflow-id-reuse-policy,
   }
 }
@@ -3907,17 +3852,17 @@ interface workflow-service {
                 "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest",
             )
             .unwrap();
-        assert!(!request.field_required("workflow_id_reuse_policy"));
+        assert!(request.field_required("workflow_id_reuse_policy"));
         assert_eq!(
             request
                 .field_default("workflow_id_reuse_policy")
-                .map(|default| default.enum_case.as_str()),
-            Some("allow-duplicate")
+                .and_then(|default| default.for_language(Language::Python)),
+            Some("temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE")
         );
     }
 
     #[test]
-    fn defers_unknown_proto_enum_field_default_to_authored_validation() {
+    fn leaves_default_expression_names_to_the_target_language() {
         let wit = r#"
 package temporal:nexus@1.0.0;
 
@@ -3931,7 +3876,7 @@ interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
     /// @nexus.proto-field "workflow_id_reuse_policy"
-    /// @nexus.default "missing-case"
+    /// @nexus.default python="Missing.Member"
     id-reuse-policy: workflow-id-reuse-policy,
   }
 }
@@ -3961,7 +3906,7 @@ interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
     /// @nexus.proto-field "workflow_id_reuse_policy"
-    /// @nexus.default "allow-duplicate"
+    /// @nexus.default python="temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE"
     /// @nexus.source go="WorkflowIDReusePolicy(ctx)"
     id-reuse-policy: workflow-id-reuse-policy,
   }
@@ -4004,8 +3949,12 @@ interface workflow-service {
             crate::spec::RecordFieldVisibility::Public
         ));
         assert_eq!(
-            field.default_value.as_ref().unwrap().enum_case,
-            "allow-duplicate"
+            field
+                .default_value
+                .as_ref()
+                .unwrap()
+                .for_language(Language::Python),
+            Some("temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE")
         );
     }
 

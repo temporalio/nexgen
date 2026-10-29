@@ -1464,7 +1464,7 @@ fn field_write_for_rendered_field(
             !matches!(
                 planned_field.field_type,
                 PlannedType::Map(_, _) | PlannedType::List(_)
-            ) && planned_field.default_value.is_none()
+            )
         });
     match converter {
         Some(converter) => function_field_write(

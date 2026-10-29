@@ -2,14 +2,16 @@
 
 import * as workflow from "@temporalio/workflow";
 import { protoBackedShowcaseService } from "../services";
-import type { NamespaceInfo } from "../models";
+import { namespaceInfoWithDefaults } from "../models";
+import type { NamespaceInfoInput } from "../models";
 
 /**
  * @param request - Request for the operation.
  */
 export async function namespaceInfoOperation(
-  request: NamespaceInfo,
+  requestInput: NamespaceInfoInput,
 ): Promise<workflow.NexusOperationHandle<void>> {
+  const request = namespaceInfoWithDefaults(requestInput);
   const client = workflow.createNexusServiceClient({
     service: protoBackedShowcaseService,
     endpoint: "temporal-system",

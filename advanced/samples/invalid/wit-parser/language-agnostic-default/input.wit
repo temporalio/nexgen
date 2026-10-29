@@ -1,8 +1,8 @@
-package test:non-enum-default;
+package temporal:nexus@1.0.0;
 
-world system { export models; }
+world system { export workflow-service; }
 
-interface models {
+interface workflow-service {
   /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
   record request {
     /// @nexus.default "request-id"

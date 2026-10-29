@@ -1,0 +1,11 @@
+package example:defaults@1.0.0;
+
+world system { export defaults-service; }
+
+interface defaults-service {
+  record request {
+    /// @nexus.default python="3" typescript="3" go="3" dotnet="3u"
+    attempts: option<u32>,
+  }
+  submit: func(request: request);
+}

@@ -126,6 +126,10 @@ impl<'a> ApiPlanner<'a> {
             self.external_models
                 .model_uses_support_extensions(model, self.api_plan)
                 || model.sourced_fields().next().is_some()
+                || model
+                    .fields
+                    .values()
+                    .any(|field| super::initialization::default_expression(field).is_some())
         }) && let Some(support_namespace) = self.support_namespace
         {
             imports.push(support_namespace);
@@ -148,6 +152,8 @@ impl<'a> ApiPlanner<'a> {
         for model in models {
             self.render_model(&mut output, model);
         }
+        self.render_default_input_types(&mut output);
+        self.render_default_initializers(&mut output);
         output.push_str(&self.external_model_fragments.body);
         close_namespace(&mut output);
         output
@@ -1731,7 +1737,11 @@ impl<'a> ApiPlanner<'a> {
                 nullable_type(&base)
             };
         }
-        self.field_type(field)
+        if field.api_required() {
+            self.default_input_annotation(field, &self.field_type(field))
+        } else {
+            nullable_type(&self.default_input_annotation(field, &self.field_type(field)))
+        }
     }
 
     fn flattened_nested_parameter_type(
@@ -1744,13 +1754,17 @@ impl<'a> ApiPlanner<'a> {
             .field_flattened_annotation(field_name)
             .and_then(|annotation| annotation.value())
         {
-            if field.required {
+            if field.api_required() {
                 annotation.to_string()
             } else {
                 nullable_type(annotation)
             }
         } else {
-            self.field_type(field)
+            if field.api_required() {
+                self.field_type(field)
+            } else {
+                nullable_type(&self.field_type(field))
+            }
         }
     }
 
@@ -1799,7 +1813,7 @@ impl<'a> ApiPlanner<'a> {
                     option_fields.push((
                         nested_field,
                         field_type,
-                        field.required && nested_field.required,
+                        field.api_required() && nested_field.api_required(),
                     ));
                 }
                 continue;
@@ -1813,7 +1827,7 @@ impl<'a> ApiPlanner<'a> {
                 field,
                 FlattenedFunctionMode::String,
             );
-            option_fields.push((field, field_type, field.required));
+            option_fields.push((field, field_type, field.api_required()));
         }
         let options_type_parameters = self
             .operation_model_parameters(operation)
@@ -1976,7 +1990,7 @@ impl<'a> ApiPlanner<'a> {
                     if nested_field.function.is_none() {
                         continue;
                     }
-                    let nested_required = field.required && nested_field.required;
+                    let nested_required = field.api_required() && nested_field.api_required();
                     render_parameter_separator(output, has_parameters);
                     output.push_str(&self.flattened_nested_parameter_type(
                         nested_model,
@@ -2000,7 +2014,7 @@ impl<'a> ApiPlanner<'a> {
             ));
             output.push(' ');
             output.push_str(&csharp_parameter_name(&field.name));
-            if !field.required {
+            if !field.api_required() {
                 output.push_str(" = null");
             }
             if matches!(
@@ -2009,6 +2023,198 @@ impl<'a> ApiPlanner<'a> {
             ) {
                 self.render_function_args_parameters(output, model, field, has_parameters);
             }
+        }
+    }
+
+    fn render_default_initializers(&self, output: &mut String) {
+        let records = super::initialization::records_with_defaults(self.api_plan);
+        let inputs = super::initialization::records_with_defaults(self.api_plan);
+        if records.is_empty() {
+            return;
+        }
+        output.push_str("internal static class NexgenDefaultInitializers\n{\n");
+        for (_, record) in self.api_plan.records() {
+            if !records.contains(&record.full_name) {
+                continue;
+            }
+            let parameters = self.api_plan.record_type_parameters(&record.full_name);
+            let generic = if parameters.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "<{}>",
+                    parameters
+                        .iter()
+                        .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
+            let name = format!("{}{generic}", csharp_type_name(&record.name));
+            if inputs.contains(&record.full_name) {
+                output.push_str(&format!(
+                    "    internal static {name} WithNexgenDefaults{generic}(this {}Input{generic} value)\n    {{\n",
+                    csharp_type_name(&record.name)
+                ));
+                let fields = record
+                    .model_fields()
+                    .map(|(_, field)| {
+                        let value = format!("value.{}", field_property_name(field));
+                        (
+                            field,
+                            dotnet_operation_value_expr(field, &value, self.api_plan),
+                        )
+                    })
+                    .collect();
+                let sourced = record
+                    .sourced_fields()
+                    .map(|(_, _, expression)| {
+                        dotnet_source_expr(expression, self.support_namespace)
+                    })
+                    .collect();
+                output.push_str(&format!(
+                    "        return {};\n    }}\n",
+                    model_init_expr(&name, fields, sourced, false)
+                ));
+            }
+        }
+        output.push_str("}\n\n");
+    }
+
+    fn default_input_annotation(
+        &self,
+        field: &RecordFieldSpec<PlannedFamily>,
+        annotation: &str,
+    ) -> String {
+        let inputs = super::initialization::records_with_defaults(self.api_plan);
+        let Some(record) = super::initialization::input_record(&field.field_type, &inputs) else {
+            return annotation.to_string();
+        };
+        let name = csharp_type_name(&record.model_name);
+        annotation.replacen(&name, &format!("{name}Input"), 1)
+    }
+
+    fn render_default_input_types(&self, output: &mut String) {
+        let inputs = super::initialization::records_with_defaults(self.api_plan);
+        for (_, record) in self.api_plan.records() {
+            if !inputs.contains(&record.full_name) {
+                continue;
+            }
+            let parameters = self.api_plan.record_type_parameters(&record.full_name);
+            let generic = if parameters.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "<{}>",
+                    parameters
+                        .iter()
+                        .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
+            let name = csharp_type_name(&record.name);
+            render_xml_summary(
+                output,
+                "",
+                Some(
+                    "Operation input with omittable defaulted fields. Defaults are evaluated when preparing an outbound request.",
+                ),
+                record.experimental,
+            );
+            output.push_str(&format!("public sealed class {name}Input{generic}\n{{\n"));
+            let fields = record.model_fields().collect::<Vec<_>>();
+            let required = fields
+                .iter()
+                .filter(|(_, field)| field.api_required())
+                .collect::<Vec<_>>();
+            let field_type = |field_name: &str, field: &RecordFieldSpec<PlannedFamily>| {
+                let base = self.default_input_annotation(
+                    field,
+                    &self.model_field_type(record, field_name, field),
+                );
+                if field.api_required() {
+                    base
+                } else {
+                    nullable_type(&base)
+                }
+            };
+            render_xml_summary(
+                output,
+                "    ",
+                Some("Initializes input values without evaluating defaults."),
+                false,
+            );
+            output.push_str(&format!(
+                "    public {name}Input({})\n    {{\n",
+                required
+                    .iter()
+                    .map(|(field_name, field)| format!(
+                        "{} {}",
+                        field_type(field_name, field),
+                        csharp_parameter_name(&field.name)
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            for (_, field) in &required {
+                output.push_str(&format!(
+                    "        {} = {};\n",
+                    field_property_name(field),
+                    csharp_parameter_name(&field.name)
+                ));
+            }
+            output.push_str("    }\n");
+            render_xml_summary(
+                output,
+                "    ",
+                Some("Copies a complete model without evaluating defaults."),
+                false,
+            );
+            output.push_str(&format!(
+                "    public {name}Input({name}{generic} value)\n    {{\n"
+            ));
+            for (_, field) in &fields {
+                let property = field_property_name(field);
+                let source = format!("value.{property}");
+                let value =
+                    if super::initialization::input_record(&field.field_type, &inputs).is_some() {
+                        let input_type = self.default_input_annotation(
+                            field,
+                            &self.dotnet_value_type(&field.field_type),
+                        );
+                        let input_type = input_type.trim_end_matches('?');
+                        if field.required {
+                            format!("new {input_type}({source})")
+                        } else {
+                            format!("{source} is null ? null : new {input_type}({source})")
+                        }
+                    } else {
+                        source
+                    };
+                output.push_str(&format!("        {property} = {value};\n"));
+            }
+            output.push_str("    }\n");
+            for (field_name, field) in fields {
+                render_xml_summary(
+                    output,
+                    "    ",
+                    Some(
+                        field
+                            .doc
+                            .as_ref()
+                            .and_then(dotnet_doc)
+                            .unwrap_or("Gets or sets the operation input value."),
+                    ),
+                    false,
+                );
+                output.push_str(&format!(
+                    "    public {} {} {{ get; set; }}\n",
+                    field_type(field_name, field),
+                    field_property_name(field)
+                ));
+            }
+            output.push_str("}\n\n");
         }
     }
 
@@ -2037,6 +2243,33 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&csharp_parameter_name(&arg_field.name));
         }
     }
+}
+
+fn dotnet_input_default_expr(field: &RecordFieldSpec<PlannedFamily>, value: &str) -> String {
+    if field.required
+        && let Some(default) = super::initialization::default_expression(field)
+    {
+        format!("(({value}) ?? ({default}))")
+    } else {
+        value.to_string()
+    }
+}
+
+fn dotnet_operation_value_expr(
+    field: &RecordFieldSpec<PlannedFamily>,
+    value: &str,
+    spec: &PlannedSpec,
+) -> String {
+    let inputs = super::initialization::records_with_defaults(spec);
+    let value = if super::initialization::input_record(&field.field_type, &inputs).is_some() {
+        format!(
+            "({value}){}.WithNexgenDefaults()",
+            if field.api_required() { "" } else { "?" }
+        )
+    } else {
+        value.to_string()
+    };
+    dotnet_input_default_expr(field, &value)
 }
 
 #[derive(Debug, Default)]
@@ -3158,19 +3391,21 @@ fn render_flattened_method_body(
     let field_exprs = model
         .public_fields()
         .map(|(field_name, field)| {
-            (
+            let value = flattened_request_field_expr(
                 field_name,
                 field,
-                flattened_request_field_expr(
-                    field_name,
-                    field,
-                    model,
-                    api_plan,
-                    overload,
-                    support_namespace,
-                    options_required,
-                ),
-            )
+                model,
+                api_plan,
+                overload,
+                support_namespace,
+                options_required,
+            );
+            let initialized = if flattened_nested_model(field, api_plan).is_some() {
+                dotnet_input_default_expr(field, &value)
+            } else {
+                dotnet_operation_value_expr(field, &value, api_plan)
+            };
+            (field_name, field, initialized)
         })
         .collect::<Vec<_>>();
     let mut constructor_args = field_exprs
@@ -3361,15 +3596,15 @@ fn model_has_options_fields(model: &PlannedModel, api_plan: &PlannedSpec) -> boo
 fn model_options_required(model: &PlannedModel, api_plan: &PlannedSpec) -> bool {
     model.public_fields().any(|(field_name, field)| {
         if let Some(nested_model) = flattened_nested_model(field, api_plan) {
-            field.required
+            field.api_required()
                 && nested_model
                     .public_fields()
                     .any(|(nested_field_name, nested_field)| {
-                        nested_field.required
+                        nested_field.api_required()
                             && field_is_options_field(nested_model, nested_field_name, nested_field)
                     })
         } else {
-            field.required && field_is_options_field(model, field_name, field)
+            field.api_required() && field_is_options_field(model, field_name, field)
         }
     })
 }
@@ -3410,11 +3645,15 @@ fn nested_model_init_expr(
             .map(|(_, nested_field)| {
                 (
                     nested_field,
-                    option_nested_field_expr(field, nested_field, options_required),
+                    dotnet_input_default_expr(
+                        nested_field,
+                        &option_nested_field_expr(field, nested_field, options_required),
+                    ),
                 )
             })
             .collect(),
         Vec::new(),
+        false,
     );
     if field.required {
         init_expr
@@ -3427,17 +3666,25 @@ fn model_init_expr(
     type_name: &str,
     field_exprs: Vec<(&RecordFieldSpec<PlannedFamily>, String)>,
     sourced_field_exprs: Vec<String>,
+    options_surface: bool,
 ) -> String {
+    let required = |field: &&RecordFieldSpec<PlannedFamily>| {
+        if options_surface {
+            field.api_required()
+        } else {
+            field.required
+        }
+    };
     let constructor_args = field_exprs
         .iter()
-        .filter(|(field, _)| field.required)
+        .filter(|(field, _)| required(field))
         .map(|(_, expr)| expr.as_str())
         .chain(sourced_field_exprs.iter().map(String::as_str))
         .collect::<Vec<_>>()
         .join(", ");
     let assignments = field_exprs
         .iter()
-        .filter(|(field, _)| !field.required)
+        .filter(|(field, _)| !required(field))
         .map(|(field, expr)| format!("{} = {}", field_property_name(field), expr))
         .collect::<Vec<_>>()
         .join(", ");
@@ -3451,7 +3698,7 @@ fn model_init_expr(
 }
 
 fn option_field_expr(field: &RecordFieldSpec<PlannedFamily>, options_required: bool) -> String {
-    if options_required || field.required {
+    if options_required || field.api_required() {
         format!("options.{}", field_property_name(field))
     } else {
         format!("options?.{}", field_property_name(field))
@@ -3463,7 +3710,7 @@ fn option_nested_field_expr(
     nested_field: &RecordFieldSpec<PlannedFamily>,
     options_required: bool,
 ) -> String {
-    if options_required || (field.required && nested_field.required) {
+    if options_required || (field.api_required() && nested_field.api_required()) {
         format!("options.{}", field_property_name(nested_field))
     } else {
         format!("options?.{}", field_property_name(nested_field))
@@ -3696,6 +3943,19 @@ fn resource_method_request_model_init_expr(
             resource_method_request_value_expr(&field.value, api_plan, support_namespace)?,
         ));
     }
+    let options_surface = matches!(init_kind, ResourceMethodRequestInitKind::OptionsFields);
+    if !options_surface {
+        for (_, field) in model.model_fields() {
+            if field.required
+                && !field_exprs
+                    .iter()
+                    .any(|(provided, _)| provided.name == field.name)
+                && let Some(default) = super::initialization::default_expression(field)
+            {
+                field_exprs.push((field, format!("({default})")));
+            }
+        }
+    }
     let sourced_field_exprs = type_name_override.is_none().then(|| {
         model
             .sourced_fields()
@@ -3706,6 +3966,7 @@ fn resource_method_request_model_init_expr(
         type_name_override.unwrap_or(&csharp_type_name(&model.name)),
         field_exprs,
         sourced_field_exprs.unwrap_or_default(),
+        options_surface,
     ))
 }
 

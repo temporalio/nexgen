@@ -43,14 +43,12 @@ def test_optional_authored_enum_without_default() -> None:
     assert converter.from_transfer_type(wire, Alert) == model
 
 
-def test_authored_enum_default() -> None:
-    model = NamespaceInfo()
-    assert model.state == NamespaceState.NamespaceStateRegistered
+def test_conversion_does_not_apply_operation_defaults() -> None:
+    model = NamespaceInfo(state=NamespaceState.NamespaceStateUnspecified)
     converter = getattr(NamespaceInfo, "__temporal_transfer_type_converter")
-    assert (
-        converter.to_transfer_type(model).state
-        == NamespaceState.NamespaceStateRegistered.value
-    )
+    wire = converter.to_transfer_type(model)
+    assert wire.state == 0
+    assert converter.from_transfer_type(wire, NamespaceInfo).state == model.state
 
 
 @pytest.mark.parametrize("data", [b"", b"\x00\x01\x7f\x80\xff"])

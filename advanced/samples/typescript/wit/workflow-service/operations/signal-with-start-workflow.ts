@@ -4,7 +4,8 @@ import type * as common from "@temporalio/common";
 import * as nexus from "../../../../nexus";
 import * as workflow from "../../../../workflow";
 import { workflowService } from "../services";
-import type { SignalWithStartWorkflowRequest } from "../models";
+import { signalWithStartWorkflowRequestWithDefaults } from "../models";
+import type { SignalWithStartWorkflowRequestInput } from "../models";
 import type { ExternalWorkflowHandle } from "../../../../workflow";
 import * as support from "../../../support/temporal_model_converters";
 
@@ -14,7 +15,7 @@ type SignalWithStartWorkflowInput<
   ) => Promise<any>,
   SignalValue extends common.SignalDefinition<any[]> = common.SignalDefinition<any[]>,
 > =
-  SignalWithStartWorkflowRequest<WorkflowFn, SignalValue> extends infer Input
+  SignalWithStartWorkflowRequestInput<WorkflowFn, SignalValue> extends infer Input
     ? Input extends unknown
       ? Omit<Input, "headers" | "namespace"> & { headers?: never; namespace?: never }
       : never
@@ -35,10 +36,10 @@ export async function signalWithStartWorkflow<
 >(
   requestInput: SignalWithStartWorkflowInput<WorkflowFn, SignalValue>,
 ): Promise<ExternalWorkflowHandle> {
-  const request = {
+  const request = signalWithStartWorkflowRequestWithDefaults({
     ...requestInput,
     namespace: support.workflowNamespace(),
-  } as SignalWithStartWorkflowRequest<WorkflowFn, SignalValue>;
+  } as SignalWithStartWorkflowRequestInput<WorkflowFn, SignalValue>);
   const client = nexus.createNexusServiceClient({
     service: workflowService,
     endpoint: "temporal-system",

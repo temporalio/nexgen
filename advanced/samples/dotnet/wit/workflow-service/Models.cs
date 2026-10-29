@@ -79,12 +79,13 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="SignalWithStartWorkflowRequest"/> class.
         /// </summary>
-        public SignalWithStartWorkflowRequest(string workflow, string id, string taskQueue, string signal, string @namespace)
+        public SignalWithStartWorkflowRequest(string workflow, string id, string taskQueue, string signal, Temporalio.Api.Enums.V1.WorkflowIdReusePolicy idReusePolicy, string @namespace)
         {
             Workflow = workflow;
             Id = id;
             TaskQueue = taskQueue;
             Signal = signal;
+            IdReusePolicy = idReusePolicy;
             Namespace = @namespace;
         }
 
@@ -127,7 +128,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Behavior when a closed workflow with the same ID exists. Default is allow-duplicate.
         /// </summary>
-        public Temporalio.Api.Enums.V1.WorkflowIdReusePolicy? IdReusePolicy { get; init; }
+        public Temporalio.Api.Enums.V1.WorkflowIdReusePolicy IdReusePolicy { get; init; }
         /// <summary>
         /// Behavior when a workflow is currently running with the same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is terminate-if-running. Defaults to use-existing.
         /// </summary>
@@ -175,14 +176,13 @@ namespace Temporalio.Workflows
 
         internal static SignalWithStartWorkflowRequest FromTransferType(Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionRequest wire)
         {
-            return new SignalWithStartWorkflowRequest(Nexgen.Support.ProtoExtensions.FromWorkflowTypeProto(wire.WorkflowType), wire.WorkflowId, Nexgen.Support.ProtoExtensions.FromTaskQueueProto(wire.TaskQueue), wire.SignalName, wire.Namespace)
+            return new SignalWithStartWorkflowRequest(Nexgen.Support.ProtoExtensions.FromWorkflowTypeProto(wire.WorkflowType), wire.WorkflowId, Nexgen.Support.ProtoExtensions.FromTaskQueueProto(wire.TaskQueue), wire.SignalName, wire.WorkflowIdReusePolicy, wire.Namespace)
             {
                 Args = wire.Input == null ? null : Nexgen.Support.ProtoExtensions.FromPayloads(wire.Input),
                 SignalArgs = wire.SignalInput == null ? null : Nexgen.Support.ProtoExtensions.FromPayloads(wire.SignalInput),
                 ExecutionTimeout = wire.WorkflowExecutionTimeout == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.WorkflowExecutionTimeout),
                 RunTimeout = wire.WorkflowRunTimeout == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.WorkflowRunTimeout),
                 TaskTimeout = wire.WorkflowTaskTimeout == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.WorkflowTaskTimeout),
-                IdReusePolicy = (int)wire.WorkflowIdReusePolicy == 0 ? null : wire.WorkflowIdReusePolicy,
                 IdConflictPolicy = (int)wire.WorkflowIdConflictPolicy == 0 ? null : wire.WorkflowIdConflictPolicy,
                 RetryPolicy = wire.RetryPolicy == null ? null : Nexgen.Support.ProtoExtensions.FromRetryPolicyProto(wire.RetryPolicy),
                 CronSchedule = string.IsNullOrEmpty(wire.CronSchedule) ? null : wire.CronSchedule,
@@ -224,14 +224,7 @@ namespace Temporalio.Workflows
             {
                 proto.WorkflowTaskTimeout = taskTimeout.ToProto();
             }
-            if (IdReusePolicy is { } idReusePolicy)
-            {
-                proto.WorkflowIdReusePolicy = idReusePolicy;
-            }
-            else
-            {
-                proto.WorkflowIdReusePolicy = Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate;
-            }
+            proto.WorkflowIdReusePolicy = IdReusePolicy;
             if (IdConflictPolicy is { } idConflictPolicy)
             {
                 proto.WorkflowIdConflictPolicy = idConflictPolicy;
@@ -349,6 +342,138 @@ namespace Temporalio.Workflows
             public object? FromTransferType(object? transferType) => transferType is null ? null : SignalWithStartWorkflowResponse.FromTransferType((Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse)transferType);
         }
 
+    }
+
+    /// <summary>
+    /// Operation input with omittable defaulted fields. Defaults are evaluated when preparing an outbound request.
+    /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
+    public sealed class SignalWithStartWorkflowRequestInput
+    {
+        /// <summary>
+        /// Initializes input values without evaluating defaults.
+        /// </summary>
+        public SignalWithStartWorkflowRequestInput(string workflow, string id, string taskQueue, string signal)
+        {
+            Workflow = workflow;
+            Id = id;
+            TaskQueue = taskQueue;
+            Signal = signal;
+        }
+        /// <summary>
+        /// Copies a complete model without evaluating defaults.
+        /// </summary>
+        public SignalWithStartWorkflowRequestInput(SignalWithStartWorkflowRequest value)
+        {
+            Workflow = value.Workflow;
+            Args = value.Args;
+            Id = value.Id;
+            TaskQueue = value.TaskQueue;
+            Signal = value.Signal;
+            SignalArgs = value.SignalArgs;
+            ExecutionTimeout = value.ExecutionTimeout;
+            RunTimeout = value.RunTimeout;
+            TaskTimeout = value.TaskTimeout;
+            IdReusePolicy = value.IdReusePolicy;
+            IdConflictPolicy = value.IdConflictPolicy;
+            RetryPolicy = value.RetryPolicy;
+            CronSchedule = value.CronSchedule;
+            Memo = value.Memo;
+            SearchAttributes = value.SearchAttributes;
+            Priority = value.Priority;
+            VersioningOverride = value.VersioningOverride;
+            StartDelay = value.StartDelay;
+            UserMetadata = value.UserMetadata;
+            Headers = value.Headers;
+        }
+        /// <summary>
+        /// Workflow type name or workflow expression identifying the workflow to start.
+        /// </summary>
+        public string Workflow { get; set; }
+        /// <summary>
+        /// Arguments for the workflow.
+        /// </summary>
+        public IReadOnlyCollection<object?>? Args { get; set; }
+        /// <summary>
+        /// Unique identifier for the workflow execution. Must be nonempty.
+        /// </summary>
+        public string Id { get; set; }
+        /// <summary>
+        /// Task queue to run the workflow on.
+        /// </summary>
+        public string TaskQueue { get; set; }
+        /// <summary>
+        /// Signal name or signal expression to send with the start request.
+        /// </summary>
+        public string Signal { get; set; }
+        /// <summary>
+        /// Arguments for the signal.
+        /// </summary>
+        public IReadOnlyCollection<object?>? SignalArgs { get; set; }
+        /// <summary>
+        /// Total workflow execution timeout, including retries and continue-as-new. Defaults to unlimited.
+        /// </summary>
+        public System.TimeSpan? ExecutionTimeout { get; set; }
+        /// <summary>
+        /// Timeout of a single workflow run. Defaults to the workflow execution timeout.
+        /// </summary>
+        public System.TimeSpan? RunTimeout { get; set; }
+        /// <summary>
+        /// Timeout of a single workflow task. Defaults to 10 seconds.
+        /// </summary>
+        public System.TimeSpan? TaskTimeout { get; set; }
+        /// <summary>
+        /// Behavior when a closed workflow with the same ID exists. Default is allow-duplicate.
+        /// </summary>
+        public Temporalio.Api.Enums.V1.WorkflowIdReusePolicy? IdReusePolicy { get; set; }
+        /// <summary>
+        /// Behavior when a workflow is currently running with the same ID. Set to use-existing for idempotent deduplication on workflow ID. Cannot be set if id-reuse-policy is terminate-if-running. Defaults to use-existing.
+        /// </summary>
+        public Temporalio.Api.Enums.V1.WorkflowIdConflictPolicy? IdConflictPolicy { get; set; }
+        /// <summary>
+        /// Retry policy for the workflow.
+        /// </summary>
+        public Temporalio.Common.RetryPolicy? RetryPolicy { get; set; }
+        /// <summary>
+        /// Cron schedule for recurring workflow executions. See https://docs.temporal.io/cron-job.
+        /// </summary>
+        public string? CronSchedule { get; set; }
+        /// <summary>
+        /// Memo for the workflow.
+        /// </summary>
+        public IReadOnlyDictionary<string, object?>? Memo { get; set; }
+        /// <summary>
+        /// Typed search attributes for the workflow.
+        /// </summary>
+        public Temporalio.Common.SearchAttributeCollection? SearchAttributes { get; set; }
+        /// <summary>
+        /// Priority of the workflow execution.
+        /// </summary>
+        public Temporalio.Common.Priority? Priority { get; set; }
+        /// <summary>
+        /// Override for workflow versioning behavior.
+        /// </summary>
+        public Temporalio.Common.VersioningOverride? VersioningOverride { get; set; }
+        /// <summary>
+        /// Amount of time to wait before starting the workflow. This does not work with cron-schedule.
+        /// </summary>
+        public System.TimeSpan? StartDelay { get; set; }
+        /// <summary>
+        /// Static metadata for the workflow execution.
+        /// </summary>
+        public UserMetadata? UserMetadata { get; set; }
+        /// <summary>
+        /// Headers for the request.
+        /// </summary>
+        public IReadOnlyDictionary<string, object?>? Headers { get; set; }
+    }
+
+    internal static class NexgenDefaultInitializers
+    {
+        internal static SignalWithStartWorkflowRequest WithNexgenDefaults(this SignalWithStartWorkflowRequestInput value)
+        {
+            return new SignalWithStartWorkflowRequest(value.Workflow, value.Id, value.TaskQueue, value.Signal, ((value.IdReusePolicy) ?? (Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate)), Nexgen.Support.TemporalWorkflowContext.WorkflowNamespace()) { Args = value.Args, SignalArgs = value.SignalArgs, ExecutionTimeout = value.ExecutionTimeout, RunTimeout = value.RunTimeout, TaskTimeout = value.TaskTimeout, IdConflictPolicy = value.IdConflictPolicy, RetryPolicy = value.RetryPolicy, CronSchedule = value.CronSchedule, Memo = value.Memo, SearchAttributes = value.SearchAttributes, Priority = value.Priority, VersioningOverride = value.VersioningOverride, StartDelay = value.StartDelay, UserMetadata = value.UserMetadata, Headers = value.Headers };
+        }
     }
 
 }

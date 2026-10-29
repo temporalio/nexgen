@@ -32,12 +32,16 @@ describe("authored protobuf enum and byte models", () => {
     }
   });
 
-  it("uses the authored enum default", () => {
-    expect(namespaces.toTransferType({}).state).toBe(
-      temporal.api.enums.v1.NamespaceState.NAMESPACE_STATE_REGISTERED,
+  it("does not apply operation defaults during conversion", () => {
+    expect(
+      namespaces.toTransferType({ state: NamespaceState.NamespaceStateUnspecified })
+        .state,
+    ).toBe(temporal.api.enums.v1.NamespaceState.NAMESPACE_STATE_UNSPECIFIED);
+    expect(namespaces.fromTransferType({ state: 0 }).state).toBe(
+      NamespaceState.NamespaceStateUnspecified,
     );
-    expect(namespaces.fromTransferType({}).state).toBe(
-      NamespaceState.NamespaceStateRegistered,
+    expect(() => namespaces.fromTransferType({})).toThrow(
+      "missing required field NamespaceInfo.state",
     );
   });
 

@@ -20,11 +20,18 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
+func (m namespaceInfo) withDefaults(ctx workflow.Context) namespaceInfo {
+	if m.State == 0 {
+		m.State = (NamespaceStateNamespaceStateRegistered)
+	}
+	return m
+}
+
 // --- Datatypes ---
 
 type namespaceInfo struct {
 	Name  *string
-	State *NamespaceState
+	State NamespaceState
 	Data  map[string]string
 }
 
@@ -32,7 +39,7 @@ func (m namespaceInfo) GetName() *string {
 	return m.Name
 }
 
-func (m namespaceInfo) GetState() *NamespaceState {
+func (m namespaceInfo) GetState() NamespaceState {
 	return m.State
 }
 
@@ -45,11 +52,7 @@ func namespaceInfoToProto(m *namespaceInfo) (*namespace.NamespaceInfo, error) {
 	if m.Name != nil {
 		message.Name = (*m.Name)
 	}
-	if m.State != nil {
-		message.State = enums.NamespaceState((*m.State))
-	} else {
-		message.State = enums.NamespaceState(1)
-	}
+	message.State = enums.NamespaceState(m.State)
 	if len(m.Data) > 0 {
 		message.Data = make(map[string]string, len(m.Data))
 		for k, v := range m.Data {
@@ -65,10 +68,7 @@ func namespaceInfoFromProto(proto *namespace.NamespaceInfo, out *namespaceInfo) 
 		converted := proto.GetName()
 		out.Name = &converted
 	}
-	{
-		converted := NamespaceState(int32(proto.GetState()))
-		out.State = &converted
-	}
+	out.State = NamespaceState(int32(proto.GetState()))
 	if len(proto.GetData()) > 0 {
 		out.Data = make(map[string]string, len(proto.GetData()))
 		for k, v := range proto.GetData() {
@@ -208,6 +208,7 @@ func callbackNexusOperation(ctx workflow.Context, request CallbackNexus) workflo
 }
 
 func namespaceInfoOperation(ctx workflow.Context, request namespaceInfo) workflow.Future {
+	request = request.withDefaults(ctx)
 	request.Data = support.NamespaceData(ctx)
 	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
 	fut := c.ExecuteOperation(ctx, "NamespaceInfoOperation", request, workflow.NexusOperationOptions{})
@@ -872,12 +873,8 @@ func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOpt
 	if opts.Name != "" {
 		name = &opts.Name
 	}
-	var state *NamespaceState
-	if opts.State != 0 {
-		state = &opts.State
-	}
 	return namespaceInfoOperation(ctx, namespaceInfo{
 		Name:  name,
-		State: state,
+		State: opts.State,
 	})
 }

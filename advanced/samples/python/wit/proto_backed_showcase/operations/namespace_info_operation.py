@@ -27,11 +27,11 @@ async def namespace_info_operation(
     *,
     name: str | None = None,
     data: dict[str, str] | None = None,
-    state: NamespaceState = NamespaceState.NamespaceStateRegistered,
+    state: NamespaceState | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[None,]:
     request = NamespaceInfo(
         name=name,
         data=data or {},
-        state=state,
+        state=((NamespaceState.NamespaceStateRegistered) if state is None else state),
     )
     return await _namespace_info_operation(request)

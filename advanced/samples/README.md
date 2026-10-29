@@ -28,6 +28,18 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
 
 ## WIT examples
 
+### `defaults`
+
+Operation-scoped defaults for scalars, enums, flags, aliases, and nested
+records, including optional parents, flattening, and resource forwarding. See
+the [behavior guide](defaults.md).
+
+- WIT: [`inputs/defaults.wit`](inputs/defaults.wit)
+- .NET: [`dotnet/wit/defaults/`](dotnet/wit/defaults/)
+- Go: [`go/defaults/`](go/defaults/)
+- Python: [`python/wit/defaults/`](python/wit/defaults/)
+- TypeScript: [`typescript/wit/defaults/`](typescript/wit/defaults/)
+
 ### `function-execution`
 
 - WIT: [`inputs/function-execution.wit`](inputs/function-execution.wit)

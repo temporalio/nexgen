@@ -831,7 +831,8 @@ pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
     pub annotation: Option<F::Text>,
     pub flattened_annotation: Option<F::Text>,
     pub field_type: TypeSpec<F>,
-    pub default_value: Option<FieldDefaultSpec>,
+    /// Target-language expression evaluated only during outbound initialization.
+    pub default_value: Option<F::Text>,
     pub required: bool,
     pub visibility: RecordFieldVisibility,
     pub function: Option<FunctionFieldSpec<F>>,
@@ -1001,7 +1002,7 @@ impl<F: TypeFamily> RecordSpec<F> {
         self.fields.get(field_name).map(|field| &field.field_type)
     }
 
-    pub fn field_default(&self, field_name: &str) -> Option<&FieldDefaultSpec> {
+    pub fn field_default(&self, field_name: &str) -> Option<&F::Text> {
         self.fields
             .get(field_name)
             .and_then(|field| field.default_value.as_ref())
@@ -1077,6 +1078,11 @@ impl<F: TypeFamily> FlagsSpec<F> {
 }
 
 impl<F: TypeFamily> RecordFieldSpec<F> {
+    /// Defaults make operation arguments omittable, not model or wire fields.
+    pub fn api_required(&self) -> bool {
+        self.required && self.default_value.as_ref().is_none_or(TextSpec::is_empty)
+    }
+
     fn map_names_with<G, M>(
         self,
         record_full_name: &str,
@@ -1094,7 +1100,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             annotation: self.annotation.map(|text| map.map_text(text)),
             flattened_annotation: self.flattened_annotation.map(|text| map.map_text(text)),
             field_type: self.field_type.map_names_with(map),
-            default_value: self.default_value,
+            default_value: self.default_value.map(|text| map.map_text(text)),
             required: self.required,
             visibility: self.visibility,
             function: self.function.map(|function| function.map_names_with(map)),
@@ -1475,11 +1481,6 @@ impl<N: AsRef<str>> AsRef<str> for JsonModelSpec<N> {
     fn as_ref(&self) -> &str {
         self.name.as_ref()
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FieldDefaultSpec {
-    pub enum_case: String,
 }
 
 /// A WIT alias marked with `@nexus.type-parameter`.

@@ -1,6 +1,6 @@
 //! Shared rendering of resolved resource-method request plans.
 
-use crate::planning::{RequestPlan, RequestPlanSource};
+use crate::planning::{RequestPlan, RequestPlanField, RequestPlanSource};
 
 pub(crate) fn render_request_plan<FName, FAssign, FConstruct, FResource, FParam>(
     plan: &RequestPlan,
@@ -13,7 +13,7 @@ pub(crate) fn render_request_plan<FName, FAssign, FConstruct, FResource, FParam>
 where
     FName: Fn(&str) -> String + Copy,
     FAssign: Fn(String, String) -> String + Copy,
-    FConstruct: Fn(&str, Vec<String>) -> String + Copy,
+    FConstruct: Fn(&str, Vec<String>, &[RequestPlanField]) -> String + Copy,
     FResource: Fn(&str) -> String + Copy,
     FParam: Fn(&str) -> String + Copy,
 {
@@ -44,7 +44,7 @@ where
                     )
                 })
                 .collect();
-            render_construct(message_name, rendered_fields)
+            render_construct(message_name, rendered_fields, fields)
         }
     }
 }

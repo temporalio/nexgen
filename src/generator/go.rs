@@ -16,7 +16,7 @@ use crate::planning::{
     PlannedResourceMethodResultKind as PlannedResourceMethodResult, PlannedSpec, PlannedType,
 };
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, EnumValueSpec, ExternalTypeSpec, FieldDefaultSpec, FlagsSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec,
     FunctionArgsSpec as GenericFunctionArgsSpec, FunctionFieldSpec as GenericFunctionFieldSpec,
     FunctionResultSpec as GenericFunctionResultSpec, IntSpec, ModulePath, OperationSpec,
     RecordFieldSpec, RecordSpec, SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
@@ -120,8 +120,8 @@ pub(in crate::generator) struct PlannedField {
     annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) flattened_annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) required: bool,
-    pub(in crate::generator) default_value: Option<FieldDefaultSpec>,
-    pub(in crate::generator) default_enum_value: Option<EnumValueSpec>,
+    api_required: bool,
+    default_expression: Option<String>,
     role: PlannedFieldRole,
     pub(in crate::generator) kind: PlannedFieldKind,
 }
@@ -358,8 +358,8 @@ pub(in crate::generator) fn planned_field(
         annotation_override: field.annotation.clone(),
         flattened_annotation_override: field.flattened_annotation.clone(),
         required: field.required,
-        default_value: field.default_value.clone(),
-        default_enum_value: field.data.default_enum_value.clone(),
+        api_required: field.api_required(),
+        default_expression: super::initialization::default_expression(field).map(str::to_string),
         role,
         kind: planned_field_kind(&field.field_type, spec),
     }
@@ -1299,6 +1299,12 @@ impl<'a> ApiPlanner<'a> {
         }
         let model_fragments = self.external_models.render_models()?;
         self.imports.extend(model_fragments.imports);
+        let defaults = render_go_default_initializers(
+            self.api_plan,
+            &self.models,
+            &self.package,
+            &mut self.imports,
+        );
         // The Nexus service definition (operation references) is emitted in
         // both modes, so the `nexus` import is needed whenever a spec has
         // services — not just in NativeApi.
@@ -1348,21 +1354,22 @@ impl<'a> ApiPlanner<'a> {
                 external_imports.push((path.clone(), alias.clone()));
             }
         }
-        if services
-            .iter()
-            .flat_map(|s| &s.operations)
-            .filter_map(|o| o.unpacked_input.as_ref())
-            .flatten()
-            .any(|p| {
-                p.function.as_ref().is_some_and(|f| {
-                    !function_value_is_string(f)
-                        && f.name_extractor.as_ref().is_some_and(|helper| {
-                            self.package
-                                .function_name_extractor(helper)
-                                .starts_with("support.")
-                        })
-                })
-            })
+        if (defaults.contains("support.")
+            || services
+                .iter()
+                .flat_map(|s| &s.operations)
+                .filter_map(|o| o.unpacked_input.as_ref())
+                .flatten()
+                .any(|p| {
+                    p.function.as_ref().is_some_and(|f| {
+                        !function_value_is_string(f)
+                            && f.name_extractor.as_ref().is_some_and(|helper| {
+                                self.package
+                                    .function_name_extractor(helper)
+                                    .starts_with("support.")
+                            })
+                    })
+                }))
             && let Some(path) = &self.package.support_package
             && !external_imports
                 .iter()
@@ -1378,6 +1385,7 @@ impl<'a> ApiPlanner<'a> {
             &self.imports,
             &external_imports,
             &model_fragments.body,
+            &defaults,
             self.external_models
                 .render_operation_references(self.api_plan, &self.package)?
                 .as_deref(),
@@ -1523,14 +1531,14 @@ impl<'a> ApiPlanner<'a> {
                                         self::planned_field(record, name, spec, self.api_plan);
                                     RenderedFlattenedField {
                                         field: field.clone(),
-                                        default_punning_zero: (!field.required)
-                                            .then(|| {
-                                                public_default_punning_zero_for_field(
-                                                    &planned.kind,
-                                                    &field.go_type,
-                                                )
-                                            })
-                                            .flatten(),
+                                        default_punning_zero: public_default_punning_zero_for_field(
+                                            &planned.kind,
+                                            &if field.go_type.starts_with('*') {
+                                                field.go_type.clone()
+                                            } else {
+                                                format!("*{}", field.go_type)
+                                            },
+                                        ),
                                     }
                                 })
                                 .collect(),
@@ -1546,7 +1554,24 @@ impl<'a> ApiPlanner<'a> {
                             )
                         })
                         .flatten();
-                    let public_go_type = if default_punning_zero.is_some() {
+                    let default_input = planned_field.default_expression.clone().filter(|_| {
+                        planned_field.required
+                            && public_default_punning_zero_for_field(
+                                &planned_field.kind,
+                                &format!("*{}", field.go_type),
+                            )
+                            .is_none()
+                            && !go_type_is_nilable(&field.go_type)
+                            && !matches!(
+                                planned_field.kind,
+                                PlannedFieldKind::Singular(
+                                    PlannedValueType::Variant(_) | PlannedValueType::Unknown
+                                )
+                            )
+                    });
+                    let public_go_type = if default_input.is_some() {
+                        format!("*{}", field.go_type)
+                    } else if default_punning_zero.is_some() {
                         field
                             .go_type
                             .strip_prefix('*')
@@ -1566,9 +1591,10 @@ impl<'a> ApiPlanner<'a> {
                         go_type: field.go_type.clone(),
                         public_go_type,
                         default_punning_zero,
+                        default_input,
                         function,
                         function_args,
-                        required: field.required,
+                        required: planned_field.api_required,
                         flattened_fields,
                     })
                 })
@@ -1599,6 +1625,12 @@ impl<'a> ApiPlanner<'a> {
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
             unpacked_input,
             wire_binding: None,
+            initialize_defaults: operation.input.as_ref().is_some_and(|input| {
+                super::initialization::type_has_defaults(
+                    input,
+                    &super::initialization::records_with_defaults(self.api_plan),
+                )
+            }),
         })
     }
 
@@ -2266,6 +2298,7 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// When present, the operation function converts native values to/from
     /// wire values and types the SDK call in terms of the wire messages.
     pub(in crate::generator) wire_binding: Option<proto::OperationBinding>,
+    pub(in crate::generator) initialize_defaults: bool,
 }
 
 /// A single parameter in an unpacked convenience wrapper function signature.
@@ -2286,6 +2319,8 @@ struct RenderedUnpackedParam {
     public_go_type: String,
     /// Public zero value that represents absence, when default-punning applies.
     default_punning_zero: Option<String>,
+    /// A required non-punned value uses a presence-bearing public pointer.
+    default_input: Option<String>,
     /// Function field metadata for required `@nexus.function` fields. Optional
     /// function fields remain string-shaped in generated options structs.
     function: Option<FunctionFieldSpec>,
@@ -3571,6 +3606,7 @@ fn render_file(
     imports: &BTreeSet<String>,
     external_imports: &[(String, String)],
     external_model_body: &str,
+    default_initializers: &str,
     operation_references: Option<&str>,
     enums: &[&RenderedEnum],
     flags: &[&RenderedFlags],
@@ -3638,6 +3674,7 @@ fn render_file(
     }
 
     let body_start = output.len();
+    output.push_str(default_initializers);
     if let Some(operation_references) = operation_references {
         if !operation_references.is_empty() {
             output.push('\n');
@@ -4177,6 +4214,127 @@ fn render_model(
     external_models.render_model_converters(output, key, model);
 }
 
+pub(in crate::generator) fn render_go_request_initialization(
+    output: &mut String,
+    operation: &RenderedOperation<'_>,
+) {
+    if operation.initialize_defaults {
+        output.push_str("\trequest = request.withDefaults(ctx)\n");
+    }
+}
+
+fn render_go_default_initializers(
+    spec: &PlannedSpec,
+    models: &IndexMap<String, RenderedModel>,
+    package: &GoPackageContext,
+    imports: &mut BTreeSet<String>,
+) -> String {
+    let records = super::initialization::records_with_defaults(spec);
+    let mut output = String::new();
+    for (key, model) in models {
+        let Some(record) = record_for_model_key(spec, key) else {
+            continue;
+        };
+        if !records.contains(&record.full_name) {
+            continue;
+        }
+        if !package.is_self_import("go.temporal.io/sdk/workflow") {
+            imports.insert("go.temporal.io/sdk/workflow".to_string());
+        }
+        let (ident, parameters) = split_go_type_decl_name(&model.name);
+        let receiver = if parameters.is_empty() {
+            ident.to_string()
+        } else {
+            let names = parameters
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .split(',')
+                .filter_map(|parameter| parameter.split_whitespace().next())
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{ident}[{names}]")
+        };
+        output.push_str(&format!(
+            "\nfunc (m {receiver}) withDefaults(ctx {}) {receiver} {{\n",
+            package.workflow_context_type()
+        ));
+        for ((name, field), rendered) in record.model_fields().zip(&model.fields) {
+            let destination = format!("m.{}", rendered.name);
+            let kind = planned_field_kind(&field.field_type, spec);
+            if let Some(default) = super::initialization::default_expression(field) {
+                let pointer_scalar =
+                    public_default_punning_zero_for_field(&kind, &rendered.go_type).is_some();
+                let zero = if !field.required
+                    || go_type_is_nilable(&rendered.go_type)
+                    || matches!(
+                        kind,
+                        PlannedFieldKind::Singular(
+                            PlannedValueType::Variant(_) | PlannedValueType::Unknown
+                        )
+                    ) {
+                    Some("nil".to_string())
+                } else {
+                    public_default_punning_zero_for_field(&kind, &format!("*{}", rendered.go_type))
+                };
+                if let Some(zero) = zero {
+                    output.push_str(&format!("\tif {destination} == {zero} {{\n"));
+                    if pointer_scalar {
+                        output.push_str(&format!(
+                            "\t\tvar value {} = ({default})\n\t\t{destination} = &value\n",
+                            rendered.go_type.trim_start_matches('*')
+                        ));
+                    } else {
+                        output.push_str(&format!("\t\t{destination} = ({default})\n"));
+                    }
+                    output.push_str("\t}\n");
+                }
+            }
+            let _ = name;
+            render_go_nested_defaults(
+                &mut output,
+                &field.field_type,
+                &destination,
+                rendered.go_type.starts_with('*'),
+                &records,
+            );
+        }
+        output.push_str("\treturn m\n}\n");
+    }
+    output
+}
+
+fn render_go_nested_defaults(
+    output: &mut String,
+    value_type: &PlannedType,
+    destination: &str,
+    pointer: bool,
+    records: &BTreeSet<String>,
+) {
+    if !super::initialization::type_has_defaults(value_type, records) {
+        return;
+    }
+    match value_type {
+        PlannedType::Record(_) => {
+            if pointer {
+                output.push_str(&format!(
+                    "\tif {destination} != nil {{\n\t\tvalue := {destination}.withDefaults(ctx)\n\t\t{destination} = &value\n\t}}\n"
+                ));
+            } else {
+                output.push_str(&format!(
+                    "\t{destination} = {destination}.withDefaults(ctx)\n"
+                ));
+            }
+        }
+        PlannedType::Option(inner) => {
+            render_go_nested_defaults(output, inner, destination, true, records)
+        }
+        PlannedType::External(ExternalTypeSpec::Alias(alias)) => {
+            render_go_nested_defaults(output, &alias.target, destination, pointer, records)
+        }
+        _ => {}
+    }
+}
+
 fn model_getter_name(field: &RenderedField) -> String {
     format!("Get{}", field.name)
 }
@@ -4562,6 +4720,7 @@ fn render_resource_methods(
                         go_type: "string".to_string(),
                         public_go_type: "any".to_string(),
                         default_punning_zero: None,
+                        default_input: None,
                         function: primary.function.clone(),
                         function_args: None,
                         required: true,
@@ -4620,12 +4779,51 @@ fn render_resource_methods(
                     request_plan,
                     go_field_name,
                     |name, value| format!("{name}: {value}"),
-                    |msg_name, fields| {
+                    |msg_name, mut fields, supplied| {
                         // Look up the rendered model name; fall back to
                         // deriving it from the message name.
                         let type_name = record_for_model_key(api_plan, msg_name)
                             .map(|m| visibility.adjusted_model_name(record_message_key(m), &m.name))
                             .unwrap_or_else(|| message_model_name(msg_name));
+                        if let Some(record) = record_for_model_key(api_plan, msg_name) {
+                            for (_, field) in record.model_fields() {
+                                if !field.required
+                                    || supplied.iter().any(|provided| {
+                                        go_field_name(&provided.field_name)
+                                            == go_field_name(&field.name)
+                                    })
+                                {
+                                    continue;
+                                }
+                                let Some(default) =
+                                    super::initialization::default_expression(field)
+                                else {
+                                    continue;
+                                };
+                                let kind = planned_field_kind(&field.field_type, api_plan);
+                                let native_type =
+                                    resolve_resource_field_kind(&kind, false, package);
+                                if public_default_punning_zero_for_field(
+                                    &kind,
+                                    &format!("*{native_type}"),
+                                )
+                                .is_none()
+                                    && !go_type_is_nilable(&native_type)
+                                    && !matches!(
+                                        kind,
+                                        PlannedFieldKind::Singular(
+                                            PlannedValueType::Variant(_)
+                                                | PlannedValueType::Unknown
+                                        )
+                                    )
+                                {
+                                    fields.push(format!(
+                                        "{}: ({default})",
+                                        go_field_name(&field.name)
+                                    ));
+                                }
+                            }
+                        }
                         if fields.is_empty() {
                             format!("{type_name}{{}}")
                         } else {
@@ -4801,6 +4999,7 @@ fn render_operation_function(
     output.push_str(") ");
     render_operation_future_return_type(output, package);
     output.push_str(" {\n");
+    render_go_request_initialization(output, operation);
     let endpoint = service
         .endpoint
         .as_deref()
@@ -5480,7 +5679,10 @@ fn render_convenience_wrapper(
             output.push_str(&function_name_local_var_for_params(param, params));
         } else if param.function_args.is_some() {
             output.push_str(&param.param_name);
-        } else if param.default_punning_zero.is_some() || param.flattened_fields.is_some() {
+        } else if param.default_punning_zero.is_some()
+            || param.flattened_fields.is_some()
+            || param.default_input.is_some()
+        {
             output.push_str(&param.param_name);
         } else {
             output.push_str("opts.");
@@ -5554,6 +5756,13 @@ fn render_public_input_locals(output: &mut String, params: &[RenderedUnpackedPar
         .iter()
         .filter(|param| param_belongs_in_options(param))
     {
+        if let Some(default) = &param.default_input {
+            output.push_str(&format!(
+                "\tvar {} {}\n\tif opts.{} == nil {{\n\t\t{} = ({default})\n\t}} else {{\n\t\t{} = *opts.{}\n\t}}\n",
+                param.param_name, param.go_type, param.field_name,
+                param.param_name, param.param_name, param.field_name,
+            ));
+        }
         if let Some(fields) = &param.flattened_fields {
             output.push_str(&format!("\tvar {} {}\n", param.param_name, param.go_type));
             let conditions = fields
@@ -5574,10 +5783,15 @@ fn render_public_input_locals(output: &mut String, params: &[RenderedUnpackedPar
                 let field = &flattened.field;
                 if flattened.default_punning_zero.is_some() {
                     output.push_str(&format!(
-                        "\t\tif {} {{\n\t\t\t{}.{} = &opts.{}\n\t\t}}\n",
+                        "\t\tif {} {{\n\t\t\t{}.{} = {}opts.{}\n\t\t}}\n",
                         flattened.presence_condition(),
                         param.param_name,
                         field.name,
+                        if field.go_type.starts_with('*') {
+                            "&"
+                        } else {
+                            ""
+                        },
                         field.name
                     ));
                 } else {

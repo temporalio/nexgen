@@ -532,6 +532,9 @@ fn synthesize_request_plan(
                 && let Some(value) =
                     synthesize_request_plan(spec, descriptors, child_message_name, environment)?
             {
+                if !field.required && !request_plan_has_source(&value) {
+                    continue;
+                }
                 fields.push(RequestPlanField {
                     field_name: field.api_name,
                     value,
@@ -574,6 +577,9 @@ fn synthesize_record_request_plan(
             && let Some(value) =
                 synthesize_request_plan(spec, descriptors, child_message_name, environment)?
         {
+            if !field.required && !request_plan_has_source(&value) {
+                continue;
+            }
             fields.push(RequestPlanField {
                 field_name: field.api_name,
                 value,
@@ -585,6 +591,9 @@ fn synthesize_record_request_plan(
             && let Some(value) =
                 synthesize_record_request_plan(spec, descriptors, child_record_name, environment)?
         {
+            if !field.required && !request_plan_has_source(&value) {
+                continue;
+            }
             fields.push(RequestPlanField {
                 field_name: field.api_name,
                 value,
@@ -601,6 +610,15 @@ fn synthesize_record_request_plan(
         message_name: record_name.to_string(),
         fields,
     }))
+}
+
+fn request_plan_has_source(plan: &RequestPlan) -> bool {
+    match plan {
+        RequestPlan::Source(_) => true,
+        RequestPlan::Construct { fields, .. } => fields
+            .iter()
+            .any(|field| request_plan_has_source(&field.value)),
+    }
 }
 
 fn visible_message_fields(
@@ -689,7 +707,7 @@ fn build_record_field_info(
     spec: &ApiSpec<SelectedFamily>,
 ) -> Result<MessageFieldInfo> {
     let api_name = field.name.clone();
-    let required = field.required;
+    let required = field.api_required();
     let hidden = matches!(field.visibility, RecordFieldVisibility::Sourced { .. });
     let message_name = api_field_message_name(&field.field_type, spec);
     Ok(MessageFieldInfo {
@@ -729,7 +747,12 @@ fn build_message_field_info(
         .and_then(|record| record.field_name_override(proto_name))
         .map(str::to_string)
         .unwrap_or_else(|| proto_name.to_kebab_case());
-    let required = record.is_some_and(|record| record.field_required(proto_name));
+    let required = record.is_some_and(|record| {
+        record
+            .fields
+            .get(proto_name)
+            .is_some_and(|field| field.api_required())
+    });
     let hidden = record.is_some_and(|record| {
         record.field_omitted(proto_name) || record.field_source(proto_name).is_some()
     });

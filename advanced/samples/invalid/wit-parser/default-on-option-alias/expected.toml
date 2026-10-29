@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit-directive"
+contains = ["@nexus.default", "attempts", "cannot be used on option<T> fields", "use T"]

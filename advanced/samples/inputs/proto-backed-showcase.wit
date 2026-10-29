@@ -161,7 +161,11 @@ interface proto-backed-showcase-service {
     name: option<string>,
     /// @nexus.source go="NamespaceData(ctx)"
     data: option<map<string, string>>,
-    /// @nexus.default "namespace-state-registered"
+    /// @nexus.default
+    ///   python="NamespaceState.NamespaceStateRegistered"
+    ///   typescript="NamespaceState.NamespaceStateRegistered"
+    ///   go="NamespaceStateNamespaceStateRegistered"
+    ///   dotnet="NamespaceState.NamespaceStateRegistered"
     state: namespace-state,
     /// @nexus.omit
     description: placeholder,
