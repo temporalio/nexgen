@@ -72,8 +72,12 @@ impl CompilerPass<ResourceBoundFamily, OperationBoundFamily> for OperationBindin
                 let output_resource_return = resolved
                     .and_then(|returns| returns.get(&operation.name))
                     .cloned();
+                // A language with no transform expression returns the handle.
+                let transforms = operation
+                    .output_transform()
+                    .is_some_and(|transform| transform.transform.value().is_some());
                 operation.data = OperationBoundOperation {
-                    direct_return: operation.output_transform().is_some()
+                    direct_return: transforms
                         || output_resource_return.is_some()
                         || matches!(
                             operation.output_type(),

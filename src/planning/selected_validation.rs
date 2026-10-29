@@ -268,6 +268,67 @@ fn validate_flattened_field_names(
             }
         }
     }
+    let flattened_list = |value: &TypeSpec<SelectedFamily>| {
+        let TypeSpec::List(item) = value.without_option() else {
+            return None;
+        };
+        let TypeSpec::Record(record) = item.as_ref() else {
+            return None;
+        };
+        let record = spec
+            .record(record.as_str())
+            .filter(|record| record.flatten_in_api)?;
+        let fields = record
+            .fields
+            .values()
+            .filter(|field| !matches!(field.origin, Some(FieldOrigin::Omitted)))
+            .count();
+        // TypeScript sends a record with no proto as it is, so only a proto converter can wrap.
+        let reason = if fields != 1 {
+            format!(
+                "which flattens with {fields} fields. A list flattens a record with one field only"
+            )
+        } else if record.source.is_none() {
+            "which flattens with no `@nexus.proto`. A list flattens a proto-backed record only"
+                .to_string()
+        } else {
+            return None;
+        };
+        Some((record.full_name.clone(), reason))
+    };
+    let lists = spec
+        .records()
+        .flat_map(|(_, record)| {
+            record.fields.iter().map(move |(field_name, field)| {
+                (
+                    format!("record `{}` field `{field_name}`", record.full_name),
+                    &field.field_type,
+                )
+            })
+        })
+        .chain(spec.services.iter().flat_map(|service| {
+            service.resources.iter().flat_map(|resource| {
+                resource.methods.iter().flat_map(move |method| {
+                    method.params.iter().map(move |param| {
+                        (
+                            format!(
+                                "resource `{}` method `{}` parameter `{}`",
+                                resource.name, method.name, param.name
+                            ),
+                            &param.field_type,
+                        )
+                    })
+                })
+            })
+        }));
+    for (context, value) in lists {
+        if let Some((record, reason)) = flattened_list(value) {
+            return Err(invalid(format!(
+                "{context} is a list of `{record}`, {reason}"
+            )));
+        }
+    }
+
     Ok(())
 }
 

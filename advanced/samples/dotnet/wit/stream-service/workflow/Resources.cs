@@ -25,7 +25,7 @@ namespace Temporalio.Workflows
         public bool? Created { get; }
 
         [GeneratedCode("nexgen", null)]
-        public Task<AppendRecordsResponse> PublishAsync(IReadOnlyList<AppendRecord<TBody>> records)
+        public Task<AppendRecordsResponse> PublishAsync(IReadOnlyList<TBody> records)
         {
             var request = new AppendRecordsOptions<TBody>(Ref, records);
             return Operations.AppendRecordsAsync(request);

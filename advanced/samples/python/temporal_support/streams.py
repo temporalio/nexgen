@@ -44,3 +44,8 @@ def request_id() -> str:
     if temporalio.workflow.in_workflow():
         return str(temporalio.workflow.uuid4())
     return str(uuid.uuid4())
+
+
+def last_offset(response: typing.Any) -> int:
+    """The offset of the last Record that an append wrote, or 0 for none."""
+    return response.last_offset or 0

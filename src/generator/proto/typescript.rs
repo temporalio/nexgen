@@ -17,7 +17,7 @@ use crate::generator::typescript::{
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
-    PlannedWireFieldBinding, relative_descriptor_name,
+    PlannedWireFieldBinding, flattened_list_field, relative_descriptor_name,
 };
 use crate::spec::{EnumSpec, ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
 
@@ -249,6 +249,21 @@ fn nested_generic_expressions(
         }
     };
     Some(match &field.field_type {
+        // The model holds the values of a flattened record, and the converter wraps each one.
+        PlannedType::List(item) if let Some((_, value)) = flattened_list_field(api_plan, item) => {
+            let conversion = resolved.wire_conversion.as_ref()?;
+            let value = typescript_generated_field_name(&value.name);
+            (
+                collection(format!(
+                    "{wire}?.map((value: any) => {}.{value})",
+                    conversion.from_wire_expr("value")
+                )),
+                collection(format!(
+                    "model.{name}?.map((value) => {})",
+                    conversion.to_wire_expr(&format!("{{ {value}: value }}"))
+                )),
+            )
+        }
         PlannedType::List(_) => (
             collection(repeated_from_wire_expr(&resolved, wire)),
             collection(repeated_to_wire_expr(&resolved, name)),

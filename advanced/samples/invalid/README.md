@@ -31,7 +31,7 @@ Categories group the compiler rule, not merely the input format or target:
 - `proto/`: protobuf binding compatibility and defaults.
 - `type-parameters/`: shared generic-type restrictions.
 - `resources/`: resource methods and operation bindings.
-- `flatten/`: a `@nexus.flatten-in-api` on a field.
+- `flatten/`: `@nexus.flatten-in-api`.
 - `name-collisions/`: conflicts caused by emitted names, including
   target-specific naming transformations.
 - `system-nexus/`: cases requiring system-Nexus mode, grouped further by

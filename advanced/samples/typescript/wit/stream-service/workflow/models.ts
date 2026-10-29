@@ -302,7 +302,7 @@ export const appendRecordsResponseTransferTypeConverter = {
 };
 export interface AppendRecordsRequest<BodyT> {
   ref: StreamRef;
-  records: AppendRecord<BodyT>[];
+  records: BodyT[];
   /**
    * The batch number in this epoch. Empty takes the next one, and a retry writes it
    * again.
@@ -327,8 +327,8 @@ function appendRecordsRequestFromProto<BodyT>(
   return {
     ref: streamRefFromProto(requiredField(proto.ref, "AppendRecordsRequest", "ref")),
     records: requiredField(
-      proto.records?.map((value: any) =>
-        appendRecordFromProto(value, { bodyT: typeInfo.bodyT }),
+      proto.records?.map(
+        (value: any) => appendRecordFromProto(value, { bodyT: typeInfo.bodyT }).body,
       ),
       "AppendRecordsRequest",
       "records",
@@ -349,7 +349,7 @@ function appendRecordsRequestToProto<BodyT>(
     ref: streamRefToProto(requiredField(model.ref, "AppendRecordsRequest", "ref")),
     records: requiredField(
       model.records?.map((value) =>
-        appendRecordToProto(value, { bodyT: typeInfo.bodyT }),
+        appendRecordToProto({ body: value }, { bodyT: typeInfo.bodyT }),
       ),
       "AppendRecordsRequest",
       "records",
