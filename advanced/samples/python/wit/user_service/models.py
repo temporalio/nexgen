@@ -23,3 +23,22 @@ class NotifyRequest:
     channels: list[str] | None = dataclasses.field(default_factory=list)
     sender: str
     attempt: int | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class UpdateProfileRequest:
+    user_id: str
+    address: Address
+    preferences: ContactPreferences | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class Address:
+    city: str
+    postal_code: str | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class ContactPreferences:
+    locale: str | None = None
+    timezone: str | None = None

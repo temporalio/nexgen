@@ -71,6 +71,14 @@ class UserServiceHandler:
     ) -> None:
         self.calls.append(("Notify", input))
 
+    @sync_operation
+    async def update_profile(
+        self,
+        _ctx: StartOperationContext,
+        input: user_service_models.UpdateProfileRequest,
+    ) -> None:
+        self.calls.append(("UpdateProfile", input))
+
 
 @workflow.defn
 class UserServiceCallerWorkflow:
@@ -143,3 +151,62 @@ async def test_get_user_returns_user_resource(env: WorkflowEnvironment) -> None:
     assert isinstance(update_request, user_service_models.UpdateEmailRequest)
     assert update_request.user_id == "user-123"
     assert update_request.email == "new@example.com"
+
+
+@workflow.defn
+class UpdateProfileWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        service = user_service.UserServiceClient("user-service")
+        await (
+            await service.update_profile(user_id="user-123", city="Berlin", locale="de")
+        )
+        await (
+            await service.update_profile(
+                user_id="user-123", city="Oslo", postal_code="0150"
+            )
+        )
+
+
+async def test_update_profile_builds_its_flattened_records(
+    env: WorkflowEnvironment,
+) -> None:
+    task_queue = str(uuid.uuid4())
+    service_handler = UserServiceHandler()
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        workflows=[UpdateProfileWorkflow],
+        nexus_service_handlers=[service_handler],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        endpoint = await env.create_nexus_endpoint("user-service", task_queue)
+        try:
+            await env.client.execute_workflow(
+                UpdateProfileWorkflow.run,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue,
+            )
+        finally:
+            await env.delete_nexus_endpoint(endpoint)
+
+    # The optional record stays unset when none of its parameters is given.
+    assert service_handler.calls == [
+        (
+            "UpdateProfile",
+            user_service_models.UpdateProfileRequest(
+                user_id="user-123",
+                address=user_service_models.Address(city="Berlin"),
+                preferences=user_service_models.ContactPreferences(locale="de"),
+            ),
+        ),
+        (
+            "UpdateProfile",
+            user_service_models.UpdateProfileRequest(
+                user_id="user-123",
+                address=user_service_models.Address(city="Oslo", postal_code="0150"),
+                preferences=None,
+            ),
+        ),
+    ]

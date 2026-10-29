@@ -7,9 +7,12 @@ import typing
 import temporalio.workflow
 
 from .models import (
+    Address,
+    ContactPreferences,
     GetUserRequest,
     NotifyRequest,
     UpdateEmailRequest,
+    UpdateProfileRequest,
 )
 from ._resources.user import (
     User,
@@ -36,6 +39,11 @@ class UserService:
         NotifyRequest,
         None,
     ] = Operation(name="Notify")
+
+    update_profile: Operation[
+        UpdateProfileRequest,
+        None,
+    ] = Operation(name="UpdateProfile")
 
 
 class UserServiceClient:
@@ -97,5 +105,36 @@ class UserServiceClient:
         )
         return await self._nexus_client.start_operation(
             operation="Notify",
+            input=request,
+        )
+
+    async def update_profile(
+        self,
+        *,
+        user_id: str,
+        city: str,
+        postal_code: str | None = None,
+        locale: str | None = None,
+        timezone: str | None = None,
+    ) -> temporalio.workflow.NexusOperationHandle[None]:
+        address = Address(
+            city=city,
+            postal_code=postal_code,
+        )
+        preferences = (
+            None
+            if locale is None and timezone is None
+            else ContactPreferences(
+                locale=locale,
+                timezone=timezone,
+            )
+        )
+        request = UpdateProfileRequest(
+            user_id=user_id,
+            address=address,
+            preferences=preferences,
+        )
+        return await self._nexus_client.start_operation(
+            operation="UpdateProfile",
             input=request,
         )
