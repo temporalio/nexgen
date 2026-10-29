@@ -220,10 +220,12 @@ function taskQueuePartitionsFromProto(
       taskQueuePartitionFromProto(value),
     ),
     activityTaskQueuePartitions: requiredField(
-      proto.activityTaskQueuePartitions,
+      proto.activityTaskQueuePartitions?.map((value: any) =>
+        taskQueuePartitionFromProto(value),
+      ),
       "TaskQueuePartitions",
       "activityTaskQueuePartitions",
-    )?.map((value: any) => taskQueuePartitionFromProto(value)),
+    ),
   };
 }
 
@@ -235,10 +237,12 @@ function taskQueuePartitionsToProto(
       taskQueuePartitionToProto(value),
     ),
     activityTaskQueuePartitions: requiredField(
-      model.activityTaskQueuePartitions,
+      model.activityTaskQueuePartitions?.map((value) =>
+        taskQueuePartitionToProto(value),
+      ),
       "TaskQueuePartitions",
       "activityTaskQueuePartitions",
-    )?.map((value) => taskQueuePartitionToProto(value)),
+    ),
   };
 }
 
@@ -467,17 +471,17 @@ function callbackNexusFromProto(
       "CallbackNexus",
       "url",
     ),
-    header:
-      requiredField(proto.header, "CallbackNexus", "header") == null
+    header: requiredField(
+      proto.header == null
         ? undefined
         : (Object.fromEntries(
-            Object.entries(
-              requiredField(proto.header, "CallbackNexus", "header") as Record<
-                string,
-                any
-              >,
-            ).map(([key, value]: [string, any]) => [key, value as string]),
+            Object.entries(proto.header as Record<string, any>).map(
+              ([key, value]: [string, any]) => [key, value as string],
+            ),
           ) as Record<string, string>),
+      "CallbackNexus",
+      "header",
+    ),
   };
 }
 
@@ -486,17 +490,17 @@ function callbackNexusToProto(
 ): temporal.api.common.v1.Callback.INexus {
   return {
     url: requiredField(model.url, "CallbackNexus", "url"),
-    header:
-      requiredField(model.header, "CallbackNexus", "header") == null
+    header: requiredField(
+      model.header == null
         ? undefined
         : Object.fromEntries(
-            Object.entries(
-              requiredField(model.header, "CallbackNexus", "header") as Record<
-                string,
-                any
-              >,
-            ).map(([key, value]: [string, any]) => [key, value]),
+            Object.entries(model.header as Record<string, any>).map(
+              ([key, value]: [string, any]) => [key, value],
+            ),
           ),
+      "CallbackNexus",
+      "header",
+    ),
   };
 }
 
