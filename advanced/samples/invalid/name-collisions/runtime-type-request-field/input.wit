@@ -1,0 +1,36 @@
+package temporal:nexus@1.0.0;
+
+world system { export job-service; }
+
+// A Python call takes the runtime type `output_type` next to the fields of its request.
+/// @nexus.endpoint "jobs"
+interface job-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.proto "temporal.api.compute.v1.ComputeProvider"
+  record provider {
+    /// @nexus.omit
+    %type: placeholder,
+    details: output-t,
+    /// @nexus.omit
+    nexus-endpoint: placeholder,
+  }
+
+  record get-request {
+    id: string,
+    output-type: option<string>,
+  }
+
+  /// @nexus.type-parameter "output-t"
+  resource job {
+    constructor(id: string);
+
+    /// @nexus.operation "get"
+    get: func(output-type: option<string>) -> provider;
+  }
+
+  get: func(request: get-request) -> provider;
+}

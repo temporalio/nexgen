@@ -2,6 +2,4 @@ targets = ["workflow"]
 
 [error]
 kind = "invalid-wit"
-contains = [
-  "resource `holder` cannot contain generic type parameters",
-]
+contains = ["resource `holder`", "type parameter `models.context-t`", "which it doesn't declare"]

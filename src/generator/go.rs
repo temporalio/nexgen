@@ -759,6 +759,18 @@ fn generate_in_tree(
     primary_origin: GeneratedFileOrigin,
     file_name: Option<PathBuf>,
 ) -> Result<GoGenerationResult> {
+    // Go resources have no type parameters, so nexgen can't render a generic one.
+    if let Some(resource) = api_plan
+        .services
+        .iter()
+        .flat_map(|service| &service.resources)
+        .find(|resource| !resource.type_parameters.is_empty())
+    {
+        return Err(Error::UnsupportedGenericResource {
+            language: Language::Go,
+            resource: resource.name.clone(),
+        });
+    }
     ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin, file_name)
 }
 

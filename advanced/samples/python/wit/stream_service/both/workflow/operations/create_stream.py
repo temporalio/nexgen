@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import typing
 import temporalio.nexus.system
 import datetime
 import temporalio.workflow
@@ -16,9 +17,13 @@ from .._resources import Stream
 import temporal_support as _support
 
 
+BodyT = typing.TypeVar("BodyT")
+
+
 async def _create_stream(
     request: CreateStreamRequest,
-) -> Stream:
+    body_type: type[BodyT],
+) -> Stream[BodyT]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
         endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -32,17 +37,19 @@ async def _create_stream(
     if result.ref is None:
         raise RuntimeError("CreateStream answered without `ref`")
     return Stream(
+        body_type=body_type,
         ref=result.ref,
         created=result.created or None,
     )
 
 
 async def create_stream(
+    body_type: type[BodyT],
     *,
     stream_ref: StreamRef,
     retention: datetime.timedelta | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
-) -> Stream:
+) -> Stream[BodyT]:
     """
     Args:
         stream_ref: The ref of the Stream to create. Its id is the Stream id.
@@ -57,4 +64,4 @@ async def create_stream(
         id_conflict_policy=id_conflict_policy,
         request_id=_support.request_id(),
     )
-    return await _create_stream(request)
+    return await _create_stream(request, body_type)

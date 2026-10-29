@@ -1,0 +1,14 @@
+package test:resource-type-parameter-not-an-alias;
+
+world system { export models; }
+
+interface models {
+  record value {
+    text: string,
+  }
+
+  /// @nexus.type-parameter "value"
+  resource holder {
+    constructor(value: value);
+  }
+}

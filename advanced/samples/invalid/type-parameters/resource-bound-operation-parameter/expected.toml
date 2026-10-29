@@ -1,0 +1,7 @@
+[error]
+kind = "invalid-wit"
+contains = [
+  "resource-bound operation `Get`",
+  "type parameter `holder-service.extra-t`",
+  "resource `holder` doesn't declare",
+]

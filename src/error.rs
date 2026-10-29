@@ -69,6 +69,20 @@ pub enum Error {
     #[error("the client target {reason}")]
     UnsupportedClientTarget { reason: String },
 
+    #[error("the generic resource `{resource}` isn't supported in {language}")]
+    UnsupportedGenericResource {
+        language: Language,
+        resource: String,
+    },
+
+    #[error("the {language} runtime type `{name}` of `{parameter}` clashes with {conflicting}")]
+    RuntimeTypeArgumentNameConflict {
+        language: Language,
+        name: String,
+        parameter: String,
+        conflicting: String,
+    },
+
     #[error("`{name}` is a client method of both `{first_service}` and `{second_service}`")]
     ClientTargetNameConflict {
         name: String,

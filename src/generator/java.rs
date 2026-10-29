@@ -28,6 +28,18 @@ pub(crate) fn generate(
     let mut leaves = Vec::new();
     collect_leaves(&tree.root, &mut leaves);
     for leaf in &leaves {
+        if let Some(resource) = leaf
+            .spec
+            .services
+            .iter()
+            .flat_map(|service| &service.resources)
+            .find(|resource| !resource.type_parameters.is_empty())
+        {
+            return Err(Error::UnsupportedGenericResource {
+                language: crate::language::Language::Java,
+                resource: resource.name.clone(),
+            });
+        }
         if let Some((_, record)) = leaf
             .spec
             .records()

@@ -1,0 +1,10 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "invalid-wit"
+contains = [
+  "resource `scheduler`",
+  "type parameter `job-service.output-t`",
+  "which it doesn't declare",
+]

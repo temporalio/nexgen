@@ -1,0 +1,5 @@
+languages = ["python", "typescript"]
+
+[error]
+kind = "runtime-type-argument-name-conflict"
+contains = ["runtime type", "of `ValueT`", "field `value-type` of resource `holder`"]

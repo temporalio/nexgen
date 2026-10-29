@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import typing
 import temporalio.nexus.system
 import datetime
 import temporalio.workflow
@@ -22,7 +23,10 @@ from ..models import (
 import temporal_support as _support
 
 
-class Stream:
+BodyT = typing.TypeVar("BodyT")
+
+
+class Stream(typing.Generic[BodyT]):
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
     ref: StreamRef
@@ -32,13 +36,20 @@ class Stream:
         self,
         ref: StreamRef,
         created: bool | None,
+        *,
+        body_type: type[BodyT] | None = None,
     ) -> None:
         self.ref = ref
         self.created = created
+        # Not a dataclass field, so the converter doesn't encode it. A
+        # decoded handle decodes its generic values as `typing.Any`.
+        self.body_type: type[BodyT] = body_type or typing.cast(
+            "type[BodyT]", typing.Any
+        )
 
     async def publish(
         self,
-        records: list[AppendRecord],
+        records: list[AppendRecord[BodyT]],
     ) -> AppendRecordsResponse:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
@@ -69,7 +80,7 @@ class Stream:
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
-    ) -> ReadRecordsResponse:
+    ) -> ReadRecordsResponse[BodyT]:
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
@@ -80,7 +91,7 @@ class Stream:
             create_wait=create_wait,
             max_bytes=max_bytes,
         )
-        handle = await _read_records(request)
+        handle = await _read_records(request, self.body_type)
         return await handle
 
     async def describe(
@@ -95,7 +106,7 @@ class Stream:
 
 
 async def _append_records(
-    request: AppendRecordsRequest,
+    request: AppendRecordsRequest[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
@@ -111,7 +122,7 @@ async def _append_records(
 async def append_records(
     *,
     ref: StreamRef,
-    records: list[AppendRecord],
+    records: list[AppendRecord[BodyT]],
     sequence: int | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     """Append one batch. Workflow code makes the call from a Local Activity.
@@ -157,7 +168,8 @@ async def close_stream(
 
 async def _read_records(
     request: ReadRecordsRequest,
-) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse,]:
+    body_type: type[BodyT],
+) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
         endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -165,11 +177,12 @@ async def _read_records(
     return await nexus_client.start_operation(
         operation="ReadRecords",
         input=request,
-        output_type=ReadRecordsResponse,
+        output_type=ReadRecordsResponse[body_type],
     )
 
 
 async def read_records(
+    body_type: type[BodyT],
     *,
     ref: StreamRef,
     from_offset: int | None = None,
@@ -179,7 +192,7 @@ async def read_records(
     create_wait: datetime.timedelta | None = None,
     last: int | None = None,
     max_bytes: int | None = None,
-) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse,]:
+) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
     """A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
     Activity.
 
@@ -206,7 +219,7 @@ async def read_records(
         last=last,
         max_bytes=max_bytes,
     )
-    return await _read_records(request)
+    return await _read_records(request, body_type)
 
 
 async def _describe_stream(

@@ -14,13 +14,23 @@ import { closeStream } from "./operations/close-stream";
 import { readRecords } from "./operations/read-records";
 import { describeStream } from "./operations/describe-stream";
 
-export class Stream {
+export class Stream<BodyT = unknown> {
+  // The handle converts as data without its private fields.
+  readonly #bodyType: common.TypeInfo<BodyT> | undefined;
+
   public constructor(
     public readonly ref: StreamRef,
     public readonly created: boolean | undefined,
-  ) {}
+    bodyType?: common.TypeInfo<BodyT>,
+  ) {
+    this.#bodyType = bodyType;
+  }
 
-  public async publish(records: AppendRecord[]): Promise<AppendRecordsResponse> {
+  public get bodyType(): common.TypeInfo<BodyT> | undefined {
+    return this.#bodyType;
+  }
+
+  public async publish(records: AppendRecord<BodyT>[]): Promise<AppendRecordsResponse> {
     const request = { ref: this.ref, records: records };
     const handle = await appendRecords(request);
     return await handle.result();
@@ -39,7 +49,7 @@ export class Stream {
     wait?: common.Duration,
     createWait?: common.Duration,
     maxBytes?: number,
-  ): Promise<ReadRecordsResponse> {
+  ): Promise<ReadRecordsResponse<BodyT>> {
     const request = {
       ref: this.ref,
       fromOffset: fromOffset,
@@ -49,7 +59,7 @@ export class Stream {
       createWait: createWait,
       maxBytes: maxBytes,
     };
-    const handle = await readRecords(request);
+    const handle = await readRecords(request, this.bodyType);
     return await handle.result();
   }
 

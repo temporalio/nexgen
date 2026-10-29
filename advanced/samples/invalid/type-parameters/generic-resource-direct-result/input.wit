@@ -1,0 +1,34 @@
+package test:generic-resource-direct-result;
+
+world system { export holder-service; }
+
+/// @nexus.endpoint "holders"
+interface holder-service {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+
+  record set-request {
+    id: string,
+    value: value-t,
+  }
+
+  /// @nexus.type-parameter "value-t"
+  resource holder {
+    constructor(id: string);
+
+    /// @nexus.operation "set"
+    set: func(value: value-t);
+  }
+
+  type holder-result = own<holder>;
+
+  record open-request {
+    id: string,
+  }
+
+  open: func(request: open-request) -> holder-result;
+
+  set: func(request: set-request);
+}

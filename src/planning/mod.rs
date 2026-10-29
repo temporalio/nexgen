@@ -150,6 +150,8 @@ pub(crate) struct PlannedResource {
     pub(crate) name: String,
     pub(crate) doc: Option<String>,
     pub(crate) type_name: String,
+    /// The type parameters that the resource declares, in order.
+    pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
 }
@@ -179,7 +181,11 @@ pub(crate) struct PlannedResourceMethodResult {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum PlannedResourceMethodResultKind {
-    Resource { type_name: String },
+    Resource {
+        type_name: String,
+        /// The type parameters of the returned resource, which the method's resource declares.
+        type_parameters: Vec<crate::spec::TypeParameterSpec>,
+    },
     Value(PlannedType),
 }
 
@@ -235,6 +241,9 @@ pub(crate) struct PlannedWireVariantMember {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct PlannedOperationData {
     pub(crate) output_resource_return: Option<PlannedOperationResourceReturn>,
+    /// The type parameters that a call passes as runtime types, since the request can't give
+    /// them. Only an operation of a generic resource has them.
+    pub(crate) runtime_type_parameters: Vec<crate::spec::TypeParameterSpec>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

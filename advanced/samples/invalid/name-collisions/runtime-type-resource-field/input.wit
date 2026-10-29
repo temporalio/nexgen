@@ -1,0 +1,27 @@
+package test:runtime-type-resource-field;
+
+world system { export holder-service; }
+
+// The runtime type of value-t is `value_type` in Python and `valueType` in TypeScript.
+/// @nexus.endpoint "holders"
+interface holder-service {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+
+  record set-request {
+    id: string,
+    value: value-t,
+  }
+
+  /// @nexus.type-parameter "value-t"
+  resource holder {
+    constructor(id: string, value-type: option<string>);
+
+    /// @nexus.operation "set"
+    set: func(value: value-t);
+  }
+
+  set: func(request: set-request);
+}

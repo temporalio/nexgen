@@ -1,0 +1,36 @@
+package temporal:nexus@1.0.0;
+
+world system { export job-service; }
+
+// A non-generic resource can't give the type arguments of the generic resource that it returns.
+/// @nexus.endpoint "jobs"
+interface job-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.proto "temporal.api.compute.v1.ComputeProvider"
+  record provider {
+    /// @nexus.omit
+    %type: placeholder,
+    details: output-t,
+    /// @nexus.omit
+    nexus-endpoint: placeholder,
+  }
+
+  /// @nexus.type-parameter "output-t"
+  resource job {
+    constructor(id: string);
+
+    update: func(provider: provider);
+  }
+
+  type job-result = own<job>;
+
+  resource scheduler {
+    constructor(id: string);
+
+    open: func(id: string) -> job-result;
+  }
+}

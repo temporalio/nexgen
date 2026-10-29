@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit"
+contains = ["operation `Open`", "generic resource `holder`", "no `@nexus.proto` message"]

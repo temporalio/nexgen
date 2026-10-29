@@ -1,0 +1,8 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+languages = ["python"]
+targets = ["workflow"]
+
+[error]
+kind = "runtime-type-argument-name-conflict"
+contains = ["python runtime type `output_type` of `OutputT`", "a field of `GetRequest`"]
