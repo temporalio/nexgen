@@ -955,11 +955,10 @@ Fields annotated with `@nexus.source` are supplied by a helper in each
 applicable API target, rather than exposed as convenience arguments. Sources
 apply to all targets unless restricted by `targets="workflow"`,
 `targets="client"`, or a comma-separated list. Other targets expose the field as
-an ordinary argument. Generation with no API targets rejects sourced fields,
-since the source would have no effect. Each value is a helper call relative to
-the project's support package, supplied with `--support-package`. Include the
-call and its arguments in WIT. Nexgen adds the package prefix and imports
-support for the generated field.
+an ordinary argument. With no API target, a sourced field is an ordinary model
+field. Each value is a helper call relative to the project's support package,
+supplied with `--support-package`. Include the call and its arguments in WIT.
+Nexgen adds the package prefix and imports support for the generated field.
 
 ```wit
 record start-workflow-request {
@@ -1460,7 +1459,8 @@ descriptor replaces signature-derived typing.
 separate the targets with commas.
 
 - Without `--targets`, generation emits models and service definitions only.
-- Resources and sourced fields require at least one API target.
+  Resources are data classes with their fields, and sourced fields are ordinary
+  model fields. A handler that implements the service needs only these.
 - `workflow` selects the API for Workflow code.
 - `client` writes the same API for code outside a Workflow, in a `client`
   package inside the output directory. So far only Python supports it. It can be

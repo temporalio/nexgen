@@ -1,3 +1,0 @@
-[error]
-kind = "invalid-resource"
-contains = ["resource declarations require at least one API target"]

@@ -1642,8 +1642,10 @@ impl<'a> ApiPlanner<'a> {
                     let (output_ref, output_module_path) =
                         self.external_models
                             .service_model_ref(&output, "models", self.api_plan);
-                    let conversion = self.resolve_message_value_conversion(&output)?;
-                    (output_ref, output_module_path, conversion.annotation)
+                    // With no API target, nothing binds the resource, and the operation returns
+                    // its wire message, which can have no record.
+                    let annotation = self.resolve_output_annotation(&output)?;
+                    (output_ref, output_module_path, annotation)
                 } else {
                     (
                         resource.type_name.clone(),

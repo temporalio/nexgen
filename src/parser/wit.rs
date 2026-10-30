@@ -3684,10 +3684,6 @@ mod tests {
     }
 
     fn validate(language: Language, wit: &str) -> Result<(), Error> {
-        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
-            targets: crate::nexgen_config::GenerationTargets::WORKFLOW,
-            ..crate::nexgen_config::current()
-        });
         let spec = parse_result(language, wit)?;
         let descriptors = descriptors();
         crate::planning::AuthoredValidationPass::new(&descriptors, language)

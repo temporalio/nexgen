@@ -1,5 +1,0 @@
-targets = []
-
-[error]
-kind = "unsupported-sourced-type-field"
-contains = ["namespace", "requires at least one API target", "no effect"]
