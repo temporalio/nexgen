@@ -9,14 +9,14 @@ import temporalio.workflow
 from typing_extensions import override
 
 import temporal_support as support
-from wit import target_sources_both as both
-from wit import target_sources_client as client_only
-from wit import target_sources_workflow as workflow_only
-from wit.target_sources_both import models as both_models
-from wit.target_sources_both._resources import Job as WorkflowJob
-from wit.target_sources_both import client as both_client
-from wit.target_sources_client import client as client_api
-from wit.target_sources_workflow import models as workflow_models
+from wit.target_sources import both
+from wit.target_sources import client as client_only
+from wit.target_sources import workflow as workflow_only
+from wit.target_sources.both import models as both_models
+from wit.target_sources.both._resources import Job as WorkflowJob
+from wit.target_sources.both import client as both_client
+from wit.target_sources.client import client as client_api
+from wit.target_sources.workflow import models as workflow_models
 
 
 class Recorder:
@@ -119,8 +119,7 @@ async def test_client_only_uses_applicable_sources(
         )
     ]
 
-    with support.current_client(client):
-        await client_api.Job(job_id="job").restart()
+    await client_api.Job(recorder, job_id="job").restart()
     assert source_calls == ["shared", "client", "shared"]
     assert recorder.calls[-1] == (
         "Restart",
@@ -139,8 +138,7 @@ async def test_combined_apis_share_models_but_not_source_policy(
     assert type(workflow_recorder.calls[0][1]) is both_models.SubmitRequest
     assert type(recorder.calls[0][1]) is both_models.SubmitRequest
 
-    with support.current_client(client):
-        await both_client.Job(job_id="client-job").restart()
+    await both_client.Job(recorder, job_id="client-job").restart()
     await WorkflowJob(job_id="workflow-job").restart()
     assert source_calls[-2:] == ["shared", "shared"]
     assert recorder.calls[-1] == (

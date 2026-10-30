@@ -18,25 +18,26 @@ struct ExamplesConfig {
     examples: std::collections::BTreeMap<String, ExampleConfig>,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 struct ExampleConfig {
+    #[serde(flatten)]
+    options: ExampleOptions,
+    #[serde(flatten)]
+    children: std::collections::BTreeMap<String, ExampleConfig>,
+}
+
+#[derive(Clone, Default, Deserialize)]
+struct ExampleOptions {
     languages: Option<Vec<String>>,
-    #[serde(default)]
-    system_nexus: bool,
-    /// The targets of a language with the client target. The other languages get the workflow
-    /// target.
-    #[serde(default)]
-    targets: Vec<ExampleTarget>,
-    /// Generate the same authored input under several API selections.
-    #[serde(default)]
-    variants: std::collections::BTreeMap<String, Vec<ExampleTarget>>,
+    system_nexus: Option<bool>,
+    targets: Option<Vec<ExampleTarget>>,
     // Each example plans against only the protos it declares, so one sample's protos can't
     // change how another example resolves a proto name.
     descriptors: Option<ExampleDescriptors>,
 }
 
 /// Opt-in, as in the compiler rejection fixtures. An example with no `descriptors` gets none.
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 enum ExampleDescriptors {
     Preset(DescriptorPreset),
@@ -44,13 +45,13 @@ enum ExampleDescriptors {
     Paths(Vec<PathBuf>),
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 enum DescriptorPreset {
     Temporal,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 enum ExampleTarget {
     Workflow,
@@ -58,13 +59,42 @@ enum ExampleTarget {
 }
 
 impl ExampleConfig {
-    fn targets(&self, language: Language) -> GenerationTargets {
-        if !language.has_client_target() || self.targets.is_empty() {
-            return GenerationTargets::WORKFLOW;
+    fn configurations(&self, example_id: &str) -> Vec<(PathBuf, ExampleOptions)> {
+        if self.children.is_empty() {
+            return vec![(PathBuf::from(example_id), self.options.clone())];
         }
+        self.children
+            .iter()
+            .map(|(name, child)| {
+                (
+                    Path::new(example_id).join(name),
+                    self.options.overridden_by(&child.options),
+                )
+            })
+            .collect()
+    }
+}
+
+impl ExampleOptions {
+    fn overridden_by(&self, child: &Self) -> Self {
+        Self {
+            languages: child.languages.clone().or_else(|| self.languages.clone()),
+            system_nexus: child.system_nexus.or(self.system_nexus),
+            targets: child.targets.clone().or_else(|| self.targets.clone()),
+            descriptors: child
+                .descriptors
+                .clone()
+                .or_else(|| self.descriptors.clone()),
+        }
+    }
+
+    fn targets(&self) -> GenerationTargets {
+        let Some(targets) = &self.targets else {
+            return GenerationTargets::NONE;
+        };
         GenerationTargets {
-            workflow: self.targets.contains(&ExampleTarget::Workflow),
-            client: self.targets.contains(&ExampleTarget::Client),
+            workflow: targets.contains(&ExampleTarget::Workflow),
+            client: targets.contains(&ExampleTarget::Client),
         }
     }
 
@@ -306,7 +336,12 @@ fn discover_example_ids(repo_root: &Path, language: Language) -> Result<Vec<Stri
             config
                 .examples
                 .get(&id)
-                .is_none_or(|example| example.supports(language))
+                .is_none_or(|example| {
+                    example
+                        .configurations(&id)
+                        .iter()
+                        .any(|(_, options)| options.supports(language))
+                })
                 .then_some(id)
         })
         .collect::<Vec<_>>();
@@ -320,18 +355,35 @@ fn load_examples_config(input_root: &Path) -> Result<ExamplesConfig> {
         path: path.clone(),
         source,
     })?;
-    toml::from_str(&contents).map_err(|source| Error::InvalidExampleConfig {
-        path,
-        reason: source.to_string(),
-    })
+    parse_examples_config(&contents).map_err(|reason| Error::InvalidExampleConfig { path, reason })
 }
 
-fn example_descriptor_paths(
-    repo_root: &Path,
-    example: Option<&ExampleConfig>,
-) -> Result<Vec<PathBuf>> {
+fn parse_examples_config(contents: &str) -> std::result::Result<ExamplesConfig, String> {
+    let config: ExamplesConfig = toml::from_str(contents).map_err(|error| error.to_string())?;
+    for (name, example) in &config.examples {
+        for (child_name, child) in &example.children {
+            if !child_name.chars().any(|c| c.is_ascii_alphanumeric())
+                || !child_name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            {
+                return Err(format!(
+                    "`{name}.{child_name}`: a child configuration name must contain letters or numbers and may use '-' or '_'"
+                ));
+            }
+            if !child.children.is_empty() {
+                return Err(format!(
+                    "`{name}.{child_name}`: child configurations cannot contain further child configurations"
+                ));
+            }
+        }
+    }
+    Ok(config)
+}
+
+fn example_descriptor_paths(repo_root: &Path, options: &ExampleOptions) -> Result<Vec<PathBuf>> {
     let root = repo_root.join("advanced/samples/descriptors");
-    let names = match example.and_then(|example| example.descriptors.as_ref()) {
+    let names = match options.descriptors.as_ref() {
         None => Vec::new(),
         Some(ExampleDescriptors::Preset(DescriptorPreset::Temporal)) => {
             vec![PathBuf::from("temporal_api.bin")]
@@ -518,50 +570,41 @@ fn reset_example_output_directory(language_root: &Path, output_path: &Path) -> R
 
 fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Result<()> {
     let config = load_examples_config(&repo_root.join("advanced/samples/inputs"))?;
-    if let Some(example) = config.examples.get(example_id)
-        && !example.variants.is_empty()
-    {
-        for (name, targets) in &example.variants {
-            build_example_variant(
-                repo_root,
-                language,
-                example_id,
-                &format!("{example_id}-{name}"),
-                Some(GenerationTargets {
-                    workflow: targets.contains(&ExampleTarget::Workflow),
-                    client: targets.contains(&ExampleTarget::Client),
-                }),
-            )?;
-        }
+    let example = config.examples.get(example_id).cloned().unwrap_or_default();
+    let configurations = example
+        .configurations(example_id)
+        .into_iter()
+        .filter(|(_, options)| options.supports(language))
+        .collect::<Vec<_>>();
+    if configurations.is_empty() {
         return Ok(());
     }
-    build_example_variant(repo_root, language, example_id, example_id, None)
+    let language_root = advanced_language_root(repo_root, language);
+    let output_root = example_output_path(repo_root, language, Path::new(example_id));
+    reset_example_output_directory(&language_root, &output_root)?;
+    for (output_id, options) in configurations {
+        build_example_configuration(repo_root, language, example_id, &output_id, &options)?;
+    }
+    Ok(())
 }
 
-fn build_example_variant(
+fn build_example_configuration(
     repo_root: &Path,
     language: Language,
     example_id: &str,
-    output_id: &str,
-    targets: Option<GenerationTargets>,
+    output_id: &Path,
+    options: &ExampleOptions,
 ) -> Result<()> {
     let input_path = example_input_path(repo_root, example_id);
-    let config = load_examples_config(&repo_root.join("advanced/samples/inputs"))?;
     let mut input_paths = vec![input_path.clone()];
     input_paths.extend(example_linked_input_paths(repo_root, &input_path)?);
     let output_path = example_output_path(repo_root, language, output_id);
     let language_root = advanced_language_root(repo_root, language);
-    reset_example_output_directory(&language_root, &output_path)?;
-    let example = config.examples.get(example_id);
-    let system_nexus = example.is_some_and(|example| example.system_nexus);
+    let system_nexus = options.system_nexus.unwrap_or_default();
     let generate_request = GenerateRequest {
         config: NexgenConfig {
             system_nexus,
-            targets: targets.unwrap_or_else(|| {
-                example
-                    .map(|example| example.targets(language))
-                    .unwrap_or(GenerationTargets::WORKFLOW)
-            }),
+            targets: options.targets(),
         },
         language,
         input_paths,
@@ -570,11 +613,10 @@ fn build_example_variant(
         } else {
             sample_support_package(repo_root, language, &output_path)
         },
-        descriptor_paths: example_descriptor_paths(repo_root, config.examples.get(example_id))?,
+        descriptor_paths: example_descriptor_paths(repo_root, options)?,
         output_path: output_path.clone(),
         format: false,
-        java_package_name: (language == Language::Java)
-            .then(|| example_directory_name(language, example_id)),
+        java_package_name: (language == Language::Java).then(|| example_java_package(output_id)),
         ts_date_time_types: Default::default(),
         dotnet_namespace: None,
     };
@@ -730,12 +772,33 @@ fn example_linked_input_paths(root: &Path, input_path: &Path) -> Result<Vec<Path
     let path = root.join("advanced/samples/inputs/deps");
     Ok(path.is_dir().then_some(path).into_iter().collect())
 }
-fn example_output_path(root: &Path, language: Language, id: &str) -> PathBuf {
+fn example_output_path(root: &Path, language: Language, id: &Path) -> PathBuf {
     let root = advanced_language_root(root, language);
+    let directory: PathBuf = id
+        .iter()
+        .map(|component| {
+            example_directory_name(
+                language,
+                component.to_str().expect("example names are UTF-8"),
+            )
+        })
+        .collect();
     match language {
-        Language::Go => root.join(example_directory_name(language, id)),
-        _ => root.join("wit").join(example_directory_name(language, id)),
+        Language::Go => root.join(directory),
+        _ => root.join("wit").join(directory),
     }
+}
+
+fn example_java_package(id: &Path) -> String {
+    id.iter()
+        .map(|component| {
+            example_directory_name(
+                Language::Java,
+                component.to_str().expect("example names are UTF-8"),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(".")
 }
 fn json_example_output_path(
     root: &Path,
@@ -897,6 +960,167 @@ fn normalize_example_header(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn child_configurations_inherit_and_override_all_example_options() {
+        let config = parse_examples_config(
+            r#"
+[sample]
+languages = ["python"]
+system_nexus = true
+targets = ["workflow", "client"]
+descriptors = "temporal"
+
+[sample.inherited]
+
+[sample.cleared]
+system_nexus = false
+targets = []
+descriptors = []
+
+[sample.replaced]
+languages = ["go"]
+targets = ["workflow"]
+descriptors = ["streams.bin"]
+"#,
+        )
+        .unwrap();
+        let configurations = config.examples["sample"].configurations("sample");
+        assert_eq!(
+            configurations
+                .iter()
+                .map(|(id, _)| id.clone())
+                .collect::<Vec<_>>(),
+            [
+                PathBuf::from("sample/cleared"),
+                PathBuf::from("sample/inherited"),
+                PathBuf::from("sample/replaced")
+            ]
+        );
+        let cleared = &configurations[0].1;
+        assert_eq!(cleared.system_nexus, Some(false));
+        assert_eq!(cleared.targets(), GenerationTargets::NONE);
+        assert_eq!(
+            cleared.descriptors,
+            Some(ExampleDescriptors::Paths(Vec::new()))
+        );
+        assert!(cleared.supports(Language::Python));
+        assert!(!cleared.supports(Language::Go));
+
+        let inherited = &configurations[1].1;
+        assert_eq!(inherited.system_nexus, Some(true));
+        assert_eq!(inherited.targets(), GenerationTargets::ALL);
+        assert_eq!(
+            inherited.descriptors,
+            Some(ExampleDescriptors::Preset(DescriptorPreset::Temporal))
+        );
+
+        let replaced = &configurations[2].1;
+        assert_eq!(replaced.system_nexus, Some(true));
+        assert_eq!(replaced.targets(), GenerationTargets::WORKFLOW);
+        assert_eq!(
+            replaced.descriptors,
+            Some(ExampleDescriptors::Paths(vec![PathBuf::from(
+                "streams.bin"
+            )]))
+        );
+        assert!(replaced.supports(Language::Go));
+        assert!(!replaced.supports(Language::Python));
+    }
+
+    #[test]
+    fn an_example_without_children_keeps_its_output_name() {
+        let config = parse_examples_config("[sample]\n").unwrap();
+        let configurations = config.examples["sample"].configurations("sample");
+        assert_eq!(configurations.len(), 1);
+        assert_eq!(configurations[0].0, Path::new("sample"));
+        assert_eq!(configurations[0].1.targets(), GenerationTargets::NONE);
+        assert!(!configurations[0].1.system_nexus.unwrap_or_default());
+        assert!(configurations[0].1.descriptors.is_none());
+        assert!(configurations[0].1.supports(Language::Python));
+    }
+
+    #[test]
+    fn child_output_paths_preserve_hierarchy_and_language_casing() {
+        let root = Path::new("repo");
+        let configuration = Path::new("some-service/client-only");
+        for (language, expected) in [
+            (
+                Language::Python,
+                "advanced/samples/python/wit/some_service/client_only",
+            ),
+            (
+                Language::TypeScript,
+                "advanced/samples/typescript/wit/some-service/client-only",
+            ),
+            (Language::Go, "advanced/samples/go/someservice/clientonly"),
+            (
+                Language::Dotnet,
+                "advanced/samples/dotnet/wit/some-service/client-only",
+            ),
+            (
+                Language::Java,
+                "advanced/samples/java/wit/some-service/client-only",
+            ),
+        ] {
+            assert_eq!(
+                example_output_path(root, language, configuration),
+                root.join(expected)
+            );
+        }
+        let java_configuration = Path::new("someService/clientOnly");
+        let package = example_java_package(java_configuration);
+        assert_eq!(package, "someService.clientOnly");
+        let output = example_output_path(root, Language::Java, java_configuration);
+        assert_eq!(
+            output.file_name().unwrap().to_str().unwrap(),
+            package.rsplit('.').next().unwrap()
+        );
+    }
+
+    #[test]
+    fn discovery_filters_languages_after_resolving_child_options() {
+        let root = temp_language_root("child-config-discovery");
+        let inputs = root.join("advanced/samples/inputs");
+        fs::create_dir_all(&inputs).unwrap();
+        fs::write(inputs.join("sample.wit"), "").unwrap();
+        fs::write(
+            inputs.join("examples.toml"),
+            r#"
+[sample]
+languages = ["python"]
+
+[sample.go]
+languages = ["go"]
+targets = ["workflow"]
+"#,
+        )
+        .unwrap();
+        assert!(
+            discover_example_ids(&root, Language::Python)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            discover_example_ids(&root, Language::Go).unwrap(),
+            ["sample"]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn configuration_rejects_unknown_settings_and_nested_children() {
+        for source in [
+            "[sample]\nsystem_nexuz = true\n",
+            "[sample.child]\nsystem_nexuz = true\n",
+            "[sample.child.grandchild]\ntargets = []\n",
+            "[sample.\"../outside\"]\ntargets = []\n",
+            "[sample.\"__\"]\ntargets = []\n",
+        ] {
+            assert!(parse_examples_config(source).is_err(), "{source}");
+        }
+    }
+
     fn temp_language_root(label: &str) -> PathBuf {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -968,6 +1192,10 @@ mod tests {
             (
                 "advanced/samples/typescript/wit/workflow-service",
                 "../../support/temporal_model_converters",
+            ),
+            (
+                "advanced/samples/typescript/wit/example/workflow",
+                "../../../support/temporal_model_converters",
             ),
             (
                 "advanced/samples/typescript/json_schema/api/chat",

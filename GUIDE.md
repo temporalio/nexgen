@@ -195,11 +195,6 @@ For `@nexus.source`, the sample writes `workflow_namespace()`. Generated code
 calls `_support.workflow_namespace()`. Check the generated project with
 `ruff check`, a Python type checker, and your tests.
 
-With the client target, a client resource with no `_operations` calls
-`current_operations()`, which returns the current client. It raises when no
-client is current, for example in Workflow code. See
-[`operations.py`](advanced/samples/python/temporal_support/operations.py).
-
 ### TypeScript
 
 Export helpers from a TypeScript module and pass either an installed package
@@ -1477,8 +1472,8 @@ separate the targets with commas.
 The `client` package has its own resource classes and a
 `<Service>ClientExtension` for each service, with the names of the Workflow
 package. It imports the models of the parent package, so both targets share
-them. A resource crosses the targets as data, and each side decodes it as its
-own class.
+them. Resource identity fields can be transported as data; client handles are
+constructed with an explicit service-bound Nexus client.
 
 ```text
 stream_service/
@@ -1512,14 +1507,19 @@ error.
 nexgen also refuses an operation named `client`. The parent package exports each
 operation, and an import of the client package sets the attribute of that name.
 
-A client resource calls its operations through the client in its private
-`_operations` attribute. It isn't a dataclass field, so a resource still
-converts as data. A client call puts the client there with the generated
-`bind_<resource>_operations`. A resource whose methods bind no operation has
-neither the attribute nor the binder. A handle with no `_operations`, such as
-one that you build from its fields, calls `current_operations()` of the support
-package, which returns the current client. The Workflow resource classes don't
-change.
+A client resource takes a service-bound Nexus client as its first constructor
+argument. Its methods call that client's `start_operation` directly, preserving
+the service and endpoint binding. Operations that return a resource construct
+the handle with the same Nexus client used to start the operation.
+
+```python
+job = Job(nexus_client, job_id="job")
+await job.restart()
+```
+
+The client is runtime state, not a resource identity field. Serialization
+carries only identity data. When an operation returns resource data, the
+generated API decodes it before constructing the client-backed handle.
 
 Sources work in the client target as well. Restrict workflow-only helpers with
 `targets="workflow"`. If a required resource-method request field has neither an

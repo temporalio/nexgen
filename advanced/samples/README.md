@@ -28,6 +28,35 @@ sample-project instructions for [Go](go/README.md), [Python](python/README.md),
 
 ## WIT examples
 
+[`inputs/examples.toml`](inputs/examples.toml) configures each input's
+languages, API targets, System Nexus bindings, and descriptors. API targets are
+opt-in. An example with no child tables generates once under its input name.
+Child tables generate separate outputs, inheriting the parent settings and
+replacing the fields they specify:
+
+```toml
+[target-sources]
+languages = ["python"]
+
+[target-sources.workflow]
+targets = ["workflow"]
+
+[target-sources.client]
+targets = ["client"]
+
+[target-sources.both]
+targets = ["workflow", "client"]
+```
+
+These outputs are placed in `target-sources/workflow`, `target-sources/client`,
+and `target-sources/both`, with language-specific casing. Each child can
+override any of the parent's settings. Lists replace the inherited list;
+`targets = []` selects no APIs and `descriptors = []` selects no descriptors. An
+explicit `system_nexus = false` overrides `true`. Language filtering uses the
+resolved child settings. Child tables cannot contain further child tables. The
+sample builder clears the example's output directory once before generating its
+children.
+
 ### `defaults`
 
 Operation-scoped defaults for scalars, enums, flags, aliases, and nested
@@ -180,17 +209,24 @@ Some of the output doesn't type-check. Python imports the Stream protos from
 TypeScript passes a `number` where a resource method's proto request wants a
 `Long`. So `tsc` skips the service, but the test still checks its models.
 
-Python generates both targets. The client target writes the `client` package,
-with its own `Stream` class, and imports the models of the parent package.
-
 - WIT: [`inputs/stream-service.wit`](inputs/stream-service.wit)
 - .NET: [`dotnet/wit/stream-service/`](dotnet/wit/stream-service/),
   [`dotnet/tests/StreamServiceChecks.cs`](dotnet/tests/StreamServiceChecks.cs)
-- Python: [`python/wit/stream_service/`](python/wit/stream_service/),
-  [`python/tests/test_client_target.py`](python/tests/test_client_target.py)
+- Python: [`python/wit/stream_service/`](python/wit/stream_service/)
 - TypeScript:
   [`typescript/wit/stream-service/`](typescript/wit/stream-service/),
   [`typescript/tests/stream-service.test.ts`](typescript/tests/stream-service.test.ts)
+
+### `target-sources`
+
+A standalone WIT service generated for workflow-only, client-only, and combined
+APIs. It exercises target-specific sources, shared models, and resource handles
+returned by a client.
+
+- WIT: [`inputs/target-sources.wit`](inputs/target-sources.wit)
+- Python tests:
+  [`python/tests/test_client_target.py`](python/tests/test_client_target.py),
+  [`python/tests/test_target_sources.py`](python/tests/test_target_sources.py)
 
 ## Supporting files
 

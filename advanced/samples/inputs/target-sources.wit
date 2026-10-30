@@ -19,7 +19,22 @@ interface source-service {
   resource job {
     constructor(job-id: string);
     restart: func();
+    refresh: func() -> own<job>;
   }
+
+  resource marker {
+    constructor();
+  }
+
+  record create-job-request {
+    job-id: string,
+  }
+
+  create-job: func(request: create-job-request) -> own<job>;
+  refresh: func(request: create-job-request) -> own<job>;
+
+  record create-marker-request {}
+  create-marker: func(request: create-marker-request) -> own<marker>;
 
   record restart-request {
     job-id: string,
@@ -28,4 +43,38 @@ interface source-service {
   }
 
   restart: func(request: restart-request);
+
+  resource run {
+    constructor(job-id: string, run-id: option<string>);
+
+    /// @nexus.operation "cancel-run"
+    cancel: func();
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse"
+  type run-result = own<run>;
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest"
+  record create-run-request {
+    /// @nexus.proto-field "namespace"
+    job-id: string,
+    query: option<string>,
+  }
+
+  create-run: func(request: create-run-request) -> run-result;
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse"
+  record run-with-status {
+    run: own<run>,
+    started: option<bool>,
+  }
+
+  create-run-with-status: func(request: create-run-request) -> run-with-status;
+
+  record cancel-run-request {
+    job-id: string,
+    run-id: option<string>,
+  }
+
+  cancel-run: func(request: cancel-run-request);
 }

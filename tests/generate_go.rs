@@ -147,6 +147,7 @@ fn cli_accepts_unused_go_support_package() {
         .args([
             "go",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--support-package",
             "example.com/nexgen/support",
             "--output",
@@ -233,6 +234,7 @@ fn cli_rejects_go_output_directory_mismatched_with_namespace() {
         .args([
             "go",
             temp_input_path.to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",
@@ -294,6 +296,7 @@ fn cli_preserves_existing_output_directory_contents() {
         .args([
             "go",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",
@@ -341,6 +344,7 @@ fn cli_overwrites_previously_generated_files_in_place() {
         .args([
             "go",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",

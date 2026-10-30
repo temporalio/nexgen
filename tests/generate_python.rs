@@ -132,6 +132,7 @@ fn cli_generates_wit_direct_example_without_descriptors() {
         .args([
             "python",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",

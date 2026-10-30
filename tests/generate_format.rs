@@ -55,6 +55,7 @@ mod format_tests {
             .args([
                 "python",
                 sample_input_path(&root).to_str().unwrap(),
+                "--targets=workflow",
                 "--output",
                 output_path.to_str().unwrap(),
                 "--support-package",
@@ -176,6 +177,7 @@ done
             .args([
                 "ts",
                 sample_input_path(&root).to_str().unwrap(),
+                "--targets=workflow",
                 "--output",
                 output_path.to_str().unwrap(),
                 "--support-package",

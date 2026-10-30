@@ -1,48 +1,75 @@
 [workflow-service]
+targets = ["workflow"]
 system_nexus = true
 descriptors = "temporal"
 
 [multi-operation-service]
+targets = ["workflow"]
 system_nexus = true
 
 [generic-models]
+targets = ["workflow"]
 descriptors = "temporal"
 
 [start-workflow]
+targets = ["workflow"]
 descriptors = "temporal"
 
 [proto-backed-showcase]
+targets = ["workflow"]
 descriptors = "temporal"
 
 [proto-generic]
+targets = ["workflow"]
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
 [proto-oneof]
+targets = ["workflow"]
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
 [notification-service]
+targets = ["workflow"]
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
 # The Stream service WIT of temporalio-streams, on the Stream protos of temporalio/api#895 at
-# 44519d8a. Its .NET output builds in Nexgen.DotNetStreamService.csproj. Python also gets the
-# client target.
+# 44519d8a. Its .NET output builds in Nexgen.DotNetStreamService.csproj.
 [stream-service]
 languages = ["python", "typescript", "dotnet"]
 system_nexus = true
-targets = ["workflow", "client"]
+targets = ["workflow"]
 descriptors = ["temporal_api.bin", "streams.bin"]
 
 # A System Nexus operation that returns a resource.
 [workflow-handle]
+targets = ["workflow"]
 languages = ["python", "dotnet", "typescript"]
 system_nexus = true
 descriptors = "temporal"
 
+[defaults]
+targets = ["workflow"]
+
+[function-execution]
+targets = ["workflow"]
+
+[user-service]
+targets = ["workflow"]
+
+[type-showcase]
+targets = ["workflow"]
+
 [target-sources]
 languages = ["python"]
-variants.workflow = ["workflow"]
-variants.client = ["client"]
-variants.both = ["workflow", "client"]
+descriptors = "temporal"
+
+[target-sources.workflow]
+targets = ["workflow"]
+
+[target-sources.client]
+targets = ["client"]
+
+[target-sources.both]
+targets = ["workflow", "client"]

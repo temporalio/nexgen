@@ -5,23 +5,12 @@ from __future__ import annotations
 import dataclasses
 import enum
 import typing
-import typing_extensions
 
 
 class MyEnum(enum.IntEnum):
     Unspecified = 0
     Standard = 1
     Express = 2
-
-    @classmethod
-    @typing_extensions.override
-    def _missing_(cls, value: object) -> MyEnum | None:
-        if not isinstance(value, int):
-            return None
-        member = int.__new__(cls, value)
-        member._name_ = f"Unknown{value}"
-        member._value_ = value
-        return member
 
 
 MyFlags: typing.TypeAlias = int

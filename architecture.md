@@ -130,3 +130,6 @@ client code use different SDK entry points.
 API code builds requests and evaluates the sources that apply to its target.
 Model constructors and converters only handle data. This lets workflow and
 client APIs share models without sharing runtime behavior.
+
+Client resources keep their service-bound Nexus client. API code decodes
+returned resource data and constructs handles with that client.
