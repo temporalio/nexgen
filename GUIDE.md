@@ -2131,6 +2131,52 @@ type or transform expression refers to an otherwise-unavailable module.
 
 ---
 
+### @nexus.poll
+
+**Placement:** Operation (function) **Syntax:**
+`@nexus.poll python="<support-helper>" target="client"`
+
+Generates an `iter_<name>` async iterator in the client target, on the client
+extension and on each client resource method that binds the operation. The
+iterator sends the request, yields the response, and calls
+`<support-helper>(request, response)`. The helper returns the next request, or
+`None` to stop. The helper has the rules of the poll, so the directive names no
+field. Only Python generates the iterator so far, and the other languages ignore
+the directive.
+
+The extension's iterator creates one Nexus client with `_create_nexus_client`
+and uses it for every page. The iterator of a client handle uses the Nexus
+client of the handle. Each page is a new operation, so it gets a new random
+operation ID.
+
+Only the client target gets an iterator so far, so the directive needs
+`target="client"`, and the Workflow package has no iterator. With the client
+target, nexgen refuses the directive on an operation with function inputs, an
+output transform, a resource result or no result, since it can't make an
+iterator for those yet. It also refuses the directive on a resource method, and
+an `iter_<name>` that another operation, method or field already has.
+
+```wit
+/// @nexus.operation name="ReadRecords"
+/// @nexus.poll python="next_read_request" target="client"
+read-records: func(request: read-records-request) -> read-records-response;
+```
+
+```python
+def next_read_request(request, response):
+    if response.done:
+        return None
+    from_offset = response.next_offset
+    if from_offset is None:
+        from_offset = request.from_offset
+    return dataclasses.replace(request, from_offset=from_offset, last=None)
+```
+
+The referenced helper must be available from the package specified by
+`--support-package`.
+
+---
+
 ### @nexus.flatten-in-api
 
 **Placement:** Record type (with `@nexus.proto`) **Syntax:**

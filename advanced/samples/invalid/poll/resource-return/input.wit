@@ -1,0 +1,17 @@
+package temporal:poll-resource-return@1.0.0;
+
+world service { export reader; }
+
+/// @nexus.endpoint "reader"
+interface reader {
+  resource cursor {
+    constructor(offset: s64);
+  }
+
+  type cursor-result = own<cursor>;
+
+  record open-request { offset: s64 }
+
+  /// @nexus.poll python="next_open_request" target="client"
+  open: func(request: open-request) -> cursor-result;
+}

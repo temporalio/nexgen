@@ -18,6 +18,8 @@ import temporalio.service
 import temporalio.workflow
 from typing_extensions import override
 
+import wit.stream_service.both.workflow as workflow_package
+import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
 from wit.stream_service.both.client import Stream, StreamServiceClientExtension
 from wit.stream_service.both.workflow import _resources as workflow_resources
 from wit.stream_service.client.client import (
@@ -34,6 +36,8 @@ from wit.stream_service.both.models import (
     DescribeStreamRequest,
     DescribeStreamResponse,
     Producer,
+    ReadRecordsRequest,
+    ReadRecordsResponse,
     StreamHandle,
 )
 
@@ -115,6 +119,9 @@ class _AnswersOutbound(temporalio.client.OutboundInterceptor):
         self, input: temporalio.client.GetNexusOperationResultInput
     ) -> typing.Any:
         answer = self._answers.answers[input.operation]
+        if isinstance(answer, list):
+            # A list answers each call in turn.
+            answer = typing.cast(list[object], answer).pop(0)
         if input.result_type is None:
             return answer
         assert self._answers.client is not None
@@ -302,3 +309,39 @@ def test_resource_serialization_carries_only_identity_fields() -> None:
         "handle": dataclasses.asdict(ref),
         "created": None,
     }
+
+
+async def test_a_stream_reads_every_page_on_its_own_nexus_client() -> None:
+    ref = StreamHandle(id="s1")
+    pages = [
+        ReadRecordsResponse(next_offset=2),
+        ReadRecordsResponse(),
+        ReadRecordsResponse(done=True),
+    ]
+    client, answers = connect(
+        Client,
+        {"CreateStream": CreateStreamResult(handle=ref), "ReadRecords": list(pages)},
+    )
+    stream = await client.create_stream(id="s1")
+
+    read = [page async for page in stream.iter_read(from_offset=1)]
+
+    assert read == pages
+    assert [started.arg for started in answers.started[1:]] == [
+        ReadRecordsRequest(handle=ref, from_offset=1),
+        ReadRecordsRequest(handle=ref, from_offset=2),
+        # The empty page has no next offset, so the read stays at offset 2.
+        ReadRecordsRequest(handle=ref, from_offset=2),
+    ]
+    # The iterator uses the Nexus client that `create_stream` gave the handle, and each
+    # page is a new operation.
+    assert len(client.created_clients) == 1
+    assert len({started.id for started in answers.started}) == len(answers.started)
+
+
+def test_only_the_client_target_has_the_read_poll() -> None:
+    assert hasattr(workflow_stream_module, "read_records")
+    assert not hasattr(workflow_stream_module, "iter_read_records")
+    assert not hasattr(workflow_package, "iter_read_records")
+    assert not hasattr(workflow_stream_module.Stream, "iter_read")
+    assert hasattr(Stream, "iter_read")

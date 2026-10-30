@@ -1,0 +1,7 @@
+languages = ["python"]
+system_nexus = true
+targets = ["workflow", "client"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = ["`iter_read`", "resource method `Feed.read`", "method `Feed.iter-read`"]

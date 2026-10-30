@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import dataclasses
 import typing
 import temporalio.client
@@ -105,6 +106,39 @@ class Stream:
             id=f"{_uuid.uuid4()}",
         )
         return await handle.result()
+
+    async def iter_read(
+        self,
+        from_offset: int | None = None,
+        start: StreamReadStart | None = None,
+        max_records: int | None = None,
+        wait: datetime.timedelta | None = None,
+        create_wait: datetime.timedelta | None = None,
+        max_bytes: int | None = None,
+    ) -> collections.abc.AsyncIterator[ReadRecordsResponse]:
+        """Yield each response of ``read``, until the last one."""
+        request = ReadRecordsRequest(
+            stream=self.stream,
+            from_offset=from_offset,
+            start=start,
+            max_records=max_records,
+            wait=wait,
+            create_wait=create_wait,
+            max_bytes=max_bytes,
+        )
+        nexus_client = self._nexus_client
+        while True:
+            handle = await nexus_client.start_operation(
+                operation=StreamService.read_records,
+                arg=request,
+                id=f"{_uuid.uuid4()}",
+            )
+            response = await handle.result()
+            yield response
+            next_request = _support.next_read_request(request, response)
+            if next_request is None:
+                return
+            request = next_request
 
     async def describe(
         self,
