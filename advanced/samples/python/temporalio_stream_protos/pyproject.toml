@@ -10,19 +10,16 @@ version = "0.1.0"
 requires-python = ">=3.10"
 
 # uv installs a path dependency from a wheel that it builds, so the package needs a backend.
-# hatchling can limit that wheel to the files below.
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
 
-# Only the Stream proto modules, so the wheel adds files to temporalio and replaces none.
-[tool.hatch.build.targets.wheel]
-only-include = [
-    "temporalio/api/enums/v1/stream_pb2.py",
-    "temporalio/api/enums/v1/stream_pb2.pyi",
-    "temporalio/api/stream",
-    "temporalio/api/streamservice",
-]
+# temporalio/ here has no __init__.py, so the wheel adds the Stream modules to the installed
+# temporalio and replaces none of its files.
+[tool.uv.build-backend]
+module-name = "temporalio"
+module-root = ""
+namespace = true
 
 # A change to a module rebuilds the wheel, not only a change to this file.
 [tool.uv]
