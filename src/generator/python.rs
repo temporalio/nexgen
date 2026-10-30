@@ -7,7 +7,6 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::generator::json_schema::python as python_json;
 use crate::generator::proto::python as python_proto;
-use crate::generator::resource_plan::render_request_plan_with_sources;
 use crate::generator::{
     ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
@@ -20,7 +19,9 @@ use crate::planning::{
     PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind, PlannedSpec, PlannedType,
     message_model_name, operation_input_model, operation_output_direct_result,
 };
-use crate::planning::{RequestPlan, ResolvedResourceBindingSource};
+use crate::planning::{
+    RequestPlan, RequestPlanField, RequestPlanSource, ResolvedResourceBindingSource,
+};
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, FlagsSpec,
     FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec,
@@ -1452,8 +1453,12 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     GenerationTarget::Workflow
                 };
-                let request_expr =
-                    render_request_plan_python(method, request_plan, self.api_plan, target);
+                let request_expr = render_resource_method_request_expr(
+                    method,
+                    request_plan,
+                    self.api_plan,
+                    target,
+                );
                 if client {
                     render_resource_method_request(output, &request_expr);
                     let client = format!(
@@ -6270,7 +6275,7 @@ fn render_resource_method_operation_body(
 fn python_missing_request_defaults<'a>(
     spec: &'a PlannedSpec,
     name: &str,
-    supplied: &[crate::planning::RequestPlanField],
+    supplied: &[RequestPlanField],
     target: GenerationTarget,
 ) -> Vec<(String, &'a str)> {
     let Some(record) = spec.record(name).or_else(|| {
@@ -6302,57 +6307,118 @@ fn python_missing_request_defaults<'a>(
         .collect()
 }
 
+/// The request of a resource method, with one argument per line, as `ruff format` keeps it.
+fn render_resource_method_request_expr(
+    method: &PlannedResourceMethod,
+    plan: &RequestPlan,
+    api_plan: &PlannedSpec,
+    target: GenerationTarget,
+) -> String {
+    let RequestPlan::Construct {
+        message_name,
+        fields,
+    } = plan
+    else {
+        return render_request_plan_python(method, plan, api_plan, target);
+    };
+    let model_name = python_request_model_name(api_plan, message_name);
+    let arguments = python_request_arguments(method, message_name, fields, api_plan, target);
+    if arguments.is_empty() {
+        return format!("{model_name}()");
+    }
+    let mut expr = format!("{model_name}(\n");
+    for argument in arguments {
+        expr.push_str("            ");
+        expr.push_str(&argument);
+        expr.push_str(",\n");
+    }
+    expr.push_str("        )");
+    expr
+}
+
 fn render_request_plan_python(
     method: &PlannedResourceMethod,
     plan: &RequestPlan,
     api_plan: &PlannedSpec,
     target: GenerationTarget,
 ) -> String {
-    let render_method_param = |name: &str| {
-        let is_list = method
-            .params
-            .iter()
-            .any(|param| param.name == name && resource_method_list_param(param).is_some());
-        if is_list {
-            format!("{} or []", python_field_name(name))
-        } else {
-            python_field_name(name)
+    match plan {
+        RequestPlan::Source(RequestPlanSource::ResourceField(name)) => {
+            format!("self.{}", python_field_name(name))
         }
-    };
-    render_request_plan_with_sources(
-        plan,
-        python_field_name,
-        |name, value| format!("{name}={value}"),
-        |message_name, mut fields, supplied| {
-            fields.extend(
-                python_missing_request_defaults(api_plan, message_name, supplied, target)
-                    .into_iter()
-                    .map(|(name, expression)| format!("{name}=({expression})")),
-            );
-            let record =
-                crate::generator::resource_plan::record_for_request_name(api_plan, message_name);
-            let model_name = record
-                .map(|record| record.name.clone())
-                .unwrap_or_else(|| message_model_name(message_name));
-            if fields.is_empty() {
-                format!("{model_name}()")
+        RequestPlan::Source(RequestPlanSource::MethodParam(name)) => {
+            let is_list = method
+                .params
+                .iter()
+                .any(|param| param.name == *name && resource_method_list_param(param).is_some());
+            if is_list {
+                format!("{} or []", python_field_name(name))
             } else {
-                format!("{model_name}({})", fields.join(", "))
+                python_field_name(name)
             }
-        },
-        |name| format!("self.{}", python_field_name(name)),
-        render_method_param,
-        |message_name| {
-            crate::generator::resource_plan::record_for_request_name(api_plan, message_name)
-                .map(|record| {
-                    record
-                        .sources_for(target)
-                        .map(|(_, field, source)| (field.name.clone(), python_source_call(source)))
-                        .collect()
+        }
+        RequestPlan::Construct {
+            message_name,
+            fields,
+        } => format!(
+            "{}({})",
+            python_request_model_name(api_plan, message_name),
+            python_request_arguments(method, message_name, fields, api_plan, target).join(", ")
+        ),
+    }
+}
+
+/// The arguments of a request model, with the target's sources and defaults for the fields that
+/// the plan doesn't fill.
+fn python_request_arguments(
+    method: &PlannedResourceMethod,
+    message_name: &str,
+    fields: &[RequestPlanField],
+    api_plan: &PlannedSpec,
+    target: GenerationTarget,
+) -> Vec<String> {
+    let mut arguments = fields
+        .iter()
+        .map(|field| {
+            format!(
+                "{}={}",
+                python_field_name(&field.field_name),
+                render_request_plan_python(method, &field.value, api_plan, target)
+            )
+        })
+        .collect::<Vec<_>>();
+    if let Some(record) =
+        crate::generator::resource_plan::record_for_request_name(api_plan, message_name)
+    {
+        arguments.extend(
+            record
+                .sources_for(target)
+                .filter(|(_, field, _)| {
+                    fields
+                        .iter()
+                        .all(|planned| planned.field_name != field.name)
                 })
-                .unwrap_or_default()
-        },
-    )
+                .map(|(_, field, source)| {
+                    format!(
+                        "{}={}",
+                        python_field_name(&field.name),
+                        python_source_call(source)
+                    )
+                }),
+        );
+    }
+    arguments.extend(
+        python_missing_request_defaults(api_plan, message_name, fields, target)
+            .into_iter()
+            .map(|(name, expression)| format!("{name}=({expression})")),
+    );
+    arguments
+}
+
+fn python_request_model_name(api_plan: &PlannedSpec, message_name: &str) -> String {
+    crate::generator::resource_plan::record_for_request_name(api_plan, message_name)
+        .map(|record| record.name.clone())
+        .unwrap_or_else(|| message_model_name(message_name))
 }
 
 fn resource_method_list_param(param: &PlannedResourceField) -> Option<&PlannedType> {

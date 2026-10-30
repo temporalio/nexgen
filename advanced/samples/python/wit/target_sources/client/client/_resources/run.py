@@ -28,7 +28,10 @@ class Run:
     async def cancel(
         self,
     ) -> None:
-        request = CancelRunRequest(job_id=self.job_id, run_id=self.run_id)
+        request = CancelRunRequest(
+            job_id=self.job_id,
+            run_id=self.run_id,
+        )
         nexus_client = self._nexus_client
         handle = await nexus_client.start_operation(
             operation="CancelRun",

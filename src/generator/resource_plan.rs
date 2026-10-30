@@ -22,43 +22,6 @@ where
     FResource: Fn(&str) -> String + Copy,
     FParam: Fn(&str) -> String + Copy,
 {
-    render_request_plan_with_sources(
-        plan,
-        member_name,
-        render_assignment,
-        render_construct,
-        render_resource_field_source,
-        render_method_param_source,
-        |_| Vec::new(),
-    )
-}
-
-/// Adds target-specific source expressions at construction sites without changing
-/// the shared request plan or inferring field identities from rendered code.
-pub(crate) fn render_request_plan_with_sources<
-    FName,
-    FAssign,
-    FConstruct,
-    FResource,
-    FParam,
-    FSources,
->(
-    plan: &RequestPlan,
-    member_name: FName,
-    render_assignment: FAssign,
-    render_construct: FConstruct,
-    render_resource_field_source: FResource,
-    render_method_param_source: FParam,
-    sources: FSources,
-) -> String
-where
-    FName: Fn(&str) -> String + Copy,
-    FAssign: Fn(String, String) -> String + Copy,
-    FConstruct: Fn(&str, Vec<String>, &[RequestPlanField]) -> String + Copy,
-    FResource: Fn(&str) -> String + Copy,
-    FParam: Fn(&str) -> String + Copy,
-    FSources: Fn(&str) -> Vec<(String, String)> + Copy,
-{
     match plan {
         RequestPlan::Source(RequestPlanSource::ResourceField(name)) => {
             render_resource_field_source(name)
@@ -70,28 +33,22 @@ where
             message_name,
             fields,
         } => {
-            let mut rendered_fields = fields
+            let rendered_fields = fields
                 .iter()
                 .map(|field| {
                     render_assignment(
                         member_name(&field.field_name),
-                        render_request_plan_with_sources(
+                        render_request_plan(
                             &field.value,
                             member_name,
                             render_assignment,
                             render_construct,
                             render_resource_field_source,
                             render_method_param_source,
-                            sources,
                         ),
                     )
                 })
-                .collect::<Vec<_>>();
-            for (name, expression) in sources(message_name) {
-                if fields.iter().all(|field| field.field_name != name) {
-                    rendered_fields.push(render_assignment(member_name(&name), expression));
-                }
-            }
+                .collect();
             render_construct(message_name, rendered_fields, fields)
         }
     }

@@ -16,7 +16,10 @@ class Run:
     async def cancel(
         self,
     ) -> None:
-        request = CancelRunRequest(job_id=self.job_id, run_id=self.run_id)
+        request = CancelRunRequest(
+            job_id=self.job_id,
+            run_id=self.run_id,
+        )
         handle = await _cancel_run(request)
         await handle
 

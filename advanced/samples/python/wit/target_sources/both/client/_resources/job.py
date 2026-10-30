@@ -29,7 +29,10 @@ class Job:
     async def restart(
         self,
     ) -> None:
-        request = RestartRequest(job_id=self.job_id, shared=_support.shared_source())
+        request = RestartRequest(
+            job_id=self.job_id,
+            shared=_support.shared_source(),
+        )
         nexus_client = self._nexus_client
         handle = await nexus_client.start_operation(
             operation="Restart",
@@ -40,7 +43,9 @@ class Job:
     async def refresh(
         self,
     ) -> Job:
-        request = CreateJobRequest(job_id=self.job_id)
+        request = CreateJobRequest(
+            job_id=self.job_id,
+        )
         nexus_client = self._nexus_client
         handle = await nexus_client.start_operation(
             operation="Refresh",
