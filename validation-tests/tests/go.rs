@@ -529,8 +529,8 @@ fn go_json_examples_render_expected_language_features() {
             } else {
                 // Definitions mode emits the Nexus service/operation reference
                 // struct (so callers drive the SDK's Nexus client directly)
-                // but never the workflow client — that surface is NativeApi
-                // only, hence no `ServiceClient` type and no workflow import.
+                // but never the workflow client. That client is part of the
+                // Workflow API, hence no `ServiceClient` type and no workflow import.
                 assert!(!generated.contains("ServiceClient"));
                 assert!(!generated.contains("go.temporal.io/sdk/workflow"));
                 match example_id {

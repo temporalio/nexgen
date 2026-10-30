@@ -1,15 +1,15 @@
 # .NET advanced samples
 
 Generated C# for the WIT inputs in [`../inputs/`](../inputs/), plus the
-snapshot-only native-api form of the JSON-Schema inputs.
+snapshot-only Workflow API form of the JSON-Schema inputs.
 
 - `TemporalSupport/` — authored converters and workflow-service helpers shared
   by the generated projects.
 - `wit/` — generated output per WIT example (`workflow-service`, `user-service`,
   `type-showcase`, `proto-backed-showcase`, `start-workflow`,
   `function-execution`): models, operations, and Nexus service interfaces.
-- `json_schema/api/` — native-api (service + client) output for the JSON-Schema
-  inputs, compiled by its own project,
+- `json_schema/api/` — Workflow API (service + client) output for the
+  JSON-Schema inputs, compiled by its own project,
   `json_schema/Nexgen.DotNetJsonSchemaApi.csproj` (`net8.0` with its default C#
   12, the JSON Schema output's floor; the WIT projects pin C# 9).
 - `tests/` — endpoint runtime checks (`WorkflowService`, `UserService`), the

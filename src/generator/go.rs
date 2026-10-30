@@ -1309,9 +1309,8 @@ impl<'a> ApiPlanner<'a> {
         }
         let model_fragments = self.external_models.render_models()?;
         self.imports.extend(model_fragments.imports);
-        // The Nexus service definition (operation references) is emitted in
-        // both modes, so the `nexus` import is needed whenever a spec has
-        // services — not just in NativeApi.
+        // The Nexus service definition (operation references) is emitted with or without the
+        // Workflow API, so the `nexus` import is needed whenever a spec has services.
         if self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
             && !self

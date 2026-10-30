@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- JSON Schema native-API samples (models, services, clients). -->
+    <!-- JSON Schema Workflow API samples (models, services, clients). -->
     <Compile Remove="bin/**/*.cs;obj/**/*.cs" />
   </ItemGroup>
 

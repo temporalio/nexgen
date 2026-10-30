@@ -1457,7 +1457,7 @@ assert services.QuoteService.__doc__ == 'Service ends with a quote "', (
 
 /// A deprecated operation is declared as `typing.Annotated[Operation[...], ...]`,
 /// and `nexusrpc`'s `@service` resolves that annotation with `eval_str=True`, so
-/// `typing` has to be bound at runtime. The native-API client body imports it
+/// `typing` has to be bound at runtime. The Workflow API client body imports it
 /// incidentally; a definitions-only package does not, which is why this probe
 /// runs in definitions-only mode and *imports* the result.
 /// See `specs/json-schema/features/deprecated.md`.

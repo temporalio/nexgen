@@ -411,15 +411,15 @@ validated. Proto oneof member names must round-trip through WIT's snake-case
 wire naming; the scaffolder rejects a name that cannot be represented without
 changing it.
 
-Python native-API generation converts both authored shapes bidirectionally. For
-`option<variant>`, an unset protobuf oneof decodes to `None`, and encoding
+Python Workflow API generation converts both authored shapes bidirectionally.
+For `option<variant>`, an unset protobuf oneof decodes to `None`, and encoding
 `None` leaves the oneof unset. A required `variant` has no `None` annotation or
 constructor default; decoding an unset oneof or encoding a runtime `None` raises
 `ValueError("missing required field Model.field")`. Each selected case uses the
 normal WIT variant tuple form `(tag, payload)`, and unknown authored tags
 continue to raise `ValueError`.
 
-.NET native-API generation converts both shapes as well: the containing model
+.NET Workflow API generation converts both shapes as well: the containing model
 switches over the protobuf oneof case to construct the variant's nested case
 record, an unset `option<variant>` decodes to `null`, and an unset required
 oneof throws `InvalidOperationException`. Encoding a `null` required variant
