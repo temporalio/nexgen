@@ -12,17 +12,14 @@ use serde::Deserialize;
 
 use crate::error::{Error, Result};
 
-#[derive(Default, Deserialize)]
+#[derive(Default)]
 struct ExamplesConfig {
-    #[serde(flatten)]
     examples: std::collections::BTreeMap<String, ExampleConfig>,
 }
 
-#[derive(Clone, Default, Deserialize)]
+#[derive(Clone, Default)]
 struct ExampleConfig {
-    #[serde(flatten)]
     options: ExampleOptions,
-    #[serde(flatten)]
     children: std::collections::BTreeMap<String, ExampleConfig>,
 }
 
@@ -58,7 +55,58 @@ enum ExampleTarget {
     Client,
 }
 
+/// The keys of a table that are settings. Any other key must be a child table.
+const OPTION_KEYS: [&str; 4] = ["languages", "system_nexus", "targets", "descriptors"];
+
+impl ExamplesConfig {
+    fn from_table(table: toml::Table) -> std::result::Result<Self, String> {
+        let mut examples = std::collections::BTreeMap::new();
+        for (name, value) in table {
+            let toml::Value::Table(section) = value else {
+                return Err(format!(
+                    "unknown setting `{name}` outside an example section"
+                ));
+            };
+            let example = ExampleConfig::from_table(&name, section, true)?;
+            examples.insert(name, example);
+        }
+        Ok(Self { examples })
+    }
+}
+
 impl ExampleConfig {
+    // Splitting the keys by hand keeps a misspelled setting from becoming a child
+    // configuration, which would silently stop the parent from generating.
+    fn from_table(
+        path: &str,
+        table: toml::Table,
+        allow_children: bool,
+    ) -> std::result::Result<Self, String> {
+        let mut options = toml::Table::new();
+        let mut children = std::collections::BTreeMap::new();
+        for (key, value) in table {
+            if OPTION_KEYS.contains(&key.as_str()) {
+                options.insert(key, value);
+                continue;
+            }
+            let toml::Value::Table(child) = value else {
+                return Err(format!("unknown setting `{key}` in `[{path}]`"));
+            };
+            if !allow_children {
+                return Err(format!(
+                    "`{path}.{key}`: child configurations cannot contain further \
+                     child configurations"
+                ));
+            }
+            let child_path = format!("{path}.{key}");
+            children.insert(key, Self::from_table(&child_path, child, false)?);
+        }
+        let options = toml::Value::Table(options)
+            .try_into()
+            .map_err(|error: toml::de::Error| format!("`[{path}]`: {}", error.message()))?;
+        Ok(Self { options, children })
+    }
+
     fn configurations(&self, example_id: &str) -> Vec<(PathBuf, ExampleOptions)> {
         if self.children.is_empty() {
             return vec![(PathBuf::from(example_id), self.options.clone())];
@@ -356,9 +404,10 @@ fn load_examples_config(input_root: &Path) -> Result<ExamplesConfig> {
 }
 
 fn parse_examples_config(contents: &str) -> std::result::Result<ExamplesConfig, String> {
-    let config: ExamplesConfig = toml::from_str(contents).map_err(|error| error.to_string())?;
+    let table: toml::Table = toml::from_str(contents).map_err(|error| error.to_string())?;
+    let config = ExamplesConfig::from_table(table)?;
     for (name, example) in &config.examples {
-        for (child_name, child) in &example.children {
+        for child_name in example.children.keys() {
             if !child_name.chars().any(|c| c.is_ascii_alphanumeric())
                 || !child_name
                     .chars()
@@ -366,11 +415,6 @@ fn parse_examples_config(contents: &str) -> std::result::Result<ExamplesConfig, 
             {
                 return Err(format!(
                     "`{name}.{child_name}`: a child configuration name must contain letters or numbers and may use '-' or '_'"
-                ));
-            }
-            if !child.children.is_empty() {
-                return Err(format!(
-                    "`{name}.{child_name}`: child configurations cannot contain further child configurations"
                 ));
             }
         }
@@ -1109,14 +1153,38 @@ targets = ["workflow"]
 
     #[test]
     fn configuration_rejects_unknown_settings_and_nested_children() {
-        for source in [
-            "[sample]\nsystem_nexuz = true\n",
-            "[sample.child]\nsystem_nexuz = true\n",
-            "[sample.child.grandchild]\ntargets = []\n",
-            "[sample.\"../outside\"]\ntargets = []\n",
-            "[sample.\"__\"]\ntargets = []\n",
+        for (source, message) in [
+            (
+                "[sample]\nsystem_nexuz = true\n",
+                "unknown setting `system_nexuz` in `[sample]`",
+            ),
+            (
+                "[sample]\ntargets = [\"workflow\"]\n\n[sample.child]\nsystem_nexuz = true\n",
+                "unknown setting `system_nexuz` in `[sample.child]`",
+            ),
+            (
+                "[sample.child]\ntarget = [\"client\"]\n",
+                "unknown setting `target` in `[sample.child]`",
+            ),
+            (
+                "system_nexus = true\n",
+                "unknown setting `system_nexus` outside an example section",
+            ),
+            (
+                "[sample.child.grandchild]\ntargets = []\n",
+                "`sample.child.grandchild`: child configurations cannot contain further",
+            ),
+            (
+                "[sample.\"../outside\"]\ntargets = []\n",
+                "`sample.../outside`: a child configuration name must",
+            ),
+            (
+                "[sample.\"__\"]\ntargets = []\n",
+                "`sample.__`: a child configuration name must",
+            ),
         ] {
-            assert!(parse_examples_config(source).is_err(), "{source}");
+            let error = parse_examples_config(source).err().unwrap_or_default();
+            assert!(error.contains(message), "{source}\n{error}");
         }
     }
 
