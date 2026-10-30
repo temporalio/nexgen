@@ -603,6 +603,8 @@ impl<'a> ApiPlanner<'a> {
         module_origin: GeneratedFileOrigin,
     ) -> Result<(GeneratedFileMap, BTreeSet<String>)> {
         let targets = crate::nexgen_config::current().targets;
+        // Two services with operations of the same name also clash on a Workflow package file.
+        // Check the client names first, so that the error names the client method.
         if targets.client {
             validate_client_names(services)?;
         }
@@ -825,7 +827,7 @@ impl<'a> ApiPlanner<'a> {
                 files.insert(
                     format!("_resources/{}.py", resource_module_name(resource)),
                     self.render_resource_module_file(
-                        Some(PythonTarget::Workflow),
+                        Some(GenerationTarget::Workflow),
                         service,
                         resource,
                         &bound_operations,
@@ -882,7 +884,7 @@ impl<'a> ApiPlanner<'a> {
         if services.is_empty() {
             return Ok(());
         }
-        let dir = PythonTarget::Client
+        let dir = GenerationTarget::Client
             .package_dir()
             .expect("the client target should have a package directory");
         let origin = || GeneratedFileOrigin::fixed("generated Python client package");
@@ -915,7 +917,7 @@ impl<'a> ApiPlanner<'a> {
                 files.insert(
                     format!("{dir}/_resources/{}.py", resource_module_name(resource)),
                     self.render_resource_module_file(
-                        Some(PythonTarget::Client),
+                        Some(GenerationTarget::Client),
                         service,
                         resource,
                         &resource_bound_operations(service, resource),
@@ -944,7 +946,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
             });
         }
-        let package = PythonTarget::Client
+        let package = GenerationTarget::Client
             .package_dir()
             .expect("the client target should have a package directory");
         // The parent package exports each operation, and an import of the client package sets
@@ -965,7 +967,6 @@ impl<'a> ApiPlanner<'a> {
                 conflicting_declaration: format!("operation `{}.{}`", service.name, operation.name),
             });
         }
-        validate_client_names(services)?;
         let operations = services
             .iter()
             .flat_map(|service| service.operations.iter())
@@ -983,7 +984,7 @@ impl<'a> ApiPlanner<'a> {
         }
         let function_fields = operations
             .iter()
-            .filter_map(|operation| operation.target_unpacked_input(PythonTarget::Client))
+            .filter_map(|operation| operation.target_unpacked_input(GenerationTarget::Client))
             .flat_map(|unpacked_input| unpacked_input.functions.iter().cloned())
             .collect::<Vec<_>>();
         let output_type_parameters = operations
@@ -1036,7 +1037,7 @@ impl<'a> ApiPlanner<'a> {
                 &mut output,
                 "..models",
                 &self.api_plan.module_path.child(
-                    PythonTarget::Client
+                    GenerationTarget::Client
                         .package_dir()
                         .expect("the client target should have a package directory"),
                 ),
@@ -1067,7 +1068,7 @@ impl<'a> ApiPlanner<'a> {
 
     fn render_resource_module_file(
         &self,
-        target: Option<PythonTarget>,
+        target: Option<GenerationTarget>,
         service: &RenderedService<'_>,
         resource: &PlannedResource,
         bound_operations: &[ResourceBoundOperation<'_>],
@@ -1117,7 +1118,7 @@ impl<'a> ApiPlanner<'a> {
             );
             body.push_str("\n\n");
         }
-        let client = target == Some(PythonTarget::Client);
+        let client = target == Some(GenerationTarget::Client);
         self.render_resource(&mut body, service, resource, bound_operations, client);
         let has_resource_data = client
             && service.operations.iter().any(|operation| {
@@ -1138,13 +1139,13 @@ impl<'a> ApiPlanner<'a> {
                 module_imports.extend(field.imports.module_imports.iter().cloned());
             }
         }
-        let workflow = target == Some(PythonTarget::Workflow);
+        let workflow = target == Some(GenerationTarget::Workflow);
         if workflow && !bound_operations.is_empty() && service.endpoint.is_some() {
             body.push_str("\n\n");
             for (index, bound_operation) in bound_operations.iter().enumerate() {
                 render_operation_functions(
                     &mut body,
-                    PythonTarget::Workflow,
+                    GenerationTarget::Workflow,
                     service,
                     bound_operation.operation,
                 );
@@ -1240,7 +1241,7 @@ impl<'a> ApiPlanner<'a> {
         }
         let used_model_names = used_python_symbol_imports(&body, model_names);
         if !used_model_names.is_empty() {
-            let (models, module_path) = match target.and_then(PythonTarget::package_dir) {
+            let (models, module_path) = match target.and_then(GenerationTarget::package_dir) {
                 None => ("..models", self.api_plan.module_path.child("_resources")),
                 Some(dir) => (
                     "...models",
@@ -3107,10 +3108,10 @@ struct RenderedOperation<'a> {
 }
 
 impl RenderedOperation<'_> {
-    fn target_unpacked_input(&self, target: PythonTarget) -> Option<&RenderedUnpackedInput> {
+    fn target_unpacked_input(&self, target: GenerationTarget) -> Option<&RenderedUnpackedInput> {
         match target {
-            PythonTarget::Workflow => self.unpacked_input.as_ref(),
-            PythonTarget::Client => self
+            GenerationTarget::Workflow => self.unpacked_input.as_ref(),
+            GenerationTarget::Client => self
                 .client_unpacked_input
                 .as_ref()
                 .or(self.unpacked_input.as_ref()),
@@ -4960,7 +4961,7 @@ fn render_operation_module(
         );
         body.push_str("\n\n");
     }
-    render_operation_functions(&mut body, PythonTarget::Workflow, service, operation);
+    render_operation_functions(&mut body, GenerationTarget::Workflow, service, operation);
     if !service.delay_load_temporalio_workflow {
         module_imports.insert("temporalio.workflow".to_string());
     }
@@ -5730,6 +5731,17 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
                 client_operation_name(service, operation),
             ];
             for name in names {
+                // A method of this name replaces the hook that each extension calls.
+                if name == CLIENT_NEXUS_CLIENT_HOOK {
+                    return Err(Error::PythonGeneratedNameConflict {
+                        name,
+                        generated_by: "the hook of each client extension".to_string(),
+                        conflicting_declaration: format!(
+                            "a client method of operation `{}.{}`",
+                            service.name, operation.name
+                        ),
+                    });
+                }
                 if let Some(first_service) = owners.insert(name.clone(), service.name) {
                     return Err(Error::ClientTargetNameConflict {
                         name,
@@ -5767,6 +5779,8 @@ class _NexusClient(typing.Protocol):
         input: typing.Any,
     ) -> collections.abc.Awaitable[None]: ...
 "#;
+
+const CLIENT_NEXUS_CLIENT_HOOK: &str = "_create_nexus_client";
 
 const PYTHON_CLIENT_EXTENSION_HOOK: &str = r#"
     @abc.abstractmethod
@@ -5826,7 +5840,7 @@ fn render_client_extension(output: &mut String, service: &RenderedService<'_>) {
     output.push_str(PYTHON_CLIENT_EXTENSION_HOOK);
     for operation in &service.operations {
         output.push('\n');
-        render_operation_functions(output, PythonTarget::Client, service, operation);
+        render_operation_functions(output, GenerationTarget::Client, service, operation);
     }
 }
 
@@ -6442,7 +6456,7 @@ enum PythonTypeParameter {
 
 fn render_function_unpacked_overloads(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
@@ -6935,7 +6949,7 @@ fn overload_case_for_callable<'a>(
 
 fn render_function_unpacked_overload(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
@@ -7166,7 +7180,7 @@ fn function_unpacked_overload_renders_parameter_name(
 
 fn render_function_unpacked_overload_case_doc(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     unpacked_input: &RenderedUnpackedInput,
     overload_cases: &[RenderedFunctionOverloadCase],
 ) {
@@ -7273,7 +7287,7 @@ fn function_overload_args_doc(
 }
 
 fn function_unpacked_overload_return_annotation(
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     overload_cases: &[RenderedFunctionOverloadCase],
@@ -7303,7 +7317,7 @@ fn function_unpacked_overload_return_annotation(
             );
         }
     }
-    if target == PythonTarget::Client {
+    if target == GenerationTarget::Client {
         return output_annotation;
     }
     let output_annotation = temporalio_workflow_type_annotation(service, &output_annotation);
@@ -7375,66 +7389,47 @@ fn replace_python_identifier(source: &str, identifier: &str, replacement: &str) 
     output
 }
 
-/// The target of the operation code. The renderers take it, since the target sets the form of the
-/// code, such as its indent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PythonTarget {
-    /// Module functions that Workflow code calls.
-    Workflow,
-    /// Methods of a client extension, which code outside a Workflow calls.
-    Client,
+/// The indent of each line at the level of the target's `def`. The Workflow target writes module
+/// functions, and the client target writes methods of a client extension.
+fn target_indent(target: GenerationTarget) -> &'static str {
+    match target {
+        GenerationTarget::Workflow => "",
+        GenerationTarget::Client => "    ",
+    }
 }
 
-impl PythonTarget {
-    fn package_dir(self) -> Option<&'static str> {
-        match self {
-            Self::Workflow => GenerationTarget::Workflow,
-            Self::Client => GenerationTarget::Client,
-        }
-        .package_dir()
-    }
-
-    /// The indent of each line at the level of the target's `def`.
-    fn indent(self) -> &'static str {
-        match self {
-            Self::Workflow => "",
-            Self::Client => "    ",
-        }
-    }
-
-    /// The indent one level deeper than `indent`, as in the target's function bodies.
-    fn body_indent(self) -> &'static str {
-        const SPACES: &str = "        ";
-        &SPACES[..self.indent().len() + 4]
-    }
+/// The indent one level deeper than `target_indent`, as in the target's function bodies.
+fn target_body_indent(target: GenerationTarget) -> &'static str {
+    const SPACES: &str = "        ";
+    &SPACES[..target_indent(target).len() + 4]
 }
 
 /// Starts the `def` line of an operation, with `self` for a method.
-fn render_operation_signature_start(output: &mut String, target: PythonTarget, name: &str) {
+fn render_operation_signature_start(output: &mut String, target: GenerationTarget, name: &str) {
     start_line(output, target, "async def ");
     output.push_str(name);
     output.push_str("(\n");
-    if target == PythonTarget::Client {
+    if target == GenerationTarget::Client {
         start_line(output, target, "    self,\n");
     }
 }
 
-fn start_line(output: &mut String, target: PythonTarget, text: &str) {
-    output.push_str(target.indent());
+fn start_line(output: &mut String, target: GenerationTarget, text: &str) {
+    output.push_str(target_indent(target));
     output.push_str(text);
 }
 
 fn render_operation_functions(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
     match target {
-        PythonTarget::Workflow => {
+        GenerationTarget::Workflow => {
             render_request_only_operation_function(output, service, operation)
         }
-        PythonTarget::Client => render_client_operation_method(output, service, operation),
+        GenerationTarget::Client => render_client_operation_method(output, service, operation),
     }
     if let Some(unpacked_input) = operation.target_unpacked_input(target) {
         output.push('\n');
@@ -7443,7 +7438,7 @@ fn render_operation_functions(
             output.push('\n');
         }
         render_unpacked_operation_function(output, target, service, operation, unpacked_input);
-    } else if target == PythonTarget::Client {
+    } else if target == GenerationTarget::Client {
         output.push('\n');
         render_client_request_method(output, service, operation);
     }
@@ -7483,7 +7478,7 @@ fn render_client_operation_method(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
-    let target = PythonTarget::Client;
+    let target = GenerationTarget::Client;
     render_operation_signature_start(output, target, &client_operation_name(service, operation));
     if let Some(input) = &operation.input {
         start_line(output, target, "    request: ");
@@ -7503,7 +7498,7 @@ fn render_client_operation_body(
     client: Option<&str>,
     discard_result: bool,
 ) {
-    let target = PythonTarget::Client;
+    let target = GenerationTarget::Client;
     if let Some(client) = client {
         start_line(output, target, "    nexus_client = ");
         output.push_str(client);
@@ -7560,7 +7555,12 @@ fn render_client_operation_body(
         output.push('\n');
     } else if let Some(resource_return) = &operation.output_resource_return {
         start_line(output, target, "    result = await handle\n");
-        render_resource_return_guards(output, target.body_indent(), operation, resource_return);
+        render_resource_return_guards(
+            output,
+            target_body_indent(target),
+            operation,
+            resource_return,
+        );
         if let Some(holder) = &resource_return.holder {
             render_resource_holder_return(output, target, resource_return, holder);
             return;
@@ -7610,7 +7610,7 @@ fn render_client_request_method(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
-    let target = PythonTarget::Client;
+    let target = GenerationTarget::Client;
     if operation.deprecated {
         start_line(
             output,
@@ -7627,7 +7627,7 @@ fn render_client_request_method(
     start_line(output, target, ") -> ");
     output.push_str(&operation_result_annotation(operation));
     output.push_str(":\n");
-    render_operation_docstring(output, target.body_indent(), operation, &[], None);
+    render_operation_docstring(output, target_body_indent(target), operation, &[], None);
     start_line(output, target, "    return await self.");
     output.push_str(&client_operation_name(service, operation));
     if operation.input.is_some() {
@@ -7751,7 +7751,7 @@ fn render_request_only_operation_function(
             &temporalio_workflow_operation_runtime_names(service, operation),
             "    ",
         );
-        render_inline_nexus_client(output, PythonTarget::Workflow, service);
+        render_inline_nexus_client(output, GenerationTarget::Workflow, service);
         if operation.generic_model_types {
             output.push_str("    return typing.cast(\n");
             output.push_str("        ");
@@ -7814,7 +7814,7 @@ fn render_request_only_operation_function(
     );
 
     if operation.output_direct_result {
-        render_inline_nexus_client(output, PythonTarget::Workflow, service);
+        render_inline_nexus_client(output, GenerationTarget::Workflow, service);
         output.push_str("    handle = await nexus_client.start_operation(\n");
         output.push_str("        operation=");
         output.push_str(&python_string_literal(operation.wire_name));
@@ -7831,7 +7831,7 @@ fn render_request_only_operation_function(
         return;
     }
 
-    render_inline_nexus_client(output, PythonTarget::Workflow, service);
+    render_inline_nexus_client(output, GenerationTarget::Workflow, service);
     output.push_str("    handle = await nexus_client.start_operation(\n");
     output.push_str("        operation=");
     output.push_str(&python_string_literal(operation.wire_name));
@@ -7854,7 +7854,12 @@ fn render_request_only_operation_function(
         output.push_str("    result = await handle\n");
         render_resource_return_guards(output, "    ", operation, resource_return);
         if let Some(holder) = &resource_return.holder {
-            render_resource_holder_return(output, PythonTarget::Workflow, resource_return, holder);
+            render_resource_holder_return(
+                output,
+                GenerationTarget::Workflow,
+                resource_return,
+                holder,
+            );
             return;
         }
         output.push_str("    return ");
@@ -7875,7 +7880,7 @@ fn render_request_only_operation_function(
 /// field of the same name in the wire record.
 fn render_resource_holder_return(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     resource_return: &PlannedOperationResourceReturn,
     holder: &PlannedResourceHolder,
 ) {
@@ -7895,7 +7900,7 @@ fn render_resource_holder_return(
         output.push('=');
         output.push_str(&resource_return.resource_type_name);
         output.push_str("(\n");
-        if target == PythonTarget::Client {
+        if target == GenerationTarget::Client {
             start_line(output, target, "            nexus_client,\n");
         }
         for binding in &resource_return.bindings {
@@ -8213,7 +8218,7 @@ fn python_docstring_literal_text(value: &str) -> String {
 
 fn render_unpacked_operation_function(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
@@ -8223,7 +8228,7 @@ fn render_unpacked_operation_function(
         return;
     }
 
-    let body_indent = target.body_indent();
+    let body_indent = target_body_indent(target);
     if operation.deprecated {
         start_line(
             output,
@@ -8273,12 +8278,12 @@ fn render_unpacked_operation_function(
 /// handle, unless it awaits the result itself.
 fn render_unpacked_return_annotation(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
     start_line(output, target, ") -> ");
-    if target == PythonTarget::Client {
+    if target == GenerationTarget::Client {
         output.push_str(&erase_python_type_parameters_with_replacement(
             &operation.overload_output_annotation,
             &operation.output_type_parameters,
@@ -8307,13 +8312,13 @@ fn render_unpacked_return_annotation(
 
 /// The function or method that an unpacked operation passes its request to.
 fn operation_call_target(
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) -> String {
     match target {
-        PythonTarget::Workflow => request_operation_function_name(operation),
-        PythonTarget::Client => format!("self.{}", client_operation_name(service, operation)),
+        GenerationTarget::Workflow => request_operation_function_name(operation),
+        GenerationTarget::Client => format!("self.{}", client_operation_name(service, operation)),
     }
 }
 
@@ -8349,7 +8354,7 @@ fn operation_public_return_annotation(
 
 fn render_function_unpacked_implementation(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     unpacked_input: &RenderedUnpackedInput,
@@ -8434,7 +8439,7 @@ fn render_function_unpacked_implementation(
             ));
         }
         if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
-            render_python_default_expr(output, &default_expr, target.body_indent());
+            render_python_default_expr(output, &default_expr, target_body_indent(target));
         }
         output.push_str(",\n");
     }
@@ -8442,7 +8447,7 @@ fn render_function_unpacked_implementation(
     render_unpacked_return_annotation(output, target, service, operation);
     render_unpacked_operation_docstring(
         output,
-        target.body_indent(),
+        target_body_indent(target),
         operation,
         unpacked_input,
         primary_function,
@@ -8500,7 +8505,7 @@ fn render_function_unpacked_implementation(
         }
     }
     for flattened_message in &unpacked_input.flattened_messages {
-        render_flattened_message_setup(output, target.body_indent(), flattened_message);
+        render_flattened_message_setup(output, target_body_indent(target), flattened_message);
     }
 
     start_line(output, target, "    request = ");
@@ -8611,7 +8616,7 @@ fn render_flattened_message_setup(
 
 fn render_inline_nexus_client(
     output: &mut String,
-    target: PythonTarget,
+    target: GenerationTarget,
     service: &RenderedService<'_>,
 ) {
     let endpoint = python_string_literal(
@@ -8621,15 +8626,15 @@ fn render_inline_nexus_client(
             .expect("an operation function should have a service endpoint"),
     );
     match target {
-        PythonTarget::Client => start_line(
+        GenerationTarget::Client => start_line(
             output,
             target,
             "    nexus_client = self._create_nexus_client(\n",
         ),
-        PythonTarget::Workflow if service.delay_load_temporalio_workflow => {
+        GenerationTarget::Workflow if service.delay_load_temporalio_workflow => {
             start_line(output, target, "    nexus_client = create_nexus_client(\n")
         }
-        PythonTarget::Workflow => start_line(
+        GenerationTarget::Workflow => start_line(
             output,
             target,
             "    nexus_client = temporalio.workflow.create_nexus_client(\n",

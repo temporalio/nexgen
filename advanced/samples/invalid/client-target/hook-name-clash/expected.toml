@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["client"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = ["`_create_nexus_client`", "operation `Create.NexusClient`"]

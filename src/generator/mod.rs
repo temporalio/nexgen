@@ -480,7 +480,6 @@ pub(crate) fn generate_files_from_planned_tree(
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     let targets = crate::nexgen_config::current().targets;
-    validate_targets(language)?;
     fn validate_sources(
         node: &ApiSpecNode<PlannedFamily>,
         targets: GenerationTargets,
@@ -527,16 +526,12 @@ pub(crate) fn generate_files_from_planned_tree(
 }
 
 pub(crate) fn validate_targets(language: Language) -> Result<()> {
-    let config = crate::nexgen_config::current();
-    if !config.targets.client {
-        return Ok(());
+    if crate::nexgen_config::current().targets.client && !language.has_client_target() {
+        return Err(Error::UnsupportedClientTarget {
+            reason: format!("isn't for {language} yet"),
+        });
     }
-    let reason = if !language.has_client_target() {
-        format!("isn't for {language} yet")
-    } else {
-        return Ok(());
-    };
-    Err(Error::UnsupportedClientTarget { reason })
+    Ok(())
 }
 
 fn generate_go_tree(
