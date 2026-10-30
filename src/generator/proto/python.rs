@@ -14,7 +14,9 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding, PlannedWireVariantMember, relative_descriptor_name,
 };
-use crate::spec::{EnumSpec, ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
+use crate::spec::{
+    EnumSpec, ExternalTypeSpec, FieldOrigin, RecordFieldSpec, RecordSpec, TypeReplacementSpec,
+};
 
 #[derive(Debug)]
 struct RenderedWireRead {
@@ -1178,7 +1180,7 @@ fn render_record_wire_block(
     let proto_fields = planned_model
         .fields
         .values()
-        .filter(|field| field.visibility != crate::spec::RecordFieldVisibility::Omitted)
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
         .map(|field| ModelBackend::analyze_field(api_plan, planned_model, field, resolve_type))
         .collect::<Result<Vec<_>>>()?;
     let type_arguments = runtime_type_arguments(model);
@@ -1247,9 +1249,7 @@ fn render_record_wire_block(
             for (((field_name, planned_field), rendered_field), proto_field) in planned_model
                 .fields
                 .iter()
-                .filter(|(_, field)| {
-                    field.visibility != crate::spec::RecordFieldVisibility::Omitted
-                })
+                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
                 .map(|(name, field)| (name.as_str(), field))
                 .zip(model.fields.iter())
                 .zip(proto_fields.iter())
@@ -1293,9 +1293,7 @@ fn render_record_wire_block(
             for (((field_name, planned_field), rendered_field), proto_field) in planned_model
                 .fields
                 .iter()
-                .filter(|(_, field)| {
-                    field.visibility != crate::spec::RecordFieldVisibility::Omitted
-                })
+                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
                 .map(|(name, field)| (name.as_str(), field))
                 .zip(model.fields.iter())
                 .zip(proto_fields.iter())
@@ -1362,7 +1360,7 @@ fn render_record_wire_block(
         for (((field_name, planned_field), rendered_field), proto_field) in planned_model
             .fields
             .iter()
-            .filter(|(_, field)| field.visibility != crate::spec::RecordFieldVisibility::Omitted)
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
             .map(|(name, field)| (name.as_str(), field))
             .zip(model.fields.iter())
             .zip(proto_fields.iter())

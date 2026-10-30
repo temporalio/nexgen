@@ -22,6 +22,7 @@ pub(crate) struct OperationBoundResource {
 pub(crate) struct OperationBoundFamily;
 
 impl TypeFamily for OperationBoundFamily {
+    type Origin = Option<crate::spec::FieldOrigin>;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -98,6 +99,12 @@ impl CompilerPass<ResourceBoundFamily, OperationBoundFamily> for OperationBindin
 struct OperationBindingMapper;
 
 impl ApiSpecTransform<ResourceBoundFamily, OperationBoundFamily> for OperationBindingMapper {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldOrigin>,
+    ) -> Option<crate::spec::FieldOrigin> {
+        origin
+    }
     fn map_spec_data(&mut self, _data: ResourceBoundData) {}
     fn map_record(&mut self, value: Symbol) -> Symbol {
         value

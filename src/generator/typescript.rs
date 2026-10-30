@@ -25,10 +25,10 @@ use crate::planning::{
 };
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec,
-    FunctionFieldSpec, FunctionResultSpec, IntSpec, LanguageImportSpec, LanguageImportStyle,
-    ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
-    SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, FlagsSpec,
+    FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, IntSpec, LanguageImportSpec,
+    LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec, RecordSpec, SelectedTextSpec,
+    TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -451,7 +451,7 @@ impl<'a> ApiPlanner<'a> {
                         let mut fields = record
                             .fields
                             .values()
-                            .filter(|field| field.visibility == RecordFieldVisibility::ApiOmitted)
+                            .filter(|field| matches!(field.origin, Some(FieldOrigin::ApiOmitted)))
                             .map(|field| field.name.clone())
                             .collect::<Vec<_>>();
                         fields.extend(
@@ -926,12 +926,7 @@ impl<'a> ApiPlanner<'a> {
                     format!("Record<string, {}>", value_type.annotation),
                 ),
                 doc,
-                optional: !field.required
-                    || field
-                        .default_value
-                        .as_ref()
-                        .and_then(|text| text.value())
-                        .is_none(),
+                optional: !field.required || !field.has_default(),
                 from_wire_expr: map_value_from_wire_expr(&value_type, wire_field_expr),
                 to_wire_expr: map_value_to_wire_expr_from_expr(
                     &value_type,
@@ -1100,12 +1095,7 @@ impl<'a> ApiPlanner<'a> {
                     typescript_array_annotation(&resolved_type.annotation),
                 ),
                 doc,
-                optional: !field.required
-                    || field
-                        .default_value
-                        .as_ref()
-                        .and_then(|text| text.value())
-                        .is_none(),
+                optional: !field.required || !field.has_default(),
                 from_wire_expr: repeated_from_wire_expr(&resolved_type, wire_field_expr),
                 to_wire_expr: repeated_to_wire_expr(&resolved_type, &generated_field_name),
                 flattened_fields: Vec::new(),
@@ -1273,7 +1263,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
-                targets: field.visibility.source_targets(),
+                targets: field.source_targets(),
                 visible: true,
                 from_wire_expr: map_value_from_wire_expr(
                     &value_type,
@@ -1298,7 +1288,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
-                targets: field.visibility.source_targets(),
+                targets: field.source_targets(),
                 visible: true,
                 from_wire_expr: format!(
                     "{} ?? []",
@@ -1313,7 +1303,7 @@ impl<'a> ApiPlanner<'a> {
             annotation: Self::typescript_field_annotation(field, resolved_type.annotation.clone()),
             doc,
             source_expr: default_source_expr,
-            targets: field.visibility.source_targets(),
+            targets: field.source_targets(),
             visible: true,
             from_wire_expr: required_from_wire_expr(
                 &resolved_type,
@@ -5596,7 +5586,7 @@ fn typescript_operation_defaults(
     let mut overrides = Vec::new();
     let mut assignments = Vec::new();
     for (field_name, field) in record.model_fields() {
-        let default = field.default_value.as_ref().and_then(|text| text.value());
+        let default = field.default_for(crate::nexgen_config::GenerationTarget::Workflow);
         let Some(rendered) = model.fields.iter().find(|rendered| {
             rendered.wire_name == field_name
                 || rendered.name == typescript_generated_field_name(&field.name)
@@ -5610,7 +5600,7 @@ fn typescript_operation_defaults(
             let nested_record = api_plan
                 .record(&nested_type.full_name)
                 .expect("flattened record exists");
-            let present = if field.api_required() {
+            let present = if field.api_required(crate::nexgen_config::GenerationTarget::Workflow) {
                 "true".to_string()
             } else {
                 rendered
@@ -5626,10 +5616,8 @@ fn typescript_operation_defaults(
                     .find(|(_, spec)| typescript_generated_field_name(&spec.name) == child.name)
                     .map(|(_, spec)| spec)
                     .expect("flattened child exists");
-                let Some(default) = child_spec
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
+                let Some(default) =
+                    child_spec.default_for(crate::nexgen_config::GenerationTarget::Workflow)
                 else {
                     continue;
                 };
@@ -5668,7 +5656,7 @@ fn typescript_operation_defaults(
     let omitted = record
         .fields
         .values()
-        .filter(|field| field.visibility == RecordFieldVisibility::ApiOmitted)
+        .filter(|field| matches!(field.origin, Some(FieldOrigin::ApiOmitted)))
         .map(|field| field.name.clone())
         .chain(record.sourced_fields().map(|(name, _, _)| name.to_string()))
         .collect::<BTreeSet<_>>();
@@ -6474,9 +6462,12 @@ fn resource_return_binding_expr_typescript(
         ResolvedResourceBindingSource::RequestField {
             field_name,
             proto_field_name,
-            hidden,
+            origin,
         } => {
-            if *hidden {
+            if matches!(
+                origin,
+                Some(FieldOrigin::Source { .. } | FieldOrigin::Omitted)
+            ) {
                 let expr = format!(
                     "request.{}",
                     typescript_generated_field_name(proto_field_name)

@@ -9,9 +9,9 @@ use crate::error::{Error, Result};
 use crate::spec::{
     AliasTypeSpec, ApiSpec, ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec,
     ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec, FunctionFieldSpec,
-    FunctionResultSpec, JsonModelSpec, ModulePath, OperationSpec, RecordFieldVisibility,
-    RecordSpec, ResourceFieldSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec,
-    ServiceSpec, Symbol, TypeDeclSpec, TypeFamily, TypeReplacementSpec, TypeSpec,
+    FunctionResultSpec, JsonModelSpec, ModulePath, OperationSpec, RecordSpec, ResourceFieldSpec,
+    SelectedFamily, SelectedResourceType, SelectedTextSpec, ServiceSpec, Symbol, TypeDeclSpec,
+    TypeFamily, TypeReplacementSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, ApiSpecNode, ApiSpecTree, CompilerPass};
 
@@ -50,6 +50,7 @@ pub(crate) use type_planning::TypePlanningPass;
 pub(crate) struct PlannedFamily;
 
 impl TypeFamily for PlannedFamily {
+    type Origin = Option<crate::spec::FieldOrigin>;
     type SpecData = PlannedSpecData;
     type Record = PlannedRecordType;
     type Enum = PlannedEnumType;

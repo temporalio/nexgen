@@ -488,7 +488,7 @@ pub(crate) fn generate_files_from_planned_tree(
         match node {
             ApiSpecNode::Leaf(leaf) => {
                 for target in targets.iter() {
-                    resource_plan::validate_resource_sources(&leaf.spec, target)?;
+                    resource_plan::validate_resource_origins(&leaf.spec, target)?;
                 }
             }
             ApiSpecNode::Branch(branch) => {

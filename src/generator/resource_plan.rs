@@ -5,7 +5,7 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedResourceMethodBindingSpec, PlannedSpec, RequestPlan,
     RequestPlanField, RequestPlanSource,
 };
-use crate::spec::{ExternalTypeSourceSpec, RecordSpec};
+use crate::spec::{ExternalTypeSourceSpec, FieldOrigin, RecordSpec};
 
 pub(crate) fn render_request_plan<FName, FAssign, FConstruct, FResource, FParam>(
     plan: &RequestPlan,
@@ -115,7 +115,7 @@ pub(crate) fn record_for_request_name<'a>(
 }
 
 /// Check each API independently, preserving the shared request and source policy.
-pub(crate) fn validate_resource_sources(
+pub(crate) fn validate_resource_origins(
     api_plan: &PlannedSpec,
     target: crate::nexgen_config::GenerationTarget,
 ) -> Result<()> {
@@ -127,14 +127,14 @@ pub(crate) fn validate_resource_sources(
                 else {
                     continue;
                 };
-                if let Some(field) = missing_source_field(api_plan, request_plan, target) {
+                if let Some((field, kind)) = missing_origin_field(api_plan, request_plan, target) {
                     return Err(Error::InvalidResourceMethod {
                         service: service.name.clone(),
                         resource: resource.type_name.clone(),
                         method: method.name.clone(),
                         reason: format!(
-                            "the sourced field `{field}` has no value for the `{}` target; \
-                             supply it from a resource field or method parameter, or include this target in its source",
+                            "the {kind} field `{field}` has no value for the `{}` target; \
+                             supply it from a resource field or method parameter, or include this target in its origin",
                             match target {
                                 crate::nexgen_config::GenerationTarget::Workflow => "workflow",
                                 crate::nexgen_config::GenerationTarget::Client => "client",
@@ -148,11 +148,11 @@ pub(crate) fn validate_resource_sources(
     Ok(())
 }
 
-fn missing_source_field(
+fn missing_origin_field(
     api_plan: &PlannedSpec,
     plan: &RequestPlan,
     target: crate::nexgen_config::GenerationTarget,
-) -> Option<String> {
+) -> Option<(String, &'static str)> {
     let RequestPlan::Construct {
         message_name,
         fields,
@@ -162,18 +162,24 @@ fn missing_source_field(
         return None;
     };
     if let Some(record) = record_for_request_name(api_plan, message_name) {
-        for (_, field, _) in record.sourced_fields() {
+        for field in record.fields.values() {
+            let kind = match field.origin.as_ref() {
+                Some(FieldOrigin::Source { .. }) => "sourced",
+                Some(FieldOrigin::Default { .. }) => "defaulted",
+                _ => continue,
+            };
             if field.required
-                && field.visibility.source_for(target).is_none()
+                && field.source_for(target).is_none()
+                && field.default_for(target).is_none()
                 && fields
                     .iter()
                     .all(|planned| planned.field_name != field.name)
             {
-                return Some(field.name.clone());
+                return Some((field.name.clone(), kind));
             }
         }
     }
     fields
         .iter()
-        .find_map(|field| missing_source_field(api_plan, &field.value, target))
+        .find_map(|field| missing_origin_field(api_plan, &field.value, target))
 }

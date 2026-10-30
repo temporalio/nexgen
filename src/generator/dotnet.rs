@@ -21,7 +21,7 @@ use crate::planning::{
     PlannedResourceHolderField, RequestPlan, RequestPlanField, RequestPlanSource,
     ResolvedResourceBindingSource,
 };
-use crate::spec::RecordFieldVisibility;
+use crate::spec::FieldOrigin;
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionFieldSpec, IntSpec,
     OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec, VariantSpec,
@@ -156,13 +156,7 @@ impl<'a> ApiPlanner<'a> {
             self.external_models
                 .model_uses_support_extensions(model, self.api_plan)
                 || model.sourced_fields().next().is_some()
-                || model.fields.values().any(|field| {
-                    field
-                        .default_value
-                        .as_ref()
-                        .and_then(|text| text.value())
-                        .is_some()
-                })
+                || model.fields.values().any(|field| field.has_default())
         }) && let Some(support_namespace) = self.support_namespace
         {
             imports.push(support_namespace);
@@ -1782,7 +1776,7 @@ impl<'a> ApiPlanner<'a> {
                 nullable_type(&base)
             };
         }
-        if field.api_required() {
+        if field.api_required(GenerationTarget::Workflow) {
             self.field_type(field)
         } else {
             nullable_type(&self.field_type(field))
@@ -1799,13 +1793,13 @@ impl<'a> ApiPlanner<'a> {
             .field_flattened_annotation(field_name)
             .and_then(|annotation| annotation.value())
         {
-            if field.api_required() {
+            if field.api_required(GenerationTarget::Workflow) {
                 annotation.to_string()
             } else {
                 nullable_type(annotation)
             }
         } else {
-            if field.api_required() {
+            if field.api_required(GenerationTarget::Workflow) {
                 self.field_type(field)
             } else {
                 nullable_type(&self.field_type(field))
@@ -1860,7 +1854,8 @@ impl<'a> ApiPlanner<'a> {
                     option_fields.push((
                         nested_field,
                         field_type,
-                        field.api_required() && nested_field.api_required(),
+                        field.api_required(GenerationTarget::Workflow)
+                            && nested_field.api_required(GenerationTarget::Workflow),
                     ));
                 }
                 continue;
@@ -1874,7 +1869,11 @@ impl<'a> ApiPlanner<'a> {
                 field,
                 FlattenedFunctionMode::String,
             );
-            option_fields.push((field, field_type, field.api_required()));
+            option_fields.push((
+                field,
+                field_type,
+                field.api_required(GenerationTarget::Workflow),
+            ));
         }
         let options_type_parameters = self
             .operation_model_parameters(operation)
@@ -2037,7 +2036,8 @@ impl<'a> ApiPlanner<'a> {
                     if nested_field.function.is_none() {
                         continue;
                     }
-                    let nested_required = field.api_required() && nested_field.api_required();
+                    let nested_required = field.api_required(GenerationTarget::Workflow)
+                        && nested_field.api_required(GenerationTarget::Workflow);
                     render_parameter_separator(output, has_parameters);
                     output.push_str(&self.flattened_nested_parameter_type(
                         nested_model,
@@ -2061,7 +2061,7 @@ impl<'a> ApiPlanner<'a> {
             ));
             output.push(' ');
             output.push_str(&csharp_parameter_name(&field.name));
-            if !field.api_required() {
+            if !field.api_required(GenerationTarget::Workflow) {
                 output.push_str(" = null");
             }
             if matches!(
@@ -2102,7 +2102,7 @@ impl<'a> ApiPlanner<'a> {
 
 fn dotnet_input_default_expr(field: &RecordFieldSpec<PlannedFamily>, value: &str) -> String {
     if field.required
-        && let Some(default) = field.default_value.as_ref().and_then(|text| text.value())
+        && let Some(default) = field.default_for(GenerationTarget::Workflow)
     {
         format!("(({value}) ?? ({default}))")
     } else {
@@ -3284,16 +3284,12 @@ fn render_flattened_method_body(
     let mut constructor_args = field_exprs
         .iter()
         .filter(|(_, field, _)| {
-            field.required && !matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
+            field.required && !matches!(field.origin, Some(FieldOrigin::Source { .. }))
         })
         .map(|(_, _, expr)| expr.clone())
         .collect::<Vec<_>>();
     constructor_args.extend(model.sourced_fields().map(|(name, field, source_expr)| {
-        if field
-            .visibility
-            .source_for(GenerationTarget::Workflow)
-            .is_some()
-        {
+        if field.source_for(GenerationTarget::Workflow).is_some() {
             dotnet_source_expr(source_expr, support_namespace)
         } else {
             field_exprs
@@ -3310,7 +3306,7 @@ fn render_flattened_method_body(
     let optional_field_exprs = field_exprs
         .iter()
         .filter(|(_, field, _)| {
-            !field.required && !matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
+            !field.required && !matches!(field.origin, Some(FieldOrigin::Source { .. }))
         })
         .map(|(_, field, expr)| (*field, expr.clone()))
         .collect::<Vec<_>>();
@@ -3488,10 +3484,10 @@ fn model_options_required(model: &PlannedModel, api_plan: &PlannedSpec) -> bool 
         .api_fields(GenerationTarget::Workflow)
         .any(|(field_name, field)| {
             if let Some(nested_model) = flattened_nested_model(field, api_plan) {
-                field.api_required()
+                field.api_required(GenerationTarget::Workflow)
                     && nested_model.api_fields(GenerationTarget::Workflow).any(
                         |(nested_field_name, nested_field)| {
-                            nested_field.api_required()
+                            nested_field.api_required(GenerationTarget::Workflow)
                                 && field_is_options_field(
                                     nested_model,
                                     nested_field_name,
@@ -3500,7 +3496,8 @@ fn model_options_required(model: &PlannedModel, api_plan: &PlannedSpec) -> bool 
                         },
                     )
             } else {
-                field.api_required() && field_is_options_field(model, field_name, field)
+                field.api_required(GenerationTarget::Workflow)
+                    && field_is_options_field(model, field_name, field)
             }
         })
 }
@@ -3566,7 +3563,7 @@ fn model_init_expr(
 ) -> String {
     let required = |field: &&RecordFieldSpec<PlannedFamily>| {
         if options_surface {
-            field.api_required()
+            field.api_required(GenerationTarget::Workflow)
         } else {
             field.required
         }
@@ -3594,7 +3591,7 @@ fn model_init_expr(
 }
 
 fn option_field_expr(field: &RecordFieldSpec<PlannedFamily>, options_required: bool) -> String {
-    if options_required || field.api_required() {
+    if options_required || field.api_required(GenerationTarget::Workflow) {
         format!("options.{}", field_property_name(field))
     } else {
         format!("options?.{}", field_property_name(field))
@@ -3606,7 +3603,10 @@ fn option_nested_field_expr(
     nested_field: &RecordFieldSpec<PlannedFamily>,
     options_required: bool,
 ) -> String {
-    if options_required || (field.api_required() && nested_field.api_required()) {
+    if options_required
+        || (field.api_required(GenerationTarget::Workflow)
+            && nested_field.api_required(GenerationTarget::Workflow))
+    {
         format!("options.{}", field_property_name(nested_field))
     } else {
         format!("options?.{}", field_property_name(nested_field))
@@ -3830,10 +3830,7 @@ fn resource_method_request_model_init_expr(
                 candidate.name == field.field_name || field_name.as_str() == field.field_name
             })?;
         if matches!(init_kind, ResourceMethodRequestInitKind::OptionsFields)
-            && (model_field
-                .visibility
-                .source_for(GenerationTarget::Workflow)
-                .is_some()
+            && (model_field.source_for(GenerationTarget::Workflow).is_some()
                 || !field_is_options_field(model, model_field_name, model_field))
         {
             continue;
@@ -3850,7 +3847,7 @@ fn resource_method_request_model_init_expr(
                 && !field_exprs
                     .iter()
                     .any(|(provided, _)| provided.name == field.name)
-                && let Some(default) = field.default_value.as_ref().and_then(|text| text.value())
+                && let Some(default) = field.default_for(GenerationTarget::Workflow)
             {
                 field_exprs.push((field, format!("({default})")));
             }
@@ -3865,11 +3862,7 @@ fn resource_method_request_model_init_expr(
                     .find(|(candidate, _)| candidate.name == field.name)
                     .map(|(_, expression)| expression.clone())
                     .unwrap_or_else(|| {
-                        if field
-                            .visibility
-                            .source_for(GenerationTarget::Workflow)
-                            .is_some()
-                        {
+                        if field.source_for(GenerationTarget::Workflow).is_some() {
                             dotnet_source_expr(source_expr, support_namespace)
                         } else {
                             "default".to_string()
@@ -3879,9 +3872,7 @@ fn resource_method_request_model_init_expr(
             .collect()
     });
     if type_name_override.is_none() {
-        field_exprs.retain(|(field, _)| {
-            !matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
-        });
+        field_exprs.retain(|(field, _)| !matches!(field.origin, Some(FieldOrigin::Source { .. })));
     }
     Some(model_init_expr(
         type_name_override.unwrap_or(&csharp_type_name(&model.name)),
@@ -4086,9 +4077,12 @@ fn resource_return_binding_expr(
         ResolvedResourceBindingSource::RequestField {
             field_name,
             proto_field_name: _,
-            hidden,
+            origin,
         } => {
-            if *hidden {
+            if matches!(
+                origin,
+                Some(FieldOrigin::Source { .. } | FieldOrigin::Omitted)
+            ) {
                 let expr = format!("{request_expr}.{}", csharp_type_name(field_name));
                 optional_resource_binding_expr(resource, binding, expr, api_plan)
             } else {

@@ -22,9 +22,9 @@ use crate::planning::{
 };
 use crate::planning::{RequestPlan, ResolvedResourceBindingSource};
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec,
-    FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec, LanguageImportStyle, ModulePath,
-    OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec, SelectedTextSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, FlagsSpec,
+    FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec,
+    LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec, RecordSpec, SelectedTextSpec,
     TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpec, ApiSpecBranch, ApiSpecNode};
@@ -1878,10 +1878,10 @@ impl<'a> ApiPlanner<'a> {
         for ((_field_name, planned_field), rendered_field) in planned_model
             .fields
             .iter()
-            .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
             .zip(model.fields.iter())
         {
-            if let Some(source_expr) = planned_field.visibility.source_for(target) {
+            if let Some(source_expr) = planned_field.source_for(target) {
                 request_fields.push(RenderedUnpackedRequestField {
                     attr_name: rendered_field.attr_name.clone(),
                     value_expr: python_source_call(source_expr),
@@ -1889,11 +1889,22 @@ impl<'a> ApiPlanner<'a> {
                 });
                 continue;
             }
-            if planned_field.visibility == RecordFieldVisibility::ApiOmitted {
+            if matches!(planned_field.origin, Some(FieldOrigin::ApiOmitted)) {
                 continue;
             }
-            let default_kind = rendered_field.default_kind.clone();
-            if let Some(flattened) = self.build_flattened_message(planned_field, rendered_field) {
+            let default_kind =
+                if planned_field.has_default() && planned_field.default_for(target).is_none() {
+                    match planned_field.field_type {
+                        PlannedType::List(_) => PythonFieldDefaultKind::EmptyList,
+                        PlannedType::Map(_, _) => PythonFieldDefaultKind::EmptyDict,
+                        _ => rendered_field.default_kind.clone(),
+                    }
+                } else {
+                    rendered_field.default_kind.clone()
+                };
+            if let Some(flattened) =
+                self.build_flattened_message(planned_field, rendered_field, target)
+            {
                 request_fields.push(RenderedUnpackedRequestField {
                     attr_name: flattened.local_name.clone(),
                     value_expr: flattened.local_name.clone(),
@@ -1925,17 +1936,12 @@ impl<'a> ApiPlanner<'a> {
             )?;
             parameters.push(RenderedUnpackedInputField {
                 attr_name: rendered_field.attr_name.clone(),
-                annotation: if !planned_field.api_required() && planned_field.required {
+                annotation: if !planned_field.api_required(target) && planned_field.required {
                     format!("{} | None", rendered_field.annotation)
                 } else {
                     rendered_field.annotation.clone()
                 },
-                default_kind: if planned_field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
+                default_kind: if planned_field.default_for(target).is_some() {
                     PythonFieldDefaultKind::None
                 } else {
                     default_kind.clone()
@@ -1948,7 +1954,11 @@ impl<'a> ApiPlanner<'a> {
             });
             request_fields.push(RenderedUnpackedRequestField {
                 attr_name: rendered_field.attr_name.clone(),
-                value_expr: python_input_default_expr(planned_field, &rendered_field.attr_name),
+                value_expr: python_input_default_expr(
+                    planned_field,
+                    &rendered_field.attr_name,
+                    target,
+                ),
                 default_kind,
             });
         }
@@ -2004,6 +2014,7 @@ impl<'a> ApiPlanner<'a> {
         &self,
         planned_field: &RecordFieldSpec<PlannedFamily>,
         rendered_field: &RenderedField,
+        target: GenerationTarget,
     ) -> Option<RenderedFlattenedMessage> {
         let model_type = &planned_field.field_type;
         let PlannedType::Record(record) = model_type else {
@@ -2023,9 +2034,12 @@ impl<'a> ApiPlanner<'a> {
             fields: nested_planned_model
                 .fields
                 .iter()
-                .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
                 .zip(nested_rendered_model.fields.iter())
-                .filter(|((_, field), _)| field.visibility == RecordFieldVisibility::Public)
+                .filter(|((_, field), _)| {
+                    !matches!(field.origin, Some(FieldOrigin::ApiOmitted))
+                        && field.source_for(target).is_none()
+                })
                 .map(
                     |((nested_field_name, nested_planned_field), nested_rendered_field)| {
                         RenderedFlattenedMessageField {
@@ -2034,7 +2048,7 @@ impl<'a> ApiPlanner<'a> {
                                 .field_flattened_annotation(nested_field_name)
                                 .and_then(|annotation| annotation.value())
                                 .map(|annotation| {
-                                    if nested_planned_field.api_required() {
+                                    if nested_planned_field.api_required(target) {
                                         annotation.to_string()
                                     } else {
                                         format!("{annotation} | None")
@@ -2042,7 +2056,7 @@ impl<'a> ApiPlanner<'a> {
                                 })
                                 .unwrap_or_else(|| {
                                     if nested_planned_field.required
-                                        && !nested_planned_field.api_required()
+                                        && !nested_planned_field.api_required(target)
                                     {
                                         format!("{} | None", nested_rendered_field.annotation)
                                     } else {
@@ -2053,15 +2067,11 @@ impl<'a> ApiPlanner<'a> {
                             initialized_expr: python_input_default_expr(
                                 nested_planned_field,
                                 &nested_rendered_field.attr_name,
+                                target,
                             ),
-                            default_kind: if nested_planned_field.api_required() {
+                            default_kind: if nested_planned_field.api_required(target) {
                                 PythonFieldDefaultKind::Required
-                            } else if nested_planned_field
-                                .default_value
-                                .as_ref()
-                                .and_then(|text| text.value())
-                                .is_some()
-                            {
+                            } else if nested_planned_field.default_for(target).is_some() {
                                 PythonFieldDefaultKind::None
                             } else {
                                 nested_rendered_field.default_kind.clone()
@@ -2109,7 +2119,7 @@ impl<'a> ApiPlanner<'a> {
         let fields = planned_model
             .fields
             .iter()
-            .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
             .map(|(field_name, field)| self.build_field(planned_model, field_name, field))
             .collect::<Result<Vec<_>>>()?;
 
@@ -2231,12 +2241,7 @@ impl<'a> ApiPlanner<'a> {
                     format!("dict[{}, {}]", key_type.annotation, value_type.annotation),
                     false,
                 ),
-                default_kind: if field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
+                default_kind: if field.has_default() {
                     if field.required {
                         PythonFieldDefaultKind::Required
                     } else {
@@ -2245,12 +2250,7 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     PythonFieldDefaultKind::EmptyDict
                 },
-                default_expr: if field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
+                default_expr: if field.has_default() {
                     (!field.required).then(|| "None".to_string())
                 } else {
                     Some("dataclasses.field(default_factory=dict)".to_string())
@@ -2276,12 +2276,7 @@ impl<'a> ApiPlanner<'a> {
                     format!("list[{}]", resolved_type.annotation),
                     false,
                 ),
-                default_kind: if field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
+                default_kind: if field.has_default() {
                     if field.required {
                         PythonFieldDefaultKind::Required
                     } else {
@@ -2290,12 +2285,7 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     PythonFieldDefaultKind::EmptyList
                 },
-                default_expr: if field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
-                    .is_some()
-                {
+                default_expr: if field.has_default() {
                     (!field.required).then(|| "None".to_string())
                 } else {
                     Some("dataclasses.field(default_factory=list)".to_string())
@@ -2606,7 +2596,7 @@ fn collect_python_language_imports(api_plan: &PlannedSpec) -> Vec<LanguageImport
         for (_, field) in record
             .fields
             .iter()
-            .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
         {
             if let Some(function) = &field.function {
                 collect_function_imports(function, &mut imports);
@@ -2796,9 +2786,13 @@ fn render_record_wire_block_lines(output: &mut String, lines: &[String]) {
     }
 }
 
-fn python_input_default_expr(field: &RecordFieldSpec<PlannedFamily>, value: &str) -> String {
+fn python_input_default_expr(
+    field: &RecordFieldSpec<PlannedFamily>,
+    value: &str,
+    target: GenerationTarget,
+) -> String {
     if field.required
-        && let Some(default) = field.default_value.as_ref().and_then(|text| text.value())
+        && let Some(default) = field.default_for(target)
     {
         format!("(({default}) if {value} is None else {value})")
     } else {
@@ -6283,6 +6277,7 @@ fn python_missing_request_defaults<'a>(
     spec: &'a PlannedSpec,
     name: &str,
     supplied: &[crate::planning::RequestPlanField],
+    target: GenerationTarget,
 ) -> Vec<(String, &'a str)> {
     let Some(record) = spec.record(name).or_else(|| {
         spec.records().map(|(_, record)| record).find(|record| {
@@ -6305,9 +6300,7 @@ fn python_missing_request_defaults<'a>(
                     .any(|field| python_field_name(&field.field_name) == name))
             .then(|| {
                 field
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
+                    .default_for(target)
                     .map(|expression| (name, expression))
             })
             .flatten()
@@ -6338,7 +6331,7 @@ fn render_request_plan_python(
         |name, value| format!("{name}={value}"),
         |message_name, mut fields, supplied| {
             fields.extend(
-                python_missing_request_defaults(api_plan, message_name, supplied)
+                python_missing_request_defaults(api_plan, message_name, supplied, target)
                     .into_iter()
                     .map(|(name, expression)| format!("{name}=({expression})")),
             );
@@ -6412,9 +6405,12 @@ fn resource_return_binding_expr_python(binding: &PlannedOperationResourceFieldBi
         ResolvedResourceBindingSource::RequestField {
             field_name,
             proto_field_name: _,
-            hidden,
+            origin,
         } => {
-            if *hidden {
+            if matches!(
+                origin,
+                Some(FieldOrigin::Source { .. } | FieldOrigin::Omitted)
+            ) {
                 let expr = format!("request.{}", python_field_name(field_name));
                 if binding.optional {
                     format!("{expr} or None")

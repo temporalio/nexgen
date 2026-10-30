@@ -359,11 +359,9 @@ pub(in crate::generator) fn planned_field(
         annotation_override: field.annotation.clone(),
         flattened_annotation_override: field.flattened_annotation.clone(),
         required: field.required,
-        api_required: field.api_required(),
+        api_required: field.api_required(GenerationTarget::Workflow),
         default_expression: field
-            .default_value
-            .as_ref()
-            .and_then(|text| text.value())
+            .default_for(GenerationTarget::Workflow)
             .map(str::to_string),
         role,
         kind: planned_field_kind(&field.field_type, spec),
@@ -4713,8 +4711,7 @@ fn render_resource_methods(
                             .unwrap_or_else(|| message_model_name(msg_name));
                         if let Some(record) = record_for_model_key(api_plan, msg_name) {
                             for (_, field) in record.model_fields() {
-                                let Some(default) =
-                                    field.default_value.as_ref().and_then(|text| text.value())
+                                let Some(default) = field.default_for(GenerationTarget::Workflow)
                                 else {
                                     continue;
                                 };

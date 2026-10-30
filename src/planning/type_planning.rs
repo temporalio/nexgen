@@ -355,6 +355,12 @@ struct TypePlanningMapper<'a, 'descriptors> {
 }
 
 impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMapper<'_, '_> {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldOrigin>,
+    ) -> Option<crate::spec::FieldOrigin> {
+        origin
+    }
     fn map_spec_data(&mut self, _data: ()) -> PlannedSpecData {
         self.planner.spec_data.clone()
     }
@@ -1356,6 +1362,12 @@ impl CompilerPass<OperationLoweredFamily, PlannedFamily> for TypePlanningPass<'_
 struct SelectedToOperationLoweredMapper;
 
 impl ApiSpecTransform<SelectedFamily, OperationLoweredFamily> for SelectedToOperationLoweredMapper {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldOrigin>,
+    ) -> Option<crate::spec::FieldOrigin> {
+        origin
+    }
     fn map_spec_data(&mut self, _data: ()) {}
     fn map_record(&mut self, value: Symbol) -> Symbol {
         value
