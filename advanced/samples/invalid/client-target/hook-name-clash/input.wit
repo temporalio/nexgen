@@ -1,0 +1,11 @@
+package temporal:client-hook-name-clash@1.0.0;
+
+world system { export create; }
+
+// The private client method of `nexus-client` is `_create_nexus_client`, the name of the hook.
+/// @nexus.endpoint "create"
+interface create {
+  record nexus-client-request { id: string }
+
+  nexus-client: func(request: nexus-client-request);
+}

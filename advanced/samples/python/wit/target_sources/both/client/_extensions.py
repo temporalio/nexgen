@@ -5,7 +5,10 @@ from __future__ import annotations
 import typing
 import abc
 
-from ._nexus_client import _NexusClient
+from ._nexus_client import (
+    _NexusClient,
+    _operation_id,
+)
 from ..models import (
     CancelRunRequest,
     CreateJobRequest,
@@ -22,8 +25,7 @@ from ._resources import (
     Run,
     RunWithStatus,
 )
-from ._resources.job import _JobData
-from ._resources.marker import _MarkerData
+from .. import _resources as _resource_data
 import temporal_support as _support
 
 
@@ -48,6 +50,9 @@ class SourceServiceClientExtension(abc.ABC):
                 "create_run",
                 "create_run_with_status",
                 "cancel_run",
+                "get_job",
+                "get_marker",
+                "get_run",
             ):
                 if name in base.__dict__:
                     raise TypeError(
@@ -64,6 +69,47 @@ class SourceServiceClientExtension(abc.ABC):
         """Return the Nexus client that starts the operations of ``service``."""
         ...
 
+    def get_job(
+        self,
+        *,
+        job_id: str,
+    ) -> Job:
+        """Return the ``Job`` handle that has these identity fields."""
+        return Job(
+            self._create_nexus_client(
+                service="SourceService",
+                endpoint="sources",
+            ),
+            job_id=job_id,
+        )
+
+    def get_marker(
+        self,
+    ) -> Marker:
+        """Return the ``Marker`` handle that has these identity fields."""
+        return Marker(
+            self._create_nexus_client(
+                service="SourceService",
+                endpoint="sources",
+            ),
+        )
+
+    def get_run(
+        self,
+        *,
+        job_id: str,
+        run_id: str | None,
+    ) -> Run:
+        """Return the ``Run`` handle that has these identity fields."""
+        return Run(
+            self._create_nexus_client(
+                service="SourceService",
+                endpoint="sources",
+            ),
+            job_id=job_id,
+            run_id=run_id,
+        )
+
     async def _source_service_submit(
         self,
         request: SubmitRequest,
@@ -74,9 +120,10 @@ class SourceServiceClientExtension(abc.ABC):
         )
         handle = await nexus_client.start_operation(
             operation="Submit",
-            input=request,
+            arg=request,
+            id=_operation_id(),
         )
-        await handle
+        await handle.result()
 
     async def submit(
         self,
@@ -102,10 +149,11 @@ class SourceServiceClientExtension(abc.ABC):
         )
         handle = await nexus_client.start_operation(
             operation="CreateJob",
-            input=request,
-            output_type=_JobData,
+            arg=request,
+            id=_operation_id(),
+            result_type=_resource_data.Job,
         )
-        result = await handle
+        result = await handle.result()
         return Job(
             nexus_client,
             job_id=result.job_id,
@@ -131,10 +179,11 @@ class SourceServiceClientExtension(abc.ABC):
         )
         handle = await nexus_client.start_operation(
             operation="Refresh",
-            input=request,
-            output_type=_JobData,
+            arg=request,
+            id=_operation_id(),
+            result_type=_resource_data.Job,
         )
-        result = await handle
+        result = await handle.result()
         return Job(
             nexus_client,
             job_id=result.job_id,
@@ -160,10 +209,11 @@ class SourceServiceClientExtension(abc.ABC):
         )
         handle = await nexus_client.start_operation(
             operation="CreateMarker",
-            input=request,
-            output_type=_MarkerData,
+            arg=request,
+            id=_operation_id(),
+            result_type=_resource_data.Marker,
         )
-        await handle
+        _ = await handle.result()
         return Marker(
             nexus_client,
         )
@@ -184,9 +234,10 @@ class SourceServiceClientExtension(abc.ABC):
         )
         handle = await nexus_client.start_operation(
             operation="Restart",
-            input=request,
+            arg=request,
+            id=_operation_id(),
         )
-        await handle
+        await handle.result()
 
     async def restart(
         self,
@@ -209,10 +260,11 @@ class SourceServiceClientExtension(abc.ABC):
         )
         handle = await nexus_client.start_operation(
             operation="CreateRun",
-            input=request,
-            output_type=RunResult,
+            arg=request,
+            id=_operation_id(),
+            result_type=RunResult,
         )
-        result = await handle
+        result = await handle.result()
         resource = Run(
             nexus_client,
             job_id=request.job_id,
@@ -242,10 +294,11 @@ class SourceServiceClientExtension(abc.ABC):
         )
         handle = await nexus_client.start_operation(
             operation="CreateRunWithStatus",
-            input=request,
-            output_type=SignalWithStartWorkflowExecutionResponse,
+            arg=request,
+            id=_operation_id(),
+            result_type=SignalWithStartWorkflowExecutionResponse,
         )
-        result = await handle
+        result = await handle.result()
         return RunWithStatus(
             run=Run(
                 nexus_client,
@@ -277,9 +330,10 @@ class SourceServiceClientExtension(abc.ABC):
         )
         handle = await nexus_client.start_operation(
             operation="CancelRun",
-            input=request,
+            arg=request,
+            id=_operation_id(),
         )
-        await handle
+        await handle.result()
 
     async def cancel_run(
         self,

@@ -491,7 +491,7 @@ fn render_oneof_to_proto(output: &mut String, owner: &str, oneof: &OneofField<'_
 }
 
 impl ModelBackend {
-    /// Report the proto converter values that the native API barrel exposes.
+    /// Report the proto converter values that the Workflow API barrel exposes.
     /// Definitions-only barrels already re-export every model value.
     pub(in crate::generator) fn model_value_exports(
         &self,

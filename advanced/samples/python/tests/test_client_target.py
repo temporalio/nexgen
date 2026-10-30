@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import collections.abc
 import dataclasses
 import types
 import typing
+import uuid
 
 import pytest
 import temporalio.converter
@@ -32,6 +32,19 @@ class Call:
     input: object
 
 
+class FakeHandle:
+    def __init__(self, answer: object, result_type: type[typing.Any] | None) -> None:
+        self._answer: object = answer
+        self._result_type: type[typing.Any] | None = result_type
+
+    async def result(self) -> typing.Any:
+        if self._result_type is None:
+            return self._answer
+        converter = temporalio.converter.DataConverter.default
+        payloads = await converter.encode([self._answer])
+        return (await converter.decode(payloads, [self._result_type]))[0]
+
+
 class FakeNexusClient:
     def __init__(self, client: FakeClient, service: str, endpoint: str | None) -> None:
         self._client: FakeClient = client
@@ -41,24 +54,15 @@ class FakeNexusClient:
     async def start_operation(
         self,
         operation: str,
-        input: typing.Any,
+        arg: typing.Any,
         *,
-        output_type: type[typing.Any] | None = None,
-    ) -> collections.abc.Awaitable[typing.Any]:
-        self._client.calls.append(Call(self._service, self._endpoint, operation, input))
+        id: str,
+        result_type: type[typing.Any] | None = None,
+    ) -> FakeHandle:
+        self._client.calls.append(Call(self._service, self._endpoint, operation, arg))
+        self._client.operation_ids.append(id)
         answer = self._client.answers[operation].pop(0)
-
-        async def result() -> object:
-            if output_type is not None:
-                converter = temporalio.converter.DataConverter.default
-                return (
-                    await converter.decode(
-                        await converter.encode([answer]), [output_type]
-                    )
-                )[0]
-            return answer
-
-        return result()
+        return FakeHandle(answer, result_type)
 
 
 class FakeClient(SourceServiceClientExtension):
@@ -67,6 +71,7 @@ class FakeClient(SourceServiceClientExtension):
     def __init__(self, answers: dict[str, list[object]]) -> None:
         self.answers: dict[str, list[object]] = answers
         self.calls: list[Call] = []
+        self.operation_ids: list[str] = []
         self.created_clients: list[FakeNexusClient] = []
 
     @override
@@ -108,6 +113,23 @@ async def test_a_created_resource_calls_its_operations_through_the_client() -> N
             RestartRequest(job_id="job", shared="shared"),
         ),
     ]
+
+
+async def test_each_call_gets_a_new_random_operation_id() -> None:
+    client = FakeClient(
+        {
+            "CreateJob": [workflow_resources.Job(job_id="job")],
+            "Restart": [None, None],
+        }
+    )
+
+    job = await client.create_job(job_id="job")
+    await job.restart()
+    await job.restart()
+
+    ids = client.operation_ids
+    assert [str(uuid.UUID(id)) for id in ids] == ids
+    assert len(set(ids)) == 3
 
 
 async def test_a_handle_uses_the_nexus_client_passed_to_its_constructor() -> None:

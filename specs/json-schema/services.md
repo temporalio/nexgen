@@ -414,8 +414,8 @@ public interface IChatService
 }
 ```
 
-In native-API mode the same file also carries a `ChatServiceClient` that a
-workflow uses to call each operation (`SendMessageAsync`, …).
+With `--targets workflow` the same file also carries a `ChatServiceClient` that
+a workflow uses to call each operation (`SendMessageAsync`, …).
 
 All five agree byte-for-byte on the wire: service `"example.v1.ChatService"`,
 operations `"poll-messages"` and `"SendMessage"` (P1).

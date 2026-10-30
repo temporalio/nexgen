@@ -86,10 +86,6 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
         id_reuse_policy = _support.workflow_id_reuse_policy_from_proto(
             value.workflow_id_reuse_policy
         )
-        if not value.namespace:
-            raise ValueError(
-                "missing required field SignalWithStartWorkflowRequest.namespace"
-            )
         namespace = value.namespace
         return SignalWithStartWorkflowRequest(
             workflow=workflow,

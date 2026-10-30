@@ -6,9 +6,9 @@ world system { export source-service; }
 interface source-service {
   record submit-request {
     id: string,
-    /// @nexus.source python="shared_source()"
+    /// @nexus.source python="shared_source()" typescript="sharedSource()" go="SharedSource(ctx)" dotnet="TargetSources.Shared()"
     shared: string,
-    /// @nexus.source targets="workflow" python="workflow_source()"
+    /// @nexus.source targets="workflow" python="workflow_source()" typescript="workflowSource()" go="WorkflowSource(ctx)" dotnet="TargetSources.Workflow()"
     workflow: string,
     /// @nexus.source targets="client" python="client_source()"
     client: string,
@@ -38,7 +38,7 @@ interface source-service {
 
   record restart-request {
     job-id: string,
-    /// @nexus.source python="shared_source()"
+    /// @nexus.source python="shared_source()" typescript="sharedSource()" go="SharedSource(ctx)" dotnet="TargetSources.Shared()"
     shared: string,
   }
 
@@ -51,10 +51,13 @@ interface source-service {
     cancel: func();
   }
 
-  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse"
+  // These proto-backed types borrow Temporal API messages only to cover proto-backed resource
+  // holders and `@nexus.proto-field`. The fields do not match what the messages mean, so do not
+  // copy them into a real service.
+  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse" typescript-import="@temporalio/proto"
   type run-result = own<run>;
 
-  /// @nexus.proto "temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest"
+  /// @nexus.proto "temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest" typescript-import="@temporalio/proto"
   record create-run-request {
     /// @nexus.proto-field "namespace"
     job-id: string,
@@ -63,7 +66,7 @@ interface source-service {
 
   create-run: func(request: create-run-request) -> run-result;
 
-  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse"
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse" typescript-import="@temporalio/proto"
   record run-with-status {
     run: own<run>,
     started: option<bool>,

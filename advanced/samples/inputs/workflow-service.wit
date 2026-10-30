@@ -44,7 +44,7 @@ interface workflow-service {
     /// @nexus.proto-field "workflow_id"
     id: string,
     /// @nexus.doc "Task queue to run the workflow on. Defaults to the calling workflow's task queue."
-    /// @nexus.default
+    /// @nexus.default targets="workflow"
     ///   python="_support.workflow_task_queue()"
     ///   typescript="workflow.workflowInfo().taskQueue"
     ///   go="workflow.GetInfo(ctx).TaskQueueName"

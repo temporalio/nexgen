@@ -1008,6 +1008,13 @@ impl GoExternalModels {
         }
     }
 
+    fn support_helper_call(&self, call: &str) -> String {
+        match self {
+            Self::Proto(backend) => backend.support_converter(call.to_string()),
+            Self::Json(_) => call.to_string(),
+        }
+    }
+
     fn function_with_support_helper(&self, function: &FunctionFieldSpec) -> FunctionFieldSpec {
         let mut function = function.clone();
         if let Self::Proto(backend) = self {
@@ -1302,9 +1309,8 @@ impl<'a> ApiPlanner<'a> {
         }
         let model_fragments = self.external_models.render_models()?;
         self.imports.extend(model_fragments.imports);
-        // The Nexus service definition (operation references) is emitted in
-        // both modes, so the `nexus` import is needed whenever a spec has
-        // services — not just in NativeApi.
+        // The Nexus service definition (operation references) is emitted with or without the
+        // Workflow API, so the `nexus` import is needed whenever a spec has services.
         if self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
             && !self
@@ -1635,6 +1641,19 @@ impl<'a> ApiPlanner<'a> {
         if let Some(helper) = serialization_context_expr {
             validate_go_serialization_context_helper(helper, &operation.name)?;
         }
+        let sourced_fields = record_for_message(self.api_plan, &input)
+            .map(|record| {
+                record
+                    .sources_for(GenerationTarget::Workflow)
+                    .map(|(field_name, _, source)| {
+                        (
+                            go_field_name(field_name),
+                            self.external_models.support_helper_call(source),
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
@@ -1646,6 +1665,7 @@ impl<'a> ApiPlanner<'a> {
             output_type,
             raw_output_type,
             serialization_context_expr,
+            sourced_fields,
             output_transform_expr: go_output_transform.map(|(_, expr)| expr),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
@@ -2309,6 +2329,10 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     pub(in crate::generator) output_transform_expr: Option<&'a str>,
     /// Helper selecting the context for user payloads nested in this operation.
     pub(in crate::generator) serialization_context_expr: Option<&'a str>,
+    /// The Go name and source expression of each sourced field of the request for the Workflow
+    /// API. The public wrapper fills them, and a resource method fills those that it has no value
+    /// for, so a resource field wins over its source.
+    sourced_fields: Vec<(String, String)>,
     /// Go return type for an `@nexus.output-transform`, with any embedded
     /// import path stripped from the WIT annotation.
     pub(in crate::generator) output_transform_type: Option<String>,
@@ -3683,16 +3707,7 @@ fn render_file(
             output.push('\n');
         }
         for (path, alias) in external_imports {
-            output.push('\t');
-            let default_alias = path.rsplit('/').next().unwrap_or(path);
-            if alias != default_alias || alias == "support" {
-                output.push_str(alias);
-                output.push(' ');
-            }
-            output.push('"');
-            output.push_str(path);
-            output.push('"');
-            output.push('\n');
+            output.push_str(&go_aliased_import_line(path, alias));
         }
         output.push_str(")\n");
     }
@@ -3901,21 +3916,58 @@ fn render_file(
     output.push_str(registry);
 
     // Imports collected while planning can become unused when the SDK owns
-    // input conversion instead of the generated wrapper.
-    let unused_external_imports: Vec<_> = external_imports
+    // input conversion instead of the generated wrapper, or when the Workflow API
+    // that needs them is not selected.
+    let body = &output[body_start..];
+    let unused_imports: Vec<String> = imports
         .iter()
-        .filter(|(_, alias)| !output[body_start..].contains(&format!("{alias}.")))
+        .filter(|path| {
+            !external_imports
+                .iter()
+                .any(|(external, _)| external == *path)
+        })
+        .filter(|path| !uses_go_package(body, path.rsplit('/').next().unwrap_or(path)))
+        .map(|path| format!("\t\"{path}\"\n"))
+        .chain(
+            external_imports
+                .iter()
+                .filter(|(_, alias)| !uses_go_package(body, alias))
+                .map(|(path, alias)| go_aliased_import_line(path, alias)),
+        )
         .collect();
-    for (path, alias) in unused_external_imports {
-        let default_alias = path.rsplit('/').next().unwrap_or(path);
-        let import = if alias == default_alias {
-            format!("\t\"{path}\"\n")
-        } else {
-            format!("\t{alias} \"{path}\"\n")
-        };
+    for import in unused_imports {
         output = output.replacen(&import, "", 1);
     }
+    let block = "\nimport (\n";
+    if let Some(start) = output.find(block)
+        && let Some(length) = output[start + block.len()..].find(")\n")
+        && output[start + block.len()..][..length].trim().is_empty()
+    {
+        output.replace_range(start..start + block.len() + length + 2, "");
+    }
     output
+}
+
+/// The import line for an external package, with its alias when the alias differs from the
+/// last path segment.
+fn go_aliased_import_line(path: &str, alias: &str) -> String {
+    let default_alias = path.rsplit('/').next().unwrap_or(path);
+    if alias != default_alias || alias == "support" {
+        format!("\t{alias} \"{path}\"\n")
+    } else {
+        format!("\t\"{path}\"\n")
+    }
+}
+
+/// Whether `code` refers to the package `name`. The check ignores `runtime.` when it looks for
+/// `time.`.
+fn uses_go_package(code: &str, name: &str) -> bool {
+    let reference = format!("{name}.");
+    code.match_indices(&reference).any(|(start, _)| {
+        !code[..start].chars().next_back().is_some_and(|previous| {
+            previous.is_alphanumeric() || previous == '_' || previous == '.'
+        })
+    })
 }
 
 /// Renders a Go doc comment (`// ...`), wrapping each paragraph to the
@@ -4699,6 +4751,12 @@ fn render_resource_methods(
                     })
                     .collect::<BTreeMap<_, _>>();
                 let request_locals = std::cell::RefCell::new(String::new());
+                let top_message = match request_plan {
+                    crate::planning::RequestPlan::Construct { message_name, .. } => {
+                        Some(message_name.as_str())
+                    }
+                    crate::planning::RequestPlan::Source(_) => None,
+                };
                 let mut request_expr = render_request_plan(
                     request_plan,
                     go_field_name,
@@ -4775,6 +4833,17 @@ fn render_resource_methods(
                                     );
                                     fields[index] =
                                         format!("{}: {local}", go_field_name(&field.name));
+                                }
+                            }
+                        }
+                        // The operation function doesn't fill sources, so a field that the
+                        // resource has no value for takes its source here.
+                        if top_message == Some(msg_name) {
+                            for (field_name, expression) in &operation.sourced_fields {
+                                if supplied.iter().all(|provided| {
+                                    go_field_name(&provided.field_name) != *field_name
+                                }) {
+                                    fields.push(format!("{field_name}: {expression}"));
                                 }
                             }
                         }
@@ -5644,6 +5713,13 @@ fn render_convenience_wrapper(
         }
         output.push_str(",\n");
     }
+    for (field_name, expression) in &operation.sourced_fields {
+        output.push_str("\t\t");
+        output.push_str(field_name);
+        output.push_str(": ");
+        output.push_str(expression);
+        output.push_str(",\n");
+    }
     output.push_str("\t})\n");
 
     output.push_str("}\n");
@@ -5840,6 +5916,13 @@ fn render_forwarding_wrapper(
     render_operation_wrapper_return_type(output, package);
 
     output.push_str(" {\n");
+    for (field_name, expression) in &operation.sourced_fields {
+        output.push_str("\trequest.");
+        output.push_str(field_name);
+        output.push_str(" = ");
+        output.push_str(expression);
+        output.push('\n');
+    }
     output.push_str("\treturn ");
     output.push_str(&operation.func_name);
     output.push_str("(ctx, request)\n");

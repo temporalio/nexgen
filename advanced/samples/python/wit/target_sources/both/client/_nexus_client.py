@@ -2,31 +2,44 @@
 
 from __future__ import annotations
 
-import collections.abc
 import typing
+import uuid
 
 
 _OutputT = typing.TypeVar("_OutputT")
+_OutputT_co = typing.TypeVar("_OutputT_co", covariant=True)
 
 
-class _NexusClient(typing.Protocol):
-    """Starts the Nexus operations of one service."""
+class _NexusOperationHandle(typing.Protocol[_OutputT_co]):
+    """A started Nexus operation."""
+
+    async def result(self) -> _OutputT_co: ...
+
+
+# The client modules import the names below, so they aren't unused.
+class _NexusClient(typing.Protocol):  # pyright: ignore[reportUnusedClass]
+    """Starts the operations of one Nexus service, like ``temporalio.client.NexusClient``."""
 
     @typing.overload
     async def start_operation(
         self,
         operation: str,
-        input: typing.Any,
+        arg: typing.Any,
         *,
-        output_type: type[_OutputT],
-    ) -> collections.abc.Awaitable[_OutputT]: ...
+        id: str,
+        result_type: type[_OutputT],
+    ) -> _NexusOperationHandle[_OutputT]: ...
 
     @typing.overload
     async def start_operation(
         self,
         operation: str,
-        input: typing.Any,
-    ) -> collections.abc.Awaitable[None]: ...
+        arg: typing.Any,
+        *,
+        id: str,
+    ) -> _NexusOperationHandle[typing.Any]: ...
 
 
-__all__ = ["_NexusClient"]
+def _operation_id() -> str:  # pyright: ignore[reportUnusedFunction]
+    """Return a new random operation ID."""
+    return str(uuid.uuid4())

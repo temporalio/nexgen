@@ -19,14 +19,19 @@ class Job:
     async def restart(
         self,
     ) -> None:
-        request = RestartRequest(job_id=self.job_id, shared=_support.shared_source())
+        request = RestartRequest(
+            job_id=self.job_id,
+            shared=_support.shared_source(),
+        )
         handle = await _restart(request)
         await handle
 
     async def refresh(
         self,
     ) -> Job:
-        request = CreateJobRequest(job_id=self.job_id)
+        request = CreateJobRequest(
+            job_id=self.job_id,
+        )
         return await _refresh(request)
 
 

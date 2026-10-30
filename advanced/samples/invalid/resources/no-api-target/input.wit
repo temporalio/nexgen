@@ -1,9 +1,0 @@
-package temporal:resource-without-api@1.0.0;
-
-world system { export resource-service; }
-
-interface resource-service {
-  resource handle {
-    constructor(id: string);
-  }
-}

@@ -1404,9 +1404,9 @@ impl ModelBackend {
                 output.push_str("),\n");
             }
             output.push_str("}\n\n");
-            // The workflow client is part of the NativeApi surface; the
-            // definitions-only output emits just the service/operation
-            // reference struct so callers drive the Nexus client directly.
+            // The workflow client is part of the Workflow API. Output with no API target emits
+            // just the service/operation reference struct, so callers drive the Nexus client
+            // directly.
             if self.include_service_imports {
                 render_service_client(&mut output, service, api_plan, package, self)?;
             }

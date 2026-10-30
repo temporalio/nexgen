@@ -6,7 +6,9 @@ use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use crate::error::{Error, Result};
 use crate::generator::json_schema::dotnet as dotnet_json;
 use crate::generator::proto::dotnet as dotnet_proto;
-use crate::generator::resource_plan::record_for_request_name;
+use crate::generator::resource_plan::{
+    record_for_request_name, request_plan_fills_source, resource_method_fills_source,
+};
 use crate::generator::{
     ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
@@ -1138,7 +1140,17 @@ impl<'a> ApiPlanner<'a> {
         }
         output.push_str("    ");
         let access = self.operation_request_method_access(operation, request_kind);
-        if endpoint_parameter && access == "private" {
+        // A resource method that sends its own value for a sourced field calls this overload.
+        let resource_calls_request = self.api_plan.services.iter().any(|service| {
+            service.operation(&operation.name).is_some()
+                && resource_method_fills_source(
+                    self.api_plan,
+                    &service.name,
+                    &operation.name,
+                    GenerationTarget::Workflow,
+                )
+        });
+        if access == "private" && (endpoint_parameter || resource_calls_request) {
             output.push_str("internal");
         } else {
             output.push_str(access);
@@ -3715,6 +3727,18 @@ fn resource_method_operation_call_args(
             _ => return None,
         },
     )?;
+    // The options wrapper fills every sourced field from its source, but the resource's value
+    // wins over the source.
+    if request_plan_fills_source(api_plan, request_plan, GenerationTarget::Workflow) {
+        return resource_method_request_model_init_expr(
+            request_plan,
+            api_plan,
+            support_namespace,
+            None,
+            ResourceMethodRequestInitKind::AllFields,
+        )
+        .map(|expr| vec![expr]);
+    }
     if operation_has_flattened_convenience(operation, model, api_plan) {
         if model
             .public_fields()

@@ -110,5 +110,4 @@ support-package name. Each target gets its own temporary output directory. The
 proof of concept does not offer arbitrary CLI arguments or exact stderr
 snapshots; add configuration only when a concrete case needs it.
 
-An omitted or empty target list selects definitions only. This is used to verify
-that sourced fields are rejected without any API targets.
+An omitted or empty target list selects definitions only.

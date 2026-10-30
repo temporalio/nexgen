@@ -48,8 +48,6 @@ class _StartWorkflowRequestTransferTypeConverter(
         if not value.HasField("task_queue"):
             raise ValueError("missing required field StartWorkflowRequest.task_queue")
         task_queue = _support.task_queue_from_proto(value.task_queue)
-        if not value.namespace:
-            raise ValueError("missing required field StartWorkflowRequest.namespace")
         namespace = value.namespace
         return StartWorkflowRequest(
             workflow=workflow,

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use heck::{ToShoutySnakeCase, ToUpperCamelCase};
+use heck::ToShoutySnakeCase;
 use prost_types::FieldDescriptorProto;
 use prost_types::field_descriptor_proto::{Label, Type};
 
@@ -44,32 +44,6 @@ impl<'a> AuthoredValidationPass<'a> {
     }
 
     pub(crate) fn validate_spec(&self, spec: &ApiSpec) -> Result<()> {
-        if crate::nexgen_config::current().targets.is_empty() {
-            for (_, record) in spec.records() {
-                if let Some((name, _)) = record.fields.iter().find(|(_, field)| {
-                    field
-                        .origin
-                        .for_language(self.language)
-                        .and_then(FieldOrigin::source)
-                        .is_some()
-                }) {
-                    return Err(Error::UnsupportedSourcedTypeField {
-                        message: record.full_name.clone(),
-                        field: name.to_string(),
-                        reason: "a sourced field requires at least one API target; its source has no effect with no targets selected".to_string(),
-                    });
-                }
-            }
-            for service in &spec.services {
-                if let Some(resource) = service.resources.first() {
-                    return Err(Error::InvalidResource {
-                        service: service.name.clone(),
-                        resource: resource.name.to_upper_camel_case(),
-                        reason: "resource declarations require at least one API target; select `--targets workflow` or another supported API target".to_string(),
-                    });
-                }
-            }
-        }
         python::validate_service_configuration(spec)?;
         dotnet::validate_service_configuration(spec, self.language)?;
         validate_external_type_bindings(spec, self.descriptors, self.language)

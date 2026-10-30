@@ -10,11 +10,6 @@ class Run:
     job_id: str
     run_id: str | None
 
-    async def cancel(
-        self,
-    ) -> None:
-        raise NotImplementedError("run.cancel is not yet implemented")
-
 
 @dataclasses.dataclass(slots=True)
 class RunWithStatus:

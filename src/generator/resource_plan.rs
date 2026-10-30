@@ -22,43 +22,6 @@ where
     FResource: Fn(&str) -> String + Copy,
     FParam: Fn(&str) -> String + Copy,
 {
-    render_request_plan_with_sources(
-        plan,
-        member_name,
-        render_assignment,
-        render_construct,
-        render_resource_field_source,
-        render_method_param_source,
-        |_| Vec::new(),
-    )
-}
-
-/// Adds target-specific source expressions at construction sites without changing
-/// the shared request plan or inferring field identities from rendered code.
-pub(crate) fn render_request_plan_with_sources<
-    FName,
-    FAssign,
-    FConstruct,
-    FResource,
-    FParam,
-    FSources,
->(
-    plan: &RequestPlan,
-    member_name: FName,
-    render_assignment: FAssign,
-    render_construct: FConstruct,
-    render_resource_field_source: FResource,
-    render_method_param_source: FParam,
-    sources: FSources,
-) -> String
-where
-    FName: Fn(&str) -> String + Copy,
-    FAssign: Fn(String, String) -> String + Copy,
-    FConstruct: Fn(&str, Vec<String>, &[RequestPlanField]) -> String + Copy,
-    FResource: Fn(&str) -> String + Copy,
-    FParam: Fn(&str) -> String + Copy,
-    FSources: Fn(&str) -> Vec<(String, String)> + Copy,
-{
     match plan {
         RequestPlan::Source(RequestPlanSource::ResourceField(name)) => {
             render_resource_field_source(name)
@@ -70,28 +33,22 @@ where
             message_name,
             fields,
         } => {
-            let mut rendered_fields = fields
+            let rendered_fields = fields
                 .iter()
                 .map(|field| {
                     render_assignment(
                         member_name(&field.field_name),
-                        render_request_plan_with_sources(
+                        render_request_plan(
                             &field.value,
                             member_name,
                             render_assignment,
                             render_construct,
                             render_resource_field_source,
                             render_method_param_source,
-                            sources,
                         ),
                     )
                 })
-                .collect::<Vec<_>>();
-            for (name, expression) in sources(message_name) {
-                if fields.iter().all(|field| field.field_name != name) {
-                    rendered_fields.push(render_assignment(member_name(&name), expression));
-                }
-            }
+                .collect();
             render_construct(message_name, rendered_fields, fields)
         }
     }
@@ -112,6 +69,58 @@ pub(crate) fn record_for_request_name<'a>(
             )
         })
     })
+}
+
+/// Whether a request plan fills a top-level request field that has a source in `target`. The
+/// resource's value wins over the source, so such a resource method must not call an operation
+/// wrapper that fills the field from the source.
+pub(crate) fn request_plan_fills_source(
+    api_plan: &PlannedSpec,
+    plan: &RequestPlan,
+    target: crate::nexgen_config::GenerationTarget,
+) -> bool {
+    let RequestPlan::Construct {
+        message_name,
+        fields,
+    } = plan
+    else {
+        return false;
+    };
+    let Some(record) = record_for_request_name(api_plan, message_name) else {
+        return false;
+    };
+    fields.iter().any(|field| {
+        record.fields.values().any(|candidate| {
+            candidate.name == field.field_name && candidate.source_for(target).is_some()
+        })
+    })
+}
+
+/// Whether a resource method of the service binds the operation with a plan that fills one of
+/// the operation's sourced fields.
+pub(crate) fn resource_method_fills_source(
+    api_plan: &PlannedSpec,
+    service_name: &str,
+    operation_name: &str,
+    target: crate::nexgen_config::GenerationTarget,
+) -> bool {
+    api_plan
+        .services
+        .iter()
+        .filter(|service| service.name == service_name)
+        .flat_map(|service| service.resources.iter().map(|resource| &resource.data))
+        .flat_map(|resource| &resource.methods)
+        .any(|method| {
+            matches!(
+                &method.binding,
+                PlannedResourceMethodBindingSpec::Operation {
+                    operation_name: name,
+                    request_plan,
+                    ..
+                } if name == operation_name
+                    && request_plan_fills_source(api_plan, request_plan, target)
+            )
+        })
 }
 
 /// Check each API independently, preserving the shared request and source policy.

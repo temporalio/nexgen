@@ -12,17 +12,14 @@ use serde::Deserialize;
 
 use crate::error::{Error, Result};
 
-#[derive(Default, Deserialize)]
+#[derive(Default)]
 struct ExamplesConfig {
-    #[serde(flatten)]
     examples: std::collections::BTreeMap<String, ExampleConfig>,
 }
 
-#[derive(Clone, Default, Deserialize)]
+#[derive(Clone, Default)]
 struct ExampleConfig {
-    #[serde(flatten)]
     options: ExampleOptions,
-    #[serde(flatten)]
     children: std::collections::BTreeMap<String, ExampleConfig>,
 }
 
@@ -58,7 +55,58 @@ enum ExampleTarget {
     Client,
 }
 
+/// The keys of a table that are settings. Any other key must be a child table.
+const OPTION_KEYS: [&str; 4] = ["languages", "system_nexus", "targets", "descriptors"];
+
+impl ExamplesConfig {
+    fn from_table(table: toml::Table) -> std::result::Result<Self, String> {
+        let mut examples = std::collections::BTreeMap::new();
+        for (name, value) in table {
+            let toml::Value::Table(section) = value else {
+                return Err(format!(
+                    "unknown setting `{name}` outside an example section"
+                ));
+            };
+            let example = ExampleConfig::from_table(&name, section, true)?;
+            examples.insert(name, example);
+        }
+        Ok(Self { examples })
+    }
+}
+
 impl ExampleConfig {
+    // Splitting the keys by hand keeps a misspelled setting from becoming a child
+    // configuration, which would silently stop the parent from generating.
+    fn from_table(
+        path: &str,
+        table: toml::Table,
+        allow_children: bool,
+    ) -> std::result::Result<Self, String> {
+        let mut options = toml::Table::new();
+        let mut children = std::collections::BTreeMap::new();
+        for (key, value) in table {
+            if OPTION_KEYS.contains(&key.as_str()) {
+                options.insert(key, value);
+                continue;
+            }
+            let toml::Value::Table(child) = value else {
+                return Err(format!("unknown setting `{key}` in `[{path}]`"));
+            };
+            if !allow_children {
+                return Err(format!(
+                    "`{path}.{key}`: child configurations cannot contain further \
+                     child configurations"
+                ));
+            }
+            let child_path = format!("{path}.{key}");
+            children.insert(key, Self::from_table(&child_path, child, false)?);
+        }
+        let options = toml::Value::Table(options)
+            .try_into()
+            .map_err(|error: toml::de::Error| format!("`[{path}]`: {}", error.message()))?;
+        Ok(Self { options, children })
+    }
+
     fn configurations(&self, example_id: &str) -> Vec<(PathBuf, ExampleOptions)> {
         if self.children.is_empty() {
             return vec![(PathBuf::from(example_id), self.options.clone())];
@@ -329,6 +377,22 @@ fn discover_example_ids(repo_root: &Path, language: Language) -> Result<Vec<Stri
     let config = load_examples_config(&input_root)?;
     let mut input_paths = Vec::new();
     discover_example_input_paths(&input_root, &mut input_paths)?;
+    // An example without a section generates only definitions. Without this check, a
+    // misspelled section name would drop the generated API and give no error.
+    let input_ids = input_paths
+        .iter()
+        .filter_map(|path| example_id_for_input(path))
+        .collect::<Vec<_>>();
+    if let Some(name) = config
+        .examples
+        .keys()
+        .find(|name| !input_ids.contains(name))
+    {
+        return Err(Error::InvalidExampleConfig {
+            path: input_root.join("examples.toml"),
+            reason: format!("section `[{name}]` matches no `.wit` input file"),
+        });
+    }
     let mut ids = input_paths
         .into_iter()
         .filter_map(|path| {
@@ -359,26 +423,62 @@ fn load_examples_config(input_root: &Path) -> Result<ExamplesConfig> {
 }
 
 fn parse_examples_config(contents: &str) -> std::result::Result<ExamplesConfig, String> {
-    let config: ExamplesConfig = toml::from_str(contents).map_err(|error| error.to_string())?;
+    let table: toml::Table = toml::from_str(contents).map_err(|error| error.to_string())?;
+    let config = ExamplesConfig::from_table(table)?;
     for (name, example) in &config.examples {
-        for (child_name, child) in &example.children {
-            if !child_name.chars().any(|c| c.is_ascii_alphanumeric())
-                || !child_name
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-            {
+        validate_child_names(name, example)?;
+    }
+    Ok(config)
+}
+
+/// Words that cannot name a Python package.
+const PYTHON_KEYWORDS: &[&str] = &[
+    "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue",
+    "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import",
+    "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while",
+    "with", "yield",
+];
+
+fn validate_child_names(name: &str, example: &ExampleConfig) -> std::result::Result<(), String> {
+    for child_name in example.children.keys() {
+        if !child_name.starts_with(|c: char| c.is_ascii_alphabetic())
+            || !child_name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(format!(
+                "`{name}.{child_name}`: a child configuration name must start with a letter \
+                 and may use letters, numbers, '-' or '_'"
+            ));
+        }
+        let package = example_directory_name(Language::Python, child_name);
+        if PYTHON_KEYWORDS.contains(&package.as_str()) {
+            return Err(format!(
+                "`{name}.{child_name}`: `{package}` is a Python keyword and cannot name a package"
+            ));
+        }
+    }
+    // Each child writes into a directory named for the language, and the example output
+    // directory is cleared only once. Two children in one directory would merge their files.
+    for language in [
+        Language::Dotnet,
+        Language::Python,
+        Language::TypeScript,
+        Language::Go,
+        Language::Java,
+    ] {
+        let mut directories = std::collections::BTreeMap::new();
+        for child_name in example.children.keys() {
+            let directory = example_directory_name(language, child_name);
+            if let Some(other) = directories.insert(directory.clone(), child_name) {
                 return Err(format!(
-                    "`{name}.{child_name}`: a child configuration name must contain letters or numbers and may use '-' or '_'"
-                ));
-            }
-            if !child.children.is_empty() {
-                return Err(format!(
-                    "`{name}.{child_name}`: child configurations cannot contain further child configurations"
+                    "`{name}`: child configurations `{other}` and `{child_name}` both write to \
+                     the {language} directory `{directory}`"
                 ));
             }
         }
     }
-    Ok(config)
+    Ok(())
 }
 
 fn example_descriptor_paths(repo_root: &Path, options: &ExampleOptions) -> Result<Vec<PathBuf>> {
@@ -1110,14 +1210,100 @@ targets = ["workflow"]
 
     #[test]
     fn configuration_rejects_unknown_settings_and_nested_children() {
-        for source in [
-            "[sample]\nsystem_nexuz = true\n",
-            "[sample.child]\nsystem_nexuz = true\n",
-            "[sample.child.grandchild]\ntargets = []\n",
-            "[sample.\"../outside\"]\ntargets = []\n",
-            "[sample.\"__\"]\ntargets = []\n",
+        for (source, message) in [
+            (
+                "[sample]\nsystem_nexuz = true\n",
+                "unknown setting `system_nexuz` in `[sample]`",
+            ),
+            (
+                "[sample]\ntargets = [\"workflow\"]\n\n[sample.child]\nsystem_nexuz = true\n",
+                "unknown setting `system_nexuz` in `[sample.child]`",
+            ),
+            (
+                "[sample.child]\ntarget = [\"client\"]\n",
+                "unknown setting `target` in `[sample.child]`",
+            ),
+            (
+                "system_nexus = true\n",
+                "unknown setting `system_nexus` outside an example section",
+            ),
+            (
+                "[sample.child.grandchild]\ntargets = []\n",
+                "`sample.child.grandchild`: child configurations cannot contain further",
+            ),
+            (
+                "[sample.\"../outside\"]\ntargets = []\n",
+                "`sample.../outside`: a child configuration name must",
+            ),
+            (
+                "[sample.\"__\"]\ntargets = []\n",
+                "`sample.__`: a child configuration name must",
+            ),
         ] {
-            assert!(parse_examples_config(source).is_err(), "{source}");
+            let error = parse_examples_config(source).err().unwrap_or_default();
+            assert!(error.contains(message), "{source}\n{error}");
+        }
+    }
+
+    #[test]
+    fn discovery_rejects_a_section_that_matches_no_input() {
+        let root = temp_language_root("section-without-input");
+        let inputs = root.join("advanced/samples/inputs");
+        fs::create_dir_all(&inputs).unwrap();
+        fs::write(inputs.join("user-service.wit"), "").unwrap();
+        fs::write(
+            inputs.join("examples.toml"),
+            "[user_service]\ntargets = [\"workflow\"]\n",
+        )
+        .unwrap();
+        let error = discover_example_ids(&root, Language::Python)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("examples.toml"), "{error}");
+        assert!(
+            error.contains("section `[user_service]` matches no `.wit` input file"),
+            "{error}"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn configuration_rejects_children_that_share_a_directory_in_any_language() {
+        for (first, second, language, directory) in [
+            ("client-only", "client_only", "python", "client_only"),
+            ("client-only", "ClientOnly", "python", "client_only"),
+            ("client_only", "ClientOnly", "python", "client_only"),
+            ("a-b", "ab", "go", "ab"),
+        ] {
+            let source = format!("[sample.\"{first}\"]\n[sample.\"{second}\"]\n");
+            let error = parse_examples_config(&source).err().unwrap_or_default();
+            let message = format!(
+                "`{}` and `{}` both write to the {language} directory `{directory}`",
+                first.min(second),
+                first.max(second)
+            );
+            assert!(error.contains(&message), "{source}\n{error}");
+        }
+        assert!(parse_examples_config("[sample.client]\n[sample.both]\n").is_ok());
+    }
+
+    #[test]
+    fn configuration_rejects_children_that_cannot_name_a_python_package() {
+        for (child, message) in [
+            (
+                "\"2\"",
+                "`sample.2`: a child configuration name must start with a letter",
+            ),
+            (
+                "_hidden",
+                "`sample._hidden`: a child configuration name must start with a letter",
+            ),
+            ("async", "`sample.async`: `async` is a Python keyword"),
+            ("Class", "`sample.Class`: `class` is a Python keyword"),
+        ] {
+            let source = format!("[sample.{child}]\n");
+            let error = parse_examples_config(&source).err().unwrap_or_default();
+            assert!(error.contains(message), "{source}\n{error}");
         }
     }
 

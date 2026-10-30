@@ -25,7 +25,7 @@ interface defaults-service {
     ///   go="MyFlagsRead | MyFlagsWrite"
     ///   dotnet="MyFlags.Read | MyFlags.Write"
     permissions: my-flags,
-    /// @nexus.default
+    /// @nexus.default targets="workflow"
     ///   python="_support.workflow_namespace()"
     ///   typescript="support.workflowNamespace()"
     ///   go="support.WorkflowNamespace(ctx)"

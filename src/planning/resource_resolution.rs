@@ -936,7 +936,28 @@ impl<'a> ResourceResolutionPass<'a> {
                 })
                 .collect::<Result<BTreeMap<_, _>>>()?
         } else {
-            BTreeMap::new()
+            // With no API target, a resource is data only. It keeps its fields, and nothing binds
+            // its methods or the operations that return it.
+            spec.services
+                .iter()
+                .map(|service| {
+                    let resources = service
+                        .resources
+                        .iter()
+                        .map(|resource| ResolvedResourceSpec {
+                            name: resource.name.clone(),
+                            doc: resource.doc.clone(),
+                            fields: resource.fields.clone(),
+                            methods: Vec::new(),
+                        })
+                        .collect();
+                    let resolved = ResolvedServiceResources {
+                        resources,
+                        operation_returns: BTreeMap::new(),
+                    };
+                    (service.name.clone(), resolved)
+                })
+                .collect()
         };
         Ok(spec.map_names(ResourceBindingMapper {
             data: ResourceBoundData { bindings },

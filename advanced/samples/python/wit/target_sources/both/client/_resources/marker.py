@@ -17,9 +17,4 @@ class Marker:
         self._nexus_client: _NexusClient = nexus_client
 
 
-@dataclasses.dataclass(slots=True)
-class _MarkerData:
-    pass
-
-
-__all__ = ["Marker", "_MarkerData"]
+__all__ = ["Marker"]

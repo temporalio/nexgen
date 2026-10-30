@@ -19,7 +19,14 @@ from wit.target_sources.client import client as client_api
 from wit.target_sources.workflow import models as workflow_models
 
 
-class Recorder:
+class Handle:
+    async def result(self) -> typing.Any:
+        return None
+
+
+class WorkflowRecorder:
+    """Records the calls of the Workflow API, whose handles are awaitable."""
+
     def __init__(self) -> None:
         self.calls: list[tuple[str, object]] = []
 
@@ -35,6 +42,23 @@ class Recorder:
         future: asyncio.Future[typing.Any] = asyncio.get_running_loop().create_future()
         future.set_result(None)
         return future
+
+
+class Recorder:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, object]] = []
+
+    async def start_operation(
+        self,
+        operation: str,
+        arg: typing.Any,
+        *,
+        id: str,
+        result_type: type[typing.Any] | None = None,
+    ) -> Handle:
+        del id, result_type
+        self.calls.append((operation, arg))
+        return Handle()
 
 
 class ClientOnly(client_api.SourceServiceClientExtension):
@@ -72,10 +96,10 @@ def source_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 @pytest.fixture
-def workflow_recorder(monkeypatch: pytest.MonkeyPatch) -> Recorder:
-    recorder = Recorder()
+def workflow_recorder(monkeypatch: pytest.MonkeyPatch) -> WorkflowRecorder:
+    recorder = WorkflowRecorder()
 
-    def create(*, service: str, endpoint: str) -> Recorder:
+    def create(*, service: str, endpoint: str) -> WorkflowRecorder:
         assert (service, endpoint) == ("SourceService", "sources")
         return recorder
 
@@ -84,7 +108,7 @@ def workflow_recorder(monkeypatch: pytest.MonkeyPatch) -> Recorder:
 
 
 async def test_workflow_only_uses_applicable_sources(
-    workflow_recorder: Recorder, source_calls: list[str]
+    workflow_recorder: WorkflowRecorder, source_calls: list[str]
 ) -> None:
     _ = await workflow_only.submit(id="id", client="supplied")
     assert source_calls == ["shared", "workflow"]
@@ -128,7 +152,7 @@ async def test_client_only_uses_applicable_sources(
 
 
 async def test_combined_apis_share_models_but_not_source_policy(
-    workflow_recorder: Recorder, source_calls: list[str]
+    workflow_recorder: WorkflowRecorder, source_calls: list[str]
 ) -> None:
     recorder = Recorder()
     client = BothClient(recorder)
