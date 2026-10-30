@@ -54,6 +54,9 @@ interface source-service {
     cancel: func();
   }
 
+  // These proto-backed types borrow Temporal API messages only to cover proto-backed resource
+  // holders and `@nexus.proto-field`. The fields do not match what the messages mean, so do not
+  // copy them into a real service.
   /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse" typescript-import="@temporalio/proto"
   type run-result = own<run>;
 
