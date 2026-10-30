@@ -1641,15 +1641,14 @@ impl<'a> ApiPlanner<'a> {
         if let Some(helper) = serialization_context_expr {
             validate_go_serialization_context_helper(helper, &operation.name)?;
         }
-        let sourced_assignments = record_for_message(self.api_plan, &input)
+        let sourced_fields = record_for_message(self.api_plan, &input)
             .map(|record| {
                 record
                     .sources_for(GenerationTarget::Workflow)
                     .map(|(field_name, _, source)| {
-                        format!(
-                            "request.{} = {}",
+                        (
                             go_field_name(field_name),
-                            self.external_models.support_helper_call(source)
+                            self.external_models.support_helper_call(source),
                         )
                     })
                     .collect()
@@ -1666,7 +1665,7 @@ impl<'a> ApiPlanner<'a> {
             output_type,
             raw_output_type,
             serialization_context_expr,
-            sourced_assignments,
+            sourced_fields,
             output_transform_expr: go_output_transform.map(|(_, expr)| expr),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
@@ -2327,9 +2326,10 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     pub(in crate::generator) output_transform_expr: Option<&'a str>,
     /// Helper selecting the context for user payloads nested in this operation.
     pub(in crate::generator) serialization_context_expr: Option<&'a str>,
-    /// Statements that fill the sourced fields of `request` for the Workflow API. Only used
-    /// when there is no `wire_binding`, which renders its own.
-    sourced_assignments: Vec<String>,
+    /// The Go name and source expression of each sourced field of the request for the Workflow
+    /// API. The public wrapper fills them, and a resource method fills those that it has no value
+    /// for, so a resource field wins over its source.
+    sourced_fields: Vec<(String, String)>,
     /// Go return type for an `@nexus.output-transform`, with any embedded
     /// import path stripped from the WIT annotation.
     pub(in crate::generator) output_transform_type: Option<String>,
@@ -4748,6 +4748,12 @@ fn render_resource_methods(
                     })
                     .collect::<BTreeMap<_, _>>();
                 let request_locals = std::cell::RefCell::new(String::new());
+                let top_message = match request_plan {
+                    crate::planning::RequestPlan::Construct { message_name, .. } => {
+                        Some(message_name.as_str())
+                    }
+                    crate::planning::RequestPlan::Source(_) => None,
+                };
                 let mut request_expr = render_request_plan(
                     request_plan,
                     go_field_name,
@@ -4824,6 +4830,17 @@ fn render_resource_methods(
                                     );
                                     fields[index] =
                                         format!("{}: {local}", go_field_name(&field.name));
+                                }
+                            }
+                        }
+                        // The operation function doesn't fill sources, so a field that the
+                        // resource has no value for takes its source here.
+                        if top_message == Some(msg_name) {
+                            for (field_name, expression) in &operation.sourced_fields {
+                                if supplied.iter().all(|provided| {
+                                    go_field_name(&provided.field_name) != *field_name
+                                }) {
+                                    fields.push(format!("{field_name}: {expression}"));
                                 }
                             }
                         }
@@ -5003,11 +5020,6 @@ fn render_operation_function(
     output.push_str(") ");
     render_operation_future_return_type(output, package);
     output.push_str(" {\n");
-    for assignment in &operation.sourced_assignments {
-        output.push('\t');
-        output.push_str(assignment);
-        output.push('\n');
-    }
     let endpoint = service
         .endpoint
         .as_deref()
@@ -5698,6 +5710,13 @@ fn render_convenience_wrapper(
         }
         output.push_str(",\n");
     }
+    for (field_name, expression) in &operation.sourced_fields {
+        output.push_str("\t\t");
+        output.push_str(field_name);
+        output.push_str(": ");
+        output.push_str(expression);
+        output.push_str(",\n");
+    }
     output.push_str("\t})\n");
 
     output.push_str("}\n");
@@ -5894,6 +5913,13 @@ fn render_forwarding_wrapper(
     render_operation_wrapper_return_type(output, package);
 
     output.push_str(" {\n");
+    for (field_name, expression) in &operation.sourced_fields {
+        output.push_str("\trequest.");
+        output.push_str(field_name);
+        output.push_str(" = ");
+        output.push_str(expression);
+        output.push('\n');
+    }
     output.push_str("\treturn ");
     output.push_str(&operation.func_name);
     output.push_str("(ctx, request)\n");

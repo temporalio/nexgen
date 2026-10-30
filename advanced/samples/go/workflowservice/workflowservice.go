@@ -450,7 +450,6 @@ func userMetadataFromProto(cfg *commonconverter.SystemNexusConfig, proto *sdk.Us
 // --- Operations (internal) ---
 
 func signalWithStartWorkflow(ctx workflow.Context, request signalWithStartWorkflowRequest) workflow.Future {
-	request.Namespace = support.WorkflowNamespace(ctx)
 	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -683,6 +682,7 @@ func SignalWithStartWorkflow(
 		VersioningOverride:       opts.VersioningOverride,
 		StartDelay:               startDelay,
 		UserMetadata:             userMetadataValue,
+		Namespace:                support.WorkflowNamespace(ctx),
 	})
 }
 

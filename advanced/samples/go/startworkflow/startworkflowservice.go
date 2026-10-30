@@ -273,7 +273,6 @@ func NewSignalResult(namespace string, started bool) SignalResult {
 // --- Operations (internal) ---
 
 func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
-	request.Namespace = support.WorkflowNamespace(ctx)
 	c := workflow.NewNexusClient("temporal-system", "StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "StartWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -290,7 +289,6 @@ func startWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.
 }
 
 func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflow.Future {
-	request.Namespace = support.WorkflowNamespace(ctx)
 	c := workflow.NewNexusClient("temporal-system", "StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "RestartWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -307,7 +305,6 @@ func restartWorkflow(ctx workflow.Context, request startWorkflowRequest) workflo
 }
 
 func cancelWorkflow(ctx workflow.Context, request cancelWorkflowRequest) workflow.Future {
-	request.Namespace = support.WorkflowNamespace(ctx)
 	c := workflow.NewNexusClient("temporal-system", "StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "CancelWorkflow", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -323,7 +320,6 @@ func cancelWorkflow(ctx workflow.Context, request cancelWorkflowRequest) workflo
 }
 
 func signalWithStart(ctx workflow.Context, request cancelWorkflowRequest) workflow.Future {
-	request.Namespace = support.WorkflowNamespace(ctx)
 	c := workflow.NewNexusClient("temporal-system", "StartWorkflowService")
 	fut := c.ExecuteOperation(ctx, "SignalWithStart", request, workflow.NexusOperationOptions{})
 	result, resultSettable := workflow.NewFuture(ctx)
@@ -416,6 +412,7 @@ func StartWorkflow(ctx workflow.Context, opts StartWorkflowOptions) workflow.Fut
 		WorkflowID:         opts.WorkflowID,
 		TaskQueue:          opts.TaskQueue,
 		WorkflowStartDelay: workflowStartDelay,
+		Namespace:          support.WorkflowNamespace(ctx),
 	})
 }
 
@@ -440,6 +437,7 @@ func RestartWorkflow(ctx workflow.Context, opts RestartWorkflowOptions) workflow
 		WorkflowID:         opts.WorkflowID,
 		TaskQueue:          opts.TaskQueue,
 		WorkflowStartDelay: workflowStartDelay,
+		Namespace:          support.WorkflowNamespace(ctx),
 	})
 }
 
@@ -458,6 +456,7 @@ func CancelWorkflow(ctx workflow.Context, opts CancelWorkflowOptions) workflow.F
 	return cancelWorkflow(ctx, cancelWorkflowRequest{
 		WorkflowExecution: opts.WorkflowExecution,
 		Reason:            reason,
+		Namespace:         support.WorkflowNamespace(ctx),
 	})
 }
 
@@ -476,5 +475,6 @@ func SignalWithStart(ctx workflow.Context, opts SignalWithStartOptions) workflow
 	return signalWithStart(ctx, cancelWorkflowRequest{
 		WorkflowExecution: opts.WorkflowExecution,
 		Reason:            reason,
+		Namespace:         support.WorkflowNamespace(ctx),
 	})
 }

@@ -969,8 +969,11 @@ record start-workflow-request {
 ```
 
 The workflow convenience API does not require a `namespace` argument. Request
-construction evaluates the helper. Shared models and their converters do not
-evaluate sources, so direct model construction must supply required fields:
+construction evaluates the helper. In a resource method, a resource field or a
+method parameter of the same name takes precedence over a source, and the source
+fills only the fields that the method has no value for. Every language follows
+this rule. Shared models and their converters do not evaluate sources, so direct
+model construction must supply required fields:
 
 ```python
 request = StartWorkflowRequest(

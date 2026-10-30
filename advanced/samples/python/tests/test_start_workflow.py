@@ -74,7 +74,7 @@ class StartWorkflowServiceHandler:
         input: start_workflow_models.CancelWorkflowRequest,
     ) -> start_workflow_models.CancelWorkflowResponse:
         self.calls.append(("CancelWorkflow", input))
-        assert input.namespace == "default"
+        assert input.namespace == "stored-namespace"
         assert input.workflow_execution.workflow_id == "workflow-id"
         assert input.workflow_execution.run_id == "run-123"
         return start_workflow_models.CancelWorkflowResponse()
@@ -97,7 +97,13 @@ class StartWorkflowCallerWorkflow:
             workflow_id="workflow-id",
             task_queue=TASK_QUEUE,
         )
-        await handle.cancel()
+        # The handle's namespace wins over the namespace source.
+        stored = StartedWorkflow(
+            namespace="stored-namespace",
+            workflow_id=handle.workflow_id,
+            run_id=handle.run_id,
+        )
+        await stored.cancel()
         restarted_handle = await handle.restart_workflow(
             workflow="ExampleWorkflow",
             task_queue=TASK_QUEUE,

@@ -29,14 +29,14 @@ namespace Nexgen.StartWorkflowService
         [GeneratedCode("nexgen", null)]
         public Task CancelAsync(string? reason)
         {
-            var request = new CancelWorkflowOptions(new WorkflowExecution(WorkflowId) { RunId = RunId }) { Reason = reason };
+            var request = new CancelWorkflowRequest(new WorkflowExecution(WorkflowId) { RunId = RunId }, Namespace) { Reason = reason };
             return Operations.CancelWorkflowAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task<StartedWorkflow> RestartWorkflowAsync(string workflow, string taskQueue)
         {
-            var request = new RestartWorkflowOptions(WorkflowId, workflow, taskQueue);
+            var request = new StartWorkflowRequest(WorkflowId, workflow, taskQueue, Namespace);
             return Operations.RestartWorkflowAsync(request);
         }
 

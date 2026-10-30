@@ -201,7 +201,6 @@ func callbackNexusOperation(ctx workflow.Context, request CallbackNexus) workflo
 }
 
 func namespaceInfoOperation(ctx workflow.Context, request namespaceInfo) workflow.Future {
-	request.Data = support.NamespaceData(ctx)
 	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
 	fut := c.ExecuteOperation(ctx, "NamespaceInfoOperation", request, workflow.NexusOperationOptions{})
 	return fut
@@ -874,5 +873,6 @@ func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOpt
 	return namespaceInfoOperation(ctx, namespaceInfo{
 		Name:  name,
 		State: state,
+		Data:  support.NamespaceData(ctx),
 	})
 }

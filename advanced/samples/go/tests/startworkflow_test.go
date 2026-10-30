@@ -79,8 +79,10 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 		if err := start.RestartWorkflow(ctx, "resource-workflow", "resource-queue").Get(ctx, &resourceRestart); err != nil {
 			return err
 		}
+		// The resource's namespace wins over the namespace source.
+		stored := sw.NewStartedWorkflow("stored-namespace", "start-id", "start-run")
 		var resourceCancel sw.CancelWorkflowResponse
-		return start.Cancel(ctx, "resource-cancel").Get(ctx, &resourceCancel)
+		return stored.Cancel(ctx, "resource-cancel").Get(ctx, &resourceCancel)
 	})
 
 	s.True(s.env.IsWorkflowCompleted())
@@ -116,4 +118,5 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 	s.Equal("start-id", resourceCancel.GetWorkflowExecution().GetWorkflowId())
 	s.Equal("start-run", resourceCancel.GetWorkflowExecution().GetRunId())
 	s.Equal("resource-cancel", resourceCancel.GetReason())
+	s.Equal("stored-namespace", resourceCancel.GetNamespace())
 }

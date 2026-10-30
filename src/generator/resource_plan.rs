@@ -71,6 +71,58 @@ pub(crate) fn record_for_request_name<'a>(
     })
 }
 
+/// Whether a request plan fills a top-level request field that has a source in `target`. The
+/// resource's value wins over the source, so such a resource method must not call an operation
+/// wrapper that fills the field from the source.
+pub(crate) fn request_plan_fills_source(
+    api_plan: &PlannedSpec,
+    plan: &RequestPlan,
+    target: crate::nexgen_config::GenerationTarget,
+) -> bool {
+    let RequestPlan::Construct {
+        message_name,
+        fields,
+    } = plan
+    else {
+        return false;
+    };
+    let Some(record) = record_for_request_name(api_plan, message_name) else {
+        return false;
+    };
+    fields.iter().any(|field| {
+        record.fields.values().any(|candidate| {
+            candidate.name == field.field_name && candidate.source_for(target).is_some()
+        })
+    })
+}
+
+/// Whether a resource method of the service binds the operation with a plan that fills one of
+/// the operation's sourced fields.
+pub(crate) fn resource_method_fills_source(
+    api_plan: &PlannedSpec,
+    service_name: &str,
+    operation_name: &str,
+    target: crate::nexgen_config::GenerationTarget,
+) -> bool {
+    api_plan
+        .services
+        .iter()
+        .filter(|service| service.name == service_name)
+        .flat_map(|service| service.resources.iter().map(|resource| &resource.data))
+        .flat_map(|resource| &resource.methods)
+        .any(|method| {
+            matches!(
+                &method.binding,
+                PlannedResourceMethodBindingSpec::Operation {
+                    operation_name: name,
+                    request_plan,
+                    ..
+                } if name == operation_name
+                    && request_plan_fills_source(api_plan, request_plan, target)
+            )
+        })
+}
+
 /// Check each API independently, preserving the shared request and source policy.
 pub(crate) fn validate_resource_origins(
     api_plan: &PlannedSpec,

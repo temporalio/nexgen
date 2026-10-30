@@ -186,7 +186,7 @@ func NewJob(jobID string) *Job {
 }
 
 func (u *Job) Restart(ctx workflow.Context) workflow.Future {
-	return restart(ctx, restartRequest{JobID: u.JobID})
+	return restart(ctx, restartRequest{JobID: u.JobID, Shared: support.SharedSource(ctx)})
 }
 
 func (u *Job) Refresh(ctx workflow.Context) workflow.Future {
@@ -225,8 +225,6 @@ func (u *Run) Cancel(ctx workflow.Context) workflow.Future {
 // --- Operations (internal) ---
 
 func submit(ctx workflow.Context, request submitRequest) workflow.Future {
-	request.Shared = support.SharedSource(ctx)
-	request.Workflow = support.WorkflowSource(ctx)
 	c := workflow.NewNexusClient("sources", "SourceService")
 	fut := c.ExecuteOperation(ctx, "Submit", request, workflow.NexusOperationOptions{})
 	return fut
@@ -251,7 +249,6 @@ func createMarker(ctx workflow.Context, request createMarkerRequest) workflow.Fu
 }
 
 func restart(ctx workflow.Context, request restartRequest) workflow.Future {
-	request.Shared = support.SharedSource(ctx)
 	c := workflow.NewNexusClient("sources", "SourceService")
 	fut := c.ExecuteOperation(ctx, "Restart", request, workflow.NexusOperationOptions{})
 	return fut
@@ -325,8 +322,10 @@ type SubmitOptions struct {
 
 func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
 	return submit(ctx, submitRequest{
-		ID:     opts.ID,
-		Client: opts.Client,
+		ID:       opts.ID,
+		Client:   opts.Client,
+		Shared:   support.SharedSource(ctx),
+		Workflow: support.WorkflowSource(ctx),
 	})
 }
 
@@ -366,7 +365,8 @@ type RestartOptions struct {
 
 func Restart(ctx workflow.Context, opts RestartOptions) workflow.Future {
 	return restart(ctx, restartRequest{
-		JobID: opts.JobID,
+		JobID:  opts.JobID,
+		Shared: support.SharedSource(ctx),
 	})
 }
 
