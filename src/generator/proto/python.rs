@@ -30,9 +30,14 @@ struct RenderedWireWrite {
 }
 
 enum WireReadPolicy {
-    Required { missing_error: String },
+    Required {
+        missing_error: String,
+        check_empty: bool,
+    },
     Optional,
-    Default { default_expr: String },
+    Default {
+        default_expr: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -678,12 +683,17 @@ fn field_read(
     };
 
     let mut read = match policy {
-        WireReadPolicy::Required { missing_error } => {
+        WireReadPolicy::Required {
+            missing_error,
+            check_empty,
+        } => {
             let mut setup_lines = Vec::new();
             if field_has_proto_presence(field) {
                 setup_lines.push(format!("if not value.HasField(\"{proto_name}\"):"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
-            } else if matches!(&field.field_type, PlannedType::String | PlannedType::Bytes) {
+            } else if check_empty
+                && matches!(&field.field_type, PlannedType::String | PlannedType::Bytes)
+            {
                 setup_lines.push(format!("if not value.{proto_name}:"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
             }
@@ -1251,7 +1261,7 @@ fn render_record_wire_block(
                             &rendered_field.wire_value_type,
                             proto_field.generic_carrier,
                             &type_arguments,
-                            field_read_policy(&model.name, rendered_field),
+                            field_read_policy(&model.name, planned_field, rendered_field),
                         )
                     },
                     |oneof| {
@@ -1295,7 +1305,7 @@ fn render_record_wire_block(
                             &rendered_field.wire_value_type,
                             proto_field.generic_carrier,
                             &type_arguments,
-                            field_read_policy(&model.name, rendered_field),
+                            field_read_policy(&model.name, planned_field, rendered_field),
                         )
                     },
                     |oneof| {
@@ -1409,14 +1419,23 @@ fn render_record_wire_block(
     }))
 }
 
-fn field_read_policy(model_name: &str, rendered_field: &RenderedField) -> WireReadPolicy {
+fn field_read_policy(
+    model_name: &str,
+    planned_field: &RecordFieldSpec<PlannedFamily>,
+    rendered_field: &RenderedField,
+) -> WireReadPolicy {
     match &rendered_field.default_kind {
         PythonFieldDefaultKind::Required => {
             let missing_error = python_string_literal(&format!(
                 "missing required field {model_name}.{}",
                 rendered_field.attr_name
             ));
-            WireReadPolicy::Required { missing_error }
+            WireReadPolicy::Required {
+                missing_error,
+                // The source fills the field when the API builds a request. The wire value of a
+                // handler's request can still be empty, and decode accepts it as it is.
+                check_empty: !matches!(planned_field.origin, Some(FieldOrigin::Source { .. })),
+            }
         }
         PythonFieldDefaultKind::None => WireReadPolicy::Optional,
         PythonFieldDefaultKind::EmptyDict => WireReadPolicy::Default {

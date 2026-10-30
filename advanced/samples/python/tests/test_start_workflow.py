@@ -7,6 +7,8 @@ from nexusrpc import Operation
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 import pytest
 from temporalio import workflow
+from temporalio.api.common.v1 import WorkflowExecution
+from temporalio.api.workflowservice.v1 import RequestCancelWorkflowExecutionRequest
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 import wit.start_workflow as start_workflow
@@ -166,6 +168,22 @@ def test_workflow_execution_serializes() -> None:
 
     assert proto.workflow_id == "workflow-id"
     assert proto.run_id == ""
+
+
+def test_decode_accepts_an_empty_sourced_namespace() -> None:
+    converter = getattr(
+        start_workflow_models.CancelWorkflowRequest,
+        "__temporal_transfer_type_converter",
+    )
+    request = converter.from_transfer_type(
+        RequestCancelWorkflowExecutionRequest(
+            workflow_execution=WorkflowExecution(workflow_id="workflow-id"),
+        ),
+        start_workflow_models.CancelWorkflowRequest,
+    )
+
+    assert request.namespace == ""
+    assert request.workflow_execution.workflow_id == "workflow-id"
 
 
 async def test_start_workflow_returns_wrapper_handle(
