@@ -2,114 +2,38 @@
 
 from __future__ import annotations
 
-import collections.abc
-import typing
-
-import nexusrpc
-import temporalio.converter
-from . import services as _services
-from .operations.activity_options_operation import activity_options_operation
-from .operations.failure_operation import failure_operation
-from .operations.workflow_execution_info_operation import (
-    workflow_execution_info_operation,
+from .models import (
+    ActivityOptions,
+    Alert,
+    AlertLevel,
+    BadBinaries,
+    BadBinary,
+    CallbackInternal,
+    CallbackNexus,
+    FailureContainer,
+    NamespaceInfo,
+    NamespaceState,
+    TaskQueuePartition,
+    TaskQueuePartitions,
+    WorkflowExecution,
+    WorkflowExecutionInfo,
 )
-from .operations.task_queue_partitions_operation import task_queue_partitions_operation
-from .operations.bad_binaries_operation import bad_binaries_operation
-from .operations.alert_operation import alert_operation
-from .operations.callback_internal_operation import callback_internal_operation
-from .operations.callback_nexus_operation import callback_nexus_operation
-from .operations.namespace_info_operation import namespace_info_operation
+from .services import ProtoBackedShowcaseService
 
 __all__ = [
-    "activity_options_operation",
-    "alert_operation",
-    "bad_binaries_operation",
-    "callback_internal_operation",
-    "callback_nexus_operation",
-    "failure_operation",
-    "namespace_info_operation",
-    "task_queue_partitions_operation",
-    "workflow_execution_info_operation",
+    "ActivityOptions",
+    "Alert",
+    "AlertLevel",
+    "BadBinaries",
+    "BadBinary",
+    "CallbackInternal",
+    "CallbackNexus",
+    "FailureContainer",
+    "NamespaceInfo",
+    "NamespaceState",
+    "TaskQueuePartition",
+    "TaskQueuePartitions",
+    "WorkflowExecution",
+    "WorkflowExecutionInfo",
+    "ProtoBackedShowcaseService",
 ]
-
-
-_InputT = typing.TypeVar("_InputT")
-_OutputT = typing.TypeVar("_OutputT")
-
-
-_SerializationContextFactory = collections.abc.Callable[
-    [_InputT], temporalio.converter.SerializationContext
-]
-
-
-class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
-    def __init__(
-        self,
-        *,
-        operation: nexusrpc.Operation[_InputT, _OutputT],
-        serialization_context: _SerializationContextFactory[_InputT] | None = None,
-    ) -> None:
-        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation
-        self.serialization_context: _SerializationContextFactory[_InputT] | None = (
-            serialization_context
-        )
-
-
-__nexus_operation_registry__: dict[
-    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
-] = {
-    (
-        "ProtoBackedShowcaseService",
-        "ActivityOptionsOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.activity_options_operation,
-    ),
-    (
-        "ProtoBackedShowcaseService",
-        "FailureOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.failure_operation,
-    ),
-    (
-        "ProtoBackedShowcaseService",
-        "WorkflowExecutionInfoOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.workflow_execution_info_operation,
-    ),
-    (
-        "ProtoBackedShowcaseService",
-        "TaskQueuePartitionsOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.task_queue_partitions_operation,
-    ),
-    (
-        "ProtoBackedShowcaseService",
-        "BadBinariesOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.bad_binaries_operation,
-    ),
-    (
-        "ProtoBackedShowcaseService",
-        "AlertOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.alert_operation,
-    ),
-    (
-        "ProtoBackedShowcaseService",
-        "CallbackInternalOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.callback_internal_operation,
-    ),
-    (
-        "ProtoBackedShowcaseService",
-        "CallbackNexusOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.callback_nexus_operation,
-    ),
-    (
-        "ProtoBackedShowcaseService",
-        "NamespaceInfoOperation",
-    ): _NexusOperationInfo(
-        operation=_services.ProtoBackedShowcaseService.namespace_info_operation,
-    ),
-}

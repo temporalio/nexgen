@@ -9,10 +9,10 @@ from temporalio import workflow
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
-import wit.type_showcase as type_showcase
+import wit.type_showcase.workflow as type_showcase
 import wit.type_showcase.models as type_showcase_models
 import wit.type_showcase.services as type_showcase_services
-from wit.type_showcase._resources import User
+from wit.type_showcase.workflow._resources import User
 
 APP_ROOT = Path(__file__).resolve().parent
 OUTPUT_PATH = APP_ROOT.parent / "wit" / "type_showcase"

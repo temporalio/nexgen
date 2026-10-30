@@ -14,7 +14,7 @@ from .models import (
     UpdateEmailRequest,
     UpdateNotificationSettingsRequest,
 )
-from ._resources.user import User
+from .workflow._resources.user import User
 
 
 @service

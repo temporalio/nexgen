@@ -19,9 +19,9 @@ from temporalio.worker import (
 )
 from typing_extensions import assert_type, override
 import pytest
-import wit.workflow_service as workflow_service
+import wit.workflow_service.workflow as workflow_service
 import wit.workflow_service.models as workflow_service_models
-from wit.workflow_service._system_nexus_interceptor import (
+from wit.workflow_service.workflow._system_nexus_interceptor import (
     _SystemNexusWorkflowOutboundInterceptorTerminal,
 )
 

@@ -8,7 +8,7 @@ from .._nexus_client import (
     _NexusClient,
     _operation_id,
 )
-from ... import _resources as _resource_data
+from ...workflow import _resources as _resource_data
 from ...models import (
     CreateJobRequest,
     RestartRequest,

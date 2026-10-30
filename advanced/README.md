@@ -41,8 +41,10 @@ Checked-in generated output lives under
 `advanced/samples/python/wit/<example_name>/` and
 `advanced/samples/typescript/wit/<example-name>/`; Go output lives under
 `advanced/samples/go/<example-name>/` and .NET output lives under
-`advanced/samples/dotnet/wit/<example-name>/`. Language-specific tests live
-under each language's `tests/` directory where present.
+`advanced/samples/dotnet/wit/<example-name>/`. Python output puts the Workflow
+API in a `workflow` package next to `models.py` and `services.py`.
+Language-specific tests live under each language's `tests/` directory where
+present.
 
 [`samples/inputs/examples.toml`](samples/inputs/examples.toml) configures each
 input's languages, API targets, System Nexus bindings, and descriptors. API

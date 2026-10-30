@@ -5,7 +5,9 @@ snapshot-only JSON-Schema **Workflow API** outputs.
 
 - Authored WIT inputs live in `advanced/samples/inputs/*.wit`
 - Checked-in generated packages live in `advanced/samples/python/wit/<name>/`,
-  where `<name>` is the snake_case WIT input name
+  where `<name>` is the snake_case WIT input name. The Workflow API of a package
+  is in its `workflow` package, such as `wit.start_workflow.workflow`, and the
+  client API is in `client`
 - Authored Temporal converters live in the shared `temporal_support/` package;
   generated WIT modules import that package as `_support` rather than copying
   it, and generated models are exposed as the public `models` module

@@ -6,7 +6,7 @@ import typing
 
 from typing_extensions import override
 
-import wit.cross_service_resource._resources as workflow_resources
+import wit.cross_service_resource.workflow._resources as workflow_resources
 from wit.cross_service_resource.client import JobsClientExtension, OrdersClientExtension
 from wit.cross_service_resource.models import PlaceRequest, RestartRequest
 

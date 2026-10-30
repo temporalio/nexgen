@@ -13,8 +13,8 @@ from wit.defaults.models import (
     RecordWithDefaults,
     Request,
 )
-from wit.defaults.operations.submit import submit
-from wit.defaults._resources import Sender
+from wit.defaults.workflow.operations.submit import submit
+from wit.defaults.workflow._resources import Sender
 
 
 @dataclasses.dataclass

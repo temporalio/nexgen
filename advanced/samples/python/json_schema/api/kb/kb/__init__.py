@@ -7,63 +7,15 @@ from .models import (
     GetPageInput,
     PutBlockOutput,
 )
-import collections.abc
-import typing
-
-import nexusrpc
-import temporalio.converter
-from .services import KnowledgeBaseServiceClient
-from . import services as _services
+from .services import (
+    KnowledgeBaseService,
+    KnowledgeBaseServiceClient,
+)
 
 __all__ = [
     "GetCategoryTreeInput",
     "GetPageInput",
     "PutBlockOutput",
+    "KnowledgeBaseService",
     "KnowledgeBaseServiceClient",
 ]
-
-
-_InputT = typing.TypeVar("_InputT")
-_OutputT = typing.TypeVar("_OutputT")
-
-
-_SerializationContextFactory = collections.abc.Callable[
-    [_InputT], temporalio.converter.SerializationContext
-]
-
-
-class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
-    def __init__(
-        self,
-        *,
-        operation: nexusrpc.Operation[_InputT, _OutputT],
-        serialization_context: _SerializationContextFactory[_InputT] | None = None,
-    ) -> None:
-        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation
-        self.serialization_context: _SerializationContextFactory[_InputT] | None = (
-            serialization_context
-        )
-
-
-__nexus_operation_registry__: dict[
-    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
-] = {
-    (
-        "example.kb.v1.KnowledgeBaseService",
-        "GetPage",
-    ): _NexusOperationInfo(
-        operation=_services.KnowledgeBaseService.get_page,
-    ),
-    (
-        "example.kb.v1.KnowledgeBaseService",
-        "PutBlock",
-    ): _NexusOperationInfo(
-        operation=_services.KnowledgeBaseService.put_block,
-    ),
-    (
-        "example.kb.v1.KnowledgeBaseService",
-        "GetCategoryTree",
-    ): _NexusOperationInfo(
-        operation=_services.KnowledgeBaseService.get_category_tree,
-    ),
-}

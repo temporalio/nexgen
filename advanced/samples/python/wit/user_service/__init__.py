@@ -2,60 +2,20 @@
 
 from __future__ import annotations
 
-import collections.abc
-import typing
-
-import nexusrpc
-import temporalio.converter
-from .services import UserServiceClient
-from . import services as _services
+from .models import (
+    GetUserRequest,
+    NotifyRequest,
+    UpdateEmailRequest,
+)
+from .services import (
+    UserService,
+    UserServiceClient,
+)
 
 __all__ = [
+    "GetUserRequest",
+    "NotifyRequest",
+    "UpdateEmailRequest",
+    "UserService",
     "UserServiceClient",
 ]
-
-
-_InputT = typing.TypeVar("_InputT")
-_OutputT = typing.TypeVar("_OutputT")
-
-
-_SerializationContextFactory = collections.abc.Callable[
-    [_InputT], temporalio.converter.SerializationContext
-]
-
-
-class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
-    def __init__(
-        self,
-        *,
-        operation: nexusrpc.Operation[_InputT, _OutputT],
-        serialization_context: _SerializationContextFactory[_InputT] | None = None,
-    ) -> None:
-        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation
-        self.serialization_context: _SerializationContextFactory[_InputT] | None = (
-            serialization_context
-        )
-
-
-__nexus_operation_registry__: dict[
-    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
-] = {
-    (
-        "UserService",
-        "GetUser",
-    ): _NexusOperationInfo(
-        operation=_services.UserService.get_user,
-    ),
-    (
-        "UserService",
-        "UpdateEmail",
-    ): _NexusOperationInfo(
-        operation=_services.UserService.update_email,
-    ),
-    (
-        "UserService",
-        "Notify",
-    ): _NexusOperationInfo(
-        operation=_services.UserService.notify,
-    ),
-}

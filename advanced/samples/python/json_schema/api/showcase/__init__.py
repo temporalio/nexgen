@@ -3,49 +3,85 @@
 from __future__ import annotations
 
 from ._definitions import Violation
-import collections.abc
-import typing
-
-import nexusrpc
-import temporalio.converter
-from .services import ShowcaseServicePyClient
-from . import services as _services
+from .models import (
+    Address,
+    AddressBook,
+    Attributes,
+    BlobIndex,
+    Choices,
+    ChoicesValue,
+    Circle,
+    ContactPy,
+    DateIndex,
+    Extras,
+    GetShowcaseInput,
+    ItemRules,
+    Labels,
+    LinkNote,
+    Metrics,
+    Nicknames,
+    Note,
+    Quotas,
+    Settings,
+    Shape,
+    Showcase,
+    ShowcaseAudit,
+    ShowcaseDetailObject,
+    ShowcaseLedger,
+    ShowcaseLedgerValue,
+    ShowcaseLocation,
+    ShowcaseLocationGeo,
+    ShowcaseMetadata,
+    ShowcaseRowsItem,
+    ShowcaseSegmentsItem,
+    Square,
+    TextNote,
+    Tokens,
+    Widget,
+    WidgetBase,
+)
+from .services import (
+    ShowcaseServicePy,
+    ShowcaseServicePyClient,
+)
 
 __all__ = [
     "Violation",
+    "Address",
+    "AddressBook",
+    "Attributes",
+    "BlobIndex",
+    "Choices",
+    "ChoicesValue",
+    "Circle",
+    "ContactPy",
+    "DateIndex",
+    "Extras",
+    "GetShowcaseInput",
+    "ItemRules",
+    "Labels",
+    "LinkNote",
+    "Metrics",
+    "Nicknames",
+    "Note",
+    "Quotas",
+    "Settings",
+    "Shape",
+    "Showcase",
+    "ShowcaseAudit",
+    "ShowcaseDetailObject",
+    "ShowcaseLedger",
+    "ShowcaseLedgerValue",
+    "ShowcaseLocation",
+    "ShowcaseLocationGeo",
+    "ShowcaseMetadata",
+    "ShowcaseRowsItem",
+    "ShowcaseSegmentsItem",
+    "Square",
+    "TextNote",
+    "Tokens",
+    "Widget",
+    "WidgetBase",
+    "ShowcaseServicePy",
     "ShowcaseServicePyClient",
 ]
-
-
-_InputT = typing.TypeVar("_InputT")
-_OutputT = typing.TypeVar("_OutputT")
-
-
-_SerializationContextFactory = collections.abc.Callable[
-    [_InputT], temporalio.converter.SerializationContext
-]
-
-
-class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
-    def __init__(
-        self,
-        *,
-        operation: nexusrpc.Operation[_InputT, _OutputT],
-        serialization_context: _SerializationContextFactory[_InputT] | None = None,
-    ) -> None:
-        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation
-        self.serialization_context: _SerializationContextFactory[_InputT] | None = (
-            serialization_context
-        )
-
-
-__nexus_operation_registry__: dict[
-    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
-] = {
-    (
-        "example.showcase.v1.ShowcaseService",
-        "GetShowcase",
-    ): _NexusOperationInfo(
-        operation=_services.ShowcaseServicePy.get_showcase_py,
-    ),
-}

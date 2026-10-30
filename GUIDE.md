@@ -1464,21 +1464,32 @@ separate the targets with commas.
 - Without `--targets`, generation emits models and service definitions only.
   Resources are data classes with their fields, and sourced fields are ordinary
   model fields. A handler that implements the service needs only these.
-- `workflow` selects the API for Workflow code.
+- `workflow` selects the API for Workflow code. In Python it is in a `workflow`
+  package inside the output directory.
 - `client` writes the same API for code outside a Workflow, in a `client`
   package inside the output directory. So far only Python supports it. It can be
   selected independently or alongside `workflow`. nexgen refuses it for a
   service with no `@nexus.endpoint`.
 
+In Python, the root package has the models and the service definitions for every
+target, and it exports them. The `workflow` package has the operation functions,
+the resource classes, the operation registry and, for System Nexus, the
+interceptor. Import an operation from it, for example
+`from stream_service.workflow import create_stream`. A client class for a
+service with no endpoint stays in the root `services` module.
+
 The `client` package has its own resource classes and a
-`<Service>ClientExtension` for each service, with the names of the Workflow
-package. It imports the models of the parent package, so both targets share
-them. Resource identity fields can be transported as data; client handles are
-constructed with an explicit service-bound Nexus client.
+`<Service>ClientExtension` for each service, with the names of the `workflow`
+package. Both packages import the models of the root package, so the targets
+share them. Resource identity fields can be transported as data; client handles
+are constructed with an explicit service-bound Nexus client. With the Workflow
+target, the client decodes resource data into the `workflow` resource classes.
 
 ```text
 stream_service/
-  models.py, services.py, _resources/  # the Workflow target
+  __init__.py, models.py, services.py  # every target
+  workflow/
+    __init__.py, operations/, _resources/  # the Workflow target
   client/
     __init__.py, _extensions.py, _resources/  # the client target
 ```
@@ -1517,9 +1528,6 @@ one package can't have methods of the same name, private or public, and nexgen
 refuses them. An extension also refuses a client class that gets one of its
 public names from another base, because Python would use one of the two with no
 error.
-
-nexgen also refuses an operation named `client`. The parent package exports each
-operation, and an import of the client package sets the attribute of that name.
 
 A client resource takes a service-bound Nexus client as its first constructor
 argument. Its methods call that client's `start_operation` directly, preserving

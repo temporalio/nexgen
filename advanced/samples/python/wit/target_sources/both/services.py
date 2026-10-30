@@ -13,8 +13,8 @@ from .models import (
     SignalWithStartWorkflowExecutionResponse,
     SubmitRequest,
 )
-from ._resources.job import Job
-from ._resources.marker import Marker
+from .workflow._resources.job import Job
+from .workflow._resources.marker import Marker
 
 
 @service

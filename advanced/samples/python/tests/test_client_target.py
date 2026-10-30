@@ -13,7 +13,7 @@ from temporalio.api.workflowservice.v1 import (
 )
 from typing_extensions import override
 
-import wit.target_sources.both._resources as workflow_resources
+import wit.target_sources.both.workflow._resources as workflow_resources
 from wit.target_sources.both.client import Job, Marker, SourceServiceClientExtension
 from wit.target_sources.both.models import (
     CancelRunRequest,

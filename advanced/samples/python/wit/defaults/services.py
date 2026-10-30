@@ -7,7 +7,7 @@ from .models import (
     GetSenderRequest,
     Request,
 )
-from ._resources.sender import Sender
+from .workflow._resources.sender import Sender
 
 
 @service

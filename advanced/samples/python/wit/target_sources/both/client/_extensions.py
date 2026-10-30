@@ -25,7 +25,7 @@ from ._resources import (
     Run,
     RunWithStatus,
 )
-from .. import _resources as _resource_data
+from ..workflow import _resources as _resource_data
 import temporal_support as _support
 
 

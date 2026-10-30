@@ -275,20 +275,6 @@ fn insert_branch_index_file(
     )
 }
 
-fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
-    plan.types
-        .values()
-        .filter(|entry| entry.is_module_export())
-        .filter_map(|entry| match &entry.declaration {
-            TypeDeclSpec::Record(record) => Some(record.name.clone()),
-            TypeDeclSpec::Enum(enumeration) => Some(enumeration.name.clone()),
-            TypeDeclSpec::Flags(flags) => Some(flags.name.clone()),
-            TypeDeclSpec::Variant(variant) => Some(variant.name.clone()),
-            TypeDeclSpec::External(_) => None,
-        })
-        .collect()
-}
-
 struct ApiPlanner<'a> {
     api_plan: &'a PlannedSpec,
     support_package: &'a str,
@@ -666,59 +652,17 @@ impl<'a> ApiPlanner<'a> {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
-        let rendered_model_names = model_names.iter().cloned().collect::<BTreeSet<_>>();
-        let mut package_model_names = if self.model_hoists.is_some() {
-            rendered_model_names.clone()
-        } else {
-            BTreeSet::new()
-        };
-        package_model_names.extend(
-            planned_module_export_model_names(self.api_plan)
-                .intersection(&rendered_model_names)
-                .cloned(),
-        );
-        package_model_names.extend(
-            model_fragments
-                .module_exported_names
-                .intersection(&rendered_model_names)
-                .cloned(),
-        );
-        let mut package_model_names = package_model_names.into_iter().collect::<Vec<_>>();
-        sort_python_model_names(&mut package_model_names, &self.variants, model_fragments);
-        let render_init = |root_package_imports: &RootPackageImports| {
-            if targets.workflow {
-                render_package_init(
-                    services,
-                    &package_model_names,
-                    &resource_names,
-                    &resource_operation_owners,
-                    self.support_package,
-                    self.api_plan,
-                    self.model_hoists,
-                    root_package_imports,
-                )
-            } else {
-                render_definitions_only_package_init(services, &model_names, root_package_imports)
-            }
-        };
         let empty_root_package_imports = RootPackageImports::new();
         let root_package_imports = if self.model_hoists.is_none() {
             &model_fragments.root_package_imports
         } else {
             &empty_root_package_imports
         };
-        let exported_names = package_export_names(
-            services,
-            if targets.workflow {
-                &package_model_names
-            } else {
-                &model_names
-            },
-            root_package_imports,
-        );
+        let exported_names = package_export_names(services, &model_names, root_package_imports);
+        // The root package has the definitions in every target, and each API has its own package.
         files.insert(
             "__init__.py",
-            render_init(root_package_imports),
+            render_definitions_only_package_init(services, &model_names, root_package_imports),
             module_origin.clone(),
         )?;
         super::emit_package(
@@ -748,6 +692,7 @@ impl<'a> ApiPlanner<'a> {
                     services,
                     &operation_model_names,
                     &resource_names,
+                    &resource_operation_owners,
                 ),
                 GenerationTarget::Client => self.render_client_package(
                     files,
@@ -757,7 +702,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
             },
         )?;
-        if !resource_names.is_empty() {
+        if !targets.workflow && !resource_names.is_empty() {
             files.insert(
                 "_resources/__init__.py",
                 render_resources_package_init(services, self.api_plan),
@@ -798,14 +743,32 @@ impl<'a> ApiPlanner<'a> {
         Ok((files, exported_names))
     }
 
+    /// Renders the package of the Workflow target, with the operation functions, the resource
+    /// classes and the operation registry. It imports the models of the parent package.
     fn render_workflow_package(
         &self,
         files: &mut GeneratedFileMap,
         services: &[RenderedService<'_>],
         model_names: &[String],
         resource_names: &[String],
+        resource_operation_owners: &BTreeMap<String, String>,
     ) -> Result<()> {
-        let resource_operation_owners = resource_operation_owners(services);
+        if services.is_empty() {
+            return Ok(());
+        }
+        let dir = python_target_package(GenerationTarget::Workflow);
+        files.insert(
+            format!("{dir}/__init__.py"),
+            render_workflow_package_init(services, resource_operation_owners, self.support_package),
+            GeneratedFileOrigin::fixed("generated Python Workflow package initializer"),
+        )?;
+        if !resource_names.is_empty() {
+            files.insert(
+                format!("{dir}/_resources/__init__.py"),
+                render_resources_package_init(services, self.api_plan),
+                GeneratedFileOrigin::fixed("generated Python resources package initializer"),
+            )?;
+        }
         let has_standalone_operations = services.iter().any(|service| {
             service.endpoint.is_some()
                 && service.operations.iter().any(|operation| {
@@ -815,14 +778,14 @@ impl<'a> ApiPlanner<'a> {
         });
         if has_standalone_operations {
             files.insert(
-                "operations/__init__.py",
+                format!("{dir}/operations/__init__.py"),
                 render_operations_package_init(),
                 GeneratedFileOrigin::fixed("generated Python operations package initializer"),
             )?;
         }
         if crate::nexgen_config::current().system_nexus {
             files.insert(
-                "_system_nexus_interceptor.py",
+                format!("{dir}/_system_nexus_interceptor.py"),
                 render_system_nexus_interceptor(services),
                 GeneratedFileOrigin::fixed("generated Python system Nexus interceptor"),
             )?;
@@ -831,7 +794,7 @@ impl<'a> ApiPlanner<'a> {
             for resource in &service.resources {
                 let bound_operations = resource_bound_operations(service, resource);
                 files.insert(
-                    format!("_resources/{}.py", resource_module_name(resource)),
+                    format!("{dir}/_resources/{}.py", resource_module_name(resource)),
                     self.render_resource_module_file(
                         Some(GenerationTarget::Workflow),
                         service,
@@ -854,7 +817,7 @@ impl<'a> ApiPlanner<'a> {
                         continue;
                     }
                     files.insert(
-                        format!("operations/{}.py", operation.attr_name),
+                        format!("{dir}/operations/{}.py", operation.attr_name),
                         render_operation_module(
                             service,
                             operation,
@@ -949,27 +912,6 @@ impl<'a> ApiPlanner<'a> {
                     "doesn't take service `{}` yet, which has no endpoint",
                     service.name
                 ),
-            });
-        }
-        let package = GenerationTarget::Client
-            .package_dir()
-            .expect("the client target should have a package directory");
-        // The parent package exports each operation, and an import of the client package sets
-        // the attribute of the same name.
-        if let Some((service, operation)) = services
-            .iter()
-            .flat_map(|service| {
-                service
-                    .operations
-                    .iter()
-                    .map(move |operation| (service, operation))
-            })
-            .find(|(_, operation)| operation.attr_name == package)
-        {
-            return Err(Error::PythonGeneratedNameConflict {
-                name: package.to_string(),
-                generated_by: "the package of the client target".to_string(),
-                conflicting_declaration: format!("operation `{}.{}`", service.name, operation.name),
             });
         }
         let operations = services
@@ -1267,11 +1209,14 @@ impl<'a> ApiPlanner<'a> {
         }
         let used_model_names = used_python_symbol_imports(&body, model_names);
         if !used_model_names.is_empty() {
-            let (models, module_path) = match target.and_then(GenerationTarget::package_dir) {
+            let (models, module_path) = match target {
                 None => ("..models", self.api_plan.module_path.child("_resources")),
-                Some(dir) => (
+                Some(target) => (
                     "...models",
-                    self.api_plan.module_path.child(dir).child("_resources"),
+                    self.api_plan
+                        .module_path
+                        .child(python_target_package(target))
+                        .child("_resources"),
                 ),
             };
             render_model_name_imports(
@@ -3911,10 +3856,7 @@ fn render_definitions_only_package_init(
     let mut output = String::new();
     render_generated_file_header(&mut output);
     output.push('\n');
-    let service_names = services
-        .iter()
-        .map(|service| service.name.to_string())
-        .collect::<Vec<_>>();
+    let service_names = services_module_export_names(services);
     render_root_package_imports(&mut output, root_package_imports);
     if !model_names.is_empty() {
         render_named_python_import(&mut output, ".models", model_names);
@@ -3945,29 +3887,24 @@ fn package_export_names(
 ) -> BTreeSet<String> {
     let mut names = root_package_export_names(root_package_imports);
     names.extend(model_names.iter().cloned());
-    match crate::nexgen_config::current().targets.workflow {
-        false => {
-            names.extend(services.iter().map(|service| service.name.to_string()));
-        }
-        true => {
-            names.extend(
-                services
-                    .iter()
-                    .filter(|service| service.endpoint.is_none())
-                    .map(endpoint_service_object_name),
-            );
-            names.extend(
-                services
-                    .iter()
-                    .filter(|service| service.endpoint.is_some())
-                    .flat_map(|service| {
-                        service
-                            .operations
-                            .iter()
-                            .map(|operation| operation.attr_name.clone())
-                    }),
-            );
-        }
+    names.extend(services_module_export_names(services));
+    names
+}
+
+/// The names that the root package exports from the services module. With the Workflow API,
+/// the module also has a client class for each service with no endpoint.
+fn services_module_export_names(services: &[RenderedService<'_>]) -> Vec<String> {
+    let mut names = services
+        .iter()
+        .map(|service| service.name.to_string())
+        .collect::<Vec<_>>();
+    if crate::nexgen_config::current().targets.workflow {
+        names.extend(
+            services
+                .iter()
+                .filter(|service| service.endpoint.is_none())
+                .map(endpoint_service_object_name),
+        );
     }
     names
 }
@@ -3988,6 +3925,17 @@ fn client_resource_data_type(type_name: &str) -> String {
 
 const CLIENT_RESOURCE_DATA_MODULE: &str = "_resource_data";
 
+/// The package of a target inside the output directory. Python gives each API its own package,
+/// so the Workflow API has one as the client does.
+fn python_target_package(target: GenerationTarget) -> &'static str {
+    match target {
+        GenerationTarget::Workflow => "workflow",
+        GenerationTarget::Client => GenerationTarget::Client
+            .package_dir()
+            .expect("the client target should have a package directory"),
+    }
+}
+
 /// The names that a client module imports from the module of the Nexus client protocol.
 fn client_nexus_imports(body: &str) -> Vec<String> {
     let mut names = vec!["_NexusClient".to_string()];
@@ -4001,8 +3949,17 @@ fn client_nexus_imports(body: &str) -> Vec<String> {
 /// package in the client module, such as `..`.
 fn render_client_resource_data_import(output: &mut String, body: &str, parent: &str) {
     if body_uses_python_symbol(body, CLIENT_RESOURCE_DATA_MODULE) {
+        // The Workflow resource classes are the resource data when the Workflow API is on.
+        let package = if crate::nexgen_config::current().targets.workflow {
+            format!(
+                "{parent}{}",
+                python_target_package(GenerationTarget::Workflow)
+            )
+        } else {
+            parent.to_string()
+        };
         output.push_str(&format!(
-            "from {parent} import _resources as {CLIENT_RESOURCE_DATA_MODULE}\n"
+            "from {package} import _resources as {CLIENT_RESOURCE_DATA_MODULE}\n"
         ));
     }
 }
@@ -4874,6 +4831,15 @@ fn render_service_module(
     if needs_temporalio_workflow_runtime {
         output.push_str("import temporalio.workflow\n");
     }
+    // The Workflow resource classes are the resource types when the Workflow API is on.
+    let resources_package = if include_endpoint_clients {
+        format!(
+            ".{}._resources",
+            python_target_package(GenerationTarget::Workflow)
+        )
+    } else {
+        "._resources".to_string()
+    };
     let mut resource_imports_by_module = BTreeMap::<String, BTreeSet<String>>::new();
     for (resource_type_name, module_name) in &resource_type_imports {
         resource_imports_by_module
@@ -4912,7 +4878,7 @@ fn render_service_module(
         for (module_name, names) in &resource_imports_by_module {
             render_named_python_import(
                 &mut output,
-                &format!("._resources.{module_name}"),
+                &format!("{resources_package}.{module_name}"),
                 &names.iter().cloned().collect::<Vec<_>>(),
             );
         }
@@ -4931,7 +4897,7 @@ fn render_service_module(
         );
         render_named_python_import_with_indent(
             &mut output,
-            "._resources",
+            &resources_package,
             &used_resource_names,
             "    ",
         );
@@ -4948,7 +4914,7 @@ fn render_service_module(
         );
         render_named_python_import_with_indent(
             &mut output,
-            "._resources",
+            &resources_package,
             &used_resource_names,
             "    ",
         );
@@ -5046,8 +5012,11 @@ fn render_operation_module(
     let used_model_names = used_python_symbol_imports(&body, model_names);
     render_model_name_imports(
         &mut output,
-        "..models",
-        &api_plan.module_path.child("operations"),
+        "...models",
+        &api_plan
+            .module_path
+            .child(python_target_package(GenerationTarget::Workflow))
+            .child("operations"),
         api_plan,
         &used_model_names,
         model_hoists,
@@ -5278,7 +5247,7 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         .collect::<Vec<_>>();
     let mut output = String::new();
     render_generated_file_header(&mut output);
-    output.push_str("\n\nimport abc\nimport typing\n\nfrom . import models\n\nif typing.TYPE_CHECKING:\n    import temporalio.workflow\n    from temporalio.worker._interceptor import StartNexusOperationInput\n\n\n__all__ = [\n    \"_start_system_nexus_operation\",\n    \"_SystemNexusWorkflowOutboundInterceptorBase\",\n    \"_SystemNexusWorkflowOutboundInterceptorTerminal\",\n]\n\n\n_InputT = typing.TypeVar(\"_InputT\")\n_OutputT = typing.TypeVar(\"_OutputT\")\n\n\n");
+    output.push_str("\n\nimport abc\nimport typing\n\nfrom .. import models\n\nif typing.TYPE_CHECKING:\n    import temporalio.workflow\n    from temporalio.worker._interceptor import StartNexusOperationInput\n\n\n__all__ = [\n    \"_start_system_nexus_operation\",\n    \"_SystemNexusWorkflowOutboundInterceptorBase\",\n    \"_SystemNexusWorkflowOutboundInterceptorTerminal\",\n]\n\n\n_InputT = typing.TypeVar(\"_InputT\")\n_OutputT = typing.TypeVar(\"_OutputT\")\n\n\n");
     output.push_str(
         "async def _start_system_nexus_operation(\n    interceptor: _SystemNexusWorkflowOutboundInterceptorBase,\n    input: StartNexusOperationInput[_InputT, _OutputT],\n) -> temporalio.workflow.NexusOperationHandle[_OutputT]:\n",
     );
@@ -5400,15 +5369,10 @@ fn render_function_type_parameter_definitions(
     }
 }
 
-fn render_package_init(
+fn render_workflow_package_init(
     services: &[RenderedService<'_>],
-    model_names: &[String],
-    _resource_names: &[String],
     resource_operation_owners: &BTreeMap<String, String>,
     support_package: &str,
-    _api_plan: &PlannedSpec,
-    _model_hoists: Option<&PythonModelHoists>,
-    root_package_imports: &RootPackageImports,
 ) -> String {
     let operation_function_names = services
         .iter()
@@ -5422,19 +5386,10 @@ fn render_package_init(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
-    let service_object_names = services
-        .iter()
-        .filter(|service| service.endpoint.is_none())
-        .map(endpoint_service_object_name)
-        .collect::<Vec<_>>();
     let operation_registry_body = render_operation_registry_body(services);
     let mut output = String::new();
     render_generated_file_header(&mut output);
     output.push('\n');
-    render_root_package_imports(&mut output, root_package_imports);
-    if !model_names.is_empty() {
-        render_named_python_import(&mut output, ".models", model_names);
-    }
     if services
         .iter()
         .any(|service| !service.operations.is_empty())
@@ -5445,33 +5400,23 @@ fn render_package_init(
         output.push_str("import nexusrpc\n");
         output.push_str("import temporalio.converter\n");
     }
-    if !service_object_names.is_empty() {
-        render_named_python_import(&mut output, ".services", &service_object_names);
-    }
-    if services
-        .iter()
-        .any(|service| !service.operations.is_empty())
-    {
-        output.push_str("from . import services as _services\n");
-    }
-    if !services.is_empty() {
-        for service in services {
-            for operation in &service.operations {
-                let module = if let Some(resource_owner) =
-                    resource_operation_owners.get(&operation_key(service.name, operation.name))
-                {
-                    format!("._resources.{resource_owner}")
-                } else {
-                    format!(".operations.{}", operation.attr_name)
-                };
-                if service.endpoint.is_some() {
-                    render_named_python_import(
-                        &mut output,
-                        &module,
-                        std::slice::from_ref(&operation.attr_name),
-                    );
-                }
-            }
+    for service in services {
+        if service.endpoint.is_none() {
+            continue;
+        }
+        for operation in &service.operations {
+            let module = if let Some(resource_owner) =
+                resource_operation_owners.get(&operation_key(service.name, operation.name))
+            {
+                format!("._resources.{resource_owner}")
+            } else {
+                format!(".operations.{}", operation.attr_name)
+            };
+            render_named_python_import(
+                &mut output,
+                &module,
+                std::slice::from_ref(&operation.attr_name),
+            );
         }
     }
     render_support_import(
@@ -5480,28 +5425,15 @@ fn render_package_init(
         support_package,
         false,
     );
-    output.push_str("\n__all__ = [\n");
-    for name in root_package_export_names(root_package_imports) {
-        output.push_str("    ");
-        output.push_str(&python_string_literal(&name));
-        output.push_str(",\n");
+    if !operation_function_names.is_empty() {
+        output.push_str("\n__all__ = [\n");
+        for name in &operation_function_names {
+            output.push_str("    ");
+            output.push_str(&python_string_literal(name));
+            output.push_str(",\n");
+        }
+        output.push_str("]\n");
     }
-    for name in model_names {
-        output.push_str("    ");
-        output.push_str(&python_string_literal(name));
-        output.push_str(",\n");
-    }
-    for name in &service_object_names {
-        output.push_str("    ");
-        output.push_str(&python_string_literal(name));
-        output.push_str(",\n");
-    }
-    for name in &operation_function_names {
-        output.push_str("    ");
-        output.push_str(&python_string_literal(name));
-        output.push_str(",\n");
-    }
-    output.push_str("]\n");
     output.push_str(&operation_registry_body);
     output
 }
@@ -5514,6 +5446,7 @@ fn render_operation_registry_body(services: &[RenderedService<'_>]) -> String {
         return String::new();
     }
 
+    let registry_type = "dict[tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]]";
     let mut output = String::new();
     output.push_str("\n\n_InputT = typing.TypeVar(\"_InputT\")\n");
     output.push_str("_OutputT = typing.TypeVar(\"_OutputT\")\n");
@@ -5526,31 +5459,45 @@ fn render_operation_registry_body(services: &[RenderedService<'_>]) -> String {
     );
     output.push_str("        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation\n");
     output.push_str("        self.serialization_context: _SerializationContextFactory[_InputT] | None = serialization_context\n");
-    output.push_str("\n\n__nexus_operation_registry__: dict[tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]] = {\n");
+    // The services module can import the Workflow resource classes, and an import of those
+    // runs this package first. So the registry imports the services module on first use.
+    output.push_str("\n\ndef __getattr__(name: str) -> ");
+    output.push_str(registry_type);
+    output.push_str(":\n");
+    output.push_str("    if name != \"__nexus_operation_registry__\":\n");
+    output.push_str(
+        "        raise AttributeError(f\"module {__name__!r} has no attribute {name!r}\")\n",
+    );
+    output.push_str("    from .. import services as _services\n\n");
+    output.push_str("    registry: ");
+    output.push_str(registry_type);
+    output.push_str(" = {\n");
     for service in services {
         for operation in &service.operations {
-            output.push_str("    (\n");
-            output.push_str("        \"");
+            output.push_str("        (\n");
+            output.push_str("            \"");
             output.push_str(service.wire_name);
             output.push_str("\",\n");
-            output.push_str("        \"");
+            output.push_str("            \"");
             output.push_str(operation.wire_name);
             output.push_str("\",\n");
-            output.push_str("    ): _NexusOperationInfo(\n");
-            output.push_str("        operation=_services.");
+            output.push_str("        ): _NexusOperationInfo(\n");
+            output.push_str("            operation=_services.");
             output.push_str(service.name);
             output.push('.');
             output.push_str(&operation.attr_name);
             output.push_str(",\n");
             if let Some(serialization_context) = &operation.serialization_context_expr {
-                output.push_str("        serialization_context=");
+                output.push_str("            serialization_context=");
                 output.push_str(serialization_context);
                 output.push_str(",\n");
             }
-            output.push_str("    ),\n");
+            output.push_str("        ),\n");
         }
     }
-    output.push_str("}\n");
+    output.push_str("    }\n");
+    output.push_str("    globals()[name] = registry\n");
+    output.push_str("    return registry\n");
     output
 }
 

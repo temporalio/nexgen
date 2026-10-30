@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from ._definitions import Violation
+from .models import Temporal
 
 __all__ = [
     "Violation",
+    "Temporal",
 ]

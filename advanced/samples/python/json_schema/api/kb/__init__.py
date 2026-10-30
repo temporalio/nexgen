@@ -8,6 +8,7 @@ from .content import (
 from .kb import (
     GetCategoryTreeInput,
     GetPageInput,
+    KnowledgeBaseService,
     KnowledgeBaseServiceClient,
     PutBlockOutput,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "Category",
     "GetCategoryTreeInput",
     "GetPageInput",
+    "KnowledgeBaseService",
     "KnowledgeBaseServiceClient",
     "Page",
     "PageMeta",

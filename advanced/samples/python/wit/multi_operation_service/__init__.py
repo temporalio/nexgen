@@ -2,56 +2,14 @@
 
 from __future__ import annotations
 
-import collections.abc
-import typing
-
-import nexusrpc
-import temporalio.converter
-from . import services as _services
-from .operations.first_operation import first_operation
-from .operations.second_operation import second_operation
+from .models import (
+    Request,
+    Response,
+)
+from .services import InterceptorService
 
 __all__ = [
-    "first_operation",
-    "second_operation",
+    "Request",
+    "Response",
+    "InterceptorService",
 ]
-
-
-_InputT = typing.TypeVar("_InputT")
-_OutputT = typing.TypeVar("_OutputT")
-
-
-_SerializationContextFactory = collections.abc.Callable[
-    [_InputT], temporalio.converter.SerializationContext
-]
-
-
-class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
-    def __init__(
-        self,
-        *,
-        operation: nexusrpc.Operation[_InputT, _OutputT],
-        serialization_context: _SerializationContextFactory[_InputT] | None = None,
-    ) -> None:
-        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation
-        self.serialization_context: _SerializationContextFactory[_InputT] | None = (
-            serialization_context
-        )
-
-
-__nexus_operation_registry__: dict[
-    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
-] = {
-    (
-        "InterceptorService",
-        "FirstOperation",
-    ): _NexusOperationInfo(
-        operation=_services.InterceptorService.first_operation,
-    ),
-    (
-        "InterceptorService",
-        "SecondOperation",
-    ): _NexusOperationInfo(
-        operation=_services.InterceptorService.second_operation,
-    ),
-}

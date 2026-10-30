@@ -2,72 +2,22 @@
 
 from __future__ import annotations
 
-import collections.abc
-import typing
-
-import nexusrpc
-import temporalio.converter
-from . import services as _services
-from .operations.start_workflow import start_workflow
-from ._resources.started_workflow import restart_workflow
-from ._resources.started_workflow import cancel_workflow
-from .operations.signal_with_start import signal_with_start
+from .models import (
+    CancelWorkflowRequest,
+    CancelWorkflowResponse,
+    SignalResultResponse,
+    StartWorkflowRequest,
+    StartWorkflowResult,
+    WorkflowExecution,
+)
+from .services import StartWorkflowService
 
 __all__ = [
-    "cancel_workflow",
-    "restart_workflow",
-    "signal_with_start",
-    "start_workflow",
+    "CancelWorkflowRequest",
+    "CancelWorkflowResponse",
+    "SignalResultResponse",
+    "StartWorkflowRequest",
+    "StartWorkflowResult",
+    "WorkflowExecution",
+    "StartWorkflowService",
 ]
-
-
-_InputT = typing.TypeVar("_InputT")
-_OutputT = typing.TypeVar("_OutputT")
-
-
-_SerializationContextFactory = collections.abc.Callable[
-    [_InputT], temporalio.converter.SerializationContext
-]
-
-
-class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
-    def __init__(
-        self,
-        *,
-        operation: nexusrpc.Operation[_InputT, _OutputT],
-        serialization_context: _SerializationContextFactory[_InputT] | None = None,
-    ) -> None:
-        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation
-        self.serialization_context: _SerializationContextFactory[_InputT] | None = (
-            serialization_context
-        )
-
-
-__nexus_operation_registry__: dict[
-    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
-] = {
-    (
-        "StartWorkflowService",
-        "StartWorkflow",
-    ): _NexusOperationInfo(
-        operation=_services.StartWorkflowService.start_workflow,
-    ),
-    (
-        "StartWorkflowService",
-        "RestartWorkflow",
-    ): _NexusOperationInfo(
-        operation=_services.StartWorkflowService.restart_workflow,
-    ),
-    (
-        "StartWorkflowService",
-        "CancelWorkflow",
-    ): _NexusOperationInfo(
-        operation=_services.StartWorkflowService.cancel_workflow,
-    ),
-    (
-        "StartWorkflowService",
-        "SignalWithStart",
-    ): _NexusOperationInfo(
-        operation=_services.StartWorkflowService.signal_with_start,
-    ),
-}

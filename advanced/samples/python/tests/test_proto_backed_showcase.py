@@ -17,7 +17,7 @@ from temporalio import workflow
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
-import wit.proto_backed_showcase as proto_backed_showcase
+import wit.proto_backed_showcase.workflow as proto_backed_showcase
 import wit.proto_backed_showcase.models as proto_backed_showcase_models
 import wit.proto_backed_showcase.services as proto_backed_showcase_services
 

@@ -1,0 +1,1 @@
+Python output with `--targets workflow` puts the Workflow API in a `workflow` package. Import the operation functions, the resource classes, `__nexus_operation_registry__` and `_system_nexus_interceptor` from `<package>.workflow` instead of `<package>`. The root package keeps `models.py` and `services.py` and exports the models and service definitions.

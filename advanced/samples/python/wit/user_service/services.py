@@ -11,13 +11,13 @@ from .models import (
     NotifyRequest,
     UpdateEmailRequest,
 )
-from ._resources.user import (
+from .workflow._resources.user import (
     User,
     bind_user_client,
 )
 
 if typing.TYPE_CHECKING:
-    from ._resources import User
+    from .workflow._resources import User
 
 
 @service

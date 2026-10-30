@@ -7,7 +7,7 @@ from .models import (
     PlaceRequest,
     RestartRequest,
 )
-from ._resources.job import Job
+from .workflow._resources.job import Job
 
 
 @service

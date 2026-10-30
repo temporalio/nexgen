@@ -10,18 +10,19 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 import wit.user_service as user_service
+import wit.user_service.workflow as user_service_workflow
 import wit.user_service.models as user_service_models
 import wit.user_service.services as user_service_services
-from wit.user_service._resources import User
+from wit.user_service.workflow._resources import User
 
 APP_ROOT = Path(__file__).resolve().parent
 OUTPUT_PATH = APP_ROOT.parent / "wit" / "user_service"
 
-GET_USER_OPERATION_INFO = user_service.__nexus_operation_registry__[
+GET_USER_OPERATION_INFO = user_service_workflow.__nexus_operation_registry__[
     ("UserService", "GetUser")
 ]
 GET_USER_OPERATION = GET_USER_OPERATION_INFO.operation
-UPDATE_EMAIL_OPERATION_INFO = user_service.__nexus_operation_registry__[
+UPDATE_EMAIL_OPERATION_INFO = user_service_workflow.__nexus_operation_registry__[
     ("UserService", "UpdateEmail")
 ]
 UPDATE_EMAIL_OPERATION = UPDATE_EMAIL_OPERATION_INFO.operation
@@ -84,7 +85,7 @@ class UserServiceCallerWorkflow:
 
 def test_generated_metadata() -> None:
     assert OUTPUT_PATH.exists(), f"expected generated package at {OUTPUT_PATH}"
-    registry = user_service.__nexus_operation_registry__
+    registry = user_service_workflow.__nexus_operation_registry__
 
     assert isinstance(GET_USER_OPERATION, Operation)
     assert GET_USER_OPERATION.name == "GetUser"

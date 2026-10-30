@@ -14,7 +14,7 @@ from ..models import (
     RestartRequest,
 )
 from ._resources import Job
-from .. import _resources as _resource_data
+from ..workflow import _resources as _resource_data
 
 
 class JobsClientExtension(abc.ABC):

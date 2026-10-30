@@ -4,7 +4,7 @@ import typing
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-import wit.function_execution as function_execution
+import wit.function_execution.workflow as function_execution
 from wit.function_execution.models import ExecuteCallbackRequest, ExecuteFunctionResult
 
 

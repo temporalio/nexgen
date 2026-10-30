@@ -11,10 +11,10 @@ from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.workflowservice.v1 import RequestCancelWorkflowExecutionRequest
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
-import wit.start_workflow as start_workflow
+import wit.start_workflow.workflow as start_workflow
 import wit.start_workflow.models as start_workflow_models
 import wit.start_workflow.services as start_workflow_services
-from wit.start_workflow._resources import StartedWorkflow
+from wit.start_workflow.workflow._resources import StartedWorkflow
 
 APP_ROOT = Path(__file__).resolve().parent
 OUTPUT_PATH = APP_ROOT.parent / "wit" / "start_workflow"

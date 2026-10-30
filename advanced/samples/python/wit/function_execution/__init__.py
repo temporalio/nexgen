@@ -2,96 +2,34 @@
 
 from __future__ import annotations
 
-import collections.abc
-import typing
-
-import nexusrpc
-import temporalio.converter
-from . import services as _services
-from .operations.execute_function import execute_function
-from .operations.execute_callback import execute_callback
-from .operations.execute_counted_function import execute_counted_function
-from .operations.execute_named_function import execute_named_function
-from .operations.execute_varargs_function import execute_varargs_function
-from .operations.execute_named_varargs_function import execute_named_varargs_function
-from .operations.execute_descriptors import execute_descriptors
+from .models import (
+    ExecuteCallbackRequest,
+    ExecuteCountedFunctionRequest,
+    ExecuteCountedFunctionResult,
+    ExecuteDescriptorsRequest,
+    ExecuteFunctionRequest,
+    ExecuteFunctionResult,
+    ExecuteNamedFunctionRequest,
+    ExecuteNamedFunctionResult,
+    ExecuteNamedVarargsFunctionRequest,
+    ExecuteNamedVarargsFunctionResult,
+    ExecuteVarargsFunctionRequest,
+    ExecuteVarargsFunctionResult,
+)
+from .services import FunctionExecution
 
 __all__ = [
-    "execute_callback",
-    "execute_counted_function",
-    "execute_descriptors",
-    "execute_function",
-    "execute_named_function",
-    "execute_named_varargs_function",
-    "execute_varargs_function",
+    "ExecuteCallbackRequest",
+    "ExecuteCountedFunctionRequest",
+    "ExecuteCountedFunctionResult",
+    "ExecuteDescriptorsRequest",
+    "ExecuteFunctionRequest",
+    "ExecuteFunctionResult",
+    "ExecuteNamedFunctionRequest",
+    "ExecuteNamedFunctionResult",
+    "ExecuteNamedVarargsFunctionRequest",
+    "ExecuteNamedVarargsFunctionResult",
+    "ExecuteVarargsFunctionRequest",
+    "ExecuteVarargsFunctionResult",
+    "FunctionExecution",
 ]
-
-
-_InputT = typing.TypeVar("_InputT")
-_OutputT = typing.TypeVar("_OutputT")
-
-
-_SerializationContextFactory = collections.abc.Callable[
-    [_InputT], temporalio.converter.SerializationContext
-]
-
-
-class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
-    def __init__(
-        self,
-        *,
-        operation: nexusrpc.Operation[_InputT, _OutputT],
-        serialization_context: _SerializationContextFactory[_InputT] | None = None,
-    ) -> None:
-        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation
-        self.serialization_context: _SerializationContextFactory[_InputT] | None = (
-            serialization_context
-        )
-
-
-__nexus_operation_registry__: dict[
-    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
-] = {
-    (
-        "FunctionExecution",
-        "ExecuteFunction",
-    ): _NexusOperationInfo(
-        operation=_services.FunctionExecution.execute_function,
-    ),
-    (
-        "FunctionExecution",
-        "ExecuteCallback",
-    ): _NexusOperationInfo(
-        operation=_services.FunctionExecution.execute_callback,
-    ),
-    (
-        "FunctionExecution",
-        "ExecuteCountedFunction",
-    ): _NexusOperationInfo(
-        operation=_services.FunctionExecution.execute_counted_function,
-    ),
-    (
-        "FunctionExecution",
-        "ExecuteNamedFunction",
-    ): _NexusOperationInfo(
-        operation=_services.FunctionExecution.execute_named_function,
-    ),
-    (
-        "FunctionExecution",
-        "ExecuteVarargsFunction",
-    ): _NexusOperationInfo(
-        operation=_services.FunctionExecution.execute_varargs_function,
-    ),
-    (
-        "FunctionExecution",
-        "ExecuteNamedVarargsFunction",
-    ): _NexusOperationInfo(
-        operation=_services.FunctionExecution.execute_named_varargs_function,
-    ),
-    (
-        "FunctionExecution",
-        "ExecuteDescriptors",
-    ): _NexusOperationInfo(
-        operation=_services.FunctionExecution.execute_descriptors,
-    ),
-}
