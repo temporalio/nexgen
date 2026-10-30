@@ -1772,10 +1772,12 @@ fn renders_sample_with_versioned_header() {
         "nexgen v{}",
         manifest["package"]["version"].as_str().unwrap()
     );
-    assert!(
-        output
-            .values()
-            .any(|contents| { contents.contains(&header) })
-    );
     assert!(!output.is_empty());
+    for (path, contents) in &output {
+        assert!(
+            contents.contains(&header),
+            "{} is missing the versioned header",
+            path.display()
+        );
+    }
 }

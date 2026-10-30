@@ -80,6 +80,30 @@ namespace Nexgen.FunctionExecution
             return result;
         }
 
+        [GeneratedCode("nexgen", null)]
+        public static async Task<ExecuteFunctionResult> ExecuteSecondaryGroupsAsync(ExecuteSecondaryGroupsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<ExecuteFunctionResult>(svc => svc.ExecuteSecondaryGroups(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        [GeneratedCode("nexgen", null)]
+        public static async Task<ExecuteFunctionResult> ExecuteFixedSecondaryAsync(ExecuteFixedSecondaryRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<ExecuteFunctionResult>(svc => svc.ExecuteFixedSecondary(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        [GeneratedCode("nexgen", null)]
+        public static async Task<ExecuteFunctionResult> ExecuteDescriptorSecondaryAsync(ExecuteDescriptorSecondaryRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<ExecuteFunctionResult>(svc => svc.ExecuteDescriptorSecondary(request)).ConfigureAwait(true);
+            return result;
+        }
+
     }
 
 }

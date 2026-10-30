@@ -15,14 +15,20 @@ from .operations.execute_named_function import execute_named_function
 from .operations.execute_varargs_function import execute_varargs_function
 from .operations.execute_named_varargs_function import execute_named_varargs_function
 from .operations.execute_descriptors import execute_descriptors
+from .operations.execute_secondary_groups import execute_secondary_groups
+from .operations.execute_fixed_secondary import execute_fixed_secondary
+from .operations.execute_descriptor_secondary import execute_descriptor_secondary
 
 __all__ = [
     "execute_callback",
     "execute_counted_function",
+    "execute_descriptor_secondary",
     "execute_descriptors",
+    "execute_fixed_secondary",
     "execute_function",
     "execute_named_function",
     "execute_named_varargs_function",
+    "execute_secondary_groups",
     "execute_varargs_function",
 ]
 
@@ -93,5 +99,23 @@ __nexus_operation_registry__: dict[
         "ExecuteDescriptors",
     ): _NexusOperationInfo(
         operation=_services.FunctionExecution.execute_descriptors,
+    ),
+    (
+        "FunctionExecution",
+        "ExecuteSecondaryGroups",
+    ): _NexusOperationInfo(
+        operation=_services.FunctionExecution.execute_secondary_groups,
+    ),
+    (
+        "FunctionExecution",
+        "ExecuteFixedSecondary",
+    ): _NexusOperationInfo(
+        operation=_services.FunctionExecution.execute_fixed_secondary,
+    ),
+    (
+        "FunctionExecution",
+        "ExecuteDescriptorSecondary",
+    ): _NexusOperationInfo(
+        operation=_services.FunctionExecution.execute_descriptor_secondary,
     ),
 }

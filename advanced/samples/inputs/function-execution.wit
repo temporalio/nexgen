@@ -50,6 +50,33 @@ interface functions {
   /// @nexus.type go="any"
   type payload = placeholder;
   type payloads = list<payload>;
+
+  /// @nexus.function-args varargs=true
+  signal-call: func(signal-args: payloads) -> string;
+  /// @nexus.function
+  ///   signature="signal-call"
+  ///   args-field="notification-payloads"
+  ///   alternate-type="string"
+  type signal-function = placeholder;
+
+  /// @nexus.function-args varargs=true
+  other-call: func(other-args: payloads) -> string;
+  /// @nexus.function
+  ///   signature="other-call"
+  ///   args-field="other-payloads"
+  ///   alternate-type="string"
+  type other-function = placeholder;
+
+  /// @nexus.function-args varargs=true
+  primary-descriptor-call: func(primary-args: payloads) -> string;
+  /// @nexus.function
+  ///   primary=true
+  ///   signature="primary-descriptor-call"
+  ///   go-value-type="any"
+  ///   go-args-type="[]string"
+  ///   go-name-extractor="DescriptorName"
+  type primary-descriptor = placeholder;
+
   /// @nexus.function-args varargs=true
   duration-call: func(duration-values: payloads) -> string;
   /// @nexus.function-args varargs=true
@@ -86,6 +113,24 @@ interface functions {
 interface function-execution {
   use functions.{counted-function, executable-function, named-function, named-varargs-function, varargs-function};
   use functions.{duration-descriptor, context-descriptor, callable-descriptor, callback-function};
+  use functions.{signal-function, other-function, primary-descriptor};
+
+  record execute-secondary-groups-request {
+    function: named-varargs-function,
+    other: other-function,
+    signal: signal-function,
+  }
+
+  record execute-fixed-secondary-request {
+    function: executable-function,
+    signal: signal-function,
+    other: other-function,
+  }
+
+  record execute-descriptor-secondary-request {
+    function: primary-descriptor,
+    signal: signal-function,
+  }
 
   record execute-callback-request {
     function: callback-function,
@@ -145,4 +190,7 @@ interface function-execution {
   execute-varargs-function: func(request: execute-varargs-function-request) -> execute-varargs-function-result;
   execute-named-varargs-function: func(request: execute-named-varargs-function-request) -> execute-named-varargs-function-result;
   execute-descriptors: func(request: execute-descriptors-request) -> execute-function-result;
+  execute-secondary-groups: func(request: execute-secondary-groups-request) -> execute-function-result;
+  execute-fixed-secondary: func(request: execute-fixed-secondary-request) -> execute-function-result;
+  execute-descriptor-secondary: func(request: execute-descriptor-secondary-request) -> execute-function-result;
 }

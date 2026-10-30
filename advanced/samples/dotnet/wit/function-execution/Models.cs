@@ -72,6 +72,30 @@ namespace Nexgen.FunctionExecution
     }
 
     [GeneratedCode("nexgen", null)]
+    public record ExecuteDescriptorSecondaryRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExecuteDescriptorSecondaryRequest"/> class.
+        /// </summary>
+        public ExecuteDescriptorSecondaryRequest(string function, string signal)
+        {
+            Function = function;
+            Signal = signal;
+        }
+
+        public string Function { get; init; }
+        /// <summary>
+        /// Arguments for the function.
+        /// </summary>
+        public IReadOnlyCollection<string>? PrimaryArgs { get; init; }
+        public string Signal { get; init; }
+        /// <summary>
+        /// Arguments for the signal.
+        /// </summary>
+        public IReadOnlyCollection<string>? SignalArgs { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record ExecuteDescriptorsRequest
     {
         /// <summary>
@@ -105,6 +129,42 @@ namespace Nexgen.FunctionExecution
         /// Arguments for the callable.
         /// </summary>
         public IReadOnlyCollection<string>? CallableValues { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record ExecuteFixedSecondaryRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExecuteFixedSecondaryRequest"/> class.
+        /// </summary>
+        public ExecuteFixedSecondaryRequest(string function, string name, bool enabled, string signal, string other)
+        {
+            Function = function;
+            Name = name;
+            Enabled = enabled;
+            Signal = signal;
+            Other = other;
+        }
+
+        public string Function { get; init; }
+        /// <summary>
+        /// The name argument for the function.
+        /// </summary>
+        public string Name { get; init; }
+        /// <summary>
+        /// The enabled argument for the function.
+        /// </summary>
+        public bool Enabled { get; init; }
+        public string Signal { get; init; }
+        /// <summary>
+        /// Arguments for the signal.
+        /// </summary>
+        public IReadOnlyCollection<string>? SignalArgs { get; init; }
+        public string Other { get; init; }
+        /// <summary>
+        /// Arguments for the other.
+        /// </summary>
+        public IReadOnlyCollection<string>? OtherArgs { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -213,6 +273,36 @@ namespace Nexgen.FunctionExecution
         }
 
         public string Value { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record ExecuteSecondaryGroupsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExecuteSecondaryGroupsRequest"/> class.
+        /// </summary>
+        public ExecuteSecondaryGroupsRequest(string function, string other, string signal)
+        {
+            Function = function;
+            Other = other;
+            Signal = signal;
+        }
+
+        public string Function { get; init; }
+        /// <summary>
+        /// Arguments for the function.
+        /// </summary>
+        public IReadOnlyCollection<string>? Args { get; init; }
+        public string Other { get; init; }
+        /// <summary>
+        /// Arguments for the other.
+        /// </summary>
+        public IReadOnlyCollection<string>? OtherArgs { get; init; }
+        public string Signal { get; init; }
+        /// <summary>
+        /// Arguments for the signal.
+        /// </summary>
+        public IReadOnlyCollection<string>? SignalArgs { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]

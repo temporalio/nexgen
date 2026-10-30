@@ -184,3 +184,78 @@ func TestCompositeDescriptorsAndArgumentPacking(t *testing.T) {
 	require.Equal(t, []any{"context-arg"}, field(request, "CallbackValues"))
 	require.Equal(t, []any{"callable-arg"}, field(request, "CallableValues"))
 }
+
+func variadicSecondary(args ...any) string {
+	return "secondary"
+}
+
+func TestSecondaryCallableGroupsAndTrailingVarargs(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	service := nexus.NewService(functionExecutionServiceName)
+	requests := map[string]any{}
+	for _, operation := range []string{
+		"ExecuteSecondaryGroups", "ExecuteFixedSecondary", "ExecuteDescriptorSecondary",
+	} {
+		require.NoError(t, service.Register(nexus.NewSyncOperation(operation,
+			func(_ context.Context, input any, _ nexus.StartOperationOptions) (fe.ExecuteFunctionResult, error) {
+				requests[operation] = input
+				return fe.ExecuteFunctionResult{Value: operation}, nil
+			})))
+	}
+	env.RegisterNexusService(service)
+	env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		// The authored order is other, signal, with the primary variadic
+		// group moved to the end. Secondary argument groups remain slices.
+		if err := fe.ExecuteSecondaryGroups(
+			ctx, fe.ExecuteSecondaryGroupsOptions{},
+			variadicSecondary, []any{"other-a", "other-b"},
+			"signal-name", []any{"signal-a", "signal-b"},
+			validVarargsFunction, "primary-a", "primary-b",
+		).Get(ctx, nil); err != nil {
+			return err
+		}
+		// A fixed primary keeps its place; the last secondary is variadic.
+		// The authored secondary order is reversed from the operation above.
+		if err := fe.ExecuteFixedSecondary(
+			ctx, fe.ExecuteFixedSecondaryOptions{}, validFunction, "fixed-name", true,
+			variadicSecondary, []any{"fixed-signal"},
+			"other-name", "fixed-other-a", "fixed-other-b",
+		).Get(ctx, nil); err != nil {
+			return err
+		}
+		// An explicit primary descriptor takes one slice argument, not
+		// varargs, allowing the secondary group to use the variadic tail.
+		return fe.ExecuteDescriptorSecondary(
+			ctx, fe.ExecuteDescriptorSecondaryOptions{},
+			[]time.Duration{time.Second}, []string{"descriptor-primary"},
+			"descriptor-signal-name", "descriptor-signal-a", "descriptor-signal-b",
+		).Get(ctx, nil)
+	})
+	require.True(t, env.IsWorkflowCompleted())
+	require.NoError(t, env.GetWorkflowError())
+	require.Len(t, requests, 3)
+
+	groups := requests["ExecuteSecondaryGroups"]
+	require.Equal(t, "variadicSecondary", stringField(groups, "Other"))
+	require.Equal(t, []any{"other-a", "other-b"}, field(groups, "OtherArgs"))
+	require.Equal(t, "signal-name", stringField(groups, "Signal"))
+	require.Equal(t, []any{"signal-a", "signal-b"}, field(groups, "SignalArgs"))
+	require.Equal(t, "validVarargsFunction", stringField(groups, "Function"))
+	require.Equal(t, []string{"primary-a", "primary-b"}, stringSliceField(groups, "Args"))
+
+	fixed := requests["ExecuteFixedSecondary"]
+	require.Equal(t, "validFunction", stringField(fixed, "Function"))
+	require.Equal(t, "fixed-name", stringField(fixed, "Name"))
+	require.Equal(t, true, field(fixed, "Enabled"))
+	require.Equal(t, "variadicSecondary", stringField(fixed, "Signal"))
+	require.Equal(t, []any{"fixed-signal"}, field(fixed, "SignalArgs"))
+	require.Equal(t, "other-name", stringField(fixed, "Other"))
+	require.Equal(t, []any{"fixed-other-a", "fixed-other-b"}, field(fixed, "OtherArgs"))
+
+	descriptor := requests["ExecuteDescriptorSecondary"]
+	require.Equal(t, "durations:[1s]", stringField(descriptor, "Function"))
+	require.Equal(t, []any{[]any{"descriptor-primary"}}, field(descriptor, "PrimaryArgs"))
+	require.Equal(t, "descriptor-signal-name", stringField(descriptor, "Signal"))
+	require.Equal(t, []any{"descriptor-signal-a", "descriptor-signal-b"}, field(descriptor, "SignalArgs"))
+}

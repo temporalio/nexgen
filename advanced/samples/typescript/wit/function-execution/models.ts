@@ -291,3 +291,253 @@ export type ExecuteDescriptorsRequest<
           durationValues?: Parameters<DurationsFn> | Readonly<Parameters<DurationsFn>>;
         })
 >;
+
+export type ReplaceExecuteSecondaryGroupsRequest<Base, New> = Omit<
+  Base,
+  "args" | "function_" | "other" | "otherArgs" | "signal" | "signalArgs"
+> &
+  New;
+
+export type ExecuteSecondaryGroupsRequest<
+  FunctionFn extends (...args: any[]) => string = (...args: any[]) => string,
+  OtherFn extends (...args: any[]) => string = (...args: any[]) => string,
+  SignalFn extends (...args: any[]) => string = (...args: any[]) => string,
+> = ReplaceExecuteSecondaryGroupsRequest<
+  {
+    function_: string | FunctionFn;
+    /**
+     * Arguments for function_.
+     */
+    args?: ReadonlyArray<unknown> | Readonly<Parameters<FunctionFn>>;
+    other: string | OtherFn;
+    /**
+     * Arguments for other.
+     */
+    otherArgs?: ReadonlyArray<unknown> | Readonly<Parameters<OtherFn>>;
+    signal: string | SignalFn;
+    /**
+     * Arguments for signal.
+     */
+    signalArgs?: ReadonlyArray<unknown> | Readonly<Parameters<SignalFn>>;
+  },
+  (
+    | {
+        function_: string;
+        /**
+         * Arguments for function_.
+         */
+        args?: ReadonlyArray<unknown>;
+      }
+    | ({
+        function_: FunctionFn;
+      } & (Parameters<FunctionFn> extends [any, ...any[]]
+        ? {
+            /**
+             * Arguments for function_.
+             */
+            args: Parameters<FunctionFn> | Readonly<Parameters<FunctionFn>>;
+          }
+        : {
+            /**
+             * Arguments for function_.
+             */
+            args?: Parameters<FunctionFn> | Readonly<Parameters<FunctionFn>>;
+          }))
+  ) &
+    (
+      | {
+          other: string;
+          /**
+           * Arguments for other.
+           */
+          otherArgs?: ReadonlyArray<unknown>;
+        }
+      | ({
+          other: OtherFn;
+        } & (Parameters<OtherFn> extends [any, ...any[]]
+          ? {
+              /**
+               * Arguments for other.
+               */
+              otherArgs: Parameters<OtherFn> | Readonly<Parameters<OtherFn>>;
+            }
+          : {
+              /**
+               * Arguments for other.
+               */
+              otherArgs?: Parameters<OtherFn> | Readonly<Parameters<OtherFn>>;
+            }))
+    ) &
+    (
+      | {
+          signal: string;
+          /**
+           * Arguments for signal.
+           */
+          signalArgs?: ReadonlyArray<unknown>;
+        }
+      | ({
+          signal: SignalFn;
+        } & (Parameters<SignalFn> extends [any, ...any[]]
+          ? {
+              /**
+               * Arguments for signal.
+               */
+              signalArgs: Parameters<SignalFn> | Readonly<Parameters<SignalFn>>;
+            }
+          : {
+              /**
+               * Arguments for signal.
+               */
+              signalArgs?: Parameters<SignalFn> | Readonly<Parameters<SignalFn>>;
+            }))
+    )
+>;
+
+export type ReplaceExecuteFixedSecondaryRequest<Base, New> = Omit<
+  Base,
+  "other" | "otherArgs" | "signal" | "signalArgs"
+> &
+  New;
+
+export type ExecuteFixedSecondaryRequest<
+  FunctionFn extends (name: string, enabled: boolean) => string = (
+    name: string,
+    enabled: boolean,
+  ) => string,
+  OtherFn extends (...args: any[]) => string = (...args: any[]) => string,
+  SignalFn extends (...args: any[]) => string = (...args: any[]) => string,
+> = ReplaceExecuteFixedSecondaryRequest<
+  {
+    function_: FunctionFn;
+    /**
+     * The name argument for the function.
+     */
+    name: string;
+    /**
+     * The enabled argument for the function.
+     */
+    enabled: boolean;
+    signal: string | SignalFn;
+    /**
+     * Arguments for signal.
+     */
+    signalArgs?: ReadonlyArray<unknown> | Readonly<Parameters<SignalFn>>;
+    other: string | OtherFn;
+    /**
+     * Arguments for other.
+     */
+    otherArgs?: ReadonlyArray<unknown> | Readonly<Parameters<OtherFn>>;
+  },
+  (
+    | {
+        other: string;
+        /**
+         * Arguments for other.
+         */
+        otherArgs?: ReadonlyArray<unknown>;
+      }
+    | ({
+        other: OtherFn;
+      } & (Parameters<OtherFn> extends [any, ...any[]]
+        ? {
+            /**
+             * Arguments for other.
+             */
+            otherArgs: Parameters<OtherFn> | Readonly<Parameters<OtherFn>>;
+          }
+        : {
+            /**
+             * Arguments for other.
+             */
+            otherArgs?: Parameters<OtherFn> | Readonly<Parameters<OtherFn>>;
+          }))
+  ) &
+    (
+      | {
+          signal: string;
+          /**
+           * Arguments for signal.
+           */
+          signalArgs?: ReadonlyArray<unknown>;
+        }
+      | ({
+          signal: SignalFn;
+        } & (Parameters<SignalFn> extends [any, ...any[]]
+          ? {
+              /**
+               * Arguments for signal.
+               */
+              signalArgs: Parameters<SignalFn> | Readonly<Parameters<SignalFn>>;
+            }
+          : {
+              /**
+               * Arguments for signal.
+               */
+              signalArgs?: Parameters<SignalFn> | Readonly<Parameters<SignalFn>>;
+            }))
+    )
+>;
+
+export type ReplaceExecuteDescriptorSecondaryRequest<Base, New> = Omit<
+  Base,
+  "function_" | "primaryArgs" | "signal" | "signalArgs"
+> &
+  New;
+
+export type ExecuteDescriptorSecondaryRequest<
+  FunctionFn extends (...args: any[]) => string = (...args: any[]) => string,
+  SignalFn extends (...args: any[]) => string = (...args: any[]) => string,
+> = ReplaceExecuteDescriptorSecondaryRequest<
+  {
+    function_: FunctionFn;
+    /**
+     * Arguments for function_.
+     */
+    primaryArgs?: ReadonlyArray<unknown> | Readonly<Parameters<FunctionFn>>;
+    signal: string | SignalFn;
+    /**
+     * Arguments for signal.
+     */
+    signalArgs?: ReadonlyArray<unknown> | Readonly<Parameters<SignalFn>>;
+  },
+  {
+    function_: FunctionFn;
+  } & (Parameters<FunctionFn> extends [any, ...any[]]
+    ? {
+        /**
+         * Arguments for function_.
+         */
+        primaryArgs: Parameters<FunctionFn> | Readonly<Parameters<FunctionFn>>;
+      }
+    : {
+        /**
+         * Arguments for function_.
+         */
+        primaryArgs?: Parameters<FunctionFn> | Readonly<Parameters<FunctionFn>>;
+      }) &
+    (
+      | {
+          signal: string;
+          /**
+           * Arguments for signal.
+           */
+          signalArgs?: ReadonlyArray<unknown>;
+        }
+      | ({
+          signal: SignalFn;
+        } & (Parameters<SignalFn> extends [any, ...any[]]
+          ? {
+              /**
+               * Arguments for signal.
+               */
+              signalArgs: Parameters<SignalFn> | Readonly<Parameters<SignalFn>>;
+            }
+          : {
+              /**
+               * Arguments for signal.
+               */
+              signalArgs?: Parameters<SignalFn> | Readonly<Parameters<SignalFn>>;
+            }))
+    )
+>;

@@ -156,6 +156,100 @@ func (m executeDescriptorsRequest) GetCallableValues() []any {
 	return m.CallableValues
 }
 
+type executeSecondaryGroupsRequest struct {
+	Function   string
+	Args       []string
+	Other      string
+	OtherArgs  []any
+	Signal     string
+	SignalArgs []any
+}
+
+func (m executeSecondaryGroupsRequest) GetFunction() string {
+	return m.Function
+}
+
+func (m executeSecondaryGroupsRequest) GetArgs() []string {
+	return m.Args
+}
+
+func (m executeSecondaryGroupsRequest) GetOther() string {
+	return m.Other
+}
+
+func (m executeSecondaryGroupsRequest) GetOtherArgs() []any {
+	return m.OtherArgs
+}
+
+func (m executeSecondaryGroupsRequest) GetSignal() string {
+	return m.Signal
+}
+
+func (m executeSecondaryGroupsRequest) GetSignalArgs() []any {
+	return m.SignalArgs
+}
+
+type executeFixedSecondaryRequest struct {
+	Function   string
+	Name       string
+	Enabled    bool
+	Signal     string
+	SignalArgs []any
+	Other      string
+	OtherArgs  []any
+}
+
+func (m executeFixedSecondaryRequest) GetFunction() string {
+	return m.Function
+}
+
+func (m executeFixedSecondaryRequest) GetName() string {
+	return m.Name
+}
+
+func (m executeFixedSecondaryRequest) GetEnabled() bool {
+	return m.Enabled
+}
+
+func (m executeFixedSecondaryRequest) GetSignal() string {
+	return m.Signal
+}
+
+func (m executeFixedSecondaryRequest) GetSignalArgs() []any {
+	return m.SignalArgs
+}
+
+func (m executeFixedSecondaryRequest) GetOther() string {
+	return m.Other
+}
+
+func (m executeFixedSecondaryRequest) GetOtherArgs() []any {
+	return m.OtherArgs
+}
+
+type executeDescriptorSecondaryRequest struct {
+	Function    string
+	PrimaryArgs []any
+	Signal      string
+	SignalArgs  []any
+}
+
+func (m executeDescriptorSecondaryRequest) GetFunction() string {
+	return m.Function
+}
+
+func (m executeDescriptorSecondaryRequest) GetPrimaryArgs() []any {
+	return m.PrimaryArgs
+}
+
+func (m executeDescriptorSecondaryRequest) GetSignal() string {
+	return m.Signal
+}
+
+func (m executeDescriptorSecondaryRequest) GetSignalArgs() []any {
+	return m.SignalArgs
+}
+
 // --- Operations (internal) ---
 
 func executeFunction(ctx workflow.Context, request executeFunctionRequest) workflow.Future {
@@ -197,6 +291,24 @@ func executeNamedVarargsFunction(ctx workflow.Context, request executeNamedVarar
 func executeDescriptors(ctx workflow.Context, request executeDescriptorsRequest) workflow.Future {
 	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
 	fut := c.ExecuteOperation(ctx, "ExecuteDescriptors", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func executeSecondaryGroups(ctx workflow.Context, request executeSecondaryGroupsRequest) workflow.Future {
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteSecondaryGroups", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func executeFixedSecondary(ctx workflow.Context, request executeFixedSecondaryRequest) workflow.Future {
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteFixedSecondary", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func executeDescriptorSecondary(ctx workflow.Context, request executeDescriptorSecondaryRequest) workflow.Future {
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteDescriptorSecondary", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
@@ -466,5 +578,176 @@ func ExecuteDescriptors[FunctionF interface {
 		CallbackValues: []any{callbackValues},
 		Callable:       callableName,
 		CallableValues: []any{callableValues},
+	})
+}
+
+type ExecuteSecondaryGroupsOptions struct {
+}
+
+// Input otherArgs: Arguments for the other.
+// Input signalArgs: Arguments for the signal.
+// Input args: Arguments for the function.
+func ExecuteSecondaryGroups[FunctionF interface {
+	~string | func(...string) string
+}, OtherF interface{ ~string | func(...any) string }, SignalF interface{ ~string | func(...any) string }](
+	ctx workflow.Context,
+	opts ExecuteSecondaryGroupsOptions,
+	other OtherF,
+	otherArgs []any,
+	signal SignalF,
+	signalArgs []any,
+	function FunctionF,
+	args ...string,
+) workflow.Future {
+	functionName := ""
+	{
+		switch rv := reflect.ValueOf(function); rv.Kind() {
+		case reflect.String:
+			functionName = rv.String()
+		case reflect.Func:
+			fullName := runtime.FuncForPC(rv.Pointer()).Name()
+			elements := strings.Split(fullName, ".")
+			shortName := elements[len(elements)-1]
+			functionName = strings.TrimSuffix(shortName, "-fm")
+		default:
+			panic("nexgen function name requires string or function")
+		}
+	}
+	otherName := ""
+	{
+		switch rv := reflect.ValueOf(other); rv.Kind() {
+		case reflect.String:
+			otherName = rv.String()
+		case reflect.Func:
+			fullName := runtime.FuncForPC(rv.Pointer()).Name()
+			elements := strings.Split(fullName, ".")
+			shortName := elements[len(elements)-1]
+			otherName = strings.TrimSuffix(shortName, "-fm")
+		default:
+			panic("nexgen function name requires string or function")
+		}
+	}
+	signalName := ""
+	{
+		switch rv := reflect.ValueOf(signal); rv.Kind() {
+		case reflect.String:
+			signalName = rv.String()
+		case reflect.Func:
+			fullName := runtime.FuncForPC(rv.Pointer()).Name()
+			elements := strings.Split(fullName, ".")
+			shortName := elements[len(elements)-1]
+			signalName = strings.TrimSuffix(shortName, "-fm")
+		default:
+			panic("nexgen function name requires string or function")
+		}
+	}
+	return executeSecondaryGroups(ctx, executeSecondaryGroupsRequest{
+		Function:   functionName,
+		Args:       args,
+		Other:      otherName,
+		OtherArgs:  otherArgs,
+		Signal:     signalName,
+		SignalArgs: signalArgs,
+	})
+}
+
+type ExecuteFixedSecondaryOptions struct {
+}
+
+// Input name: The name argument for the function.
+// Input enabled: The enabled argument for the function.
+// Input signalArgs: Arguments for the signal.
+// Input otherArgs: Arguments for the other.
+func ExecuteFixedSecondary[SignalF interface{ ~string | func(...any) string }, OtherF interface{ ~string | func(...any) string }](
+	ctx workflow.Context,
+	opts ExecuteFixedSecondaryOptions,
+	function func(string, bool) string,
+	name string,
+	enabled bool,
+	signal SignalF,
+	signalArgs []any,
+	other OtherF,
+	otherArgs ...any,
+) workflow.Future {
+	functionName := ""
+	{
+		rv := reflect.ValueOf(function)
+		fullName := runtime.FuncForPC(rv.Pointer()).Name()
+		elements := strings.Split(fullName, ".")
+		shortName := elements[len(elements)-1]
+		functionName = strings.TrimSuffix(shortName, "-fm")
+	}
+	signalName := ""
+	{
+		switch rv := reflect.ValueOf(signal); rv.Kind() {
+		case reflect.String:
+			signalName = rv.String()
+		case reflect.Func:
+			fullName := runtime.FuncForPC(rv.Pointer()).Name()
+			elements := strings.Split(fullName, ".")
+			shortName := elements[len(elements)-1]
+			signalName = strings.TrimSuffix(shortName, "-fm")
+		default:
+			panic("nexgen function name requires string or function")
+		}
+	}
+	otherName := ""
+	{
+		switch rv := reflect.ValueOf(other); rv.Kind() {
+		case reflect.String:
+			otherName = rv.String()
+		case reflect.Func:
+			fullName := runtime.FuncForPC(rv.Pointer()).Name()
+			elements := strings.Split(fullName, ".")
+			shortName := elements[len(elements)-1]
+			otherName = strings.TrimSuffix(shortName, "-fm")
+		default:
+			panic("nexgen function name requires string or function")
+		}
+	}
+	return executeFixedSecondary(ctx, executeFixedSecondaryRequest{
+		Function:   functionName,
+		Name:       name,
+		Enabled:    enabled,
+		Signal:     signalName,
+		SignalArgs: signalArgs,
+		Other:      otherName,
+		OtherArgs:  otherArgs,
+	})
+}
+
+type ExecuteDescriptorSecondaryOptions struct {
+}
+
+// Input primaryArg: Arguments for the function.
+// Input signalArgs: Arguments for the signal.
+func ExecuteDescriptorSecondary[SignalF interface{ ~string | func(...any) string }](
+	ctx workflow.Context,
+	opts ExecuteDescriptorSecondaryOptions,
+	function any,
+	primaryArg []string,
+	signal SignalF,
+	signalArgs ...any,
+) workflow.Future {
+	functionName := support.DescriptorName(ctx, function)
+	signalName := ""
+	{
+		switch rv := reflect.ValueOf(signal); rv.Kind() {
+		case reflect.String:
+			signalName = rv.String()
+		case reflect.Func:
+			fullName := runtime.FuncForPC(rv.Pointer()).Name()
+			elements := strings.Split(fullName, ".")
+			shortName := elements[len(elements)-1]
+			signalName = strings.TrimSuffix(shortName, "-fm")
+		default:
+			panic("nexgen function name requires string or function")
+		}
+	}
+	return executeDescriptorSecondary(ctx, executeDescriptorSecondaryRequest{
+		Function:    functionName,
+		PrimaryArgs: []any{primaryArg},
+		Signal:      signalName,
+		SignalArgs:  signalArgs,
 	})
 }

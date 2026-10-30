@@ -7,13 +7,16 @@ from .models import (
     ExecuteCallbackRequest,
     ExecuteCountedFunctionRequest,
     ExecuteCountedFunctionResult,
+    ExecuteDescriptorSecondaryRequest,
     ExecuteDescriptorsRequest,
+    ExecuteFixedSecondaryRequest,
     ExecuteFunctionRequest,
     ExecuteFunctionResult,
     ExecuteNamedFunctionRequest,
     ExecuteNamedFunctionResult,
     ExecuteNamedVarargsFunctionRequest,
     ExecuteNamedVarargsFunctionResult,
+    ExecuteSecondaryGroupsRequest,
     ExecuteVarargsFunctionRequest,
     ExecuteVarargsFunctionResult,
 )
@@ -55,3 +58,18 @@ class FunctionExecution:
         ExecuteDescriptorsRequest,
         ExecuteFunctionResult,
     ] = Operation(name="ExecuteDescriptors")
+
+    execute_secondary_groups: Operation[
+        ExecuteSecondaryGroupsRequest,
+        ExecuteFunctionResult,
+    ] = Operation(name="ExecuteSecondaryGroups")
+
+    execute_fixed_secondary: Operation[
+        ExecuteFixedSecondaryRequest,
+        ExecuteFunctionResult,
+    ] = Operation(name="ExecuteFixedSecondary")
+
+    execute_descriptor_secondary: Operation[
+        ExecuteDescriptorSecondaryRequest,
+        ExecuteFunctionResult,
+    ] = Operation(name="ExecuteDescriptorSecondary")
