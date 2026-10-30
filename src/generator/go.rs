@@ -3705,16 +3705,7 @@ fn render_file(
             output.push('\n');
         }
         for (path, alias) in external_imports {
-            output.push('\t');
-            let default_alias = path.rsplit('/').next().unwrap_or(path);
-            if alias != default_alias || alias == "support" {
-                output.push_str(alias);
-                output.push(' ');
-            }
-            output.push('"');
-            output.push_str(path);
-            output.push('"');
-            output.push('\n');
+            output.push_str(&go_aliased_import_line(path, alias));
         }
         output.push_str(")\n");
     }
@@ -3923,21 +3914,58 @@ fn render_file(
     output.push_str(registry);
 
     // Imports collected while planning can become unused when the SDK owns
-    // input conversion instead of the generated wrapper.
-    let unused_external_imports: Vec<_> = external_imports
+    // input conversion instead of the generated wrapper, or when the Workflow API
+    // that needs them is not selected.
+    let body = &output[body_start..];
+    let unused_imports: Vec<String> = imports
         .iter()
-        .filter(|(_, alias)| !output[body_start..].contains(&format!("{alias}.")))
+        .filter(|path| {
+            !external_imports
+                .iter()
+                .any(|(external, _)| external == *path)
+        })
+        .filter(|path| !uses_go_package(body, path.rsplit('/').next().unwrap_or(path)))
+        .map(|path| format!("\t\"{path}\"\n"))
+        .chain(
+            external_imports
+                .iter()
+                .filter(|(_, alias)| !uses_go_package(body, alias))
+                .map(|(path, alias)| go_aliased_import_line(path, alias)),
+        )
         .collect();
-    for (path, alias) in unused_external_imports {
-        let default_alias = path.rsplit('/').next().unwrap_or(path);
-        let import = if alias == default_alias {
-            format!("\t\"{path}\"\n")
-        } else {
-            format!("\t{alias} \"{path}\"\n")
-        };
+    for import in unused_imports {
         output = output.replacen(&import, "", 1);
     }
+    let block = "\nimport (\n";
+    if let Some(start) = output.find(block)
+        && let Some(length) = output[start + block.len()..].find(")\n")
+        && output[start + block.len()..][..length].trim().is_empty()
+    {
+        output.replace_range(start..start + block.len() + length + 2, "");
+    }
     output
+}
+
+/// The import line for an external package, with its alias when the alias differs from the
+/// last path segment.
+fn go_aliased_import_line(path: &str, alias: &str) -> String {
+    let default_alias = path.rsplit('/').next().unwrap_or(path);
+    if alias != default_alias || alias == "support" {
+        format!("\t{alias} \"{path}\"\n")
+    } else {
+        format!("\t\"{path}\"\n")
+    }
+}
+
+/// Whether `code` refers to the package `name`. The check ignores `runtime.` when it looks for
+/// `time.`.
+fn uses_go_package(code: &str, name: &str) -> bool {
+    let reference = format!("{name}.");
+    code.match_indices(&reference).any(|(start, _)| {
+        !code[..start].chars().next_back().is_some_and(|previous| {
+            previous.is_alphanumeric() || previous == '_' || previous == '.'
+        })
+    })
 }
 
 /// Renders a Go doc comment (`// ...`), wrapping each paragraph to the
