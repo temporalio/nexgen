@@ -42,9 +42,37 @@ Checked-in generated output lives under
 `advanced/samples/typescript/wit/<example-name>/`; Go output lives under
 `advanced/samples/go/<example-name>/` and .NET output lives under
 `advanced/samples/dotnet/wit/<example-name>/`. Language-specific tests live
-under each language's `tests/` directory where present. See
-[`samples/README.md`](samples/README.md) for links to each example's WIT,
-generated code, and tests.
+under each language's `tests/` directory where present.
+
+[`samples/inputs/examples.toml`](samples/inputs/examples.toml) configures each
+input's languages, API targets, System Nexus bindings, and descriptors. API
+targets are opt-in. An example with no child tables generates once under its
+input name. Child tables generate separate outputs, inheriting the parent
+settings and replacing the fields they specify:
+
+```toml
+[target-sources]
+languages = ["python"]
+descriptors = "temporal"
+
+[target-sources.workflow]
+targets = ["workflow"]
+
+[target-sources.client]
+targets = ["client"]
+
+[target-sources.both]
+targets = ["workflow", "client"]
+```
+
+These outputs are placed in `target-sources/workflow`, `target-sources/client`,
+and `target-sources/both`, with language-specific casing. Each child can
+override any of the parent's settings. Lists replace the inherited list;
+`targets = []` selects no APIs and `descriptors = []` selects no descriptors. An
+explicit `system_nexus = false` overrides `true`. Language filtering uses the
+resolved child settings. Child tables cannot contain further child tables. The
+sample builder clears the example's output directory once before generating its
+children.
 
 The linked `nexus:temporal-types` WIT package describes semantic types, while
 authored language-specific Temporal converters live in each sample project:
