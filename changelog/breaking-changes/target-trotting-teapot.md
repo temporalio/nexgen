@@ -1,3 +1,3 @@
-Select generated APIs with `--targets workflow`, `--targets client`, or both; `--native-api` is removed and the default emits only models and definitions. Python client generation no longer requires a workflow API.
-Sources apply to all API targets unless restricted with `targets="..."`. Shared models no longer evaluate source defaults; resources and sourced fields require at least one API target.
-Python client resource constructors require a service-bound Nexus client. Resource methods use that client directly, and generated operations pass it to returned resource handles.
+`--native-api` is removed. Use `--targets workflow` for the same output. Without `--targets`, nexgen generates only models and definitions.
+The library replaces `GenerationMode` and `generate_source_with_mode` with `GenerationTargets` and `generate_source_with_targets`. The function `generate_source` generates only models and definitions, as the CLI does without `--targets`.
+Sources apply to all API targets unless restricted with `targets="..."`. Shared models no longer evaluate source defaults. Resources and sourced fields require at least one API target.

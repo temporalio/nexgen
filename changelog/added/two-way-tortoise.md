@@ -1,1 +1,2 @@
 `--targets workflow,client` also generates a Python `client` package, with its own resource classes and a client extension for each service. The client methods start the operations from code outside a Workflow and return the result. The models are shared, and the Workflow package doesn't change.
+Python client resource constructors require a service-bound Nexus client. Resource methods use that client directly, and generated operations pass it to returned resource handles.
