@@ -97,14 +97,15 @@ flowchart LR
   constraints. Native protobuf-backed enums must match the descriptor's full
   case list, order, and numbers; reordered, omitted, and sparse cases are
   rejected before planning. It also checks authored service configuration
-  against the generation mode, with target-specific policies owned by their
+  against the requested API targets. Language-specific policies remain in
   language backends.
 - `LanguageSelectionPass` selects the target-language values from authored
   language maps.
 - `SelectedValidationPass` validates the selected generic surface after
   selection.
 - `ResourceResolutionPass` resolves resource-method and resource-return facts
-  from the API spec and descriptors.
+  from the API spec and descriptors. With no API target, it keeps only the
+  resource fields, so resources become data classes.
 - `OperationBindingPass` attaches resolved resource facts to their owning
   operations and resources.
 - `OperationLoweringPass` turns wire-backed resource returns into explicit
@@ -120,3 +121,16 @@ flowchart LR
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
   the consuming module can only resolve it from the tree-wide manifest.
+
+## Models and APIs
+
+Data models and their wire converters are shared across API targets. Operation
+wrappers and callable resource classes are target-specific because workflow and
+client code use different SDK entry points.
+
+API code builds requests and evaluates the sources that apply to its target.
+Model constructors and converters only handle data. This lets workflow and
+client APIs share models without sharing runtime behavior.
+
+Client resources keep their service-bound Nexus client. API code decodes
+returned resource data and constructs handles with that client.

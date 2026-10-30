@@ -31,9 +31,9 @@ interface generic-model-service {
     lookup: list<tuple<string, u32>>,
     /// @nexus.type go="time.Duration"
     elapsed: u64,
-    /// @nexus.source go="WorkflowNamespace(ctx)"
+    /// @nexus.source targets="workflow" go="WorkflowNamespace(ctx)"
     namespace: string,
-    /// @nexus.source go="RequestType(ctx)"
+    /// @nexus.source targets="workflow" go="RequestType(ctx)"
     %type: string,
   }
 

@@ -21,6 +21,12 @@ export async function cancelWorkflow(
     ...requestInput,
     namespace: support.workflowNamespace(),
   } as CancelWorkflowRequest;
+  return await _cancelWorkflow(request);
+}
+
+export async function _cancelWorkflow(
+  request: CancelWorkflowRequest,
+): Promise<workflow.NexusOperationHandle<CancelWorkflowResponse>> {
   const client = workflow.createNexusServiceClient({
     service: startWorkflowService,
     endpoint: "temporal-system",

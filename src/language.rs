@@ -22,6 +22,11 @@ impl Language {
             Self::TypeScript => "typescript",
         }
     }
+
+    /// Whether nexgen generates the client target for the language.
+    pub const fn has_client_target(self) -> bool {
+        matches!(self, Self::Python)
+    }
 }
 
 impl fmt::Display for Language {

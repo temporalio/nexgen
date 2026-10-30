@@ -5,19 +5,80 @@
 
 use std::cell::RefCell;
 
-use crate::generator::GenerationMode;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NexgenConfig {
-    pub mode: GenerationMode,
     pub system_nexus: bool,
+    pub targets: GenerationTargets,
+}
+
+/// The code that calls the generated API. The models are the same for each target.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GenerationTargets {
+    /// Workflow code.
+    pub workflow: bool,
+    /// Code outside a Workflow, through a client class that inherits a generated extension.
+    pub client: bool,
+}
+
+/// One generation target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GenerationTarget {
+    Workflow,
+    Client,
+}
+
+impl GenerationTarget {
+    /// The directory of the target's package inside the output directory of a service. The
+    /// Workflow target writes into that directory itself. Each language applies its own casing.
+    pub fn package_dir(self) -> Option<&'static str> {
+        match self {
+            Self::Workflow => None,
+            Self::Client => Some("client"),
+        }
+    }
+}
+
+impl GenerationTargets {
+    pub const NONE: Self = Self {
+        workflow: false,
+        client: false,
+    };
+    pub const WORKFLOW: Self = Self {
+        workflow: true,
+        client: false,
+    };
+    pub const CLIENT: Self = Self {
+        workflow: false,
+        client: true,
+    };
+    pub const ALL: Self = Self {
+        workflow: true,
+        client: true,
+    };
+
+    pub fn contains(self, target: GenerationTarget) -> bool {
+        match target {
+            GenerationTarget::Workflow => self.workflow,
+            GenerationTarget::Client => self.client,
+        }
+    }
+
+    pub fn iter(self) -> impl Iterator<Item = GenerationTarget> {
+        [GenerationTarget::Workflow, GenerationTarget::Client]
+            .into_iter()
+            .filter(move |target| self.contains(*target))
+    }
+
+    pub fn is_empty(self) -> bool {
+        !self.workflow && !self.client
+    }
 }
 
 impl Default for NexgenConfig {
     fn default() -> Self {
         Self {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: false,
+            targets: GenerationTargets::default(),
         }
     }
 }
@@ -50,14 +111,13 @@ impl Drop for NexgenConfigScope {
 
 #[cfg(test)]
 mod tests {
-    use super::{NexgenConfig, current, scope};
-    use crate::generator::GenerationMode;
+    use super::{GenerationTargets, NexgenConfig, current, scope};
 
     #[test]
     fn restores_nested_configuration_after_unwinding() {
         let outer = NexgenConfig {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: true,
+            targets: GenerationTargets::default(),
         };
         {
             let _outer_scope = scope(outer);
@@ -75,8 +135,8 @@ mod tests {
     #[test]
     fn is_isolated_per_thread() {
         let config = NexgenConfig {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: true,
+            targets: GenerationTargets::default(),
         };
         {
             let _scope = scope(config);

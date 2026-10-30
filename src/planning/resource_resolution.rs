@@ -9,8 +9,8 @@ use prost_types::field_descriptor_proto::Type;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::spec::{
-    ApiSpec, ApiSpecTransform, ExternalTypeSpec, JsonModelSpec, OperationSpec, RecordFieldSpec,
-    RecordFieldVisibility, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
+    ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldOrigin, JsonModelSpec, OperationSpec,
+    RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
     ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec, ServiceSpec, Symbol,
     TypeFamily, TypeSpec,
 };
@@ -25,6 +25,7 @@ pub(crate) struct ResourceBoundData {
 }
 
 impl TypeFamily for ResourceBoundFamily {
+    type Origin = Option<crate::spec::FieldOrigin>;
     type SpecData = ResourceBoundData;
     type Record = Symbol;
     type Enum = Symbol;
@@ -47,6 +48,12 @@ struct ResourceBindingMapper {
 }
 
 impl ApiSpecTransform<SelectedFamily, ResourceBoundFamily> for ResourceBindingMapper {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldOrigin>,
+    ) -> Option<crate::spec::FieldOrigin> {
+        origin
+    }
     fn map_spec_data(&mut self, _data: ()) -> ResourceBoundData {
         self.data.clone()
     }
@@ -145,7 +152,7 @@ pub enum ResolvedResourceBindingSource {
     RequestField {
         field_name: String,
         proto_field_name: String,
-        hidden: bool,
+        origin: Option<FieldOrigin>,
     },
     ResultField {
         field_name: String,
@@ -179,7 +186,7 @@ struct MessageFieldInfo {
     proto_name: String,
     api_name: String,
     required: bool,
-    hidden: bool,
+    origin: Option<FieldOrigin>,
     message_name: Option<String>,
 }
 
@@ -491,7 +498,7 @@ fn bind_resource_return_field(
         return Ok(ResolvedResourceBindingSource::RequestField {
             field_name: field.api_name,
             proto_field_name: field.proto_name,
-            hidden: field.hidden,
+            origin: field.origin,
         });
     }
     if let Some(field) =
@@ -543,7 +550,12 @@ fn synthesize_request_plan(
             }
         }
 
-        if field.required {
+        if field.required
+            && !field
+                .origin
+                .as_ref()
+                .is_some_and(FieldOrigin::can_initialize)
+        {
             return Ok(None);
         }
     }
@@ -601,7 +613,12 @@ fn synthesize_record_request_plan(
             continue;
         }
 
-        if field.required {
+        if field.required
+            && !field
+                .origin
+                .as_ref()
+                .is_some_and(FieldOrigin::can_initialize)
+        {
             return Ok(None);
         }
     }
@@ -628,7 +645,7 @@ fn visible_message_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_message_fields(spec, descriptors, message_name)?
         .into_iter()
-        .filter(|field| !field.hidden)
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
         .collect())
 }
 
@@ -638,7 +655,7 @@ fn visible_record_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_record_fields(spec, record_name)?
         .into_iter()
-        .filter(|field| !field.hidden)
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
         .collect())
 }
 
@@ -696,7 +713,7 @@ fn all_record_fields(
     record
         .fields
         .iter()
-        .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
         .map(|(field_name, field)| build_record_field_info(field_name, field, spec))
         .collect()
 }
@@ -707,14 +724,13 @@ fn build_record_field_info(
     spec: &ApiSpec<SelectedFamily>,
 ) -> Result<MessageFieldInfo> {
     let api_name = field.name.clone();
-    let required = field.api_required();
-    let hidden = matches!(field.visibility, RecordFieldVisibility::Sourced { .. });
+    let required = field.required;
     let message_name = api_field_message_name(&field.field_type, spec);
     Ok(MessageFieldInfo {
         proto_name: field_name.to_string(),
         api_name,
         required,
-        hidden,
+        origin: field.origin.clone(),
         message_name,
     })
 }
@@ -751,17 +767,16 @@ fn build_message_field_info(
         record
             .fields
             .get(proto_name)
-            .is_some_and(|field| field.api_required())
-    });
-    let hidden = record.is_some_and(|record| {
-        record.field_omitted(proto_name) || record.field_source(proto_name).is_some()
+            .is_some_and(|field| field.required)
     });
     let message_name = field_message_name(field, descriptors);
     Ok(MessageFieldInfo {
         proto_name: proto_name.to_string(),
         api_name,
         required,
-        hidden,
+        origin: record
+            .and_then(|record| record.fields.get(proto_name))
+            .and_then(|field| field.origin.clone()),
         message_name,
     })
 }
@@ -893,12 +908,18 @@ fn operation_output_resource_wire_type(
 /// owning operation and resource nodes by `OperationBindingPass`.
 pub(crate) struct ResourceResolutionPass<'a> {
     descriptors: &'a DescriptorIndex,
-    mode: super::PlanningMode,
+    targets: crate::nexgen_config::GenerationTargets,
 }
 
 impl<'a> ResourceResolutionPass<'a> {
-    pub(crate) fn new(descriptors: &'a DescriptorIndex, mode: super::PlanningMode) -> Self {
-        Self { descriptors, mode }
+    pub(crate) fn new(
+        descriptors: &'a DescriptorIndex,
+        targets: crate::nexgen_config::GenerationTargets,
+    ) -> Self {
+        Self {
+            descriptors,
+            targets,
+        }
     }
 
     pub(super) fn bind_spec(
@@ -906,7 +927,7 @@ impl<'a> ResourceResolutionPass<'a> {
         spec: ApiSpec<SelectedFamily>,
     ) -> Result<ApiSpec<super::ResourceBoundFamily>> {
         ensure_unique_resource_names(&spec)?;
-        let bindings = if self.mode == super::PlanningMode::NativeApi {
+        let bindings = if !self.targets.is_empty() {
             spec.services
                 .iter()
                 .map(|service| {
@@ -915,7 +936,28 @@ impl<'a> ResourceResolutionPass<'a> {
                 })
                 .collect::<Result<BTreeMap<_, _>>>()?
         } else {
-            BTreeMap::new()
+            // With no API target, a resource is data only. It keeps its fields, and nothing binds
+            // its methods or the operations that return it.
+            spec.services
+                .iter()
+                .map(|service| {
+                    let resources = service
+                        .resources
+                        .iter()
+                        .map(|resource| ResolvedResourceSpec {
+                            name: resource.name.clone(),
+                            doc: resource.doc.clone(),
+                            fields: resource.fields.clone(),
+                            methods: Vec::new(),
+                        })
+                        .collect();
+                    let resolved = ResolvedServiceResources {
+                        resources,
+                        operation_returns: BTreeMap::new(),
+                    };
+                    (service.name.clone(), resolved)
+                })
+                .collect()
         };
         Ok(spec.map_names(ResourceBindingMapper {
             data: ResourceBoundData { bindings },

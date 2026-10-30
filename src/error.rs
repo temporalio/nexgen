@@ -56,6 +56,16 @@ pub enum Error {
         conflicting_field: String,
     },
 
+    #[error("the client target {reason}")]
+    UnsupportedClientTarget { reason: String },
+
+    #[error("`{name}` is a client method of both `{first_service}` and `{second_service}`")]
+    ClientTargetNameConflict {
+        name: String,
+        first_service: String,
+        second_service: String,
+    },
+
     #[error(
         "Python generated name `{name}` for {generated_by} conflicts with {conflicting_declaration}"
     )]

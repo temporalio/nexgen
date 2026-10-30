@@ -12,7 +12,7 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedResource, PlannedResourceField, PlannedSpec,
     PlannedType, PlannedWireFieldBinding,
 };
-use crate::spec::{ExternalTypeSpec, RecordFieldVisibility, RecordSpec};
+use crate::spec::{ExternalTypeSpec, FieldOrigin, RecordSpec};
 
 use crate::generator::go::{
     GoPackageContext, PlannedEnumType, PlannedFieldKind, PlannedMessageSource, PlannedMessageType,
@@ -785,10 +785,6 @@ pub(in crate::generator) struct OperationBinding {
     /// converter, and the model is passed to `ExecuteOperation` as-is.
     input_to_proto: Option<String>,
 
-    /// Assignments that populate the request model's `@nexus.source` fields
-    /// from their source expressions, emitted at the top of the operation
-    /// function where `dc` is prepared from the workflow context.
-    input_sourced_assignments: Vec<String>,
     /// Proto type expression for the response, or `None` for void operations.
     output_proto_type: Option<String>,
     /// Go type of the generated model the response decodes into directly,
@@ -985,7 +981,6 @@ impl ModelBackend {
                         planned_service.name.as_str(),
                         resource_return,
                         resource,
-                        record_for_message(api_plan, &input),
                         api_plan,
                         self,
                         &self.package,
@@ -1053,22 +1048,8 @@ impl ModelBackend {
                     PlannedOperationOutput::None => (None, None, None, false),
                 };
 
-                let input_sourced_assignments = record_for_message(api_plan, &input)
-                    .map(|planned_model| {
-                        planned_model
-                            .sourced_fields()
-                            .map(|(field_name, _, source_expr)| {
-                                let source_expr = self.support_converter(source_expr.to_string());
-                                format!("request.{} = {source_expr}", go_field_name(field_name))
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-
                 rendered_op.wire_binding = Some(OperationBinding {
                     input_to_proto,
-
-                    input_sourced_assignments,
                     output_proto_type,
                     output_model_type,
                     output_from_proto,
@@ -1088,7 +1069,7 @@ fn validate_record_conversion(record: &RecordSpec<PlannedFamily>) -> Result<()> 
     for (field_name, field) in record
         .fields
         .iter()
-        .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
     {
         match &field.data.wire_binding {
             Some(PlannedWireFieldBinding::VariantMembers { wire_name, .. }) => {
@@ -1153,11 +1134,6 @@ pub(in crate::generator) fn render_operation_function_proto(
         output.push_str("\tdc := ");
         output.push_str(&package.workflow_data_converter());
         output.push_str("(ctx)\n");
-    }
-    for assignment in &binding.input_sourced_assignments {
-        output.push('\t');
-        output.push_str(assignment);
-        output.push('\n');
     }
 
     let input_arg = match binding.input_to_proto.as_deref() {
@@ -1364,7 +1340,6 @@ fn build_rendered_resource_return(
     service_name: &str,
     resource_return: &PlannedOperationResourceReturn,
     resource: &PlannedResource,
-    input_record: Option<&RecordSpec<PlannedFamily>>,
     api_plan: &PlannedSpec,
     backend: &ModelBackend,
     package: &GoPackageContext,
@@ -1389,15 +1364,13 @@ fn build_rendered_resource_return(
         let (mut expr, constructor_needs_pointer_unpack) = match &binding.source {
             ResolvedResourceBindingSource::RequestField {
                 field_name,
-                proto_field_name,
-                hidden,
+                proto_field_name: _,
+                origin,
             } => {
                 // Sourced request fields live on the generated model as
                 // unexported fields (populated at the call site), so they read
                 // the same way as public fields.
-                let is_sourced = input_record
-                    .is_some_and(|record| record.field_source(proto_field_name).is_some());
-                if *hidden && !is_sourced {
+                if origin.as_ref().is_some_and(FieldOrigin::is_omitted) {
                     return Err(Error::UnsupportedGoProtoConversion {
                         context: format!(
                             "resource return field `{}.{}`",

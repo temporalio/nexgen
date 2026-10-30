@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use indexmap::IndexMap;
 
 use crate::language::Language;
+use crate::nexgen_config::{GenerationTarget, GenerationTargets};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ApiSpec<F: TypeFamily = AuthoredFamily> {
@@ -179,6 +180,7 @@ impl<F: TypeFamily> std::fmt::Display for ResourceTypeSpec<F> {
 }
 
 pub trait TypeFamily {
+    type Origin: std::fmt::Debug + Clone + PartialEq;
     type SpecData: std::fmt::Debug + Clone + PartialEq;
     type Record: std::fmt::Debug + Clone + PartialEq;
     type Enum: std::fmt::Debug + Clone + PartialEq;
@@ -206,6 +208,7 @@ pub trait TextSpec: std::fmt::Debug + Clone + PartialEq {
 pub struct AuthoredFamily;
 
 impl TypeFamily for AuthoredFamily {
+    type Origin = LanguageFieldOrigins;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -229,6 +232,7 @@ impl TypeFamily for AuthoredFamily {
 pub(crate) struct SelectedFamily;
 
 impl TypeFamily for SelectedFamily {
+    type Origin = Option<FieldOrigin>;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -251,6 +255,7 @@ impl TypeFamily for SelectedFamily {
 /// This is intentionally broader than names: a family transform also maps the
 /// pass-specific data attached to specs, declarations, operations, and fields.
 pub trait ApiSpecTransform<From: TypeFamily, To: TypeFamily> {
+    fn map_origin(&mut self, origin: From::Origin) -> To::Origin;
     fn map_spec_data(&mut self, data: From::SpecData) -> To::SpecData;
     fn map_record(&mut self, name: From::Record) -> To::Record;
     fn map_enum(&mut self, name: From::Enum) -> To::Enum;
@@ -831,24 +836,99 @@ pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
     pub annotation: Option<F::Text>,
     pub flattened_annotation: Option<F::Text>,
     pub field_type: TypeSpec<F>,
-    /// Target-language expression evaluated only during outbound initialization.
-    pub default_value: Option<F::Text>,
     pub required: bool,
-    pub visibility: RecordFieldVisibility,
+    pub origin: F::Origin,
     pub function: Option<FunctionFieldSpec<F>>,
     pub data: F::FieldData,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RecordFieldVisibility {
-    Public,
+pub enum FieldOrigin {
     /// Present in generated models and wire conversion, but omitted from
     /// generated operation convenience APIs.
     ApiOmitted,
     Omitted,
-    Sourced {
-        source_expr: String,
+    Default {
+        expression: FieldExpression,
+        targets: GenerationTargets,
     },
+    Source {
+        expression: FieldExpression,
+        targets: GenerationTargets,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldExpression {
+    pub value: String,
+    pub import: Option<String>,
+}
+
+/// Origin alternatives retained until language selection.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LanguageFieldOrigins {
+    pub default: Option<FieldOrigin>,
+    pub by_language: BTreeMap<Language, FieldOrigin>,
+}
+
+impl LanguageFieldOrigins {
+    pub fn for_language(&self, language: Language) -> Option<&FieldOrigin> {
+        self.by_language.get(&language).or(self.default.as_ref())
+    }
+
+    pub fn is_omitted(&self) -> bool {
+        matches!(self.default, Some(FieldOrigin::Omitted))
+    }
+}
+
+impl FieldOrigin {
+    pub fn is_omitted(&self) -> bool {
+        matches!(self, Self::Omitted)
+    }
+
+    pub fn source_targets(&self) -> GenerationTargets {
+        match self {
+            Self::Source { targets, .. } => *targets,
+            _ => GenerationTargets::NONE,
+        }
+    }
+
+    pub fn source_for(&self, target: GenerationTarget) -> Option<&str> {
+        match self {
+            Self::Source {
+                expression,
+                targets,
+            } if targets.contains(target) => Some(&expression.value),
+            _ => None,
+        }
+    }
+    pub fn source(&self) -> Option<&str> {
+        match self {
+            Self::Source { expression, .. } => Some(&expression.value),
+            _ => None,
+        }
+    }
+
+    pub fn default(&self) -> Option<&str> {
+        match self {
+            Self::Default { expression, .. } => Some(&expression.value),
+            _ => None,
+        }
+    }
+
+    pub fn default_for(&self, target: GenerationTarget) -> Option<&str> {
+        match self {
+            Self::Default {
+                expression,
+                targets,
+            } if targets.contains(target) => Some(&expression.value),
+            _ => None,
+        }
+    }
+
+    pub fn can_initialize(&self) -> bool {
+        matches!(self, Self::Default { .. } | Self::Source { .. })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -929,33 +1009,74 @@ impl<F: TypeFamily> RecordSpec<F> {
         &self.doc
     }
 
-    pub fn public_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)> {
+    pub fn public_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
         self.fields
             .iter()
-            .filter(|(_, field)| field.visibility == RecordFieldVisibility::Public)
+            .filter(|(_, field)| matches!(field.origin, None | Some(FieldOrigin::Default { .. })))
             .map(|(name, field)| (name.as_str(), field))
+    }
+
+    /// Caller-supplied convenience fields for one API. This is a view of the
+    /// authored policy; it never changes the shared model's field metadata.
+    pub fn api_fields(
+        &self,
+        target: GenerationTarget,
+    ) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
+        self.fields
+            .iter()
+            .filter(move |(_, field)| {
+                !matches!(
+                    field.origin,
+                    Some(FieldOrigin::Omitted | FieldOrigin::ApiOmitted)
+                ) && field.source_for(target).is_none()
+            })
+            .map(|(name, field)| (name.as_str(), field))
+    }
+
+    pub fn sources_for(
+        &self,
+        target: GenerationTarget,
+    ) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)>
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
+        self.sourced_fields()
+            .filter(move |(_, field, _)| field.source_for(target).is_some())
     }
 
     /// Fields represented by the generated model, including fields hidden from
     /// operation convenience APIs and excluding sourced fields.
-    pub fn model_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)> {
+    pub fn model_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
         self.fields
             .iter()
             .filter(|(_, field)| {
                 matches!(
-                    field.visibility,
-                    RecordFieldVisibility::Public | RecordFieldVisibility::ApiOmitted
+                    field.origin,
+                    None | Some(FieldOrigin::Default { .. } | FieldOrigin::ApiOmitted)
                 )
             })
             .map(|(name, field)| (name.as_str(), field))
     }
 
-    pub fn sourced_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)> {
+    pub fn sourced_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)>
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
         self.fields.iter().filter_map(|(name, field)| {
-            let RecordFieldVisibility::Sourced { source_expr, .. } = &field.visibility else {
-                return None;
-            };
-            Some((name.as_str(), field, source_expr.as_str()))
+            field
+                .origin
+                .as_ref()
+                .and_then(FieldOrigin::source)
+                .map(|source| (name.as_str(), field, source))
         })
     }
 
@@ -968,7 +1089,10 @@ impl<F: TypeFamily> RecordSpec<F> {
         })
     }
 
-    pub fn is_empty_model(&self) -> bool {
+    pub fn is_empty_model(&self) -> bool
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
         self.doc.is_empty()
             && self
                 .fields
@@ -1002,19 +1126,13 @@ impl<F: TypeFamily> RecordSpec<F> {
         self.fields.get(field_name).map(|field| &field.field_type)
     }
 
-    pub fn field_default(&self, field_name: &str) -> Option<&F::Text> {
+    pub fn field_source(&self, field_name: &str) -> Option<&str>
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
         self.fields
             .get(field_name)
-            .and_then(|field| field.default_value.as_ref())
-    }
-
-    pub fn field_source(&self, field_name: &str) -> Option<&str> {
-        self.fields.get(field_name).and_then(|field| {
-            let RecordFieldVisibility::Sourced { source_expr, .. } = &field.visibility else {
-                return None;
-            };
-            Some(source_expr.as_str())
-        })
+            .and_then(|field| field.origin.as_ref().and_then(FieldOrigin::source))
     }
 
     pub fn field_required(&self, field_name: &str) -> bool {
@@ -1023,10 +1141,13 @@ impl<F: TypeFamily> RecordSpec<F> {
             .is_some_and(|field| field.required)
     }
 
-    pub fn field_omitted(&self, field_name: &str) -> bool {
+    pub fn field_omitted(&self, field_name: &str) -> bool
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
         self.fields
             .get(field_name)
-            .is_some_and(|field| field.visibility == RecordFieldVisibility::Omitted)
+            .is_some_and(|field| field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
     }
 
     pub fn function(&self, field_name: &str) -> Option<&FunctionFieldSpec<F>> {
@@ -1079,8 +1200,46 @@ impl<F: TypeFamily> FlagsSpec<F> {
 
 impl<F: TypeFamily> RecordFieldSpec<F> {
     /// Defaults make operation arguments omittable, not model or wire fields.
-    pub fn api_required(&self) -> bool {
-        self.required && self.default_value.as_ref().is_none_or(TextSpec::is_empty)
+    pub fn api_required(&self, target: GenerationTarget) -> bool
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
+        self.required && self.default_for(target).is_none() && self.source_for(target).is_none()
+    }
+
+    pub fn default_for(&self, target: GenerationTarget) -> Option<&str>
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
+        self.origin
+            .as_ref()
+            .and_then(|origin| origin.default_for(target))
+    }
+
+    pub fn has_default(&self) -> bool
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
+        matches!(self.origin, Some(FieldOrigin::Default { .. }))
+    }
+
+    pub fn source_for(&self, target: GenerationTarget) -> Option<&str>
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
+        self.origin
+            .as_ref()
+            .and_then(|origin| origin.source_for(target))
+    }
+
+    pub fn source_targets(&self) -> GenerationTargets
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
+        self.origin
+            .as_ref()
+            .map(FieldOrigin::source_targets)
+            .unwrap_or(GenerationTargets::NONE)
     }
 
     fn map_names_with<G, M>(
@@ -1100,22 +1259,23 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             annotation: self.annotation.map(|text| map.map_text(text)),
             flattened_annotation: self.flattened_annotation.map(|text| map.map_text(text)),
             field_type: self.field_type.map_names_with(map),
-            default_value: self.default_value.map(|text| map.map_text(text)),
             required: self.required,
-            visibility: self.visibility,
+            origin: map.map_origin(self.origin),
             function: self.function.map(|function| function.map_names_with(map)),
             data,
         }
     }
 
-    fn is_empty_model_field(&self) -> bool {
+    fn is_empty_model_field(&self) -> bool
+    where
+        F: TypeFamily<Origin = Option<FieldOrigin>>,
+    {
         self.name.is_empty()
             && self.doc.is_none()
             && self.annotation.is_none()
             && self.flattened_annotation.is_none()
-            && self.default_value.is_none()
             && !self.required
-            && self.visibility == RecordFieldVisibility::Public
+            && self.origin.is_none()
             && self.function.is_none()
     }
 }
@@ -1703,7 +1863,7 @@ where
 
 impl<F> ApiSpec<F>
 where
-    F: TypeFamily,
+    F: TypeFamily<Origin = Option<FieldOrigin>>,
     F::Record: AsRef<str>,
     F::Variant: AsRef<str>,
 {
@@ -1744,7 +1904,7 @@ where
         }
         if let Some(record) = self.record(record_name) {
             for field in record.fields.values() {
-                if field.visibility == RecordFieldVisibility::Omitted
+                if field.origin.as_ref().is_some_and(FieldOrigin::is_omitted)
                     || field
                         .annotation
                         .as_ref()

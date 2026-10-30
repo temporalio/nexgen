@@ -60,13 +60,30 @@ struct GenerateArgs {
     #[cfg(feature = "advanced")]
     #[arg(long)]
     format: bool,
-    #[cfg(feature = "advanced")]
-    #[arg(long = "native-api")]
-    generate_native_api: bool,
     /// Generate Temporal System Nexus-specific bindings.
     #[cfg(feature = "advanced")]
     #[arg(long = "system-nexus")]
     system_nexus: bool,
+    /// Generate APIs for these callers: workflow or client (Python only).
+    /// Defaults to models and definitions only. Repeat the flag or use commas.
+    #[cfg(feature = "advanced")]
+    #[arg(long = "targets", value_enum, value_delimiter = ',')]
+    targets: Vec<CliGenerationTarget>,
+}
+
+#[cfg(feature = "advanced")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum CliGenerationTarget {
+    Workflow,
+    Client,
+}
+
+#[cfg(feature = "advanced")]
+fn generation_targets(targets: &[CliGenerationTarget]) -> nexgen::nexgen_config::GenerationTargets {
+    nexgen::nexgen_config::GenerationTargets {
+        workflow: targets.contains(&CliGenerationTarget::Workflow),
+        client: targets.contains(&CliGenerationTarget::Client),
+    }
 }
 
 #[derive(Args)]
@@ -201,12 +218,8 @@ fn main() -> ExitCode {
             {
                 let system_nexus = args.common.system_nexus;
                 let config = NexgenConfig {
-                    mode: if args.common.generate_native_api {
-                        nexgen::generator::GenerationMode::NativeApi
-                    } else {
-                        nexgen::generator::GenerationMode::DefinitionsOnly
-                    },
                     system_nexus,
+                    targets: generation_targets(&args.common.targets),
                 };
                 let mut request = generate_request(
                     Language::Python,
@@ -234,12 +247,8 @@ fn main() -> ExitCode {
             {
                 let system_nexus = args.common.system_nexus;
                 let config = NexgenConfig {
-                    mode: if args.common.generate_native_api {
-                        nexgen::generator::GenerationMode::NativeApi
-                    } else {
-                        nexgen::generator::GenerationMode::DefinitionsOnly
-                    },
                     system_nexus,
+                    targets: generation_targets(&args.common.targets),
                 };
                 let mut request = generate_request(
                     Language::TypeScript,
@@ -300,12 +309,8 @@ fn generate_request(
     GenerateRequest {
         #[cfg(feature = "advanced")]
         config: NexgenConfig {
-            mode: if args.generate_native_api {
-                nexgen::generator::GenerationMode::NativeApi
-            } else {
-                nexgen::generator::GenerationMode::DefinitionsOnly
-            },
             system_nexus: args.system_nexus,
+            targets: generation_targets(&args.targets),
         },
         #[cfg(not(feature = "advanced"))]
         config: Default::default(),

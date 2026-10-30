@@ -18,8 +18,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Condvar, Mutex};
 
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
+use nexgen::nexgen_config::GenerationTargets;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -356,11 +356,11 @@ internal static class Check
 #[test]
 fn csharp_json_examples_build_in_both_modes() {
     for example in ["chat", "kb", "showcase", "temporal"] {
-        for mode in [GenerationMode::DefinitionsOnly, GenerationMode::NativeApi] {
+        for targets in [GenerationTargets::NONE, GenerationTargets::WORKFLOW] {
             let case = JsonCase::new(&format!("sample-{example}"));
             generate_to_file(&GenerateRequest {
                 config: NexgenConfig {
-                    mode,
+                    targets,
                     ..Default::default()
                 },
                 language: Language::Dotnet,
@@ -2969,7 +2969,7 @@ fn csharp_json_services_render_docs_deprecation_and_one_sided_io() {
             case.generate(&["legacy.nexusrpc.yaml"])
         };
         let services = output.file("Services.cs");
-        // The contract is public unless `--native-api` puts a client in front.
+        // The contract is public unless a workflow target puts a client in front.
         let visibility = if native { "internal" } else { "public" };
         assert_has(
             services,
@@ -3184,11 +3184,7 @@ fn csharp_json_overrides_may_spell_any_generated_local() {
                 &format!("type: object\nproperties:\n  a: {{ type: string, x-cs-name: {name} }}\n"),
             );
             probe
-                .try_generate(
-                    &["probe.yaml"],
-                    GenerationMode::DefinitionsOnly,
-                    Some(NAMESPACE),
-                )
+                .try_generate(&["probe.yaml"], GenerationTargets::NONE, Some(NAMESPACE))
                 .is_ok()
         })
         .collect();

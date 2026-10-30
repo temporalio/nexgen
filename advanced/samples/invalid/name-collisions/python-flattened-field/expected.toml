@@ -1,4 +1,5 @@
 languages = ["python"]
+targets = ["workflow"]
 inputs = ["input.wit", "../../../inputs/deps"]
 descriptors = "temporal"
 

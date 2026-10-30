@@ -462,7 +462,7 @@ function signalWithStartWorkflowRequestToProto<
                 : support.valueToPayload(model.staticDetails),
           },
     header: model.headers == null ? undefined : support.headerToProto(model.headers),
-    namespace: model.namespace ?? support.workflowNamespace(),
+    namespace: model.namespace,
   };
 }
 

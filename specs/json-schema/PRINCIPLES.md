@@ -382,10 +382,10 @@ would be. Six consequences, each normative:
   services and operation I/O models actually rendered in that file, so an
   unrelated `$defs` model does not cause a false collision.
 * **Identifiers synthesized from a service key are in the pass.** Go's
-  `--native-api` output adds `<Service>Client` and `New<Service>Client` to the
+  workflow-target output adds `<Service>Client` and `New<Service>Client` to the
   flat package, so a `$defs` model named `AlphaClient` beside a service `Alpha`
-  is a redeclaration. Both names are reserved even outside `--native-api`, so
-  the accepted schema set does not depend on generation mode.
+  is a redeclaration. Both names are reserved even without the workflow target,
+  so the accepted schema set does not depend on API selection.
 * **A synthesized name is a function of its own origin only.** The identifier
   synthesized from a model's member depends on that model and that member and
   nothing else. Deriving it from how many *other* models declare a same-named
@@ -835,13 +835,14 @@ model member scope and closed-value constant scope.
     code spells framework types `global::`-qualified too, so no schema type name
     can shadow them. The generator emits formatted C# directly; no external
     formatter runs.
-14. **Services are NexusRpc interfaces, `public` unless `--native-api`.** Each
-    service is a `[NexusService(fqn)]` `interface I<Name>` with one
-    `[NexusOperation(wire)]` method per operation (see [[services]]). Without
-    `--native-api` the contract is the API, so it is `public`, like Java's
-    service interface: a handler (`[NexusServiceHandler(typeof(I<Name>))]`) or a
-    caller (`Workflow.CreateNexusWorkflowClient<I<Name>>`) in another assembly
-    can name it. With `--native-api`, callers use the generated `<Name>Client`
+14. **Services are NexusRpc interfaces, `public` unless a workflow API is
+    selected.** Each service is a `[NexusService(fqn)]` `interface I<Name>` with
+    one `[NexusOperation(wire)]` method per operation (see [[services]]).
+    Without a workflow target the contract is the API, so it is `public`, like
+    Java's service interface: a handler
+    (`[NexusServiceHandler(typeof(I<Name>))]`) or a caller
+    (`Workflow.CreateNexusWorkflowClient<I<Name>>`) in another assembly can name
+    it. With `--targets workflow`, callers use the generated `<Name>Client`
     wrapper instead, so the contract is `internal`. Definitions mode emits the
     contract only, with no handler or client scaffolding; the sample suite
     implements and calls it end to end over a real Nexus endpoint (§5), with

@@ -7,9 +7,10 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::generator::render_request_plan;
 use crate::generator::{
-    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
+    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
 use crate::language::Language;
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedJsonType, PlannedProtoType, PlannedProtoTypeInfo, PlannedResource,
     PlannedResourceMethodBindingSpec as PlannedResourceMethodBinding,
@@ -358,11 +359,9 @@ pub(in crate::generator) fn planned_field(
         annotation_override: field.annotation.clone(),
         flattened_annotation_override: field.flattened_annotation.clone(),
         required: field.required,
-        api_required: field.api_required(),
+        api_required: field.api_required(GenerationTarget::Workflow),
         default_expression: field
-            .default_value
-            .as_ref()
-            .and_then(|text| text.value())
+            .default_for(GenerationTarget::Workflow)
             .map(str::to_string),
         role,
         kind: planned_field_kind(&field.field_type, spec),
@@ -947,7 +946,7 @@ impl GoExternalModels {
     ) -> Self {
         if plan_uses_json_models(api_plan) {
             Self::Json(json::ModelBackend::new(
-                crate::nexgen_config::current().mode == GenerationMode::NativeApi,
+                crate::nexgen_config::current().targets.workflow,
             ))
         } else {
             Self::Proto(proto::ModelBackend::new(
@@ -1006,6 +1005,13 @@ impl GoExternalModels {
         match self {
             Self::Json(backend) => backend.model_type_annotation(model_type),
             Self::Proto(backend) => backend.model_type_annotation(model_type),
+        }
+    }
+
+    fn support_helper_call(&self, call: &str) -> String {
+        match self {
+            Self::Proto(backend) => backend.support_converter(call.to_string()),
+            Self::Json(_) => call.to_string(),
         }
     }
 
@@ -1303,9 +1309,8 @@ impl<'a> ApiPlanner<'a> {
         }
         let model_fragments = self.external_models.render_models()?;
         self.imports.extend(model_fragments.imports);
-        // The Nexus service definition (operation references) is emitted in
-        // both modes, so the `nexus` import is needed whenever a spec has
-        // services — not just in NativeApi.
+        // The Nexus service definition (operation references) is emitted with or without the
+        // Workflow API, so the `nexus` import is needed whenever a spec has services.
         if self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
             && !self
@@ -1315,7 +1320,7 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
         }
-        if crate::nexgen_config::current().mode == GenerationMode::NativeApi
+        if crate::nexgen_config::current().targets.workflow
             && self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
             && !self.package.is_self_import("go.temporal.io/sdk/workflow")
@@ -1498,7 +1503,7 @@ impl<'a> ApiPlanner<'a> {
             let planned_record = record_for_message(self.api_plan, &input);
             let planned_fields = planned_record.map(|record| {
                 record
-                    .public_fields()
+                    .api_fields(GenerationTarget::Workflow)
                     .map(|(field_name, field)| {
                         planned_field(record, field_name, field, self.api_plan)
                     })
@@ -1507,10 +1512,12 @@ impl<'a> ApiPlanner<'a> {
             model
                 .fields
                 .iter()
-                .enumerate()
-                .filter_map(|(index, field)| {
-                    let planned_field =
-                        planned_fields.as_ref().and_then(|fields| fields.get(index));
+                .filter_map(|field| {
+                    let planned_field = planned_fields.as_ref().and_then(|fields| {
+                        fields
+                            .iter()
+                            .find(|planned| go_field_name(&planned.authored_name) == field.name)
+                    });
                     let planned_field = planned_field?;
                     let function = match &planned_field.role {
                         PlannedFieldRole::Function(function) if planned_field.required => {
@@ -1634,6 +1641,19 @@ impl<'a> ApiPlanner<'a> {
         if let Some(helper) = serialization_context_expr {
             validate_go_serialization_context_helper(helper, &operation.name)?;
         }
+        let sourced_fields = record_for_message(self.api_plan, &input)
+            .map(|record| {
+                record
+                    .sources_for(GenerationTarget::Workflow)
+                    .map(|(field_name, _, source)| {
+                        (
+                            go_field_name(field_name),
+                            self.external_models.support_helper_call(source),
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
@@ -1645,6 +1665,7 @@ impl<'a> ApiPlanner<'a> {
             output_type,
             raw_output_type,
             serialization_context_expr,
+            sourced_fields,
             output_transform_expr: go_output_transform.map(|(_, expr)| expr),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
@@ -2305,6 +2326,10 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     pub(in crate::generator) output_transform_expr: Option<&'a str>,
     /// Helper selecting the context for user payloads nested in this operation.
     pub(in crate::generator) serialization_context_expr: Option<&'a str>,
+    /// The Go name and source expression of each sourced field of the request for the Workflow
+    /// API. The public wrapper fills them, and a resource method fills those that it has no value
+    /// for, so a resource field wins over its source.
+    sourced_fields: Vec<(String, String)>,
     /// Go return type for an `@nexus.output-transform`, with any embedded
     /// import path stripped from the WIT annotation.
     pub(in crate::generator) output_transform_type: Option<String>,
@@ -3679,16 +3704,7 @@ fn render_file(
             output.push('\n');
         }
         for (path, alias) in external_imports {
-            output.push('\t');
-            let default_alias = path.rsplit('/').next().unwrap_or(path);
-            if alias != default_alias || alias == "support" {
-                output.push_str(alias);
-                output.push(' ');
-            }
-            output.push('"');
-            output.push_str(path);
-            output.push('"');
-            output.push('\n');
+            output.push_str(&go_aliased_import_line(path, alias));
         }
         output.push_str(")\n");
     }
@@ -3718,7 +3734,8 @@ fn render_file(
         return output;
     }
 
-    let has_operations = services.iter().any(|s| !s.operations.is_empty());
+    let has_operations = crate::nexgen_config::current().targets.workflow
+        && services.iter().any(|s| !s.operations.is_empty());
 
     // --- Datatypes ---
     let private_enums = enums
@@ -3788,14 +3805,16 @@ fn render_file(
                     visibility,
                     constructor_returns_value,
                 );
-                render_resource_methods(
-                    &mut output,
-                    service,
-                    resource,
-                    api_plan,
-                    package,
-                    visibility,
-                );
+                if crate::nexgen_config::current().targets.workflow {
+                    render_resource_methods(
+                        &mut output,
+                        service,
+                        resource,
+                        api_plan,
+                        package,
+                        visibility,
+                    );
+                }
             }
         }
     }
@@ -3837,9 +3856,10 @@ fn render_file(
         || !public_variants.is_empty()
         || !public_models.is_empty();
 
-    let has_endpoint_operations = services
-        .iter()
-        .any(|service| service.endpoint.is_some() && !service.operations.is_empty());
+    let has_endpoint_operations = crate::nexgen_config::current().targets.workflow
+        && services
+            .iter()
+            .any(|service| service.endpoint.is_some() && !service.operations.is_empty());
 
     if has_endpoint_operations || has_public_datatypes {
         output.push_str("\n// --- Operations (public API) ---\n");
@@ -3860,6 +3880,9 @@ fn render_file(
             render_model(&mut output, key, model, external_models, true);
         }
         for service in services {
+            if !crate::nexgen_config::current().targets.workflow {
+                continue;
+            }
             if service.endpoint.is_none() {
                 continue;
             }
@@ -3890,21 +3913,58 @@ fn render_file(
     output.push_str(registry);
 
     // Imports collected while planning can become unused when the SDK owns
-    // input conversion instead of the generated wrapper.
-    let unused_external_imports: Vec<_> = external_imports
+    // input conversion instead of the generated wrapper, or when the Workflow API
+    // that needs them is not selected.
+    let body = &output[body_start..];
+    let unused_imports: Vec<String> = imports
         .iter()
-        .filter(|(_, alias)| !output[body_start..].contains(&format!("{alias}.")))
+        .filter(|path| {
+            !external_imports
+                .iter()
+                .any(|(external, _)| external == *path)
+        })
+        .filter(|path| !uses_go_package(body, path.rsplit('/').next().unwrap_or(path)))
+        .map(|path| format!("\t\"{path}\"\n"))
+        .chain(
+            external_imports
+                .iter()
+                .filter(|(_, alias)| !uses_go_package(body, alias))
+                .map(|(path, alias)| go_aliased_import_line(path, alias)),
+        )
         .collect();
-    for (path, alias) in unused_external_imports {
-        let default_alias = path.rsplit('/').next().unwrap_or(path);
-        let import = if alias == default_alias {
-            format!("\t\"{path}\"\n")
-        } else {
-            format!("\t{alias} \"{path}\"\n")
-        };
+    for import in unused_imports {
         output = output.replacen(&import, "", 1);
     }
+    let block = "\nimport (\n";
+    if let Some(start) = output.find(block)
+        && let Some(length) = output[start + block.len()..].find(")\n")
+        && output[start + block.len()..][..length].trim().is_empty()
+    {
+        output.replace_range(start..start + block.len() + length + 2, "");
+    }
     output
+}
+
+/// The import line for an external package, with its alias when the alias differs from the
+/// last path segment.
+fn go_aliased_import_line(path: &str, alias: &str) -> String {
+    let default_alias = path.rsplit('/').next().unwrap_or(path);
+    if alias != default_alias || alias == "support" {
+        format!("\t{alias} \"{path}\"\n")
+    } else {
+        format!("\t\"{path}\"\n")
+    }
+}
+
+/// Whether `code` refers to the package `name`. The check ignores `runtime.` when it looks for
+/// `time.`.
+fn uses_go_package(code: &str, name: &str) -> bool {
+    let reference = format!("{name}.");
+    code.match_indices(&reference).any(|(start, _)| {
+        !code[..start].chars().next_back().is_some_and(|previous| {
+            previous.is_alphanumeric() || previous == '_' || previous == '.'
+        })
+    })
 }
 
 /// Renders a Go doc comment (`// ...`), wrapping each paragraph to the
@@ -4688,6 +4748,12 @@ fn render_resource_methods(
                     })
                     .collect::<BTreeMap<_, _>>();
                 let request_locals = std::cell::RefCell::new(String::new());
+                let top_message = match request_plan {
+                    crate::planning::RequestPlan::Construct { message_name, .. } => {
+                        Some(message_name.as_str())
+                    }
+                    crate::planning::RequestPlan::Source(_) => None,
+                };
                 let mut request_expr = render_request_plan(
                     request_plan,
                     go_field_name,
@@ -4700,8 +4766,7 @@ fn render_resource_methods(
                             .unwrap_or_else(|| message_model_name(msg_name));
                         if let Some(record) = record_for_model_key(api_plan, msg_name) {
                             for (_, field) in record.model_fields() {
-                                let Some(default) =
-                                    field.default_value.as_ref().and_then(|text| text.value())
+                                let Some(default) = field.default_for(GenerationTarget::Workflow)
                                 else {
                                     continue;
                                 };
@@ -4765,6 +4830,17 @@ fn render_resource_methods(
                                     );
                                     fields[index] =
                                         format!("{}: {local}", go_field_name(&field.name));
+                                }
+                            }
+                        }
+                        // The operation function doesn't fill sources, so a field that the
+                        // resource has no value for takes its source here.
+                        if top_message == Some(msg_name) {
+                            for (field_name, expression) in &operation.sourced_fields {
+                                if supplied.iter().all(|provided| {
+                                    go_field_name(&provided.field_name) != *field_name
+                                }) {
+                                    fields.push(format!("{field_name}: {expression}"));
                                 }
                             }
                         }
@@ -5634,6 +5710,13 @@ fn render_convenience_wrapper(
         }
         output.push_str(",\n");
     }
+    for (field_name, expression) in &operation.sourced_fields {
+        output.push_str("\t\t");
+        output.push_str(field_name);
+        output.push_str(": ");
+        output.push_str(expression);
+        output.push_str(",\n");
+    }
     output.push_str("\t})\n");
 
     output.push_str("}\n");
@@ -5830,6 +5913,13 @@ fn render_forwarding_wrapper(
     render_operation_wrapper_return_type(output, package);
 
     output.push_str(" {\n");
+    for (field_name, expression) in &operation.sourced_fields {
+        output.push_str("\trequest.");
+        output.push_str(field_name);
+        output.push_str(" = ");
+        output.push_str(expression);
+        output.push('\n');
+    }
     output.push_str("\treturn ");
     output.push_str(&operation.func_name);
     output.push_str("(ctx, request)\n");

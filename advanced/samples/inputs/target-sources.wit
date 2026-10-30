@@ -1,0 +1,83 @@
+package temporal:target-sources@1.0.0;
+
+world system { export source-service; }
+
+/// @nexus.endpoint "sources"
+interface source-service {
+  record submit-request {
+    id: string,
+    /// @nexus.source python="shared_source()" typescript="sharedSource()" go="SharedSource(ctx)" dotnet="TargetSources.Shared()"
+    shared: string,
+    /// @nexus.source targets="workflow" python="workflow_source()" typescript="workflowSource()" go="WorkflowSource(ctx)" dotnet="TargetSources.Workflow()"
+    workflow: string,
+    /// @nexus.source targets="client" python="client_source()"
+    client: string,
+  }
+
+  submit: func(request: submit-request);
+
+  resource job {
+    constructor(job-id: string);
+    restart: func();
+    refresh: func() -> own<job>;
+  }
+
+  resource marker {
+    constructor();
+  }
+
+  record create-job-request {
+    job-id: string,
+  }
+
+  create-job: func(request: create-job-request) -> own<job>;
+  refresh: func(request: create-job-request) -> own<job>;
+
+  record create-marker-request {}
+  create-marker: func(request: create-marker-request) -> own<marker>;
+
+  record restart-request {
+    job-id: string,
+    /// @nexus.source python="shared_source()" typescript="sharedSource()" go="SharedSource(ctx)" dotnet="TargetSources.Shared()"
+    shared: string,
+  }
+
+  restart: func(request: restart-request);
+
+  resource run {
+    constructor(job-id: string, run-id: option<string>);
+
+    /// @nexus.operation "cancel-run"
+    cancel: func();
+  }
+
+  // These proto-backed types borrow Temporal API messages only to cover proto-backed resource
+  // holders and `@nexus.proto-field`. The fields do not match what the messages mean, so do not
+  // copy them into a real service.
+  /// @nexus.proto "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse" typescript-import="@temporalio/proto"
+  type run-result = own<run>;
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest" typescript-import="@temporalio/proto"
+  record create-run-request {
+    /// @nexus.proto-field "namespace"
+    job-id: string,
+    query: option<string>,
+  }
+
+  create-run: func(request: create-run-request) -> run-result;
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse" typescript-import="@temporalio/proto"
+  record run-with-status {
+    run: own<run>,
+    started: option<bool>,
+  }
+
+  create-run-with-status: func(request: create-run-request) -> run-with-status;
+
+  record cancel-run-request {
+    job-id: string,
+    run-id: option<string>,
+  }
+
+  cancel-run: func(request: cancel-run-request);
+}

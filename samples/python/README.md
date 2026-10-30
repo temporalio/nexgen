@@ -26,5 +26,5 @@ uv run pytest
 uv run basedpyright
 ```
 
-The native-api variant of these schemas (services + clients) lives under
+The Workflow API variant of these schemas (services + clients) lives under
 `advanced/samples/python/json_schema/api/`.

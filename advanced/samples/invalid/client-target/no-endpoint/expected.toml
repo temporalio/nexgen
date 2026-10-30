@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["workflow", "client"]
+
+[error]
+kind = "unsupported-client-target"
+contains = ["doesn't take service `GreetingService` yet, which has no endpoint"]

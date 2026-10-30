@@ -180,7 +180,12 @@ fn enqueue_declaration_references(
                 record
                     .fields
                     .values()
-                    .filter(|field| field.visibility != RecordFieldVisibility::Omitted)
+                    .filter(|field| {
+                        !field
+                            .origin
+                            .as_ref()
+                            .is_some_and(|origin| origin.is_omitted())
+                    })
                     .map(|field| field.field_type.clone()),
             );
         }

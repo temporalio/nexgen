@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["workflow", "client"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = ["`client`", "the package of the client target", "operation `JobService.Client`"]

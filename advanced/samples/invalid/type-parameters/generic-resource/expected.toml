@@ -1,3 +1,5 @@
+targets = ["workflow"]
+
 [error]
 kind = "invalid-wit"
 contains = [

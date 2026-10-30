@@ -5,7 +5,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use nexgen::error::{Error, ErrorKind};
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
 use nexgen::{GenerateRequest, generate_to_file};
 use serde::Deserialize;
@@ -20,7 +19,23 @@ struct Expectation {
     descriptors: Option<Descriptors>,
     #[serde(default)]
     system_nexus: bool,
+    #[serde(default)]
+    targets: Vec<Target>,
     error: ExpectedError,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum Target {
+    Workflow,
+    Client,
+}
+
+fn generation_targets(targets: &[Target]) -> nexgen::nexgen_config::GenerationTargets {
+    nexgen::nexgen_config::GenerationTargets {
+        workflow: targets.contains(&Target::Workflow),
+        client: targets.contains(&Target::Client),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -159,8 +174,8 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
         let output = tempfile::tempdir().map_err(|error| error.to_string())?;
         let result = generate_to_file(&GenerateRequest {
             config: nexgen::nexgen_config::NexgenConfig {
-                mode: GenerationMode::NativeApi,
                 system_nexus: expected.system_nexus,
+                targets: generation_targets(&expected.targets),
             },
             language,
             input_paths: inputs.clone(),

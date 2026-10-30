@@ -290,6 +290,7 @@ def build_full_signal_request(
 ) -> workflow_service_models.SignalWithStartWorkflowRequest:
     return workflow_service_models.SignalWithStartWorkflowRequest(
         workflow=ExampleWorkflow.run,
+        namespace="default",
         id=workflow_id,
         task_queue=TASK_QUEUE,
         signal=signal,

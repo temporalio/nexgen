@@ -32,7 +32,7 @@ cargo run --features advanced -- go advanced/samples/inputs/proto-backed-showcas
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package go.temporal.io/sdk/advanced/samples/go/support \
-  --native-api --output advanced/samples/go/protobackedshowcase
+  --targets workflow --output advanced/samples/go/protobackedshowcase
 ```
 
 The system Nexus sample support source imports `go.temporal.io/sdk/internal`

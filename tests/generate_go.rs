@@ -1,5 +1,5 @@
 // Drives the `nexgen` binary over the WIT/proto CLI surface (`--descriptors`,
-// `--native-api`, `--support-package`), all behind the `advanced` feature.
+// `--targets`, `--support-package`), all behind the `advanced` feature.
 #![cfg(feature = "advanced")]
 
 use std::collections::BTreeMap;
@@ -55,8 +55,8 @@ fn generate_to_string_with_inputs(
     let output_path = temp_dir.join("output");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
             system_nexus: false,
+            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
         },
         language,
         input_paths: input_paths.to_vec(),
@@ -147,6 +147,7 @@ fn cli_accepts_unused_go_support_package() {
         .args([
             "go",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--support-package",
             "example.com/nexgen/support",
             "--output",
@@ -186,6 +187,7 @@ fn cli_generates_go_with_package_self_imports_removed() {
         .args([
             "go",
             temp_input_path.to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",
@@ -232,6 +234,7 @@ fn cli_rejects_go_output_directory_mismatched_with_namespace() {
         .args([
             "go",
             temp_input_path.to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",
@@ -293,6 +296,7 @@ fn cli_preserves_existing_output_directory_contents() {
         .args([
             "go",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",
@@ -340,6 +344,7 @@ fn cli_overwrites_previously_generated_files_in_place() {
         .args([
             "go",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",
@@ -499,8 +504,8 @@ interface sample-service {{
     let output_path = temp_dir.join("output");
     let result = generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
             system_nexus: false,
+            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![wit_path],

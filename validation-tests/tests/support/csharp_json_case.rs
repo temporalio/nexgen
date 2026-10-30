@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
+use nexgen::nexgen_config::GenerationTargets;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -112,18 +112,18 @@ impl JsonCase {
     /// Generates definitions-only C# for `inputs` (paths below `input/`; `.`
     /// is the whole input directory) into the [`NAMESPACE`] root namespace.
     pub fn generate(&self, inputs: &[&str]) -> Output {
-        self.try_generate(inputs, GenerationMode::DefinitionsOnly, Some(NAMESPACE))
+        self.try_generate(inputs, GenerationTargets::NONE, Some(NAMESPACE))
             .unwrap_or_else(|error| panic!("generation failed: {error}"))
     }
 
     pub fn generate_native(&self, inputs: &[&str]) -> Output {
-        self.try_generate(inputs, GenerationMode::NativeApi, Some(NAMESPACE))
+        self.try_generate(inputs, GenerationTargets::WORKFLOW, Some(NAMESPACE))
             .unwrap_or_else(|error| panic!("generation failed: {error}"))
     }
 
     /// The load or generation diagnostic for `inputs`.
     pub fn generate_err(&self, inputs: &[&str]) -> String {
-        match self.try_generate(inputs, GenerationMode::DefinitionsOnly, Some(NAMESPACE)) {
+        match self.try_generate(inputs, GenerationTargets::NONE, Some(NAMESPACE)) {
             Ok(output) => panic!("generation succeeded:\n{}", output.all()),
             Err(error) => error,
         }
@@ -132,7 +132,7 @@ impl JsonCase {
     pub fn try_generate(
         &self,
         inputs: &[&str],
-        mode: GenerationMode,
+        targets: GenerationTargets,
         namespace: Option<&str>,
     ) -> Result<Output, String> {
         let output_path = self.output_dir();
@@ -141,7 +141,7 @@ impl JsonCase {
         }
         generate_to_file(&GenerateRequest {
             config: NexgenConfig {
-                mode,
+                targets,
                 ..Default::default()
             },
             language: Language::Dotnet,

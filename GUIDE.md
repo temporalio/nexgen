@@ -30,6 +30,7 @@ of `@nexus` directives.
   - [Flattened Records](#flattened-records)
   - [Output Transforms](#output-transforms)
 - [Function References](#function-references)
+- [Generation Targets](#generation-targets)
 - [Directive Glossary](#directive-glossary)
 
 ---
@@ -140,7 +141,7 @@ cargo run --features advanced -- go advanced/samples/inputs/proto-backed-showcas
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package go.temporal.io/sdk/advanced/samples/go/support \
-  --native-api --output advanced/samples/go/protobackedshowcase
+  --targets workflow --output advanced/samples/go/protobackedshowcase
 ```
 
 Export converter functions from the support package. For
@@ -177,7 +178,7 @@ cargo run --features advanced -- python advanced/samples/inputs/proto-backed-sho
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package temporal_support \
-  --native-api --output advanced/samples/python/wit/proto_backed_showcase
+  --targets workflow --output advanced/samples/python/wit/proto_backed_showcase
 ```
 
 Your runtime must also be able to `import temporal_support` (for example,
@@ -210,7 +211,7 @@ cargo run --features advanced -- typescript advanced/samples/inputs/proto-backed
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package ../../support/temporal_model_converters \
-  --native-api --output advanced/samples/typescript/wit/proto-backed-showcase
+  --targets workflow --output advanced/samples/typescript/wit/proto-backed-showcase
 ```
 
 Export the exact WIT-named or derived converter functions, for example
@@ -248,7 +249,7 @@ cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-sho
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package Nexgen.Support \
-  --native-api --output advanced/samples/dotnet/wit/proto-backed-showcase
+  --targets workflow --output advanced/samples/dotnet/wit/proto-backed-showcase
 ```
 
 Generated calls qualify helper names with `Nexgen.Support`; where extension
@@ -950,27 +951,35 @@ own nullable contracts.
 
 ### Sourced Fields
 
-Fields annotated with `@nexus.source` are not exposed in operation convenience
-APIs. Each value is a helper call relative to the project's support package,
+Fields annotated with `@nexus.source` are supplied by a helper in each
+applicable API target, rather than exposed as convenience arguments. Sources
+apply to all targets unless restricted by `targets="workflow"`,
+`targets="client"`, or a comma-separated list. Other targets expose the field as
+an ordinary argument. With no API target, a sourced field is an ordinary model
+field. Each value is a helper call relative to the project's support package,
 supplied with `--support-package`. Include the call and its arguments in WIT.
 Nexgen adds the package prefix and imports support for the generated field.
 
 ```wit
 record start-workflow-request {
   workflow-id: string,
-  /// @nexus.source python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
+  /// @nexus.source targets="workflow" python="workflow_namespace()" typescript="workflowNamespace()" go="WorkflowNamespace(ctx)" dotnet="TemporalWorkflowContext.WorkflowNamespace()"
   namespace: string,
 }
 ```
 
-The convenience API does not require a `namespace` argument. For example, the
-generated Python model uses the helper as a default factory. Conversion then
-reads the model field:
+The workflow convenience API does not require a `namespace` argument. Request
+construction evaluates the helper. In a resource method, a resource field or a
+method parameter of the same name takes precedence over a source, and the source
+fills only the fields that the method has no value for. Every language follows
+this rule. Shared models and their converters do not evaluate sources, so direct
+model construction must supply required fields:
 
 ```python
-namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
-# In to_transfer_type:
-message.namespace = value.namespace
+request = StartWorkflowRequest(
+    workflow_id=workflow_id,
+    namespace=_support.workflow_namespace(),
+)
 ```
 
 Nexgen prefixes the helper call, but it does not add arguments. The configured
@@ -1447,6 +1456,109 @@ descriptor replaces signature-derived typing.
 
 ---
 
+## Generation Targets
+
+`--targets` sets the code that calls the generated API. Repeat the flag, or
+separate the targets with commas.
+
+- Without `--targets`, generation emits models and service definitions only.
+  Resources are data classes with their fields, and sourced fields are ordinary
+  model fields. A handler that implements the service needs only these.
+- `workflow` selects the API for Workflow code.
+- `client` writes the same API for code outside a Workflow, in a `client`
+  package inside the output directory. So far only Python supports it. It can be
+  selected independently or alongside `workflow`. nexgen refuses it for a
+  service with no `@nexus.endpoint`.
+
+The `client` package has its own resource classes and a
+`<Service>ClientExtension` for each service, with the names of the Workflow
+package. It imports the models of the parent package, so both targets share
+them. Resource identity fields can be transported as data; client handles are
+constructed with an explicit service-bound Nexus client.
+
+```text
+stream_service/
+  models.py, services.py, _resources/  # the Workflow target
+  client/
+    __init__.py, _extensions.py, _resources/  # the client target
+```
+
+A client class inherits one or more extensions and implements
+`_create_nexus_client`. That method returns a Nexus client for one service, with
+the `start_operation` of `temporalio.client.NexusClient`. A subclass of
+`temporalio.client.Client` returns
+`self.create_nexus_client(service, endpoint)`. A call starts the operation and
+returns its result.
+
+```python
+import typing
+
+import temporalio.client
+from stream_service.client import StreamServiceClientExtension
+
+
+class Client(temporalio.client.Client, StreamServiceClientExtension):
+    def _create_nexus_client(
+        self, *, service: str, endpoint: str
+    ) -> temporalio.client.NexusClient[typing.Any]:
+        return self.create_nexus_client(service, endpoint)
+
+
+client = await Client.connect("localhost:7233")
+stream = await client.create_stream(id="s1")
+await stream.publish(records=records)
+```
+
+Each call starts the operation with a new random operation ID.
+
+Each operation also has a private method that takes the request, such as
+`_stream_service_create_stream`. Its name has the service name. Two services of
+one package can't have methods of the same name, private or public, and nexgen
+refuses them. An extension also refuses a client class that gets one of its
+public names from another base, because Python would use one of the two with no
+error.
+
+nexgen also refuses an operation named `client`. The parent package exports each
+operation, and an import of the client package sets the attribute of that name.
+
+A client resource takes a service-bound Nexus client as its first constructor
+argument. Its methods call that client's `start_operation` directly, preserving
+the service and endpoint binding. An operation that returns a resource gives the
+handle a Nexus client for the resource's own service. When another service
+returns the resource, the extension creates that client with
+`_create_nexus_client`, so the handle still starts its operations on the
+endpoint of its own service.
+
+```python
+job = Job(nexus_client, job_id="job")
+await job.restart()
+```
+
+The client is runtime state, not a resource identity field. Serialization
+carries only identity data. When an operation returns resource data, the
+generated API decodes it before constructing the client-backed handle.
+
+To rebuild a handle from identity fields that you stored, for example in a
+Workflow result, call the factory of the resource on the extension. Its name is
+`get_` and the snake-case name of the resource, and it takes the identity
+fields. It creates a Nexus client for the resource's own service with
+`_create_nexus_client`.
+
+```python
+job = client.get_job(job_id=stored_job_id)
+await job.restart()
+```
+
+nexgen refuses a factory name that is also the name of a client method of a
+service in the package.
+
+Sources work in the client target as well. Restrict workflow-only helpers with
+`targets="workflow"`. If a required resource-method request field has neither an
+applicable source nor a resource field or method parameter supplying it,
+generation rejects that API target.
+
+---
+
 ## Directive Glossary
 
 All directives are written in WIT doc comments (`///`) and prefixed with
@@ -1733,7 +1845,7 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 ### @nexus.source
 
 **Placement:** Record field (within a `@nexus.proto` record) **Syntax:**
-`@nexus.source python="<helper-call>" typescript="<helper-call>" go="<helper-call>" dotnet="<helper-call>"`
+`@nexus.source [targets="workflow,client"] python="<helper-call>" typescript="<helper-call>" go="<helper-call>" dotnet="<helper-call>"`
 
 Provides a field value through a helper in the package specified by
 `--support-package`. The field is not an argument in operation convenience APIs.
@@ -1746,9 +1858,11 @@ expressions, including property access after a call, are not valid here.
 namespace: string,
 ```
 
-The sample's Python model uses `_support.workflow_namespace` as its default
-factory. Go calls `support.WorkflowNamespace(ctx)`. Both helpers come from the
-configured support package.
+The sample's workflow API calls `_support.workflow_namespace()` in Python or
+`support.WorkflowNamespace(ctx)` in Go while constructing a request. Restrict
+this helper to the workflow target with `targets="workflow"`. Without a target
+list, a source applies to all targets. Models and wire conversion never evaluate
+the source.
 
 Cannot be combined with `@nexus.default`.
 
@@ -1757,12 +1871,14 @@ Cannot be combined with `@nexus.default`.
 ### @nexus.default
 
 **Placement:** Record field **Syntax:**
-`@nexus.default python="<expression>" typescript="<expression>" go="<expression>" dotnet="<expression>"`
+`@nexus.default [targets="workflow,client"] python="<expression>" typescript="<expression>" go="<expression>" dotnet="<expression>"`
 
 Makes an operation argument omittable and calculates its value when the
 generated operation prepares its outbound request. The field must have a
 non-option type: `@nexus.default` is rejected on `option<T>`, including aliases
-to option types.
+to option types. Without a target list, a default applies to all targets.
+Restrict a default that needs a Workflow context, such as
+`_support.workflow_task_queue()`, with `targets="workflow"`.
 
 ```wit
 /// @nexus.default

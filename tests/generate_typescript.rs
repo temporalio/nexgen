@@ -1,5 +1,5 @@
 // Drives the `nexgen` binary over the WIT/proto CLI surface (`--descriptors`,
-// `--native-api`, `--support-package`), all behind the `advanced` feature.
+// `--targets`, `--support-package`), all behind the `advanced` feature.
 #![cfg(feature = "advanced")]
 
 use std::collections::BTreeMap;
@@ -422,7 +422,7 @@ fn cli_uses_typescript_support_package() {
             "./shared/helpers",
             "--output",
             output_path.to_str().unwrap(),
-            "--native-api",
+            "--targets=workflow",
         ])
         .output()
         .unwrap();
@@ -881,7 +881,7 @@ fn typescript_json_native_barrel_exports_violation_type_only() {
         output_path: output_path.clone(),
         format: false,
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
+            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
             ..Default::default()
         },
         java_package_name: None,

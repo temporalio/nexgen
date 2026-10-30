@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["workflow", "client"]
+
+[error]
+kind = "invalid-resource-method"
+contains = ["restart", "the sourced field `namespace`", "`client` target"]

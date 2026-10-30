@@ -1,7 +1,7 @@
 # Python WIT Examples
 
 `uv`-managed Python 3.10+ example suite for the WIT generator outputs, plus the
-snapshot-only JSON-Schema **native-api** outputs.
+snapshot-only JSON-Schema **Workflow API** outputs.
 
 - Authored WIT inputs live in `advanced/samples/inputs/*.wit`
 - Checked-in generated packages live in `advanced/samples/python/wit/<name>/`,
@@ -9,7 +9,7 @@ snapshot-only JSON-Schema **native-api** outputs.
 - Authored Temporal converters live in the shared `temporal_support/` package;
   generated WIT modules import that package as `_support` rather than copying
   it, and generated models are exposed as the public `models` module
-- JSON-Schema native-api outputs (services + clients) live under
+- JSON-Schema Workflow API outputs (services + clients) live under
   `advanced/samples/python/json_schema/api/` and are snapshot-tested only
 - Proto wire-compatibility fixtures live in `advanced/samples/wire/proto/`
 - Pytest files (WIT round-trips + proto wire compatibility) live in
@@ -56,7 +56,7 @@ cargo run --features advanced -- python advanced/samples/inputs/proto-backed-sho
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package temporal_support \
-  --native-api --output advanced/samples/python/wit/proto_backed_showcase
+  --targets workflow --output advanced/samples/python/wit/proto_backed_showcase
 ```
 
 To make your package importable, install it or put its parent directory on

@@ -14,7 +14,7 @@ use crate::generator::{dotnet, python};
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, AuthoredFamily, ExternalTypeBindingSpec, ExternalTypeSourceSpec, ExternalTypeSpec,
-    RecordFieldSpec, RecordFieldVisibility, RecordSpec, ServiceSpec, TypeSpec,
+    FieldOrigin, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 
@@ -27,6 +27,7 @@ struct MessageUsage {
 #[derive(Clone, Copy)]
 struct ModelConfig<'a> {
     record: &'a RecordSpec,
+    language: Language,
 }
 
 pub(crate) struct AuthoredValidationPass<'a> {
@@ -62,16 +63,30 @@ impl CompilerPass<AuthoredFamily, AuthoredFamily> for AuthoredValidationPass<'_>
 }
 
 impl<'a> ModelConfig<'a> {
-    fn from_record(record: &'a RecordSpec) -> Self {
-        Self { record }
+    fn from_record(record: &'a RecordSpec, language: Language) -> Self {
+        Self { record, language }
+    }
+
+    fn origin(&self, field_name: &str) -> Option<&FieldOrigin> {
+        self.record
+            .fields
+            .get(field_name)
+            .and_then(|field| field.origin.for_language(self.language))
     }
 
     fn is_field_omitted(&self, field_name: &str) -> bool {
-        self.record.field_omitted(field_name)
+        self.record
+            .fields
+            .get(field_name)
+            .is_some_and(|field| field.origin.is_omitted())
     }
 
     fn is_field_hidden(&self, field_name: &str) -> bool {
-        self.record.field_omitted(field_name) || self.record.field_source(field_name).is_some()
+        self.is_field_omitted(field_name)
+            || self
+                .origin(field_name)
+                .and_then(FieldOrigin::source)
+                .is_some()
     }
 }
 
@@ -157,7 +172,7 @@ fn validate_external_type_bindings(
         validate_message_model_config(
             spec,
             proto_name.as_str(),
-            ModelConfig::from_record(record),
+            ModelConfig::from_record(record, language),
             message,
             descriptors,
             usages.get(proto_name.as_str()).copied().unwrap_or_default(),
@@ -313,12 +328,12 @@ fn validate_oneof_model_config(
                 field: oneof.name.to_string(),
             });
         };
-        if grouped_field.visibility == RecordFieldVisibility::Omitted {
+        if grouped_field.origin.is_omitted() {
             continue;
         }
         if matches!(
-            grouped_field.visibility,
-            RecordFieldVisibility::Sourced { .. }
+            grouped_field.origin.for_language(model_config.language),
+            Some(FieldOrigin::Source { .. })
         ) {
             return Err(Error::InvalidTypeOverrideField {
                 message: message_name.to_string(),
@@ -506,7 +521,7 @@ fn validate_message_model_config(
         .record
         .fields
         .iter()
-        .filter(|(_, field)| field.visibility == RecordFieldVisibility::Omitted)
+        .filter(|(_, field)| field.origin.is_omitted())
         .map(|(field_name, _)| field_name)
     {
         if oneof_by_name(&oneofs, field_name).is_some() {
@@ -530,10 +545,11 @@ fn validate_message_model_config(
     )?;
     validate_authored_field_types(message_name, model_config, message, &oneofs, descriptors)?;
     validate_invocation_fields(message_name, model_config, message, descriptors, usage)?;
-    for (field_name, _) in
-        model_config.record.fields.iter().filter(|(_, field)| {
-            field.required && field.visibility == RecordFieldVisibility::Omitted
-        })
+    for (field_name, _) in model_config
+        .record
+        .fields
+        .iter()
+        .filter(|(_, field)| field.required && field.origin.is_omitted())
     {
         return Err(Error::ConflictingTypeOverrideField {
             message: message_name.to_string(),
@@ -557,13 +573,11 @@ fn validate_record_fields(
             continue;
         }
         validate_model_override_field(message_name, field_name, message)?;
-        if field.visibility == RecordFieldVisibility::Omitted
+        if field.origin.is_omitted()
             && (field.doc.is_some()
                 || field.annotation.is_some()
                 || field.flattened_annotation.is_some()
-                || field.default_value.is_some()
-                || field.function.is_some()
-                || matches!(field.visibility, RecordFieldVisibility::Sourced { .. }))
+                || field.function.is_some())
         {
             return Err(Error::OmittedCustomizedTypeOverrideField {
                 message: message_name.to_string(),
@@ -618,7 +632,12 @@ fn validate_record_fields(
         }
     }
 
-    for (field_name, _, _) in model_config.record.sourced_fields() {
+    for (field_name, _) in model_config.record.fields.iter().filter(|(name, _)| {
+        model_config
+            .origin(name)
+            .and_then(FieldOrigin::source)
+            .is_some()
+    }) {
         if oneof_by_name(oneofs, field_name).is_some() {
             continue;
         }
@@ -825,8 +844,8 @@ fn validate_invocation_fields(
             });
         }
         if model_config
-            .record
-            .field_source(&function.args_field)
+            .origin(&function.args_field)
+            .and_then(FieldOrigin::source)
             .is_some()
         {
             return Err(Error::ConflictingTypeOverrideFieldProperties {

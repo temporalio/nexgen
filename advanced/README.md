@@ -18,7 +18,7 @@ The generator picks its input format from the file extension, so the same
 (`.json`/`.yaml`/`.yml`) inputs.
 
 > [!IMPORTANT]
-> The `--descriptors`, `--format`, and `--native-api` flags, and the `add-rpc`,
+> The `--descriptors`, `--format`, and `--targets` flags, and the `add-rpc`,
 > `add-message`, and `debug-wit-dir` subcommands, are gated behind the
 > `advanced` Cargo feature, which is off by default. Build or run with
 > `--features advanced` (as every command below does), or produce a binary that
@@ -42,9 +42,37 @@ Checked-in generated output lives under
 `advanced/samples/typescript/wit/<example-name>/`; Go output lives under
 `advanced/samples/go/<example-name>/` and .NET output lives under
 `advanced/samples/dotnet/wit/<example-name>/`. Language-specific tests live
-under each language's `tests/` directory where present. See
-[`samples/README.md`](samples/README.md) for links to each example's WIT,
-generated code, and tests.
+under each language's `tests/` directory where present.
+
+[`samples/inputs/examples.toml`](samples/inputs/examples.toml) configures each
+input's languages, API targets, System Nexus bindings, and descriptors. API
+targets are opt-in. An example with no child tables generates once under its
+input name. Child tables generate separate outputs, inheriting the parent
+settings and replacing the fields they specify:
+
+```toml
+[target-sources]
+languages = ["python"]
+descriptors = "temporal"
+
+[target-sources.workflow]
+targets = ["workflow"]
+
+[target-sources.client]
+targets = ["client"]
+
+[target-sources.both]
+targets = ["workflow", "client"]
+```
+
+These outputs are placed in `target-sources/workflow`, `target-sources/client`,
+and `target-sources/both`, with language-specific casing. Each child can
+override any of the parent's settings. Lists replace the inherited list;
+`targets = []` selects no APIs and `descriptors = []` selects no descriptors. An
+explicit `system_nexus = false` overrides `true`. Language filtering uses the
+resolved child settings. Child tables cannot contain further child tables. The
+sample builder clears the example's output directory once before generating its
+children.
 
 The linked `nexus:temporal-types` WIT package describes semantic types, while
 authored language-specific Temporal converters live in each sample project:
@@ -183,8 +211,9 @@ cargo run --features advanced -- dotnet \
 
 Inputs are positional; pass more than one path (a file or a directory) to link
 additional WIT into the parser workspace. Generation produces definitions by
-default. Add `--native-api` to also generate native API bindings. Add `--format`
-to run a formatter after generation:
+default. Add `--targets workflow` to generate workflow API bindings, or select
+`--targets client` for Python client APIs. Add `--format` to run a formatter
+after generation:
 
 - Python: `ruff format`
 - TypeScript: `prettier --write`
@@ -315,7 +344,7 @@ cargo run --features advanced -- python \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package temporal_support \
-  --native-api \
+  --targets workflow \
   --output /tmp/workflow_service
 ```
 
@@ -382,15 +411,15 @@ validated. Proto oneof member names must round-trip through WIT's snake-case
 wire naming; the scaffolder rejects a name that cannot be represented without
 changing it.
 
-Python native-API generation converts both authored shapes bidirectionally. For
-`option<variant>`, an unset protobuf oneof decodes to `None`, and encoding
+Python Workflow API generation converts both authored shapes bidirectionally.
+For `option<variant>`, an unset protobuf oneof decodes to `None`, and encoding
 `None` leaves the oneof unset. A required `variant` has no `None` annotation or
 constructor default; decoding an unset oneof or encoding a runtime `None` raises
 `ValueError("missing required field Model.field")`. Each selected case uses the
 normal WIT variant tuple form `(tag, payload)`, and unknown authored tags
 continue to raise `ValueError`.
 
-.NET native-API generation converts both shapes as well: the containing model
+.NET Workflow API generation converts both shapes as well: the containing model
 switches over the protobuf oneof case to construct the variant's nested case
 record, an unset `option<variant>` decodes to `null`, and an unset required
 oneof throws `InvalidOperationException`. Encoding a `null` required variant

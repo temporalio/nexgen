@@ -1196,9 +1196,11 @@ fn build_fields_from_record(
                     annotation: None,
                     flattened_annotation: None,
                     field_type,
-                    default_value: None,
                     required: false,
-                    visibility: RecordFieldVisibility::Omitted,
+                    origin: LanguageFieldOrigins {
+                        default: Some(FieldOrigin::Omitted),
+                        ..Default::default()
+                    },
                     function: None,
                     data: (),
                 },
@@ -1279,17 +1281,14 @@ fn build_fields_from_record(
                 annotation,
                 flattened_annotation,
                 field_type,
-                default_value: field_default,
                 required,
-                visibility: source
-                    .map(|source_expr| RecordFieldVisibility::Sourced { source_expr })
-                    .unwrap_or_else(|| {
-                        if api_omit_directive.is_some() {
-                            RecordFieldVisibility::ApiOmitted
-                        } else {
-                            RecordFieldVisibility::Public
-                        }
-                    }),
+                origin: build_field_origins(
+                    &directives,
+                    field_default.as_ref(),
+                    api_omit_directive.is_some(),
+                    path,
+                    &field_context,
+                )?,
                 function,
                 data: (),
             },
@@ -1319,9 +1318,8 @@ fn build_fields_from_record(
                             arg_field.field_type,
                             language,
                         ),
-                        default_value: None,
                         required: arg_field.required,
-                        visibility: RecordFieldVisibility::Public,
+                        origin: Default::default(),
                         function: None,
                         data: (),
                     },
@@ -1728,6 +1726,103 @@ pub(crate) fn find_proto_name_for_type_def(
     directive_value(&directives, "proto", path, context, "value")
 }
 
+fn build_field_origins(
+    directives: &[Directive],
+    default: Option<&LanguageStringSpec>,
+    api_omitted: bool,
+    path: &Path,
+    context: &str,
+) -> Result<LanguageFieldOrigins> {
+    let mut origins = LanguageFieldOrigins::default();
+    if api_omitted {
+        origins.default = Some(FieldOrigin::ApiOmitted);
+        if default.is_some() {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(), context: context.to_string(),
+                directive: "@nexus.api-omit".to_string(),
+                reason: "cannot be combined with `@nexus.default`; use `@nexus.source` to supply a value without a caller argument".to_string(),
+            });
+        }
+    }
+    let default_directive = directive(directives, "default", path, context)?;
+    let default_targets = default_directive
+        .map(|directive| build_origin_targets(directive, path, context, "default"))
+        .transpose()?
+        .unwrap_or(crate::nexgen_config::GenerationTargets::ALL);
+    for language in all_languages() {
+        let source = build_source_call(directives, path, context, language)?;
+        let expression = default.and_then(|default| default.for_language(language));
+        if source.is_some() && expression.is_some() {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: context.to_string(),
+                directive: "@nexus.default".to_string(),
+                reason: "cannot be combined with `@nexus.source` for the same language".to_string(),
+            });
+        }
+        let origin = if let Some((value, targets)) = source {
+            if api_omitted {
+                return Err(Error::InvalidWitDirective {
+                    path: path.to_path_buf(),
+                    context: context.to_string(),
+                    directive: "@nexus.api-omit".to_string(),
+                    reason: "cannot be combined with `@nexus.source`".to_string(),
+                });
+            }
+            Some(FieldOrigin::Source {
+                expression: FieldExpression {
+                    value,
+                    import: None,
+                },
+                targets,
+            })
+        } else {
+            expression.map(|value| FieldOrigin::Default {
+                expression: FieldExpression {
+                    value: value.to_string(),
+                    import: default
+                        .and_then(|default| default.import_for_language(language))
+                        .map(str::to_string),
+                },
+                targets: default_targets,
+            })
+        };
+        if let Some(origin) = origin {
+            origins.by_language.insert(language, origin);
+        }
+    }
+    Ok(origins)
+}
+
+fn build_origin_targets(
+    directive: &Directive,
+    path: &Path,
+    context: &str,
+    kind: &str,
+) -> Result<crate::nexgen_config::GenerationTargets> {
+    let Some(value) = directive.value("targets") else {
+        return Ok(crate::nexgen_config::GenerationTargets::ALL);
+    };
+    let mut targets = crate::nexgen_config::GenerationTargets::NONE;
+    for name in value.split(',').map(str::trim) {
+        match name {
+            "workflow" => targets.workflow = true,
+            "client" => targets.client = true,
+            _ => {
+                return Err(Error::InvalidWitDirective {
+                    path: path.to_path_buf(),
+                    context: context.to_string(),
+                    directive: format!("@nexus.{kind}"),
+                    reason: format!(
+                        "unknown {kind} target `{name}`; expected `workflow` or `client`"
+                    ),
+                });
+            }
+        }
+    }
+    Ok(targets)
+}
+
 fn build_field_default(
     directive: Option<&Directive>,
     path: &Path,
@@ -1754,10 +1849,12 @@ fn build_source_call(
     path: &Path,
     context: &str,
     language: Language,
-) -> Result<Option<String>> {
+) -> Result<Option<(String, crate::nexgen_config::GenerationTargets)>> {
     let Some(directive) = directive(directives, "source", path, context)? else {
         return Ok(None);
     };
+
+    let targets = build_origin_targets(directive, path, context, "source")?;
 
     for key in [
         "go-support-import",
@@ -1815,7 +1912,7 @@ fn build_source_call(
         });
     }
 
-    Ok(Some(source_expr.to_string()))
+    Ok(Some((source_expr.to_string(), targets)))
 }
 
 fn is_support_helper_invocation(source_expr: &str) -> bool {
@@ -3536,6 +3633,7 @@ fn parse_bool(value: &str) -> std::result::Result<bool, String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::spec::FieldOrigin;
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -3814,9 +3912,10 @@ interface workflow-service {
             .unwrap();
         assert!(request.field_required("workflow_id_reuse_policy"));
         assert_eq!(
-            request
-                .field_default("workflow_id_reuse_policy")
-                .and_then(|default| default.for_language(Language::Python)),
+            request.fields["workflow_id_reuse_policy"]
+                .origin
+                .for_language(Language::Python)
+                .and_then(FieldOrigin::default),
             Some("temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE")
         );
     }
@@ -3885,11 +3984,13 @@ interface workflow-service {
             .find(|(_, record)| record.name == "Request")
             .unwrap()
             .1;
-        assert!(matches!(
-            go_record.fields["workflow_id_reuse_policy"].visibility,
-            crate::spec::RecordFieldVisibility::Sourced { ref source_expr }
-                if source_expr == "WorkflowIDReusePolicy(ctx)"
-        ));
+        assert_eq!(
+            go_record.fields["workflow_id_reuse_policy"]
+                .origin
+                .for_language(Language::Go)
+                .and_then(FieldOrigin::source),
+            Some("WorkflowIDReusePolicy(ctx)")
+        );
 
         let python = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
             Language::Python,
@@ -3904,24 +4005,21 @@ interface workflow-service {
             .unwrap()
             .1;
         let field = &python_record.fields["workflow_id_reuse_policy"];
-        assert!(matches!(
-            field.visibility,
-            crate::spec::RecordFieldVisibility::Public
-        ));
+        assert_eq!(
+            field.origin,
+            go_record.fields["workflow_id_reuse_policy"].origin
+        );
         assert_eq!(
             field
-                .default_value
-                .as_ref()
-                .unwrap()
-                .for_language(Language::Python),
+                .origin
+                .for_language(Language::Python)
+                .and_then(FieldOrigin::default),
             Some("temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE")
         );
     }
 
     #[test]
     fn selects_sourced_field_expression_without_rewriting_it() {
-        use crate::spec::RecordFieldVisibility;
-
         let wit = r#"
 package temporal:nexus@1.0.0;
 
@@ -3948,11 +4046,13 @@ interface workflow-service {
                 .find(|(_, record)| record.name == "Request")
                 .unwrap()
                 .1;
-            assert!(matches!(
-                &record.fields["namespace"].visibility,
-                RecordFieldVisibility::Sourced { source_expr } if source_expr == expression
-            ));
-            assert_eq!(record.field_source("namespace"), Some(expression));
+            assert_eq!(
+                record.fields["namespace"]
+                    .origin
+                    .for_language(language)
+                    .and_then(FieldOrigin::source),
+                Some(expression)
+            );
         }
     }
 
@@ -4075,9 +4175,15 @@ interface workflow-service {
             Some("temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse")
         );
         assert!(request.field_required("workflow_type"));
-        assert!(request.field_omitted("header"));
+        assert!(request.fields["header"].origin.is_omitted());
         let model = request;
-        assert!(model.field_source("header").is_none());
+        assert!(
+            model.fields["header"]
+                .origin
+                .for_language(Language::Python)
+                .and_then(FieldOrigin::source)
+                .is_none()
+        );
         assert_eq!(model.field_name_override("workflow_type"), Some("workflow"));
         assert_eq!(
             model.field_name_override("workflow_execution_timeout"),
@@ -4141,7 +4247,10 @@ interface workflow-service {
             "string"
         );
         assert_eq!(
-            model.field_source("namespace"),
+            model.fields["namespace"]
+                .origin
+                .for_language(Language::Python)
+                .and_then(FieldOrigin::source),
             Some("workflow_namespace()")
         );
 
@@ -4260,7 +4369,10 @@ interface workflow-service {
                     "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
                 )
                 .unwrap()
-                .field_source("namespace"),
+                .fields["namespace"]
+                .origin
+                .for_language(Language::Python)
+                .and_then(FieldOrigin::source),
             Some("workflow_namespace()")
         );
         assert_eq!(
@@ -4269,7 +4381,10 @@ interface workflow-service {
                     "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
                 )
                 .unwrap()
-                .field_source("namespace"),
+                .fields["namespace"]
+                .origin
+                .for_language(Language::TypeScript)
+                .and_then(FieldOrigin::source),
             Some("workflowNamespace()")
         );
         assert_eq!(
@@ -4278,7 +4393,10 @@ interface workflow-service {
                     "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
                 )
                 .unwrap()
-                .field_source("namespace"),
+                .fields["namespace"]
+                .origin
+                .for_language(Language::Dotnet)
+                .and_then(FieldOrigin::source),
             Some("TemporalWorkflowContext.WorkflowNamespace()")
         );
     }

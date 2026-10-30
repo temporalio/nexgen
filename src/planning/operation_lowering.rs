@@ -11,8 +11,8 @@ use crate::error::{Error, Result};
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 use crate::spec::{
     ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec, JsonModelSpec, ProtoTypeSpec,
-    RecordFieldSpec, RecordFieldVisibility, RecordSpec, SelectedResourceType, Symbol,
-    TypeDeclEntry, TypeDeclSpec, TypeSpec,
+    RecordFieldSpec, RecordSpec, SelectedResourceType, Symbol, TypeDeclEntry, TypeDeclSpec,
+    TypeSpec,
 };
 
 use super::{
@@ -25,6 +25,7 @@ use super::{
 pub(crate) struct OperationLoweredFamily;
 
 impl crate::spec::TypeFamily for OperationLoweredFamily {
+    type Origin = Option<crate::spec::FieldOrigin>;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -241,9 +242,8 @@ fn resource_result_fields(
                     annotation: None,
                     flattened_annotation: None,
                     field_type: TypeSpec::String,
-                    default_value: None,
                     required: false,
-                    visibility: RecordFieldVisibility::Public,
+                    origin: None,
                     function: None,
                     data: (),
                 },
@@ -255,6 +255,12 @@ fn resource_result_fields(
 struct OperationLoweringMapper;
 
 impl ApiSpecTransform<OperationBoundFamily, OperationLoweredFamily> for OperationLoweringMapper {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldOrigin>,
+    ) -> Option<crate::spec::FieldOrigin> {
+        origin
+    }
     fn map_spec_data(&mut self, _data: ()) {}
     fn map_record(&mut self, value: Symbol) -> Symbol {
         value

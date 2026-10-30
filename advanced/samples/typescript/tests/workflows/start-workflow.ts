@@ -1,4 +1,5 @@
 import { startWorkflow } from "../../wit/start-workflow/index.ts";
+import { StartedWorkflow } from "../../wit/start-workflow/resources.ts";
 
 export async function exampleWorkflow(customerId: string): Promise<string> {
   return customerId;
@@ -19,7 +20,12 @@ export async function startWorkflowCaller(): Promise<{
     "exampleWorkflow",
     "demo-task-queue",
   );
-  await handle.cancel();
+  // The handle's namespace wins over the namespace source.
+  await new StartedWorkflow(
+    "stored-namespace",
+    handle.workflowId,
+    handle.runId,
+  ).cancel();
   return {
     namespace: handle.namespace,
     restartedRunId: restartedHandle.runId,

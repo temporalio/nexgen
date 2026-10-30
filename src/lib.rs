@@ -16,7 +16,7 @@ use std::process::Command;
 
 use descriptors::DescriptorIndex;
 use error::Result;
-use generator::{GenerateFilesOptions, GeneratedFiles, GeneratedOutputLayout, GenerationMode};
+use generator::{GenerateFilesOptions, GeneratedFiles, GeneratedOutputLayout};
 use language::Language;
 use spec::{ApiSpecTree, CompilerPass};
 
@@ -133,7 +133,7 @@ pub(crate) fn compile_tree_to_files(
     descriptors: &DescriptorIndex,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
-    let mode = nexgen_config::current().mode;
+    generator::validate_targets(language)?;
     // parse (frontend) -> validate authored intent -> select target metadata
     let authored_tree =
         planning::AuthoredValidationPass::new(descriptors, language).apply(authored_tree)?;
@@ -144,14 +144,9 @@ pub(crate) fn compile_tree_to_files(
 
     // selected IR -> resource bindings -> operation relationships -> lowered
     // operation results -> planned types -> reachability-pruned planned IR
-    let resource_bound_tree = planning::ResourceResolutionPass::new(
-        descriptors,
-        match mode {
-            GenerationMode::NativeApi => planning::PlanningMode::NativeApi,
-            GenerationMode::DefinitionsOnly => planning::PlanningMode::DefinitionsOnly,
-        },
-    )
-    .apply(selected_tree)?;
+    let resource_bound_tree =
+        planning::ResourceResolutionPass::new(descriptors, nexgen_config::current().targets)
+            .apply(selected_tree)?;
     let operation_bound_tree = planning::OperationBindingPass::new().apply(resource_bound_tree)?;
     let operation_lowered_tree =
         planning::OperationLoweringPass::new().apply(operation_bound_tree)?;

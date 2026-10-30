@@ -112,7 +112,7 @@ namespace Nexgen.StartWorkflowService
         }
 
         [GeneratedCode("nexgen", null)]
-        private static async Task<StartedWorkflow> RestartWorkflowAsync(StartWorkflowRequest request)
+        internal static async Task<StartedWorkflow> RestartWorkflowAsync(StartWorkflowRequest request)
         {
             var client = Workflow.CreateNexusWorkflowClient<IStartWorkflowService>(StartWorkflowServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<StartWorkflowResult>(svc => svc.RestartWorkflow(request)).ConfigureAwait(true);
@@ -131,7 +131,7 @@ namespace Nexgen.StartWorkflowService
         }
 
         [GeneratedCode("nexgen", null)]
-        private static async Task<CancelWorkflowResponse> CancelWorkflowAsync(CancelWorkflowRequest request)
+        internal static async Task<CancelWorkflowResponse> CancelWorkflowAsync(CancelWorkflowRequest request)
         {
             var client = Workflow.CreateNexusWorkflowClient<IStartWorkflowService>(StartWorkflowServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<CancelWorkflowResponse>(svc => svc.CancelWorkflow(request)).ConfigureAwait(true);

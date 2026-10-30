@@ -12,9 +12,9 @@ use crate::generator::proto::typescript::{
     model_typescript_interface_ref, typescript_replacement_type_name,
 };
 use crate::generator::render_request_plan;
+use crate::generator::resource_plan::{request_plan_fills_source, resource_method_fills_source};
 use crate::generator::{
-    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
-    TsDateTimeTypes,
+    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, TsDateTimeTypes,
 };
 use crate::language::Language;
 use crate::planning::{
@@ -26,10 +26,10 @@ use crate::planning::{
 };
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FlagsSpec, FunctionArgsSpec,
-    FunctionFieldSpec, FunctionResultSpec, IntSpec, LanguageImportSpec, LanguageImportStyle,
-    ModulePath, OperationSpec, RecordFieldSpec, RecordFieldVisibility, RecordSpec,
-    SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, FlagsSpec,
+    FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, IntSpec, LanguageImportSpec,
+    LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec, RecordSpec, SelectedTextSpec,
+    TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -452,17 +452,32 @@ impl<'a> ApiPlanner<'a> {
                         let mut fields = record
                             .fields
                             .values()
-                            .filter(|field| field.visibility == RecordFieldVisibility::ApiOmitted)
+                            .filter(|field| matches!(field.origin, Some(FieldOrigin::ApiOmitted)))
                             .map(|field| field.name.clone())
                             .collect::<Vec<_>>();
-                        fields.extend(record.sourced_fields().map(|(name, _, _)| name.to_string()));
+                        fields.extend(
+                            record
+                                .sources_for(crate::nexgen_config::GenerationTarget::Workflow)
+                                .map(|(name, _, _)| name.to_string()),
+                        );
                         fields.sort();
                         fields.dedup();
                         fields
                     })
                     .unwrap_or_default(),
                 sourced_fields: input_model
-                    .map(|model| model.sourced_fields.clone())
+                    .map(|model| {
+                        model
+                            .sourced_fields
+                            .iter()
+                            .filter(|field| {
+                                field
+                                    .targets
+                                    .contains(crate::nexgen_config::GenerationTarget::Workflow)
+                            })
+                            .cloned()
+                            .collect()
+                    })
                     .unwrap_or_default(),
                 default_initialization,
                 transfer_type_converter: input_conversion
@@ -907,12 +922,7 @@ impl<'a> ApiPlanner<'a> {
                     format!("Record<string, {}>", value_type.annotation),
                 ),
                 doc,
-                optional: !field.required
-                    || field
-                        .default_value
-                        .as_ref()
-                        .and_then(|text| text.value())
-                        .is_none(),
+                optional: !field.required || !field.has_default(),
                 from_wire_expr: map_value_from_wire_expr(&value_type, wire_field_expr),
                 to_wire_expr: map_value_to_wire_expr_from_expr(
                     &value_type,
@@ -1081,12 +1091,7 @@ impl<'a> ApiPlanner<'a> {
                     typescript_array_annotation(&resolved_type.annotation),
                 ),
                 doc,
-                optional: !field.required
-                    || field
-                        .default_value
-                        .as_ref()
-                        .and_then(|text| text.value())
-                        .is_none(),
+                optional: !field.required || !field.has_default(),
                 from_wire_expr: repeated_from_wire_expr(&resolved_type, wire_field_expr),
                 to_wire_expr: repeated_to_wire_expr(&resolved_type, &generated_field_name),
                 flattened_fields: Vec::new(),
@@ -1235,7 +1240,9 @@ impl<'a> ApiPlanner<'a> {
         let field_name = typescript_generated_field_name(field_name);
 
         let default_source_expr = sourced_support_call(source_expr);
-        let source_expr = format!("model.{field_name} ?? ({default_source_expr})");
+        // Transfer conversion is data-only; sources are evaluated by the API,
+        // never while serializing a shared model.
+        let source_expr = format!("model.{field_name}");
         let doc = field
             .doc
             .as_ref()
@@ -1252,6 +1259,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
+                targets: field.source_targets(),
                 visible: true,
                 from_wire_expr: map_value_from_wire_expr(
                     &value_type,
@@ -1276,6 +1284,7 @@ impl<'a> ApiPlanner<'a> {
                 ),
                 doc,
                 source_expr: default_source_expr,
+                targets: field.source_targets(),
                 visible: true,
                 from_wire_expr: format!(
                     "{} ?? []",
@@ -1290,6 +1299,7 @@ impl<'a> ApiPlanner<'a> {
             annotation: Self::typescript_field_annotation(field, resolved_type.annotation.clone()),
             doc,
             source_expr: default_source_expr,
+            targets: field.source_targets(),
             visible: true,
             from_wire_expr: required_from_wire_expr(
                 &resolved_type,
@@ -3033,6 +3043,7 @@ pub(in crate::generator) struct RenderedSourcedField {
     annotation: String,
     doc: Option<String>,
     source_expr: String,
+    targets: crate::nexgen_config::GenerationTargets,
     visible: bool,
     pub(in crate::generator) from_wire_expr: String,
     pub(in crate::generator) to_wire_expr: String,
@@ -3213,7 +3224,7 @@ fn render_module_files(
     api_plan: &PlannedSpec,
     module_origin: GeneratedFileOrigin,
 ) -> Result<GeneratedFileMap> {
-    let mode = crate::nexgen_config::current().mode;
+    let targets = crate::nexgen_config::current().targets;
     let model_requirements = collect_typescript_model_requirements(variants, models);
     let resource_requirements = collect_typescript_resource_requirements(services);
     let module_model_names = model_fragments
@@ -3251,7 +3262,7 @@ fn render_module_files(
     }
     files.insert(
         "index.ts",
-        if mode == GenerationMode::NativeApi {
+        if targets.workflow {
             render_index_module(services, &index_model_names, &index_exports)
         } else {
             render_definitions_only_index_module(
@@ -3262,9 +3273,85 @@ fn render_module_files(
         },
         module_origin.clone(),
     )?;
-    if has_models_module {
-        files.insert("models.ts", models_source, module_origin.clone())?;
-    }
+    super::emit_package(
+        &mut files,
+        targets,
+        |files| {
+            if has_models_module {
+                files.insert("models.ts", models_source, module_origin.clone())?;
+            }
+            Ok(())
+        },
+        |files, target| {
+            debug_assert_eq!(target, crate::nexgen_config::GenerationTarget::Workflow);
+            if crate::nexgen_config::current().system_nexus && !services.is_empty() {
+                files.insert(
+                    "registry.ts",
+                    render_operation_registry_module(
+                        enums,
+                        flags,
+                        variants,
+                        models,
+                        &module_model_names,
+                        services,
+                        support_package,
+                        api_plan,
+                    ),
+                    GeneratedFileOrigin::fixed(
+                        "generated TypeScript System Nexus operation registry",
+                    ),
+                )?;
+            }
+            if crate::nexgen_config::current().system_nexus && !services.is_empty() {
+                files.insert(
+                    "interceptors.ts",
+                    render_system_nexus_interceptors_module(
+                        enums,
+                        flags,
+                        variants,
+                        models,
+                        &module_model_names,
+                        services,
+                        language_imports,
+                        api_plan,
+                    ),
+                    GeneratedFileOrigin::fixed("generated TypeScript System Nexus interceptors"),
+                )?;
+            }
+            {
+                for service in services {
+                    if service.endpoint.is_none() {
+                        continue;
+                    }
+                    for operation in &service.operations {
+                        files.insert(
+                            format!("operations/{}.ts", operation_file_name(operation)),
+                            render_operation_module(
+                                enums,
+                                flags,
+                                variants,
+                                models,
+                                &module_model_names,
+                                services,
+                                service,
+                                operation,
+                                language_imports,
+                                support_package,
+                                api_plan,
+                            ),
+                            GeneratedFileOrigin::operation(
+                                Language::TypeScript,
+                                service.name,
+                                operation.name,
+                            ),
+                        )?;
+                    }
+                }
+            }
+            Ok(())
+        },
+    )?;
+    // Assemble shared contracts and resource data with the selected API members.
     if !services.is_empty() {
         files.insert(
             "services.ts",
@@ -3277,42 +3364,10 @@ fn render_module_files(
                 services,
                 language_imports,
                 support_package,
-                mode == GenerationMode::NativeApi,
+                targets,
                 api_plan,
             ),
             module_origin.clone(),
-        )?;
-    }
-    if crate::nexgen_config::current().system_nexus && !services.is_empty() {
-        files.insert(
-            "registry.ts",
-            render_operation_registry_module(
-                enums,
-                flags,
-                variants,
-                models,
-                &module_model_names,
-                services,
-                support_package,
-                api_plan,
-            ),
-            GeneratedFileOrigin::fixed("generated TypeScript System Nexus operation registry"),
-        )?;
-    }
-    if crate::nexgen_config::current().system_nexus && !services.is_empty() {
-        files.insert(
-            "interceptors.ts",
-            render_system_nexus_interceptors_module(
-                enums,
-                flags,
-                variants,
-                models,
-                &module_model_names,
-                services,
-                language_imports,
-                api_plan,
-            ),
-            GeneratedFileOrigin::fixed("generated TypeScript System Nexus interceptors"),
         )?;
     }
     if services.iter().any(|service| !service.resources.is_empty()) {
@@ -3332,36 +3387,6 @@ fn render_module_files(
             ),
             module_origin.clone(),
         )?;
-    }
-    if mode == GenerationMode::NativeApi {
-        for service in services {
-            if service.endpoint.is_none() {
-                continue;
-            }
-            for operation in &service.operations {
-                files.insert(
-                    format!("operations/{}.ts", operation_file_name(operation)),
-                    render_operation_module(
-                        enums,
-                        flags,
-                        variants,
-                        models,
-                        &module_model_names,
-                        services,
-                        service,
-                        operation,
-                        language_imports,
-                        support_package,
-                        api_plan,
-                    ),
-                    GeneratedFileOrigin::operation(
-                        Language::TypeScript,
-                        service.name,
-                        operation.name,
-                    ),
-                )?;
-            }
-        }
     }
     files.insert_multi(
         rendered_support.files,
@@ -4115,10 +4140,10 @@ fn render_models_module(
     support_package: &str,
     api_plan: &PlannedSpec,
 ) -> String {
-    let mode = crate::nexgen_config::current().mode;
+    let targets = crate::nexgen_config::current().targets;
     let mut body = String::new();
 
-    let uses_function_payload_helpers = mode == GenerationMode::NativeApi
+    let uses_function_payload_helpers = targets.workflow
         && models.iter().any(|model| {
             model.fields.iter().any(|field| {
                 field.to_wire_expr.contains("requestArgsToPayloads(")
@@ -4343,14 +4368,14 @@ fn render_service_module(
     services: &[RenderedService<'_>],
     language_imports: &[LanguageImportSpec],
     support_package: &str,
-    include_native_api: bool,
+    targets: crate::nexgen_config::GenerationTargets,
     api_plan: &PlannedSpec,
 ) -> String {
     let mut body = String::new();
     for service in services {
         render_service_definition(&mut body, service);
         body.push('\n');
-        if include_native_api && service.endpoint.is_none() {
+        if targets.workflow && service.endpoint.is_none() {
             render_endpoint_service_class(&mut body, service);
             body.push('\n');
         }
@@ -4421,7 +4446,7 @@ fn render_service_module(
     );
     let resource_client_binders = services
         .iter()
-        .filter(|service| include_native_api && service.endpoint.is_none())
+        .filter(|service| targets.workflow && service.endpoint.is_none())
         .flat_map(|service| service.resources.iter())
         .filter(|resource| {
             contains_identifier(&body, &resource_client_bind_function_name(resource))
@@ -4448,7 +4473,7 @@ fn render_resources_module(
     let mut body = String::new();
     for service in services {
         for resource in &service.resources {
-            render_resource(&mut body, resource, service);
+            render_resource(&mut body, resource, service, api_plan);
             body.push('\n');
         }
     }
@@ -4496,13 +4521,20 @@ fn render_resources_module(
         }
         if service.endpoint.is_some() {
             for operation in &service.operations {
-                let operation_function_name =
-                    typescript_operation_function_name(service, operation);
-                if contains_identifier(&body, &operation_function_name) {
+                let used_functions = [
+                    typescript_operation_function_name(service, operation),
+                    typescript_operation_request_function_name(operation),
+                ]
+                .into_iter()
+                // A resource method can have the name of the operation function that it no
+                // longer calls, so only a call counts.
+                .filter(|name| body.contains(&format!("await {name}(")))
+                .collect::<Vec<_>>();
+                if !used_functions.is_empty() {
                     render_value_imports(
                         &mut imports,
                         &format!("./operations/{}", operation_file_name(operation)),
-                        std::slice::from_ref(&operation_function_name),
+                        &used_functions,
                     );
                 }
             }
@@ -4526,7 +4558,14 @@ fn render_operation_module(
 ) -> String {
     let mut body = String::new();
     render_operation_input_alias(&mut body, service, operation);
-    render_operation_function(&mut body, service, operation);
+    let request_function = service.endpoint.is_some()
+        && resource_method_fills_source(
+            api_plan,
+            service.name,
+            operation.name,
+            crate::nexgen_config::GenerationTarget::Workflow,
+        );
+    render_operation_function(&mut body, service, operation, request_function);
     let body = with_private_required_field(body);
     let mut imports = String::new();
     render_typescript_namespace_imports(
@@ -5542,7 +5581,7 @@ fn typescript_operation_defaults(
     let mut overrides = Vec::new();
     let mut assignments = Vec::new();
     for (field_name, field) in record.model_fields() {
-        let default = field.default_value.as_ref().and_then(|text| text.value());
+        let default = field.default_for(crate::nexgen_config::GenerationTarget::Workflow);
         let Some(rendered) = model.fields.iter().find(|rendered| {
             rendered.wire_name == field_name
                 || rendered.name == typescript_generated_field_name(&field.name)
@@ -5556,7 +5595,7 @@ fn typescript_operation_defaults(
             let nested_record = api_plan
                 .record(&nested_type.full_name)
                 .expect("flattened record exists");
-            let present = if field.api_required() {
+            let present = if field.api_required(crate::nexgen_config::GenerationTarget::Workflow) {
                 "true".to_string()
             } else {
                 rendered
@@ -5572,10 +5611,8 @@ fn typescript_operation_defaults(
                     .find(|(_, spec)| typescript_generated_field_name(&spec.name) == child.name)
                     .map(|(_, spec)| spec)
                     .expect("flattened child exists");
-                let Some(default) = child_spec
-                    .default_value
-                    .as_ref()
-                    .and_then(|text| text.value())
+                let Some(default) =
+                    child_spec.default_for(crate::nexgen_config::GenerationTarget::Workflow)
                 else {
                     continue;
                 };
@@ -5614,7 +5651,7 @@ fn typescript_operation_defaults(
     let omitted = record
         .fields
         .values()
-        .filter(|field| field.visibility == RecordFieldVisibility::ApiOmitted)
+        .filter(|field| matches!(field.origin, Some(FieldOrigin::ApiOmitted)))
         .map(|field| field.name.clone())
         .chain(record.sourced_fields().map(|(name, _, _)| name.to_string()))
         .collect::<BTreeSet<_>>();
@@ -5740,7 +5777,12 @@ fn resource_client_require_function_name(resource: &PlannedResource) -> String {
     format!("require{}Client", resource.type_name)
 }
 
-fn render_resource(output: &mut String, resource: &PlannedResource, service: &RenderedService<'_>) {
+fn render_resource(
+    output: &mut String,
+    resource: &PlannedResource,
+    service: &RenderedService<'_>,
+    api_plan: &PlannedSpec,
+) {
     let client_symbol_name = resource_client_symbol_name(resource);
     if service.endpoint.is_none() {
         output.push_str("const ");
@@ -5830,6 +5872,11 @@ fn render_resource(output: &mut String, resource: &PlannedResource, service: &Re
                     .endpoint
                     .is_none()
                     .then(|| format!("{}(this)", resource_client_require_function_name(resource)));
+                let fills_source = request_plan_fills_source(
+                    api_plan,
+                    request_plan,
+                    crate::nexgen_config::GenerationTarget::Workflow,
+                );
                 if *direct_return {
                     output.push_str(&render_resource_method_operation_body(
                         4,
@@ -5842,6 +5889,7 @@ fn render_resource(output: &mut String, resource: &PlannedResource, service: &Re
                         request_plan,
                         &branchable_params,
                         true,
+                        fills_source,
                     ));
                 } else {
                     output.push_str(&render_resource_method_operation_body(
@@ -5855,6 +5903,7 @@ fn render_resource(output: &mut String, resource: &PlannedResource, service: &Re
                         request_plan,
                         &branchable_params,
                         false,
+                        fills_source,
                     ));
                 }
             }
@@ -6141,6 +6190,7 @@ fn render_resource_method_operation_body(
     request_plan: &RequestPlan,
     branchable_params: &[String],
     direct_return: bool,
+    fills_source: bool,
 ) -> String {
     let indent_str = " ".repeat(indent);
     if let Some((param_name, remaining)) = branchable_params.split_first() {
@@ -6161,6 +6211,7 @@ fn render_resource_method_operation_body(
             request_plan,
             remaining,
             direct_return,
+            fills_source,
         ));
         output.push_str(&indent_str);
         output.push_str("} else {\n");
@@ -6175,15 +6226,48 @@ fn render_resource_method_operation_body(
             request_plan,
             remaining,
             direct_return,
+            fills_source,
         ));
         output.push_str(&indent_str);
         output.push_str("}\n");
         return output;
     }
 
-    let request_expr = render_request_plan_typescript(request_plan);
+    // A standalone operation wrapper supplies its applicable sources itself;
+    // do not pass those fields through its caller-only convenience signature.
+    // Keep the shared plan intact for APIs that construct the raw model.
+    let mut caller_plan = request_plan.clone();
+    // The resource's value wins over a source, so a plan that fills a sourced field builds the
+    // complete request, like a resource bound to a client, and fills the other sources itself.
+    let complete_request = client_expr.is_some() || fills_source;
+    if !complete_request
+        && let RequestPlan::Construct { fields, .. } = &mut caller_plan
+        && let Some(input) = &operation.input
+    {
+        fields.retain(|field| {
+            let name = typescript_generated_field_name(&field.field_name);
+            input
+                .sourced_fields
+                .iter()
+                .all(|source| source.name != name)
+        });
+    }
+    let unfilled_sources = match (&operation.input, &caller_plan) {
+        (Some(input), RequestPlan::Construct { fields, .. }) if complete_request => input
+            .sourced_fields
+            .iter()
+            .filter(|source| {
+                fields
+                    .iter()
+                    .all(|field| typescript_generated_field_name(&field.field_name) != source.name)
+            })
+            .map(|source| format!("{}: {}", source.name, source.source_expr))
+            .collect(),
+        _ => Vec::new(),
+    };
+    let request_expr = render_request_plan_typescript(&caller_plan, &unfilled_sources);
     let mut output = String::new();
-    if client_expr.is_some()
+    if complete_request
         && let Some(initialization) = operation
             .input
             .as_ref()
@@ -6201,6 +6285,11 @@ fn render_resource_method_operation_body(
         output.push_str(&format!("{indent_str}const request = {request_expr};\n"));
     }
     let Some(client_expr) = client_expr else {
+        let function_name = if fills_source {
+            typescript_operation_request_function_name(operation)
+        } else {
+            typescript_operation_function_name(service, operation)
+        };
         if direct_return {
             output.push_str(&indent_str);
             if result_annotation == "void" {
@@ -6208,7 +6297,7 @@ fn render_resource_method_operation_body(
             } else {
                 output.push_str("return await ");
             }
-            output.push_str(&typescript_operation_function_name(service, operation));
+            output.push_str(&function_name);
             output.push('(');
             if let Some(endpoint_expr) = &endpoint_expr {
                 output.push_str(endpoint_expr);
@@ -6219,7 +6308,7 @@ fn render_resource_method_operation_body(
         } else {
             output.push_str(&indent_str);
             output.push_str("const handle = await ");
-            output.push_str(&typescript_operation_function_name(service, operation));
+            output.push_str(&function_name);
             output.push('(');
             if let Some(endpoint_expr) = &endpoint_expr {
                 output.push_str(endpoint_expr);
@@ -6342,12 +6431,20 @@ fn render_resource_start_operation(
     output.push_str("    );\n");
 }
 
-fn render_request_plan_typescript(plan: &RequestPlan) -> String {
+/// Renders a request plan, with `top_level_fields` added to the top-level request.
+fn render_request_plan_typescript(plan: &RequestPlan, top_level_fields: &[String]) -> String {
+    let top_message = match plan {
+        RequestPlan::Construct { message_name, .. } => Some(message_name.as_str()),
+        RequestPlan::Source(_) => None,
+    };
     render_request_plan(
         plan,
         typescript_generated_field_name,
         |name, value| format!("{name}: {value}"),
-        |_message_name, fields, _supplied| {
+        |message_name, mut fields, _supplied| {
+            if top_message == Some(message_name) {
+                fields.extend(top_level_fields.iter().cloned());
+            }
             if fields.is_empty() {
                 "{}".to_string()
             } else {
@@ -6404,9 +6501,12 @@ fn resource_return_binding_expr_typescript(
         ResolvedResourceBindingSource::RequestField {
             field_name,
             proto_field_name,
-            hidden,
+            origin,
         } => {
-            if *hidden {
+            if matches!(
+                origin,
+                Some(FieldOrigin::Source { .. } | FieldOrigin::Omitted)
+            ) {
                 let expr = format!(
                     "request.{}",
                     typescript_generated_field_name(proto_field_name)
@@ -6452,6 +6552,7 @@ fn render_operation_function(
     output: &mut String,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
+    request_function: bool,
 ) {
     let client_namespace = if crate::nexgen_config::current().system_nexus {
         "nexus"
@@ -6525,17 +6626,17 @@ fn render_operation_function(
         }
         output.push_str(",\n");
     }
-    if returns_direct {
-        output.push_str("): Promise<");
-        output.push_str(&operation.output_annotation);
-        output.push_str("> {\n");
+    let return_annotation = if returns_direct {
+        format!("Promise<{}>", operation.output_annotation)
     } else {
-        output.push_str(&format!(
-            "): Promise<{client_namespace}.NexusOperationHandle<"
-        ));
-        output.push_str(&operation.output_operation_annotation);
-        output.push_str(">> {\n");
-    }
+        format!(
+            "Promise<{client_namespace}.NexusOperationHandle<{}>>",
+            operation.output_operation_annotation
+        )
+    };
+    output.push_str("): ");
+    output.push_str(&return_annotation);
+    output.push_str(" {\n");
     if let Some(input) = &operation.input {
         if let Some(initialization) = &input.default_initialization {
             let mut sourced = String::new();
@@ -6559,6 +6660,31 @@ fn render_operation_function(
             output.push_str("  } as ");
             output.push_str(&input.annotation);
             output.push_str(";\n");
+        }
+        // A resource method that has its own value for a sourced field calls the request
+        // function, so the source doesn't replace that value.
+        if request_function {
+            let request_function_name = typescript_operation_request_function_name(operation);
+            output.push_str("  return await ");
+            output.push_str(&request_function_name);
+            output.push_str("(request);\n}\n\n");
+            if input_type_parameters.is_empty() {
+                output.push_str("export async function ");
+                output.push_str(&request_function_name);
+                output.push_str("(\n");
+            } else {
+                render_named_generic_function_start(
+                    output,
+                    &format!("export async function {request_function_name}"),
+                    input_type_parameters,
+                    0,
+                );
+            }
+            output.push_str("  request: ");
+            output.push_str(&input.annotation);
+            output.push_str(",\n): ");
+            output.push_str(&return_annotation);
+            output.push_str(" {\n");
         }
     }
     if !returns_direct {
@@ -6819,6 +6945,12 @@ fn render_resource_structural_type(output: &mut String, resource: &PlannedResour
         output.push_str("; ");
     }
     output.push('}');
+}
+
+/// The function that starts an operation with a complete request. A WIT name can't start with
+/// `_`, so it can't clash with an operation function.
+fn typescript_operation_request_function_name(operation: &RenderedOperation<'_>) -> String {
+    format!("_{}", operation.attr_name)
 }
 
 fn typescript_operation_function_name(
