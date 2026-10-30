@@ -17,6 +17,8 @@ package = false
 exclude-newer = "2 weeks"
 
 [tool.uv.sources]
+# Keep it non-editable. An editable install adds a path entry, and Python ignores that path for
+# modules of the installed temporalio package.
 temporalio-stream-protos = { path = "temporalio_stream_protos" }
 
 [tool.pytest.ini_options]
