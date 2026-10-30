@@ -374,6 +374,22 @@ fn discover_example_ids(repo_root: &Path, language: Language) -> Result<Vec<Stri
     let config = load_examples_config(&input_root)?;
     let mut input_paths = Vec::new();
     discover_example_input_paths(&input_root, &mut input_paths)?;
+    // An example without a section generates only definitions. Without this check, a
+    // misspelled section name would drop the generated API and give no error.
+    let input_ids = input_paths
+        .iter()
+        .filter_map(|path| example_id_for_input(path))
+        .collect::<Vec<_>>();
+    if let Some(name) = config
+        .examples
+        .keys()
+        .find(|name| !input_ids.contains(name))
+    {
+        return Err(Error::InvalidExampleConfig {
+            path: input_root.join("examples.toml"),
+            reason: format!("section `[{name}]` matches no `.wit` input file"),
+        });
+    }
     let mut ids = input_paths
         .into_iter()
         .filter_map(|path| {
@@ -1186,6 +1202,28 @@ targets = ["workflow"]
             let error = parse_examples_config(source).err().unwrap_or_default();
             assert!(error.contains(message), "{source}\n{error}");
         }
+    }
+
+    #[test]
+    fn discovery_rejects_a_section_that_matches_no_input() {
+        let root = temp_language_root("section-without-input");
+        let inputs = root.join("advanced/samples/inputs");
+        fs::create_dir_all(&inputs).unwrap();
+        fs::write(inputs.join("user-service.wit"), "").unwrap();
+        fs::write(
+            inputs.join("examples.toml"),
+            "[user_service]\ntargets = [\"workflow\"]\n",
+        )
+        .unwrap();
+        let error = discover_example_ids(&root, Language::Python)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("examples.toml"), "{error}");
+        assert!(
+            error.contains("section `[user_service]` matches no `.wit` input file"),
+            "{error}"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     fn temp_language_root(label: &str) -> PathBuf {
