@@ -26,8 +26,8 @@ target-version = "py310"
 extend-exclude = ["streamprotos"]
 
 [tool.basedpyright]
-# The stream service imports Stream protos that temporalio doesn't have yet.
-exclude = [".venv", "streamprotos", "wit/stream_service"]
+# The stream service models import Stream protos that temporalio doesn't have yet.
+exclude = [".venv", "streamprotos", "wit/stream_service/both/models.py"]
 reportAny = false
 reportExplicitAny = false
 reportPrivateUsage = false

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+import importlib
+import sys
 from typing import cast
 
 import pytest
@@ -14,6 +16,31 @@ DEV_SERVER_EXTRA_ARGS = [
     "--dynamic-config-value",
     "history.enableSignalWithStartFromWorkflow=true",
 ]
+
+
+def install_stream_protos() -> None:
+    """Make the Stream protos importable where the generated Stream service imports them.
+
+    No temporalio release has the Stream protos yet, so ``streamprotos/`` holds them.
+    """
+    for name in (
+        "temporalio.api.enums.v1.stream_pb2",
+        "temporalio.api.stream",
+        "temporalio.api.stream.v1",
+        "temporalio.api.stream.v1.message_pb2",
+        "temporalio.api.streamservice",
+        "temporalio.api.streamservice.v1",
+        "temporalio.api.streamservice.v1.request_response_pb2",
+    ):
+        module = importlib.import_module(
+            "streamprotos.temporal." + name.removeprefix("temporalio.")
+        )
+        sys.modules[name] = module
+        parent, _, child = name.rpartition(".")
+        setattr(importlib.import_module(parent), child, module)
+
+
+install_stream_protos()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
