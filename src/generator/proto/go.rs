@@ -577,7 +577,7 @@ fn go_message_conversion(
             let config = config.map(str::to_string).unwrap_or_else(|| {
                 format!(
                     "&{}{{DataConverter: dc}}",
-                    backend.package.system_nexus_config_type()
+                    backend.package.system_nexus_context_type()
                 )
             });
             format!("{config}, ")
@@ -2399,7 +2399,7 @@ fn render_model_converters(
     output.push_str("ToProto(");
     if crate::nexgen_config::current().system_nexus {
         output.push_str("cfg *");
-        output.push_str(&package.system_nexus_config_type());
+        output.push_str(&package.system_nexus_context_type());
         output.push_str(", ");
     }
     output.push_str("m *");
@@ -2426,7 +2426,7 @@ fn render_model_converters(
     output.push_str("FromProto(");
     if crate::nexgen_config::current().system_nexus {
         output.push_str("cfg *");
-        output.push_str(&package.system_nexus_config_type());
+        output.push_str(&package.system_nexus_context_type());
         output.push_str(", ");
     }
     output.push_str("proto ");
