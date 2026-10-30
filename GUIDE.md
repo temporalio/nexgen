@@ -1838,12 +1838,14 @@ Cannot be combined with `@nexus.default`.
 ### @nexus.default
 
 **Placement:** Record field **Syntax:**
-`@nexus.default python="<expression>" typescript="<expression>" go="<expression>" dotnet="<expression>"`
+`@nexus.default [targets="workflow,client"] python="<expression>" typescript="<expression>" go="<expression>" dotnet="<expression>"`
 
 Makes an operation argument omittable and calculates its value when the
 generated operation prepares its outbound request. The field must have a
 non-option type: `@nexus.default` is rejected on `option<T>`, including aliases
-to option types.
+to option types. Without a target list, a default applies to all targets.
+Restrict a default that needs a Workflow context, such as
+`_support.workflow_task_queue()`, with `targets="workflow"`.
 
 ```wit
 /// @nexus.default
