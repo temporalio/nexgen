@@ -492,8 +492,10 @@ function appendRecordsRequestFromProto(
     handle: streamHandleFromProto(
       requiredField(proto.handle, "AppendRecordsRequest", "handle"),
     ),
-    records: requiredField(proto.records, "AppendRecordsRequest", "records")?.map(
-      (value: any) => appendRecordFromProto(value),
+    records: requiredField(
+      proto.records?.map((value: any) => appendRecordFromProto(value)),
+      "AppendRecordsRequest",
+      "records",
     ),
     sequence: proto.sequence ?? undefined,
     producer: producerFromProto(
@@ -514,8 +516,10 @@ function appendRecordsRequestToProto(
     handle: streamHandleToProto(
       requiredField(model.handle, "AppendRecordsRequest", "handle"),
     ),
-    records: requiredField(model.records, "AppendRecordsRequest", "records")?.map(
-      (value) => appendRecordToProto(value),
+    records: requiredField(
+      model.records?.map((value) => appendRecordToProto(value)),
+      "AppendRecordsRequest",
+      "records",
     ),
     sequence: model.sequence,
     producer: model.producer == null ? undefined : producerToProto(model.producer),
@@ -667,8 +671,10 @@ function readRecordsResponseFromProto(
   proto: temporal.api.streamservice.v1.IReadRecordsResponse,
 ): ReadRecordsResponse {
   return {
-    records: requiredField(proto.records, "ReadRecordsResponse", "records")?.map(
-      (value: any) => streamRecordFromProto(value),
+    records: requiredField(
+      proto.records?.map((value: any) => streamRecordFromProto(value)),
+      "ReadRecordsResponse",
+      "records",
     ),
     nextOffset: proto.nextOffset ?? undefined,
     done: proto.done ?? undefined,
@@ -679,8 +685,10 @@ function readRecordsResponseToProto(
   model: ReadRecordsResponse,
 ): temporal.api.streamservice.v1.IReadRecordsResponse {
   return {
-    records: requiredField(model.records, "ReadRecordsResponse", "records")?.map(
-      (value) => streamRecordToProto(value),
+    records: requiredField(
+      model.records?.map((value) => streamRecordToProto(value)),
+      "ReadRecordsResponse",
+      "records",
     ),
     nextOffset: model.nextOffset,
     done: model.done,
@@ -852,10 +860,10 @@ function streamSupersededFromProto(
       "producerId",
     ),
     failedTasks: requiredField(
-      proto.failedTasks,
+      proto.failedTasks?.slice(),
       "StreamSuperseded",
       "failedTasks",
-    )?.slice(),
+    ),
     producerKind:
       proto.producerKind == null
         ? undefined
@@ -876,10 +884,10 @@ function streamSupersededToProto(
   return {
     producerId: requiredField(model.producerId, "StreamSuperseded", "producerId"),
     failedTasks: requiredField(
-      model.failedTasks,
+      model.failedTasks?.slice(),
       "StreamSuperseded",
       "failedTasks",
-    )?.slice(),
+    ),
     producerKind:
       model.producerKind == null
         ? undefined
