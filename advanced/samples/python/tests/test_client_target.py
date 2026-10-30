@@ -14,10 +14,16 @@ from temporalio.api.workflowservice.v1 import (
 from typing_extensions import override
 
 import wit.target_sources.both._resources as workflow_resources
-from wit.target_sources.both.client import Job, Marker, SourceServiceClientExtension
+from wit.target_sources.both.client import (
+    Job,
+    Marker,
+    OrdersClientExtension,
+    SourceServiceClientExtension,
+)
 from wit.target_sources.both.models import (
     CancelRunRequest,
     CreateJobRequest,
+    PlaceRequest,
     RestartRequest,
 )
 
@@ -79,6 +85,32 @@ class FakeClient(SourceServiceClientExtension):
         client = FakeNexusClient(self, service, endpoint)
         self.created_clients.append(client)
         return client
+
+
+class FakeOrdersClient(FakeClient, OrdersClientExtension):
+    """A fake SDK client that inherits the extensions of two services."""
+
+
+async def test_a_resource_from_another_service_calls_its_own_service() -> None:
+    client = FakeOrdersClient(
+        {
+            "Place": [workflow_resources.Job(job_id="job")],
+            "Restart": [None],
+        }
+    )
+
+    job = await client.place(job_id="job")
+    await job.restart()
+
+    assert client.calls == [
+        Call("Orders", "orders", "Place", PlaceRequest(job_id="job")),
+        Call(
+            SOURCE_SERVICE,
+            "sources",
+            "Restart",
+            RestartRequest(job_id="job", shared="shared"),
+        ),
+    ]
 
 
 async def test_a_created_resource_calls_its_operations_through_the_client() -> None:

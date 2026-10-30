@@ -1,6 +1,9 @@
 package temporal:target-sources@1.0.0;
 
-world system { export source-service; }
+world system {
+  export source-service;
+  export orders;
+}
 
 /// @nexus.endpoint "sources"
 interface source-service {
@@ -77,4 +80,17 @@ interface source-service {
   }
 
   cancel-run: func(request: cancel-run-request);
+}
+
+// Another interface returns a Job. Its client handle still starts the Job's operations on the
+// `sources` endpoint.
+/// @nexus.endpoint "orders"
+interface orders {
+  use source-service.{job};
+
+  record place-request {
+    job-id: string,
+  }
+
+  place: func(request: place-request) -> own<job>;
 }

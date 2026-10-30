@@ -11,6 +11,7 @@ from ..models import (
     CreateJobRequest,
     CreateMarkerRequest,
     CreateRunRequest,
+    PlaceRequest,
     RestartRequest,
     RunResult,
     SignalWithStartWorkflowExecutionResponse,
@@ -291,3 +292,64 @@ class SourceServiceClientExtension(abc.ABC):
             run_id=run_id,
         )
         return await self._source_service_cancel_run(request)
+
+
+class OrdersClientExtension(abc.ABC):
+    """Starts the operations of ``Orders`` from code outside a Workflow.
+
+    A client class inherits this class and implements ``_create_nexus_client``.
+    """
+
+    def __init_subclass__(cls, **kwargs: typing.Any) -> None:
+        super().__init_subclass__(**kwargs)
+        # The MRO picks one base for a name that two bases have, with no error.
+        for base in cls.__mro__:
+            if OrdersClientExtension in base.__mro__:
+                continue
+            for name in ("place",):
+                if name in base.__dict__:
+                    raise TypeError(
+                        f"{cls.__qualname__} gets {name} from {base.__qualname__} and from OrdersClientExtension"
+                    )
+
+    @abc.abstractmethod
+    def _create_nexus_client(
+        self,
+        *,
+        service: str,
+        endpoint: str,
+    ) -> _NexusClient:
+        """Return the Nexus client that starts the operations of ``service``."""
+        ...
+
+    async def _orders_place(
+        self,
+        request: PlaceRequest,
+    ) -> Job:
+        nexus_client = self._create_nexus_client(
+            service="Orders",
+            endpoint="orders",
+        )
+        handle = await nexus_client.start_operation(
+            operation="Place",
+            input=request,
+            output_type=_resource_data.Job,
+        )
+        result = await handle
+        return Job(
+            self._create_nexus_client(
+                service="SourceService",
+                endpoint="sources",
+            ),
+            job_id=result.job_id,
+        )
+
+    async def place(
+        self,
+        *,
+        job_id: str,
+    ) -> Job:
+        request = PlaceRequest(
+            job_id=job_id,
+        )
+        return await self._orders_place(request)

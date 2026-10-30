@@ -1507,8 +1507,11 @@ operation, and an import of the client package sets the attribute of that name.
 
 A client resource takes a service-bound Nexus client as its first constructor
 argument. Its methods call that client's `start_operation` directly, preserving
-the service and endpoint binding. Operations that return a resource construct
-the handle with the same Nexus client used to start the operation.
+the service and endpoint binding. An operation that returns a resource gives the
+handle a Nexus client for the resource's own service. When another service
+returns the resource, the extension creates that client with
+`_create_nexus_client`, so the handle still starts its operations on the
+endpoint of its own service.
 
 ```python
 job = Job(nexus_client, job_id="job")

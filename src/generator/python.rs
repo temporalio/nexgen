@@ -529,18 +529,21 @@ impl<'a> ApiPlanner<'a> {
             })
             .collect::<Result<Vec<_>>>()?;
         let mut services = services;
-        let resource_fields = services
+        let client_resources = services
             .iter()
-            .flat_map(|service| &service.resources)
-            .map(|resource| {
-                (
-                    resource.type_name.clone(),
-                    resource
-                        .fields
-                        .iter()
-                        .map(|field| python_field_name(&field.name))
-                        .collect::<Vec<_>>(),
-                )
+            .flat_map(|service| {
+                service.resources.iter().map(|resource| {
+                    let client_resource = ClientResourceResult {
+                        service: service.wire_name.to_string(),
+                        endpoint: service.endpoint.clone(),
+                        fields: resource
+                            .fields
+                            .iter()
+                            .map(|field| python_field_name(&field.name))
+                            .collect(),
+                    };
+                    (resource.type_name.clone(), client_resource)
+                })
             })
             .collect::<BTreeMap<_, _>>();
         for operation in services
@@ -548,10 +551,12 @@ impl<'a> ApiPlanner<'a> {
             .flat_map(|service| service.operations.iter_mut())
         {
             if operation.output_direct_result {
-                operation.client_resource_fields = resource_fields
-                    .get(&operation.output_ref)
-                    .expect("a direct resource result should name a declared resource")
-                    .clone();
+                operation.client_resource = Some(
+                    client_resources
+                        .get(&operation.output_ref)
+                        .expect("a direct resource result should name a declared resource")
+                        .clone(),
+                );
             }
         }
 
@@ -1754,7 +1759,7 @@ impl<'a> ApiPlanner<'a> {
                 .map(|helper| format!("_support.{helper}")),
             output_resource_return,
             output_direct_result,
-            client_resource_fields: Vec::new(),
+            client_resource: None,
             output_none: operation.output_type().is_none(),
             unpacked_input,
             client_unpacked_input,
@@ -3040,8 +3045,8 @@ struct RenderedOperation<'a> {
     serialization_context_expr: Option<String>,
     output_resource_return: Option<PlannedOperationResourceReturn>,
     output_direct_result: bool,
-    /// Identity fields used to construct a direct resource result with its client.
-    client_resource_fields: Vec<String>,
+    /// The resource that the operation returns directly, for the client target.
+    client_resource: Option<ClientResourceResult>,
     output_none: bool,
     unpacked_input: Option<RenderedUnpackedInput>,
     /// Target-specific source applicability changes the convenience parameters.
@@ -3060,6 +3065,17 @@ impl RenderedOperation<'_> {
                 .or(self.unpacked_input.as_ref()),
         }
     }
+}
+
+/// A client handle gets the Nexus client of its resource's own service. Another service can
+/// return the resource, and its client would start the resource's operations on the wrong
+/// endpoint.
+#[derive(Debug, Clone)]
+struct ClientResourceResult {
+    service: String,
+    endpoint: Option<String>,
+    /// The identity fields, which the handle takes from the decoded result.
+    fields: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -7597,11 +7613,11 @@ fn render_client_operation_body(
         }
         start_line(output, target, "    )\n");
         start_line(output, target, "    return resource\n");
-    } else if operation.output_direct_result {
+    } else if let Some(resource) = &operation.client_resource {
         start_line(
             output,
             target,
-            if operation.client_resource_fields.is_empty() {
+            if resource.fields.is_empty() {
                 "    await handle\n"
             } else {
                 "    result = await handle\n"
@@ -7610,8 +7626,26 @@ fn render_client_operation_body(
         start_line(output, target, "    return ");
         output.push_str(&operation.output_ref);
         output.push_str("(\n");
-        start_line(output, target, "        nexus_client,\n");
-        for field in &operation.client_resource_fields {
+        if client.is_some() || resource.service == service.wire_name {
+            // The operation's service owns the resource, so its client fits the handle. A
+            // resource method always returns a resource of its own service.
+            start_line(output, target, "        nexus_client,\n");
+        } else {
+            start_line(output, target, "        self._create_nexus_client(\n");
+            start_line(output, target, "            service=");
+            output.push_str(&python_string_literal(&resource.service));
+            output.push_str(",\n");
+            start_line(output, target, "            endpoint=");
+            output.push_str(&python_string_literal(
+                resource
+                    .endpoint
+                    .as_deref()
+                    .expect("the client target refuses a service with no endpoint"),
+            ));
+            output.push_str(",\n");
+            start_line(output, target, "        ),\n");
+        }
+        for field in &resource.fields {
             start_line(output, target, "        ");
             output.push_str(&format!("{field}=result.{field},\n"));
         }

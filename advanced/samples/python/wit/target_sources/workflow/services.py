@@ -8,6 +8,7 @@ from .models import (
     CreateJobRequest,
     CreateMarkerRequest,
     CreateRunRequest,
+    PlaceRequest,
     RestartRequest,
     RunResult,
     SignalWithStartWorkflowExecutionResponse,
@@ -58,3 +59,11 @@ class SourceService:
         CancelRunRequest,
         None,
     ] = Operation(name="CancelRun")
+
+
+@service
+class Orders:
+    place: Operation[
+        PlaceRequest,
+        Job,
+    ] = Operation(name="Place")

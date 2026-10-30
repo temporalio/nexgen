@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from ._extensions import SourceServiceClientExtension
+from ._extensions import (
+    SourceServiceClientExtension,
+    OrdersClientExtension,
+)
 from ._resources import (
     Job,
     Marker,
@@ -12,6 +15,7 @@ from ._resources import (
 
 __all__ = [
     "SourceServiceClientExtension",
+    "OrdersClientExtension",
     "Job",
     "Marker",
     "Run",
