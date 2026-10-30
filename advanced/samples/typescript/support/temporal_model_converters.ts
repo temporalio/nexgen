@@ -110,6 +110,14 @@ export function workflowNamespace(): string {
   return workflow.workflowInfo().namespace;
 }
 
+export function sharedSource(): string {
+  return "shared";
+}
+
+export function workflowSource(): string {
+  return "workflow";
+}
+
 /** Serialization context for payloads owned by a signal-with-start target workflow. */
 export function signalWithStartWorkflowSerializationContext(request: {
   namespace?: string | null;

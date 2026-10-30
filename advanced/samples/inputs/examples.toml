@@ -62,14 +62,15 @@ targets = ["workflow"]
 targets = ["workflow"]
 
 [target-sources]
-languages = ["python"]
 descriptors = "temporal"
 
 [target-sources.workflow]
 targets = ["workflow"]
 
 [target-sources.client]
+languages = ["python"]
 targets = ["client"]
 
 [target-sources.both]
+languages = ["python"]
 targets = ["workflow", "client"]

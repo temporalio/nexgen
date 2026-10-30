@@ -1008,6 +1008,13 @@ impl GoExternalModels {
         }
     }
 
+    fn support_helper_call(&self, call: &str) -> String {
+        match self {
+            Self::Proto(backend) => backend.support_converter(call.to_string()),
+            Self::Json(_) => call.to_string(),
+        }
+    }
+
     fn function_with_support_helper(&self, function: &FunctionFieldSpec) -> FunctionFieldSpec {
         let mut function = function.clone();
         if let Self::Proto(backend) = self {
@@ -1635,6 +1642,20 @@ impl<'a> ApiPlanner<'a> {
         if let Some(helper) = serialization_context_expr {
             validate_go_serialization_context_helper(helper, &operation.name)?;
         }
+        let sourced_assignments = record_for_message(self.api_plan, &input)
+            .map(|record| {
+                record
+                    .sources_for(GenerationTarget::Workflow)
+                    .map(|(field_name, _, source)| {
+                        format!(
+                            "request.{} = {}",
+                            go_field_name(field_name),
+                            self.external_models.support_helper_call(source)
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
@@ -1646,6 +1667,7 @@ impl<'a> ApiPlanner<'a> {
             output_type,
             raw_output_type,
             serialization_context_expr,
+            sourced_assignments,
             output_transform_expr: go_output_transform.map(|(_, expr)| expr),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
@@ -2306,6 +2328,9 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     pub(in crate::generator) output_transform_expr: Option<&'a str>,
     /// Helper selecting the context for user payloads nested in this operation.
     pub(in crate::generator) serialization_context_expr: Option<&'a str>,
+    /// Statements that fill the sourced fields of `request` for the Workflow API. Only used
+    /// when there is no `wire_binding`, which renders its own.
+    sourced_assignments: Vec<String>,
     /// Go return type for an `@nexus.output-transform`, with any embedded
     /// import path stripped from the WIT annotation.
     pub(in crate::generator) output_transform_type: Option<String>,
@@ -4951,6 +4976,11 @@ fn render_operation_function(
     output.push_str(") ");
     render_operation_future_return_type(output, package);
     output.push_str(" {\n");
+    for assignment in &operation.sourced_assignments {
+        output.push('\t');
+        output.push_str(assignment);
+        output.push('\n');
+    }
     let endpoint = service
         .endpoint
         .as_deref()
