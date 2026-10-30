@@ -907,7 +907,7 @@ impl<'a> ApiPlanner<'a> {
         files.insert(format!("{dir}/_extensions.py"), extensions, origin())?;
         let mut nexus_client = String::new();
         render_generated_file_header(&mut nexus_client);
-        nexus_client.push_str("\nimport collections.abc\nimport typing\n\n\n");
+        nexus_client.push_str("\nimport typing\nimport uuid\n\n\n");
         nexus_client.push_str(PYTHON_CLIENT_NEXUS_PROTOCOL);
         files.insert(format!("{dir}/_nexus_client.py"), nexus_client, origin())?;
         if !resources.is_empty() {
@@ -1035,7 +1035,7 @@ impl<'a> ApiPlanner<'a> {
         ) {
             output.push('\n');
         }
-        render_named_python_import(&mut output, "._nexus_client", &["_NexusClient".to_string()]);
+        render_named_python_import(&mut output, "._nexus_client", &client_nexus_imports(&body));
         let used_model_names = used_python_symbol_imports(&body, model_names);
         if !used_model_names.is_empty() {
             render_model_name_imports(
@@ -1192,7 +1192,7 @@ impl<'a> ApiPlanner<'a> {
             render_named_python_import(
                 &mut output,
                 ".._nexus_client",
-                &["_NexusClient".to_string()],
+                &client_nexus_imports(&body),
             );
             render_client_resource_data_import(&mut output, &body, "...");
         }
@@ -3919,6 +3919,15 @@ fn client_resource_data_type(type_name: &str) -> String {
 
 const CLIENT_RESOURCE_DATA_MODULE: &str = "_resource_data";
 
+/// The names that a client module imports from the module of the Nexus client protocol.
+fn client_nexus_imports(body: &str) -> Vec<String> {
+    let mut names = vec!["_NexusClient".to_string()];
+    if body_uses_python_symbol(body, "_operation_id") {
+        names.push("_operation_id".to_string());
+    }
+    names
+}
+
 /// Imports the resources of the parent package. `parent` is the relative name of the parent
 /// package in the client module, such as `..`.
 fn render_client_resource_data_import(output: &mut String, body: &str, parent: &str) {
@@ -5728,30 +5737,45 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
     Ok(())
 }
 
-/// The Nexus client that a client extension starts operations with. It has the
-/// `start_operation` of the Workflow Nexus client.
+/// The Nexus client that a client extension starts operations with. It has the `start_operation`
+/// of `temporalio.client.NexusClient`, so `Client.create_nexus_client` can supply it.
 const PYTHON_CLIENT_NEXUS_PROTOCOL: &str = r#"_OutputT = typing.TypeVar("_OutputT")
+_OutputT_co = typing.TypeVar("_OutputT_co", covariant=True)
 
 
-# The client modules import this class, so it isn't unused.
+class _NexusOperationHandle(typing.Protocol[_OutputT_co]):
+    """A started Nexus operation."""
+
+    async def result(self) -> _OutputT_co: ...
+
+
+# The client modules import the names below, so they aren't unused.
 class _NexusClient(typing.Protocol):  # pyright: ignore[reportUnusedClass]
-    """Starts the Nexus operations of one service."""
+    """Starts the operations of one Nexus service, like ``temporalio.client.NexusClient``."""
 
     @typing.overload
     async def start_operation(
         self,
         operation: str,
-        input: typing.Any,
+        arg: typing.Any,
         *,
-        output_type: type[_OutputT],
-    ) -> collections.abc.Awaitable[_OutputT]: ...
+        id: str,
+        result_type: type[_OutputT],
+    ) -> _NexusOperationHandle[_OutputT]: ...
 
     @typing.overload
     async def start_operation(
         self,
         operation: str,
-        input: typing.Any,
-    ) -> collections.abc.Awaitable[None]: ...
+        arg: typing.Any,
+        *,
+        id: str,
+    ) -> _NexusOperationHandle[typing.Any]: ...
+
+
+def _operation_id() -> str:  # pyright: ignore[reportUnusedFunction]
+    """Return a new random operation ID."""
+    return str(uuid.uuid4())
 "#;
 
 const CLIENT_NEXUS_CLIENT_HOOK: &str = "_create_nexus_client";
@@ -7541,55 +7565,45 @@ fn render_client_operation_body(
     } else {
         render_inline_nexus_client(output, target, service);
     }
-    // `output_type` names the generic model with no type arguments, so the cast adds them.
-    let cast_handle = operation.generic_model_types && !operation_returns_direct(operation);
-    if cast_handle {
-        start_line(output, target, "    handle = typing.cast(\n");
-        start_line(output, target, "        collections.abc.Awaitable[");
-        output.push_str(&operation.output_annotation);
-        output.push_str("],\n");
-        start_line(
-            output,
-            target,
-            "        await nexus_client.start_operation(\n",
-        );
-    } else {
-        start_line(
-            output,
-            target,
-            "    handle = await nexus_client.start_operation(\n",
-        );
-    }
+    start_line(
+        output,
+        target,
+        "    handle = await nexus_client.start_operation(\n",
+    );
     start_line(output, target, "        operation=");
     output.push_str(&python_string_literal(operation.wire_name));
     output.push_str(",\n");
-    start_line(output, target, "        input=");
+    start_line(output, target, "        arg=");
     output.push_str(operation_input_wire_expr(operation));
     output.push_str(",\n");
+    start_line(output, target, "        id=_operation_id(),\n");
     if !operation.output_none {
-        start_line(output, target, "        output_type=");
-        if operation.output_direct_result {
+        start_line(output, target, "        result_type=");
+        if operation.client_resource.is_some() {
             output.push_str(&client_resource_data_type(&operation.output_ref));
         } else {
             output.push_str(&operation.output_type_expr);
         }
         output.push_str(",\n");
     }
-    if cast_handle {
-        start_line(output, target, "        ),\n");
-    }
     start_line(output, target, "    )\n");
+    // A statement that drops a result other than `None` needs `_ =` for basedpyright.
+    let await_result = if operation.output_none {
+        "    await handle.result()\n"
+    } else {
+        "    _ = await handle.result()\n"
+    };
     if discard_result {
-        start_line(output, target, "    await handle\n");
+        start_line(output, target, await_result);
         return;
     }
     if let Some(transform_expr) = &operation.output_transform_expr {
-        start_line(output, target, "    result = await handle\n");
+        start_line(output, target, "    result = await handle.result()\n");
         start_line(output, target, "    return ");
         output.push_str(transform_expr);
         output.push('\n');
     } else if let Some(resource_return) = &operation.output_resource_return {
-        start_line(output, target, "    result = await handle\n");
+        start_line(output, target, "    result = await handle.result()\n");
         render_resource_return_guards(
             output,
             target_body_indent(target),
@@ -7614,15 +7628,11 @@ fn render_client_operation_body(
         start_line(output, target, "    )\n");
         start_line(output, target, "    return resource\n");
     } else if let Some(resource) = &operation.client_resource {
-        start_line(
-            output,
-            target,
-            if resource.fields.is_empty() {
-                "    await handle\n"
-            } else {
-                "    result = await handle\n"
-            },
-        );
+        if resource.fields.is_empty() {
+            start_line(output, target, await_result);
+        } else {
+            start_line(output, target, "    result = await handle.result()\n");
+        }
         start_line(output, target, "    return ");
         output.push_str(&operation.output_ref);
         output.push_str("(\n");
@@ -7651,9 +7661,17 @@ fn render_client_operation_body(
         }
         start_line(output, target, "    )\n");
     } else if operation.output_none {
-        start_line(output, target, "    await handle\n");
+        start_line(output, target, await_result);
+    } else if operation.generic_model_types {
+        // `result_type` names the generic model with no type arguments, so the cast adds them.
+        start_line(output, target, "    return typing.cast(\n");
+        start_line(output, target, "        ");
+        output.push_str(&operation.output_annotation);
+        output.push_str(",\n");
+        start_line(output, target, "        await handle.result(),\n");
+        start_line(output, target, "    )\n");
     } else {
-        start_line(output, target, "    return await handle\n");
+        start_line(output, target, "    return await handle.result()\n");
     }
 }
 

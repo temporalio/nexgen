@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import dataclasses
 
-from .._nexus_client import _NexusClient
+from .._nexus_client import (
+    _NexusClient,
+    _operation_id,
+)
 from ...models import CancelRunRequest
 
 
@@ -35,9 +38,10 @@ class Run:
         nexus_client = self._nexus_client
         handle = await nexus_client.start_operation(
             operation="CancelRun",
-            input=request,
+            arg=request,
+            id=_operation_id(),
         )
-        await handle
+        await handle.result()
 
 
 @dataclasses.dataclass(slots=True)
