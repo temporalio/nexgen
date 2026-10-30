@@ -40,13 +40,13 @@ class User:
         self,
         *,
         reason: str | None = None,
-        channels: list[str] | None = None,
+        channels: list[str],
         sender: str,
     ) -> None:
         request = NotifyRequest(
             user_id=self.user_id,
             reason=reason,
-            channels=channels or [],
+            channels=channels,
             sender=sender,
         )
         nexus_client = getattr(self, "_nexus_client")

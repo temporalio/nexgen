@@ -472,32 +472,38 @@ reason?: string;
 
 ### Lists and Maps
 
-Lists and maps that are optional default to empty collections, not `None`.
+Lists and maps without an `option<>` wrapper are required and have no implicit
+empty-collection default. Optional collections default to `None` in Python or
+may be omitted in TypeScript; absence is not replaced with an empty collection.
 
 ```wit
 record user-profile {
-  tags: list<string>,               // optional in this context
-  metadata: map<string, string>,    // optional in this context
+  tags: list<string>,
+  metadata: map<string, string>,
+  aliases: option<list<string>>,
 }
 ```
 
 **Python:**
 
 ```python
-tags: list[str] | None = dataclasses.field(default_factory=list)
-metadata: dict[str, str] | None = dataclasses.field(default_factory=dict)
+tags: list[str]
+metadata: dict[str, str]
+aliases: list[str] | None = None
 ```
 
 **TypeScript:**
 
 ```typescript
-tags?: string[];
-metadata?: Record<string, string>;
+tags: string[];
+metadata: Record<string, string>;
+aliases?: string[];
 ```
 
-Whether a field is required or optional is determined by the WIT `option<>`
-wrapper (for WIT-direct fields) or proto field presence semantics (for
-proto-backed fields).
+The WIT `option<>` wrapper controls authored collection optionality, including
+in proto-backed records. Protobuf repeated and map fields have no presence
+information, so decoding their wire values produces collections even when empty;
+their API fields do not gain implicit constructor defaults.
 
 In a record with `@nexus.proto`, write a proto `bytes` field as `list<u8>`.
 nexgen generates Python `bytes`, TypeScript `Uint8Array`, Go `[]byte`, or .NET

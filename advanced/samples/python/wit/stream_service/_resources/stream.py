@@ -32,12 +32,12 @@ class Stream:
 
     async def publish(
         self,
-        records: list[AppendRecord] | None = None,
+        records: list[AppendRecord],
     ) -> AppendRecordsResponse:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             stream=self.stream,
-            records=records or [],
+            records=records,
         )
         handle = await _append_records(request)
         return await handle
@@ -106,7 +106,7 @@ async def _append_records(
 async def append_records(
     *,
     stream: StreamRef,
-    records: list[AppendRecord] | None = None,
+    records: list[AppendRecord],
     producer: Producer | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     """Append one batch. Workflow code makes the call from a Local Activity.
@@ -116,7 +116,7 @@ async def append_records(
     """
     request = AppendRecordsRequest(
         stream=stream,
-        records=records or [],
+        records=records,
         producer=producer,
     )
     return await _append_records(request)

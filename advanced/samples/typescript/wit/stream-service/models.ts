@@ -421,7 +421,7 @@ export const appendRecordsResponseTransferTypeConverter = {
 };
 export interface AppendRecordsRequest {
   stream: StreamRef;
-  records?: AppendRecord[];
+  records: AppendRecord[];
   /**
    * Required outside a Workflow. In a Workflow the transport sets it.
    */
@@ -435,7 +435,11 @@ function appendRecordsRequestFromProto(
     stream: streamRefFromProto(
       requiredField(proto.stream, "AppendRecordsRequest", "stream"),
     ),
-    records: proto.records?.map((value: any) => appendRecordFromProto(value)),
+    records: requiredField(
+      proto.records?.map((value: any) => appendRecordFromProto(value)),
+      "AppendRecordsRequest",
+      "records",
+    ),
     producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
   };
 }
@@ -447,7 +451,11 @@ function appendRecordsRequestToProto(
     stream: streamRefToProto(
       requiredField(model.stream, "AppendRecordsRequest", "stream"),
     ),
-    records: model.records?.map((value) => appendRecordToProto(value)),
+    records: requiredField(
+      model.records?.map((value) => appendRecordToProto(value)),
+      "AppendRecordsRequest",
+      "records",
+    ),
     producer: model.producer == null ? undefined : producerToProto(model.producer),
   };
 }
@@ -576,7 +584,7 @@ export const closeStreamRequestTransferTypeConverter = {
   },
 };
 export interface ReadRecordsResponse {
-  records?: StreamRecord[];
+  records: StreamRecord[];
   /**
    * The from-offset of the next read, which is the newest offset read + 1.
    */
@@ -591,7 +599,11 @@ function readRecordsResponseFromProto(
   proto: temporal.api.streamservice.v1.IReadRecordsResponse,
 ): ReadRecordsResponse {
   return {
-    records: proto.records?.map((value: any) => streamRecordFromProto(value)),
+    records: requiredField(
+      proto.records?.map((value: any) => streamRecordFromProto(value)),
+      "ReadRecordsResponse",
+      "records",
+    ),
     nextOffset: proto.nextOffset ?? undefined,
     done: proto.done ?? undefined,
   };
@@ -601,7 +613,11 @@ function readRecordsResponseToProto(
   model: ReadRecordsResponse,
 ): temporal.api.streamservice.v1.IReadRecordsResponse {
   return {
-    records: model.records?.map((value) => streamRecordToProto(value)),
+    records: requiredField(
+      model.records?.map((value) => streamRecordToProto(value)),
+      "ReadRecordsResponse",
+      "records",
+    ),
     nextOffset: model.nextOffset,
     done: model.done,
   };
@@ -745,7 +761,7 @@ export interface Supersession {
   /**
    * Workflow only. Started event ids of failed or timed out Workflow Tasks.
    */
-  failedTasks?: Long[];
+  failedTasks: Long[];
   producerKind?: StreamProducerKind;
   epoch?: ProducerEpoch;
   /**
@@ -771,7 +787,11 @@ function supersessionFromProto(
       "Supersession",
       "producerId",
     ),
-    failedTasks: proto.failedTasks?.slice(),
+    failedTasks: requiredField(
+      proto.failedTasks?.slice(),
+      "Supersession",
+      "failedTasks",
+    ),
     producerKind:
       proto.producerKind == null
         ? undefined
@@ -791,7 +811,11 @@ function supersessionToProto(
 ): temporal.api.stream.v1.ISupersession {
   return {
     producerId: requiredField(model.producerId, "Supersession", "producerId"),
-    failedTasks: model.failedTasks?.slice(),
+    failedTasks: requiredField(
+      model.failedTasks?.slice(),
+      "Supersession",
+      "failedTasks",
+    ),
     producerKind:
       model.producerKind == null
         ? undefined

@@ -1,0 +1,26 @@
+package test:collections@1.0.0;
+
+world system {
+  export collections;
+}
+
+/// @nexus.endpoint "collections"
+interface collections {
+  type strings = list<string>;
+  type labels = map<string, string>;
+
+  resource bucket {
+    constructor(id: string);
+    update: func(maybe-items: option<strings>, items: strings, labels: labels, maybe-labels: option<labels>);
+  }
+
+  record update-request {
+    id: string,
+    maybe-items: option<strings>,
+    items: strings,
+    labels: labels,
+    maybe-labels: option<labels>,
+  }
+
+  update: func(request: update-request);
+}

@@ -491,7 +491,7 @@ class AppendRecordsRequest:
     """
 
     stream: StreamRef
-    records: list[AppendRecord] | None = dataclasses.field(default_factory=list)
+    records: list[AppendRecord]
     producer: Producer | None = None
 
 
@@ -517,14 +517,13 @@ class _AppendRecordsRequestTransferTypeConverter(
         stream = _StreamRefTransferTypeConverter().from_transfer_type(
             value.stream, StreamRef
         )
+        records = [
+            _AppendRecordTransferTypeConverter().from_transfer_type(item, AppendRecord)
+            for item in value.records
+        ]
         return AppendRecordsRequest(
             stream=stream,
-            records=[
-                _AppendRecordTransferTypeConverter().from_transfer_type(
-                    item, AppendRecord
-                )
-                for item in value.records
-            ],
+            records=records,
             producer=_ProducerTransferTypeConverter().from_transfer_type(
                 value.producer, Producer
             )
@@ -543,12 +542,11 @@ class _AppendRecordsRequestTransferTypeConverter(
         message.stream.CopyFrom(
             _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
         )
-        if value.records:
-            for element in value.records:
-                item = message.records.add()
-                item.CopyFrom(
-                    _AppendRecordTransferTypeConverter().to_transfer_type(element)
-                )
+        for element in value.records:
+            item = message.records.add()
+            item.CopyFrom(
+                _AppendRecordTransferTypeConverter().to_transfer_type(element)
+            )
         if value.producer is not None:
             message.producer.CopyFrom(
                 _ProducerTransferTypeConverter().to_transfer_type(value.producer)
@@ -857,7 +855,7 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class ReadRecordsResponse:
-    records: list[StreamRecord] | None = dataclasses.field(default_factory=list)
+    records: list[StreamRecord]
     next_offset: int | None = None
     done: bool | None = None
 
@@ -879,13 +877,12 @@ class _ReadRecordsResponseTransferTypeConverter(
         value: temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsResponse,
         type_hint: type[ReadRecordsResponse],
     ) -> ReadRecordsResponse:
+        records = [
+            _StreamRecordTransferTypeConverter().from_transfer_type(item, StreamRecord)
+            for item in value.records
+        ]
         return ReadRecordsResponse(
-            records=[
-                _StreamRecordTransferTypeConverter().from_transfer_type(
-                    item, StreamRecord
-                )
-                for item in value.records
-            ],
+            records=records,
             next_offset=value.next_offset if value.next_offset != 0 else None,
             done=value.done if bool(value.done) else None,
         )
@@ -898,12 +895,11 @@ class _ReadRecordsResponseTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsResponse()
         )
-        if value.records:
-            for element in value.records:
-                item = message.records.add()
-                item.CopyFrom(
-                    _StreamRecordTransferTypeConverter().to_transfer_type(element)
-                )
+        for element in value.records:
+            item = message.records.add()
+            item.CopyFrom(
+                _StreamRecordTransferTypeConverter().to_transfer_type(element)
+            )
         if value.next_offset is not None:
             message.next_offset = value.next_offset
         if value.done is not None:
@@ -1061,7 +1057,7 @@ class Supersession:
     """Which earlier Records a Superseded item withdraws."""
 
     producer_id: str
-    failed_tasks: list[int] | None = dataclasses.field(default_factory=list)
+    failed_tasks: list[int]
     producer_kind: StreamProducerKind | None = None
     epoch: ProducerEpoch | None = None
     previous_completed_task: WorkflowTaskEpoch | None = None
@@ -1087,9 +1083,10 @@ class _SupersessionTransferTypeConverter(
         if not value.producer_id:
             raise ValueError("missing required field Supersession.producer_id")
         producer_id = value.producer_id
+        failed_tasks = list(value.failed_tasks)
         return Supersession(
             producer_id=producer_id,
-            failed_tasks=list(value.failed_tasks),
+            failed_tasks=failed_tasks,
             producer_kind=StreamProducerKind(value.producer_kind)
             if value.producer_kind != 0
             else None,
@@ -1114,8 +1111,7 @@ class _SupersessionTransferTypeConverter(
     ) -> temporalio.api.stream.v1.message_pb2.Supersession:
         message = temporalio.api.stream.v1.message_pb2.Supersession()
         message.producer_id = value.producer_id
-        if value.failed_tasks:
-            message.failed_tasks.extend(value.failed_tasks)
+        message.failed_tasks.extend(value.failed_tasks)
         if value.producer_kind is not None:
             message.producer_kind = (
                 temporalio.api.enums.v1.stream_pb2.StreamProducerKind.ValueType(

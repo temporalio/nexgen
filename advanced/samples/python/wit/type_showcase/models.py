@@ -48,10 +48,10 @@ class SetProfileRequest:
     profile: UserProfile
 
 
-@dataclasses.dataclass(slots=True, kw_only=True)
+@dataclasses.dataclass(slots=True)
 class UserProfile:
-    tags: list[str] | None = dataclasses.field(default_factory=list)
-    metadata: dict[str, str] | None = dataclasses.field(default_factory=dict)
+    tags: list[str]
+    metadata: dict[str, str]
     capabilities: UserCapability
     sync_state: tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]
     notification_target: NotificationTarget
@@ -74,22 +74,18 @@ class RecordSyncRequest:
     report: SyncReport
 
 
-@dataclasses.dataclass(slots=True, kw_only=True)
+@dataclasses.dataclass(slots=True)
 class SyncReport:
     """
     .. warning::
         This API is experimental and subject to change.
     """
 
-    route: list[tuple[float, float]] | None = dataclasses.field(default_factory=list)
-    attempts: (
-        list[tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]]
-        | None
-    ) = dataclasses.field(default_factory=list)
-    region_status: (
-        dict[str, tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]]
-        | None
-    ) = dataclasses.field(default_factory=dict)
+    route: list[tuple[float, float]]
+    attempts: list[tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]]
+    region_status: dict[
+        str, tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]
+    ]
     item_count: int
     byte_count: int
     clock_skew_ms: int
