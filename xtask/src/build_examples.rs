@@ -423,19 +423,59 @@ fn parse_examples_config(contents: &str) -> std::result::Result<ExamplesConfig, 
     let table: toml::Table = toml::from_str(contents).map_err(|error| error.to_string())?;
     let config = ExamplesConfig::from_table(table)?;
     for (name, example) in &config.examples {
+        validate_child_names(name, example)?;
+    }
+    Ok(config)
+}
+
+/// Words that cannot name a Python package.
+const PYTHON_KEYWORDS: &[&str] = &[
+    "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue",
+    "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import",
+    "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while",
+    "with", "yield",
+];
+
+fn validate_child_names(name: &str, example: &ExampleConfig) -> std::result::Result<(), String> {
+    for child_name in example.children.keys() {
+        if !child_name.starts_with(|c: char| c.is_ascii_alphabetic())
+            || !child_name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(format!(
+                "`{name}.{child_name}`: a child configuration name must start with a letter \
+                 and may use letters, numbers, '-' or '_'"
+            ));
+        }
+        let package = example_directory_name(Language::Python, child_name);
+        if PYTHON_KEYWORDS.contains(&package.as_str()) {
+            return Err(format!(
+                "`{name}.{child_name}`: `{package}` is a Python keyword and cannot name a package"
+            ));
+        }
+    }
+    // Each child writes into a directory named for the language, and the example output
+    // directory is cleared only once. Two children in one directory would merge their files.
+    for language in [
+        Language::Dotnet,
+        Language::Python,
+        Language::TypeScript,
+        Language::Go,
+        Language::Java,
+    ] {
+        let mut directories = std::collections::BTreeMap::new();
         for child_name in example.children.keys() {
-            if !child_name.chars().any(|c| c.is_ascii_alphanumeric())
-                || !child_name
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-            {
+            let directory = example_directory_name(language, child_name);
+            if let Some(other) = directories.insert(directory.clone(), child_name) {
                 return Err(format!(
-                    "`{name}.{child_name}`: a child configuration name must contain letters or numbers and may use '-' or '_'"
+                    "`{name}`: child configurations `{other}` and `{child_name}` both write to \
+                     the {language} directory `{directory}`"
                 ));
             }
         }
     }
-    Ok(config)
+    Ok(())
 }
 
 fn example_descriptor_paths(repo_root: &Path, options: &ExampleOptions) -> Result<Vec<PathBuf>> {
@@ -1224,6 +1264,46 @@ targets = ["workflow"]
             "{error}"
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn configuration_rejects_children_that_share_a_directory_in_any_language() {
+        for (first, second, language, directory) in [
+            ("client-only", "client_only", "python", "client_only"),
+            ("client-only", "ClientOnly", "python", "client_only"),
+            ("client_only", "ClientOnly", "python", "client_only"),
+            ("a-b", "ab", "go", "ab"),
+        ] {
+            let source = format!("[sample.\"{first}\"]\n[sample.\"{second}\"]\n");
+            let error = parse_examples_config(&source).err().unwrap_or_default();
+            let message = format!(
+                "`{}` and `{}` both write to the {language} directory `{directory}`",
+                first.min(second),
+                first.max(second)
+            );
+            assert!(error.contains(&message), "{source}\n{error}");
+        }
+        assert!(parse_examples_config("[sample.client]\n[sample.both]\n").is_ok());
+    }
+
+    #[test]
+    fn configuration_rejects_children_that_cannot_name_a_python_package() {
+        for (child, message) in [
+            (
+                "\"2\"",
+                "`sample.2`: a child configuration name must start with a letter",
+            ),
+            (
+                "_hidden",
+                "`sample._hidden`: a child configuration name must start with a letter",
+            ),
+            ("async", "`sample.async`: `async` is a Python keyword"),
+            ("Class", "`sample.Class`: `class` is a Python keyword"),
+        ] {
+            let source = format!("[sample.{child}]\n");
+            let error = parse_examples_config(&source).err().unwrap_or_default();
+            assert!(error.contains(message), "{source}\n{error}");
+        }
     }
 
     fn temp_language_root(label: &str) -> PathBuf {
