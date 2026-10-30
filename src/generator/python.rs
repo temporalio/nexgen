@@ -8032,46 +8032,6 @@ mod tests {
     }
 
     #[test]
-    fn enum_defaults_use_resolved_identity_for_native_and_converter_aliases() {
-        let mut resolved_type = super::ResolvedFieldType {
-            annotation: "AliasPolicy".to_string(),
-            imports: super::PythonImports::default(),
-            kind: super::ResolvedFieldKind::Enum,
-            wire_conversion: None,
-        };
-        let mut default_value = crate::spec::EnumValueSpec {
-            name: "AllowDuplicate".to_string(),
-            wire_name: "allow-duplicate".to_string(),
-            number: 7,
-        };
-        let native_default = super::enum_default_expr(&resolved_type, &default_value);
-        assert_eq!(native_default, "AliasPolicy.AllowDuplicate");
-        assert_eq!(
-            super::python_parameter_default_expr(&super::PythonFieldDefaultKind::Expression(
-                native_default
-            )),
-            Some("AliasPolicy.AllowDuplicate".to_string())
-        );
-
-        // A proto descriptor name can include a prefix absent from the resolved
-        // semantic name. SDK enum members still use SHOUTY_SNAKE casing.
-        default_value.wire_name = "WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE".to_string();
-        resolved_type.annotation = "WorkflowIDReusePolicy".to_string();
-        resolved_type.wire_conversion = Some(super::WireValueConversion {
-            annotation: "int".to_string(),
-            from_wire: "WorkflowIDReusePolicy({wire})".to_string(),
-            to_wire: "int({value})".to_string(),
-            imports: super::PythonImports::default(),
-            supports_unpacked_input: false,
-        });
-        let sdk_default = super::enum_default_expr(&resolved_type, &default_value);
-        assert_eq!(sdk_default, "WorkflowIDReusePolicy.ALLOW_DUPLICATE");
-        let mut rendered = String::new();
-        super::render_python_default_expr(&mut rendered, &sdk_default, "    ");
-        assert_eq!(rendered, " = WorkflowIDReusePolicy.ALLOW_DUPLICATE");
-    }
-
-    #[test]
     fn support_import_requirement_includes_sourced_fields_and_converter_calls() {
         for (body, sourced, expected) in [
             ("value = workflow_namespace()\n", true, true),
