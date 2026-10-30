@@ -8975,10 +8975,10 @@ pub(crate) fn build_name_manifest(
         {
             let service_ident = service.code_ident(language);
             top.insert(language, service_ident.clone(), service.origin_label())?;
-            // Go's native API mode adds two package declarations whose spelling
+            // Go's Workflow API adds two package declarations whose spelling
             // is fixed by the service identifier. The loader deliberately has
-            // one mode-independent accept set, so reserve them even when this
-            // invocation will not render the optional native client.
+            // one target-independent accept set, so reserve them even when this
+            // invocation will not render the optional Workflow client.
             if language == Language::Go {
                 let client_ident = format!("{service_ident}Client");
                 top.insert(
