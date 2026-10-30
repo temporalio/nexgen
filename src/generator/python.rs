@@ -904,7 +904,6 @@ impl<'a> ApiPlanner<'a> {
         render_generated_file_header(&mut nexus_client);
         nexus_client.push_str("\nimport collections.abc\nimport typing\n\n\n");
         nexus_client.push_str(PYTHON_CLIENT_NEXUS_PROTOCOL);
-        nexus_client.push_str("\n__all__ = [\"_NexusClient\"]\n");
         files.insert(format!("{dir}/_nexus_client.py"), nexus_client, origin())?;
         if !resources.is_empty() {
             files.insert(
@@ -1051,16 +1050,7 @@ impl<'a> ApiPlanner<'a> {
         if !used_resource_names.is_empty() {
             render_named_python_import(&mut output, "._resources", &used_resource_names);
         }
-        for resource in services.iter().flat_map(|service| service.resources.iter()) {
-            let data_type = resource_data_type_name(&resource.type_name);
-            if !used_python_symbol_imports(&body, std::slice::from_ref(&data_type)).is_empty() {
-                render_named_python_import(
-                    &mut output,
-                    &format!("._resources.{}", resource_module_name(resource)),
-                    &[data_type],
-                );
-            }
-        }
+        render_client_resource_data_import(&mut output, &body, "..");
         render_support_import(&mut output, &body, self.support_package, false);
         output.push_str("\n\n");
         output.push_str(&body);
@@ -1090,16 +1080,6 @@ impl<'a> ApiPlanner<'a> {
             })
             .flatten()
             .collect::<BTreeSet<_>>();
-        let mut data_resource;
-        let resource = if target.is_none() {
-            data_resource = resource.clone();
-            for method in &mut data_resource.methods {
-                method.binding = PlannedResourceMethodBindingSpec::Stub;
-            }
-            &data_resource
-        } else {
-            resource
-        };
         let mut body = String::new();
         let function_fields = bound_operations
             .iter()
@@ -1120,15 +1100,7 @@ impl<'a> ApiPlanner<'a> {
             body.push_str("\n\n");
         }
         let client = target == Some(GenerationTarget::Client);
-        self.render_resource(&mut body, service, resource, bound_operations, client);
-        let has_resource_data = client
-            && service.operations.iter().any(|operation| {
-                operation.output_direct_result && operation.output_ref == resource.type_name
-            });
-        if has_resource_data {
-            body.push_str("\n\n");
-            self.render_resource_data(&mut body, resource);
-        }
+        self.render_resource(&mut body, service, resource, bound_operations, target);
         for (full_name, (_, resource_type)) in resource_holders(self.api_plan) {
             if resource_type != resource.type_name {
                 continue;
@@ -1164,9 +1136,6 @@ impl<'a> ApiPlanner<'a> {
         }
         if client {
             let mut exports = vec![resource.type_name.clone()];
-            if has_resource_data {
-                exports.push(resource_data_type_name(&resource.type_name));
-            }
             exports.extend(
                 resource_holders(self.api_plan)
                     .into_values()
@@ -1220,25 +1189,7 @@ impl<'a> ApiPlanner<'a> {
                 ".._nexus_client",
                 &["_NexusClient".to_string()],
             );
-            for other in self
-                .api_plan
-                .services
-                .iter()
-                .flat_map(|service| &service.resources)
-            {
-                let other = &other.data;
-                let data_type = resource_data_type_name(&other.type_name);
-                if other.type_name != resource.type_name
-                    && !used_python_symbol_imports(&body, std::slice::from_ref(&data_type))
-                        .is_empty()
-                {
-                    render_named_python_import(
-                        &mut output,
-                        &format!(".{}", resource_module_name(other)),
-                        &[data_type],
-                    );
-                }
-            }
+            render_client_resource_data_import(&mut output, &body, "...");
         }
         let used_model_names = used_python_symbol_imports(&body, model_names);
         if !used_model_names.is_empty() {
@@ -1286,8 +1237,9 @@ impl<'a> ApiPlanner<'a> {
         service: &RenderedService<'_>,
         resource: &PlannedResource,
         bound_operations: &[ResourceBoundOperation<'_>],
-        client: bool,
+        target: Option<GenerationTarget>,
     ) {
+        let client = target == Some(GenerationTarget::Client);
         output.push_str(if client {
             "@dataclasses.dataclass(init=False)\n"
         } else {
@@ -1311,6 +1263,14 @@ impl<'a> ApiPlanner<'a> {
         if client {
             self.render_resource_constructor(output, resource);
         }
+        let Some(target) = target else {
+            // With no API target, the class carries the fields only, so that no caller gets a
+            // method that can't start its operation.
+            if resource.fields.is_empty() {
+                output.push_str("    pass\n");
+            }
+            return;
+        };
         if resource.methods.is_empty() {
             if !client {
                 output.push_str("\n    pass\n");
@@ -1326,7 +1286,7 @@ impl<'a> ApiPlanner<'a> {
                 resource,
                 method,
                 bound_operations,
-                client,
+                target,
             );
         }
     }
@@ -1364,26 +1324,6 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
-    fn render_resource_data(&self, output: &mut String, resource: &PlannedResource) {
-        output.push_str("@dataclasses.dataclass(slots=True)\nclass ");
-        output.push_str(&resource_data_type_name(&resource.type_name));
-        output.push_str(":\n");
-        if resource.fields.is_empty() {
-            output.push_str("    pass\n");
-        }
-        for field in &resource.fields {
-            output.push_str(&format!(
-                "    {}: {}\n",
-                python_field_name(&field.name),
-                self.python_resource_field_annotation(
-                    &field.kind,
-                    field.optional,
-                    field.function.as_ref()
-                )
-            ));
-        }
-    }
-
     fn render_resource_class_method(
         &self,
         output: &mut String,
@@ -1391,8 +1331,9 @@ impl<'a> ApiPlanner<'a> {
         resource: &PlannedResource,
         method: &PlannedResourceMethod,
         bound_operations: &[ResourceBoundOperation<'_>],
-        client: bool,
+        target: GenerationTarget,
     ) {
+        let client = target == GenerationTarget::Client;
         let result_annotation = self.python_resource_method_result_annotation(method);
         output.push_str("    async def ");
         output.push_str(&python_field_name(&method.name));
@@ -1448,11 +1389,6 @@ impl<'a> ApiPlanner<'a> {
                     .find(|bound_operation| bound_operation.operation.name == operation_name)
                     .map(|bound_operation| bound_operation.operation)
                     .expect("bound resource operation should be rendered in the same module");
-                let target = if client {
-                    GenerationTarget::Client
-                } else {
-                    GenerationTarget::Workflow
-                };
                 let request_expr = render_resource_method_request_expr(
                     method,
                     request_plan,
@@ -3957,8 +3893,22 @@ fn resource_module_name(resource: &PlannedResource) -> String {
     python_ident(&resource.name.to_snake_case())
 }
 
-fn resource_data_type_name(type_name: &str) -> String {
-    format!("_{type_name}Data")
+/// The resource class of the parent package that a client decodes a result into. It has the
+/// fields of the client handle, and the client package has no copy of it.
+fn client_resource_data_type(type_name: &str) -> String {
+    format!("{CLIENT_RESOURCE_DATA_MODULE}.{type_name}")
+}
+
+const CLIENT_RESOURCE_DATA_MODULE: &str = "_resource_data";
+
+/// Imports the resources of the parent package. `parent` is the relative name of the parent
+/// package in the client module, such as `..`.
+fn render_client_resource_data_import(output: &mut String, body: &str, parent: &str) {
+    if body_uses_python_symbol(body, CLIENT_RESOURCE_DATA_MODULE) {
+        output.push_str(&format!(
+            "from {parent} import _resources as {CLIENT_RESOURCE_DATA_MODULE}\n"
+        ));
+    }
 }
 
 fn resource_client_identifier(resource: &PlannedResource, base: &str) -> String {
@@ -5765,7 +5715,8 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
 const PYTHON_CLIENT_NEXUS_PROTOCOL: &str = r#"_OutputT = typing.TypeVar("_OutputT")
 
 
-class _NexusClient(typing.Protocol):
+# The client modules import this class, so it isn't unused.
+class _NexusClient(typing.Protocol):  # pyright: ignore[reportUnusedClass]
     """Starts the Nexus operations of one service."""
 
     @typing.overload
@@ -7600,7 +7551,7 @@ fn render_client_operation_body(
     if !operation.output_none {
         start_line(output, target, "        output_type=");
         if operation.output_direct_result {
-            output.push_str(&resource_data_type_name(&operation.output_ref));
+            output.push_str(&client_resource_data_type(&operation.output_ref));
         } else {
             output.push_str(&operation.output_type_expr);
         }

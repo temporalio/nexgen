@@ -9,7 +9,8 @@ import typing
 _OutputT = typing.TypeVar("_OutputT")
 
 
-class _NexusClient(typing.Protocol):
+# The client modules import this class, so it isn't unused.
+class _NexusClient(typing.Protocol):  # pyright: ignore[reportUnusedClass]
     """Starts the Nexus operations of one service."""
 
     @typing.overload
@@ -27,6 +28,3 @@ class _NexusClient(typing.Protocol):
         operation: str,
         input: typing.Any,
     ) -> collections.abc.Awaitable[None]: ...
-
-
-__all__ = ["_NexusClient"]

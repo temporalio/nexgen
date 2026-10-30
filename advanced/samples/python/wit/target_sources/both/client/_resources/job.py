@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 
 from .._nexus_client import _NexusClient
+from ... import _resources as _resource_data
 from ...models import (
     CreateJobRequest,
     RestartRequest,
@@ -50,7 +51,7 @@ class Job:
         handle = await nexus_client.start_operation(
             operation="Refresh",
             input=request,
-            output_type=_JobData,
+            output_type=_resource_data.Job,
         )
         result = await handle
         return Job(
@@ -59,9 +60,4 @@ class Job:
         )
 
 
-@dataclasses.dataclass(slots=True)
-class _JobData:
-    job_id: str
-
-
-__all__ = ["Job", "_JobData"]
+__all__ = ["Job"]

@@ -22,8 +22,7 @@ from ._resources import (
     Run,
     RunWithStatus,
 )
-from ._resources.job import _JobData
-from ._resources.marker import _MarkerData
+from .. import _resources as _resource_data
 import temporal_support as _support
 
 
@@ -103,7 +102,7 @@ class SourceServiceClientExtension(abc.ABC):
         handle = await nexus_client.start_operation(
             operation="CreateJob",
             input=request,
-            output_type=_JobData,
+            output_type=_resource_data.Job,
         )
         result = await handle
         return Job(
@@ -132,7 +131,7 @@ class SourceServiceClientExtension(abc.ABC):
         handle = await nexus_client.start_operation(
             operation="Refresh",
             input=request,
-            output_type=_JobData,
+            output_type=_resource_data.Job,
         )
         result = await handle
         return Job(
@@ -161,7 +160,7 @@ class SourceServiceClientExtension(abc.ABC):
         handle = await nexus_client.start_operation(
             operation="CreateMarker",
             input=request,
-            output_type=_MarkerData,
+            output_type=_resource_data.Marker,
         )
         await handle
         return Marker(

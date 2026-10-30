@@ -8,13 +8,3 @@ import dataclasses
 @dataclasses.dataclass
 class Job:
     job_id: str
-
-    async def restart(
-        self,
-    ) -> None:
-        raise NotImplementedError("job.restart is not yet implemented")
-
-    async def refresh(
-        self,
-    ) -> Job:
-        raise NotImplementedError("job.refresh is not yet implemented")
