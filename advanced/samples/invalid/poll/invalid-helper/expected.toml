@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit-directive"
+contains = ["@nexus.poll", "invalid `python` support helper `next_read(request, response)`"]

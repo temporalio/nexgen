@@ -1,0 +1,12 @@
+package temporal:poll-without-helper@1.0.0;
+
+world service { export reader; }
+
+/// @nexus.endpoint "reader"
+interface reader {
+  record read-request { offset: option<s64> }
+  record read-response { done: option<bool> }
+
+  /// @nexus.poll
+  read: func(request: read-request) -> read-response;
+}

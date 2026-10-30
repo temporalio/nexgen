@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit-directive"
+contains = ["@nexus.poll", "goes on the operation that the method binds, not on the method"]
