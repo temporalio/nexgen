@@ -1535,6 +1535,20 @@ The client is runtime state, not a resource identity field. Serialization
 carries only identity data. When an operation returns resource data, the
 generated API decodes it before constructing the client-backed handle.
 
+To rebuild a handle from identity fields that you stored, for example in a
+Workflow result, call the factory of the resource on the extension. Its name is
+`get_` and the snake-case name of the resource, and it takes the identity
+fields. It creates a Nexus client for the resource's own service with
+`_create_nexus_client`.
+
+```python
+job = client.get_job(job_id=stored_job_id)
+await job.restart()
+```
+
+nexgen refuses a factory name that is also the name of a client method of a
+service in the package.
+
 Sources work in the client target as well. Restrict workflow-only helpers with
 `targets="workflow"`. If a required resource-method request field has neither an
 applicable source nor a resource field or method parameter supplying it,

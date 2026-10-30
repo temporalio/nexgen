@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["client"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = ["`get_job`", "resource `Job`", "service `Scheduler`"]

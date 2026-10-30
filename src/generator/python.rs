@@ -1006,8 +1006,13 @@ impl<'a> ApiPlanner<'a> {
             body.push_str("\n\n");
         }
         for service in services {
+            let mut factories = String::new();
+            for resource in &service.resources {
+                factories.push('\n');
+                self.render_client_resource_factory(&mut factories, service, resource);
+            }
             body.push_str("\n\n");
-            render_client_extension(&mut body, service);
+            render_client_extension(&mut body, service, &factories);
         }
 
         let module_imports = operations
@@ -1060,6 +1065,70 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("\n\n");
         output.push_str(&body);
         Ok(output)
+    }
+
+    /// A public method that builds a client handle from the identity fields of a resource, for
+    /// example from fields that a caller stored. The handle gets a Nexus client for the
+    /// resource's own service.
+    fn render_client_resource_factory(
+        &self,
+        output: &mut String,
+        service: &RenderedService<'_>,
+        resource: &PlannedResource,
+    ) {
+        let receiver = resource_client_identifier(resource, "self");
+        output.push_str("    def ");
+        output.push_str(&client_resource_factory_name(resource));
+        output.push_str("(\n        ");
+        output.push_str(&receiver);
+        output.push_str(",\n");
+        if !resource.fields.is_empty() {
+            output.push_str("        *,\n");
+        }
+        for field in &resource.fields {
+            output.push_str(&format!(
+                "        {}: {},\n",
+                python_field_name(&field.name),
+                self.python_resource_field_annotation(
+                    &field.kind,
+                    field.optional,
+                    field.function.as_ref()
+                )
+            ));
+        }
+        output.push_str("    ) -> ");
+        output.push_str(&resource.type_name);
+        output.push_str(":\n");
+        render_python_docstring(
+            output,
+            "        ",
+            Some(&format!(
+                "Return the ``{}`` handle that has these identity fields.",
+                resource.type_name
+            )),
+            &[],
+            None,
+            false,
+        );
+        output.push_str("        return ");
+        output.push_str(&resource.type_name);
+        output.push_str("(\n");
+        output.push_str(&format!("            {receiver}._create_nexus_client(\n"));
+        output.push_str("                service=");
+        output.push_str(&python_string_literal(service.wire_name));
+        output.push_str(",\n                endpoint=");
+        output.push_str(&python_string_literal(
+            service
+                .endpoint
+                .as_deref()
+                .expect("the client target refuses a service with no endpoint"),
+        ));
+        output.push_str(",\n            ),\n");
+        for field in &resource.fields {
+            let name = python_field_name(&field.name);
+            output.push_str(&format!("            {name}={name},\n"));
+        }
+        output.push_str("        )\n");
     }
 
     fn render_resource_module_file(
@@ -5734,6 +5803,18 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
             }
         }
     }
+    // One client class can inherit every extension, so a factory clashes with a method of any
+    // service.
+    for resource in services.iter().flat_map(|service| &service.resources) {
+        let factory = client_resource_factory_name(resource);
+        if let Some(owner) = owners.get(&factory) {
+            return Err(Error::PythonGeneratedNameConflict {
+                name: factory,
+                generated_by: format!("the client factory of resource `{}`", resource.type_name),
+                conflicting_declaration: format!("a client method of service `{owner}`"),
+            });
+        }
+    }
     Ok(())
 }
 
@@ -5792,7 +5873,7 @@ const PYTHON_CLIENT_EXTENSION_HOOK: &str = r#"
         ...
 "#;
 
-fn render_client_extension(output: &mut String, service: &RenderedService<'_>) {
+fn render_client_extension(output: &mut String, service: &RenderedService<'_>, factories: &str) {
     let class_name = client_extension_class_name(service);
     output.push_str("class ");
     output.push_str(&class_name);
@@ -5809,7 +5890,7 @@ fn render_client_extension(output: &mut String, service: &RenderedService<'_>) {
         None,
         service.experimental,
     );
-    if !service.operations.is_empty() {
+    if !service.operations.is_empty() || !service.resources.is_empty() {
         output.push_str("\n    def __init_subclass__(cls, **kwargs: typing.Any) -> None:\n");
         output.push_str("        super().__init_subclass__(**kwargs)\n");
         output.push_str(
@@ -5822,8 +5903,13 @@ fn render_client_extension(output: &mut String, service: &RenderedService<'_>) {
         output.push_str(" in base.__mro__:\n");
         output.push_str("                continue\n");
         output.push_str("            for name in (");
-        for operation in &service.operations {
-            output.push_str(&python_string_literal(&operation.attr_name));
+        for name in service
+            .operations
+            .iter()
+            .map(|operation| operation.attr_name.clone())
+            .chain(service.resources.iter().map(client_resource_factory_name))
+        {
+            output.push_str(&python_string_literal(&name));
             output.push_str(", ");
         }
         output.push_str("):\n");
@@ -5836,10 +5922,15 @@ fn render_client_extension(output: &mut String, service: &RenderedService<'_>) {
         output.push_str("                    )\n");
     }
     output.push_str(PYTHON_CLIENT_EXTENSION_HOOK);
+    output.push_str(factories);
     for operation in &service.operations {
         output.push('\n');
         render_operation_functions(output, GenerationTarget::Client, service, operation);
     }
+}
+
+fn client_resource_factory_name(resource: &PlannedResource) -> String {
+    format!("get_{}", resource.name.to_snake_case())
 }
 
 fn endpoint_service_object_name(service: &RenderedService<'_>) -> String {

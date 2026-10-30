@@ -51,6 +51,9 @@ class SourceServiceClientExtension(abc.ABC):
                 "create_run",
                 "create_run_with_status",
                 "cancel_run",
+                "get_job",
+                "get_marker",
+                "get_run",
             ):
                 if name in base.__dict__:
                     raise TypeError(
@@ -66,6 +69,47 @@ class SourceServiceClientExtension(abc.ABC):
     ) -> _NexusClient:
         """Return the Nexus client that starts the operations of ``service``."""
         ...
+
+    def get_job(
+        self,
+        *,
+        job_id: str,
+    ) -> Job:
+        """Return the ``Job`` handle that has these identity fields."""
+        return Job(
+            self._create_nexus_client(
+                service="SourceService",
+                endpoint="sources",
+            ),
+            job_id=job_id,
+        )
+
+    def get_marker(
+        self,
+    ) -> Marker:
+        """Return the ``Marker`` handle that has these identity fields."""
+        return Marker(
+            self._create_nexus_client(
+                service="SourceService",
+                endpoint="sources",
+            ),
+        )
+
+    def get_run(
+        self,
+        *,
+        job_id: str,
+        run_id: str | None,
+    ) -> Run:
+        """Return the ``Run`` handle that has these identity fields."""
+        return Run(
+            self._create_nexus_client(
+                service="SourceService",
+                endpoint="sources",
+            ),
+            job_id=job_id,
+            run_id=run_id,
+        )
 
     async def _source_service_submit(
         self,
