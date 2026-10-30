@@ -51,16 +51,6 @@ namespace Nexgen.SourceService
 
     }
 
-    [GeneratedCode("nexgen", null)]
-    [NexusService("Orders")]
-    internal interface IOrders
-    {
-        [GeneratedCode("nexgen", null)]
-        [NexusOperation("Place")]
-        Job Place(PlaceRequest request);
-
-    }
-
     internal interface INexgenOperationInfo
     {
         OperationDefinition Operation { get; }
@@ -90,7 +80,6 @@ namespace Nexgen.SourceService
     internal static class NexgenOperationRegistry
     {
         private static readonly ServiceDefinition SourceServiceServiceDefinition = ServiceDefinition.FromType<ISourceService>();
-        private static readonly ServiceDefinition OrdersServiceDefinition = ServiceDefinition.FromType<IOrders>();
 
         internal static IReadOnlyDictionary<(string Service, string Operation), INexgenOperationInfo> Operations { get; } = new Dictionary<(string Service, string Operation), INexgenOperationInfo>
         {
@@ -110,8 +99,6 @@ namespace Nexgen.SourceService
                 SourceServiceServiceDefinition.Operations["CreateRunWithStatus"]),
             [("SourceService", "CancelRun")] = new NexgenOperationInfo<CancelRunRequest, object>(
                 SourceServiceServiceDefinition.Operations["CancelRun"]),
-            [("Orders", "Place")] = new NexgenOperationInfo<PlaceRequest, Job>(
-                OrdersServiceDefinition.Operations["Place"]),
         };
     }
 

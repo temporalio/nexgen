@@ -110,14 +110,6 @@ func (m cancelRunRequest) GetRunID() *string {
 	return m.RunID
 }
 
-type placeRequest struct {
-	JobID string
-}
-
-func (m placeRequest) GetJobID() string {
-	return m.JobID
-}
-
 type signalWithStartWorkflowExecutionResponse struct {
 	RunID   *string
 	Started *bool
@@ -307,12 +299,6 @@ func cancelRun(ctx workflow.Context, request cancelRunRequest) workflow.Future {
 	return fut
 }
 
-func place(ctx workflow.Context, request placeRequest) workflow.Future {
-	c := workflow.NewNexusClient("orders", "Orders")
-	fut := c.ExecuteOperation(ctx, "Place", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
 // --- Operations (public API) ---
 
 type RunWithStatus struct {
@@ -435,16 +421,5 @@ func CancelRun(ctx workflow.Context, opts CancelRunOptions) workflow.Future {
 	return cancelRun(ctx, cancelRunRequest{
 		JobID: opts.JobID,
 		RunID: runID,
-	})
-}
-
-type PlaceOptions struct {
-	// JobID - Required.
-	JobID string
-}
-
-func Place(ctx workflow.Context, opts PlaceOptions) workflow.Future {
-	return place(ctx, placeRequest{
-		JobID: opts.JobID,
 	})
 }

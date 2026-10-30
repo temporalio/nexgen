@@ -13,17 +13,15 @@ import temporalio.client
 import temporalio.service
 from typing_extensions import override
 
-import wit.target_sources.both._resources as workflow_resources
-from wit.target_sources.both.client import (
+import wit.cross_service_resource._resources as workflow_resources
+from wit.cross_service_resource.client import (
+    JobsClientExtension,
     OrdersClientExtension,
-    SourceServiceClientExtension,
 )
-from wit.target_sources.both.models import PlaceRequest, RestartRequest
+from wit.cross_service_resource.models import PlaceRequest, RestartRequest
 
 
-class Client(
-    temporalio.client.Client, SourceServiceClientExtension, OrdersClientExtension
-):
+class Client(temporalio.client.Client, JobsClientExtension, OrdersClientExtension):
     @override
     def _create_nexus_client(
         self, *, service: str, endpoint: str
@@ -107,10 +105,10 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     assert uuid.UUID(place.id)
     assert place.result_type is workflow_resources.Job
     assert (restart.service, restart.endpoint, restart.operation) == (
-        "SourceService",
-        "sources",
+        "Jobs",
+        "jobs",
         "Restart",
     )
-    assert restart.arg == RestartRequest(job_id="job", shared="shared")
+    assert restart.arg == RestartRequest(job_id="job")
     assert uuid.UUID(restart.id)
     assert restart.result_type is None

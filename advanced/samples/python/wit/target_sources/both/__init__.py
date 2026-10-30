@@ -16,7 +16,6 @@ from ._resources.job import restart
 from .operations.create_run import create_run
 from .operations.create_run_with_status import create_run_with_status
 from ._resources.run import cancel_run
-from .operations.place import place
 
 __all__ = [
     "cancel_run",
@@ -24,7 +23,6 @@ __all__ = [
     "create_marker",
     "create_run",
     "create_run_with_status",
-    "place",
     "refresh",
     "restart",
     "submit",
@@ -103,11 +101,5 @@ __nexus_operation_registry__: dict[
         "CancelRun",
     ): _NexusOperationInfo(
         operation=_services.SourceService.cancel_run,
-    ),
-    (
-        "Orders",
-        "Place",
-    ): _NexusOperationInfo(
-        operation=_services.Orders.place,
     ),
 }

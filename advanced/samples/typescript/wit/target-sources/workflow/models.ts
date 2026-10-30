@@ -146,10 +146,6 @@ export interface CancelRunRequest {
   runId?: string;
 }
 
-export interface PlaceRequest {
-  jobId: string;
-}
-
 export interface RunWithStatus {
   run: Run;
   started?: boolean;

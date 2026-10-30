@@ -8,13 +8,11 @@ export { restart } from "./operations/restart";
 export { createRun } from "./operations/create-run";
 export { createRunWithStatus } from "./operations/create-run-with-status";
 export { cancelRun } from "./operations/cancel-run";
-export { place } from "./operations/place";
 export type {
   CancelRunRequest,
   CreateJobRequest,
   CreateMarkerRequest,
   CreateRunRequest,
-  PlaceRequest,
   RestartRequest,
   SubmitRequest,
 } from "./models";

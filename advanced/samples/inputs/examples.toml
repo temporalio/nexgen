@@ -68,6 +68,11 @@ targets = ["workflow"]
 [type-showcase]
 targets = ["workflow"]
 
+# A resource that another interface returns, for the Python client target.
+[cross-service-resource]
+languages = ["python"]
+targets = ["workflow", "client"]
+
 [target-sources]
 descriptors = "temporal"
 

@@ -255,45 +255,4 @@ namespace Nexgen.SourceService
 
     }
 
-    [GeneratedCode("nexgen", null)]
-    public class PlaceOptions
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PlaceOptions"/> class.
-        /// </summary>
-        public PlaceOptions(string jobId)
-        {
-            JobId = jobId;
-        }
-
-        public string JobId { get; set; }
-    }
-
-    /// <summary>
-    /// Provides generated workflow operation helpers.
-    /// </summary>
-    [GeneratedCode("nexgen", null)]
-    public static class Operations
-    {
-        [GeneratedCode("nexgen", null)]
-        private const string OrdersEndpoint = "orders";
-
-        [GeneratedCode("nexgen", null)]
-        private static async Task<Job> PlaceAsync(PlaceRequest request)
-        {
-            var client = Workflow.CreateNexusWorkflowClient<IOrders>(OrdersEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<Job>(svc => svc.Place(request)).ConfigureAwait(true);
-            return result;
-        }
-
-        /// <param name="options">Options for the operation.</param>
-        [GeneratedCode("nexgen", null)]
-        public static Task<Job> PlaceAsync(PlaceOptions options)
-        {
-            var request = new PlaceRequest(options.JobId);
-            return PlaceAsync(request);
-        }
-
-    }
-
 }

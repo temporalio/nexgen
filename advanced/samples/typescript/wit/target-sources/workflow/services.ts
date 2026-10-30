@@ -15,7 +15,6 @@ import type {
   CreateRunRequest,
   SignalWithStartWorkflowExecutionResponse,
   CancelRunRequest,
-  PlaceRequest,
 } from "./models";
 import type { Job, Marker } from "./resources";
 
@@ -42,8 +41,4 @@ export const sourceService = nexus.service("SourceService", {
     },
   }),
   cancelRun: nexus.operation<CancelRunRequest, void>({ name: "CancelRun" }),
-});
-
-export const orders = nexus.service("Orders", {
-  place: nexus.operation<PlaceRequest, Job>({ name: "Place" }),
 });

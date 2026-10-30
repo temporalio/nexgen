@@ -58,20 +58,6 @@ namespace Nexgen.SourceService
     }
 
     [GeneratedCode("nexgen", null)]
-    public record PlaceRequest
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PlaceRequest"/> class.
-        /// </summary>
-        public PlaceRequest(string jobId)
-        {
-            JobId = jobId;
-        }
-
-        public string JobId { get; init; }
-    }
-
-    [GeneratedCode("nexgen", null)]
     public record CancelRunRequest
     {
         /// <summary>

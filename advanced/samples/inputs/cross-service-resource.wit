@@ -1,0 +1,34 @@
+package temporal:cross-service-resource@1.0.0;
+
+world system {
+  export jobs;
+  export orders;
+}
+
+/// @nexus.endpoint "jobs"
+interface jobs {
+  resource job {
+    constructor(job-id: string);
+
+    restart: func();
+  }
+
+  record restart-request {
+    job-id: string,
+  }
+
+  restart: func(request: restart-request);
+}
+
+// Another interface returns a Job. Its client handle still starts the Job's operations on the
+// `jobs` endpoint.
+/// @nexus.endpoint "orders"
+interface orders {
+  use jobs.{job};
+
+  record place-request {
+    job-id: string,
+  }
+
+  place: func(request: place-request) -> own<job>;
+}

@@ -178,8 +178,3 @@ temporalio.converter.transfer_type_convertible(
 class CancelRunRequest:
     job_id: str
     run_id: str | None = None
-
-
-@dataclasses.dataclass(slots=True)
-class PlaceRequest:
-    job_id: str
