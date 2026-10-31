@@ -2076,6 +2076,48 @@ type or transform expression refers to an otherwise-unavailable module.
 
 ---
 
+### @nexus.poll
+
+**Placement:** Operation (function) **Syntax:**
+`@nexus.poll python="<support-helper>" targets="client"`
+
+Generates an `iter_<name>` async iterator on the client extension, and on each
+client resource method that binds the operation. The iterator sends the request,
+yields the response, and calls `<support-helper>(request, response)` for the
+next request. The helper is a sync function in the `--support-package`. It
+returns `None` to stop.
+
+```wit
+/// @nexus.operation name="ReadRecords"
+/// @nexus.poll python="next_read_request" targets="client"
+read-records: func(request: read-records-request) -> read-records-response;
+```
+
+```python
+def next_read_request(request, response):
+    if response.done:
+        return None
+    # A read that doesn't wait stops at the newest Record.
+    if not response.records and not request.wait:
+        return None
+    return dataclasses.replace(request, from_offset=response.next_offset)
+```
+
+The stream sample's full helper is in
+[`temporal_support/poll.py`](advanced/samples/python/temporal_support/poll.py).
+
+- The iterator yields pages, not the items in them.
+- All pages use one Nexus client. Each page is a new operation with a new random
+  operation ID.
+- Only the Python client target generates the iterator, so `targets` must be
+  `client`.
+- nexgen refuses the directive on a resource method, on an operation that it
+  can't poll, and when `iter_<name>` clashes with another member.
+- Use `asyncio.timeout` to limit a whole iteration. After an error, start a new
+  iteration at the last page's `next_offset`.
+
+---
+
 ### @nexus.flatten-in-api
 
 **Placement:** Record type (with `@nexus.proto`) **Syntax:**

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import dataclasses
 import typing
 import datetime
@@ -23,6 +24,7 @@ from ...models import (
     StreamReadStart,
     StreamRef,
 )
+import temporal_support as _support
 
 
 @dataclasses.dataclass(init=False)
@@ -109,6 +111,57 @@ class Stream:
             result_type=ReadRecordsResponse,
         )
         return await handle.result()
+
+    async def iter_read(
+        self,
+        from_offset: int | None = None,
+        start: StreamReadStart | None = None,
+        max_records: int | None = None,
+        wait: datetime.timedelta | None = None,
+        create_wait: datetime.timedelta | None = None,
+        max_bytes: int | None = None,
+    ) -> collections.abc.AsyncGenerator[ReadRecordsResponse, None]:
+        """Yield each response of ``read`` until the poll helper stops.
+
+        Read one page of Records. The poll iterator reads them all.
+
+        Args:
+            from_offset: Start offset. Empty uses start. OUT_OF_RANGE past the newest
+                offset + 1.
+            start: Where to start when from-offset is empty. Unspecified is the
+                beginning.
+            max_records: About this many items per page, 1 to 1000. A Superseded item
+                stays with its Record.
+            wait: How long to wait for a new Record before an empty answer. At most 60
+                s.
+            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
+                At most 60 s.
+            max_bytes: The maximum Record bytes in a page. A larger Record is still
+                returned alone.
+        """
+        request = ReadRecordsRequest(
+            stream=self.stream,
+            from_offset=from_offset,
+            start=start,
+            max_records=max_records,
+            wait=wait,
+            create_wait=create_wait,
+            max_bytes=max_bytes,
+        )
+        nexus_client = self._nexus_client
+        while True:
+            handle = await nexus_client.start_operation(
+                operation="ReadRecords",
+                arg=request,
+                id=_operation_id(),
+                result_type=ReadRecordsResponse,
+            )
+            response = await handle.result()
+            next_request = _support.next_read_request(request, response)
+            yield response
+            if next_request is None:
+                return
+            request = next_request
 
     async def describe(
         self,

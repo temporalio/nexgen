@@ -1,0 +1,8 @@
+languages = ["python"]
+targets = ["workflow", "client"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = [
+  "Python generated name `iter_read` for the iterator of operation `Reader.Read` conflicts with operation `Reader.IterRead`",
+]

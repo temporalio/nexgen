@@ -56,6 +56,16 @@ pub enum Error {
         conflicting_field: String,
     },
 
+    #[error(
+        "the client target can't make an iterator for `@nexus.poll` on operation `{operation}` in \
+         `{path}`, since the operation {reason}"
+    )]
+    UnsupportedPoll {
+        path: PathBuf,
+        operation: String,
+        reason: String,
+    },
+
     #[error("the client target {reason}")]
     UnsupportedClientTarget { reason: String },
 

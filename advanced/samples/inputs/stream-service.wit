@@ -407,7 +407,7 @@ interface stream-service {
   /// @nexus.doc
   ///   "A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity."
   /// @nexus.operation name="ReadRecords"
-  /// @nexus.poll python="next_read_request" target="client"
+  /// @nexus.poll python="next_read_request" targets="client"
   read-records: func(request: read-records-request) -> read-records-response;
 
   /// @nexus.operation name="DescribeStream"

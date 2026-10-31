@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import typing
 import datetime
 import abc
@@ -27,6 +28,7 @@ from ..models import (
     StreamRef,
 )
 from ._resources import Stream
+import temporal_support as _support
 
 
 class StreamServiceClientExtension(abc.ABC):
@@ -49,6 +51,7 @@ class StreamServiceClientExtension(abc.ABC):
                 "append_records",
                 "close_stream",
                 "read_records",
+                "iter_read_records",
                 "describe_stream",
                 "get_stream",
             ):
@@ -262,6 +265,67 @@ class StreamServiceClientExtension(abc.ABC):
             max_bytes=max_bytes,
         )
         return await self._stream_service_read_records(request)
+
+    async def iter_read_records(
+        self,
+        *,
+        stream: StreamRef,
+        from_offset: int | None = None,
+        start: StreamReadStart | None = None,
+        max_records: int | None = None,
+        wait: datetime.timedelta | None = None,
+        create_wait: datetime.timedelta | None = None,
+        last: int | None = None,
+        max_bytes: int | None = None,
+    ) -> collections.abc.AsyncGenerator[ReadRecordsResponse, None]:
+        """Yield each response of ``read_records`` until the poll helper stops.
+
+        A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
+        Activity.
+
+        Args:
+            from_offset: Start offset. Empty uses start. OUT_OF_RANGE past the newest
+                offset + 1.
+            start: Where to start when from-offset is empty. Unspecified is the
+                beginning.
+            max_records: About this many items per page, 1 to 1000. A Superseded item
+                stays with its Record.
+            wait: How long to wait for a new Record before an empty answer. At most 60
+                s.
+            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
+                At most 60 s.
+            last: Read the newest this many Records, oldest first. No from-offset. No
+                wait.
+            max_bytes: The maximum Record bytes in a page. A larger Record is still
+                returned alone.
+        """
+        request = ReadRecordsRequest(
+            stream=stream,
+            from_offset=from_offset,
+            start=start,
+            max_records=max_records,
+            wait=wait,
+            create_wait=create_wait,
+            last=last,
+            max_bytes=max_bytes,
+        )
+        nexus_client = self._create_nexus_client(
+            service="temporal.api.streamservice.v1.StreamService",
+            endpoint="__temporal_system",
+        )
+        while True:
+            handle = await nexus_client.start_operation(
+                operation="ReadRecords",
+                arg=request,
+                id=_operation_id(),
+                result_type=ReadRecordsResponse,
+            )
+            response = await handle.result()
+            next_request = _support.next_read_request(request, response)
+            yield response
+            if next_request is None:
+                return
+            request = next_request
 
     async def _stream_service_describe_stream(
         self,

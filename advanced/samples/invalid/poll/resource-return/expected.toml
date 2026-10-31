@@ -1,0 +1,9 @@
+languages = ["python"]
+targets = ["workflow", "client"]
+
+[error]
+kind = "unsupported-poll"
+contains = [
+  "the client target can't make an iterator for `@nexus.poll` on operation `Reader.Open`",
+  "since the operation returns a resource",
+]

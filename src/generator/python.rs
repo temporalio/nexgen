@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
@@ -11,7 +11,7 @@ use crate::generator::{
     ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
 use crate::language::Language;
-use crate::nexgen_config::GenerationTarget;
+use crate::nexgen_config::{GenerationTarget, GenerationTargets};
 use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedOperationResourceReturn,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedRecordType, PlannedResource,
@@ -70,6 +70,7 @@ pub(crate) fn generate(
         ApiSpecNode::Leaf(leaf) => {
             let generated = generate_leaf(
                 &leaf.spec,
+                &leaf.source_path,
                 support_package,
                 GeneratedFileOrigin::fixed("generated Python package module"),
             )?;
@@ -85,6 +86,7 @@ pub(crate) fn generate(
 
 fn generate_leaf(
     api_plan: &PlannedSpec,
+    source_path: &Path,
     support_package: &str,
     module_origin: GeneratedFileOrigin,
 ) -> Result<PythonGenerationResult> {
@@ -93,16 +95,31 @@ fn generate_leaf(
         .module_imports
         .values()
         .all(BTreeSet::is_empty);
-    ApiPlanner::new(api_plan, inline_model_rebuilds, None, support_package)?.build(module_origin)
+    ApiPlanner::new(
+        api_plan,
+        source_path,
+        inline_model_rebuilds,
+        None,
+        support_package,
+    )?
+    .build(module_origin)
 }
 
 fn generate_leaf_with_model_hoists(
     api_plan: &PlannedSpec,
+    source_path: &Path,
     support_package: &str,
     model_hoists: &PythonModelHoists,
     module_origin: GeneratedFileOrigin,
 ) -> Result<PythonGenerationResult> {
-    ApiPlanner::new(api_plan, true, Some(model_hoists), support_package)?.build(module_origin)
+    ApiPlanner::new(
+        api_plan,
+        source_path,
+        true,
+        Some(model_hoists),
+        support_package,
+    )?
+    .build(module_origin)
 }
 
 fn generate_tree(
@@ -168,6 +185,7 @@ fn generate_tree_node(
         ApiSpecNode::Leaf(leaf) => {
             let generated = generate_leaf_with_model_hoists(
                 &leaf.spec,
+                &leaf.source_path,
                 support_package,
                 model_hoists,
                 GeneratedFileOrigin::input_module(Language::Python, &leaf.source_path),
@@ -291,6 +309,8 @@ fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
 
 struct ApiPlanner<'a> {
     api_plan: &'a PlannedSpec,
+    /// The input path of the module, for the errors that the planner raises.
+    source_path: &'a Path,
     support_package: &'a str,
     inline_model_rebuilds: bool,
     model_hoists: Option<&'a PythonModelHoists>,
@@ -476,6 +496,7 @@ impl ExternalModelBackend for PythonExternalModels {
 impl<'a> ApiPlanner<'a> {
     fn new(
         api_plan: &'a PlannedSpec,
+        source_path: &'a Path,
         inline_model_rebuilds: bool,
         model_hoists: Option<&'a PythonModelHoists>,
         support_package: &'a str,
@@ -487,6 +508,7 @@ impl<'a> ApiPlanner<'a> {
         };
         Ok(Self {
             api_plan,
+            source_path,
             support_package,
             inline_model_rebuilds,
             model_hoists,
@@ -612,6 +634,7 @@ impl<'a> ApiPlanner<'a> {
         // Two services with operations of the same name also clash on a Workflow package file.
         // Check the client names first, so that the error names the client method.
         if targets.client {
+            validate_client_polls(services, self.source_path)?;
             validate_client_names(services)?;
         }
         let mut files = GeneratedFileMap::default();
@@ -1362,6 +1385,9 @@ impl<'a> ApiPlanner<'a> {
                 bound_operations,
                 target,
             );
+            if target == GenerationTarget::Client {
+                self.render_resource_poll_method(output, resource, method, bound_operations);
+            }
         }
     }
 
@@ -1412,41 +1438,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    async def ");
         output.push_str(&python_field_name(&method.name));
         output.push_str("(\n");
-        output.push_str("        self,\n");
-        // Python refuses a parameter without a default after one with a default, and WIT
-        // allows any order, so such a method takes keyword arguments only.
-        let has_default = |param: &PlannedResourceField| {
-            param.optional || resource_method_list_param(param).is_some()
-        };
-        if method
-            .params
-            .iter()
-            .skip_while(|param| !has_default(param))
-            .any(|param| !has_default(param))
-        {
-            output.push_str("        *,\n");
-        }
-        for param in &method.params {
-            output.push_str("        ");
-            output.push_str(&python_field_name(&param.name));
-            output.push_str(": ");
-            if let Some(value) = resource_method_list_param(param) {
-                // A list request field defaults to empty, as in the standalone wrapper.
-                output.push_str("list[");
-                output.push_str(&self.python_resource_value_annotation(value));
-                output.push_str("] | None = None");
-            } else {
-                output.push_str(&self.python_resource_field_annotation(
-                    &param.kind,
-                    param.optional,
-                    param.function.as_ref(),
-                ));
-                if param.optional {
-                    output.push_str(" = None");
-                }
-            }
-            output.push_str(",\n");
-        }
+        self.render_resource_method_params(output, method);
         output.push_str("    ) -> ");
         output.push_str(&result_annotation);
         output.push_str(":\n");
@@ -1511,6 +1503,112 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str(")\n");
             }
         }
+    }
+
+    /// Renders `self` and the parameters of a resource method.
+    fn render_resource_method_params(&self, output: &mut String, method: &PlannedResourceMethod) {
+        output.push_str("        self,\n");
+        // Python refuses a parameter without a default after one with a default, and WIT
+        // allows any order, so such a method takes keyword arguments only.
+        let has_default = |param: &PlannedResourceField| {
+            param.optional || resource_method_list_param(param).is_some()
+        };
+        if method
+            .params
+            .iter()
+            .skip_while(|param| !has_default(param))
+            .any(|param| !has_default(param))
+        {
+            output.push_str("        *,\n");
+        }
+        for param in &method.params {
+            output.push_str("        ");
+            output.push_str(&python_field_name(&param.name));
+            output.push_str(": ");
+            if let Some(value) = resource_method_list_param(param) {
+                // A list request field defaults to empty, as in the standalone wrapper.
+                output.push_str("list[");
+                output.push_str(&self.python_resource_value_annotation(value));
+                output.push_str("] | None = None");
+            } else {
+                output.push_str(&self.python_resource_field_annotation(
+                    &param.kind,
+                    param.optional,
+                    param.function.as_ref(),
+                ));
+                if param.optional {
+                    output.push_str(" = None");
+                }
+            }
+            output.push_str(",\n");
+        }
+    }
+
+    /// The client iterator of a method whose operation polls. Each page uses the Nexus client of
+    /// the handle, as the other methods do.
+    fn render_resource_poll_method(
+        &self,
+        output: &mut String,
+        resource: &PlannedResource,
+        method: &PlannedResourceMethod,
+        bound_operations: &[ResourceBoundOperation<'_>],
+    ) {
+        let PlannedResourceMethodBindingSpec::Operation {
+            operation_name,
+            request_plan,
+            ..
+        } = &method.binding
+        else {
+            return;
+        };
+        let operation = bound_operations
+            .iter()
+            .map(|bound_operation| bound_operation.operation)
+            .find(|operation| operation.name == operation_name)
+            .expect("bound resource operation should be rendered in the same module");
+        let Some(next_expr) = operation.poll_next(GenerationTarget::Client) else {
+            return;
+        };
+        let method_name = python_field_name(&method.name);
+        output.push_str("\n    async def ");
+        output.push_str(&poll_function_name(&method_name));
+        output.push_str("(\n");
+        self.render_resource_method_params(output, method);
+        output.push_str("    ) -> collections.abc.AsyncGenerator[");
+        output.push_str(&operation.output_annotation);
+        output.push_str(", None]:\n");
+        // A parameter fills the request field of the same name, so it gets the doc of that field.
+        let field_docs = operation
+            .target_unpacked_input(GenerationTarget::Client)
+            .map(|unpacked_input| unpacked_operation_doc_args(unpacked_input, None))
+            .unwrap_or_default();
+        let args = method
+            .params
+            .iter()
+            .filter_map(|param| {
+                let name = python_field_name(&param.name);
+                field_docs.iter().find(|(field, _)| *field == name).cloned()
+            })
+            .collect::<Vec<_>>();
+        render_python_docstring(
+            output,
+            "        ",
+            Some(&poll_function_summary(&method_name, method.doc.as_deref())),
+            &args,
+            None,
+            operation.experimental,
+        );
+        let request_expr = render_resource_method_request_expr(
+            method,
+            request_plan,
+            self.api_plan,
+            GenerationTarget::Client,
+        );
+        render_resource_method_request(output, &request_expr);
+        output.push_str("        nexus_client = self.");
+        output.push_str(&resource_client_identifier(resource, "_nexus_client"));
+        output.push('\n');
+        render_client_poll_loop(output, operation, next_expr);
     }
 
     fn python_resource_method_result_annotation(&self, method: &PlannedResourceMethod) -> String {
@@ -1826,6 +1924,11 @@ impl<'a> ApiPlanner<'a> {
                 .serialization_context
                 .value()
                 .map(|helper| format!("_support.{helper}")),
+            poll_next_expr: operation
+                .poll_next
+                .value()
+                .map(|helper| format!("_support.{helper}")),
+            poll_targets: operation.poll_targets,
             output_resource_return,
             output_direct_result,
             client_resource: None,
@@ -3112,6 +3215,9 @@ struct RenderedOperation<'a> {
     output_type_expr: String,
     output_transform_expr: Option<String>,
     serialization_context_expr: Option<String>,
+    /// The support helper that gives the next request of a poll.
+    poll_next_expr: Option<String>,
+    poll_targets: GenerationTargets,
     output_resource_return: Option<PlannedOperationResourceReturn>,
     output_direct_result: bool,
     /// The resource that the operation returns directly, for the client target.
@@ -3125,6 +3231,13 @@ struct RenderedOperation<'a> {
 }
 
 impl RenderedOperation<'_> {
+    /// The poll helper, when the target gets the poll.
+    fn poll_next(&self, target: GenerationTarget) -> Option<&str> {
+        self.poll_next_expr
+            .as_deref()
+            .filter(|_| self.poll_targets.contains(target))
+    }
+
     fn target_unpacked_input(&self, target: GenerationTarget) -> Option<&RenderedUnpackedInput> {
         match target {
             GenerationTarget::Workflow => self.unpacked_input.as_ref(),
@@ -5771,17 +5884,115 @@ fn client_extension_class_name(service: &RenderedService<'_>) -> String {
     format!("{}ClientExtension", service.name)
 }
 
+/// Refuses a client poll that can't get an iterator, and an iterator with the name of another
+/// operation, method or field, since one of the two would hide the other.
+fn validate_client_polls(services: &[RenderedService<'_>], source_path: &Path) -> Result<()> {
+    let operation_names = services
+        .iter()
+        .flat_map(|service| {
+            service.operations.iter().map(move |operation| {
+                (
+                    operation.attr_name.clone(),
+                    format!("operation `{}.{}`", service.name, operation.name),
+                )
+            })
+        })
+        .collect::<BTreeMap<_, _>>();
+    for service in services {
+        for operation in &service.operations {
+            if operation.poll_next(GenerationTarget::Client).is_none() {
+                continue;
+            }
+            let reason = if operation
+                .target_unpacked_input(GenerationTarget::Client)
+                .is_some_and(|unpacked_input| !unpacked_input.functions.is_empty())
+            {
+                Some("has function inputs")
+            } else if operation.output_transform_expr.is_some() {
+                Some("has an output transform")
+            } else if operation.output_resource_return.is_some() || operation.output_direct_result {
+                Some("returns a resource")
+            } else if operation.output_none {
+                Some("returns nothing")
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
+                return Err(Error::UnsupportedPoll {
+                    path: source_path.to_path_buf(),
+                    operation: format!("{}.{}", service.name, operation.name),
+                    reason: reason.to_string(),
+                });
+            }
+            let iterator_name = poll_function_name(&operation.attr_name);
+            if let Some(conflicting_declaration) = operation_names.get(&iterator_name) {
+                return Err(Error::PythonGeneratedNameConflict {
+                    name: iterator_name,
+                    generated_by: format!(
+                        "the iterator of operation `{}.{}`",
+                        service.name, operation.name
+                    ),
+                    conflicting_declaration: conflicting_declaration.clone(),
+                });
+            }
+        }
+        for resource in &service.resources {
+            let member_names = resource
+                .methods
+                .iter()
+                .map(|method| (python_field_name(&method.name), "method", &method.name))
+                .chain(
+                    resource
+                        .fields
+                        .iter()
+                        .map(|field| (python_field_name(&field.name), "field", &field.name)),
+                )
+                .collect::<Vec<_>>();
+            for method in &resource.methods {
+                let PlannedResourceMethodBindingSpec::Operation { operation_name, .. } =
+                    &method.binding
+                else {
+                    continue;
+                };
+                let polled = service.operations.iter().any(|operation| {
+                    operation.name == operation_name
+                        && operation.poll_next(GenerationTarget::Client).is_some()
+                });
+                let iterator_name = poll_function_name(&python_field_name(&method.name));
+                let conflict = member_names
+                    .iter()
+                    .find(|(member_name, _, _)| *member_name == iterator_name);
+                if polled && let Some((_, kind, name)) = conflict {
+                    return Err(Error::PythonGeneratedNameConflict {
+                        name: iterator_name,
+                        generated_by: format!(
+                            "the iterator of resource method `{}.{}`",
+                            resource.type_name, method.name
+                        ),
+                        conflicting_declaration: format!("{kind} `{}.{name}`", resource.type_name),
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Each method of the package's client extensions, private ones too, has one service, so one
 /// client class can inherit them all.
 fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
     let mut owners = BTreeMap::<String, &str>::new();
     for service in services {
         for operation in &service.operations {
+            let iterator_name = operation
+                .poll_next(GenerationTarget::Client)
+                .map(|_| poll_function_name(&operation.attr_name));
             let names = [
-                operation.attr_name.clone(),
-                client_operation_name(service, operation),
+                Some(operation.attr_name.clone()),
+                Some(client_operation_name(service, operation)),
+                iterator_name,
             ];
-            for name in names {
+            for name in names.into_iter().flatten() {
                 // A method of this name replaces the hook that each extension calls.
                 if name == CLIENT_NEXUS_CLIENT_HOOK {
                     return Err(Error::PythonGeneratedNameConflict {
@@ -5906,7 +6117,13 @@ fn render_client_extension(output: &mut String, service: &RenderedService<'_>, f
         for name in service
             .operations
             .iter()
-            .map(|operation| operation.attr_name.clone())
+            .flat_map(|operation| {
+                std::iter::once(operation.attr_name.clone()).chain(
+                    operation
+                        .poll_next(GenerationTarget::Client)
+                        .map(|_| poll_function_name(&operation.attr_name)),
+                )
+            })
             .chain(service.resources.iter().map(client_resource_factory_name))
         {
             output.push_str(&python_string_literal(&name));
@@ -7592,6 +7809,140 @@ fn render_operation_functions(
         output.push('\n');
         render_client_request_method(output, service, operation);
     }
+    if target == GenerationTarget::Client
+        && let Some(next_expr) = operation.poll_next(GenerationTarget::Client)
+    {
+        output.push('\n');
+        render_operation_poll_function(output, service, operation, next_expr);
+    }
+}
+
+/// The name of the iterator of a polled operation or method.
+fn poll_function_name(name: &str) -> String {
+    format!("iter_{name}")
+}
+
+fn poll_function_summary(name: &str, doc: Option<&str>) -> String {
+    let summary = format!("Yield each response of ``{name}`` until the poll helper stops.");
+    match doc.map(str::trim).filter(|doc| !doc.is_empty()) {
+        Some(doc) => format!("{summary}\n\n{doc}"),
+        None => summary,
+    }
+}
+
+/// The client iterator of a polled operation, with the parameters of the operation's own method.
+fn render_operation_poll_function(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+    next_expr: &str,
+) {
+    let target = GenerationTarget::Client;
+    let body_indent = target_body_indent(target);
+    render_operation_signature_start(output, target, &poll_function_name(&operation.attr_name));
+    let unpacked_input = operation.target_unpacked_input(target);
+    if let Some(unpacked_input) = unpacked_input {
+        if !unpacked_input.parameters.is_empty() {
+            start_line(output, target, "    *,\n");
+        }
+        for field in &unpacked_input.parameters {
+            start_line(output, target, "    ");
+            output.push_str(&field.attr_name);
+            output.push_str(": ");
+            output.push_str(&python_parameter_annotation(
+                &field.annotation,
+                &field.default_kind,
+            ));
+            if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
+                render_python_default_expr(output, &default_expr, body_indent);
+            }
+            output.push_str(",\n");
+        }
+    } else if operation.input.is_some() {
+        start_line(output, target, "    request: ");
+        output.push_str(operation_input_annotation(operation));
+        output.push_str(",\n");
+    }
+    start_line(output, target, ") -> collections.abc.AsyncGenerator[");
+    output.push_str(&operation.output_annotation);
+    output.push_str(", None]:\n");
+    let args = unpacked_input
+        .map(|unpacked_input| unpacked_operation_doc_args(unpacked_input, None))
+        .unwrap_or_default();
+    render_python_docstring(
+        output,
+        body_indent,
+        Some(&poll_function_summary(
+            &operation.attr_name,
+            operation.doc.as_deref(),
+        )),
+        &args,
+        None,
+        operation.experimental,
+    );
+    if let Some(unpacked_input) = unpacked_input {
+        for flattened_message in &unpacked_input.flattened_messages {
+            render_flattened_message_setup(output, body_indent, flattened_message);
+        }
+        start_line(output, target, "    request = ");
+        output.push_str(&unpacked_input.model_name);
+        output.push_str("(\n");
+        for field in &unpacked_input.request_fields {
+            start_line(output, target, "        ");
+            output.push_str(&field.attr_name);
+            output.push('=');
+            output.push_str(&unpacked_request_field_value_expr(field));
+            output.push_str(",\n");
+        }
+        start_line(output, target, "    )\n");
+    }
+    // The iteration uses one Nexus client for every page.
+    render_inline_nexus_client(output, target, service);
+    render_client_poll_loop(output, operation, next_expr);
+}
+
+/// The loop of a client poll iterator, after the first request and the Nexus client. Each page
+/// is a new operation, so it gets a new random operation ID.
+fn render_client_poll_loop(
+    output: &mut String,
+    operation: &RenderedOperation<'_>,
+    next_expr: &str,
+) {
+    let target = GenerationTarget::Client;
+    start_line(output, target, "    while True:\n");
+    start_line(
+        output,
+        target,
+        "        handle = await nexus_client.start_operation(\n",
+    );
+    start_line(output, target, "            operation=");
+    output.push_str(&python_string_literal(operation.wire_name));
+    output.push_str(",\n");
+    start_line(output, target, "            arg=request,\n");
+    start_line(output, target, "            id=_operation_id(),\n");
+    start_line(output, target, "            result_type=");
+    output.push_str(&operation.output_type_expr);
+    output.push_str(",\n");
+    start_line(output, target, "        )\n");
+    if operation.generic_model_types {
+        // `result_type` is the generic model with no type arguments, so the cast adds them.
+        start_line(output, target, "        response = typing.cast(\n");
+        start_line(output, target, "            ");
+        output.push_str(&operation.output_annotation);
+        output.push_str(",\n");
+        start_line(output, target, "            await handle.result(),\n");
+        start_line(output, target, "        )\n");
+    } else {
+        start_line(output, target, "        response = await handle.result()\n");
+    }
+    // The helper runs first, so a change to the yielded page doesn't change the next request.
+    start_line(output, target, "        next_request = ");
+    output.push_str(next_expr);
+    output.push_str("(request, response)\n");
+    start_line(output, target, "        yield response\n");
+    start_line(output, target, "        if next_request is None:\n");
+    start_line(output, target, "            return\n");
+    start_line(output, target, "        request = next_request\n");
 }
 
 /// The name of the private client method that starts the operation and awaits the result.
@@ -8085,6 +8436,20 @@ fn render_unpacked_operation_docstring(
     unpacked_input: &RenderedUnpackedInput,
     primary_function: Option<&RenderedFunctionField>,
 ) {
+    render_operation_docstring(
+        output,
+        indent,
+        operation,
+        &unpacked_operation_doc_args(unpacked_input, primary_function),
+        operation.return_doc.as_deref(),
+    );
+}
+
+/// The `Args:` entries of an operation function that takes the request's fields.
+fn unpacked_operation_doc_args(
+    unpacked_input: &RenderedUnpackedInput,
+    primary_function: Option<&RenderedFunctionField>,
+) -> Vec<(String, String)> {
     let mut args = Vec::<(String, String)>::new();
     for field in &unpacked_input.parameters {
         if let Some(function) = primary_function
@@ -8161,14 +8526,7 @@ fn render_unpacked_operation_docstring(
             args.push((field.attr_name.clone(), doc.clone()));
         }
     }
-
-    render_operation_docstring(
-        output,
-        indent,
-        operation,
-        &args,
-        operation.return_doc.as_deref(),
-    );
+    args
 }
 
 fn python_field_doc_rendered_as_function_arg(
