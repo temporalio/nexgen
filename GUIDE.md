@@ -2136,24 +2136,11 @@ type or transform expression refers to an otherwise-unavailable module.
 **Placement:** Operation (function) **Syntax:**
 `@nexus.poll python="<support-helper>" targets="client"`
 
-Generates an `iter_<name>` async iterator in the client target, on the client
-extension and on each client resource method that binds the operation. The
-iterator sends the request, calls `<support-helper>(request, response)`, and
-yields the response. The helper is a plain sync function that returns the next
-request, or `None` to stop. The helper has the rules of the poll, so the
-directive refers to no field.
-
-The iterator yields each response, which is a page, not the items in it. The
-extension's iterator creates one Nexus client with `_create_nexus_client` and
-uses it for every page. The iterator of a client handle uses the Nexus client of
-the handle. Each page is a new operation, so it gets a new random operation ID.
-
-Every language validates the directive, but only the Python client target
-generates an iterator, so `targets` is required and must be `client`. With the
-client target, nexgen refuses the directive on an operation with function
-inputs, an output transform, a resource result or no result, since it can't make
-an iterator for those. It also refuses the directive on a resource method, and
-an `iter_<name>` that another operation, method or field already has.
+Generates an `iter_<name>` async iterator on the client extension, and on each
+client resource method that binds the operation. The iterator sends the request,
+yields the response, and calls `<support-helper>(request, response)` for the
+next request. The helper is a sync function in the `--support-package`. It
+returns `None` to stop.
 
 ```wit
 /// @nexus.operation name="ReadRecords"
@@ -2165,24 +2152,24 @@ read-records: func(request: read-records-request) -> read-records-response;
 def next_read_request(request, response):
     if response.done:
         return None
-    next_offset = response.next_offset
-    # A read that doesn't wait ends at the newest Record.
-    if (
-        not response.records
-        and not request.wait
-        and next_offset in (None, request.from_offset)
-    ):
+    # A read that doesn't wait stops at the newest Record.
+    if not response.records and not request.wait:
         return None
-    if next_offset is None:
-        return dataclasses.replace(request, last=None)
-    return dataclasses.replace(request, from_offset=next_offset, start=None, last=None)
+    return dataclasses.replace(request, from_offset=response.next_offset)
 ```
 
-A caller limits a whole iteration with `asyncio.timeout`. After an error, a
-caller starts a new iteration at the `next_offset` of the last page.
+The stream sample's full helper is in
+[`temporal_support/poll.py`](advanced/samples/python/temporal_support/poll.py).
 
-The referenced helper must be available from the package specified by
-`--support-package`.
+- The iterator yields pages, not the items in them.
+- All pages use one Nexus client. Each page is a new operation with a new random
+  operation ID.
+- Only the Python client target generates the iterator, so `targets` must be
+  `client`.
+- nexgen refuses the directive on a resource method, on an operation that it
+  can't poll, and when `iter_<name>` clashes with another member.
+- Use `asyncio.timeout` to limit a whole iteration. After an error, start a new
+  iteration at the last page's `next_offset`.
 
 ---
 
