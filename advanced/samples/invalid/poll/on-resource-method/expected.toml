@@ -1,6 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = [
-  "invalid WIT directive `@nexus.poll` on interface `reader` resource `Feed` method `Read`",
-  "must be on the operation that the method binds, not on the method",
-]

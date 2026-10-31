@@ -1,9 +1,0 @@
-languages = ["python"]
-system_nexus = true
-targets = ["workflow", "client"]
-
-[error]
-kind = "python-generated-name-conflict"
-contains = [
-  "Python generated name `iter_read` for the iterator of resource method `Feed.read` conflicts with method `Feed.iter-read`",
-]
