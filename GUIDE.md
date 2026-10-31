@@ -1509,6 +1509,22 @@ separate the targets with commas.
   selected independently or alongside `workflow`. nexgen refuses it for a
   service with no `@nexus.endpoint`.
 
+`@nexus.sync-start` on an operation gives its Python Workflow function a sync
+`start_<name>` with the same parameters. It starts the operation at the call and
+returns an `asyncio.Task`. Python runs a coroutine only when something awaits
+it, so sync Workflow code, such as `@workflow.init`, needs it to keep the
+operation's place in the command order.
+
+```python
+@workflow.init
+def __init__(self, input: Input) -> None:
+    self._turns = stream_service.start_create_stream(stream_ref=StreamRef(id="turns"))
+```
+
+It calls the support package's `start_now(call)`. nexgen refuses a sync start
+with the name of another function of the package. Other languages ignore the
+directive, since their calls start when they are made.
+
 Python keeps shared models and service contracts in the root package. Client
 APIs live in `client/`. Workflow-only generation keeps its API in the root
 package; when both targets are selected, the workflow API lives in `workflow/`.
@@ -1642,6 +1658,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.experimental`                   | interface, record, variant, freestanding function                                             |
 | `@nexus.doc`                            | record, record field, variant, variant case, resource, resource method, freestanding function |
 | `@nexus.operation`                      | resource method, freestanding function                                                        |
+| `@nexus.sync-start`                     | freestanding function                                                                         |
 | `@nexus.poll`                           | freestanding function                                                                         |
 | `@nexus.serialization-context`          | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
@@ -2259,6 +2276,16 @@ converted to UpperCamelCase is used (e.g., `signal-with-start-workflow` becomes
 /// @nexus.operation name="SignalWithStartWorkflowExecution"
 signal-with-start-workflow: func(...) -> ...;
 ```
+
+---
+
+### @nexus.sync-start
+
+**Placement:** Operation (function) **Syntax:** `@nexus.sync-start` (no
+arguments)
+
+Gives the operation's Python Workflow function a sync `start_<name>`. See
+[Generation Targets](#generation-targets).
 
 ---
 

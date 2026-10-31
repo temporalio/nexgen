@@ -413,13 +413,16 @@ interface stream-service {
   type create-stream-result = own<%stream>;
 
   /// @nexus.operation name="CreateStream"
+  /// @nexus.sync-start
   create-stream: func(request: create-stream-request) -> create-stream-result;
 
   /// @nexus.doc "Append one batch. Workflow code makes the call from a Local Activity."
   /// @nexus.operation name="AppendRecords"
+  /// @nexus.sync-start
   append-records: func(request: append-records-request) -> append-records-response;
 
   /// @nexus.operation name="CloseStream"
+  /// @nexus.sync-start
   close-stream: func(request: close-stream-request) -> close-stream-response;
 
   // A WIT stream can't cross a Nexus call, so a read is a request and a response. The SDK's support

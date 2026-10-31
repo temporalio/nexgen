@@ -733,6 +733,9 @@ impl<'a> ApiPlanner<'a> {
         let root_workflow = targets.contains(&GenerationTarget::Workflow)
             && !targets.contains(&GenerationTarget::Client);
         let definition_services = services.iter().collect::<Vec<_>>();
+        if targets.contains(&GenerationTarget::Workflow) {
+            validate_workflow_package_names(services)?;
+        }
         let render_init = |root_package_imports: &RootPackageImports| {
             if root_workflow {
                 render_package_init(
@@ -2116,6 +2119,7 @@ impl<'a> ApiPlanner<'a> {
             .map(|key| self.resolve_poll_items(operation, key))
             .transpose()?;
         Ok(RenderedOperation {
+            sync_start: operation.sync_start,
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
             attr_name: operation
@@ -3376,6 +3380,8 @@ struct RenderedService<'a> {
 #[derive(Debug)]
 struct RenderedOperation<'a> {
     name: &'a str,
+    /// Set by `@nexus.sync-start`.
+    sync_start: bool,
     wire_name: &'a str,
     attr_name: String,
     experimental: bool,
@@ -4518,6 +4524,7 @@ fn render_optional_python_imports_with_skipped_language_modules(
     skipped_language_modules: &BTreeSet<String>,
 ) -> bool {
     let simple_imports = [
+        ("import asyncio\n", "asyncio"),
         ("import collections.abc\n", "collections.abc"),
         ("import dataclasses\n", "dataclasses"),
         ("import enum\n", "enum"),
@@ -5689,10 +5696,12 @@ fn render_package_init(
         .iter()
         .filter(|service| service.endpoint.is_some())
         .flat_map(|service| {
-            service
-                .operations
-                .iter()
-                .map(|operation| operation.attr_name.clone())
+            service.operations.iter().flat_map(|operation| {
+                std::iter::once(operation.attr_name.clone()).chain(
+                    operation_has_start_function(operation)
+                        .then(|| start_operation_function_name(operation)),
+                )
+            })
         })
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -5745,11 +5754,11 @@ fn render_package_init(
                     format!(".operations.{}", operation.attr_name)
                 };
                 if service.endpoint.is_some() {
-                    render_named_python_import(
-                        &mut output,
-                        &module,
-                        std::slice::from_ref(&operation.attr_name),
-                    );
+                    let mut names = vec![operation.attr_name.clone()];
+                    if operation_has_start_function(operation) {
+                        names.push(start_operation_function_name(operation));
+                    }
+                    render_named_python_import(&mut output, &module, &names);
                 }
             }
         }
@@ -6301,6 +6310,53 @@ fn render_client_extension(output: &mut String, service: &RenderedService<'_>, f
 
 fn client_resource_factory_name(resource: &PlannedResource) -> String {
     format!("get_{}", resource.name.to_snake_case())
+}
+
+/// The package exports the sync start of each operation function next to the operation functions
+/// and the modules of the package.
+fn validate_workflow_package_names(services: &[RenderedService<'_>]) -> Result<()> {
+    let mut names = ["client", "models", "operations", "services"]
+        .map(|module| {
+            (
+                module.to_string(),
+                format!("the module `{module}` of the package"),
+            )
+        })
+        .into_iter()
+        .collect::<BTreeMap<_, _>>();
+    for service in services.iter().filter(|service| service.endpoint.is_some()) {
+        for operation in &service.operations {
+            names.insert(
+                operation.attr_name.clone(),
+                format!(
+                    "the function of operation `{}.{}`",
+                    service.name, operation.name
+                ),
+            );
+        }
+    }
+    for service in services.iter().filter(|service| service.endpoint.is_some()) {
+        for operation in service
+            .operations
+            .iter()
+            .filter(|operation| operation_has_start_function(operation))
+        {
+            // Two sync starts of one name come from two functions of one name, which clash on
+            // their module first.
+            let name = start_operation_function_name(operation);
+            if let Some(conflicting_declaration) = names.get(&name) {
+                return Err(Error::PythonGeneratedNameConflict {
+                    name,
+                    generated_by: format!(
+                        "the sync start of operation `{}.{}`",
+                        service.name, operation.name
+                    ),
+                    conflicting_declaration: conflicting_declaration.clone(),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn endpoint_service_object_name(service: &RenderedService<'_>) -> String {
@@ -7994,6 +8050,15 @@ fn render_operation_functions(
         output.push('\n');
         render_client_request_method(output, service, operation);
     }
+    if target == GenerationTarget::Workflow && operation_has_start_function(operation) {
+        output.push('\n');
+        render_start_operation_function(
+            output,
+            service,
+            operation,
+            operation.target_unpacked_input(target),
+        );
+    }
     if target == GenerationTarget::Client
         && let Some(next_expr) = operation.poll_next(GenerationTarget::Client)
     {
@@ -9050,6 +9115,88 @@ fn python_docstring_literal_text(value: &str) -> String {
         }
     }
     escaped
+}
+
+/// Whether a Workflow function has a sync `start_<name>`, which `@nexus.sync-start` asks for. A
+/// request with a function field has overloads, so it has none.
+fn operation_has_start_function(operation: &RenderedOperation<'_>) -> bool {
+    operation.sync_start
+        && operation
+            .unpacked_input
+            .as_ref()
+            .is_none_or(|unpacked_input| unpacked_input.functions.is_empty())
+}
+
+fn start_operation_function_name(operation: &RenderedOperation<'_>) -> String {
+    format!("start_{}", operation.attr_name)
+}
+
+/// The sync `start_<name>` of a Workflow function. Python runs a coroutine only when something
+/// awaits it, so sync Workflow code, such as `@workflow.init` or a sync handler, can't place the
+/// operation at the call with the async function. The support package's `start_now` runs the
+/// coroutine up to its first wait at the call, as `workflow.start_activity` places an Activity.
+fn render_start_operation_function(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+    unpacked_input: Option<&RenderedUnpackedInput>,
+) {
+    if operation.deprecated {
+        output.push_str(
+            "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
+        );
+    }
+    output.push_str("def ");
+    output.push_str(&start_operation_function_name(operation));
+    output.push_str("(\n");
+    let mut arguments = Vec::new();
+    match unpacked_input {
+        Some(unpacked_input) => {
+            if !unpacked_input.parameters.is_empty() {
+                output.push_str("    *,\n");
+            }
+            for field in &unpacked_input.parameters {
+                output.push_str("    ");
+                output.push_str(&field.attr_name);
+                output.push_str(": ");
+                output.push_str(&field.annotation);
+                if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
+                    render_python_default_expr(output, &default_expr, "    ");
+                }
+                output.push_str(",\n");
+                arguments.push(format!("{}={}", field.attr_name, field.attr_name));
+            }
+        }
+        None => {
+            if let Some(input) = &operation.input {
+                output.push_str("    request: ");
+                output.push_str(&input.annotation);
+                output.push_str(",\n");
+                arguments.push("request".to_string());
+            }
+        }
+    }
+    output.push_str(") -> asyncio.Task[");
+    output.push_str(&operation_public_return_annotation(service, operation));
+    output.push_str("]:\n");
+    render_python_docstring(
+        output,
+        "    ",
+        Some(&format!(
+            "Start ``{name}`` at the call, as ``workflow.start_activity`` places an Activity, so \
+             sync Workflow code keeps the operation's place in the command order. The task gives \
+             what ``{name}`` returns.",
+            name = operation.attr_name
+        )),
+        &[],
+        None,
+        false,
+    );
+    output.push_str("    return _support.start_now(");
+    output.push_str(&operation.attr_name);
+    output.push('(');
+    output.push_str(&arguments.join(", "));
+    output.push_str("))\n");
 }
 
 fn render_unpacked_operation_function(

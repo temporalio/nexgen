@@ -215,6 +215,83 @@ async def test_workflow_apis_call_the_stream_service(
     ]
 
 
+class FakeNexusClient:
+    def __init__(self, replies: dict[str, typing.Any]) -> None:
+        self.inputs: list[typing.Any] = []
+        self._replies: dict[str, typing.Any] = replies
+
+    async def start_operation(
+        self,
+        operation: str,
+        input: typing.Any,
+        *,
+        output_type: type[typing.Any] | None = None,
+    ) -> collections.abc.Awaitable[typing.Any]:
+        del output_type
+        self.inputs.append(input)
+        future: asyncio.Future[typing.Any] = asyncio.get_running_loop().create_future()
+        future.set_result(self._replies[operation])
+        return future
+
+
+def fake_workflow(
+    monkeypatch: pytest.MonkeyPatch, replies: dict[str, typing.Any]
+) -> FakeNexusClient:
+    nexus_client = FakeNexusClient(replies)
+
+    def create_client(*, service: str, endpoint: str) -> FakeNexusClient:
+        del service, endpoint
+        return nexus_client
+
+    monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
+    monkeypatch.setattr(temporalio.workflow, "info", lambda: FakeWorkflowInfo("r2"))
+    monkeypatch.setattr(temporalio.workflow, "in_workflow", lambda: True)
+    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
+    return nexus_client
+
+
+async def test_a_sync_start_places_the_operation_at_the_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    response = both_models.AppendRecordsResponse(last_offset=1)
+    nexus_client = fake_workflow(monkeypatch, {"AppendRecords": response})
+    ref = both_models.StreamRef(id="s1")
+    records = [both_models.AppendRecord(body="hi")]
+
+    task = both_workflow.start_append_records(ref=ref, records=records)
+
+    # Sync Workflow code awaits nothing, so the start can't wait for the caller's await.
+    assert nexus_client.inputs == [
+        both_models.AppendRecordsRequest(
+            ref=ref,
+            records=records,
+            producer=both_models.Producer(id="wf:r2", run_id="r2"),
+        )
+    ]
+    handle = await task
+    assert await handle == response
+
+
+def test_only_a_marked_operation_has_a_sync_start() -> None:
+    # The stream sample marks the create, the append and the close with `@nexus.sync-start`.
+    assert hasattr(both_workflow, "start_close_stream")
+    assert not hasattr(both_workflow, "start_read_records")
+    assert not hasattr(both_workflow, "start_describe_stream")
+
+
+async def test_a_sync_create_gives_the_stream(monkeypatch: pytest.MonkeyPatch) -> None:
+    ref = both_models.StreamRef(id="turns")
+    nexus_client = fake_workflow(
+        monkeypatch, {"CreateStream": both_models.CreateStreamResult(ref=ref)}
+    )
+
+    task = both_workflow.start_create_stream(stream_ref=ref)
+
+    assert len(nexus_client.inputs) == 1
+    stream = await task
+    assert stream.ref == ref
+
+
 @pytest.mark.parametrize(
     ("package", "forbidden"),
     [

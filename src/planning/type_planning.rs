@@ -662,6 +662,7 @@ impl<'a> TypePlanningContext<'a> {
                 items: poll.items.clone(),
                 resume: poll.resume.clone(),
             }),
+            sync_start: operation.sync_start,
             data: PlannedOperationData {
                 output_resource_return: plan_operation_resource_return(
                     &self.spec,
@@ -1856,6 +1857,7 @@ interface alerts {
                     output_transform: None,
                     serialization_context: LanguageStringSpec::default(),
                     poll: None,
+                    sync_start: false,
                     data: (),
                 }],
                 resources: Vec::new(),

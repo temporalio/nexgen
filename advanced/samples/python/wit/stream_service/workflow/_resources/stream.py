@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import temporalio.nexus.system
 import datetime
 import temporalio.workflow
@@ -130,6 +131,21 @@ async def append_records(
     return await _append_records(request)
 
 
+def start_append_records(
+    *,
+    ref: StreamRef,
+    records: list[AppendRecord],
+    sequence: int | None = None,
+) -> asyncio.Task[temporalio.workflow.NexusOperationHandle[AppendRecordsResponse]]:
+    """Start ``append_records`` at the call, as ``workflow.start_activity`` places an
+    Activity, so sync Workflow code keeps the operation's place in the command order.
+    The task gives what ``append_records`` returns.
+    """
+    return _support.start_now(
+        append_records(ref=ref, records=records, sequence=sequence)
+    )
+
+
 async def _close_stream(
     request: CloseStreamRequest,
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
@@ -153,6 +169,17 @@ async def close_stream(
         producer=_support.workflow_producer(),
     )
     return await _close_stream(request)
+
+
+def start_close_stream(
+    *,
+    ref: StreamRef,
+) -> asyncio.Task[temporalio.workflow.NexusOperationHandle[CloseStreamResponse]]:
+    """Start ``close_stream`` at the call, as ``workflow.start_activity`` places an
+    Activity, so sync Workflow code keeps the operation's place in the command order.
+    The task gives what ``close_stream`` returns.
+    """
+    return _support.start_now(close_stream(ref=ref))
 
 
 async def _read_records(

@@ -687,6 +687,8 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     pub serialization_context: F::Text,
     /// The `@nexus.poll` settings. None when the operation has no poll.
     pub poll: Option<OperationPollSpec<F>>,
+    /// Set by `@nexus.sync-start`. The Python Workflow target adds a sync `start_<op>`.
+    pub sync_start: bool,
     pub data: F::OperationData,
 }
 
@@ -724,6 +726,7 @@ impl<F: TypeFamily> OperationSpec<F> {
                 .map(|transform| transform.map_names_with(map)),
             serialization_context: map.map_text(self.serialization_context),
             poll: self.poll.map(|poll| poll.map_names_with(map)),
+            sync_start: self.sync_start,
             data,
         }
     }

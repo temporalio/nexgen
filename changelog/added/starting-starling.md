@@ -1,0 +1,1 @@
+`@nexus.sync-start` on an operation gives its Python Workflow function a sync `start_<name>`, which starts the operation at the call through the support package's `start_now` and returns an `asyncio.Task`.

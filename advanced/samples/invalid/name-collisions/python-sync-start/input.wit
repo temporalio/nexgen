@@ -1,0 +1,16 @@
+package test:python-sync-start@1.0.0;
+
+world system { export job-service; }
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  record cancel-request {
+    job-id: string,
+  }
+
+  /// @nexus.sync-start
+  cancel: func(request: cancel-request);
+
+  // The function of this operation has the name of the sync start of `cancel`.
+  start-cancel: func(request: cancel-request);
+}

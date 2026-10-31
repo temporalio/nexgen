@@ -245,6 +245,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "sync-start",
+            sites: &[Function],
+            keys: &[],
+            language_keys: &[],
+            repeatable: false,
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
             name: "poll",
             sites: &[Function],
             keys: &["value", "import", "targets", "items", "resume"],

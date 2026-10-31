@@ -6186,6 +6186,7 @@ fn build_operation(
         output_transform: None,
         serialization_context: LanguageStringSpec::default(),
         poll: None,
+        sync_start: false,
         data: (),
     })
 }

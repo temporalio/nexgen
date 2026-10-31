@@ -1,0 +1,10 @@
+languages = ["python"]
+targets = ["workflow"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = [
+  "`start_cancel`",
+  "the sync start of operation `JobService.Cancel`",
+  "the function of operation `JobService.StartCancel`",
+]

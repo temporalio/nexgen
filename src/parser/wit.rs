@@ -3064,6 +3064,7 @@ fn build_operation(
         output_transform,
         serialization_context,
         poll,
+        sync_start: directive(&directives, "sync-start", path, &context)?.is_some(),
         data: (),
     })
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import temporalio.nexus.system
 import datetime
 import temporalio.workflow
@@ -58,3 +59,22 @@ async def create_stream(
         request_id=_support.request_id(),
     )
     return await _create_stream(request)
+
+
+def start_create_stream(
+    *,
+    stream_ref: StreamRef,
+    retention: datetime.timedelta | None = None,
+    id_conflict_policy: StreamIdConflictPolicy | None = None,
+) -> asyncio.Task[Stream]:
+    """Start ``create_stream`` at the call, as ``workflow.start_activity`` places an
+    Activity, so sync Workflow code keeps the operation's place in the command order.
+    The task gives what ``create_stream`` returns.
+    """
+    return _support.start_now(
+        create_stream(
+            stream_ref=stream_ref,
+            retention=retention,
+            id_conflict_policy=id_conflict_policy,
+        )
+    )
