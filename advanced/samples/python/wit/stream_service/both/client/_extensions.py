@@ -12,6 +12,7 @@ import abc
 from ..services import StreamService
 from ..models import (
     CreateStreamRequest,
+    Execution,
     StreamIdConflictPolicy,
     StreamRef,
 )
@@ -43,10 +44,13 @@ class _GetStream(typing.Generic[BodyT]):
     def __call__(
         self,
         *,
-        ref: StreamRef,
+        id: str,
+        owner: Execution | None = None,
+        backend: str | None = None,
         created: bool | None = None,
     ) -> Stream[BodyT]:
-        """Return the ``Stream`` handle that has these identity fields."""
+        """A handle on an existing ``Stream``, with no call."""
+        ref = StreamRef(id=id, owner=owner, backend=backend)
         return Stream[self.body_type](
             self._extension.create_nexus_client(
                 service=StreamService,

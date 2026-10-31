@@ -154,6 +154,7 @@ pub(crate) struct PlannedResource {
     pub(crate) type_name: String,
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
+    pub(crate) flatten: Option<String>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
 }
 
