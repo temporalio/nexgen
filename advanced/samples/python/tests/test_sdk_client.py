@@ -560,3 +560,26 @@ def test_only_the_client_target_has_the_read_poll() -> None:
     assert not hasattr(workflow_stream_module.Stream, "iter_read_items")
     assert hasattr(Stream, "iter_read")
     assert hasattr(Stream, "iter_read_items")
+
+
+async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
+    client, answers = connect(
+        Client,
+        {
+            "CreateStream": CreateStreamResult(ref=StreamRef(id="s1")),
+            "DescribeStream": DescribeStreamResponse(last_offset=5),
+        },
+    )
+    timeout = datetime.timedelta(seconds=3)
+
+    stream = await client.create_stream(
+        stream_ref=StreamRef(id="s1"), rpc_timeout=timeout
+    )
+    _ = await stream.describe(rpc_metadata={"authorization": "token"})
+
+    assert [
+        (started.rpc_metadata, started.rpc_timeout) for started in answers.started
+    ] == [
+        ({}, timeout),
+        ({"authorization": "token"}, None),
+    ]
