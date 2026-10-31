@@ -2138,22 +2138,21 @@ type or transform expression refers to an otherwise-unavailable module.
 
 Generates an `iter_<name>` async iterator in the client target, on the client
 extension and on each client resource method that binds the operation. The
-iterator sends the request, yields the response, and calls
-`<support-helper>(request, response)`. The helper returns the next request, or
-`None` to stop. The helper has the rules of the poll, so the directive names no
-field. Only Python generates the iterator so far, and the other languages ignore
-the directive.
+iterator sends the request, calls `<support-helper>(request, response)`, and
+yields the response. The helper is a plain sync function that returns the next
+request, or `None` to stop. The helper has the rules of the poll, so the
+directive refers to no field.
 
-The extension's iterator creates one Nexus client with `_create_nexus_client`
-and uses it for every page. The iterator of a client handle uses the Nexus
-client of the handle. Each page is a new operation, so it gets a new random
-operation ID.
+The iterator yields each response, which is a page, not the items in it. The
+extension's iterator creates one Nexus client with `_create_nexus_client` and
+uses it for every page. The iterator of a client handle uses the Nexus client of
+the handle. Each page is a new operation, so it gets a new random operation ID.
 
-Only the client target gets an iterator so far, so the directive needs
-`targets="client"`, and the Workflow package has no iterator. With the client
-target, nexgen refuses the directive on an operation with function inputs, an
-output transform, a resource result or no result, since it can't make an
-iterator for those yet. It also refuses the directive on a resource method, and
+Every language validates the directive, but only the Python client target
+generates an iterator, so `targets` is required and must be `client`. With the
+client target, nexgen refuses the directive on an operation with function
+inputs, an output transform, a resource result or no result, since it can't make
+an iterator for those. It also refuses the directive on a resource method, and
 an `iter_<name>` that another operation, method or field already has.
 
 ```wit
@@ -2166,11 +2165,21 @@ read-records: func(request: read-records-request) -> read-records-response;
 def next_read_request(request, response):
     if response.done:
         return None
-    from_offset = response.next_offset
-    if from_offset is None:
-        from_offset = request.from_offset
-    return dataclasses.replace(request, from_offset=from_offset, last=None)
+    next_offset = response.next_offset
+    # A read that doesn't wait ends at the newest Record.
+    if (
+        not response.records
+        and not request.wait
+        and next_offset in (None, request.from_offset)
+    ):
+        return None
+    if next_offset is None:
+        return dataclasses.replace(request, last=None)
+    return dataclasses.replace(request, from_offset=next_offset, start=None, last=None)
 ```
+
+A caller limits a whole iteration with `asyncio.timeout`. After an error, a
+caller starts a new iteration at the `next_offset` of the last page.
 
 The referenced helper must be available from the package specified by
 `--support-package`.

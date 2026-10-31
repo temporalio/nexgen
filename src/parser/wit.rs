@@ -3310,8 +3310,8 @@ fn build_operation_output_transform(
     }
 }
 
-/// Reads `@nexus.poll` on an operation. Each language value names a support helper that takes
-/// the request and its response and returns the next request, or `None` to stop.
+/// Reads `@nexus.poll` on an operation. Each language value is a support helper that takes the
+/// request and its response and returns the next request, or `None` to stop.
 fn build_operation_poll(
     directives: &[Directive],
     path: &Path,

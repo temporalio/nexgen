@@ -1653,8 +1653,8 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
-    /// The client iterator of a method whose operation polls. The handle starts each page on its
-    /// own Nexus client, as its other methods do.
+    /// The client iterator of a method whose operation polls. Each page uses the Nexus client of
+    /// the handle, as the other methods do.
     fn render_resource_poll_method(
         &self,
         output: &mut String,
@@ -5973,8 +5973,8 @@ fn client_extension_class_name(service: &RenderedService<'_>) -> String {
     format!("{}ClientExtension", service.name)
 }
 
-/// Refuses a client poll that has no iterator yet, and an iterator that would hide the operation,
-/// method or field that has its name, with no error.
+/// Refuses a client poll that can't get an iterator, and an iterator with the name of another
+/// operation, method or field, since one of the two would hide the other.
 fn validate_client_polls(services: &[RenderedService<'_>], source_path: &Path) -> Result<()> {
     let operation_names = services
         .iter()
@@ -7914,7 +7914,7 @@ fn render_operation_poll_function(
         }
         start_line(output, target, "    )\n");
     }
-    // One Nexus client serves every page of the iteration.
+    // The iteration uses one Nexus client for every page.
     render_inline_nexus_client(output, target, service);
     render_client_poll_loop(output, service, operation, next_expr);
 }
@@ -7943,7 +7943,7 @@ fn render_client_poll_loop(
     start_line(output, target, "            id=f\"{_uuid.uuid4()}\",\n");
     start_line(output, target, "        )\n");
     if operation.generic_model_types {
-        // `result_type` names the generic model with no type arguments, so the cast adds them.
+        // The operation has the generic model with no type arguments, so the cast adds them.
         start_line(output, target, "        response = typing.cast(\n");
         start_line(output, target, "            ");
         output.push_str(&operation.output_annotation);
