@@ -522,7 +522,7 @@ namespace Temporalio.Workflows
         {
             return new DescribeStreamResponse()
             {
-                Status = (int)wire.Status == 0 ? null : (StreamStatus)wire.Status,
+                Status = (int)wire.Status == 0 ? null : (System.Enum.IsDefined(typeof(StreamStatus), (int)wire.Status) ? (StreamStatus)wire.Status : StreamStatus.StreamStatusUnspecified),
                 LastOffset = wire.LastOffset == 0 ? null : wire.LastOffset,
                 Retention = wire.Retention == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Retention),
             };
@@ -584,7 +584,7 @@ namespace Temporalio.Workflows
         {
             return new Execution()
             {
-                Type = (int)wire.Type == 0 ? null : (ExecutionType)wire.Type,
+                Type = (int)wire.Type == 0 ? null : (System.Enum.IsDefined(typeof(ExecutionType), (int)wire.Type) ? (ExecutionType)wire.Type : ExecutionType.ExecutionTypeUnspecified),
                 BusinessId = string.IsNullOrEmpty(wire.BusinessId) ? null : wire.BusinessId,
                 RunId = string.IsNullOrEmpty(wire.RunId) ? null : wire.RunId,
             };
@@ -655,7 +655,7 @@ namespace Temporalio.Workflows
         {
             return new Producer(wire.Id)
             {
-                Kind = (int)wire.Kind == 0 ? null : (StreamProducerKind)wire.Kind,
+                Kind = (int)wire.Kind == 0 ? null : (System.Enum.IsDefined(typeof(StreamProducerKind), (int)wire.Kind) ? (StreamProducerKind)wire.Kind : StreamProducerKind.StreamProducerKindUnspecified),
                 Epoch = wire.Epoch == null ? null : ProducerEpoch.FromTransferType(wire.Epoch),
                 RunId = string.IsNullOrEmpty(wire.RunId) ? null : wire.RunId,
             };
@@ -979,7 +979,7 @@ namespace Temporalio.Workflows
                 Producer = wire.Producer == null ? null : Producer.FromTransferType(wire.Producer),
                 Result = wire.Result == null ? null : Nexgen.Support.ProtoExtensions.FromPayload(wire.Result),
                 Failure = wire.Failure == null ? null : Nexgen.Support.ProtoExtensions.FromFailureProto(wire.Failure),
-                Status = (int)wire.Status == 0 ? null : (StreamCloseStatus)wire.Status,
+                Status = (int)wire.Status == 0 ? null : (System.Enum.IsDefined(typeof(StreamCloseStatus), (int)wire.Status) ? (StreamCloseStatus)wire.Status : StreamCloseStatus.StreamCloseStatusUnspecified),
             };
         }
 
@@ -1266,7 +1266,7 @@ namespace Temporalio.Workflows
         {
             return new Supersession(wire.ProducerId, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.FailedTasks, item => item)))
             {
-                ProducerKind = (int)wire.ProducerKind == 0 ? null : (StreamProducerKind)wire.ProducerKind,
+                ProducerKind = (int)wire.ProducerKind == 0 ? null : (System.Enum.IsDefined(typeof(StreamProducerKind), (int)wire.ProducerKind) ? (StreamProducerKind)wire.ProducerKind : StreamProducerKind.StreamProducerKindUnspecified),
                 Epoch = wire.Epoch == null ? null : ProducerEpoch.FromTransferType(wire.Epoch),
                 PreviousCompletedTask = wire.PreviousCompletedTask == null ? null : WorkflowTaskEpoch.FromTransferType(wire.PreviousCompletedTask),
                 WithdrawRun = string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun,

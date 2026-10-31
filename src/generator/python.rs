@@ -1684,6 +1684,11 @@ impl<'a> ApiPlanner<'a> {
                         number: value.number,
                     })
                     .collect(),
+                fallback: enum_spec
+                    .values
+                    .iter()
+                    .find(|value| value.fallback)
+                    .map(|value| value.name.clone()),
             });
     }
 
@@ -2691,6 +2696,8 @@ struct ResourceBoundOperation<'a> {
 struct RenderedEnum {
     name: String,
     values: Vec<RenderedEnumValue>,
+    /// The member that an unknown proto number decodes as.
+    fallback: Option<String>,
 }
 
 #[derive(Debug)]
@@ -5361,6 +5368,19 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
         output.push_str(" = ");
         output.push_str(&value.number.to_string());
         output.push('\n');
+    }
+
+    if let Some(fallback) = &enumeration.fallback {
+        let name = &enumeration.name;
+        output.push_str(&format!(
+            "\n\ndef {}(value: int) -> {name}:\n",
+            python_proto::enum_from_proto_function_name(name)
+        ));
+        output.push_str("    try:\n");
+        output.push_str(&format!("        return {name}(value)\n"));
+        output.push_str("    except ValueError:\n");
+        output.push_str("        # A newer peer can send a case that this enum doesn't know.\n");
+        output.push_str(&format!("        return {name}.{fallback}\n"));
     }
 }
 

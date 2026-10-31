@@ -864,6 +864,8 @@ pub struct EnumValueSpec {
     pub wire_name: String,
     pub name: String,
     pub number: i32,
+    /// Marked with `@nexus.fallback`, so an unknown proto number decodes as this case.
+    pub fallback: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

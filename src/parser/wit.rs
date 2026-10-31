@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use tempfile::TempDir;
 use wit_parser_crate::{
-    Function, FunctionKind, Handle, Interface, PackageId, PackageSourceMap, Record, Resolve, Type,
-    TypeDef, TypeDefKind, TypeId, TypeOwner, WorldId, WorldItem, WorldKey,
+    Enum, Function, FunctionKind, Handle, Interface, PackageId, PackageSourceMap, Record, Resolve,
+    Type, TypeDef, TypeDefKind, TypeId, TypeOwner, WorldId, WorldItem, WorldKey,
 };
 
 use crate::error::{Error, Result};
@@ -565,6 +565,7 @@ fn collect_interface_types(
     for type_id in interface.types.values() {
         let type_def = &resolve.types[*type_id];
         validate_type_parameter_directive(resolve, *type_id, type_def, path)?;
+        reject_misplaced_fallback_in_type(resolve, *type_id, type_def, path)?;
         if let Some(record) =
             build_wit_record_spec(resolve, *type_id, type_def, path, &interface_name, language)?
         {
@@ -723,6 +724,8 @@ fn build_wit_enum_spec(
     };
 
     let type_name = type_def.name.as_deref().unwrap_or("unnamed-type");
+    let context = format!("type `{}`", wit_type_full_name(resolve, type_id));
+    let fallback = enum_fallback_case(enumeration, type_def, path, &context)?;
     Ok(Some(EnumSpec {
         name: type_name.to_upper_camel_case(),
         full_name: wit_type_full_name(resolve, type_id),
@@ -734,10 +737,109 @@ fn build_wit_enum_spec(
                 wire_name: value.name.clone(),
                 name: value.name.to_upper_camel_case(),
                 number: i32::try_from(index).expect("WIT enum case index should fit in i32"),
+                fallback: fallback == Some(index),
             })
             .collect(),
         source: build_type_source(type_def, path, interface_name)?,
     }))
+}
+
+/// The index of the case with `@nexus.fallback`, if the enum has one.
+fn enum_fallback_case(
+    enumeration: &Enum,
+    type_def: &TypeDef,
+    path: &Path,
+    context: &str,
+) -> Result<Option<usize>> {
+    let mut fallback = None::<(usize, &str)>;
+    for (index, case) in enumeration.cases.iter().enumerate() {
+        let case_context = format!("{context} case `{}`", case.name);
+        let directives = parse_directives(case.docs.contents.as_deref(), path, &case_context)?;
+        let Some(directive) = directive(&directives, "fallback", path, &case_context)? else {
+            continue;
+        };
+        if !directive.args.is_empty() {
+            return Err(fallback_error(
+                path,
+                &case_context,
+                "does not take arguments",
+            ));
+        }
+        if let Some((_, first)) = fallback {
+            return Err(fallback_error(
+                path,
+                context,
+                &format!(
+                    "is on `{first}` and `{}`, but an enum has one fallback case",
+                    case.name
+                ),
+            ));
+        }
+        fallback = Some((index, case.name.as_str()));
+    }
+    // Only a proto number can be one that the enum doesn't know.
+    if fallback.is_some() && find_proto_name_for_type_def(type_def, path, context)?.is_none() {
+        return Err(fallback_error(
+            path,
+            context,
+            "is only supported on an enum with `@nexus.proto`",
+        ));
+    }
+    Ok(fallback.map(|(index, _)| index))
+}
+
+/// Refuses `@nexus.fallback` on a type, and on the cases of a variant or flags.
+///
+/// A misplaced fallback would have no effect, so the enum would still fail on a case that a newer
+/// peer sends. The author learns that at run time, not at generation time.
+fn reject_misplaced_fallback_in_type(
+    resolve: &Resolve,
+    type_id: TypeId,
+    type_def: &TypeDef,
+    path: &Path,
+) -> Result<()> {
+    let context = format!("type `{}`", wit_type_full_name(resolve, type_id));
+    let directives = parse_directives(type_def.docs.contents.as_deref(), path, &context)?;
+    reject_misplaced_fallback(&directives, path, &context)?;
+    let cases = match &type_def.kind {
+        TypeDefKind::Variant(variant) => variant
+            .cases
+            .iter()
+            .map(|case| (case.name.as_str(), case.docs.contents.as_deref()))
+            .collect(),
+        TypeDefKind::Flags(flags) => flags
+            .flags
+            .iter()
+            .map(|flag| (flag.name.as_str(), flag.docs.contents.as_deref()))
+            .collect(),
+        _ => Vec::new(),
+    };
+    for (name, docs) in cases {
+        let case_context = format!("{context} case `{name}`");
+        let directives = parse_directives(docs, path, &case_context)?;
+        reject_misplaced_fallback(&directives, path, &case_context)?;
+    }
+    Ok(())
+}
+
+fn reject_misplaced_fallback(directives: &[Directive], path: &Path, context: &str) -> Result<()> {
+    if directive(directives, "fallback", path, context)?.is_some() {
+        return Err(fallback_error(
+            path,
+            context,
+            "is only supported on enum cases",
+        ));
+    }
+    Ok(())
+}
+
+fn fallback_error(path: &Path, context: &str, reason: &str) -> Error {
+    Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.fallback".to_string(),
+        reason: reason.to_string(),
+    }
 }
 
 fn build_wit_flags_spec(
@@ -1112,6 +1214,7 @@ fn build_fields_from_record(
         let field_context = format!("{context} field `{}`", field.name);
         let directives = parse_directives(field.docs.contents.as_deref(), path, &field_context)?;
         reject_misplaced_type_parameter(&directives, path, &field_context)?;
+        reject_misplaced_fallback(&directives, path, &field_context)?;
         let generated_field_name = directive(&directives, "name", path, &field_context)?
             .and_then(|directive| directive_language_value(directive, language))
             .unwrap_or(&field.name)
@@ -2557,6 +2660,7 @@ fn build_service(
     let context = format!("interface `{interface_name}`");
     let directives = parse_directives(interface.docs.contents.as_deref(), path, &context)?;
     reject_misplaced_type_parameter(&directives, path, &context)?;
+    reject_misplaced_fallback(&directives, path, &context)?;
     let endpoint = directive_value_for_language(&directives, "endpoint", path, &context, language)?;
     let service_name = interface_name.to_upper_camel_case();
     let wire_service_name = build_wire_service_name(&directives, path, &context, &service_name)?;
@@ -2696,6 +2800,7 @@ fn build_resource(
             &constructor_context,
         )?;
         reject_misplaced_type_parameter(&directives, path, &constructor_context)?;
+        reject_misplaced_fallback(&directives, path, &constructor_context)?;
     }
     let fields = match constructor {
         Some(constructor) => constructor
@@ -2771,6 +2876,7 @@ fn build_resource_method(
     );
     let directives = parse_directives(function.docs.contents.as_deref(), path, &context)?;
     reject_misplaced_type_parameter(&directives, path, &context)?;
+    reject_misplaced_fallback(&directives, path, &context)?;
     let params = function
         .params
         .iter()
@@ -2880,6 +2986,7 @@ fn build_operation(
     let context = format!("{service_context} operation `{operation_name}`");
     let directives = parse_directives(function.docs.contents.as_deref(), path, &context)?;
     reject_misplaced_type_parameter(&directives, path, &context)?;
+    reject_misplaced_fallback(&directives, path, &context)?;
     let wire_operation_name =
         build_wire_operation_name(&directives, path, &context, &operation_name)?;
     let experimental = experimental_directive(&directives, path, &context)?;

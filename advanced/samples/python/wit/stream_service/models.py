@@ -27,11 +27,27 @@ class StreamProducerKind(enum.IntEnum):
     StreamProducerKindStandaloneActivity = 5
 
 
+def _stream_producer_kind_from_proto(value: int) -> StreamProducerKind:
+    try:
+        return StreamProducerKind(value)
+    except ValueError:
+        # A newer peer can send a case that this enum doesn't know.
+        return StreamProducerKind.StreamProducerKindUnspecified
+
+
 class ExecutionType(enum.IntEnum):
     ExecutionTypeUnspecified = 0
     ExecutionTypeWorkflow = 1
     ExecutionTypeActivity = 2
     ExecutionTypeNexusOperation = 3
+
+
+def _execution_type_from_proto(value: int) -> ExecutionType:
+    try:
+        return ExecutionType(value)
+    except ValueError:
+        # A newer peer can send a case that this enum doesn't know.
+        return ExecutionType.ExecutionTypeUnspecified
 
 
 class StreamReadStart(enum.IntEnum):
@@ -49,11 +65,27 @@ class StreamCloseStatus(enum.IntEnum):
     StreamCloseStatusTimedOut = 5
 
 
+def _stream_close_status_from_proto(value: int) -> StreamCloseStatus:
+    try:
+        return StreamCloseStatus(value)
+    except ValueError:
+        # A newer peer can send a case that this enum doesn't know.
+        return StreamCloseStatus.StreamCloseStatusUnspecified
+
+
 class StreamStatus(enum.IntEnum):
     StreamStatusUnspecified = 0
     StreamStatusOpen = 1
     StreamStatusClosed = 2
     StreamStatusExpired = 3
+
+
+def _stream_status_from_proto(value: int) -> StreamStatus:
+    try:
+        return StreamStatus(value)
+    except ValueError:
+        # A newer peer can send a case that this enum doesn't know.
+        return StreamStatus.StreamStatusUnspecified
 
 
 @dataclasses.dataclass(slots=True)
@@ -166,7 +198,9 @@ class _ProducerTransferTypeConverter(
         id = value.id
         return Producer(
             id=id,
-            kind=StreamProducerKind(value.kind) if value.kind != 0 else None,
+            kind=_stream_producer_kind_from_proto(value.kind)
+            if value.kind != 0
+            else None,
             epoch=_ProducerEpochTransferTypeConverter().from_transfer_type(
                 value.epoch, ProducerEpoch
             )
@@ -403,7 +437,7 @@ class _ExecutionTransferTypeConverter(
         type_hint: type[Execution],
     ) -> Execution:
         return Execution(
-            type=ExecutionType(value.type) if value.type != 0 else None,
+            type=_execution_type_from_proto(value.type) if value.type != 0 else None,
             business_id=value.business_id if bool(value.business_id) else None,
             run_id=value.run_id if bool(value.run_id) else None,
         )
@@ -1090,7 +1124,7 @@ class _SupersessionTransferTypeConverter(
         return Supersession(
             producer_id=producer_id,
             failed_tasks=list(value.failed_tasks),
-            producer_kind=StreamProducerKind(value.producer_kind)
+            producer_kind=_stream_producer_kind_from_proto(value.producer_kind)
             if value.producer_kind != 0
             else None,
             epoch=_ProducerEpochTransferTypeConverter().from_transfer_type(
@@ -1239,7 +1273,9 @@ class _StreamCloseTransferTypeConverter(
             failure=_support.failure_from_proto(value.failure)
             if value.HasField("failure")
             else None,
-            status=StreamCloseStatus(value.status) if value.status != 0 else None,
+            status=_stream_close_status_from_proto(value.status)
+            if value.status != 0
+            else None,
         )
 
     @typing_extensions.override
@@ -1347,7 +1383,9 @@ class _DescribeStreamResponseTransferTypeConverter(
         type_hint: type[DescribeStreamResponse],
     ) -> DescribeStreamResponse:
         return DescribeStreamResponse(
-            status=StreamStatus(value.status) if value.status != 0 else None,
+            status=_stream_status_from_proto(value.status)
+            if value.status != 0
+            else None,
             last_offset=value.last_offset if value.last_offset != 0 else None,
             retention=_support.duration_from_proto(value.retention)
             if value.HasField("retention")

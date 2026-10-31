@@ -825,7 +825,9 @@ by the target SDK or generated operation helpers.
 An enum annotated with `@nexus.proto` likewise remains a generated public enum
 unless a type replacement selects an external model. Fields use the authored
 enum's name and members, even when its name differs from the protobuf enum's.
-Converters bridge the model and protobuf enum by number.
+Converters bridge the model and protobuf enum by number. A case with
+[`@nexus.fallback`](#nexusfallback) takes a protobuf number that the enum
+doesn't know.
 
 ### Transfer-Type Conversion
 
@@ -1788,6 +1790,33 @@ defaults are not applied to their fields or to records inside lists or maps.
 Constructors and encoding/decoding do not evaluate defaults.
 
 A default cannot be combined with `@nexus.source`.
+
+---
+
+### @nexus.fallback
+
+**Placement:** Case of an enum with `@nexus.proto` **Syntax:** `@nexus.fallback`
+
+A protobuf enum is open, so a newer peer can send a number that the generated
+enum doesn't know. When a protobuf value converts to the model, such a number
+becomes the marked case. An enum has at most one fallback case, and the
+directive takes no arguments.
+
+```wit
+/// @nexus.proto "temporal.api.enums.v1.StreamStatus"
+enum stream-status {
+  /// @nexus.fallback
+  stream-status-unspecified,
+  stream-status-open,
+  stream-status-closed,
+  stream-status-expired,
+}
+```
+
+Python, TypeScript, and .NET decode an unknown number as the case. Without the
+directive, Python raises `ValueError`, and TypeScript and .NET keep the number.
+Go and Java ignore the directive. nexgen refuses it on an enum without
+`@nexus.proto`, and anywhere other than an enum case.
 
 ---
 

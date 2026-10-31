@@ -1,0 +1,8 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.fallback` on type `models.alert-level` case `severity-unspecified`",
+  "does not take arguments",
+]
