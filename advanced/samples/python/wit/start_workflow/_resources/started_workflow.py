@@ -63,6 +63,20 @@ class StartedWorkflow:
         raise NotImplementedError("started-workflow.get_result is not yet implemented")
 
 
+def get_started_workflow(
+    *,
+    namespace: str,
+    workflow_id: str,
+    run_id: str | None = None,
+) -> StartedWorkflow:
+    """A handle on an existing ``StartedWorkflow``, with no call."""
+    return StartedWorkflow(
+        namespace=namespace,
+        workflow_id=workflow_id,
+        run_id=run_id,
+    )
+
+
 async def _cancel_workflow(
     request: CancelWorkflowRequest,
 ) -> temporalio.workflow.NexusOperationHandle[CancelWorkflowResponse,]:

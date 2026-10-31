@@ -461,6 +461,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
                 type_name: name.to_upper_camel_case(),
                 type_parameters: Vec::new(),
                 fields: Vec::new(),
+                flatten: None,
                 methods: Vec::new(),
             })
     }
@@ -872,6 +873,7 @@ impl<'a> TypePlanningContext<'a> {
                 .iter()
                 .map(|field| self.planned_resource_field(field))
                 .collect(),
+            flatten: resource.flatten.clone(),
             methods,
         })
     }

@@ -735,6 +735,9 @@ impl<'a> ApiPlanner<'a> {
         let root_workflow = targets.contains(&GenerationTarget::Workflow)
             && !targets.contains(&GenerationTarget::Client);
         let definition_services = services.iter().collect::<Vec<_>>();
+        if targets.contains(&GenerationTarget::Workflow) {
+            validate_workflow_factory_names(services)?;
+        }
         let render_init = |root_package_imports: &RootPackageImports| {
             if root_workflow {
                 render_package_init(
@@ -1226,24 +1229,30 @@ impl<'a> ApiPlanner<'a> {
         resource: &PlannedResource,
     ) {
         let type_variables = resource_type_variable_names(resource);
-        for supplied in runtime_type_overload_cases(&type_variables) {
-            output.push_str("    @typing.overload\n");
-            self.render_client_resource_factory_signature(
-                output,
-                resource,
-                &type_variables,
-                RuntimeTypeSignature::Overload(&supplied),
-            );
-            output.push_str(" ...\n\n");
+        let flatten = self.resource_factory_flatten(resource);
+        for form in resource_factory_forms(flatten.as_ref()) {
+            for supplied in runtime_type_overload_cases(&type_variables) {
+                output.push_str("    @typing.overload\n");
+                self.render_resource_factory_overload(
+                    output,
+                    "    ",
+                    Some("self"),
+                    resource,
+                    form,
+                    &type_variables,
+                    RuntimeTypeSignature::Overload(&supplied),
+                );
+                output.push_str(" ...\n\n");
+            }
         }
-        self.render_client_resource_factory_signature(
+        self.render_resource_factory_impl_def(
             output,
+            "    ",
+            Some("self"),
             resource,
+            flatten.as_ref(),
             &type_variables,
-            RuntimeTypeSignature::Implementation,
         );
-        output.push('\n');
-        let receiver = resource_client_identifier(resource, "self");
         render_python_docstring(
             output,
             "        ",
@@ -1255,14 +1264,11 @@ impl<'a> ApiPlanner<'a> {
             None,
             false,
         );
-        render_untyped_runtime_type_fallbacks(output, "        ", &type_variables);
+        render_resource_factory_impl_body(output, "        ", flatten.as_ref(), &type_variables);
+        let receiver = resource_client_identifier(resource, "self");
         output.push_str("        return ");
         output.push_str(&resource.type_name);
-        let arguments = type_variables
-            .iter()
-            .map(|name| python_runtime_type_argument_name(name))
-            .collect::<Vec<_>>();
-        render_resource_type_specialization(output, &arguments);
+        render_resource_type_specialization(output, &runtime_type_argument_names(&type_variables));
         output.push_str("(\n");
         output.push_str(&format!("            {receiver}.create_nexus_client(\n"));
         output.push_str("                service=");
@@ -1275,53 +1281,235 @@ impl<'a> ApiPlanner<'a> {
                 .expect("the client target refuses a service with no endpoint"),
         ));
         output.push_str(",\n            ),\n");
-        for field in &resource.fields {
-            let name = python_field_name(&field.name);
-            output.push_str(&format!("            {name}={name},\n"));
-        }
+        render_resource_factory_arguments(output, "            ", resource);
         output.push_str("        )\n");
     }
 
-    fn render_client_resource_factory_signature(
+    /// Workflow code has no client receiver, so the factory is a module function.
+    fn render_workflow_resource_factory(&self, output: &mut String, resource: &PlannedResource) {
+        let type_variables = resource_type_variable_names(resource);
+        let flatten = self.resource_factory_flatten(resource);
+        for form in resource_factory_forms(flatten.as_ref()) {
+            for supplied in runtime_type_overload_cases(&type_variables) {
+                output.push_str("@typing.overload\n");
+                self.render_resource_factory_overload(
+                    output,
+                    "",
+                    None,
+                    resource,
+                    form,
+                    &type_variables,
+                    RuntimeTypeSignature::Overload(&supplied),
+                );
+                output.push_str(" ...\n\n\n");
+            }
+        }
+        self.render_resource_factory_impl_def(
+            output,
+            "",
+            None,
+            resource,
+            flatten.as_ref(),
+            &type_variables,
+        );
+        render_python_docstring(
+            output,
+            "    ",
+            Some(&format!(
+                "A handle on an existing ``{}``, with no call.",
+                resource.type_name
+            )),
+            &[],
+            None,
+            false,
+        );
+        render_resource_factory_impl_body(output, "    ", flatten.as_ref(), &type_variables);
+        output.push_str("    return ");
+        output.push_str(&resource.type_name);
+        render_resource_type_specialization(output, &runtime_type_argument_names(&type_variables));
+        output.push_str("(\n");
+        render_resource_factory_arguments(output, "        ", resource);
+        output.push_str("    )\n");
+    }
+
+    /// One `def` line of a factory overload, for one identity form (the ref or its promoted
+    /// fields) and one runtime-type case.
+    fn render_resource_factory_overload(
         &self,
         output: &mut String,
+        indent: &str,
+        receiver: Option<&str>,
         resource: &PlannedResource,
+        flatten: Option<&ResourceFactoryFlatten>,
         type_variables: &[String],
         signature: RuntimeTypeSignature<'_>,
     ) {
-        let receiver = resource_client_identifier(resource, "self");
-        output.push_str("    def ");
-        output.push_str(&client_resource_factory_name(resource));
-        output.push_str("(\n        ");
-        output.push_str(&receiver);
-        output.push_str(",\n");
+        output.push_str(&format!(
+            "{indent}def {}(\n",
+            client_resource_factory_name(resource)
+        ));
+        if let Some(receiver) = receiver {
+            output.push_str(&format!("{indent}    {receiver},\n"));
+        }
         if !resource.fields.is_empty() {
-            output.push_str("        *,\n");
+            output.push_str(&format!("{indent}    *,\n"));
         }
-        for field in &resource.fields {
-            output.push_str(&format!(
-                "        {}: {}{},\n",
-                python_field_name(&field.name),
-                self.python_resource_field_annotation(
-                    &field.kind,
-                    field.optional,
-                    field.function.as_ref()
-                ),
-                if field.optional { " = None" } else { "" }
-            ));
-        }
+        self.render_resource_factory_fields(output, &format!("{indent}    "), resource, flatten);
         signature.render_parameters(
             output,
-            "        ",
+            &format!("{indent}    "),
             type_variables,
             !resource.fields.is_empty(),
         );
-        output.push_str("    ) -> ");
+        output.push_str(&format!("{indent}) -> "));
         output.push_str(&signature.annotation(
             &python_type_annotation_with_arguments(&resource.type_name, type_variables),
             type_variables,
         ));
         output.push(':');
+    }
+
+    /// The implementation signature. A flattened resource accepts the ref or its promoted fields,
+    /// all optional, so either overload form can call it.
+    fn render_resource_factory_impl_def(
+        &self,
+        output: &mut String,
+        indent: &str,
+        receiver: Option<&str>,
+        resource: &PlannedResource,
+        flatten: Option<&ResourceFactoryFlatten>,
+        type_variables: &[String],
+    ) {
+        let Some(flatten) = flatten else {
+            self.render_resource_factory_overload(
+                output,
+                indent,
+                receiver,
+                resource,
+                None,
+                type_variables,
+                RuntimeTypeSignature::Implementation,
+            );
+            output.push('\n');
+            return;
+        };
+        output.push_str(&format!(
+            "{indent}def {}(\n",
+            client_resource_factory_name(resource)
+        ));
+        if let Some(receiver) = receiver {
+            output.push_str(&format!("{indent}    {receiver},\n"));
+        }
+        output.push_str(&format!("{indent}    *,\n"));
+        let field_indent = format!("{indent}    ");
+        for field in &resource.fields {
+            let name = python_field_name(&field.name);
+            let annotation = self.python_resource_field_annotation(
+                &field.kind,
+                field.optional,
+                field.function.as_ref(),
+            );
+            output.push_str(&format!(
+                "{field_indent}{name}: {} = None,\n",
+                nullable_python_annotation(&annotation)
+            ));
+            if flatten.param == field.name {
+                for promoted in &flatten.fields {
+                    output.push_str(&format!(
+                        "{field_indent}{}: {} = None,\n",
+                        promoted.attr_name,
+                        nullable_python_annotation(&promoted.annotation)
+                    ));
+                }
+            }
+        }
+        RuntimeTypeSignature::Implementation.render_parameters(
+            output,
+            &field_indent,
+            type_variables,
+            true,
+        );
+        output.push_str(&format!("{indent}) -> "));
+        output.push_str(&RuntimeTypeSignature::Implementation.annotation(
+            &python_type_annotation_with_arguments(&resource.type_name, type_variables),
+            type_variables,
+        ));
+        output.push_str(":\n");
+    }
+
+    /// The constructor fields, with a flattened parameter promoted to its record's fields.
+    fn render_resource_factory_fields(
+        &self,
+        output: &mut String,
+        indent: &str,
+        resource: &PlannedResource,
+        flatten: Option<&ResourceFactoryFlatten>,
+    ) {
+        for field in &resource.fields {
+            let name = python_field_name(&field.name);
+            let annotation = self.python_resource_field_annotation(
+                &field.kind,
+                field.optional,
+                field.function.as_ref(),
+            );
+            let Some(flatten) = flatten.filter(|flatten| flatten.param == field.name) else {
+                let default = if field.optional { " = None" } else { "" };
+                output.push_str(&format!("{indent}{name}: {annotation}{default},\n"));
+                continue;
+            };
+            for field in &flatten.fields {
+                output.push_str(&format!("{indent}{}", field.attr_name));
+                output.push_str(&field.parameter());
+            }
+        }
+    }
+
+    fn resource_factory_flatten(
+        &self,
+        resource: &PlannedResource,
+    ) -> Option<ResourceFactoryFlatten> {
+        let flatten = resource.flatten.as_ref()?;
+        let param = resource
+            .fields
+            .iter()
+            .find(|field| &field.name == flatten)?;
+        let kind = match &param.kind {
+            PlannedType::Option(inner) => inner.as_ref(),
+            kind => kind,
+        };
+        let PlannedType::Record(record) = kind else {
+            return None;
+        };
+        let planned = self.api_plan.record(&record.full_name)?;
+        let rendered = self.models.get(&record.full_name)?;
+        let fields = planned
+            .fields
+            .iter()
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+            .zip(&rendered.fields)
+            .collect::<Vec<_>>();
+        Some(ResourceFactoryFlatten {
+            param: flatten.clone(),
+            model_name: rendered.name.clone(),
+            fields: fields
+                .iter()
+                .map(|((_, planned), rendered)| {
+                    let annotation = rendered
+                        .annotation
+                        .strip_suffix(" | None")
+                        .unwrap_or(&rendered.annotation);
+                    FactoryPromotedField {
+                        attr_name: rendered.attr_name.clone(),
+                        annotation: annotation.to_string(),
+                        default_kind: rendered.default_kind.clone(),
+                        default_expr: rendered
+                            .default_expr
+                            .clone()
+                            .filter(|_| planned.has_default()),
+                    }
+                })
+                .collect(),
+        })
     }
 
     fn render_resource_module_file(
@@ -1367,6 +1555,8 @@ impl<'a> ApiPlanner<'a> {
             body.push_str("\n\n");
         }
         let type_variables = resource_type_variable_names(resource);
+        let workflow_factory = target == GenerationTarget::Workflow
+            && workflow_factory_resources(service).any(|factory| factory.name == resource.name);
         for name in &type_variables {
             body.push_str(name);
             body.push_str(" = typing.TypeVar(");
@@ -1378,6 +1568,11 @@ impl<'a> ApiPlanner<'a> {
         }
         let client = target == GenerationTarget::Client;
         self.render_resource(&mut body, service, resource, bound_operations, Some(target));
+        let workflow = target == GenerationTarget::Workflow;
+        if workflow_factory {
+            body.push_str("\n\n");
+            self.render_workflow_resource_factory(&mut body, resource);
+        }
         for (full_name, (_, resource_type)) in resource_holders(self.api_plan) {
             if resource_type != resource.type_name {
                 continue;
@@ -1389,7 +1584,6 @@ impl<'a> ApiPlanner<'a> {
                 module_imports.extend(field.imports.module_imports.iter().cloned());
             }
         }
-        let workflow = target == GenerationTarget::Workflow;
         if workflow && !bound_operations.is_empty() && service.endpoint.is_some() {
             body.push_str("\n\n");
             for (index, bound_operation) in bound_operations.iter().enumerate() {
@@ -3770,6 +3964,43 @@ pub(in crate::generator) enum PythonFieldDefaultKind {
     None,
 }
 
+struct ResourceFactoryFlatten {
+    param: String,
+    model_name: String,
+    fields: Vec<FactoryPromotedField>,
+}
+
+struct FactoryPromotedField {
+    attr_name: String,
+    annotation: String,
+    default_kind: PythonFieldDefaultKind,
+    default_expr: Option<String>,
+}
+
+impl FactoryPromotedField {
+    fn required(&self) -> bool {
+        self.default_kind == PythonFieldDefaultKind::Required && self.default_expr.is_none()
+    }
+
+    fn parameter(&self) -> String {
+        let annotation = &self.annotation;
+        if self.required() {
+            format!(": {annotation},\n")
+        } else {
+            format!(": {annotation} | None = None,\n")
+        }
+    }
+
+    /// The value that the factory passes to the model, so the model keeps its default.
+    fn value(&self) -> String {
+        let name = &self.attr_name;
+        match &self.default_expr {
+            Some(expr) => format!("{expr} if {name} is None else {name}"),
+            None => name.clone(),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct RenderedUnpackedInput {
     model_name: String,
@@ -6007,6 +6238,7 @@ fn render_package_init(
                 .operations
                 .iter()
                 .map(|operation| operation.attr_name.clone())
+                .chain(workflow_factory_resources(service).map(workflow_resource_factory_name))
         })
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -6065,6 +6297,13 @@ fn render_package_init(
                         std::slice::from_ref(&operation.attr_name),
                     );
                 }
+            }
+            for resource in workflow_factory_resources(service) {
+                render_named_python_import(
+                    &mut output,
+                    &format!("._resources.{}", resource_module_name(resource)),
+                    &[workflow_resource_factory_name(resource)],
+                );
             }
         }
     }
@@ -6798,6 +7037,143 @@ fn render_client_extension(output: &mut String, service: &RenderedService<'_>, f
 
 fn client_resource_factory_name(resource: &PlannedResource) -> String {
     format!("get_{}", resource.name.to_snake_case())
+}
+
+/// The client accessor's name, so both targets build a handle the same way.
+fn workflow_resource_factory_name(resource: &PlannedResource) -> String {
+    client_resource_factory_name(resource)
+}
+
+/// A method-less handle adds nothing, and a same-named operation that returns it gives the handle.
+fn workflow_factory_resources<'a>(
+    service: &'a RenderedService<'a>,
+) -> impl Iterator<Item = &'a PlannedResource> {
+    service.resources.iter().filter(move |resource| {
+        let gets_it = |operation: &RenderedOperation<'_>| {
+            let returns_it = (operation.output_direct_result
+                && operation.output_ref == resource.type_name)
+                || operation
+                    .output_resource_return
+                    .as_ref()
+                    .is_some_and(|returned| returned.resource_type_name == resource.type_name);
+            returns_it && operation.attr_name == workflow_resource_factory_name(resource)
+        };
+        service.endpoint.is_some()
+            && !resource.methods.is_empty()
+            && !service.operations.iter().any(gets_it)
+    })
+}
+
+/// The package exports each factory next to its operation functions and modules.
+fn validate_workflow_factory_names(services: &[RenderedService<'_>]) -> Result<()> {
+    let mut names = ["client", "models", "operations", "services"]
+        .map(|module| {
+            (
+                module.to_string(),
+                format!("the module `{module}` of the package"),
+            )
+        })
+        .into_iter()
+        .collect::<BTreeMap<_, _>>();
+    for service in services.iter().filter(|service| service.endpoint.is_some()) {
+        for operation in &service.operations {
+            names.insert(
+                operation.attr_name.clone(),
+                format!(
+                    "the function of operation `{}.{}`",
+                    service.name, operation.name
+                ),
+            );
+        }
+    }
+    for service in services {
+        for resource in workflow_factory_resources(service) {
+            let name = workflow_resource_factory_name(resource);
+            let generated_by = format!("the factory of resource `{}`", resource.type_name);
+            if let Some(conflicting_declaration) = names.insert(name.clone(), generated_by.clone())
+            {
+                return Err(Error::PythonGeneratedNameConflict {
+                    name,
+                    generated_by,
+                    conflicting_declaration,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn render_resource_factory_arguments(
+    output: &mut String,
+    indent: &str,
+    resource: &PlannedResource,
+) {
+    for field in &resource.fields {
+        let name = python_field_name(&field.name);
+        output.push_str(&format!("{indent}{name}={name},\n"));
+    }
+}
+
+/// The identity forms a factory overloads over: the ref, and a flattened resource's promoted
+/// fields.
+fn resource_factory_forms(
+    flatten: Option<&ResourceFactoryFlatten>,
+) -> Vec<Option<&ResourceFactoryFlatten>> {
+    match flatten {
+        Some(flatten) => vec![None, Some(flatten)],
+        None => vec![None],
+    }
+}
+
+fn runtime_type_argument_names(type_variables: &[String]) -> Vec<String> {
+    type_variables
+        .iter()
+        .map(|name| python_runtime_type_argument_name(name))
+        .collect()
+}
+
+/// Let an implementation parameter default to `None` without changing the overloads' types.
+fn nullable_python_annotation(annotation: &str) -> String {
+    if annotation.ends_with(" | None") {
+        annotation.to_string()
+    } else {
+        format!("{annotation} | None")
+    }
+}
+
+/// The implementation rebuilds the ref from the promoted fields when the caller gave none, then
+/// fixes an omitted runtime type to Any.
+fn render_resource_factory_impl_body(
+    output: &mut String,
+    indent: &str,
+    flatten: Option<&ResourceFactoryFlatten>,
+    type_variables: &[String],
+) {
+    if let Some(flatten) = flatten {
+        let param = python_field_name(&flatten.param);
+        output.push_str(&format!("{indent}if {param} is None:\n"));
+        let inner = format!("{indent}    ");
+        for promoted in &flatten.fields {
+            if promoted.required() {
+                output.push_str(&format!(
+                    "{inner}assert {} is not None\n",
+                    promoted.attr_name
+                ));
+            }
+        }
+        let value = format!(
+            "{}({})",
+            flatten.model_name,
+            flatten
+                .fields
+                .iter()
+                .map(|field| format!("{}={}", field.attr_name, field.value()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        output.push_str(&format!("{inner}{param} = {value}\n"));
+    }
+    render_untyped_runtime_type_fallbacks(output, indent, type_variables);
 }
 
 fn endpoint_service_object_name(service: &RenderedService<'_>) -> String {

@@ -1661,6 +1661,26 @@ await job.restart()
 nexgen refuses a factory name that is also the name of a client method of a
 service in the package.
 
+In Python, the Workflow package has the same `get_<resource>` factory for each
+resource with a method. nexgen refuses one with the name of an operation
+function of the package.
+
+`@nexus.flatten-in-api param="<parameter>"` on a resource adds an overload that
+takes the fields of that constructor parameter's record. The factory keeps the
+original by-ref form too, so a caller passes either the ref or its fields.
+
+```wit
+/// @nexus.flatten-in-api param="ref"
+resource %stream {
+  constructor(ref: stream-ref, created: option<bool>);
+}
+```
+
+```python
+stream = get_stream(id="chat-1:turns", backend="redis", body_type=Turn)
+same = get_stream(ref=StreamRef(id="chat-1:turns", backend="redis"), body_type=Turn)
+```
+
 Sources work in the client target as well. Restrict workflow-only helpers with
 `targets="workflow"`. If a required resource-method request field has neither an
 applicable source nor a resource field or method parameter supplying it,
@@ -1713,7 +1733,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.poll`                           | freestanding function                                                                         |
 | `@nexus.serialization-context`          | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
-| `@nexus.flatten-in-api`                 | record, record field                                                                          |
+| `@nexus.flatten-in-api`                 | record, record field, resource                                                                |
 | `@nexus.flattened-type`                 | record field                                                                                  |
 | `@nexus.function`                       | type alias, record field                                                                      |
 | `@nexus.function-args`                  | freestanding function                                                                         |
@@ -2053,10 +2073,10 @@ resource %stream {
 The handle keeps a runtime type for each type parameter and decodes responses
 with it. Python takes `Stream[Turn](...)`, a subclass of `Stream[Turn]`, or a
 keyword, as in `create_stream(stream_ref=ref, body_type=Turn)` or
-`client.get_stream(ref=ref, body_type=Turn)`. A call with no `body_type` decodes
-as `typing.Any`, but its static return type is `Stream[object]`; a concrete
-`Stream[Turn]` requires `body_type=Turn`. TypeScript takes `bodyType` after the
-fields, and .NET takes the type argument, as in
+`client.get_stream(id=ref.id, body_type=Turn)`. A call with no `body_type`
+decodes as `typing.Any`, but its static return type is `Stream[object]`; a
+concrete `Stream[Turn]` requires `body_type=Turn`. TypeScript takes `bodyType`
+after the fields, and .NET takes the type argument, as in
 `CreateStreamAsync<Turn>(options)`.
 
 Go and Java refuse a generic resource. A record field can't hold one yet, and an
@@ -2536,12 +2556,15 @@ The stream sample's full helpers are in
 
 ### @nexus.flatten-in-api
 
-**Placement:** Record type (with `@nexus.proto`), or a request field of such a
-type **Syntax:** `@nexus.flatten-in-api` (no arguments)
+**Placement:** Record type (with `@nexus.proto`), a request field of such a
+type, or a resource **Syntax:** `@nexus.flatten-in-api` (no arguments) on a
+record or field, `@nexus.flatten-in-api param="<parameter>"` on a resource
 
 Flattens the record's fields into the parent record's generated API surface
 instead of creating a nested model. On a field, it flattens only that call. See
-[Flattening one field](#flattening-one-field).
+[Flattening one field](#flattening-one-field). On a resource, the Python factory
+adds an overload that takes the fields of the constructor parameter `param`,
+alongside the original by-ref overload.
 
 ```wit
 /// @nexus.proto "temporal.api.sdk.v1.UserMetadata"

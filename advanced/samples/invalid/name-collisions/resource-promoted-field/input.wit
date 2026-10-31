@@ -1,0 +1,18 @@
+package temporal:nexus@1.0.0;
+
+world system { export history-service; }
+
+/// @nexus.endpoint "history"
+interface history-service {
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
+  record workflow-execution {
+    workflow-id: string,
+    run-id: option<string>,
+  }
+
+  // The promoted `run-id` has the name of another parameter.
+  /// @nexus.flatten-in-api param="execution"
+  resource run {
+    constructor(execution: workflow-execution, run-id: option<string>);
+  }
+}

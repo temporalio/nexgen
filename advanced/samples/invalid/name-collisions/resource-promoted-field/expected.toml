@@ -1,0 +1,5 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-wit"
+contains = ["resource `run` parameter `execution` promotes `run_id`, whose name `run-id` is also the name of parameter `run-id`"]

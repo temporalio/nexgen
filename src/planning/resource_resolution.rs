@@ -115,6 +115,7 @@ pub(crate) struct ResolvedResourceSpec {
     /// Inferred during resource resolution, in stable type-identity order.
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<ResourceFieldSpec<SelectedFamily>>,
+    pub(crate) flatten: Option<String>,
     pub(crate) methods: Vec<ResolvedResourceMethodSpec>,
 }
 
@@ -369,6 +370,7 @@ fn resolve_resource_methods(
         doc: resource.doc.clone(),
         type_parameters: Vec::new(),
         fields: resource.fields.clone(),
+        flatten: resource.flatten.clone(),
         methods,
     })
 }
