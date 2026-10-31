@@ -409,6 +409,29 @@ async def test_a_done_first_page_ends_the_read() -> None:
     ]
 
 
+async def test_a_changed_page_does_not_change_the_next_request() -> None:
+    ref = StreamHandle(id="s1")
+    wait = datetime.timedelta(seconds=30)
+    client, answers = connect(
+        Client,
+        {
+            "ReadRecords": [
+                ReadRecordsResponse(records=[StreamRecord(offset=1)], next_offset=2),
+                ReadRecordsResponse(done=True),
+            ]
+        },
+    )
+    stream = client.get_stream(handle=ref, created=None)
+
+    async for page in stream.iter_read(from_offset=1, wait=wait):
+        page.next_offset = 9
+
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(handle=ref, from_offset=1, wait=wait),
+        ReadRecordsRequest(handle=ref, from_offset=2, wait=wait),
+    ]
+
+
 def test_only_the_client_target_has_the_read_poll() -> None:
     assert hasattr(workflow_stream_module, "read_records")
     assert not hasattr(workflow_stream_module, "iter_read_records")

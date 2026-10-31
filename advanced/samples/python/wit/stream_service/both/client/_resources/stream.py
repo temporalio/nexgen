@@ -115,10 +115,27 @@ class Stream:
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
-    ) -> collections.abc.AsyncIterator[ReadRecordsResponse]:
-        """Yield each response of ``read``, until the last one."""
+    ) -> collections.abc.AsyncGenerator[ReadRecordsResponse, None]:
+        """Yield each response of ``read`` until the poll helper stops.
+
+        Read one page of Records. The poll iterator reads them all.
+
+        Args:
+            from_offset: Start offset. Empty uses start. OUT_OF_RANGE past the newest
+                offset + 1.
+            start: Where to start when from-offset is empty. Unspecified is the
+                beginning.
+            max_records: About this many items per page, 1 to 1000. A Superseded item
+                stays with its Record.
+            wait: How long to wait for a new Record before an empty answer. At most 60
+                s.
+            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
+                At most 60 s.
+            max_bytes: The maximum Record bytes in a page. A larger Record is still
+                returned alone.
+        """
         request = ReadRecordsRequest(
-            stream=self.stream,
+            handle=self.handle,
             from_offset=from_offset,
             start=start,
             max_records=max_records,
@@ -134,8 +151,8 @@ class Stream:
                 id=f"{_uuid.uuid4()}",
             )
             response = await handle.result()
-            yield response
             next_request = _support.next_read_request(request, response)
+            yield response
             if next_request is None:
                 return
             request = next_request

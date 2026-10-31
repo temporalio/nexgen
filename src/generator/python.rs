@@ -1649,13 +1649,11 @@ impl<'a> ApiPlanner<'a> {
         else {
             return;
         };
-        let Some(operation) = bound_operations
+        let operation = bound_operations
             .iter()
             .map(|bound_operation| bound_operation.operation)
             .find(|operation| operation.name == operation_name)
-        else {
-            return;
-        };
+            .expect("bound resource operation should be rendered in the same module");
         let Some(next_expr) = operation.poll_next(GenerationTarget::Client) else {
             return;
         };
@@ -1664,14 +1662,27 @@ impl<'a> ApiPlanner<'a> {
         output.push_str(&poll_function_name(&method_name));
         output.push_str("(\n");
         self.render_resource_method_params(output, method);
-        output.push_str("    ) -> collections.abc.AsyncIterator[");
+        output.push_str("    ) -> collections.abc.AsyncGenerator[");
         output.push_str(&operation.output_annotation);
-        output.push_str("]:\n");
+        output.push_str(", None]:\n");
+        // A parameter fills the request field of the same name, so it gets the doc of that field.
+        let field_docs = operation
+            .target_unpacked_input(GenerationTarget::Client)
+            .map(|unpacked_input| unpacked_operation_doc_args(unpacked_input, None))
+            .unwrap_or_default();
+        let args = method
+            .params
+            .iter()
+            .filter_map(|param| {
+                let name = python_field_name(&param.name);
+                field_docs.iter().find(|(field, _)| *field == name).cloned()
+            })
+            .collect::<Vec<_>>();
         render_python_docstring(
             output,
             "        ",
-            Some(&poll_function_summary(&method_name, None)),
-            &[],
+            Some(&poll_function_summary(&method_name, method.doc.as_deref())),
+            &args,
             None,
             operation.experimental,
         );
@@ -7807,7 +7818,7 @@ fn poll_function_name(name: &str) -> String {
 }
 
 fn poll_function_summary(name: &str, doc: Option<&str>) -> String {
-    let summary = format!("Yield each response of ``{name}``, until the last one.");
+    let summary = format!("Yield each response of ``{name}`` until the poll helper stops.");
     match doc.map(str::trim).filter(|doc| !doc.is_empty()) {
         Some(doc) => format!("{summary}\n\n{doc}"),
         None => summary,
@@ -7847,9 +7858,9 @@ fn render_operation_poll_function(
         output.push_str(operation_input_annotation(operation));
         output.push_str(",\n");
     }
-    start_line(output, target, ") -> collections.abc.AsyncIterator[");
+    start_line(output, target, ") -> collections.abc.AsyncGenerator[");
     output.push_str(&operation.output_annotation);
-    output.push_str("]:\n");
+    output.push_str(", None]:\n");
     let args = unpacked_input
         .map(|unpacked_input| unpacked_operation_doc_args(unpacked_input, None))
         .unwrap_or_default();
@@ -7919,10 +7930,11 @@ fn render_client_poll_loop(
     } else {
         start_line(output, target, "        response = await handle.result()\n");
     }
-    start_line(output, target, "        yield response\n");
+    // The helper runs first, so a change to the yielded page doesn't change the next request.
     start_line(output, target, "        next_request = ");
     output.push_str(next_expr);
     output.push_str("(request, response)\n");
+    start_line(output, target, "        yield response\n");
     start_line(output, target, "        if next_request is None:\n");
     start_line(output, target, "            return\n");
     start_line(output, target, "        request = next_request\n");
