@@ -2134,7 +2134,7 @@ type or transform expression refers to an otherwise-unavailable module.
 ### @nexus.poll
 
 **Placement:** Operation (function) **Syntax:**
-`@nexus.poll python="<support-helper>" target="client"`
+`@nexus.poll python="<support-helper>" targets="client"`
 
 Generates an `iter_<name>` async iterator in the client target, on the client
 extension and on each client resource method that binds the operation. The
@@ -2150,7 +2150,7 @@ client of the handle. Each page is a new operation, so it gets a new random
 operation ID.
 
 Only the client target gets an iterator so far, so the directive needs
-`target="client"`, and the Workflow package has no iterator. With the client
+`targets="client"`, and the Workflow package has no iterator. With the client
 target, nexgen refuses the directive on an operation with function inputs, an
 output transform, a resource result or no result, since it can't make an
 iterator for those yet. It also refuses the directive on a resource method, and
@@ -2158,7 +2158,7 @@ an `iter_<name>` that another operation, method or field already has.
 
 ```wit
 /// @nexus.operation name="ReadRecords"
-/// @nexus.poll python="next_read_request" target="client"
+/// @nexus.poll python="next_read_request" targets="client"
 read-records: func(request: read-records-request) -> read-records-response;
 ```
 

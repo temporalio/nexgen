@@ -4,4 +4,6 @@ targets = ["workflow", "client"]
 
 [error]
 kind = "python-generated-name-conflict"
-contains = ["`iter_read`", "resource method `Feed.read`", "method `Feed.iter-read`"]
+contains = [
+  "Python generated name `iter_read` for the iterator of resource method `Feed.read` conflicts with method `Feed.iter-read`",
+]

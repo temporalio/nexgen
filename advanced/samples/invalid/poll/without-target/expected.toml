@@ -1,3 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = ["@nexus.poll", "needs `target=\"client\"`"]

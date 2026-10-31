@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.poll", "name the support helper"]
+contains = [
+  "invalid WIT directive `@nexus.poll` on interface `reader` operation `Read`",
+  "needs a support helper that builds the next request",
+]

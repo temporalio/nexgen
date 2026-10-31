@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["@nexus.poll", "invalid `python` support helper `next_read(request, response)`"]
+contains = [
+  "invalid WIT directive `@nexus.poll` on interface `reader` operation `Read`",
+  "invalid `python` support helper `next_read(request, response)`",
+]

@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.poll` on interface `reader` operation `Read`",
+  "needs `targets=\"client\"`, since only the client target gets an iterator",
+]

@@ -7,6 +7,6 @@ interface reader {
   record read-request { offset: option<s64> }
   record read-response { done: option<bool> }
 
-  /// @nexus.poll python="next_read(request, response)"
+  /// @nexus.poll python="next_read(request, response)" targets="client"
   read: func(request: read-request) -> read-response;
 }

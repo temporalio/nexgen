@@ -7,7 +7,7 @@ interface reader {
   resource feed {
     constructor(feed-id: string);
 
-    /// @nexus.poll python="next_read"
+    /// @nexus.poll python="next_read" targets="client"
     read: func(offset: option<s64>);
   }
 

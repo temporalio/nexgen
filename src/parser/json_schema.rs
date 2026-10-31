@@ -6185,7 +6185,7 @@ fn build_operation(
         output_transform: None,
         serialization_context: LanguageStringSpec::default(),
         poll_next: LanguageStringSpec::default(),
-        poll_target: None,
+        poll_targets: Vec::new(),
         data: (),
     })
 }

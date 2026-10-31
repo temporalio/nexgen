@@ -4,4 +4,6 @@ targets = ["workflow", "client"]
 
 [error]
 kind = "python-generated-name-conflict"
-contains = ["`iter_read`", "operation `Reader.Read`", "operation `Reader.IterRead`"]
+contains = [
+  "Python generated name `iter_read` for the iterator of operation `Reader.Read` conflicts with operation `Reader.IterRead`",
+]

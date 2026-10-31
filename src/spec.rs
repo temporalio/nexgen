@@ -676,8 +676,8 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     /// The support helper that turns a request and its response into the next request of a poll,
     /// or into nothing to stop. It changes no model or wire byte.
     pub poll_next: F::Text,
-    /// The only target whose API gets the poll. Without it, every target gets the poll.
-    pub poll_target: Option<GenerationTarget>,
+    /// The targets whose API gets the poll.
+    pub poll_targets: Vec<GenerationTarget>,
     pub data: F::OperationData,
 }
 
@@ -715,7 +715,7 @@ impl<F: TypeFamily> OperationSpec<F> {
                 .map(|transform| transform.map_names_with(map)),
             serialization_context: map.map_text(self.serialization_context),
             poll_next: map.map_text(self.poll_next),
-            poll_target: self.poll_target,
+            poll_targets: self.poll_targets,
             data,
         }
     }

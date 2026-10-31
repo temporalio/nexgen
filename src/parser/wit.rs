@@ -3011,7 +3011,7 @@ fn build_resource_method(
             path: path.to_path_buf(),
             context: context.clone(),
             directive: "@nexus.poll".to_string(),
-            reason: "goes on the operation that the method binds, not on the method".to_string(),
+            reason: "must be on the operation that the method binds, not on the method".to_string(),
         });
     }
     let params = function
@@ -3152,7 +3152,7 @@ fn build_operation(
         &operation_name,
     )?;
     let serialization_context = build_operation_serialization_context(&directives, path, &context)?;
-    let (poll_next, poll_target) = build_operation_poll(&directives, path, &context)?;
+    let (poll_next, poll_targets) = build_operation_poll(&directives, path, &context)?;
     let output = if let Some(output_type) = function.result.as_ref() {
         Some(
             find_operation_type_spec(resolve, output_type, path, &context)?.ok_or_else(|| {
@@ -3193,7 +3193,7 @@ fn build_operation(
         output_transform,
         serialization_context,
         poll_next,
-        poll_target,
+        poll_targets,
         data: (),
     })
 }
@@ -3316,9 +3316,9 @@ fn build_operation_poll(
     directives: &[Directive],
     path: &Path,
     context: &str,
-) -> Result<(LanguageStringSpec, Option<GenerationTarget>)> {
+) -> Result<(LanguageStringSpec, Vec<GenerationTarget>)> {
     let Some(directive) = directive(directives, "poll", path, context)? else {
-        return Ok((LanguageStringSpec::default(), None));
+        return Ok((LanguageStringSpec::default(), Vec::new()));
     };
     let invalid = |reason: String| Error::InvalidWitDirective {
         path: path.to_path_buf(),
@@ -3329,7 +3329,7 @@ fn build_operation_poll(
     let spec = directive_language_string(directive);
     if spec.default.is_none() && spec.by_language.is_empty() {
         return Err(invalid(
-            "name the support helper that builds the next request".to_string(),
+            "needs a support helper that builds the next request".to_string(),
         ));
     }
     for (language, helper) in spec
@@ -3348,23 +3348,19 @@ fn build_operation_poll(
             )));
         }
     }
-    // Only the client target writes an iterator so far.
-    let target = match directive.value("target") {
-        Some("client") => GenerationTarget::Client,
-        None => {
-            return Err(invalid(
-                "needs `target=\"client\"`, since only the client target gets an iterator so far"
-                    .to_string(),
-            ));
-        }
-        Some(target) => {
-            return Err(invalid(format!(
-                "`target` is `{target}`, but it must be `client`, since only the client target \
-                 gets an iterator so far"
-            )));
-        }
-    };
-    Ok((spec, Some(target)))
+    if directive.value("targets").is_none() {
+        return Err(invalid(
+            "needs `targets=\"client\"`, since only the client target gets an iterator".to_string(),
+        ));
+    }
+    let targets = build_origin_targets(directive, path, context, "poll")?;
+    if targets.contains(&GenerationTarget::Workflow) {
+        return Err(invalid(
+            "`targets` includes `workflow`, but only the client target gets an iterator"
+                .to_string(),
+        ));
+    }
+    Ok((spec, targets))
 }
 
 fn build_operation_serialization_context(
