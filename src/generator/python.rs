@@ -2392,7 +2392,13 @@ impl<'a> ApiPlanner<'a> {
                 });
                 continue;
             }
-            if matches!(planned_field.origin, Some(FieldOrigin::ApiOmitted)) {
+            if planned_field.api_omitted_for(target) {
+                if api_omits_required_list(planned_field, target) {
+                    request_fields.push(RenderedUnpackedRequestField {
+                        attr_name: rendered_field.attr_name.clone(),
+                        value_expr: "[]".to_string(),
+                    });
+                }
                 continue;
             }
             let default_kind = rendered_field.default_kind.clone();
@@ -2529,8 +2535,7 @@ impl<'a> ApiPlanner<'a> {
                 .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
                 .zip(nested_rendered_model.fields.iter())
                 .filter(|((_, field), _)| {
-                    !matches!(field.origin, Some(FieldOrigin::ApiOmitted))
-                        && field.source_for(target).is_none()
+                    !field.api_omitted_for(target) && field.source_for(target).is_none()
                 })
                 .map(
                     |((nested_field_name, nested_planned_field), nested_rendered_field)| {
@@ -7585,6 +7590,18 @@ fn python_request_arguments(
                     )
                 }),
         );
+        arguments.extend(
+            record
+                .fields
+                .values()
+                .filter(|field| {
+                    api_omits_required_list(field, target)
+                        && fields
+                            .iter()
+                            .all(|planned| planned.field_name != field.name)
+                })
+                .map(|field| format!("{}=[]", python_field_name(&field.name))),
+        );
     }
     arguments.extend(
         python_missing_request_defaults(api_plan, message_name, fields, target)
@@ -7592,6 +7609,16 @@ fn python_request_arguments(
             .map(|(name, expression)| format!("{name}=({expression})")),
     );
     arguments
+}
+
+/// The model needs a required list that the target's API omits, so the request has it empty.
+fn api_omits_required_list(
+    field: &RecordFieldSpec<PlannedFamily>,
+    target: GenerationTarget,
+) -> bool {
+    field.required
+        && field.api_omitted_for(target)
+        && matches!(field.field_type, PlannedType::List(_))
 }
 
 fn python_request_model_name(api_plan: &PlannedSpec, message_name: &str) -> String {
@@ -7639,10 +7666,9 @@ fn resource_return_binding_expr_python(binding: &PlannedOperationResourceFieldBi
             proto_field_name: _,
             origin,
         } => {
-            if matches!(
-                origin,
-                Some(FieldOrigin::Source { .. } | FieldOrigin::Omitted)
-            ) {
+            if matches!(origin, Some(FieldOrigin::Omitted))
+                || origin.as_ref().is_some_and(FieldOrigin::is_sourced)
+            {
                 let expr = format!("request.{}", python_field_name(field_name));
                 if binding.optional {
                     format!("{expr} or None")

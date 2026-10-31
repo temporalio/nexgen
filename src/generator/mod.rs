@@ -1011,4 +1011,116 @@ interface example-service {
         );
         assert!(generated.files[&PathBuf::from("services.py")].contains("class ExampleService"));
     }
+
+    fn workflow_files(language: Language, wit: &str) -> BTreeMap<PathBuf, String> {
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
+            language,
+            wit,
+            PathBuf::from("inline.wit"),
+            &[root.join("advanced/samples/inputs/deps")],
+        )
+        .unwrap();
+        let descriptors = DescriptorIndex::load_many(&[
+            root.join("advanced/samples/descriptors/temporal_api.bin"),
+            root.join("advanced/samples/descriptors/streams.bin"),
+        ])
+        .unwrap();
+        generate_files_for_tree_with_targets_and_options(
+            language,
+            ApiSpecTree::single(spec),
+            &descriptors,
+            &[GenerationTarget::Workflow],
+            GenerateFilesOptions {
+                support_package: Some("support".to_string()),
+                ..GenerateFilesOptions::default()
+            },
+        )
+        .unwrap()
+        .files
+    }
+
+    #[test]
+    fn a_workflow_call_sends_an_omitted_required_list_empty() {
+        let wit = r#"
+package test:jobs@1.0.0;
+
+world system { export job-service; }
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  record run-request {
+    id: string,
+    /// @nexus.api-omit targets="workflow"
+    tags: list<string>,
+  }
+
+  run: func(request: run-request);
+}
+"#;
+        let python = workflow_files(Language::Python, wit);
+        let operation = &python[&PathBuf::from("operations/run.py")];
+        assert!(operation.contains("tags=[],"), "{operation}");
+        let typescript = workflow_files(Language::TypeScript, wit);
+        let operation = &typescript[&PathBuf::from("operations/run.ts")];
+        assert!(operation.contains("tags: [],"), "{operation}");
+        let dotnet = workflow_files(Language::Dotnet, wit);
+        let models = &dotnet[&PathBuf::from("Models.cs")];
+        assert!(
+            models.contains("Tags = tags ?? System.Array.Empty<string>();"),
+            "{models}"
+        );
+    }
+
+    #[test]
+    fn a_typescript_model_keeps_the_name_optionality_and_long_of_a_sourced_field() {
+        let wit = r#"
+package temporal:nexus@1.0.0;
+
+world system { export stream-service; }
+
+/// @nexus.endpoint "streams"
+interface stream-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest"
+  record read-records-request {
+    /// @nexus.omit
+    ref: placeholder,
+    /// @nexus.name typescript="offset"
+    /// @nexus.source targets="workflow" typescript="startOffset()"
+    from-offset: option<s64>,
+    /// @nexus.omit
+    start: placeholder,
+    max-records: option<s32>,
+    /// @nexus.omit
+    wait: placeholder,
+    /// @nexus.omit
+    create-wait: placeholder,
+    /// @nexus.omit
+    last: placeholder,
+    /// @nexus.omit
+    max-bytes: placeholder,
+    /// @nexus.omit
+    namespace: placeholder,
+    /// @nexus.omit
+    to-offset: placeholder,
+    /// @nexus.omit
+    wake-only: placeholder,
+    /// @nexus.omit
+    floor-from: placeholder,
+  }
+
+  read-records: func(request: read-records-request);
+}
+"#;
+        let typescript = workflow_files(Language::TypeScript, wit);
+        let models = &typescript[&PathBuf::from("models.ts")];
+        assert!(models.contains("offset?: Long;"), "{models}");
+        assert!(models.contains("fromOffset: model.offset"), "{models}");
+    }
 }

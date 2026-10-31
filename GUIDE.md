@@ -1119,7 +1119,17 @@ making it a public operation parameter.
 headers: option<header>,
 ```
 
-`@nexus.api-omit` cannot be combined with `@nexus.omit` or `@nexus.source`.
+`targets="workflow"` or `targets="client"` omits the field from those targets
+only. The other targets take it as an argument or from their `@nexus.source`.
+
+```wit
+/// @nexus.api-omit targets="workflow"
+last: option<s32>,
+```
+
+The field must be an `option<T>` or a `list<T>`, since a call leaves it unset.
+An omitted list is sent empty. `@nexus.api-omit` cannot be combined with
+`@nexus.omit`, `@nexus.default`, or a `@nexus.source` for the same target.
 
 ### Flattened Records
 
@@ -2206,14 +2216,16 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 
 ### @nexus.api-omit
 
-**Placement:** Record field **Syntax:** `@nexus.api-omit` (no arguments)
+**Placement:** Record field **Syntax:**
+`@nexus.api-omit [targets="workflow,client"]`
 
 Keeps the field on generated models and in proto conversion, but excludes it
-from generated convenience operation APIs. Unlike `@nexus.omit`, this preserves
-the field in the generated model. See [API-omitted fields](#api-omitted-fields)
-for an example.
+from generated convenience operation APIs. `targets` limits the omission to
+those targets. Unlike `@nexus.omit`, this preserves the field in the generated
+model. See [API-omitted fields](#api-omitted-fields) for an example.
 
-Cannot be combined with `@nexus.omit` or `@nexus.source`.
+Cannot be combined with `@nexus.omit`, `@nexus.default`, or a `@nexus.source`
+for the same target.
 
 ---
 

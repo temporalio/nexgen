@@ -73,5 +73,13 @@ namespace Nexgen.DotNetExamples.Tests
                 converter.FromTransferType(wire));
             Assert.Equal(StreamServiceExample.StreamStatus.StreamStatusUnspecified, decoded.Status);
         }
+
+        // Replay needs a fixed range, so the WIT omits `last` from the Workflow API only.
+        [Fact]
+        public void AWorkflowReadTakesNoLast()
+        {
+            Assert.Null(typeof(StreamServiceExample.ReadRecordsOptions).GetProperty("Last"));
+            Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest).GetProperty("Last"));
+        }
     }
 }
