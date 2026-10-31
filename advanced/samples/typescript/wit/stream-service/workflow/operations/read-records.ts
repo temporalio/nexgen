@@ -6,6 +6,12 @@ import type { ReadRecordsResponse, ReadRecordsRequest } from "../models";
 import "../resources";
 import type { Stream } from "../resources";
 
+type ReadRecordsInput = ReadRecordsRequest extends infer Input
+  ? Input extends unknown
+    ? Omit<Input, "last"> & { last?: never }
+    : never
+  : never;
+
 /**
  * A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
  * Activity.
@@ -13,7 +19,7 @@ import type { Stream } from "../resources";
  * @param request - Request for the operation.
  */
 export async function readRecords(
-  request: ReadRecordsRequest,
+  request: ReadRecordsInput,
 ): Promise<nexus.NexusOperationHandle<ReadRecordsResponse>> {
   const client = nexus.createNexusServiceClient({
     service: streamService,

@@ -173,13 +173,14 @@ fn missing_origin_field(
     if let Some(record) = record_for_request_name(api_plan, message_name) {
         for field in record.fields.values() {
             let kind = match field.origin.as_ref() {
-                Some(FieldOrigin::Source { .. }) => "sourced",
                 Some(FieldOrigin::Default { .. }) => "defaulted",
+                _ if field.has_source() => "sourced",
                 _ => continue,
             };
             if field.required
                 && field.source_for(target).is_none()
                 && field.default_for(target).is_none()
+                && !field.api_omitted_for(target)
                 && fields
                     .iter()
                     .all(|planned| planned.field_name != field.name)

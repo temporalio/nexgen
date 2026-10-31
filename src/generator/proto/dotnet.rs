@@ -800,14 +800,9 @@ fn render_model_from_wire_method(
     let init_fields = model
         .fields
         .iter()
+        .filter(|(_, field)| !field.required || field.has_source())
         .filter(|(_, field)| {
-            !field.required || matches!(field.origin, Some(FieldOrigin::Source { .. }))
-        })
-        .filter(|(_, field)| {
-            !matches!(
-                field.origin,
-                Some(FieldOrigin::Omitted | FieldOrigin::Source { .. })
-            )
+            !matches!(field.origin, Some(FieldOrigin::Omitted)) && !field.has_source()
         })
         .collect::<Vec<_>>();
     if init_fields.is_empty() {

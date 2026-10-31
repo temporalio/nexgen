@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit-directive"
+contains = ["cannot be combined with `@nexus.source` for the same target"]

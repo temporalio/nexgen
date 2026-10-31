@@ -1427,7 +1427,7 @@ fn field_read_policy(
                 missing_error,
                 // The source fills the field when the API builds a request. The wire value of a
                 // handler's request can still be empty, and decode accepts it as it is.
-                check_empty: !matches!(planned_field.origin, Some(FieldOrigin::Source { .. })),
+                check_empty: !planned_field.has_source(),
             }
         }
         PythonFieldDefaultKind::None => WireReadPolicy::Optional,
