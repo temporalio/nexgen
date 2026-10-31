@@ -1,6 +1,8 @@
 """The poll helper of the stream-service sample."""
 
+import collections.abc
 import dataclasses
+import datetime
 import typing
 
 
@@ -12,8 +14,14 @@ class _ReadRequest(_Request, typing.Protocol):
     @property
     def from_offset(self) -> int | None: ...
 
+    @property
+    def wait(self) -> datetime.timedelta | None: ...
+
 
 class _ReadResponse(typing.Protocol):
+    @property
+    def records(self) -> collections.abc.Sequence[object] | None: ...
+
     @property
     def next_offset(self) -> int | None: ...
 
@@ -29,9 +37,16 @@ def next_read_request(
 ) -> _ReadRequestT | None:
     if response.done:
         return None
-    # An empty page has no next offset, so the next read starts at the same offset.
-    from_offset = (
-        request.from_offset if response.next_offset is None else response.next_offset
-    )
-    # `last` reads the newest Records once. The next reads continue from the offset.
-    return dataclasses.replace(request, from_offset=from_offset, last=None)
+    next_offset = response.next_offset
+    # A read that doesn't wait ends at the newest Record.
+    if (
+        not response.records
+        and not request.wait
+        and next_offset in (None, request.from_offset)
+    ):
+        return None
+    if next_offset is None:
+        # `last` reads the newest Records only once.
+        return dataclasses.replace(request, last=None)
+    # `last` takes no `from_offset`, and a `from_offset` overrides `start`.
+    return dataclasses.replace(request, from_offset=next_offset, start=None, last=None)
