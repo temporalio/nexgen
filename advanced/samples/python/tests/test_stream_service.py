@@ -7,8 +7,8 @@ from temporalio.api.streamservice.v1 import request_response_pb2
 from temporalio.converter import PayloadConverter
 import temporalio.nexus.system
 
-from wit.stream_service import models
-from wit.stream_service.models import (
+from wit.stream_service.both import models
+from wit.stream_service.both.models import (
     AppendRecordsRequest,
     ReadRecordsResponse,
     StreamClose,
