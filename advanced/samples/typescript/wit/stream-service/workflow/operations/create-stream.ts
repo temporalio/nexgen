@@ -19,9 +19,9 @@ function requiredField<T>(
 
 type CreateStreamInput = CreateStreamRequest extends infer Input
   ? Input extends unknown
-    ? Omit<Input, "request_id" | "withdraw_run"> & {
-        request_id?: never;
-        withdraw_run?: never;
+    ? Omit<Input, "requestId" | "withdrawRun"> & {
+        requestId?: never;
+        withdrawRun?: never;
       }
     : never
   : never;

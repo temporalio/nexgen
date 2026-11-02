@@ -1,0 +1,8 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-resource"
+contains = [
+  """constructor field `value` uses a 64-bit integer, but result field \
+     `google.protobuf.Int32Value.value` supplies a 32-bit integer; use matching integer widths""",
+]

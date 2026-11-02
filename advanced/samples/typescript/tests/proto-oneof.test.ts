@@ -74,7 +74,7 @@ describe("proto-oneof generated models", () => {
     };
     const wire = outcomeConverter.toTransferType(model);
     expect(wire.value).toBe("success");
-    expect(wire.failure).toBeUndefined();
+    expect(Object.hasOwn(wire, "failure")).toBe(false);
     expect(wire.success?.payloads).toHaveLength(1);
     const message = temporal.api.update.v1.Outcome.decode(
       temporal.api.update.v1.Outcome.encode(wire).finish(),
@@ -96,7 +96,7 @@ describe("proto-oneof generated models", () => {
     const wire = outcomeConverter.toTransferType<string>({
       value: { tag: "failure", value: failure },
     });
-    expect(wire.success).toBeUndefined();
+    expect(Object.hasOwn(wire, "success")).toBe(false);
     const message = temporal.api.update.v1.Outcome.decode(
       temporal.api.update.v1.Outcome.encode(wire).finish(),
     );
@@ -158,22 +158,24 @@ describe("proto-oneof generated models", () => {
       const wire = pauseConverter.toTransferType(model);
       expect(wire.activity).toBe(tag);
       expect(wire[tag]).toBe("activity");
-      expect(wire[tag === "id" ? "type" : "id"]).toBeUndefined();
+      expect(Object.hasOwn(wire, tag === "id" ? "type" : "id")).toBe(false);
       const message = temporal.api.workflowservice.v1.PauseActivityRequest.decode(
         temporal.api.workflowservice.v1.PauseActivityRequest.encode(wire).finish(),
       );
       expect(pauseConverter.fromTransferType(message)).toEqual(model);
-      expect(pauseConverter.fromTransferType(JSON.parse(JSON.stringify(wire)))).toEqual(
-        model,
+      const plain = temporal.api.workflowservice.v1.PauseActivityRequest.toObject(
+        temporal.api.workflowservice.v1.PauseActivityRequest.create(wire),
+        { oneofs: true },
       );
+      expect(pauseConverter.fromTransferType(plain)).toEqual(model);
     },
   );
 
   it("preserves an unset optional oneof on SDK messages and plain objects", () => {
     const model = pauseRequest();
     const wire = pauseConverter.toTransferType(model);
-    expect(wire.id).toBeUndefined();
-    expect(wire.type).toBeUndefined();
+    expect(Object.hasOwn(wire, "id")).toBe(false);
+    expect(Object.hasOwn(wire, "type")).toBe(false);
     expect(pauseConverter.fromTransferType(wire).activity).toBeUndefined();
     const message = temporal.api.workflowservice.v1.PauseActivityRequest.decode(
       temporal.api.workflowservice.v1.PauseActivityRequest.encode(wire).finish(),
@@ -204,7 +206,12 @@ describe("proto-oneof generated models", () => {
     );
     expect(pauseConverter.fromTransferType(message)).toEqual(model);
     expect(
-      pauseConverter.fromTransferType({ ...wire, id: "id", type: "type" }).activity,
+      pauseConverter.fromTransferType({
+        ...wire,
+        activity: "id",
+        id: "id",
+        type: "type",
+      }).activity,
     ).toEqual({ tag: "id", value: "id" });
     expect(() =>
       pauseConverter.fromTransferType({

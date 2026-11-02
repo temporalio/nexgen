@@ -1,0 +1,12 @@
+package test:integer-width@1.0.0;
+world system { export clocks; }
+interface clocks {
+  /// @nexus.proto "google.protobuf.Empty"
+  record request {}
+  resource clock {
+    constructor(value: option<s64>);
+  }
+  /// @nexus.proto "google.protobuf.Int32Value"
+  type clock-result = own<clock>;
+  get-clock: func(request: request) -> clock-result;
+}
