@@ -39,6 +39,11 @@ class SourceService:
         Marker,
     ] = Operation(name="CreateMarker")
 
+    client: Operation[
+        CreateMarkerRequest,
+        None,
+    ] = Operation(name="Client")
+
     restart: Operation[
         RestartRequest,
         None,

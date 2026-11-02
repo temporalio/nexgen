@@ -3,4 +3,4 @@ targets = ["workflow", "client"]
 
 [error]
 kind = "client-target-name-conflict"
-contains = ["`describe`", "`OrderService`", "`UserService`"]
+contains = ["`describe` is a client method of both `OrderService` and `UserService`"]

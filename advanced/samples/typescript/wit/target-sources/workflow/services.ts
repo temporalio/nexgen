@@ -23,6 +23,7 @@ export const sourceService = nexus.service("SourceService", {
   createJob: nexus.operation<CreateJobRequest, Job>({ name: "CreateJob" }),
   refresh: nexus.operation<CreateJobRequest, Job>({ name: "Refresh" }),
   createMarker: nexus.operation<CreateMarkerRequest, Marker>({ name: "CreateMarker" }),
+  client: nexus.operation<CreateMarkerRequest, void>({ name: "Client" }),
   restart: nexus.operation<RestartRequest, void>({ name: "Restart" }),
   createRun: nexus.operation<CreateRunRequest, RunResult>({
     name: "CreateRun",

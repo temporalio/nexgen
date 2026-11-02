@@ -104,8 +104,10 @@ flowchart LR
 - `SelectedValidationPass` validates the selected generic surface after
   selection.
 - `ResourceResolutionPass` resolves resource-method and resource-return facts
-  from the API spec and descriptors. With no API target, it keeps only the
-  resource fields, so resources become data classes.
+  from the API spec and descriptors. Operations must return resources owned by
+  their service, including those held in result records. Return bindings
+  determine shared wire models regardless of API targets; resource methods are
+  bound only when an API target is selected.
 - `OperationBindingPass` attaches resolved resource facts to their owning
   operations and resources.
 - `OperationLoweringPass` turns wire-backed resource returns into explicit
@@ -127,6 +129,12 @@ flowchart LR
 Data models and their wire converters are shared across API targets. Operation
 wrappers and callable resource classes are target-specific because workflow and
 client code use different SDK entry points.
+
+Python emits shared models at the package root. Each API owns its contracts and
+resources. The client API lives in `client/`; the workflow API lives in
+`workflow/` when both targets are selected, or at the root for workflow-only
+output. Neither API depends on the other. Client resource identity DTOs are
+private to the client API and have no runtime API behavior.
 
 API code builds requests and evaluates the sources that apply to its target.
 Model constructors and converters only handle data. This lets workflow and

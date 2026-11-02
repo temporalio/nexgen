@@ -8,7 +8,7 @@ from .._nexus_client import (
     _NexusClient,
     _operation_id,
 )
-from ... import _resources as _resource_data
+from ._resource_data import JobData
 from ...models import (
     CreateJobRequest,
     RestartRequest,
@@ -56,7 +56,7 @@ class Job:
             operation="Refresh",
             arg=request,
             id=_operation_id(),
-            result_type=_resource_data.Job,
+            result_type=JobData,
         )
         result = await handle.result()
         return Job(

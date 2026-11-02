@@ -27,17 +27,6 @@ pub enum GenerationTarget {
     Client,
 }
 
-impl GenerationTarget {
-    /// The directory of the target's package inside the output directory of a service. The
-    /// Workflow target writes into that directory itself. Each language applies its own casing.
-    pub fn package_dir(self) -> Option<&'static str> {
-        match self {
-            Self::Workflow => None,
-            Self::Client => Some("client"),
-        }
-    }
-}
-
 impl GenerationTargets {
     pub const NONE: Self = Self {
         workflow: false,

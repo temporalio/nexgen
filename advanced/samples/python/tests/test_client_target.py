@@ -13,7 +13,7 @@ from temporalio.api.workflowservice.v1 import (
 )
 from typing_extensions import override
 
-import wit.target_sources.both._resources as workflow_resources
+import wit.target_sources.both.workflow._resources as workflow_resources
 from wit.target_sources.both.client import Job, Marker, SourceServiceClientExtension
 from wit.target_sources.both.models import (
     CancelRunRequest,
@@ -89,7 +89,7 @@ class FakeClient(SourceServiceClientExtension):
 async def test_a_created_resource_calls_its_operations_through_the_client() -> None:
     client = FakeClient(
         {
-            "CreateJob": [workflow_resources.Job(job_id="job")],
+            "CreateJob": [{"job_id": "job"}],
             "Restart": [None],
         }
     )
@@ -118,7 +118,7 @@ async def test_a_created_resource_calls_its_operations_through_the_client() -> N
 async def test_each_call_gets_a_new_random_operation_id() -> None:
     client = FakeClient(
         {
-            "CreateJob": [workflow_resources.Job(job_id="job")],
+            "CreateJob": [{"job_id": "job"}],
             "Restart": [None, None],
         }
     )
@@ -147,7 +147,7 @@ async def test_a_handle_uses_the_nexus_client_passed_to_its_constructor() -> Non
 async def test_a_resource_returned_by_a_method_keeps_the_same_nexus_client() -> None:
     client = FakeClient(
         {
-            "Refresh": [workflow_resources.Job(job_id="refreshed")],
+            "Refresh": [{"job_id": "refreshed"}],
             "Restart": [None],
         }
     )
@@ -168,7 +168,7 @@ async def test_a_resource_returned_by_a_method_keeps_the_same_nexus_client() -> 
 
 
 async def test_a_resource_without_methods_also_receives_the_nexus_client() -> None:
-    client = FakeClient({"CreateMarker": [workflow_resources.Marker()]})
+    client = FakeClient({"CreateMarker": [{}]})
     marker = await client.create_marker()
     assert isinstance(marker, Marker)
     assert dataclasses.asdict(marker) == {}

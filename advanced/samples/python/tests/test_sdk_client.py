@@ -13,15 +13,12 @@ import temporalio.client
 import temporalio.service
 from typing_extensions import override
 
-import wit.cross_service_resource._resources as workflow_resources
-from wit.cross_service_resource.client import (
-    JobsClientExtension,
-    OrdersClientExtension,
-)
-from wit.cross_service_resource.models import PlaceRequest, RestartRequest
+import wit.target_sources.both.client._resources._resource_data as resource_data
+from wit.target_sources.both.client import SourceServiceClientExtension
+from wit.target_sources.both.models import CreateJobRequest, RestartRequest
 
 
-class Client(temporalio.client.Client, JobsClientExtension, OrdersClientExtension):
+class Client(temporalio.client.Client, SourceServiceClientExtension):
     @override
     def _create_nexus_client(
         self, *, service: str, endpoint: str
@@ -86,29 +83,29 @@ def connect(answers: dict[str, object]) -> tuple[Client, Answers]:
 async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     client, answers = connect(
         {
-            "Place": workflow_resources.Job(job_id="job"),
+            "CreateJob": resource_data.JobData(job_id="job"),
             "Restart": None,
         }
     )
 
-    job = await client.place(job_id="job")
+    job = await client.create_job(job_id="job")
     await job.restart()
 
     assert job.job_id == "job"
-    place, restart = answers.started
-    assert (place.service, place.endpoint, place.operation) == (
-        "Orders",
-        "orders",
-        "Place",
+    create, restart = answers.started
+    assert (create.service, create.endpoint, create.operation) == (
+        "SourceService",
+        "sources",
+        "CreateJob",
     )
-    assert place.arg == PlaceRequest(job_id="job")
-    assert uuid.UUID(place.id)
-    assert place.result_type is workflow_resources.Job
+    assert create.arg == CreateJobRequest(job_id="job")
+    assert uuid.UUID(create.id)
+    assert create.result_type is resource_data.JobData
     assert (restart.service, restart.endpoint, restart.operation) == (
-        "Jobs",
-        "jobs",
+        "SourceService",
+        "sources",
         "Restart",
     )
-    assert restart.arg == RestartRequest(job_id="job")
+    assert restart.arg == RestartRequest(job_id="job", shared="shared")
     assert uuid.UUID(restart.id)
     assert restart.result_type is None

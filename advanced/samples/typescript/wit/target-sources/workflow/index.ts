@@ -4,6 +4,7 @@ export { submit } from "./operations/submit";
 export { createJob } from "./operations/create-job";
 export { refresh } from "./operations/refresh";
 export { createMarker } from "./operations/create-marker";
+export { client } from "./operations/client";
 export { restart } from "./operations/restart";
 export { createRun } from "./operations/create-run";
 export { createRunWithStatus } from "./operations/create-run-with-status";

@@ -1464,25 +1464,31 @@ descriptor replaces signature-derived typing.
 separate the targets with commas.
 
 - Without `--targets`, generation emits models and service definitions only.
-  Resources are data classes with their fields, and sourced fields are ordinary
-  model fields. A handler that implements the service needs only these.
+  Sourced fields are ordinary model fields. Python emits no resource classes
+  without an API target; contracts that depend on resources also belong to the
+  selected API. Other languages represent resources as data classes.
 - `workflow` selects the API for Workflow code.
 - `client` writes the same API for code outside a Workflow, in a `client`
   package inside the output directory. So far only Python supports it. It can be
   selected independently or alongside `workflow`. nexgen refuses it for a
   service with no `@nexus.endpoint`.
 
-The `client` package has its own resource classes and a
-`<Service>ClientExtension` for each service, with the names of the Workflow
-package. It imports the models of the parent package, so both targets share
-them. Resource identity fields can be transported as data; client handles are
-constructed with an explicit service-bound Nexus client.
+Python keeps shared models in the root package. Client APIs live in `client/`.
+Workflow-only generation keeps its API in the root package; when both targets
+are selected, the workflow API lives in `workflow/`. Each API owns its service
+contracts, operation wrappers, and resource classes. Neither API imports the
+other. The `client` package exposes a `<Service>ClientExtension` for each
+service. Client handles are constructed with an explicit service-bound Nexus
+client, and private client identity DTOs decode resource results without loading
+workflow resource classes.
 
 ```text
 stream_service/
-  models.py, services.py, _resources/  # the Workflow target
+  __init__.py, models.py             # shared models
+  workflow/
+    __init__.py, services.py, operations/, _resources/
   client/
-    __init__.py, _extensions.py, _resources/  # the client target
+    __init__.py, services.py, _extensions.py, _resources/
 ```
 
 A client class inherits one or more extensions and implements
@@ -1520,16 +1526,12 @@ refuses them. An extension also refuses a client class that gets one of its
 public names from another base, because Python would use one of the two with no
 error.
 
-nexgen also refuses an operation named `client`. The parent package exports each
-operation, and an import of the client package sets the attribute of that name.
-
 A client resource takes a service-bound Nexus client as its first constructor
 argument. Its methods call that client's `start_operation` directly, preserving
 the service and endpoint binding. An operation that returns a resource gives the
-handle a Nexus client for the resource's own service. When another service
-returns the resource, the extension creates that client with
-`_create_nexus_client`, so the handle still starts its operations on the
-endpoint of its own service.
+handle the same Nexus client used to start the operation. API operations can
+only return resources declared by their own service, including resources held in
+result records.
 
 ```python
 job = Job(nexus_client, job_id="job")

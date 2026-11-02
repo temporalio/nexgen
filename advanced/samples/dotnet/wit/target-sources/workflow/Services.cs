@@ -34,6 +34,10 @@ namespace Nexgen.SourceService
         Marker CreateMarker();
 
         [GeneratedCode("nexgen", null)]
+        [NexusOperation("Client")]
+        void Client();
+
+        [GeneratedCode("nexgen", null)]
         [NexusOperation("Restart")]
         void Restart(RestartRequest request);
 
@@ -91,6 +95,8 @@ namespace Nexgen.SourceService
                 SourceServiceServiceDefinition.Operations["Refresh"]),
             [("SourceService", "CreateMarker")] = new NexgenOperationInfo<object, Marker>(
                 SourceServiceServiceDefinition.Operations["CreateMarker"]),
+            [("SourceService", "Client")] = new NexgenOperationInfo<object, object>(
+                SourceServiceServiceDefinition.Operations["Client"]),
             [("SourceService", "Restart")] = new NexgenOperationInfo<RestartRequest, object>(
                 SourceServiceServiceDefinition.Operations["Restart"]),
             [("SourceService", "CreateRun")] = new NexgenOperationInfo<CreateRunRequest, RunResult>(

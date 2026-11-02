@@ -25,7 +25,8 @@ from ._resources import (
     Run,
     RunWithStatus,
 )
-from .. import _resources as _resource_data
+from ._resources._resource_data import JobData
+from ._resources._resource_data import MarkerData
 import temporal_support as _support
 
 
@@ -46,6 +47,7 @@ class SourceServiceClientExtension(abc.ABC):
                 "create_job",
                 "refresh",
                 "create_marker",
+                "client",
                 "restart",
                 "create_run",
                 "create_run_with_status",
@@ -151,7 +153,7 @@ class SourceServiceClientExtension(abc.ABC):
             operation="CreateJob",
             arg=request,
             id=_operation_id(),
-            result_type=_resource_data.Job,
+            result_type=JobData,
         )
         result = await handle.result()
         return Job(
@@ -181,7 +183,7 @@ class SourceServiceClientExtension(abc.ABC):
             operation="Refresh",
             arg=request,
             id=_operation_id(),
-            result_type=_resource_data.Job,
+            result_type=JobData,
         )
         result = await handle.result()
         return Job(
@@ -211,7 +213,7 @@ class SourceServiceClientExtension(abc.ABC):
             operation="CreateMarker",
             arg=request,
             id=_operation_id(),
-            result_type=_resource_data.Marker,
+            result_type=MarkerData,
         )
         _ = await handle.result()
         return Marker(
@@ -223,6 +225,27 @@ class SourceServiceClientExtension(abc.ABC):
     ) -> Marker:
         request = CreateMarkerRequest()
         return await self._source_service_create_marker(request)
+
+    async def _source_service_client(
+        self,
+        request: CreateMarkerRequest,
+    ) -> None:
+        nexus_client = self._create_nexus_client(
+            service="SourceService",
+            endpoint="sources",
+        )
+        handle = await nexus_client.start_operation(
+            operation="Client",
+            arg=request,
+            id=_operation_id(),
+        )
+        await handle.result()
+
+    async def client(
+        self,
+    ) -> None:
+        request = CreateMarkerRequest()
+        return await self._source_service_client(request)
 
     async def _source_service_restart(
         self,

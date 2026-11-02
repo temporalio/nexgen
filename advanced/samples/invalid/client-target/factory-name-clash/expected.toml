@@ -3,4 +3,4 @@ targets = ["client"]
 
 [error]
 kind = "python-generated-name-conflict"
-contains = ["`get_job`", "resource `Job`", "service `Scheduler`"]
+contains = ["Python generated name `get_job` for the client factory of resource `Job` conflicts with a client method of service `Scheduler`"]

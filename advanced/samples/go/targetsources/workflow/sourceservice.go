@@ -248,6 +248,12 @@ func createMarker(ctx workflow.Context, request createMarkerRequest) workflow.Fu
 	return fut
 }
 
+func client(ctx workflow.Context, request createMarkerRequest) workflow.Future {
+	c := workflow.NewNexusClient("sources", "SourceService")
+	fut := c.ExecuteOperation(ctx, "Client", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
 func restart(ctx workflow.Context, request restartRequest) workflow.Future {
 	c := workflow.NewNexusClient("sources", "SourceService")
 	fut := c.ExecuteOperation(ctx, "Restart", request, workflow.NexusOperationOptions{})
@@ -356,6 +362,13 @@ type CreateMarkerOptions struct {
 
 func CreateMarker(ctx workflow.Context, opts CreateMarkerOptions) workflow.Future {
 	return createMarker(ctx, createMarkerRequest{})
+}
+
+type ClientOptions struct {
+}
+
+func Client(ctx workflow.Context, opts ClientOptions) workflow.Future {
+	return client(ctx, createMarkerRequest{})
 }
 
 type RestartOptions struct {

@@ -1,20 +1,29 @@
 import asyncio
 import collections.abc
 import dataclasses
+import importlib
+import subprocess
+import sys
+import types
 import typing
 
 import pytest
 import temporalio.converter
 import temporalio.workflow
+from temporalio.api.workflowservice.v1 import (
+    SignalWithStartWorkflowExecutionResponse,
+    StartWorkflowExecutionResponse,
+)
 from typing_extensions import override
 
 import temporal_support as support
-from wit.target_sources import both
 from wit.target_sources import client as client_only
+from wit.target_sources import models as models_only
 from wit.target_sources import workflow as workflow_only
 from wit.target_sources.both import models as both_models
-from wit.target_sources.both._resources import Job as WorkflowJob
+from wit.target_sources.both.workflow._resources import Job as WorkflowJob
 from wit.target_sources.both import client as both_client
+from wit.target_sources.both import workflow as both_workflow
 from wit.target_sources.client import client as client_api
 from wit.target_sources.workflow import models as workflow_models
 
@@ -156,7 +165,7 @@ async def test_combined_apis_share_models_but_not_source_policy(
 ) -> None:
     recorder = Recorder()
     client = BothClient(recorder)
-    _ = await both.submit(id="workflow", client="explicit")
+    _ = await both_workflow.submit(id="workflow", client="explicit")
     await client.submit(id="client", workflow="explicit")
     assert source_calls == ["shared", "workflow", "shared", "client"]
     assert type(workflow_recorder.calls[0][1]) is both_models.SubmitRequest
@@ -175,16 +184,116 @@ async def test_combined_apis_share_models_but_not_source_policy(
     )
 
 
-def test_shared_models_never_evaluate_sources(source_calls: list[str]) -> None:
-    request = both_models.SubmitRequest(
+async def test_target_packages_do_not_conflict_with_operation_names(
+    workflow_recorder: WorkflowRecorder,
+) -> None:
+    recorder = Recorder()
+    await BothClient(recorder).client()
+    _ = await both_workflow.client()
+    assert recorder.calls == [("Client", both_models.CreateMarkerRequest())]
+    assert workflow_recorder.calls == [("Client", both_models.CreateMarkerRequest())]
+    assert both_client.SourceServiceClientExtension is not None
+
+
+@pytest.mark.parametrize(
+    ("package", "forbidden"),
+    [
+        ("wit.target_sources.both.client", "wit.target_sources.both.workflow"),
+        ("wit.target_sources.both.workflow", "wit.target_sources.both.client"),
+        ("wit.target_sources.client.client", "wit.target_sources.client.workflow"),
+    ],
+)
+def test_api_packages_import_without_the_other_target(
+    package: str, forbidden: str
+) -> None:
+    script = """
+import importlib
+import importlib.abc
+import sys
+
+package, forbidden = sys.argv[1:]
+
+class RejectOtherTarget(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == forbidden or fullname.startswith(forbidden + "."):
+            raise AssertionError("API imported another target: " + fullname)
+        return None
+
+sys.meta_path.insert(0, RejectOtherTarget())
+api = importlib.import_module(package)
+importlib.import_module(package + ".services")
+resources = importlib.import_module(package + "._resources")
+assert resources.Job
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, package, forbidden],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "package",
+    [
+        "wit.target_sources.models",
+        "wit.target_sources.client",
+        "wit.target_sources.both",
+    ],
+)
+def test_root_package_has_only_shared_definitions(package: str) -> None:
+    shared = importlib.import_module(package)
+    assert shared.SubmitRequest
+    with pytest.raises(ModuleNotFoundError):
+        _ = importlib.import_module(package + "._resources")
+    with pytest.raises(ModuleNotFoundError):
+        _ = importlib.import_module(package + ".services")
+
+
+@pytest.mark.parametrize(
+    "models",
+    [models_only, client_only, workflow_models, both_models],
+)
+def test_shared_models_never_evaluate_sources(
+    source_calls: list[str], models: types.ModuleType
+) -> None:
+    request = models.SubmitRequest(
         id="id", shared="explicit", workflow="explicit", client="explicit"
     )
     converter = temporalio.converter.PayloadConverter.default
     decoded = converter.from_payload(
-        converter.to_payload(request), both_models.SubmitRequest
+        converter.to_payload(request), models.SubmitRequest
     )
     assert decoded == request
     assert dataclasses.replace(request, id="copy").id == "copy"
     with pytest.raises(TypeError):
-        _ = both_models.SubmitRequest(id="missing")  # pyright: ignore[reportCallIssue]
+        _ = models.SubmitRequest(id="missing")
     assert source_calls == []
+
+
+@pytest.mark.parametrize(
+    "models", [models_only, client_only, workflow_models, both_models]
+)
+async def test_shared_wire_models_are_independent_of_api_targets(
+    models: types.ModuleType,
+) -> None:
+    converter = temporalio.converter.DataConverter.default
+    for wire, model_type, fields in [
+        (
+            StartWorkflowExecutionResponse(run_id="run"),
+            models.RunResult,
+            {"run_id": "run"},
+        ),
+        (
+            SignalWithStartWorkflowExecutionResponse(run_id="run", started=True),
+            models.SignalWithStartWorkflowExecutionResponse,
+            {"run_id": "run", "started": True},
+        ),
+    ]:
+        payloads = await converter.encode([wire])
+        result = (await converter.decode(payloads, [model_type]))[0]
+        assert dataclasses.asdict(result) == fields
+        assert (
+            await converter.decode(await converter.encode([result]), [type(wire)])
+        ) == [wire]

@@ -36,6 +36,9 @@ interface source-service {
   record create-marker-request {}
   create-marker: func(request: create-marker-request) -> own<marker>;
 
+  // API operation names do not share the root package's submodule namespace.
+  client: func(request: create-marker-request);
+
   record restart-request {
     job-id: string,
     /// @nexus.source python="shared_source()" typescript="sharedSource()" go="SharedSource(ctx)" dotnet="TargetSources.Shared()"

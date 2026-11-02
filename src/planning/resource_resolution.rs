@@ -194,15 +194,30 @@ pub(crate) fn resolve_service_resources(
     spec: &ApiSpec<SelectedFamily>,
     service: &ServiceSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
+    targets: crate::nexgen_config::GenerationTargets,
 ) -> Result<ResolvedServiceResources> {
     let resources = service
         .resources
         .iter()
-        .map(|resource| resolve_resource_methods(spec, service, resource, descriptors))
+        .map(|resource| {
+            if targets.is_empty() {
+                Ok(ResolvedResourceSpec {
+                    name: resource.name.clone(),
+                    doc: resource.doc.clone(),
+                    fields: resource.fields.clone(),
+                    methods: Vec::new(),
+                })
+            } else {
+                resolve_resource_methods(spec, service, resource, descriptors)
+            }
+        })
         .collect::<Result<Vec<_>>>()?;
 
     let mut operation_returns = BTreeMap::new();
     for operation in &service.operations {
+        if let Some(TypeSpec::Resource(resource)) = operation.output_type() {
+            ensure_local_resource_return(service, operation, resource.as_str())?;
+        }
         let holder = operation_output_resource_holder(spec, service, operation)?;
         let resource_name = match &holder {
             Some((_, _, resource_name, _)) => *resource_name,
@@ -818,6 +833,24 @@ fn operation_output_resource_name<'a>(
         .map(|_| resource_name.as_str())
 }
 
+fn ensure_local_resource_return(
+    service: &ServiceSpec<SelectedFamily>,
+    operation: &OperationSpec<SelectedFamily>,
+    resource_name: &str,
+) -> Result<()> {
+    if service.resource(resource_name).is_none() {
+        return Err(Error::InvalidResource {
+            service: service.name.clone(),
+            resource: resource_name.to_upper_camel_case(),
+            reason: format!(
+                "operation `{}` returns a resource declared in another service; resources must be returned by their declaring service",
+                operation.name
+            ),
+        });
+    }
+    Ok(())
+}
+
 /// The proto-backed result record of an operation that holds a resource of the service, as
 /// its record name, field key, resource name and proto message name.
 fn operation_output_resource_holder<'a>(
@@ -856,6 +889,7 @@ fn operation_output_resource_holder<'a>(
             ),
         });
     };
+    ensure_local_resource_return(service, operation, resource_name)?;
     let Some(proto_name) = record
         .source
         .as_ref()
@@ -870,9 +904,6 @@ fn operation_output_resource_holder<'a>(
             ),
         });
     };
-    if service.resource(resource_name).is_none() {
-        return Ok(None);
-    }
     Ok(Some((
         record.full_name.as_str(),
         field_key,
@@ -927,38 +958,15 @@ impl<'a> ResourceResolutionPass<'a> {
         spec: ApiSpec<SelectedFamily>,
     ) -> Result<ApiSpec<super::ResourceBoundFamily>> {
         ensure_unique_resource_names(&spec)?;
-        let bindings = if !self.targets.is_empty() {
-            spec.services
-                .iter()
-                .map(|service| {
-                    resolve_service_resources(&spec, service, self.descriptors)
-                        .map(|resources| (service.name.clone(), resources))
-                })
-                .collect::<Result<BTreeMap<_, _>>>()?
-        } else {
-            // With no API target, a resource is data only. It keeps its fields, and nothing binds
-            // its methods or the operations that return it.
-            spec.services
-                .iter()
-                .map(|service| {
-                    let resources = service
-                        .resources
-                        .iter()
-                        .map(|resource| ResolvedResourceSpec {
-                            name: resource.name.clone(),
-                            doc: resource.doc.clone(),
-                            fields: resource.fields.clone(),
-                            methods: Vec::new(),
-                        })
-                        .collect();
-                    let resolved = ResolvedServiceResources {
-                        resources,
-                        operation_returns: BTreeMap::new(),
-                    };
-                    (service.name.clone(), resolved)
-                })
-                .collect()
-        };
+        // Return bindings determine shared wire models even when no callable API is emitted.
+        let bindings = spec
+            .services
+            .iter()
+            .map(|service| {
+                resolve_service_resources(&spec, service, self.descriptors, self.targets)
+                    .map(|resources| (service.name.clone(), resources))
+            })
+            .collect::<Result<BTreeMap<_, _>>>()?;
         Ok(spec.map_names(ResourceBindingMapper {
             data: ResourceBoundData { bindings },
         }))
@@ -1078,7 +1086,13 @@ interface workflow-service {
 "#;
         let spec = parse(Language::Python, wit);
         let service = &spec.services[0];
-        let resolved = resolve_service_resources(&spec, service, &descriptors()).unwrap();
+        let resolved = resolve_service_resources(
+            &spec,
+            service,
+            &descriptors(),
+            crate::nexgen_config::GenerationTargets::WORKFLOW,
+        )
+        .unwrap();
         let method = &resolved.resources[0].methods[0];
 
         assert_eq!(method.name, "restart-workflow");
@@ -1121,7 +1135,13 @@ interface user-service {
 "#;
         let spec = parse(Language::Python, wit);
         let service = &spec.services[0];
-        let resolved = resolve_service_resources(&spec, service, &empty_descriptors()).unwrap();
+        let resolved = resolve_service_resources(
+            &spec,
+            service,
+            &empty_descriptors(),
+            crate::nexgen_config::GenerationTargets::WORKFLOW,
+        )
+        .unwrap();
         let method = &resolved.resources[0].methods[0];
 
         assert_eq!(method.name, "update-email");
@@ -1161,7 +1181,13 @@ interface user-service {
 "#;
         let spec = parse(Language::Python, wit);
         let service = &spec.services[0];
-        let resolved = resolve_service_resources(&spec, service, &empty_descriptors()).unwrap();
+        let resolved = resolve_service_resources(
+            &spec,
+            service,
+            &empty_descriptors(),
+            crate::nexgen_config::GenerationTargets::WORKFLOW,
+        )
+        .unwrap();
         let method = &resolved.resources[0].methods[0];
 
         assert_eq!(method.name, "update-email");
@@ -1226,7 +1252,13 @@ interface user-service {
 "#;
         let spec = parse(Language::Python, wit);
         let service = &spec.services[0];
-        let resolved = resolve_service_resources(&spec, service, &empty_descriptors()).unwrap();
+        let resolved = resolve_service_resources(
+            &spec,
+            service,
+            &empty_descriptors(),
+            crate::nexgen_config::GenerationTargets::WORKFLOW,
+        )
+        .unwrap();
         let method = &resolved.resources[0].methods[0];
 
         assert_eq!(method.name, "update-email");

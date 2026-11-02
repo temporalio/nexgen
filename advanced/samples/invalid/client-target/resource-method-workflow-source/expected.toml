@@ -3,4 +3,4 @@ targets = ["workflow", "client"]
 
 [error]
 kind = "invalid-resource-method"
-contains = ["restart", "the sourced field `namespace`", "`client` target"]
+contains = ["resource method `JobService.Job.restart` is invalid: the sourced field `namespace` has no value for the `client` target; supply it from a resource field or method parameter, or include this target in its origin"]

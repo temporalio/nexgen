@@ -12,7 +12,6 @@ from .models import (
     SignalWithStartWorkflowExecutionResponse,
     SubmitRequest,
 )
-from .services import SourceService
 
 __all__ = [
     "CancelRunRequest",
@@ -23,5 +22,4 @@ __all__ = [
     "RunResult",
     "SignalWithStartWorkflowExecutionResponse",
     "SubmitRequest",
-    "SourceService",
 ]

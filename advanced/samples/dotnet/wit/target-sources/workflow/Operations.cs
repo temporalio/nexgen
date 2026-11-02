@@ -183,6 +183,13 @@ namespace Nexgen.SourceService
         }
 
         [GeneratedCode("nexgen", null)]
+        public static async Task ClientAsync()
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ISourceService>(SourceServiceEndpoint);
+            await client.ExecuteNexusOperationAsync(svc => svc.Client()).ConfigureAwait(true);
+        }
+
+        [GeneratedCode("nexgen", null)]
         private static async Task RestartAsync(RestartRequest request)
         {
             var client = Workflow.CreateNexusWorkflowClient<ISourceService>(SourceServiceEndpoint);

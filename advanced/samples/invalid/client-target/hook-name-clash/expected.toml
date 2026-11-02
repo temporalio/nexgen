@@ -3,4 +3,4 @@ targets = ["client"]
 
 [error]
 kind = "python-generated-name-conflict"
-contains = ["`_create_nexus_client`", "operation `Create.NexusClient`"]
+contains = ["Python generated name `_create_nexus_client` for the hook of each client extension conflicts with a client method of operation `Create.NexusClient`"]

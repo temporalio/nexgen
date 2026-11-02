@@ -12,6 +12,7 @@ from .operations.submit import submit
 from .operations.create_job import create_job
 from ._resources.job import refresh
 from .operations.create_marker import create_marker
+from .operations.client import client
 from ._resources.job import restart
 from .operations.create_run import create_run
 from .operations.create_run_with_status import create_run_with_status
@@ -19,6 +20,7 @@ from ._resources.run import cancel_run
 
 __all__ = [
     "cancel_run",
+    "client",
     "create_job",
     "create_marker",
     "create_run",
@@ -77,6 +79,12 @@ __nexus_operation_registry__: dict[
         "CreateMarker",
     ): _NexusOperationInfo(
         operation=_services.SourceService.create_marker,
+    ),
+    (
+        "SourceService",
+        "Client",
+    ): _NexusOperationInfo(
+        operation=_services.SourceService.client,
     ),
     (
         "SourceService",
