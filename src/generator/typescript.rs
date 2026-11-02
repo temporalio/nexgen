@@ -780,6 +780,11 @@ impl<'a> ApiPlanner<'a> {
                         number: value.number,
                     })
                     .collect(),
+                fallback: planned_enum
+                    .values
+                    .iter()
+                    .find(|value| value.fallback)
+                    .map(|value| value.name.clone()),
             });
     }
 
@@ -2947,6 +2952,8 @@ struct RenderedOperationInput {
 struct RenderedEnum {
     name: String,
     values: Vec<RenderedEnumValue>,
+    /// The member that an unknown proto number decodes as.
+    fallback: Option<String>,
 }
 
 #[derive(Debug)]
@@ -4788,6 +4795,19 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
         output.push_str(",\n");
     }
     output.push_str("}\n");
+    if let Some(fallback) = &enumeration.fallback {
+        let name = &enumeration.name;
+        output.push_str(&format!(
+            "\nfunction {}(value: number): {name} {{\n",
+            typescript_proto::enum_from_number_function_name(name)
+        ));
+        output.push_str(&format!("  if (value in {name}) {{\n"));
+        output.push_str(&format!("    return value as {name};\n"));
+        output.push_str("  }\n");
+        output.push_str("  // A newer peer can send a case that this enum doesn't know.\n");
+        output.push_str(&format!("  return {name}.{fallback};\n"));
+        output.push_str("}\n");
+    }
 }
 
 fn render_flags(output: &mut String, flags: &RenderedFlags) {

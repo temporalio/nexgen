@@ -43,6 +43,7 @@ interface stream-service {
 
   /// @nexus.proto "temporal.api.enums.v1.ExecutionType"
   enum execution-type {
+    /// @nexus.fallback
     execution-type-unspecified,
     execution-type-workflow,
     execution-type-activity,
@@ -61,6 +62,7 @@ interface stream-service {
 
   /// @nexus.proto "temporal.api.enums.v1.StreamProducerKind"
   enum stream-producer-kind {
+    /// @nexus.fallback
     stream-producer-kind-unspecified,
     stream-producer-kind-workflow,
     stream-producer-kind-local-activity,
@@ -140,6 +142,7 @@ interface stream-service {
   /// @nexus.doc "How a Stream closed. Only the owner's end on the server terminates or times out."
   /// @nexus.proto "temporal.api.enums.v1.StreamCloseStatus"
   enum stream-close-status {
+    /// @nexus.fallback
     stream-close-status-unspecified,
     stream-close-status-completed,
     stream-close-status-failed,
@@ -214,6 +217,7 @@ interface stream-service {
 
   /// @nexus.proto "temporal.api.enums.v1.StreamStatus"
   enum stream-status {
+    /// @nexus.fallback
     stream-status-unspecified,
     stream-status-open,
     stream-status-closed,
@@ -422,6 +426,7 @@ interface stream-service {
   ///   typescript-extends="ApplicationFailure" typescript-extends-import="@temporalio/common"
   ///   dotnet-extends="Temporalio.Exceptions.ApplicationFailureException"
   enum stream-error-reason {
+    /// @nexus.fallback
     stream-error-reason-unspecified,
     /// @nexus.error
     stream-error-reason-not-found,

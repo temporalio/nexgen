@@ -4359,7 +4359,7 @@ pub(in crate::generator) fn field_property_name(field: &RecordFieldSpec<PlannedF
     csharp_type_name(&field.name)
 }
 
-fn enum_value_name(name: &str) -> String {
+pub(in crate::generator) fn enum_value_name(name: &str) -> String {
     name.trim_start_matches(|ch: char| ch == '_' || ch.is_ascii_digit())
         .trim_start_matches("UNSPECIFIED")
         .trim_start_matches('_')
