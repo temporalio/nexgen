@@ -21,6 +21,7 @@ mod operation_binding;
 mod operation_lowering;
 mod proto;
 mod reachability;
+mod record_backing;
 mod resource_resolution;
 mod selected_validation;
 mod selection;

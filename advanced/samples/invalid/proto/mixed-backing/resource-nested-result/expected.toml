@@ -1,0 +1,9 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-resource"
+contains = [
+  """JSON resource result constructor field `at` contains protobuf-backed record \
+     `clocks.timestamp`; remove `@nexus.proto` from the nested record, or return \
+     the resource through a protobuf-backed result""",
+]

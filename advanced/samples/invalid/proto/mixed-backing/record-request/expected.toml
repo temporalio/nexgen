@@ -1,0 +1,8 @@
+descriptors = "temporal"
+
+[error]
+kind = "mixed-record-backing"
+contains = [
+  """JSON-backed record `counters.touch-request` field `at` contains protobuf-backed record \
+     `counters.timestamp`; nested records must use the same backing""",
+]
