@@ -1,0 +1,4 @@
+TypeScript resource constructor fields and method parameters now use `Long` when bound to protobuf-backed 64-bit fields, while JSON-only values remain `number`. Conflicting protobuf/JSON bindings are rejected rather than silently losing precision.
+TypeScript protobuf converters reconstruct 64-bit `Long` values from decimal strings as well as decoded protobuf values, including across the System Nexus JSON bridge. Message construction remains the transport's responsibility.
+Resource-to-request bindings now reject mismatched integer widths, and conflicting TypeScript bindings identify both destination field paths.
+Returned resource constructor fields also reject integer-width mismatches with request or result fields. Unsigned TypeScript protobuf writes normalize `Long` signedness without changing the caller's value.

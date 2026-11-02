@@ -1,0 +1,14 @@
+package test:integer-width@1.0.0;
+world system { export clocks; }
+interface clocks {
+  /// @nexus.proto "google.protobuf.Timestamp"
+  record timestamp {
+    seconds: option<s64>,
+    nanos: option<s32>,
+  }
+  resource clock {
+    constructor();
+    touch: func(seconds: option<s64>, nanos: option<s64>);
+  }
+  touch: func(request: timestamp);
+}

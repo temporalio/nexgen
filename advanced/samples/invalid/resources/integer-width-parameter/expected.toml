@@ -1,0 +1,8 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-resource-method"
+contains = [
+  """parameter `nanos` uses a 64-bit integer, but request field \
+     `clocks.timestamp.nanos` requires a 32-bit integer; use matching integer widths""",
+]

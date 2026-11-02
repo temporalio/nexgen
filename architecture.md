@@ -108,7 +108,9 @@ flowchart LR
 - `SelectedValidationPass` validates the selected generic surface after
   selection.
 - `ResourceResolutionPass` resolves resource-method and resource-return facts
-  from the API spec and descriptors.
+  from the API spec and descriptors. It rejects integer-width mismatches between
+  resource values and the request or result fields they bind to, including
+  constructor fields populated by operations that return resources.
 - `OperationBindingPass` attaches resolved resource facts to their owning
   operations and resources.
 - `OperationLoweringPass` turns wire-backed resource returns into explicit

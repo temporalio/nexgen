@@ -8,6 +8,10 @@ system_nexus = true
 [generic-models]
 descriptors = "temporal"
 
+[integer-bindings]
+languages = ["typescript"]
+descriptors = "temporal"
+
 [start-workflow]
 descriptors = "temporal"
 

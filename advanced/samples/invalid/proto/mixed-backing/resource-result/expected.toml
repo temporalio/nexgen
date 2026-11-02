@@ -1,0 +1,12 @@
+languages = ["typescript"]
+descriptors = "temporal"
+
+[error]
+kind = "invalid-resource"
+contains = [
+  "64-bit field `seconds` has incompatible bindings",
+  "method `touch`",
+  "JSON result of `GetCounter`",
+  "requires `Long`",
+  "requires `number`",
+]

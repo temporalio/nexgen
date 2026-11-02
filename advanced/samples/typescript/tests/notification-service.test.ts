@@ -148,7 +148,7 @@ describe("notification-service generated models", () => {
     const wire = requestConverter.toTransferType(model);
     expect(wire.result).toBe("success");
     expect(wire.success).toBeDefined();
-    expect(wire.failure).toBeUndefined();
+    expect(Object.hasOwn(wire, "failure")).toBe(false);
     expect(wire.sourceContext).toBeDefined();
     expect(requestConverter.fromTransferType<Completion, SourceContext>(wire)).toEqual(
       model,
@@ -206,7 +206,7 @@ describe("notification-service generated models", () => {
       sourceContext: { workflowId: "workflow-id" },
     };
     const wire = requestConverter.toTransferType(model);
-    expect(wire.success).toBeUndefined();
+    expect(Object.hasOwn(wire, "success")).toBe(false);
     expect(wire.failure).toBeDefined();
     const decoded = requestConverter.fromTransferType<Completion, SourceContext>(wire);
     expect(decoded.sourceContext).toEqual(model.sourceContext);

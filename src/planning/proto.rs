@@ -423,9 +423,8 @@ fn planned_wire_value_type(
 ) -> PlannedType {
     match field_type(field) {
         Some(Type::Double | Type::Float) => TypeSpec::Float,
-        Some(Type::Int64 | Type::Uint64 | Type::Fixed64 | Type::Sfixed64 | Type::Sint64) => {
-            TypeSpec::Int(IntSpec::I64)
-        }
+        Some(Type::Uint64 | Type::Fixed64) => TypeSpec::Int(IntSpec::U64),
+        Some(Type::Int64 | Type::Sfixed64 | Type::Sint64) => TypeSpec::Int(IntSpec::I64),
         Some(Type::Int32 | Type::Fixed32 | Type::Uint32 | Type::Sfixed32 | Type::Sint32) => {
             TypeSpec::Int(IntSpec::I32)
         }
@@ -508,9 +507,8 @@ fn planned_value_type(
 ) -> PlannedType {
     match field_type(field) {
         Some(Type::Double | Type::Float) => TypeSpec::Float,
-        Some(Type::Int64 | Type::Uint64 | Type::Fixed64 | Type::Sfixed64 | Type::Sint64) => {
-            TypeSpec::Int(IntSpec::I64)
-        }
+        Some(Type::Uint64 | Type::Fixed64) => TypeSpec::Int(IntSpec::U64),
+        Some(Type::Int64 | Type::Sfixed64 | Type::Sint64) => TypeSpec::Int(IntSpec::I64),
         Some(Type::Int32 | Type::Fixed32 | Type::Uint32 | Type::Sfixed32 | Type::Sint32) => {
             TypeSpec::Int(IntSpec::I32)
         }
