@@ -1,0 +1,10 @@
+package test:implicit-source-targets@1.0.0;
+world system { export example; }
+interface example {
+  record request {
+    /// @nexus.source targets="client" python="first()" typescript="first()" go="First(ctx)" dotnet="First()"
+    /// @nexus.source python="second()" typescript="second()" go="Second(ctx)" dotnet="Second()"
+    context: string,
+  }
+  submit: func(request: request);
+}

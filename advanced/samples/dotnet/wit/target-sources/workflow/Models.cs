@@ -234,4 +234,20 @@ namespace Nexgen.SourceService
         public string Workflow { get; init; }
     }
 
+    [GeneratedCode("nexgen", null)]
+    public record TargetedRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TargetedRequest"/> class.
+        /// </summary>
+        public TargetedRequest(string label, string context)
+        {
+            Label = label;
+            Context = context;
+        }
+
+        public string Label { get; init; }
+        public string Context { get; init; }
+    }
+
 }

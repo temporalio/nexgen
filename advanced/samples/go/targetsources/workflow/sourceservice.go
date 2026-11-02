@@ -34,6 +34,19 @@ func (m submitRequest) GetWorkflow() string {
 	return m.Workflow
 }
 
+type targetedRequest struct {
+	Label   string
+	Context string
+}
+
+func (m targetedRequest) GetLabel() string {
+	return m.Label
+}
+
+func (m targetedRequest) GetContext() string {
+	return m.Context
+}
+
 type createJobRequest struct {
 	JobID string
 }
@@ -193,6 +206,10 @@ func (u *Job) Refresh(ctx workflow.Context) workflow.Future {
 	return refresh(ctx, createJobRequest{JobID: u.JobID})
 }
 
+func (u *Job) Targeted(ctx workflow.Context) workflow.Future {
+	return targeted(ctx, targetedRequest{Label: support.WorkflowSource(ctx), Context: support.WorkflowSource(ctx)})
+}
+
 type Marker struct {
 }
 
@@ -227,6 +244,12 @@ func (u *Run) Cancel(ctx workflow.Context) workflow.Future {
 func submit(ctx workflow.Context, request submitRequest) workflow.Future {
 	c := workflow.NewNexusClient("sources", "SourceService")
 	fut := c.ExecuteOperation(ctx, "Submit", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func targeted(ctx workflow.Context, request targetedRequest) workflow.Future {
+	c := workflow.NewNexusClient("sources", "SourceService")
+	fut := c.ExecuteOperation(ctx, "Targeted", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
@@ -332,6 +355,24 @@ func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
 		Client:   opts.Client,
 		Shared:   support.SharedSource(ctx),
 		Workflow: support.WorkflowSource(ctx),
+	})
+}
+
+type TargetedOptions struct {
+	// Label - Optional.
+	Label string
+}
+
+func Targeted(ctx workflow.Context, opts TargetedOptions) workflow.Future {
+	var label string
+	if opts.Label != "" {
+		label = opts.Label
+	} else {
+		label = support.WorkflowSource(ctx)
+	}
+	return targeted(ctx, targetedRequest{
+		Label:   label,
+		Context: support.WorkflowSource(ctx),
 	})
 }
 

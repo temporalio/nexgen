@@ -36,6 +36,13 @@ namespace Nexgen.SourceService
             return Operations.RefreshAsync(request);
         }
 
+        [GeneratedCode("nexgen", null)]
+        public Task TargetedAsync()
+        {
+            var request = new TargetedOptions();
+            return Operations.TargetedAsync(request);
+        }
+
     }
 
     [GeneratedCode("nexgen", null)]

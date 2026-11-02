@@ -184,6 +184,53 @@ async def test_combined_apis_share_models_but_not_source_policy(
     )
 
 
+async def test_repeated_sources_and_defaults_use_the_selected_target(
+    workflow_recorder: WorkflowRecorder,
+    source_calls: list[str],
+) -> None:
+    recorder = Recorder()
+    _ = await workflow_only.targeted()
+    _ = await both_workflow.targeted(label="explicit")
+    await ClientOnly(recorder).targeted()
+    await BothClient(recorder).targeted(label="explicit")
+
+    assert workflow_recorder.calls == [
+        (
+            "Targeted",
+            workflow_models.TargetedRequest(context="workflow", label="workflow"),
+        ),
+        ("Targeted", both_models.TargetedRequest(context="workflow", label="explicit")),
+    ]
+    assert recorder.calls == [
+        ("Targeted", client_only.TargetedRequest(context="client", label="client")),
+        ("Targeted", both_models.TargetedRequest(context="client", label="explicit")),
+    ]
+    assert source_calls == [
+        "workflow",
+        "workflow",
+        "workflow",
+        "client",
+        "client",
+        "client",
+    ]
+
+
+async def test_resource_requests_use_target_specific_sources_and_defaults(
+    workflow_recorder: WorkflowRecorder,
+    source_calls: list[str],
+) -> None:
+    recorder = Recorder()
+    await both_client.Job(recorder, job_id="client-job").targeted()
+    await WorkflowJob(job_id="workflow-job").targeted()
+    assert recorder.calls == [
+        ("Targeted", both_models.TargetedRequest(context="client", label="client")),
+    ]
+    assert workflow_recorder.calls == [
+        ("Targeted", both_models.TargetedRequest(context="workflow", label="workflow")),
+    ]
+    assert source_calls == ["client", "client", "workflow", "workflow"]
+
+
 async def test_target_packages_do_not_conflict_with_operation_names(
     workflow_recorder: WorkflowRecorder,
 ) -> None:
@@ -267,6 +314,11 @@ def test_shared_models_never_evaluate_sources(
     )
     assert decoded == request
     assert dataclasses.replace(request, id="copy").id == "copy"
+    targeted = models.TargetedRequest(context="explicit", label="explicit")
+    assert (
+        converter.from_payload(converter.to_payload(targeted), models.TargetedRequest)
+        == targeted
+    )
     with pytest.raises(TypeError):
         _ = models.SubmitRequest(id="missing")
     assert source_calls == []

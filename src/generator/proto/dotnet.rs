@@ -680,7 +680,7 @@ fn render_model_transfer_converter(
     output.push_str("        var proto = new ");
     output.push_str(&raw_type);
     output.push_str("();\n");
-    for (field_name, sourced_field, _source_expr) in model.sourced_fields() {
+    for (field_name, sourced_field, _) in model.sourced_fields() {
         render_field_to_proto_assignment(
             backend,
             output,

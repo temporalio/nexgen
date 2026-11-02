@@ -1848,7 +1848,7 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 
 ### @nexus.source
 
-**Placement:** Record field (within a `@nexus.proto` record) **Syntax:**
+**Placement:** Record field **Syntax:**
 `@nexus.source [targets="workflow,client"] python="<helper-call>" typescript="<helper-call>" go="<helper-call>" dotnet="<helper-call>"`
 
 Provides a field value through a helper in the package specified by
@@ -1868,7 +1868,19 @@ this helper to the workflow target with `targets="workflow"`. Without a target
 list, a source applies to all targets. Models and wire conversion never evaluate
 the source.
 
-Cannot be combined with `@nexus.default`.
+Repeat the directive to use different helpers for different targets:
+
+```wit
+/// @nexus.source targets="workflow" python="workflow_namespace()"
+/// @nexus.source targets="client" python="client_namespace()"
+namespace: string,
+```
+
+Repeated source directives must have disjoint target sets. A directive without
+`targets` covers all targets, so it overlaps any other source directive on the
+same field. Overlaps are errors, not declaration-order overrides.
+
+Cannot be combined with `@nexus.default` for the same language.
 
 ---
 
@@ -1883,6 +1895,17 @@ non-option type: `@nexus.default` is rejected on `option<T>`, including aliases
 to option types. Without a target list, a default applies to all targets.
 Restrict a default that needs a Workflow context, such as
 `_support.workflow_task_queue()`, with `targets="workflow"`.
+
+Repeat the directive with disjoint target sets to choose different defaults:
+
+```wit
+/// @nexus.default targets="workflow" python="'workflow-label'"
+/// @nexus.default targets="client" python="'client-label'"
+label: string,
+```
+
+Repeated default directives follow the same disjoint-target rule as sources:
+omitting `targets` covers all targets, and overlapping sets are errors.
 
 ```wit
 /// @nexus.default
@@ -1907,7 +1930,7 @@ arguments. Supplied nested records must be complete and pass through unchanged;
 defaults are not applied to their fields or to records inside lists or maps.
 Constructors and encoding/decoding do not evaluate defaults.
 
-A default cannot be combined with `@nexus.source`.
+A default cannot be combined with `@nexus.source` for the same language.
 
 ---
 

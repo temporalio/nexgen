@@ -17,6 +17,7 @@ use crate::generator::{
     ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, TsDateTimeTypes,
 };
 use crate::language::Language;
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedOperationResourceReturn,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedRecordType, PlannedResource,
@@ -26,10 +27,10 @@ use crate::planning::{
 };
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, FlagsSpec,
-    FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, IntSpec, LanguageImportSpec,
-    LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec, RecordSpec, SelectedTextSpec,
-    TypeReplacementSpec, TypeSpec, VariantSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldExpression,
+    FieldOrigin, FlagsSpec, FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, IntSpec,
+    LanguageImportSpec, LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec,
+    RecordSpec, SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -472,8 +473,8 @@ impl<'a> ApiPlanner<'a> {
                             .iter()
                             .filter(|field| {
                                 field
-                                    .targets
-                                    .contains(crate::nexgen_config::GenerationTarget::Workflow)
+                                    .source_expressions
+                                    .contains_key(&GenerationTarget::Workflow)
                             })
                             .cloned()
                             .collect()
@@ -696,8 +697,8 @@ impl<'a> ApiPlanner<'a> {
 
         let sourced_fields = planned_model
             .sourced_fields()
-            .map(|(field_name, field, source_expr)| {
-                self.build_sourced_field(field_name, field, source_expr)
+            .map(|(field_name, field, expressions)| {
+                self.build_sourced_field(field_name, field, expressions)
             })
             .collect();
 
@@ -1240,11 +1241,14 @@ impl<'a> ApiPlanner<'a> {
         &mut self,
         field_name: &str,
         field: &RecordFieldSpec<PlannedFamily>,
-        source_expr: &str,
+        expressions: &BTreeMap<GenerationTarget, FieldExpression>,
     ) -> RenderedSourcedField {
         let field_name = typescript_generated_field_name(field_name);
 
-        let default_source_expr = sourced_support_call(source_expr);
+        let source_expressions = expressions
+            .iter()
+            .map(|(target, expression)| (*target, sourced_support_call(&expression.value)))
+            .collect();
         // Transfer conversion is data-only; sources are evaluated by the API,
         // never while serializing a shared model.
         let source_expr = format!("model.{field_name}");
@@ -1263,8 +1267,7 @@ impl<'a> ApiPlanner<'a> {
                     format!("Record<string, {}>", value_type.annotation),
                 ),
                 doc,
-                source_expr: default_source_expr,
-                targets: field.source_targets(),
+                source_expressions,
                 visible: true,
                 from_wire_expr: map_value_from_wire_expr(
                     &value_type,
@@ -1288,8 +1291,7 @@ impl<'a> ApiPlanner<'a> {
                     typescript_array_annotation(&resolved_type.annotation),
                 ),
                 doc,
-                source_expr: default_source_expr,
-                targets: field.source_targets(),
+                source_expressions,
                 visible: true,
                 from_wire_expr: format!(
                     "{} ?? []",
@@ -1303,8 +1305,7 @@ impl<'a> ApiPlanner<'a> {
             name: field_name.clone(),
             annotation: Self::typescript_field_annotation(field, resolved_type.annotation.clone()),
             doc,
-            source_expr: default_source_expr,
-            targets: field.source_targets(),
+            source_expressions,
             visible: true,
             from_wire_expr: required_from_wire_expr(
                 &resolved_type,
@@ -3049,8 +3050,7 @@ pub(in crate::generator) struct RenderedSourcedField {
     pub(in crate::generator) name: String,
     annotation: String,
     doc: Option<String>,
-    source_expr: String,
-    targets: crate::nexgen_config::GenerationTargets,
+    source_expressions: BTreeMap<GenerationTarget, String>,
     visible: bool,
     pub(in crate::generator) from_wire_expr: String,
     pub(in crate::generator) to_wire_expr: String,
@@ -6281,7 +6281,13 @@ fn render_resource_method_operation_body(
                     .iter()
                     .all(|field| typescript_generated_field_name(&field.field_name) != source.name)
             })
-            .map(|source| format!("{}: {}", source.name, source.source_expr))
+            .map(|source| {
+                format!(
+                    "{}: {}",
+                    source.name,
+                    source.source_expressions[&GenerationTarget::Workflow]
+                )
+            })
             .collect(),
         _ => Vec::new(),
     };
@@ -6661,7 +6667,11 @@ fn render_operation_function(
         if let Some(initialization) = &input.default_initialization {
             let mut sourced = String::new();
             for field in &input.sourced_fields {
-                sourced.push_str(&format!("    {}: {},\n", field.name, field.source_expr));
+                sourced.push_str(&format!(
+                    "    {}: {},\n",
+                    field.name,
+                    field.source_expressions[&GenerationTarget::Workflow]
+                ));
             }
             output.push_str(&initialization.replace(
                 "...requestInput,\n",
@@ -6674,7 +6684,7 @@ fn render_operation_function(
                 output.push_str("    ");
                 output.push_str(&field.name);
                 output.push_str(": ");
-                output.push_str(&field.source_expr);
+                output.push_str(&field.source_expressions[&GenerationTarget::Workflow]);
                 output.push_str(",\n");
             }
             output.push_str("  } as ");

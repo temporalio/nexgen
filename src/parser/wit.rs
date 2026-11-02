@@ -1225,7 +1225,6 @@ fn build_fields_from_record(
             directive_value(&directives, "proto-field", path, &field_context, "value")?
                 .unwrap_or_else(|| field.name.to_snake_case());
         let function_directive = directive(&directives, "function", path, &field_context)?;
-        let default_directive = directive(&directives, "default", path, &field_context)?;
         let flattened_function_type = if omit_directive.is_none() && function_directive.is_none() {
             find_flattened_function_type_spec(resolve, &field.ty, path, language)?
         } else {
@@ -1262,7 +1261,10 @@ fn build_fields_from_record(
 
             for conflicting_directive in ["source", "type", "flattened-type", "function", "default"]
             {
-                if directive(&directives, conflicting_directive, path, &field_context)?.is_some() {
+                if directives
+                    .iter()
+                    .any(|directive| directive.name == conflicting_directive)
+                {
                     return Err(Error::InvalidWitDirective {
                         path: path.to_path_buf(),
                         context: field_context,
@@ -1318,9 +1320,18 @@ fn build_fields_from_record(
             resolve_record_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
             language,
         );
-        let field_default = build_field_default(default_directive, path, &field_context)?;
+        let origin = build_field_origins(
+            &directives,
+            api_omit_directive.is_some(),
+            path,
+            &field_context,
+        )?;
         let required = !is_optional_type(resolve, &field.ty);
-        if field_default.is_some() && !required {
+        if directives
+            .iter()
+            .any(|directive| directive.name == "default")
+            && !required
+        {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(),
                 context: field_context.clone(),
@@ -1328,20 +1339,9 @@ fn build_fields_from_record(
                 reason: "cannot be used on option<T> fields; use T and omit the operation argument instead".to_string(),
             });
         }
-        let source = build_source_call(&directives, path, &field_context, language)?;
-        if source.is_some()
-            && field_default
-                .as_ref()
-                .and_then(|default| default.for_language(language))
-                .is_some()
-        {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: field_context.clone(),
-                directive: "@nexus.default".to_string(),
-                reason: "cannot be combined with `@nexus.source` for the same language".to_string(),
-            });
-        }
+        let sourced = origin
+            .for_language(language)
+            .is_some_and(FieldOrigin::is_sourced);
         if let Some(api_omit_directive) = api_omit_directive {
             if !api_omit_directive.args.is_empty() {
                 return Err(Error::InvalidWitDirective {
@@ -1349,14 +1349,6 @@ fn build_fields_from_record(
                     context: field_context,
                     directive: "@nexus.api-omit".to_string(),
                     reason: "field-level api-omit does not take arguments".to_string(),
-                });
-            }
-            if source.is_some() {
-                return Err(Error::InvalidWitDirective {
-                    path: path.to_path_buf(),
-                    context: field_context,
-                    directive: "@nexus.api-omit".to_string(),
-                    reason: "cannot be combined with `@nexus.source`".to_string(),
                 });
             }
         }
@@ -1367,7 +1359,7 @@ fn build_fields_from_record(
         let function =
             build_function_field(resolve, owner, &directives, path, &field_context, language)?;
 
-        if source.is_some() && function.is_some() {
+        if sourced && function.is_some() {
             return Err(Error::ConflictingTypeOverrideFieldProperties {
                 message: context.to_string(),
                 field: proto_field_name,
@@ -1385,13 +1377,7 @@ fn build_fields_from_record(
                 flattened_annotation,
                 field_type,
                 required,
-                origin: build_field_origins(
-                    &directives,
-                    field_default.as_ref(),
-                    api_omit_directive.is_some(),
-                    path,
-                    &field_context,
-                )?,
+                origin,
                 function,
                 data: (),
             },
@@ -1831,15 +1817,21 @@ pub(crate) fn find_proto_name_for_type_def(
 
 fn build_field_origins(
     directives: &[Directive],
-    default: Option<&LanguageStringSpec>,
     api_omitted: bool,
     path: &Path,
     context: &str,
 ) -> Result<LanguageFieldOrigins> {
     let mut origins = LanguageFieldOrigins::default();
+    let sources = origin_directives(directives, "source", path, context)?;
+    let defaults = origin_directives(directives, "default", path, context)?
+        .into_iter()
+        .map(|(directive, targets)| {
+            build_field_default(directive, path, context).map(|expression| (expression, targets))
+        })
+        .collect::<Result<Vec<_>>>()?;
     if api_omitted {
         origins.default = Some(FieldOrigin::ApiOmitted);
-        if default.is_some() {
+        if !defaults.is_empty() {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(), context: context.to_string(),
                 directive: "@nexus.api-omit".to_string(),
@@ -1847,15 +1839,36 @@ fn build_field_origins(
             });
         }
     }
-    let default_directive = directive(directives, "default", path, context)?;
-    let default_targets = default_directive
-        .map(|directive| build_origin_targets(directive, path, context, "default"))
-        .transpose()?
-        .unwrap_or(crate::nexgen_config::GenerationTargets::ALL);
     for language in all_languages() {
-        let source = build_source_call(directives, path, context, language)?;
-        let expression = default.and_then(|default| default.for_language(language));
-        if source.is_some() && expression.is_some() {
+        let mut source_expressions = BTreeMap::new();
+        for (directive, targets) in &sources {
+            if let Some(value) = build_source_call(directive, path, context, language)? {
+                for target in targets.iter() {
+                    source_expressions.insert(
+                        target,
+                        FieldExpression {
+                            value: value.clone(),
+                            import: None,
+                        },
+                    );
+                }
+            }
+        }
+        let mut default_expressions = BTreeMap::new();
+        for (expression, targets) in &defaults {
+            if let Some(value) = expression.for_language(language) {
+                for target in targets.iter() {
+                    default_expressions.insert(
+                        target,
+                        FieldExpression {
+                            value: value.to_string(),
+                            import: expression.import_for_language(language).map(str::to_string),
+                        },
+                    );
+                }
+            }
+        }
+        if !source_expressions.is_empty() && !default_expressions.is_empty() {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(),
                 context: context.to_string(),
@@ -1863,7 +1876,7 @@ fn build_field_origins(
                 reason: "cannot be combined with `@nexus.source` for the same language".to_string(),
             });
         }
-        let origin = if let Some((value, targets)) = source {
+        let origin = if !source_expressions.is_empty() {
             if api_omitted {
                 return Err(Error::InvalidWitDirective {
                     path: path.to_path_buf(),
@@ -1873,28 +1886,52 @@ fn build_field_origins(
                 });
             }
             Some(FieldOrigin::Source {
-                expression: FieldExpression {
-                    value,
-                    import: None,
-                },
-                targets,
+                expressions: source_expressions,
+            })
+        } else if !default_expressions.is_empty() {
+            Some(FieldOrigin::Default {
+                expressions: default_expressions,
             })
         } else {
-            expression.map(|value| FieldOrigin::Default {
-                expression: FieldExpression {
-                    value: value.to_string(),
-                    import: default
-                        .and_then(|default| default.import_for_language(language))
-                        .map(str::to_string),
-                },
-                targets: default_targets,
-            })
+            None
         };
         if let Some(origin) = origin {
             origins.by_language.insert(language, origin);
         }
     }
     Ok(origins)
+}
+
+/// Repeated origin directives have no ordering or override precedence.
+fn origin_directives<'a>(
+    directives: &'a [Directive],
+    kind: &str,
+    path: &Path,
+    context: &str,
+) -> Result<Vec<(&'a Directive, crate::nexgen_config::GenerationTargets)>> {
+    let mut selected = Vec::new();
+    let mut seen = BTreeSet::new();
+    for directive in directives.iter().filter(|directive| directive.name == kind) {
+        let targets = build_origin_targets(directive, path, context, kind)?;
+        for target in targets.iter() {
+            if !seen.insert(target) {
+                let target = match target {
+                    crate::nexgen_config::GenerationTarget::Workflow => "workflow",
+                    crate::nexgen_config::GenerationTarget::Client => "client",
+                };
+                return Err(Error::InvalidWitDirective {
+                    path: path.to_path_buf(),
+                    context: context.to_string(),
+                    directive: format!("@nexus.{kind}"),
+                    reason: format!(
+                        "overlapping target `{target}`; repeated `@nexus.{kind}` directives must have disjoint target sets"
+                    ),
+                });
+            }
+        }
+        selected.push((directive, targets));
+    }
+    Ok(selected)
 }
 
 fn build_origin_targets(
@@ -1927,13 +1964,10 @@ fn build_origin_targets(
 }
 
 fn build_field_default(
-    directive: Option<&Directive>,
+    directive: &Directive,
     path: &Path,
     context: &str,
-) -> Result<Option<LanguageStringSpec>> {
-    let Some(directive) = directive else {
-        return Ok(None);
-    };
+) -> Result<LanguageStringSpec> {
     let expression = directive_language_string(directive);
     if expression.default.is_some() || expression.by_language.is_empty() {
         return Err(Error::InvalidWitDirective {
@@ -1944,21 +1978,15 @@ fn build_field_default(
                 .to_string(),
         });
     }
-    Ok(Some(expression))
+    Ok(expression)
 }
 
 fn build_source_call(
-    directives: &[Directive],
+    directive: &Directive,
     path: &Path,
     context: &str,
     language: Language,
-) -> Result<Option<(String, crate::nexgen_config::GenerationTargets)>> {
-    let Some(directive) = directive(directives, "source", path, context)? else {
-        return Ok(None);
-    };
-
-    let targets = build_origin_targets(directive, path, context, "source")?;
-
+) -> Result<Option<String>> {
     for key in [
         "go-support-import",
         "python-support-import",
@@ -2015,7 +2043,7 @@ fn build_source_call(
         });
     }
 
-    Ok(Some((source_expr.to_string(), targets)))
+    Ok(Some(source_expr.to_string()))
 }
 
 fn is_support_helper_invocation(source_expr: &str) -> bool {
@@ -3740,7 +3768,7 @@ fn parse_bool(value: &str) -> std::result::Result<bool, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::spec::FieldOrigin;
+    use crate::nexgen_config::GenerationTarget;
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -4022,7 +4050,7 @@ interface workflow-service {
             request.fields["workflow_id_reuse_policy"]
                 .origin
                 .for_language(Language::Python)
-                .and_then(FieldOrigin::default),
+                .and_then(|origin| origin.default_for(GenerationTarget::Workflow)),
             Some("temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE")
         );
     }
@@ -4095,7 +4123,7 @@ interface workflow-service {
             go_record.fields["workflow_id_reuse_policy"]
                 .origin
                 .for_language(Language::Go)
-                .and_then(FieldOrigin::source),
+                .and_then(|origin| origin.source_for(GenerationTarget::Workflow)),
             Some("WorkflowIDReusePolicy(ctx)")
         );
 
@@ -4120,9 +4148,77 @@ interface workflow-service {
             field
                 .origin
                 .for_language(Language::Python)
-                .and_then(FieldOrigin::default),
+                .and_then(|origin| origin.default_for(GenerationTarget::Workflow)),
             Some("temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE")
         );
+    }
+
+    #[test]
+    fn preserves_disjoint_target_expressions_for_each_language() {
+        let wit = r#"
+package test:origins@1.0.0;
+world system { export example; }
+interface example {
+  record request {
+    /// @nexus.source targets="workflow" python="workflow_source()" go="WorkflowSource(ctx)"
+    /// @nexus.source targets="client" python="client_source()" go="ClientSource(ctx)"
+    context: string,
+    /// @nexus.default targets="client" python="'client'" go="\"client\""
+    /// @nexus.default targets="workflow" python="'workflow'" go="\"workflow\""
+    label: string,
+  }
+  submit: func(request: request);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let record = spec
+            .records()
+            .find(|(_, record)| record.name == "Request")
+            .unwrap()
+            .1;
+        for (language, workflow_source, client_source, workflow_default, client_default) in [
+            (
+                Language::Python,
+                "workflow_source()",
+                "client_source()",
+                "'workflow'",
+                "'client'",
+            ),
+            (
+                Language::Go,
+                "WorkflowSource(ctx)",
+                "ClientSource(ctx)",
+                "\"workflow\"",
+                "\"client\"",
+            ),
+        ] {
+            let source = record.fields["context"]
+                .origin
+                .for_language(language)
+                .unwrap();
+            let default = record.fields["label"]
+                .origin
+                .for_language(language)
+                .unwrap();
+            assert_eq!(
+                source.source_for(GenerationTarget::Workflow),
+                Some(workflow_source)
+            );
+            assert_eq!(
+                source.source_for(GenerationTarget::Client),
+                Some(client_source)
+            );
+            assert_eq!(
+                default.default_for(GenerationTarget::Workflow),
+                Some(workflow_default)
+            );
+            assert_eq!(
+                default.default_for(GenerationTarget::Client),
+                Some(client_default)
+            );
+            assert_eq!(source.default_for(GenerationTarget::Workflow), None);
+            assert_eq!(default.source_for(GenerationTarget::Client), None);
+        }
     }
 
     #[test]
@@ -4157,7 +4253,7 @@ interface workflow-service {
                 record.fields["namespace"]
                     .origin
                     .for_language(language)
-                    .and_then(FieldOrigin::source),
+                    .and_then(|origin| origin.source_for(GenerationTarget::Workflow)),
                 Some(expression)
             );
         }
@@ -4288,7 +4384,7 @@ interface workflow-service {
             model.fields["header"]
                 .origin
                 .for_language(Language::Python)
-                .and_then(FieldOrigin::source)
+                .and_then(|origin| origin.source_for(GenerationTarget::Workflow))
                 .is_none()
         );
         assert_eq!(model.field_name_override("workflow_type"), Some("workflow"));
@@ -4357,7 +4453,7 @@ interface workflow-service {
             model.fields["namespace"]
                 .origin
                 .for_language(Language::Python)
-                .and_then(FieldOrigin::source),
+                .and_then(|origin| origin.source_for(GenerationTarget::Workflow)),
             Some("workflow_namespace()")
         );
 
@@ -4479,7 +4575,7 @@ interface workflow-service {
                 .fields["namespace"]
                 .origin
                 .for_language(Language::Python)
-                .and_then(FieldOrigin::source),
+                .and_then(|origin| origin.source_for(GenerationTarget::Workflow)),
             Some("workflow_namespace()")
         );
         assert_eq!(
@@ -4491,7 +4587,7 @@ interface workflow-service {
                 .fields["namespace"]
                 .origin
                 .for_language(Language::TypeScript)
-                .and_then(FieldOrigin::source),
+                .and_then(|origin| origin.source_for(GenerationTarget::Workflow)),
             Some("workflowNamespace()")
         );
         assert_eq!(
@@ -4503,7 +4599,7 @@ interface workflow-service {
                 .fields["namespace"]
                 .origin
                 .for_language(Language::Dotnet)
-                .and_then(FieldOrigin::source),
+                .and_then(|origin| origin.source_for(GenerationTarget::Workflow)),
             Some("TemporalWorkflowContext.WorkflowNamespace()")
         );
     }

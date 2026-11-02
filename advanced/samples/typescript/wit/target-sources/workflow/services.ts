@@ -8,6 +8,7 @@ import {
 } from "./models";
 import type {
   SubmitRequest,
+  TargetedRequest,
   CreateJobRequest,
   CreateMarkerRequest,
   RestartRequest,
@@ -20,6 +21,7 @@ import type { Job, Marker } from "./resources";
 
 export const sourceService = nexus.service("SourceService", {
   submit: nexus.operation<SubmitRequest, void>({ name: "Submit" }),
+  targeted: nexus.operation<TargetedRequest, void>({ name: "Targeted" }),
   createJob: nexus.operation<CreateJobRequest, Job>({ name: "CreateJob" }),
   refresh: nexus.operation<CreateJobRequest, Job>({ name: "Refresh" }),
   createMarker: nexus.operation<CreateMarkerRequest, Marker>({ name: "CreateMarker" }),

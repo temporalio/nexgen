@@ -8,6 +8,7 @@ import temporalio.workflow
 from ..models import (
     CreateJobRequest,
     RestartRequest,
+    TargetedRequest,
 )
 import temporal_support as _support
 
@@ -33,6 +34,16 @@ class Job:
             job_id=self.job_id,
         )
         return await _refresh(request)
+
+    async def targeted(
+        self,
+    ) -> None:
+        request = TargetedRequest(
+            context=_support.workflow_source(),
+            label=(_support.workflow_source()),
+        )
+        handle = await _targeted(request)
+        await handle
 
 
 async def _restart(
@@ -82,3 +93,27 @@ async def refresh(
         job_id=job_id,
     )
     return await _refresh(request)
+
+
+async def _targeted(
+    request: TargetedRequest,
+) -> temporalio.workflow.NexusOperationHandle[None,]:
+    nexus_client = temporalio.workflow.create_nexus_client(
+        service="SourceService",
+        endpoint="sources",
+    )
+    return await nexus_client.start_operation(
+        operation="Targeted",
+        input=request,
+    )
+
+
+async def targeted(
+    *,
+    label: str | None = None,
+) -> temporalio.workflow.NexusOperationHandle[None,]:
+    request = TargetedRequest(
+        context=_support.workflow_source(),
+        label=((_support.workflow_source()) if label is None else label),
+    )
+    return await _targeted(request)

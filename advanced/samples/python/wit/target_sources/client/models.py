@@ -17,6 +17,12 @@ class SubmitRequest:
 
 
 @dataclasses.dataclass(slots=True)
+class TargetedRequest:
+    context: str
+    label: str
+
+
+@dataclasses.dataclass(slots=True)
 class CreateJobRequest:
     job_id: str
 

@@ -12,6 +12,7 @@ from .models import (
     RunResult,
     SignalWithStartWorkflowExecutionResponse,
     SubmitRequest,
+    TargetedRequest,
 )
 from ._resources.job import Job
 from ._resources.marker import Marker
@@ -23,6 +24,11 @@ class SourceService:
         SubmitRequest,
         None,
     ] = Operation(name="Submit")
+
+    targeted: Operation[
+        TargetedRequest,
+        None,
+    ] = Operation(name="Targeted")
 
     create_job: Operation[
         CreateJobRequest,

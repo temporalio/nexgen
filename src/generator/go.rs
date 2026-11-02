@@ -1936,14 +1936,16 @@ impl<'a> ApiPlanner<'a> {
                             false,
                         )
                     })
-                    .chain(planned_model.sourced_fields().map(
-                        |(field_name, field, _source_expr)| {
-                            (
-                                planned_field(planned_model, field_name, field, self.api_plan),
-                                true,
-                            )
-                        },
-                    ))
+                    .chain(
+                        planned_model
+                            .sourced_fields()
+                            .map(|(field_name, field, _)| {
+                                (
+                                    planned_field(planned_model, field_name, field, self.api_plan),
+                                    true,
+                                )
+                            }),
+                    )
                     .collect::<Vec<_>>();
                 (planned_model.name.clone(), parameters, planned_fields)
             })

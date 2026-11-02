@@ -11,6 +11,7 @@ from .models import (
     RunResult,
     SignalWithStartWorkflowExecutionResponse,
     SubmitRequest,
+    TargetedRequest,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "RunResult",
     "SignalWithStartWorkflowExecutionResponse",
     "SubmitRequest",
+    "TargetedRequest",
 ]

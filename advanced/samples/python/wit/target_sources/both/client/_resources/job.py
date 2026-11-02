@@ -12,6 +12,7 @@ from ._resource_data import JobData
 from ...models import (
     CreateJobRequest,
     RestartRequest,
+    TargetedRequest,
 )
 import temporal_support as _support
 
@@ -63,6 +64,21 @@ class Job:
             nexus_client,
             job_id=result.job_id,
         )
+
+    async def targeted(
+        self,
+    ) -> None:
+        request = TargetedRequest(
+            context=_support.client_source(),
+            label=(_support.client_source()),
+        )
+        nexus_client = self._nexus_client
+        handle = await nexus_client.start_operation(
+            operation="Targeted",
+            arg=request,
+            id=_operation_id(),
+        )
+        await handle.result()
 
 
 __all__ = ["Job"]

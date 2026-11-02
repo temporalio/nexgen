@@ -22,6 +22,10 @@ namespace Nexgen.SourceService
         void Submit(SubmitRequest request);
 
         [GeneratedCode("nexgen", null)]
+        [NexusOperation("Targeted")]
+        void Targeted(TargetedRequest request);
+
+        [GeneratedCode("nexgen", null)]
         [NexusOperation("CreateJob")]
         Job CreateJob(CreateJobRequest request);
 
@@ -89,6 +93,8 @@ namespace Nexgen.SourceService
         {
             [("SourceService", "Submit")] = new NexgenOperationInfo<SubmitRequest, object>(
                 SourceServiceServiceDefinition.Operations["Submit"]),
+            [("SourceService", "Targeted")] = new NexgenOperationInfo<TargetedRequest, object>(
+                SourceServiceServiceDefinition.Operations["Targeted"]),
             [("SourceService", "CreateJob")] = new NexgenOperationInfo<CreateJobRequest, Job>(
                 SourceServiceServiceDefinition.Operations["CreateJob"]),
             [("SourceService", "Refresh")] = new NexgenOperationInfo<CreateJobRequest, Job>(

@@ -21,6 +21,11 @@ export interface SubmitRequest {
   workflow: string;
 }
 
+export interface TargetedRequest {
+  label: string;
+  context: string;
+}
+
 export interface CreateJobRequest {
   jobId: string;
 }

@@ -32,6 +32,12 @@ namespace Nexgen.SourceService
     }
 
     [GeneratedCode("nexgen", null)]
+    public class TargetedOptions
+    {
+        public string? Label { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public class CreateJobOptions
     {
         /// <summary>
@@ -140,6 +146,21 @@ namespace Nexgen.SourceService
         {
             var request = new SubmitRequest(options.Id, options.Client, Nexgen.Support.TargetSources.Shared(), Nexgen.Support.TargetSources.Workflow());
             return SubmitAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task TargetedAsync(TargetedRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ISourceService>(SourceServiceEndpoint);
+            await client.ExecuteNexusOperationAsync(svc => svc.Targeted(request)).ConfigureAwait(true);
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task TargetedAsync(TargetedOptions? options = null)
+        {
+            var request = new TargetedRequest(((options?.Label) ?? (TargetSources.Workflow())), Nexgen.Support.TargetSources.Workflow());
+            return TargetedAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]

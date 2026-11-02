@@ -18,6 +18,7 @@ from ..models import (
     RunResult,
     SignalWithStartWorkflowExecutionResponse,
     SubmitRequest,
+    TargetedRequest,
 )
 from ._resources import (
     Job,
@@ -44,6 +45,7 @@ class SourceServiceClientExtension(abc.ABC):
                 continue
             for name in (
                 "submit",
+                "targeted",
                 "create_job",
                 "refresh",
                 "create_marker",
@@ -140,6 +142,32 @@ class SourceServiceClientExtension(abc.ABC):
             client=_support.client_source(),
         )
         return await self._source_service_submit(request)
+
+    async def _source_service_targeted(
+        self,
+        request: TargetedRequest,
+    ) -> None:
+        nexus_client = self._create_nexus_client(
+            service="SourceService",
+            endpoint="sources",
+        )
+        handle = await nexus_client.start_operation(
+            operation="Targeted",
+            arg=request,
+            id=_operation_id(),
+        )
+        await handle.result()
+
+    async def targeted(
+        self,
+        *,
+        label: str | None = None,
+    ) -> None:
+        request = TargetedRequest(
+            context=_support.client_source(),
+            label=((_support.client_source()) if label is None else label),
+        )
+        return await self._source_service_targeted(request)
 
     async def _source_service_create_job(
         self,

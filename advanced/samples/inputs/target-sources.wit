@@ -16,10 +16,22 @@ interface source-service {
 
   submit: func(request: submit-request);
 
+  record targeted-request {
+    /// @nexus.source targets="workflow" python="workflow_source()" typescript="workflowSource()" go="WorkflowSource(ctx)" dotnet="TargetSources.Workflow()"
+    /// @nexus.source targets="client" python="client_source()"
+    context: string,
+    /// @nexus.default targets="client" python="_support.client_source()"
+    /// @nexus.default targets="workflow" python="_support.workflow_source()" typescript="support.workflowSource()" go="support.WorkflowSource(ctx)" dotnet="TargetSources.Workflow()"
+    label: string,
+  }
+
+  targeted: func(request: targeted-request);
+
   resource job {
     constructor(job-id: string);
     restart: func();
     refresh: func() -> own<job>;
+    targeted: func();
   }
 
   resource marker {

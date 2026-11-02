@@ -763,7 +763,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&field_property_name(field));
             output.push_str(" { get; init; }\n");
         }
-        for (_field_name, field, _source_expr) in model.sourced_fields() {
+        for (_field_name, field, _) in model.sourced_fields() {
             render_field_xml_doc(output, "    ", field);
             let property_name = field_property_name(field);
             output.push_str("    public ");
@@ -3300,8 +3300,8 @@ fn render_flattened_method_body(
         })
         .map(|(_, _, expr)| expr.clone())
         .collect::<Vec<_>>();
-    constructor_args.extend(model.sourced_fields().map(|(name, field, source_expr)| {
-        if field.source_for(GenerationTarget::Workflow).is_some() {
+    constructor_args.extend(model.sourced_fields().map(|(name, field, _)| {
+        if let Some(source_expr) = field.source_for(GenerationTarget::Workflow) {
             dotnet_source_expr(source_expr, support_namespace)
         } else {
             field_exprs
@@ -3880,13 +3880,13 @@ fn resource_method_request_model_init_expr(
     let sourced_field_exprs = type_name_override.is_none().then(|| {
         model
             .sourced_fields()
-            .map(|(_, field, source_expr)| {
+            .map(|(_, field, _)| {
                 field_exprs
                     .iter()
                     .find(|(candidate, _)| candidate.name == field.name)
                     .map(|(_, expression)| expression.clone())
                     .unwrap_or_else(|| {
-                        if field.source_for(GenerationTarget::Workflow).is_some() {
+                        if let Some(source_expr) = field.source_for(GenerationTarget::Workflow) {
                             dotnet_source_expr(source_expr, support_namespace)
                         } else {
                             "default".to_string()

@@ -83,10 +83,7 @@ impl<'a> ModelConfig<'a> {
 
     fn is_field_hidden(&self, field_name: &str) -> bool {
         self.is_field_omitted(field_name)
-            || self
-                .origin(field_name)
-                .and_then(FieldOrigin::source)
-                .is_some()
+            || self.origin(field_name).is_some_and(FieldOrigin::is_sourced)
     }
 }
 
@@ -635,8 +632,7 @@ fn validate_record_fields(
     for (field_name, _) in model_config.record.fields.iter().filter(|(name, _)| {
         model_config
             .origin(name)
-            .and_then(FieldOrigin::source)
-            .is_some()
+            .is_some_and(FieldOrigin::is_sourced)
     }) {
         if oneof_by_name(oneofs, field_name).is_some() {
             continue;
@@ -845,8 +841,7 @@ fn validate_invocation_fields(
         }
         if model_config
             .origin(&function.args_field)
-            .and_then(FieldOrigin::source)
-            .is_some()
+            .is_some_and(FieldOrigin::is_sourced)
         {
             return Err(Error::ConflictingTypeOverrideFieldProperties {
                 message: message_name.to_string(),

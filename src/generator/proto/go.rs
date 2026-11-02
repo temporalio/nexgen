@@ -1803,7 +1803,7 @@ fn build_field_conversions(
         .chain(
             planned_model
                 .sourced_fields()
-                .map(|(field_name, field, _)| (field_name, field)),
+                .map(|(name, field, _)| (name, field)),
         )
         .enumerate()
         .map(|(index, (field_name, field))| {

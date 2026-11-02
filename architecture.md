@@ -136,9 +136,11 @@ resources. The client API lives in `client/`; the workflow API lives in
 output. Neither API depends on the other. Client resource identity DTOs are
 private to the client API and have no runtime API behavior.
 
-API code builds requests and evaluates the sources that apply to its target.
-Model constructors and converters only handle data. This lets workflow and
-client APIs share models without sharing runtime behavior.
+Field origins retain per-target expression maps through language selection and
+shared planning. API preparation selects its target's source or default
+expression when building a request. Model constructors and converters only
+handle data. This lets workflow and client APIs share models without sharing
+runtime behavior.
 
 Client resources keep their service-bound Nexus client. API code decodes
 returned resource data and constructs handles with that client.

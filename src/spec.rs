@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use indexmap::IndexMap;
 
 use crate::language::Language;
-use crate::nexgen_config::{GenerationTarget, GenerationTargets};
+use crate::nexgen_config::GenerationTarget;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ApiSpec<F: TypeFamily = AuthoredFamily> {
@@ -849,12 +849,10 @@ pub enum FieldOrigin {
     ApiOmitted,
     Omitted,
     Default {
-        expression: FieldExpression,
-        targets: GenerationTargets,
+        expressions: BTreeMap<GenerationTarget, FieldExpression>,
     },
     Source {
-        expression: FieldExpression,
-        targets: GenerationTargets,
+        expressions: BTreeMap<GenerationTarget, FieldExpression>,
     },
 }
 
@@ -886,42 +884,24 @@ impl FieldOrigin {
         matches!(self, Self::Omitted)
     }
 
-    pub fn source_targets(&self) -> GenerationTargets {
-        match self {
-            Self::Source { targets, .. } => *targets,
-            _ => GenerationTargets::NONE,
-        }
-    }
-
     pub fn source_for(&self, target: GenerationTarget) -> Option<&str> {
         match self {
-            Self::Source {
-                expression,
-                targets,
-            } if targets.contains(target) => Some(&expression.value),
-            _ => None,
-        }
-    }
-    pub fn source(&self) -> Option<&str> {
-        match self {
-            Self::Source { expression, .. } => Some(&expression.value),
+            Self::Source { expressions } => {
+                expressions.get(&target).map(|expr| expr.value.as_str())
+            }
             _ => None,
         }
     }
 
-    pub fn default(&self) -> Option<&str> {
-        match self {
-            Self::Default { expression, .. } => Some(&expression.value),
-            _ => None,
-        }
+    pub fn is_sourced(&self) -> bool {
+        matches!(self, Self::Source { .. })
     }
 
     pub fn default_for(&self, target: GenerationTarget) -> Option<&str> {
         match self {
-            Self::Default {
-                expression,
-                targets,
-            } if targets.contains(target) => Some(&expression.value),
+            Self::Default { expressions } => {
+                expressions.get(&target).map(|expr| expr.value.as_str())
+            }
             _ => None,
         }
     }
@@ -1049,7 +1029,11 @@ impl<F: TypeFamily> RecordSpec<F> {
         F: TypeFamily<Origin = Option<FieldOrigin>>,
     {
         self.sourced_fields()
-            .filter(move |(_, field, _)| field.source_for(target).is_some())
+            .filter_map(move |(name, field, expressions)| {
+                expressions
+                    .get(&target)
+                    .map(|source| (name, field, source.value.as_str()))
+            })
     }
 
     /// Fields represented by the generated model, including fields hidden from
@@ -1069,17 +1053,26 @@ impl<F: TypeFamily> RecordSpec<F> {
             .map(|(name, field)| (name.as_str(), field))
     }
 
-    pub fn sourced_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)>
+    pub fn sourced_fields(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            &str,
+            &RecordFieldSpec<F>,
+            &BTreeMap<GenerationTarget, FieldExpression>,
+        ),
+    >
     where
         F: TypeFamily<Origin = Option<FieldOrigin>>,
     {
-        self.fields.iter().filter_map(|(name, field)| {
-            field
-                .origin
-                .as_ref()
-                .and_then(FieldOrigin::source)
-                .map(|source| (name.as_str(), field, source))
-        })
+        self.fields
+            .iter()
+            .filter_map(|(name, field)| match &field.origin {
+                Some(FieldOrigin::Source { expressions }) => {
+                    Some((name.as_str(), field, expressions))
+                }
+                _ => None,
+            })
     }
 
     pub fn functions(&self) -> impl Iterator<Item = (&str, &FunctionFieldSpec<F>)> {
@@ -1126,15 +1119,6 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn field_type(&self, field_name: &str) -> Option<&TypeSpec<F>> {
         self.fields.get(field_name).map(|field| &field.field_type)
-    }
-
-    pub fn field_source(&self, field_name: &str) -> Option<&str>
-    where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
-    {
-        self.fields
-            .get(field_name)
-            .and_then(|field| field.origin.as_ref().and_then(FieldOrigin::source))
     }
 
     pub fn field_required(&self, field_name: &str) -> bool {
@@ -1232,16 +1216,6 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
         self.origin
             .as_ref()
             .and_then(|origin| origin.source_for(target))
-    }
-
-    pub fn source_targets(&self) -> GenerationTargets
-    where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
-    {
-        self.origin
-            .as_ref()
-            .map(FieldOrigin::source_targets)
-            .unwrap_or(GenerationTargets::NONE)
     }
 
     fn map_names_with<G, M>(

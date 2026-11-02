@@ -9,6 +9,7 @@ import nexusrpc
 import temporalio.converter
 from . import services as _services
 from .operations.submit import submit
+from ._resources.job import targeted
 from .operations.create_job import create_job
 from ._resources.job import refresh
 from .operations.create_marker import create_marker
@@ -28,6 +29,7 @@ __all__ = [
     "refresh",
     "restart",
     "submit",
+    "targeted",
 ]
 
 
@@ -61,6 +63,12 @@ __nexus_operation_registry__: dict[
         "Submit",
     ): _NexusOperationInfo(
         operation=_services.SourceService.submit,
+    ),
+    (
+        "SourceService",
+        "Targeted",
+    ): _NexusOperationInfo(
+        operation=_services.SourceService.targeted,
     ),
     (
         "SourceService",
