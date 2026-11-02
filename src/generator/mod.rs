@@ -13,7 +13,7 @@ pub(crate) mod typescript;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::language::Language;
-use crate::nexgen_config::{GenerationTarget, GenerationTargets};
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{PlannedFamily, PlannedSpec, PlannedType};
 use crate::spec::{ApiSpec, RecordSpec};
 use crate::spec::{ApiSpecNode, ApiSpecTree};
@@ -418,12 +418,12 @@ pub(crate) trait ExternalModelBackend<ModelType = PlannedType> {
 /// once, emit shared definitions once, then emit each selected API independently.
 pub(crate) fn emit_package<C>(
     context: &mut C,
-    targets: GenerationTargets,
+    targets: &[GenerationTarget],
     models: impl FnOnce(&mut C) -> Result<()>,
     mut api: impl FnMut(&mut C, GenerationTarget) -> Result<()>,
 ) -> Result<()> {
     models(context)?;
-    for target in targets.iter() {
+    for &target in targets {
         api(context, target)?;
     }
     Ok(())
@@ -463,11 +463,11 @@ pub(crate) fn generate_files_for_tree_with_targets_and_options(
     language: Language,
     tree: ApiSpecTree,
     descriptors: &DescriptorIndex,
-    targets: GenerationTargets,
+    targets: &[GenerationTarget],
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     let config = crate::nexgen_config::NexgenConfig {
-        targets,
+        targets: targets.to_vec(),
         ..crate::nexgen_config::current()
     };
     let _scope = crate::nexgen_config::scope(config);
@@ -482,11 +482,11 @@ pub(crate) fn generate_files_from_planned_tree(
     let targets = crate::nexgen_config::current().targets;
     fn validate_sources(
         node: &ApiSpecNode<PlannedFamily>,
-        targets: GenerationTargets,
+        targets: &[GenerationTarget],
     ) -> Result<()> {
         match node {
             ApiSpecNode::Leaf(leaf) => {
-                for target in targets.iter() {
+                for &target in targets {
                     resource_plan::validate_resource_origins(&leaf.spec, target)?;
                 }
             }
@@ -498,7 +498,7 @@ pub(crate) fn generate_files_from_planned_tree(
         }
         Ok(())
     }
-    validate_sources(&tree.root, targets)?;
+    validate_sources(&tree.root, &targets)?;
     let mut generated = match language {
         Language::Dotnet => dotnet::generate(
             tree,
@@ -526,7 +526,11 @@ pub(crate) fn generate_files_from_planned_tree(
 }
 
 pub(crate) fn validate_targets(language: Language) -> Result<()> {
-    if crate::nexgen_config::current().targets.client && !language.has_client_target() {
+    if crate::nexgen_config::current()
+        .targets
+        .contains(&GenerationTarget::Client)
+        && !language.has_client_target()
+    {
         return Err(Error::UnsupportedClientTarget {
             reason: format!("isn't for {language} yet"),
         });
@@ -554,13 +558,7 @@ pub fn generate_source(
     descriptors: &DescriptorIndex,
     support_package: &str,
 ) -> Result<String> {
-    generate_source_with_targets(
-        language,
-        spec,
-        descriptors,
-        support_package,
-        GenerationTargets::NONE,
-    )
+    generate_source_with_targets(language, spec, descriptors, support_package, &[])
 }
 
 pub fn generate_source_with_targets(
@@ -568,7 +566,7 @@ pub fn generate_source_with_targets(
     spec: ApiSpec,
     descriptors: &DescriptorIndex,
     support_package: &str,
-    targets: GenerationTargets,
+    targets: &[GenerationTarget],
 ) -> Result<String> {
     let generated = generate_files_for_tree_with_targets_and_options(
         language,
@@ -644,25 +642,10 @@ mod tests {
     use crate::language::Language;
 
     use super::{
-        GenerateFilesOptions, GeneratedFileMap, GeneratedFileOrigin, GenerationTargets,
+        GenerateFilesOptions, GeneratedFileMap, GeneratedFileOrigin, GenerationTarget,
         generate_files_for_tree_with_targets_and_options,
     };
     use crate::spec::ApiSpecTree;
-
-    #[test]
-    fn the_python_client_target_is_independent() {
-        use crate::nexgen_config::{GenerationTargets, NexgenConfig, scope};
-
-        let _config = scope(NexgenConfig {
-            system_nexus: false,
-            targets: GenerationTargets {
-                workflow: false,
-                client: true,
-            },
-        });
-
-        super::validate_targets(Language::Python).unwrap();
-    }
 
     #[test]
     fn output_directory_named_origin_uses_its_target_language() {
@@ -964,7 +947,7 @@ interface user-service {
             Language::Python,
             ApiSpecTree::single(spec),
             &descriptors,
-            GenerationTargets::WORKFLOW,
+            &[GenerationTarget::Workflow],
             GenerateFilesOptions {
                 support_package: Some("support".to_string()),
                 ..GenerateFilesOptions::default()
@@ -1015,7 +998,7 @@ interface example-service {
             Language::Python,
             ApiSpecTree::single(spec),
             &descriptors,
-            GenerationTargets::NONE,
+            &[],
             GenerateFilesOptions {
                 support_package: Some("support".to_string()),
                 ..GenerateFilesOptions::default()

@@ -56,7 +56,7 @@ fn generate_to_string_with_inputs(
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
             system_nexus: false,
-            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
+            targets: vec![nexgen::nexgen_config::GenerationTarget::Workflow],
         },
         language,
         input_paths: input_paths.to_vec(),
@@ -505,7 +505,7 @@ interface sample-service {{
     let result = generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
             system_nexus: false,
-            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
+            targets: vec![nexgen::nexgen_config::GenerationTarget::Workflow],
         },
         language: nexgen::language::Language::Go,
         input_paths: vec![wit_path],

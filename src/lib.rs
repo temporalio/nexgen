@@ -49,7 +49,7 @@ pub struct GenerateRequest {
 }
 
 pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
-    let _config_scope = nexgen_config::scope(request.config);
+    let _config_scope = nexgen_config::scope(request.config.clone());
     // A resolved output path with no name at all (the filesystem root, or
     // `..` past it) is never a real output directory: Go and Java derive
     // package names from its basename, and for every language it means the

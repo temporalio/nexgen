@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use nexgen::error::{Error, ErrorKind};
 use nexgen::language::Language;
+use nexgen::nexgen_config::GenerationTarget;
 use nexgen::{GenerateRequest, generate_to_file};
 use serde::Deserialize;
 
@@ -20,22 +21,8 @@ struct Expectation {
     #[serde(default)]
     system_nexus: bool,
     #[serde(default)]
-    targets: Vec<Target>,
+    targets: Vec<GenerationTarget>,
     error: ExpectedError,
-}
-
-#[derive(Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-enum Target {
-    Workflow,
-    Client,
-}
-
-fn generation_targets(targets: &[Target]) -> nexgen::nexgen_config::GenerationTargets {
-    nexgen::nexgen_config::GenerationTargets {
-        workflow: targets.contains(&Target::Workflow),
-        client: targets.contains(&Target::Client),
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -175,7 +162,7 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
         let result = generate_to_file(&GenerateRequest {
             config: nexgen::nexgen_config::NexgenConfig {
                 system_nexus: expected.system_nexus,
-                targets: generation_targets(&expected.targets),
+                targets: expected.targets.clone(),
             },
             language,
             input_paths: inputs.clone(),

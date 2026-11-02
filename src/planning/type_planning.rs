@@ -1796,12 +1796,9 @@ interface alerts {
                 spec: super::super::select_spec(spec, Language::Python),
             }),
         };
-        let resource_resolved = super::super::ResourceResolutionPass::new(
-            &descriptors,
-            crate::nexgen_config::GenerationTargets::NONE,
-        )
-        .apply(authored_tree)
-        .unwrap();
+        let resource_resolved = super::super::ResourceResolutionPass::new(&descriptors, vec![])
+            .apply(authored_tree)
+            .unwrap();
         let operation_bound = super::super::OperationBindingPass::new()
             .apply(resource_resolved)
             .unwrap();

@@ -12,6 +12,7 @@ use wit_parser_crate::{
 
 use crate::error::{Error, Result};
 use crate::language::Language;
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::*;
 
 type PackageOrigins = BTreeMap<PackageId, PathBuf>;
@@ -1843,7 +1844,7 @@ fn build_field_origins(
         let mut source_expressions = BTreeMap::new();
         for (directive, targets) in &sources {
             if let Some(value) = build_source_call(directive, path, context, language)? {
-                for target in targets.iter() {
+                for &target in targets {
                     source_expressions.insert(
                         target,
                         FieldExpression {
@@ -1857,7 +1858,7 @@ fn build_field_origins(
         let mut default_expressions = BTreeMap::new();
         for (expression, targets) in &defaults {
             if let Some(value) = expression.for_language(language) {
-                for target in targets.iter() {
+                for &target in targets {
                     default_expressions.insert(
                         target,
                         FieldExpression {
@@ -1908,12 +1909,12 @@ fn origin_directives<'a>(
     kind: &str,
     path: &Path,
     context: &str,
-) -> Result<Vec<(&'a Directive, crate::nexgen_config::GenerationTargets)>> {
+) -> Result<Vec<(&'a Directive, Vec<GenerationTarget>)>> {
     let mut selected = Vec::new();
     let mut seen = BTreeSet::new();
     for directive in directives.iter().filter(|directive| directive.name == kind) {
         let targets = build_origin_targets(directive, path, context, kind)?;
-        for target in targets.iter() {
+        for &target in &targets {
             if !seen.insert(target) {
                 let target = match target {
                     crate::nexgen_config::GenerationTarget::Workflow => "workflow",
@@ -1939,15 +1940,15 @@ fn build_origin_targets(
     path: &Path,
     context: &str,
     kind: &str,
-) -> Result<crate::nexgen_config::GenerationTargets> {
+) -> Result<Vec<GenerationTarget>> {
     let Some(value) = directive.value("targets") else {
-        return Ok(crate::nexgen_config::GenerationTargets::ALL);
+        return Ok(vec![GenerationTarget::Workflow, GenerationTarget::Client]);
     };
-    let mut targets = crate::nexgen_config::GenerationTargets::NONE;
+    let mut targets = Vec::new();
     for name in value.split(',').map(str::trim) {
-        match name {
-            "workflow" => targets.workflow = true,
-            "client" => targets.client = true,
+        targets.push(match name {
+            "workflow" => GenerationTarget::Workflow,
+            "client" => GenerationTarget::Client,
             _ => {
                 return Err(Error::InvalidWitDirective {
                     path: path.to_path_buf(),
@@ -1958,8 +1959,10 @@ fn build_origin_targets(
                     ),
                 });
             }
-        }
+        });
     }
+    targets.sort_unstable();
+    targets.dedup();
     Ok(targets)
 }
 

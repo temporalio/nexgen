@@ -7,7 +7,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use nexgen::nexgen_config::GenerationTargets;
+use nexgen::nexgen_config::GenerationTarget;
 use nexgen::{GenerateRequest, generate_to_file};
 
 mod support;
@@ -197,7 +197,7 @@ fn generate_to_string_with_inputs(
     let output_path = temp_dir.join("output");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
+            targets: vec![GenerationTarget::Workflow],
             ..Default::default()
         },
         language,
@@ -351,7 +351,7 @@ interface namespace-service {
     let output_path = module_root.join("generated");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            targets: nexgen::nexgen_config::GenerationTargets::WORKFLOW,
+            targets: vec![GenerationTarget::Workflow],
             ..Default::default()
         },
         language: nexgen::language::Language::Go,
@@ -384,8 +384,8 @@ fn go_json_examples_render_expected_language_features() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
         for (mode, targets) in [
-            ("definitions", GenerationTargets::NONE),
-            ("api", GenerationTargets::WORKFLOW),
+            ("definitions", &[][..]),
+            ("api", &[GenerationTarget::Workflow][..]),
         ] {
             let temp_dir = unique_output_path(&format!("go-json-{example_id}-{mode}"));
             fs::create_dir_all(&temp_dir).unwrap();
@@ -405,7 +405,7 @@ fn go_json_examples_render_expected_language_features() {
             let definitions = actual
                 .get(&PathBuf::from("definitions.go"))
                 .expect("JSON generation emits package definitions");
-            if targets.workflow {
+            if targets.contains(&GenerationTarget::Workflow) {
                 match example_id {
                     "chat" => {
                         assert!(generated.contains("var ChatService = struct"));
@@ -845,7 +845,7 @@ fn generate_formatted_go_json_output(
     root: &Path,
     example_id: &str,
     output_path: &Path,
-    targets: GenerationTargets,
+    targets: &[GenerationTarget],
 ) {
     let mut command = Command::new(support::nexgen_binary());
     command.args([

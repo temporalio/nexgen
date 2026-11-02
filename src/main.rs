@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use nexgen::generator::TsDateTimeTypes;
 use nexgen::language::Language;
 #[cfg(feature = "advanced")]
-use nexgen::nexgen_config::NexgenConfig;
+use nexgen::nexgen_config::{GenerationTarget, NexgenConfig};
 #[cfg(feature = "advanced")]
 use nexgen::parser::write_prepared_wit_directory;
 #[cfg(feature = "advanced")]
@@ -68,22 +68,7 @@ struct GenerateArgs {
     /// Defaults to models and definitions only. Repeat the flag or use commas.
     #[cfg(feature = "advanced")]
     #[arg(long = "targets", value_enum, value_delimiter = ',')]
-    targets: Vec<CliGenerationTarget>,
-}
-
-#[cfg(feature = "advanced")]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
-enum CliGenerationTarget {
-    Workflow,
-    Client,
-}
-
-#[cfg(feature = "advanced")]
-fn generation_targets(targets: &[CliGenerationTarget]) -> nexgen::nexgen_config::GenerationTargets {
-    nexgen::nexgen_config::GenerationTargets {
-        workflow: targets.contains(&CliGenerationTarget::Workflow),
-        client: targets.contains(&CliGenerationTarget::Client),
-    }
+    targets: Vec<GenerationTarget>,
 }
 
 #[derive(Args)]
@@ -213,64 +198,20 @@ fn main() -> ExitCode {
             Some(args.package_name),
             None,
         )),
-        Commands::Python(args) => {
-            #[cfg(feature = "advanced")]
-            {
-                let system_nexus = args.common.system_nexus;
-                let config = NexgenConfig {
-                    system_nexus,
-                    targets: generation_targets(&args.common.targets),
-                };
-                let mut request = generate_request(
-                    Language::Python,
-                    args.common,
-                    Default::default(),
-                    None,
-                    args.support_package,
-                );
-                request.config = config;
-                generate_to_file(&request)
-            }
-            #[cfg(not(feature = "advanced"))]
-            {
-                generate_to_file(&generate_request(
-                    Language::Python,
-                    args.common,
-                    Default::default(),
-                    None,
-                    args.support_package,
-                ))
-            }
-        }
-        Commands::Typescript(args) => {
-            #[cfg(feature = "advanced")]
-            {
-                let system_nexus = args.common.system_nexus;
-                let config = NexgenConfig {
-                    system_nexus,
-                    targets: generation_targets(&args.common.targets),
-                };
-                let mut request = generate_request(
-                    Language::TypeScript,
-                    args.common,
-                    args.ts_date_time_types.into(),
-                    None,
-                    args.support_package,
-                );
-                request.config = config;
-                generate_to_file(&request)
-            }
-            #[cfg(not(feature = "advanced"))]
-            {
-                generate_to_file(&generate_request(
-                    Language::TypeScript,
-                    args.common,
-                    args.ts_date_time_types.into(),
-                    None,
-                    args.support_package,
-                ))
-            }
-        }
+        Commands::Python(args) => generate_to_file(&generate_request(
+            Language::Python,
+            args.common,
+            Default::default(),
+            None,
+            args.support_package,
+        )),
+        Commands::Typescript(args) => generate_to_file(&generate_request(
+            Language::TypeScript,
+            args.common,
+            args.ts_date_time_types.into(),
+            None,
+            args.support_package,
+        )),
         #[cfg(feature = "advanced")]
         Commands::AddRpc(args) => add_rpc_to_file(&AddRpcRequest {
             descriptor_paths: args.descriptors,
@@ -310,7 +251,7 @@ fn generate_request(
         #[cfg(feature = "advanced")]
         config: NexgenConfig {
             system_nexus: args.system_nexus,
-            targets: generation_targets(&args.targets),
+            targets: args.targets,
         },
         #[cfg(not(feature = "advanced"))]
         config: Default::default(),

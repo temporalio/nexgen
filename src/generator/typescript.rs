@@ -3269,7 +3269,7 @@ fn render_module_files(
     }
     files.insert(
         "index.ts",
-        if targets.workflow {
+        if targets.contains(&GenerationTarget::Workflow) {
             render_index_module(services, &index_model_names, &index_exports)
         } else {
             render_definitions_only_index_module(
@@ -3282,7 +3282,7 @@ fn render_module_files(
     )?;
     super::emit_package(
         &mut files,
-        targets,
+        &targets,
         |files| {
             if has_models_module {
                 files.insert("models.ts", models_source, module_origin.clone())?;
@@ -3371,7 +3371,7 @@ fn render_module_files(
                 services,
                 language_imports,
                 support_package,
-                targets,
+                &targets,
                 api_plan,
             ),
             module_origin.clone(),
@@ -4150,7 +4150,7 @@ fn render_models_module(
     let targets = crate::nexgen_config::current().targets;
     let mut body = String::new();
 
-    let uses_function_payload_helpers = targets.workflow
+    let uses_function_payload_helpers = targets.contains(&GenerationTarget::Workflow)
         && models.iter().any(|model| {
             model.fields.iter().any(|field| {
                 field.to_wire_expr.contains("requestArgsToPayloads(")
@@ -4375,14 +4375,14 @@ fn render_service_module(
     services: &[RenderedService<'_>],
     language_imports: &[LanguageImportSpec],
     support_package: &str,
-    targets: crate::nexgen_config::GenerationTargets,
+    targets: &[GenerationTarget],
     api_plan: &PlannedSpec,
 ) -> String {
     let mut body = String::new();
     for service in services {
         render_service_definition(&mut body, service);
         body.push('\n');
-        if targets.workflow && service.endpoint.is_none() {
+        if targets.contains(&GenerationTarget::Workflow) && service.endpoint.is_none() {
             render_endpoint_service_class(&mut body, service);
             body.push('\n');
         }
@@ -4453,7 +4453,9 @@ fn render_service_module(
     );
     let resource_client_binders = services
         .iter()
-        .filter(|service| targets.workflow && service.endpoint.is_none())
+        .filter(|service| {
+            targets.contains(&GenerationTarget::Workflow) && service.endpoint.is_none()
+        })
         .flat_map(|service| service.resources.iter())
         .filter(|resource| {
             contains_identifier(&body, &resource_client_bind_function_name(resource))

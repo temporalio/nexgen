@@ -194,7 +194,7 @@ pub(crate) fn resolve_service_resources(
     spec: &ApiSpec<SelectedFamily>,
     service: &ServiceSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
-    targets: crate::nexgen_config::GenerationTargets,
+    targets: &[crate::nexgen_config::GenerationTarget],
 ) -> Result<ResolvedServiceResources> {
     let resources = service
         .resources
@@ -939,13 +939,13 @@ fn operation_output_resource_wire_type(
 /// owning operation and resource nodes by `OperationBindingPass`.
 pub(crate) struct ResourceResolutionPass<'a> {
     descriptors: &'a DescriptorIndex,
-    targets: crate::nexgen_config::GenerationTargets,
+    targets: Vec<crate::nexgen_config::GenerationTarget>,
 }
 
 impl<'a> ResourceResolutionPass<'a> {
     pub(crate) fn new(
         descriptors: &'a DescriptorIndex,
-        targets: crate::nexgen_config::GenerationTargets,
+        targets: Vec<crate::nexgen_config::GenerationTarget>,
     ) -> Self {
         Self {
             descriptors,
@@ -963,7 +963,7 @@ impl<'a> ResourceResolutionPass<'a> {
             .services
             .iter()
             .map(|service| {
-                resolve_service_resources(&spec, service, self.descriptors, self.targets)
+                resolve_service_resources(&spec, service, self.descriptors, &self.targets)
                     .map(|resources| (service.name.clone(), resources))
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
@@ -1090,7 +1090,7 @@ interface workflow-service {
             &spec,
             service,
             &descriptors(),
-            crate::nexgen_config::GenerationTargets::WORKFLOW,
+            &[crate::nexgen_config::GenerationTarget::Workflow],
         )
         .unwrap();
         let method = &resolved.resources[0].methods[0];
@@ -1139,7 +1139,7 @@ interface user-service {
             &spec,
             service,
             &empty_descriptors(),
-            crate::nexgen_config::GenerationTargets::WORKFLOW,
+            &[crate::nexgen_config::GenerationTarget::Workflow],
         )
         .unwrap();
         let method = &resolved.resources[0].methods[0];
@@ -1185,7 +1185,7 @@ interface user-service {
             &spec,
             service,
             &empty_descriptors(),
-            crate::nexgen_config::GenerationTargets::WORKFLOW,
+            &[crate::nexgen_config::GenerationTarget::Workflow],
         )
         .unwrap();
         let method = &resolved.resources[0].methods[0];
@@ -1256,7 +1256,7 @@ interface user-service {
             &spec,
             service,
             &empty_descriptors(),
-            crate::nexgen_config::GenerationTargets::WORKFLOW,
+            &[crate::nexgen_config::GenerationTarget::Workflow],
         )
         .unwrap();
         let method = &resolved.resources[0].methods[0];

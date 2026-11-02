@@ -6,7 +6,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use nexgen::error::Error as NexgenError;
 use nexgen::generator::TsDateTimeTypes;
 use nexgen::language::Language;
-use nexgen::nexgen_config::{GenerationTargets, NexgenConfig};
+use nexgen::nexgen_config::{GenerationTarget, NexgenConfig};
 use nexgen::{GenerateRequest, format_generated_files, generate_to_file};
 use serde::Deserialize;
 
@@ -27,7 +27,7 @@ struct ExampleConfig {
 struct ExampleOptions {
     languages: Option<Vec<String>>,
     system_nexus: Option<bool>,
-    targets: Option<Vec<ExampleTarget>>,
+    targets: Option<Vec<GenerationTarget>>,
     // Each example plans against only the protos it declares, so one sample's protos can't
     // change how another example resolves a proto name.
     descriptors: Option<ExampleDescriptors>,
@@ -46,13 +46,6 @@ enum ExampleDescriptors {
 #[serde(rename_all = "lowercase")]
 enum DescriptorPreset {
     Temporal,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-enum ExampleTarget {
-    Workflow,
-    Client,
 }
 
 /// The keys of a table that are settings. Any other key must be a child table.
@@ -136,14 +129,8 @@ impl ExampleOptions {
         }
     }
 
-    fn targets(&self) -> GenerationTargets {
-        let Some(targets) = &self.targets else {
-            return GenerationTargets::NONE;
-        };
-        GenerationTargets {
-            workflow: targets.contains(&ExampleTarget::Workflow),
-            client: targets.contains(&ExampleTarget::Client),
-        }
+    fn targets(&self) -> &[GenerationTarget] {
+        self.targets.as_deref().unwrap_or_default()
     }
 
     fn supports(&self, language: Language) -> bool {
@@ -704,7 +691,7 @@ fn build_example_configuration(
     let generate_request = GenerateRequest {
         config: NexgenConfig {
             system_nexus,
-            targets: options.targets(),
+            targets: options.targets().to_vec(),
         },
         language,
         input_paths,
@@ -758,12 +745,9 @@ fn build_json_example_variant(
     let input_path = json_example_input_path(repo_root, input_id);
     let dir_name = example_directory_name(language, output_id);
     for (targets, root) in [
+        (&[][..], samples_language_root(repo_root, language)),
         (
-            GenerationTargets::NONE,
-            samples_language_root(repo_root, language),
-        ),
-        (
-            GenerationTargets::WORKFLOW,
+            &[GenerationTarget::Workflow][..],
             advanced_language_root(repo_root, language),
         ),
     ] {
@@ -771,7 +755,7 @@ fn build_json_example_variant(
         reset_example_output_directory(&root, &output_path)?;
         generate_to_file(&GenerateRequest {
             config: NexgenConfig {
-                targets,
+                targets: targets.to_vec(),
                 ..Default::default()
             },
             language,
@@ -904,10 +888,10 @@ fn json_example_output_path(
     root: &Path,
     language: Language,
     id: &str,
-    targets: GenerationTargets,
+    targets: &[GenerationTarget],
 ) -> PathBuf {
     let name = example_directory_name(language, id);
-    match (targets.workflow, language) {
+    match (targets.contains(&GenerationTarget::Workflow), language) {
         (false, Language::Java) => samples_language_root(root, language)
             .join("src/main/java/json_schema/definitions")
             .join(name),
@@ -920,10 +904,10 @@ fn json_example_output_path(
             .join(name),
     }
 }
-fn json_example_java_package(name: &str, targets: GenerationTargets) -> String {
+fn json_example_java_package(name: &str, targets: &[GenerationTarget]) -> String {
     format!(
         "json_schema.{}.{name}",
-        if targets.workflow {
+        if targets.contains(&GenerationTarget::Workflow) {
             "api"
         } else {
             "definitions"
@@ -1099,7 +1083,7 @@ descriptors = ["streams.bin"]
         );
         let cleared = &configurations[0].1;
         assert_eq!(cleared.system_nexus, Some(false));
-        assert_eq!(cleared.targets(), GenerationTargets::NONE);
+        assert_eq!(cleared.targets(), &[]);
         assert_eq!(
             cleared.descriptors,
             Some(ExampleDescriptors::Paths(Vec::new()))
@@ -1109,7 +1093,10 @@ descriptors = ["streams.bin"]
 
         let inherited = &configurations[1].1;
         assert_eq!(inherited.system_nexus, Some(true));
-        assert_eq!(inherited.targets(), GenerationTargets::ALL);
+        assert_eq!(
+            inherited.targets(),
+            &[GenerationTarget::Workflow, GenerationTarget::Client]
+        );
         assert_eq!(
             inherited.descriptors,
             Some(ExampleDescriptors::Preset(DescriptorPreset::Temporal))
@@ -1117,7 +1104,7 @@ descriptors = ["streams.bin"]
 
         let replaced = &configurations[2].1;
         assert_eq!(replaced.system_nexus, Some(true));
-        assert_eq!(replaced.targets(), GenerationTargets::WORKFLOW);
+        assert_eq!(replaced.targets(), &[GenerationTarget::Workflow]);
         assert_eq!(
             replaced.descriptors,
             Some(ExampleDescriptors::Paths(vec![PathBuf::from(
@@ -1134,7 +1121,7 @@ descriptors = ["streams.bin"]
         let configurations = config.examples["sample"].configurations("sample");
         assert_eq!(configurations.len(), 1);
         assert_eq!(configurations[0].0, Path::new("sample"));
-        assert_eq!(configurations[0].1.targets(), GenerationTargets::NONE);
+        assert_eq!(configurations[0].1.targets(), &[]);
         assert!(!configurations[0].1.system_nexus.unwrap_or_default());
         assert!(configurations[0].1.descriptors.is_none());
         assert!(configurations[0].1.supports(Language::Python));

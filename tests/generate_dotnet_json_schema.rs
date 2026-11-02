@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use nexgen::language::Language;
-use nexgen::nexgen_config::GenerationTargets;
+use nexgen::nexgen_config::GenerationTarget;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -33,11 +33,11 @@ fn project_root() -> PathBuf {
 
 /// Generates a `samples/schemas` example the way `cargo build-examples` does,
 /// minus the sample namespace, so the checks below see the derived defaults.
-fn generate_sample(example: &str, targets: GenerationTargets) -> (PathBuf, Output) {
+fn generate_sample(example: &str, targets: &[GenerationTarget]) -> (PathBuf, Output) {
     let output_path = unique_output_path(&format!("dotnet-json-sample-{example}"));
     generate_to_file(&GenerateRequest {
         config: NexgenConfig {
-            targets,
+            targets: targets.to_vec(),
             ..Default::default()
         },
         language: Language::Dotnet,
@@ -57,7 +57,7 @@ fn generate_sample(example: &str, targets: GenerationTargets) -> (PathBuf, Outpu
 
 #[test]
 fn csharp_json_examples_render_expected_language_features() {
-    for targets in [GenerationTargets::NONE, GenerationTargets::WORKFLOW] {
+    for targets in [&[][..], &[GenerationTarget::Workflow][..]] {
         let (dir, showcase) = generate_sample("showcase", targets);
         let models = showcase.file("Models.cs");
         assert_has(
@@ -97,7 +97,7 @@ fn csharp_json_examples_render_expected_language_features() {
         // Without a workflow target the contract is the API, so it is public;
         // with that target, callers use the generated client and the contract stays
         // internal.
-        let contract = if targets.workflow {
+        let contract = if targets.contains(&GenerationTarget::Workflow) {
             "internal interface IShowcaseServiceCs"
         } else {
             "public interface IShowcaseServiceCs"
@@ -112,7 +112,7 @@ fn csharp_json_examples_render_expected_language_features() {
             ],
         );
         let client = "public class ShowcaseServiceCsClient";
-        if targets.workflow {
+        if targets.contains(&GenerationTarget::Workflow) {
             assert_has(services, &[client, "GetShowcaseCsAsync("]);
         } else {
             assert_lacks(services, &[client, "Temporalio.Workflows"]);

@@ -302,7 +302,7 @@ fn read_java_files(dir: &Path) -> BTreeMap<PathBuf, String> {
 }
 
 /// Checks Java-specific rendering details exercised by the showcase schema.
-fn assert_showcase_features(mode: &str, targets: nexgen::nexgen_config::GenerationTargets) {
+fn assert_showcase_features(mode: &str, targets: Vec<nexgen::nexgen_config::GenerationTarget>) {
     let root = project_root();
     let example_id = "showcase";
     let temp_dir = unique_output_path(&format!("java-json-{mode}-{example_id}"));
@@ -362,15 +362,15 @@ fn assert_showcase_features(mode: &str, targets: nexgen::nexgen_config::Generati
 
 #[test]
 fn java_json_definitions_examples_render_expected_features() {
-    assert_showcase_features(
-        "definitions",
-        nexgen::nexgen_config::GenerationTargets::NONE,
-    );
+    assert_showcase_features("definitions", vec![]);
 }
 
 #[test]
 fn java_json_api_examples_render_expected_features() {
-    assert_showcase_features("api", nexgen::nexgen_config::GenerationTargets::WORKFLOW);
+    assert_showcase_features(
+        "api",
+        vec![nexgen::nexgen_config::GenerationTarget::Workflow],
+    );
 }
 
 /// A structured inline object branch of a property-level union is named

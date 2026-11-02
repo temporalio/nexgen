@@ -5,71 +5,22 @@
 
 use std::cell::RefCell;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NexgenConfig {
     pub system_nexus: bool,
-    pub targets: GenerationTargets,
-}
-
-/// The code that calls the generated API. The models are the same for each target.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct GenerationTargets {
-    /// Workflow code.
-    pub workflow: bool,
-    /// Code outside a Workflow, through a client class that inherits a generated extension.
-    pub client: bool,
+    pub targets: Vec<GenerationTarget>,
 }
 
 /// One generation target.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, clap::ValueEnum,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum GenerationTarget {
+    /// Workflow code.
     Workflow,
+    /// Code outside a Workflow, through a client class that inherits a generated extension.
     Client,
-}
-
-impl GenerationTargets {
-    pub const NONE: Self = Self {
-        workflow: false,
-        client: false,
-    };
-    pub const WORKFLOW: Self = Self {
-        workflow: true,
-        client: false,
-    };
-    pub const CLIENT: Self = Self {
-        workflow: false,
-        client: true,
-    };
-    pub const ALL: Self = Self {
-        workflow: true,
-        client: true,
-    };
-
-    pub fn contains(self, target: GenerationTarget) -> bool {
-        match target {
-            GenerationTarget::Workflow => self.workflow,
-            GenerationTarget::Client => self.client,
-        }
-    }
-
-    pub fn iter(self) -> impl Iterator<Item = GenerationTarget> {
-        [GenerationTarget::Workflow, GenerationTarget::Client]
-            .into_iter()
-            .filter(move |target| self.contains(*target))
-    }
-
-    pub fn is_empty(self) -> bool {
-        !self.workflow && !self.client
-    }
-}
-
-impl Default for NexgenConfig {
-    fn default() -> Self {
-        Self {
-            system_nexus: false,
-            targets: GenerationTargets::default(),
-        }
-    }
 }
 
 thread_local! {
@@ -77,10 +28,12 @@ thread_local! {
 }
 
 pub fn current() -> NexgenConfig {
-    CONFIGS.with(|configs| configs.borrow().last().copied().unwrap_or_default())
+    CONFIGS.with(|configs| configs.borrow().last().cloned().unwrap_or_default())
 }
 
-pub fn scope(config: NexgenConfig) -> NexgenConfigScope {
+pub fn scope(mut config: NexgenConfig) -> NexgenConfigScope {
+    config.targets.sort_unstable();
+    config.targets.dedup();
     CONFIGS.with(|configs| configs.borrow_mut().push(config));
     NexgenConfigScope
 }
@@ -100,16 +53,33 @@ impl Drop for NexgenConfigScope {
 
 #[cfg(test)]
 mod tests {
-    use super::{GenerationTargets, NexgenConfig, current, scope};
+    use super::{GenerationTarget, NexgenConfig, current, scope};
+
+    #[test]
+    fn normalizes_target_order_and_duplicates_at_scope_entry() {
+        let _scope = scope(NexgenConfig {
+            targets: vec![
+                GenerationTarget::Client,
+                GenerationTarget::Workflow,
+                GenerationTarget::Client,
+                GenerationTarget::Workflow,
+            ],
+            ..Default::default()
+        });
+        assert_eq!(
+            current().targets,
+            vec![GenerationTarget::Workflow, GenerationTarget::Client]
+        );
+    }
 
     #[test]
     fn restores_nested_configuration_after_unwinding() {
         let outer = NexgenConfig {
             system_nexus: true,
-            targets: GenerationTargets::default(),
+            targets: Vec::new(),
         };
         {
-            let _outer_scope = scope(outer);
+            let _outer_scope = scope(outer.clone());
             assert_eq!(current(), outer);
             let result = std::panic::catch_unwind(|| {
                 let _inner_scope = scope(NexgenConfig::default());
@@ -125,10 +95,10 @@ mod tests {
     fn is_isolated_per_thread() {
         let config = NexgenConfig {
             system_nexus: true,
-            targets: GenerationTargets::default(),
+            targets: Vec::new(),
         };
         {
-            let _scope = scope(config);
+            let _scope = scope(config.clone());
             assert_eq!(current(), config);
             assert_eq!(
                 std::thread::spawn(current).join().unwrap(),

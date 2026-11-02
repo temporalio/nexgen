@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use heck::ToSnakeCase;
 use nexgen::language::Language;
-use nexgen::nexgen_config::GenerationTargets;
+use nexgen::nexgen_config::GenerationTarget;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -660,7 +660,7 @@ fn generate_formatted_json_python_output(
     root: &Path,
     example_id: &str,
     output_path: &Path,
-    targets: GenerationTargets,
+    targets: &[GenerationTarget],
 ) {
     let input_path = json_input_path(root, example_id);
     let mut args = vec![
@@ -815,12 +815,7 @@ fn python_json_examples_expose_expected_runtime_features() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
         let output_path = unique_output_path(&format!("python-json-{example_id}"));
-        generate_formatted_json_python_output(
-            &root,
-            example_id,
-            &output_path,
-            GenerationTargets::NONE,
-        );
+        generate_formatted_json_python_output(&root, example_id, &output_path, &[]);
         assert_python_310_syntax_compatible(&output_path);
         let rendered = read_python_package_files(&output_path);
         assert_no_generated_python_diagnostic_suppressions(&rendered);
@@ -897,7 +892,7 @@ fn python_json_api_examples_expose_validation_exports() {
             &root,
             example_id,
             &output_path,
-            GenerationTargets::WORKFLOW,
+            &[GenerationTarget::Workflow],
         );
         assert_python_310_syntax_compatible(&output_path);
         let rendered = read_python_package_files(&output_path);
@@ -1763,7 +1758,7 @@ fn renders_sample_with_versioned_header() {
     let output_path = temp.path().join("output");
     generate_to_file(&GenerateRequest {
         config: NexgenConfig {
-            targets: GenerationTargets::WORKFLOW,
+            targets: vec![GenerationTarget::Workflow],
             ..Default::default()
         },
         language: Language::Python,

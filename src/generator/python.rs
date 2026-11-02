@@ -41,7 +41,11 @@ const EXPERIMENTAL_WARNING: &str = "This API is experimental and subject to chan
 /// API packages share the root models, but never import another target's API.
 fn python_api_directory(target: GenerationTarget) -> Option<&'static str> {
     match target {
-        GenerationTarget::Workflow if crate::nexgen_config::current().targets.client => {
+        GenerationTarget::Workflow
+            if crate::nexgen_config::current()
+                .targets
+                .contains(&GenerationTarget::Client) =>
+        {
             Some("workflow")
         }
         GenerationTarget::Workflow => None,
@@ -641,7 +645,7 @@ impl<'a> ApiPlanner<'a> {
         let targets = crate::nexgen_config::current().targets;
         // Two services with operations of the same name also clash on a Workflow package file.
         // Check the client names first, so that the error names the client method.
-        if targets.client {
+        if targets.contains(&GenerationTarget::Client) {
             validate_client_names(services)?;
         }
         let mut files = GeneratedFileMap::default();
@@ -715,7 +719,8 @@ impl<'a> ApiPlanner<'a> {
         );
         let mut package_model_names = package_model_names.into_iter().collect::<Vec<_>>();
         sort_python_model_names(&mut package_model_names, &self.variants, model_fragments);
-        let root_workflow = targets.workflow && !targets.client;
+        let root_workflow = targets.contains(&GenerationTarget::Workflow)
+            && !targets.contains(&GenerationTarget::Client);
         let definition_services = services
             .iter()
             .filter(|_| targets.is_empty() && resource_names.is_empty())
@@ -767,7 +772,7 @@ impl<'a> ApiPlanner<'a> {
         )?;
         super::emit_package(
             &mut files,
-            targets,
+            &targets,
             |files| {
                 // A module that declares nothing emits no models file.
                 if let Some(models_source) = render_models_module(
@@ -1875,7 +1880,11 @@ impl<'a> ApiPlanner<'a> {
             .map(|name| self.build_unpacked_input(name, GenerationTarget::Workflow))
             .transpose()?;
         let client_unpacked_input = unpacked_input_name
-            .filter(|_| crate::nexgen_config::current().targets.client)
+            .filter(|_| {
+                crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Client)
+            })
             .map(|name| self.build_unpacked_input(name, GenerationTarget::Client))
             .transpose()?;
         let output_type_parameters = unpacked_input
@@ -4045,7 +4054,10 @@ fn package_export_names(
 ) -> BTreeSet<String> {
     let mut names = root_package_export_names(root_package_imports);
     names.extend(model_names.iter().cloned());
-    match crate::nexgen_config::current().targets.workflow {
+    match crate::nexgen_config::current()
+        .targets
+        .contains(&GenerationTarget::Workflow)
+    {
         false => {
             names.extend(services.iter().map(|service| service.name.to_string()));
         }

@@ -946,7 +946,9 @@ impl GoExternalModels {
     ) -> Self {
         if plan_uses_json_models(api_plan) {
             Self::Json(json::ModelBackend::new(
-                crate::nexgen_config::current().targets.workflow,
+                crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow),
             ))
         } else {
             Self::Proto(proto::ModelBackend::new(
@@ -1320,7 +1322,9 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
         }
-        if crate::nexgen_config::current().targets.workflow
+        if crate::nexgen_config::current()
+            .targets
+            .contains(&GenerationTarget::Workflow)
             && self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
             && !self.package.is_self_import("go.temporal.io/sdk/workflow")
@@ -3739,7 +3743,9 @@ fn render_file(
         return output;
     }
 
-    let has_operations = crate::nexgen_config::current().targets.workflow
+    let has_operations = crate::nexgen_config::current()
+        .targets
+        .contains(&GenerationTarget::Workflow)
         && services.iter().any(|s| !s.operations.is_empty());
 
     // --- Datatypes ---
@@ -3810,7 +3816,10 @@ fn render_file(
                     visibility,
                     constructor_returns_value,
                 );
-                if crate::nexgen_config::current().targets.workflow {
+                if crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow)
+                {
                     render_resource_methods(
                         &mut output,
                         service,
@@ -3861,7 +3870,9 @@ fn render_file(
         || !public_variants.is_empty()
         || !public_models.is_empty();
 
-    let has_endpoint_operations = crate::nexgen_config::current().targets.workflow
+    let has_endpoint_operations = crate::nexgen_config::current()
+        .targets
+        .contains(&GenerationTarget::Workflow)
         && services
             .iter()
             .any(|service| service.endpoint.is_some() && !service.operations.is_empty());
@@ -3885,7 +3896,10 @@ fn render_file(
             render_model(&mut output, key, model, external_models, true);
         }
         for service in services {
-            if !crate::nexgen_config::current().targets.workflow {
+            if !crate::nexgen_config::current()
+                .targets
+                .contains(&GenerationTarget::Workflow)
+            {
                 continue;
             }
             if service.endpoint.is_none() {

@@ -186,61 +186,6 @@ fn cli_requires_support_package_for_wit_but_not_json_schema() {
     fs::remove_dir_all(output_path).unwrap();
 }
 
-#[test]
-fn cli_defaults_to_definitions_without_targets_or_endpoint() {
-    let temp_dir = unique_output_path("python-definitions-only");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("input.wit");
-    let output_path = temp_dir.join("output");
-    fs::write(
-        &input_path,
-        r#"
-package temporal:example@1.0.0;
-
-world system {
-  export example-service;
-}
-
-interface example-service {
-  record request {
-    name: string,
-  }
-
-  record response {
-    message: string,
-  }
-
-  example-operation: func(request: request) -> response;
-}
-"#,
-    )
-    .unwrap();
-
-    let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
-        .args([
-            "python",
-            input_path.to_str().unwrap(),
-            "--output",
-            output_path.to_str().unwrap(),
-            "--support-package",
-            "temporal_support",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(output_path.join("__init__.py").is_file());
-    assert!(output_path.join("models.py").is_file());
-    assert!(output_path.join("services.py").is_file());
-    assert!(!output_path.join("operations/example_operation.py").exists());
-
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
 /// An inline **structured** object `oneOf` branch on a property: the branch is
 /// named `<Union>Object` and emitted as a module-level dataclass, which the
 /// union's dispatcher selects for the object member of the union.

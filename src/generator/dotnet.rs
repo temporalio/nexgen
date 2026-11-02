@@ -46,8 +46,8 @@ pub(in crate::generator) const OBSOLETE_WARNING_PRAGMA: &str = "// Generated cod
 /// With the workflow target the generated `*Client` wrapper is the API callers use,
 /// so the contract stays `internal`; without it the contract is the API, which
 /// handlers and callers in other assemblies must be able to name.
-fn service_interface_visibility(targets: crate::nexgen_config::GenerationTargets) -> &'static str {
-    if targets.workflow {
+fn service_interface_visibility(targets: &[GenerationTarget]) -> &'static str {
+    if targets.contains(&GenerationTarget::Workflow) {
         "internal"
     } else {
         "public"
@@ -186,11 +186,7 @@ impl<'a> ApiPlanner<'a> {
         output
     }
 
-    fn render_service_file(
-        &self,
-        namespace: &str,
-        targets: crate::nexgen_config::GenerationTargets,
-    ) -> String {
+    fn render_service_file(&self, namespace: &str, targets: &[GenerationTarget]) -> String {
         let module_imports = self.namespaces.module_imports(self.api_plan);
         let has_endpoint_operations = self
             .api_plan
@@ -207,7 +203,7 @@ impl<'a> ApiPlanner<'a> {
         if has_endpoint_operations {
             imports.push("Temporalio.Converters");
         }
-        if targets.workflow
+        if targets.contains(&GenerationTarget::Workflow)
             && self
                 .api_plan
                 .services
@@ -255,7 +251,7 @@ impl<'a> ApiPlanner<'a> {
                 self.render_service_operation(&mut output, operation);
             }
             output.push_str("}\n\n");
-            if targets.workflow && service.endpoint.is_none() {
+            if targets.contains(&GenerationTarget::Workflow) && service.endpoint.is_none() {
                 for operation in &service.operations {
                     self.render_operation_options_type(&mut output, operation);
                 }
@@ -2419,7 +2415,7 @@ fn generate_leaf(
     let mut files = GeneratedFileMap::default();
     super::emit_package(
         &mut files,
-        targets,
+        &targets,
         |files| {
             files.insert(
                 "Models.cs",
@@ -2455,7 +2451,7 @@ fn generate_leaf(
     if !api_plan.services.is_empty() {
         files.insert(
             "Services.cs",
-            generator.render_service_file(&namespace, targets),
+            generator.render_service_file(&namespace, &targets),
             module_origin.clone(),
         )?;
     }
