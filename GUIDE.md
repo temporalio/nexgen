@@ -536,10 +536,13 @@ update-email: func(request: update-email-request) -> user-result;
 **Python:**
 
 ```python
-@dataclasses.dataclass
 class User:
     user_id: str
     email: str
+
+    def __init__(self, user_id: str, email: str) -> None:
+        self.user_id = user_id
+        self.email = email
 
     async def update_email(self, email: str) -> User:
         request = UpdateEmailRequest(user_id=self.user_id, email=email)
@@ -567,6 +570,9 @@ Key observations:
   (`user_id`, `email`).
 - Resource methods fill in identity fields from `self` (`self.user_id`) and
   accept only the remaining parameters.
+- A Python handle is not data. It compares and prints its identity fields, but
+  the payload converter can't encode or decode it. Pass the identity fields, and
+  build the handle again from them.
 - A standalone convenience wrapper is also generated for each resource method,
   taking all fields as explicit arguments.
 - Resource operations additionally produce three layers:
@@ -1539,9 +1545,9 @@ job = Job(nexus_client, job_id="job")
 await job.restart()
 ```
 
-The client is runtime state, not a resource identity field. Serialization
-carries only identity data. When an operation returns resource data, the
-generated API decodes it before constructing the client-backed handle.
+The client is runtime state, not a resource identity field. When an operation
+returns resource data, the generated API decodes the identity DTO and then
+builds the handle. The Workflow API does the same.
 
 To rebuild a handle from identity fields that you stored, for example in a
 Workflow result, call the factory of the resource on the extension. Its name is

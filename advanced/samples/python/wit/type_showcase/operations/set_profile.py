@@ -9,6 +9,7 @@ from ..models import (
     UserProfile,
 )
 from .._resources import User
+from .._resources._resource_data import UserData
 
 
 async def _set_profile(
@@ -21,9 +22,17 @@ async def _set_profile(
     handle = await nexus_client.start_operation(
         operation="SetProfile",
         input=request,
-        output_type=User,
+        output_type=UserData,
     )
-    return await handle
+    result = await handle
+    resource = User(
+        user_id=result.user_id,
+        email=result.email,
+        display_name=result.display_name,
+        status=result.status,
+        profile=result.profile,
+    )
+    return resource
 
 
 async def set_profile(

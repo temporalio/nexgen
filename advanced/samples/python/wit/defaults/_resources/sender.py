@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import dataclasses
+import typing_extensions
 import temporalio.workflow
 
 from ..models import (
@@ -17,9 +17,24 @@ from ..models import (
 import temporal_support as _support
 
 
-@dataclasses.dataclass
 class Sender:
     token: str
+
+    def __init__(
+        self,
+        token: str,
+    ) -> None:
+        self.token = token
+
+    @typing_extensions.override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Sender):
+            return NotImplemented
+        return (self.token,) == (other.token,)
+
+    @typing_extensions.override
+    def __repr__(self) -> str:
+        return f"Sender(token={self.token!r})"
 
     async def submit(
         self,

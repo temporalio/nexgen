@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import dataclasses
+import typing_extensions
 import temporalio.workflow
 
 from ..models import (
@@ -12,9 +12,9 @@ from ..models import (
     UserProfile,
     UserStatus,
 )
+from .._resources._resource_data import UserData
 
 
-@dataclasses.dataclass
 class User:
     """Python user."""
 
@@ -23,6 +23,42 @@ class User:
     display_name: str
     status: UserStatus
     profile: UserProfile
+
+    def __init__(
+        self,
+        user_id: str,
+        email: str,
+        display_name: str,
+        status: UserStatus,
+        profile: UserProfile,
+    ) -> None:
+        self.user_id = user_id
+        self.email = email
+        self.display_name = display_name
+        self.status = status
+        self.profile = profile
+
+    @typing_extensions.override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, User):
+            return NotImplemented
+        return (
+            self.user_id,
+            self.email,
+            self.display_name,
+            self.status,
+            self.profile,
+        ) == (
+            other.user_id,
+            other.email,
+            other.display_name,
+            other.status,
+            other.profile,
+        )
+
+    @typing_extensions.override
+    def __repr__(self) -> str:
+        return f"User(user_id={self.user_id!r}, email={self.email!r}, display_name={self.display_name!r}, status={self.status!r}, profile={self.profile!r})"
 
     async def update_email(
         self,
@@ -67,9 +103,17 @@ async def _update_email(
     handle = await nexus_client.start_operation(
         operation="UpdateEmail",
         input=request,
-        output_type=User,
+        output_type=UserData,
     )
-    return await handle
+    result = await handle
+    resource = User(
+        user_id=result.user_id,
+        email=result.email,
+        display_name=result.display_name,
+        status=result.status,
+        profile=result.profile,
+    )
+    return resource
 
 
 async def update_email(
@@ -94,9 +138,17 @@ async def _rename(
     handle = await nexus_client.start_operation(
         operation="Rename",
         input=request,
-        output_type=User,
+        output_type=UserData,
     )
-    return await handle
+    result = await handle
+    resource = User(
+        user_id=result.user_id,
+        email=result.email,
+        display_name=result.display_name,
+        status=result.status,
+        profile=result.profile,
+    )
+    return resource
 
 
 async def rename(
