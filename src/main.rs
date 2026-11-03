@@ -10,7 +10,7 @@ use nexgen::nexgen_config::{GenerationTarget, NexgenConfig};
 use nexgen::parser::write_prepared_wit_directory;
 #[cfg(feature = "advanced")]
 use nexgen::{AddMessageRequest, AddRpcRequest, add_message_to_file, add_rpc_to_file};
-use nexgen::{GenerateRequest, generate_to_file};
+use nexgen::{GenerateRequest, GoFacadeRequest, generate_to_file, generate_to_file_with_go_facade};
 
 #[derive(Parser)]
 #[command(name = "nexgen")]
@@ -26,7 +26,7 @@ enum Commands {
     #[command(about = "Generate C# / .NET bindings")]
     Dotnet(DotnetGenerateArgs),
     #[command(about = "Generate Go bindings")]
-    Go(SupportPackageGenerateArgs),
+    Go(GoGenerateArgs),
     #[command(about = "Generate Java bindings")]
     Java(JavaGenerateArgs),
     #[command(about = "Generate Python bindings")]
@@ -78,6 +78,18 @@ struct SupportPackageGenerateArgs {
     /// Import path or namespace of the user-owned support package (required for WIT).
     #[arg(long = "support-package")]
     support_package: Option<String>,
+}
+
+#[derive(Args)]
+struct GoGenerateArgs {
+    #[command(flatten)]
+    common: SupportPackageGenerateArgs,
+    /// Output directory for a facade that re-exports the generated native WIT API.
+    #[arg(long = "facade-output", requires = "facade_import")]
+    facade_output: Option<PathBuf>,
+    /// Import path of the implementation package used by the facade.
+    #[arg(long = "facade-import", requires = "facade_output")]
+    facade_import: Option<String>,
 }
 
 #[derive(Args)]
@@ -184,13 +196,26 @@ fn main() -> ExitCode {
             request.dotnet_namespace = args.namespace;
             generate_to_file(&request)
         }
-        Commands::Go(args) => generate_to_file(&generate_request(
-            Language::Go,
-            args.common,
-            Default::default(),
-            None,
-            args.support_package,
-        )),
+        Commands::Go(args) => {
+            let request = generate_request(
+                Language::Go,
+                args.common.common,
+                Default::default(),
+                None,
+                args.common.support_package,
+            );
+            if let Some(output_path) = args.facade_output {
+                generate_to_file_with_go_facade(
+                    &request,
+                    &GoFacadeRequest {
+                        output_path,
+                        implementation_import_path: args.facade_import.unwrap(),
+                    },
+                )
+            } else {
+                generate_to_file(&request)
+            }
+        }
         Commands::Java(args) => generate_to_file(&generate_request(
             Language::Java,
             args.common,
@@ -277,6 +302,47 @@ fn generate_request(
 mod tests {
     use super::{Cli, Commands};
     use clap::Parser;
+
+    #[test]
+    fn go_facade_options_select_the_output_and_implementation_import() {
+        let cli = Cli::try_parse_from([
+            "nexgen",
+            "go",
+            "input.wit",
+            "--output",
+            "internal",
+            "--facade-output",
+            "workflow",
+            "--facade-import",
+            "example.org/sdk/internal",
+        ])
+        .unwrap();
+        let Commands::Go(args) = cli.command else {
+            panic!("expected Go command")
+        };
+        assert_eq!(
+            args.facade_output.as_deref(),
+            Some(std::path::Path::new("workflow"))
+        );
+        assert_eq!(
+            args.facade_import.as_deref(),
+            Some("example.org/sdk/internal")
+        );
+        for option in ["--facade-output", "--facade-import"] {
+            assert!(
+                Cli::try_parse_from([
+                    "nexgen",
+                    "go",
+                    "input.wit",
+                    "--output",
+                    "internal",
+                    option,
+                    "value",
+                ])
+                .is_err()
+            );
+        }
+    }
 
     #[test]
     fn support_package_option_is_available_but_not_a_json_schema_requirement() {

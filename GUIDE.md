@@ -128,8 +128,8 @@ arguments. For example, write `workflow_namespace()` in Python,
 
 ### Go
 
-Create a **separate Go package in a separate directory** from the generated
-package, in a module that the generated code can import. Pass its full Go import
+Normally, create a separate Go package in a directory outside the generated
+output, in a module that the generated code can import. Pass its full Go import
 path, not the package name or a `.go` file path. For the sample
 [`go.mod`](advanced/samples/go/go.mod) and
 [`support/`](advanced/samples/go/support/), that value is
@@ -148,8 +148,8 @@ Export converter functions from the support package. For
 `google.protobuf.Duration`, nexgen derives `support.DurationToProto(ctx, value)`
 and `support.DurationFromProto(ctx, value)` when WIT does not specify names.
 When WIT sets `go-to` or `go-from` on `@nexus.type`, nexgen uses each given name
-exactly. Each converter must be exported. Its parameters and `(value, error)`
-results must match the generated call. See
+exactly. Imported converters must be exported. Their parameters and
+`(value, error)` results must match the generated call. See
 [the sample converters](advanced/samples/go/support/temporal_model_converters.go).
 Do not import the generated package from support. That import creates a cycle.
 The sample converters import `go.temporal.io/sdk/internal`. Only packages under
@@ -161,6 +161,55 @@ For `@nexus.source`, the sample writes `WorkflowNamespace(ctx)`. Generated code
 calls `support.WorkflowNamespace(ctx)`. The support package implements it with
 `workflow.GetInfo(ctx).Namespace`. The generated Go package imports support for
 the sourced field. Verify with `go test ./...` from the module root.
+
+#### Same-package support and System Nexus
+
+Go support can also live in the generated package. Set `--support-package` to
+the same import path as the WIT's `@nexus.namespace go="..."`. Nexgen omits the
+self-import and calls support helpers without a qualifier. This applies to
+converters, sourced fields, serialization-context helpers, and function-name
+extractors. Same-package helpers need not be exported. Keep authored files
+alongside generated files; Nexgen overwrites its own output files but does not
+clear the output directory.
+
+With `--system-nexus`, Go bindings use the SDK's `internal` runtime APIs rather
+than importing `workflow`. WIT type bindings and default expressions should also
+name the appropriate internal APIs. For generation into the SDK's `internal`
+package, use `@nexus.namespace go="go.temporal.io/sdk/internal"`; references to
+that package become unqualified.
+
+System Nexus package-level declarations use `SystemNexus_` for exported symbols
+and `systemnexus_` for private symbols. Receiver methods retain their API names,
+including `TransferTypeConverter`; package initialization still uses `init`.
+Request models are exported so interceptors can name and modify them.
+
+#### Go facades
+
+For native WIT API generation, `--facade-output` additionally writes a facade
+into another package. Supply `--facade-import` with the implementation package's
+actual Go import path. The facade directory's basename determines its package
+name. The destination need not be `workflow`; it can also be `client` or another
+package.
+
+```sh
+cargo run --features advanced -- go advanced/samples/inputs/workflow-service.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --native-api --system-nexus \
+  --support-package go.temporal.io/sdk/internal \
+  --output path/to/sdk/internal \
+  --facade-output path/to/sdk/workflow \
+  --facade-import go.temporal.io/sdk/internal
+```
+
+Facades expose type aliases, constants, and forwarding functions. Aliases retain
+the implementation's methods and type identity. Forwarders retain generic
+parameters, variadic arguments, and operation documentation. System Nexus
+facades expose the original names without the implementation prefix.
+
+Implementation and facade output come from the same compiler plan. The library
+entry point is `generate_to_file_with_go_facade`, with a `GoFacadeRequest`
+specifying the facade output path and implementation import path.
 
 ### Python
 

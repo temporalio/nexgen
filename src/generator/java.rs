@@ -180,6 +180,7 @@ pub(crate) fn generate(
         layout: GeneratedOutputLayout::Directory,
         files: files.into_files(),
         warnings: Vec::new(),
+        facade: None,
     })
 }
 

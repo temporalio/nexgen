@@ -7,7 +7,10 @@ use nexgen::error::Error as NexgenError;
 use nexgen::generator::TsDateTimeTypes;
 use nexgen::language::Language;
 use nexgen::nexgen_config::{GenerationTarget, NexgenConfig};
-use nexgen::{GenerateRequest, format_generated_files, generate_to_file};
+use nexgen::{
+    GenerateRequest, GoFacadeRequest, format_generated_files, generate_to_file,
+    generate_to_file_with_go_facade,
+};
 use serde::Deserialize;
 
 use crate::error::{Error, Result};
@@ -28,6 +31,8 @@ struct ExampleOptions {
     languages: Option<Vec<String>>,
     system_nexus: Option<bool>,
     targets: Option<Vec<GenerationTarget>>,
+    #[serde(default)]
+    go_facade: bool,
     // Each example plans against only the protos it declares, so one sample's protos can't
     // change how another example resolves a proto name.
     descriptors: Option<ExampleDescriptors>,
@@ -685,9 +690,15 @@ fn build_example_configuration(
     let input_path = example_input_path(repo_root, example_id);
     let mut input_paths = vec![input_path.clone()];
     input_paths.extend(example_linked_input_paths(repo_root, &input_path)?);
-    let output_path = example_output_path(repo_root, language, output_id);
+    let facade_output_path = example_output_path(repo_root, language, output_id);
     let language_root = advanced_language_root(repo_root, language);
     let system_nexus = options.system_nexus.unwrap_or_default();
+    let internal_go = language == Language::Go && system_nexus;
+    let output_path = if internal_go {
+        language_root.join("internal")
+    } else {
+        facade_output_path.clone()
+    };
     let generate_request = GenerateRequest {
         config: NexgenConfig {
             system_nexus,
@@ -695,8 +706,8 @@ fn build_example_configuration(
         },
         language,
         input_paths,
-        support_package: if language == Language::Go && system_nexus {
-            Some("go.temporal.io/sdk/advanced/samples/go/systemsupport".into())
+        support_package: if internal_go {
+            Some("go.temporal.io/sdk/internal".into())
         } else {
             sample_support_package(repo_root, language, &output_path)
         },
@@ -707,7 +718,44 @@ fn build_example_configuration(
         ts_date_time_types: Default::default(),
         dotnet_namespace: None,
     };
-    generate_to_file(&generate_request)?;
+    if internal_go {
+        generate_to_file_with_go_facade(
+            &generate_request,
+            &GoFacadeRequest {
+                output_path: facade_output_path.clone(),
+                implementation_import_path: "go.temporal.io/sdk/advanced/samples/go/internal"
+                    .into(),
+            },
+        )?;
+        format_example_output(&language_root, language, &facade_output_path)?;
+        normalize_example_headers(&facade_output_path)?;
+    } else {
+        if language == Language::Go
+            && config
+                .examples
+                .get(example_id)
+                .is_some_and(|example| example.go_facade)
+        {
+            let facade_path = language_root
+                .join("facade")
+                .join(example_directory_name(language, example_id));
+            reset_example_output_directory(&language_root, &facade_path)?;
+            generate_to_file_with_go_facade(
+                &generate_request,
+                &GoFacadeRequest {
+                    output_path: facade_path.clone(),
+                    implementation_import_path: format!(
+                        "go.temporal.io/sdk/advanced/samples/go/{}",
+                        example_directory_name(language, example_id),
+                    ),
+                },
+            )?;
+            format_example_output(&language_root, language, &facade_path)?;
+            normalize_example_headers(&facade_path)?;
+        } else {
+            generate_to_file(&generate_request)?;
+        }
+    }
     format_example_output(&language_root, language, &output_path)?;
     normalize_example_headers(&output_path)?;
     println!("Built {} with nexgen", output_path.display());

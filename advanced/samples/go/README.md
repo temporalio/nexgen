@@ -2,8 +2,9 @@
 
 WIT-generated packages live in directories such as `protobackedshowcase/` and
 `workflowservice/`. Hand-written converters live in [`support/`](support/) for
-ordinary Nexus samples and [`systemsupport/`](systemsupport/) for system Nexus
-samples, outside the regenerated directories.
+ordinary Nexus samples. System Nexus implementations and their authored support
+live together in [`internal/`](internal/); `workflowservice/` and
+`multioperationservice/` are generated facades.
 
 ## Using the support package
 
@@ -35,13 +36,26 @@ cargo run --features advanced -- go advanced/samples/inputs/proto-backed-showcas
   --targets workflow --output advanced/samples/go/protobackedshowcase
 ```
 
-The system Nexus sample support source imports `go.temporal.io/sdk/internal`
-because it lives under the SDK module tree; a project in another module cannot
-copy that import unchanged. Adapt those conversions using APIs available to your
-module. For `@nexus.source`, write the helper call without the package prefix.
-The sample uses `go="WorkflowNamespace(ctx)"`; generated code calls
-`support.WorkflowNamespace(ctx)`. The support helper calls
-`workflow.GetInfo(ctx).Namespace`. Run `go test ./...` from this sample module
-after generation. Run the same command from your own module root. See
+The module path is under `go.temporal.io/sdk`, which permits importing the SDK's
+internal packages. It does not make sample packages part of the SDK packages.
+[`internal/sdk_api.go`](internal/sdk_api.go) supplies aliases and wrappers for
+the existing SDK declarations; the same package contains authored support and
+prefixed generated System Nexus declarations. Generation preserves these
+authored files. The Go namespace and support package are both configured as
+`go.temporal.io/sdk/internal`, so generated references and helper calls are
+unqualified. Facades import the sample implementation's actual path,
+`go.temporal.io/sdk/advanced/samples/go/internal`.
+
+The `facade/` packages additionally exercise ordinary native APIs, including
+generic models, variants, resource constructors and methods, and function
+parameters. Their native tests call the facades instead of duplicating the
+implementation tests.
+
+A project outside the SDK module tree cannot copy the internal imports
+unchanged. Adapt those conversions using APIs available to your module. For
+`@nexus.source`, write the helper call without the package prefix. The System
+Nexus sample uses `go="WorkflowNamespace(ctx)"`, which is called locally; an
+ordinary imported support package is called as `support.WorkflowNamespace(ctx)`.
+Run `go test ./...` from this sample module after generation. See
 [the WIT guide](../../../GUIDE.md#go) for more detail. JSON Schema generation
 does not need user support.

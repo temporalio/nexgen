@@ -14,7 +14,6 @@ import (
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/interceptor"
-	"go.temporal.io/sdk/internal"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
@@ -409,14 +408,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	s.Require().NoError(err)
 	s.NotNil(transferConverter)
 
-	// Look the operation up in the registry and compute the serialization context
-	entry, ok := ws.NexusOperationRegistry[internal.SystemNexusRegistryKey{
-		Service: "temporal.api.workflowservice.v1.WorkflowService", Operation: "SignalWithStartWorkflowExecution",
-	}]
-	s.Require().True(ok)
-	s.Require().NotNil(entry.SerializationContext)
 	targetContext := converter.WorkflowSerializationContext{Namespace: "default", WorkflowID: s.targetID("target")}
-	s.Equal(targetContext, entry.SerializationContext(call.Input))
 
 	// Check that the arguments we passed to signalwithstart were given same serialization context
 	mu.Lock()

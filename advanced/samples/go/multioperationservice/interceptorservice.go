@@ -3,63 +3,27 @@
 package multioperationservice
 
 import (
-	"go.temporal.io/sdk/internal"
-	"go.temporal.io/sdk/workflow"
+	implementation "go.temporal.io/sdk/advanced/samples/go/internal"
 )
 
-// --- Datatypes ---
+type Request = implementation.SystemNexus_Request
 
-type request struct {
-	ID string
+type Response = implementation.SystemNexus_Response
+
+type FirstOperationOptions = implementation.SystemNexus_FirstOperationOptions
+
+type SecondOperationOptions = implementation.SystemNexus_SecondOperationOptions
+
+func FirstOperation(
+	ctx implementation.Context,
+	opts FirstOperationOptions,
+) implementation.Future {
+	return implementation.SystemNexus_FirstOperation(ctx, opts)
 }
 
-func (m request) GetID() string {
-	return m.ID
-}
-
-// --- Operations (internal) ---
-
-func firstOperation(ctx workflow.Context, request request) workflow.Future {
-	c := internal.NewSystemNexusClient("InterceptorService")
-	fut := c.ExecuteOperation(ctx, "FirstOperation", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func secondOperation(ctx workflow.Context, request request) workflow.Future {
-	c := internal.NewSystemNexusClient("InterceptorService")
-	fut := c.ExecuteOperation(ctx, "SecondOperation", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-// --- Operations (public API) ---
-
-type Response struct {
-	// Value - Required.
-	Value string
-}
-
-func (m Response) GetValue() string {
-	return m.Value
-}
-
-type FirstOperationOptions struct {
-	// ID - Required.
-	ID string
-}
-
-func FirstOperation(ctx workflow.Context, opts FirstOperationOptions) workflow.Future {
-	return firstOperation(ctx, request{
-		ID: opts.ID,
-	})
-}
-
-type SecondOperationOptions struct {
-	// ID - Required.
-	ID string
-}
-
-func SecondOperation(ctx workflow.Context, opts SecondOperationOptions) workflow.Future {
-	return secondOperation(ctx, request{
-		ID: opts.ID,
-	})
+func SecondOperation(
+	ctx implementation.Context,
+	opts SecondOperationOptions,
+) implementation.Future {
+	return implementation.SystemNexus_SecondOperation(ctx, opts)
 }

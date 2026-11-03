@@ -9,7 +9,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 
-	"go.temporal.io/sdk/advanced/samples/go/typeshowcase"
+	"go.temporal.io/sdk/advanced/samples/go/facade/typeshowcase"
 )
 
 const typeShowcaseServiceName = "TypeShowcase"

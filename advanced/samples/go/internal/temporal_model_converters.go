@@ -1,4 +1,4 @@
-package systemsupport
+package internal
 
 import (
 	"fmt"
@@ -9,18 +9,14 @@ import (
 	failurepb "go.temporal.io/api/failure/v1"
 	taskqueue "go.temporal.io/api/taskqueue/v1"
 	workflowpb "go.temporal.io/api/workflow/v1"
-	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
-	"go.temporal.io/sdk/internal"
-	"go.temporal.io/sdk/temporal"
-	"go.temporal.io/sdk/worker"
-	"go.temporal.io/sdk/workflow"
+	sdkinternal "go.temporal.io/sdk/internal"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // WorkflowNamespace returns the namespace of the current workflow.
-func WorkflowNamespace(ctx workflow.Context) string {
-	return workflow.GetInfo(ctx).Namespace
+func WorkflowNamespace(ctx Context) string {
+	return GetWorkflowInfo(ctx).Namespace
 }
 
 type SignalWithStartWorkflowModelRequest interface {
@@ -71,15 +67,15 @@ func TaskQueueFromProto(_ converter.DataConverter, tq *taskqueue.TaskQueue) (*st
 
 // --- RetryPolicy (temporal.api.common.v1.RetryPolicy) ---
 
-func RetryPolicyToProto(_ converter.DataConverter, p *temporal.RetryPolicy) (*common.RetryPolicy, error) {
-	return internal.ConvertToPBRetryPolicy(p), nil
+func RetryPolicyToProto(_ converter.DataConverter, p *RetryPolicy) (*common.RetryPolicy, error) {
+	return sdkinternal.ConvertToPBRetryPolicy(p), nil
 }
 
-func RetryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*temporal.RetryPolicy, error) {
+func RetryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*RetryPolicy, error) {
 	if p == nil {
 		return nil, nil
 	}
-	policy := temporal.RetryPolicy{
+	policy := RetryPolicy{
 		BackoffCoefficient:     p.GetBackoffCoefficient(),
 		MaximumAttempts:        p.GetMaximumAttempts(),
 		NonRetryableErrorTypes: p.GetNonRetryableErrorTypes(),
@@ -95,18 +91,18 @@ func RetryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*te
 
 // --- Priority (temporal.api.common.v1.Priority) ---
 
-func PriorityToProto(_ converter.DataConverter, p *temporal.Priority) (*common.Priority, error) {
+func PriorityToProto(_ converter.DataConverter, p *Priority) (*common.Priority, error) {
 	if p == nil {
 		return nil, nil
 	}
-	return internal.ConvertToPBPriority(*p), nil
+	return sdkinternal.ConvertToPBPriority(*p), nil
 }
 
-func PriorityFromProto(_ converter.DataConverter, p *common.Priority) (*temporal.Priority, error) {
+func PriorityFromProto(_ converter.DataConverter, p *common.Priority) (*Priority, error) {
 	if p == nil {
 		return nil, nil
 	}
-	return &temporal.Priority{
+	return &Priority{
 		PriorityKey:    int(p.GetPriorityKey()),
 		FairnessKey:    p.GetFairnessKey(),
 		FairnessWeight: p.GetFairnessWeight(),
@@ -168,7 +164,7 @@ func PayloadsFromProto(dc converter.DataConverter, payloads *common.Payloads) ([
 // --- Failure (temporal.api.failure.v1.Failure) ---
 
 func FailureToProto(dc converter.DataConverter, value error) (*failurepb.Failure, error) {
-	failureConverter := temporal.NewDefaultFailureConverter(temporal.DefaultFailureConverterOptions{
+	failureConverter := sdkinternal.NewDefaultFailureConverter(sdkinternal.DefaultFailureConverterOptions{
 		DataConverter: dc,
 	})
 	return failureConverter.ErrorToFailure(value), nil
@@ -178,7 +174,7 @@ func FailureFromProto(dc converter.DataConverter, failure *failurepb.Failure) (e
 	if failure == nil {
 		return nil, nil
 	}
-	failureConverter := temporal.NewDefaultFailureConverter(temporal.DefaultFailureConverterOptions{
+	failureConverter := sdkinternal.NewDefaultFailureConverter(sdkinternal.DefaultFailureConverterOptions{
 		DataConverter: dc,
 	})
 	return failureConverter.FailureToError(failure), nil
@@ -187,7 +183,7 @@ func FailureFromProto(dc converter.DataConverter, failure *failurepb.Failure) (e
 // --- Memo (temporal.api.common.v1.Memo) ---
 
 func MemoToProto(dc converter.DataConverter, memo map[string]any) (*common.Memo, error) {
-	return internal.GetWorkflowMemo(
+	return sdkinternal.GetWorkflowMemo(
 		memo,
 		dc,
 		true,
@@ -241,19 +237,19 @@ func HeaderFromProto(dc converter.DataConverter, header *common.Header) (map[str
 
 // --- SearchAttributes (temporal.api.common.v1.SearchAttributes) ---
 
-func SearchAttributesToProto(_ converter.DataConverter, searchAttributes *temporal.SearchAttributes) (*common.SearchAttributes, error) {
+func SearchAttributesToProto(_ converter.DataConverter, searchAttributes *SearchAttributes) (*common.SearchAttributes, error) {
 	if searchAttributes == nil {
 		return nil, nil
 	}
-	return internal.SerializeSearchAttributes(nil, *searchAttributes)
+	return sdkinternal.SerializeSearchAttributes(nil, *searchAttributes)
 }
 
-func SearchAttributesFromProto(_ converter.DataConverter, searchAttributes *common.SearchAttributes) (*temporal.SearchAttributes, error) {
+func SearchAttributesFromProto(_ converter.DataConverter, searchAttributes *common.SearchAttributes) (*SearchAttributes, error) {
 	if searchAttributes == nil {
 		return nil, nil
 	}
 
-	updates := make([]temporal.SearchAttributeUpdate, 0, len(searchAttributes.GetIndexedFields()))
+	updates := make([]sdkinternal.SearchAttributeUpdate, 0, len(searchAttributes.GetIndexedFields()))
 	for name, payload := range searchAttributes.GetIndexedFields() {
 		valueType, err := enums.IndexedValueTypeFromString(string(payload.GetMetadata()["type"]))
 		if err != nil {
@@ -263,31 +259,31 @@ func SearchAttributesFromProto(_ converter.DataConverter, searchAttributes *comm
 		case enums.INDEXED_VALUE_TYPE_BOOL:
 			var value bool
 			err = converter.GetDefaultDataConverter().FromPayload(payload, &value)
-			updates = append(updates, temporal.NewSearchAttributeKeyBool(name).ValueSet(value))
+			updates = append(updates, sdkinternal.NewSearchAttributeKeyBool(name).ValueSet(value))
 		case enums.INDEXED_VALUE_TYPE_KEYWORD:
 			var value string
 			err = converter.GetDefaultDataConverter().FromPayload(payload, &value)
-			updates = append(updates, temporal.NewSearchAttributeKeyKeyword(name).ValueSet(value))
+			updates = append(updates, sdkinternal.NewSearchAttributeKeyKeyword(name).ValueSet(value))
 		case enums.INDEXED_VALUE_TYPE_TEXT:
 			var value string
 			err = converter.GetDefaultDataConverter().FromPayload(payload, &value)
-			updates = append(updates, temporal.NewSearchAttributeKeyString(name).ValueSet(value))
+			updates = append(updates, sdkinternal.NewSearchAttributeKeyString(name).ValueSet(value))
 		case enums.INDEXED_VALUE_TYPE_INT:
 			var value int64
 			err = converter.GetDefaultDataConverter().FromPayload(payload, &value)
-			updates = append(updates, temporal.NewSearchAttributeKeyInt64(name).ValueSet(value))
+			updates = append(updates, sdkinternal.NewSearchAttributeKeyInt64(name).ValueSet(value))
 		case enums.INDEXED_VALUE_TYPE_DOUBLE:
 			var value float64
 			err = converter.GetDefaultDataConverter().FromPayload(payload, &value)
-			updates = append(updates, temporal.NewSearchAttributeKeyFloat64(name).ValueSet(value))
+			updates = append(updates, sdkinternal.NewSearchAttributeKeyFloat64(name).ValueSet(value))
 		case enums.INDEXED_VALUE_TYPE_DATETIME:
 			var value time.Time
 			err = converter.GetDefaultDataConverter().FromPayload(payload, &value)
-			updates = append(updates, temporal.NewSearchAttributeKeyTime(name).ValueSet(value))
+			updates = append(updates, sdkinternal.NewSearchAttributeKeyTime(name).ValueSet(value))
 		case enums.INDEXED_VALUE_TYPE_KEYWORD_LIST:
 			var value []string
 			err = converter.GetDefaultDataConverter().FromPayload(payload, &value)
-			updates = append(updates, temporal.NewSearchAttributeKeyKeywordList(name).ValueSet(value))
+			updates = append(updates, sdkinternal.NewSearchAttributeKeyKeywordList(name).ValueSet(value))
 		default:
 			return nil, fmt.Errorf("decode search attribute [%s] error: unknown type %v", name, valueType)
 		}
@@ -295,31 +291,31 @@ func SearchAttributesFromProto(_ converter.DataConverter, searchAttributes *comm
 			return nil, fmt.Errorf("decode search attribute [%s] error: %v", name, err)
 		}
 	}
-	value := temporal.NewSearchAttributes(updates...)
+	value := sdkinternal.NewSearchAttributes(updates...)
 	return &value, nil
 }
 
 // --- VersioningOverride (temporal.api.workflow.v1.VersioningOverride) ---
 
-func VersioningOverrideToProto(_ converter.DataConverter, versioningOverride *client.VersioningOverride) (*workflowpb.VersioningOverride, error) {
+func VersioningOverrideToProto(_ converter.DataConverter, versioningOverride *VersioningOverride) (*workflowpb.VersioningOverride, error) {
 	if versioningOverride == nil {
 		return nil, nil
 	}
-	return internal.VersioningOverrideToProto(*versioningOverride), nil
+	return sdkinternal.VersioningOverrideToProto(*versioningOverride), nil
 }
 
-func VersioningOverrideFromProto(_ converter.DataConverter, versioningOverride *workflowpb.VersioningOverride) (*client.VersioningOverride, error) {
+func VersioningOverrideFromProto(_ converter.DataConverter, versioningOverride *workflowpb.VersioningOverride) (*VersioningOverride, error) {
 	if versioningOverride == nil {
 		return nil, nil
 	}
 
-	var value client.VersioningOverride
+	var value VersioningOverride
 	switch override := versioningOverride.GetOverride().(type) {
 	case *workflowpb.VersioningOverride_AutoUpgrade:
-		value = &client.AutoUpgradeVersioningOverride{}
+		value = &sdkinternal.AutoUpgradeVersioningOverride{}
 	case *workflowpb.VersioningOverride_Pinned:
 		version := override.Pinned.GetVersion()
-		value = &client.PinnedVersioningOverride{Version: worker.WorkerDeploymentVersion{
+		value = &sdkinternal.PinnedVersioningOverride{Version: sdkinternal.WorkerDeploymentVersion{
 			DeploymentName: version.GetDeploymentName(),
 			BuildID:        version.GetBuildId(),
 		}}
@@ -327,11 +323,11 @@ func VersioningOverrideFromProto(_ converter.DataConverter, versioningOverride *
 	if value == nil {
 		switch versioningOverride.GetBehavior() {
 		case enums.VERSIONING_BEHAVIOR_AUTO_UPGRADE:
-			value = &client.AutoUpgradeVersioningOverride{}
+			value = &sdkinternal.AutoUpgradeVersioningOverride{}
 		case enums.VERSIONING_BEHAVIOR_PINNED:
 			deploymentName := versioningOverride.GetDeployment().GetSeriesName()
 			buildID := versioningOverride.GetDeployment().GetBuildId()
-			value = &client.PinnedVersioningOverride{Version: worker.WorkerDeploymentVersion{
+			value = &sdkinternal.PinnedVersioningOverride{Version: sdkinternal.WorkerDeploymentVersion{
 				DeploymentName: deploymentName,
 				BuildID:        buildID,
 			}}
@@ -341,9 +337,9 @@ func VersioningOverrideFromProto(_ converter.DataConverter, versioningOverride *
 }
 
 // WorkflowFunctionName returns the registered name of a workflow function.
-func WorkflowFunctionName(ctx workflow.Context, value any) string {
-	name, err := internal.GetWorkflowFunctionName(
-		internal.GetWorkflowEnvironment(ctx).GetRegistry(),
+func WorkflowFunctionName(ctx Context, value any) string {
+	name, err := sdkinternal.GetWorkflowFunctionName(
+		sdkinternal.GetWorkflowEnvironment(ctx).GetRegistry(),
 		value,
 	)
 	if err != nil {
