@@ -98,6 +98,15 @@ class DeactivateRequest:
 
 
 @dataclasses.dataclass(slots=True)
+class UpdateLabelsRequest:
+    user_id: str
+    tags: list[str]
+    metadata: dict[str, str]
+    extra_tags: list[str] | None = None
+    extra_metadata: dict[str, str] | None = None
+
+
+@dataclasses.dataclass(slots=True)
 class UpdateNotificationSettingsRequest:
     user_id: str
     settings: NotificationSettings

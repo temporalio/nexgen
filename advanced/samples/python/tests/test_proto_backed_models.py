@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import inspect
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from typing_extensions import assert_type
 
+import wit.proto_backed_showcase as proto_backed_showcase
 from wit.proto_backed_showcase.models import (
     Alert,
     AlertLevel,
+    BadBinaries,
+    BadBinary,
     CallbackInternal,
     CallbackNexus,
     NamespaceInfo,
@@ -113,3 +117,71 @@ def test_bare_collections_are_required_and_round_trip() -> None:
     wire = converter.to_transfer_type(callback)
     assert dict(wire.header) == {"x-test": "value"}
     assert converter.from_transfer_type(wire, CallbackNexus) == callback
+
+
+def test_required_collection_arguments_have_no_defaults() -> None:
+    with pytest.raises(TypeError, match="activity_task_queue_partitions"):
+        _ = inspect.signature(
+            proto_backed_showcase.task_queue_partitions_operation
+        ).bind()
+    with pytest.raises(TypeError, match="header"):
+        _ = inspect.signature(proto_backed_showcase.callback_nexus_operation).bind(
+            url="https://example.test"
+        )
+
+
+@pytest.mark.parametrize("mode", ["omitted", "none", "empty", "populated"])
+async def test_collection_arguments_preserve_absence_before_encoding(mode: str) -> None:
+    handle = object()
+    start_operation = AsyncMock(return_value=handle)
+    client = Mock(start_operation=start_operation)
+    required_list: list[TaskQueuePartition] = []
+    required_map: dict[str, str] = {}
+    optional_list: list[TaskQueuePartition] | None = None
+    optional_map: dict[str, BadBinary] | None = None
+    if mode == "empty":
+        optional_list, optional_map = [], {}
+    elif mode == "populated":
+        optional_list = [TaskQueuePartition(key="one", owner_host_name="worker")]
+        optional_map = {"one": BadBinary(reason="bad", operator="operator")}
+
+    # Capture public client calls before protobuf erases collection presence.
+    with patch("temporalio.workflow.create_nexus_client", return_value=client):
+        if mode == "omitted":
+            result = await proto_backed_showcase.task_queue_partitions_operation(
+                activity_task_queue_partitions=required_list
+            )
+        else:
+            result = await proto_backed_showcase.task_queue_partitions_operation(
+                activity_task_queue_partitions=required_list,
+                workflow_task_queue_partitions=optional_list,
+            )
+        assert result is handle
+        assert start_operation.await_args is not None
+        request = start_operation.await_args.kwargs["input"]
+        assert isinstance(request, TaskQueuePartitions)
+        assert request.activity_task_queue_partitions is required_list
+        assert request.workflow_task_queue_partitions is optional_list
+        start_operation.reset_mock()
+
+        if mode == "omitted":
+            result = await proto_backed_showcase.bad_binaries_operation()
+        else:
+            result = await proto_backed_showcase.bad_binaries_operation(
+                binaries=optional_map
+            )
+        assert result is handle
+        assert start_operation.await_args is not None
+        request = start_operation.await_args.kwargs["input"]
+        assert isinstance(request, BadBinaries)
+        assert request.binaries is optional_map
+        start_operation.reset_mock()
+
+        result = await proto_backed_showcase.callback_nexus_operation(
+            url="https://example.test", header=required_map
+        )
+        assert result is handle
+        assert start_operation.await_args is not None
+        request = start_operation.await_args.kwargs["input"]
+        assert isinstance(request, CallbackNexus)
+        assert request.header is required_map

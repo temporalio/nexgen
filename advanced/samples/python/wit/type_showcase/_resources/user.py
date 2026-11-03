@@ -9,6 +9,7 @@ from ..models import (
     DeactivateRequest,
     RenameRequest,
     UpdateEmailRequest,
+    UpdateLabelsRequest,
     UserProfile,
     UserStatus,
 )
@@ -54,6 +55,23 @@ class User:
             reason=reason,
         )
         handle = await _deactivate(request)
+        await handle
+
+    async def update_labels(
+        self,
+        tags: list[str],
+        metadata: dict[str, str],
+        extra_tags: list[str] | None = None,
+        extra_metadata: dict[str, str] | None = None,
+    ) -> None:
+        request = UpdateLabelsRequest(
+            user_id=self.user_id,
+            tags=tags,
+            metadata=metadata,
+            extra_tags=extra_tags,
+            extra_metadata=extra_metadata,
+        )
+        handle = await _update_labels(request)
         await handle
 
 
@@ -134,3 +152,34 @@ async def deactivate(
         reason=reason,
     )
     return await _deactivate(request)
+
+
+async def _update_labels(
+    request: UpdateLabelsRequest,
+) -> temporalio.workflow.NexusOperationHandle[None,]:
+    nexus_client = temporalio.workflow.create_nexus_client(
+        service="TypeShowcase",
+        endpoint="type-showcase",
+    )
+    return await nexus_client.start_operation(
+        operation="UpdateLabels",
+        input=request,
+    )
+
+
+async def update_labels(
+    *,
+    user_id: str,
+    tags: list[str],
+    metadata: dict[str, str],
+    extra_tags: list[str] | None = None,
+    extra_metadata: dict[str, str] | None = None,
+) -> temporalio.workflow.NexusOperationHandle[None,]:
+    request = UpdateLabelsRequest(
+        user_id=user_id,
+        tags=tags,
+        metadata=metadata,
+        extra_tags=extra_tags,
+        extra_metadata=extra_metadata,
+    )
+    return await _update_labels(request)

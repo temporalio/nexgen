@@ -125,6 +125,14 @@ export interface DeactivateRequest {
   reason?: string;
 }
 
+export interface UpdateLabelsRequest {
+  userId: string;
+  tags: string[];
+  metadata: Record<string, string>;
+  extraTags?: string[];
+  extraMetadata?: Record<string, string>;
+}
+
 export interface UpdateNotificationSettingsRequest {
   userId: string;
   emailEnabled: boolean;

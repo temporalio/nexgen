@@ -72,6 +72,7 @@ interface type-showcase {
     /// @nexus.doc "Default rename." go="Go rename." python="Python rename."
     rename: func(display-name: string) -> user-result;
     deactivate: func(reason: option<string>);
+    update-labels: func(tags: list<string>, metadata: map<string, string>, extra-tags: option<list<string>>, extra-metadata: option<map<string, string>>);
   }
 
   /// @nexus.experimental
@@ -117,6 +118,14 @@ interface type-showcase {
     reason: option<string>,
   }
 
+  record update-labels-request {
+    user-id: string,
+    tags: list<string>,
+    metadata: map<string, string>,
+    extra-tags: option<list<string>>,
+    extra-metadata: option<map<string, string>>,
+  }
+
   // Required input models remain public even when marked for flattening.
   /// @nexus.flatten-in-api
   record notification-settings {
@@ -150,6 +159,7 @@ interface type-showcase {
   set-profile: func(request: set-profile-request) -> user-result;
   record-sync: func(request: record-sync-request);
   deactivate: func(request: deactivate-request);
+  update-labels: func(request: update-labels-request);
   update-notification-settings: func(request: update-notification-settings-request);
   get-sync-settings: func(request: get-sync-settings-request) -> sync-settings;
 }

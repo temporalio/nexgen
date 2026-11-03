@@ -4,6 +4,7 @@ import type { UserStatus, UserProfile } from "./models";
 import { updateEmail } from "./operations/update-email";
 import { rename } from "./operations/rename";
 import { deactivate } from "./operations/deactivate";
+import { updateLabels } from "./operations/update-labels";
 
 export class User {
   public constructor(
@@ -27,6 +28,23 @@ export class User {
   public async deactivate(reason?: string): Promise<void> {
     const request = { userId: this.userId, reason: reason };
     const handle = await deactivate(request);
+    await handle.result();
+  }
+
+  public async updateLabels(
+    tags: string[],
+    metadata: Record<string, string>,
+    extraTags?: string[],
+    extraMetadata?: Record<string, string>,
+  ): Promise<void> {
+    const request = {
+      userId: this.userId,
+      tags: tags,
+      metadata: metadata,
+      extraTags: extraTags,
+      extraMetadata: extraMetadata,
+    };
+    const handle = await updateLabels(request);
     await handle.result();
   }
 }

@@ -114,6 +114,26 @@ namespace Nexgen.TypeShowcase
     }
 
     [GeneratedCode("nexgen", null)]
+    public class UpdateLabelsOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateLabelsOptions"/> class.
+        /// </summary>
+        public UpdateLabelsOptions(string userId, IReadOnlyList<string> tags, IReadOnlyDictionary<string, string> metadata)
+        {
+            UserId = userId;
+            Tags = tags;
+            Metadata = metadata;
+        }
+
+        public string UserId { get; set; }
+        public IReadOnlyList<string> Tags { get; set; }
+        public IReadOnlyDictionary<string, string> Metadata { get; set; }
+        public IReadOnlyList<string>? ExtraTags { get; set; }
+        public IReadOnlyDictionary<string, string>? ExtraMetadata { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public class UpdateNotificationSettingsOptions
     {
         /// <summary>
@@ -265,6 +285,25 @@ namespace Nexgen.TypeShowcase
                 Reason = options.Reason,
             };
             return DeactivateAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task UpdateLabelsAsync(UpdateLabelsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeShowcase>(TypeShowcaseEndpoint);
+            await client.ExecuteNexusOperationAsync(svc => svc.UpdateLabels(request)).ConfigureAwait(true);
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task UpdateLabelsAsync(UpdateLabelsOptions options)
+        {
+            var request = new UpdateLabelsRequest(options.UserId, options.Tags, options.Metadata)
+            {
+                ExtraTags = options.ExtraTags,
+                ExtraMetadata = options.ExtraMetadata,
+            };
+            return UpdateLabelsAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]

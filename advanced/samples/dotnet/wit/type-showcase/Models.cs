@@ -287,6 +287,26 @@ namespace Nexgen.TypeShowcase
     }
 
     [GeneratedCode("nexgen", null)]
+    public record UpdateLabelsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateLabelsRequest"/> class.
+        /// </summary>
+        public UpdateLabelsRequest(string userId, IReadOnlyList<string> tags, IReadOnlyDictionary<string, string> metadata)
+        {
+            UserId = userId;
+            Tags = tags;
+            Metadata = metadata;
+        }
+
+        public string UserId { get; init; }
+        public IReadOnlyList<string> Tags { get; init; }
+        public IReadOnlyDictionary<string, string> Metadata { get; init; }
+        public IReadOnlyList<string>? ExtraTags { get; init; }
+        public IReadOnlyDictionary<string, string>? ExtraMetadata { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record UpdateNotificationSettingsRequest
     {
         /// <summary>
