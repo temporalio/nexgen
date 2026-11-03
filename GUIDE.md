@@ -570,9 +570,10 @@ Key observations:
   (`user_id`, `email`).
 - Resource methods fill in identity fields from `self` (`self.user_id`) and
   accept only the remaining parameters.
-- A Python handle is not data. It compares and prints its identity fields, but
-  the payload converter can't encode or decode it. Pass the identity fields, and
-  build the handle again from them.
+- A Python resource with methods is a handle, not data. It compares and prints
+  its identity fields, but the payload converter can't encode or decode it. Pass
+  the identity fields, and build the handle again from them. A resource with no
+  methods stays a dataclass.
 - A standalone convenience wrapper is also generated for each resource method,
   taking all fields as explicit arguments.
 - Resource operations additionally produce three layers:
@@ -1547,7 +1548,7 @@ await job.restart()
 
 The client is runtime state, not a resource identity field. When an operation
 returns resource data, the generated API decodes the identity DTO and then
-builds the handle. The Workflow API does the same.
+builds the handle. The Workflow API does the same for a resource with methods.
 
 To rebuild a handle from identity fields that you stored, for example in a
 Workflow result, call the factory of the resource on the extension. Its name is

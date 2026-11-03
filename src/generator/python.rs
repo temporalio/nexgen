@@ -592,6 +592,7 @@ impl<'a> ApiPlanner<'a> {
                             .iter()
                             .map(|field| python_field_name(&field.name))
                             .collect(),
+                        has_methods: !resource.methods.is_empty(),
                     };
                     (resource.type_name.clone(), data)
                 })
@@ -1443,9 +1444,14 @@ impl<'a> ApiPlanner<'a> {
     ) {
         let client = target == Some(GenerationTarget::Client);
         // A handle has calls, so it is a plain class that the payload converter can't encode or
-        // decode. Only the identity DTO is data.
-        if target.is_none() {
-            output.push_str("@dataclasses.dataclass\n");
+        // decode. A resource with no methods is data, as its identity DTO is.
+        let handle = target.is_some() && !resource.methods.is_empty();
+        if !handle {
+            output.push_str(if client {
+                "@dataclasses.dataclass(init=False)\n"
+            } else {
+                "@dataclasses.dataclass\n"
+            });
         }
         output.push_str("class ");
         if target.is_none() {
@@ -1468,7 +1474,7 @@ impl<'a> ApiPlanner<'a> {
         }
         if client {
             self.render_resource_constructor(output, resource);
-        } else if target.is_some() {
+        } else if handle {
             self.render_resource_init(output, resource);
         }
         let Some(target) = target else {
@@ -1478,10 +1484,13 @@ impl<'a> ApiPlanner<'a> {
             }
             return;
         };
-        render_resource_identity_methods(output, resource);
         if resource.methods.is_empty() {
+            if !client {
+                output.push_str("\n    pass\n");
+            }
             return;
         }
+        render_resource_identity_methods(output, resource);
 
         for method in &resource.methods {
             output.push_str("\n");
@@ -3398,6 +3407,8 @@ impl RenderedOperation<'_> {
 struct ResourceDataResult {
     /// The identity fields, which the handle takes from the decoded result.
     fields: Vec<String>,
+    /// A resource with methods isn't data, so the Workflow API decodes its identity DTO.
+    has_methods: bool,
 }
 
 #[derive(Debug)]
@@ -6614,21 +6625,35 @@ fn render_resource_nexus_start_operation(
 }
 
 /// The `output_type` of a Workflow start call. The payload converter can't build a handle, so a
-/// direct resource result decodes as its identity DTO.
+/// direct result that is a handle decodes as its identity DTO.
 fn workflow_output_type_expr(operation: &RenderedOperation<'_>) -> String {
-    if operation.resource_data.is_some() {
+    if decodes_resource_data(operation) {
         resource_data_type(&operation.output_ref)
     } else {
         operation.output_type_expr.clone()
     }
 }
 
-/// Builds `resource` from the identity DTO that a direct resource result decodes as.
+/// Whether a Workflow call decodes a direct result as the identity DTO of a handle.
+fn decodes_resource_data(operation: &RenderedOperation<'_>) -> bool {
+    operation
+        .resource_data
+        .as_ref()
+        .is_some_and(|data| data.has_methods)
+}
+
+/// Sets `resource` from a direct resource result. A handle is built from the identity DTO that the
+/// result decodes as.
 fn render_resource_from_data(output: &mut String, indent: &str, operation: &RenderedOperation<'_>) {
     let data = operation
         .resource_data
         .as_ref()
         .expect("a direct resource result should have its identity fields");
+    if !data.has_methods {
+        output.push_str(indent);
+        output.push_str("resource = await handle\n");
+        return;
+    }
     output.push_str(indent);
     output.push_str(if data.fields.is_empty() {
         "_ = await handle\n"
@@ -8422,8 +8447,12 @@ fn render_request_only_operation_function(
         output.push_str(&workflow_output_type_expr(operation));
         output.push_str(",\n");
         output.push_str("    )\n");
-        render_resource_from_data(output, "    ", operation);
-        output.push_str("    return resource\n");
+        if decodes_resource_data(operation) {
+            render_resource_from_data(output, "    ", operation);
+            output.push_str("    return resource\n");
+        } else {
+            output.push_str("    return await handle\n");
+        }
         return;
     }
 
