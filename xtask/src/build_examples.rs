@@ -65,7 +65,10 @@ pub enum ExampleFormat {
 }
 
 fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("xtask lives inside the repository")
+        .to_path_buf()
 }
 
 pub fn build_examples(request: &BuildExamplesRequest) -> Result<()> {
@@ -760,10 +763,8 @@ fn format_example_output(
             vec![
                 "exec".into(),
                 "--".into(),
-                "prettier".into(),
+                "oxfmt".into(),
                 "--write".into(),
-                "--print-width".into(),
-                "88".into(),
                 output_path.to_string_lossy().into_owned(),
             ],
         ),

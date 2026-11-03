@@ -169,7 +169,7 @@ done
         let temp_dir = unique_temp_dir("typescript-format");
         fs::create_dir_all(&temp_dir).unwrap();
         let output_path = temp_dir.join("output");
-        write_formatter_script(&temp_dir, "prettier", "// formatted by test");
+        write_formatter_script(&temp_dir, "oxfmt", "// formatted by test");
 
         let status = Command::new(env!("CARGO_BIN_EXE_nexgen"))
             .env("PATH", formatter_path_env(&temp_dir))
