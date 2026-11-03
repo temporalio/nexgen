@@ -17,14 +17,11 @@
     "nexus-rpc": "^0.0.3"
   },
   "devDependencies": {
-    "prettier": "^3.8.3",
+    "oxfmt": "^0.75.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.12"
   },
   "engines": {
     "node": ">=26"
-  },
-  "prettier": {
-    "printWidth": 88
   }
 }

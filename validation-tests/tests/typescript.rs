@@ -362,10 +362,13 @@ fn generate_formatted_json_typescript_output_repr(
         .args([
             "exec",
             "--",
-            "prettier",
+            "oxfmt",
             "--write",
-            "--print-width",
-            "88",
+            "--config",
+            typescript_root(root)
+                .join(".oxfmtrc.json")
+                .to_str()
+                .unwrap(),
             output_path.to_str().unwrap(),
         ])
         .status()

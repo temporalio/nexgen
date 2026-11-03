@@ -356,12 +356,13 @@ fn formatter_command(language: Language, output_path: &Path) -> Result<Option<Co
                 .arg(output_path);
             Ok(Some(command))
         }
-        // Let the generated package choose its own Prettier configuration. In
-        // particular, the TypeScript SDK uses Prettier's default width while
-        // Nexgen's standalone examples configure a wider width themselves.
+        // Let the generated package choose its own oxfmt configuration.
         Language::TypeScript => {
-            let mut command = Command::new("prettier");
-            command.arg("--write").arg(output_path);
+            let mut command = Command::new("oxfmt");
+            // oxfmt rejects paths containing `..`.
+            command
+                .arg("--write")
+                .arg(absolute_output_path(output_path)?);
             Ok(Some(command))
         }
         _ => Err(error::Error::UnsupportedLanguage { language }),
@@ -462,13 +463,16 @@ mod tests {
 
     #[test]
     fn chooses_typescript_formatter_command() {
-        let command = formatter_command(Language::TypeScript, Path::new("output"))
+        let command = formatter_command(Language::TypeScript, Path::new("nested/../output"))
             .unwrap()
             .unwrap();
-        assert_eq!(command.get_program(), "prettier");
+        assert_eq!(command.get_program(), "oxfmt");
         assert_eq!(
             command.get_args().collect::<Vec<_>>(),
-            ["--write", "output"]
+            [
+                std::ffi::OsStr::new("--write"),
+                std::env::current_dir().unwrap().join("output").as_os_str(),
+            ]
         );
     }
 

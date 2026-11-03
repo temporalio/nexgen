@@ -131,7 +131,7 @@ impl Workspace {
 
     /// Generate `schema` into this workspace as `dir`, unformatted.
     ///
-    /// Unformatted on purpose: `ruff format`/`gofmt`/`prettier` reparse and
+    /// Unformatted on purpose: `ruff format`/`gofmt`/`oxfmt` reparse and
     /// rewrite the emitter's output, which is exactly how a nested same-quote
     /// f-string that is a `SyntaxError` below Python 3.12 reached the samples
     /// without any test noticing.

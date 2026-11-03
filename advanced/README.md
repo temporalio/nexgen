@@ -187,7 +187,7 @@ default. Add `--native-api` to also generate native API bindings. Add `--format`
 to run a formatter after generation:
 
 - Python: `ruff format`
-- TypeScript: `prettier --write`
+- TypeScript: `oxfmt --write`
 - Go: `gofmt -w`
 - .NET: no formatter is run
 
