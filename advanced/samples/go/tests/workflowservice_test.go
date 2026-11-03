@@ -304,7 +304,7 @@ func (s *WorkflowServiceIntegrationSuite) TestFlattenedMetadataPresence() {
 
 			// Exercise the generated transfer converter, not just the native
 			// request: absent strings must not become encoded empty payloads.
-			dc := commonconverter.WithSystemNexusDataConverter(
+			dc := commonconverter.WithDataConverterSystemNexusContext(
 				commonconverter.MakeTransferAware(converter.GetDefaultDataConverter()),
 				converter.GetDefaultDataConverter(),
 			)
@@ -410,7 +410,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	s.NotNil(transferConverter)
 
 	// Look the operation up in the registry and compute the serialization context
-	entry, ok := ws.NexusOperationRegistry[internal.NexusOperationKey{
+	entry, ok := ws.NexusOperationRegistry[internal.SystemNexusRegistryKey{
 		Service: "temporal.api.workflowservice.v1.WorkflowService", Operation: "SignalWithStartWorkflowExecution",
 	}]
 	s.Require().True(ok)
