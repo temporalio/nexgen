@@ -13,6 +13,7 @@ import wit.type_showcase as type_showcase
 import wit.type_showcase.models as type_showcase_models
 import wit.type_showcase.services as type_showcase_services
 from wit.type_showcase._resources import User
+from wit.type_showcase._resources._resource_data import UserData
 
 APP_ROOT = Path(__file__).resolve().parent
 OUTPUT_PATH = APP_ROOT.parent / "wit" / "type_showcase"
@@ -70,8 +71,8 @@ def user_resource(
     *,
     email: str,
     display_name: str,
-) -> User:
-    return User(
+) -> UserData:
+    return UserData(
         user_id="user-123",
         email=email,
         display_name=display_name,
@@ -90,7 +91,7 @@ class TypeShowcaseHandler:
         self,
         _ctx: StartOperationContext,
         input: type_showcase_models.GetUserRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("GetUser", input))
         assert input.user_id == "user-123"
         assert input.consistency_token == "read-123"
@@ -101,7 +102,7 @@ class TypeShowcaseHandler:
         self,
         _ctx: StartOperationContext,
         input: type_showcase_models.UpdateEmailRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("UpdateEmail", input))
         assert input.user_id == "user-123"
         assert input.email == "new@example.com"
@@ -112,7 +113,7 @@ class TypeShowcaseHandler:
         self,
         _ctx: StartOperationContext,
         input: type_showcase_models.RenameRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("Rename", input))
         assert input.user_id == "user-123"
         assert input.display_name == "New Name"
@@ -123,7 +124,7 @@ class TypeShowcaseHandler:
         self,
         _ctx: StartOperationContext,
         input: type_showcase_models.SetProfileRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("SetProfile", input))
         return user_resource(email="old@example.com", display_name="Old Name")
 

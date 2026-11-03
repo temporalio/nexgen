@@ -1469,47 +1469,47 @@ separate the targets with commas.
   selected API. Other languages represent resources as data classes.
 - `workflow` selects the API for Workflow code.
 - `client` writes the same API for code outside a Workflow, in a `client`
-  package inside the output directory. So far only Python supports it. It can be
+  package inside the output directory. Only Python System Nexus client
+  generation is supported, so this target requires `--system-nexus`. It can be
   selected independently or alongside `workflow`. nexgen refuses it for a
   service with no `@nexus.endpoint`.
 
-Python keeps shared models in the root package. Client APIs live in `client/`.
-Workflow-only generation keeps its API in the root package; when both targets
-are selected, the workflow API lives in `workflow/`. Each API owns its service
-contracts, operation wrappers, and resource classes. Neither API imports the
-other. The `client` package exposes a `<Service>ClientExtension` for each
+Python keeps shared models and service contracts in the root package. Client
+APIs live in `client/`. Workflow-only generation keeps its API in the root
+package; when both targets are selected, the workflow API lives in `workflow/`.
+Each API owns its operation wrappers and resource classes. Neither API imports
+the other. The `client` package exposes a `<Service>ClientExtension` for each
 service. Client handles are constructed with an explicit service-bound Nexus
-client, and private client identity DTOs decode resource results without loading
+client, and shared identity DTOs decode resource results without loading
 workflow resource classes.
 
 ```text
 stream_service/
-  __init__.py, models.py             # shared models
+  __init__.py, models.py, services.py # shared models and wire contracts
   workflow/
-    __init__.py, services.py, operations/, _resources/
+    __init__.py, operations/, _resources/
   client/
-    __init__.py, services.py, _extensions.py, _resources/
+    __init__.py, _extensions.py, _resources/
 ```
 
-A client class inherits one or more extensions and implements
-`_create_nexus_client`. That method returns a Nexus client for one service, with
-the `start_operation` of `temporalio.client.NexusClient`. A subclass of
-`temporalio.client.Client` returns
-`self.create_nexus_client(service, endpoint)`. A call starts the operation and
-returns its result.
+Service definitions always live in root `services.py`, including when no API
+target is selected. Both APIs use that same wire contract. Plain resource
+results use identity DTOs in root `_resources/_resource_data.py`; callable
+resource handles remain part of their respective APIs.
+
+A client class inherits one or more extensions and provides the SDK's
+`create_nexus_client` method. Inheriting `temporalio.client.Client` supplies
+that method directly, with no adapter. Generated calls pass the service type to
+the factory and typed operation descriptors to the SDK, which infers the request
+and result types from the shared service contract.
 
 ```python
-import typing
-
 import temporalio.client
 from stream_service.client import StreamServiceClientExtension
 
 
 class Client(temporalio.client.Client, StreamServiceClientExtension):
-    def _create_nexus_client(
-        self, *, service: str, endpoint: str
-    ) -> temporalio.client.NexusClient[typing.Any]:
-        return self.create_nexus_client(service, endpoint)
+    pass
 
 
 client = await Client.connect("localhost:7233")
@@ -1519,12 +1519,13 @@ await stream.publish(records=records)
 
 Each call starts the operation with a new random operation ID.
 
-Each operation also has a private method that takes the request, such as
-`_stream_service_create_stream`. Its name has the service name. Two services of
-one package can't have methods of the same name, private or public, and nexgen
-refuses them. An extension also refuses a client class that gets one of its
-public names from another base, because Python would use one of the two with no
-error.
+The extension exposes standalone operations and resource factories. Operations
+bound to resource methods are exposed only through their resource handles.
+
+Each standalone operation also has a private method that takes the request, such
+as `_stream_service_create_stream`. Its name has the service name. Two services
+of one package can't have methods of the same name, private or public, and
+nexgen refuses them.
 
 A client resource takes a service-bound Nexus client as its first constructor
 argument. Its methods call that client's `start_operation` directly, preserving
@@ -1546,7 +1547,7 @@ To rebuild a handle from identity fields that you stored, for example in a
 Workflow result, call the factory of the resource on the extension. Its name is
 `get_` and the snake-case name of the resource, and it takes the identity
 fields. It creates a Nexus client for the resource's own service with
-`_create_nexus_client`.
+`create_nexus_client`.
 
 ```python
 job = client.get_job(job_id=stored_job_id)

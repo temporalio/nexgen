@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
-import typing
-import temporalio.workflow
-
 from .._recursive import (
     Block,
     Page,
@@ -39,41 +36,3 @@ class KnowledgeBaseService:
         Category,
     ] = Operation(name="GetCategoryTree")
     """Fetch the category tree rooted at a category."""
-
-
-class KnowledgeBaseServiceClient:
-    def __init__(self, endpoint: str) -> None:
-        self._nexus_client: typing.Any = temporalio.workflow.create_nexus_client(
-            service="example.kb.v1.KnowledgeBaseService",
-            endpoint=endpoint,
-        )
-
-    async def get_page(
-        self,
-        request: GetPageInput,
-    ) -> temporalio.workflow.NexusOperationHandle[Page]:
-        return await self._nexus_client.start_operation(
-            operation="GetPage",
-            input=request,
-            output_type=Page,
-        )
-
-    async def put_block(
-        self,
-        request: Block,
-    ) -> temporalio.workflow.NexusOperationHandle[PutBlockOutput]:
-        return await self._nexus_client.start_operation(
-            operation="PutBlock",
-            input=request,
-            output_type=PutBlockOutput,
-        )
-
-    async def get_category_tree(
-        self,
-        request: GetCategoryTreeInput,
-    ) -> temporalio.workflow.NexusOperationHandle[Category]:
-        return await self._nexus_client.start_operation(
-            operation="GetCategoryTree",
-            input=request,
-            output_type=Category,
-        )

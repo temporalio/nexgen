@@ -1,1 +1,0 @@
-Repeat `@nexus.source` or `@nexus.default` on a field with disjoint `targets` sets to provide different expressions for workflow and client APIs. Overlapping sets are rejected, and omitting `targets` still applies to all targets.

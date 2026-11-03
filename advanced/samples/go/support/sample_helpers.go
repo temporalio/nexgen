@@ -28,7 +28,3 @@ func DescriptorName(ctx workflow.Context, value any) string {
 		panic(fmt.Sprintf("unexpected descriptor %T", value))
 	}
 }
-
-func SharedSource(ctx workflow.Context) string { return "shared" }
-
-func WorkflowSource(ctx workflow.Context) string { return "workflow" }

@@ -1,3 +1,2 @@
-`--targets workflow,client` also generates a Python `client` package, with its own resource classes and a client extension for each service. The client methods start the operations from code outside a Workflow and return the result. The models are shared, and the Workflow package doesn't change.
-Python client resource constructors require a service-bound Nexus client. Resource methods use that client directly. A returned handle gets a Nexus client for the service of its resource, and each extension has a factory that rebuilds a handle from its identity fields.
-The client extensions start operations with the `start_operation` of `temporalio.client.NexusClient`, so `_create_nexus_client` can return `Client.create_nexus_client(service, endpoint)`. Each call uses a new random operation ID.
+Python System Nexus client APIs can be generated with `--targets client --system-nexus`, alone or alongside workflow APIs. Client extensions use typed SDK operations and preserve service-bound clients on resource handles.
+`@nexus.source` and `@nexus.default` support target-specific expressions, including repeated directives with disjoint target sets.

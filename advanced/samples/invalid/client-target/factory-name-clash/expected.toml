@@ -1,4 +1,5 @@
 languages = ["python"]
+system_nexus = true
 targets = ["client"]
 
 [error]

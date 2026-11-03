@@ -51,28 +51,32 @@ input name. Child tables generate separate outputs, inheriting the parent
 settings and replacing the fields they specify:
 
 ```toml
-[target-sources]
+[stream-service]
 languages = ["python"]
-descriptors = "temporal"
+system_nexus = true
+descriptors = ["temporal_api.bin", "streams.bin"]
 
-[target-sources.workflow]
+[stream-service.models]
+targets = []
+
+[stream-service.workflow]
 targets = ["workflow"]
 
-[target-sources.client]
+[stream-service.client]
 targets = ["client"]
 
-[target-sources.both]
+[stream-service.both]
 targets = ["workflow", "client"]
 ```
 
-These outputs are placed in `target-sources/workflow`, `target-sources/client`,
-and `target-sources/both`, with language-specific casing. Each child can
-override any of the parent's settings. Lists replace the inherited list;
-`targets = []` selects no APIs and `descriptors = []` selects no descriptors. An
-explicit `system_nexus = false` overrides `true`. Language filtering uses the
-resolved child settings. Child tables cannot contain further child tables. The
-sample builder clears the example's output directory once before generating its
-children.
+These outputs are placed in `stream-service/models`, `stream-service/workflow`,
+`stream-service/client`, and `stream-service/both`, with language-specific
+casing. Each child can override any of the parent's settings. Lists replace the
+inherited list; `targets = []` selects no APIs and `descriptors = []` selects no
+descriptors. An explicit `system_nexus = false` overrides `true`. Language
+filtering uses the resolved child settings. Child tables cannot contain further
+child tables. The sample builder clears the example's output directory once
+before generating its children.
 
 The linked `nexus:temporal-types` WIT package describes semantic types, while
 authored language-specific Temporal converters live in each sample project:
@@ -212,8 +216,8 @@ cargo run --features advanced -- dotnet \
 Inputs are positional; pass more than one path (a file or a directory) to link
 additional WIT into the parser workspace. Generation produces definitions by
 default. Add `--targets workflow` to generate workflow API bindings, or select
-`--targets client` for Python client APIs. Add `--format` to run a formatter
-after generation:
+`--targets client --system-nexus` for Python System Nexus client APIs. Add
+`--format` to run a formatter after generation:
 
 - Python: `ruff format`
 - TypeScript: `oxfmt --write`

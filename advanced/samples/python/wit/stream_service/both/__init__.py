@@ -34,6 +34,7 @@ from .models import (
     Timestamp,
     WorkflowTaskEpoch,
 )
+from .services import StreamService
 
 __all__ = [
     "AppendRecord",
@@ -66,4 +67,5 @@ __all__ = [
     "Supersession",
     "Timestamp",
     "WorkflowTaskEpoch",
+    "StreamService",
 ]

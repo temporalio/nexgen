@@ -8,7 +8,7 @@ import typing
 
 import nexusrpc
 import temporalio.converter
-from .services import ChatServiceClient
+from ._clients import ChatServiceClient
 from . import services as _services
 
 __all__ = [

@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import dataclasses
 import typing
+import temporalio.client
+import uuid as _uuid
 import datetime
 
-from .._nexus_client import (
-    _NexusClient,
-    _operation_id,
-)
+from ...services import StreamService
 from ...models import (
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
     CloseStreamRequest,
-    CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
     ReadRecordsRequest,
@@ -34,13 +32,13 @@ class Stream:
 
     def __init__(
         self,
-        nexus_client: _NexusClient,
+        nexus_client: temporalio.client.NexusClient[typing.Any],
         /,
         *,
         stream: StreamRef,
         created: bool | None,
     ) -> None:
-        self._nexus_client: _NexusClient = nexus_client
+        self._nexus_client: temporalio.client.NexusClient[typing.Any] = nexus_client
         self.stream = stream
         self.created = created
 
@@ -53,12 +51,10 @@ class Stream:
             stream=self.stream,
             records=records or [],
         )
-        nexus_client = self._nexus_client
-        handle = await nexus_client.start_operation(
-            operation="AppendRecords",
+        handle = await self._nexus_client.start_operation(
+            operation=StreamService.append_records,
             arg=request,
-            id=_operation_id(),
-            result_type=AppendRecordsResponse,
+            id=f"{_uuid.uuid4()}",
         )
         return await handle.result()
 
@@ -73,12 +69,10 @@ class Stream:
             result=result,
             failure=failure,
         )
-        nexus_client = self._nexus_client
-        handle = await nexus_client.start_operation(
-            operation="CloseStream",
+        handle = await self._nexus_client.start_operation(
+            operation=StreamService.close_stream,
             arg=request,
-            id=_operation_id(),
-            result_type=CloseStreamResponse,
+            id=f"{_uuid.uuid4()}",
         )
         _ = await handle.result()
 
@@ -101,12 +95,10 @@ class Stream:
             create_wait=create_wait,
             max_bytes=max_bytes,
         )
-        nexus_client = self._nexus_client
-        handle = await nexus_client.start_operation(
-            operation="ReadRecords",
+        handle = await self._nexus_client.start_operation(
+            operation=StreamService.read_records,
             arg=request,
-            id=_operation_id(),
-            result_type=ReadRecordsResponse,
+            id=f"{_uuid.uuid4()}",
         )
         return await handle.result()
 
@@ -117,12 +109,10 @@ class Stream:
         request = DescribeStreamRequest(
             stream=self.stream,
         )
-        nexus_client = self._nexus_client
-        handle = await nexus_client.start_operation(
-            operation="DescribeStream",
+        handle = await self._nexus_client.start_operation(
+            operation=StreamService.describe_stream,
             arg=request,
-            id=_operation_id(),
-            result_type=DescribeStreamResponse,
+            id=f"{_uuid.uuid4()}",
         )
         return await handle.result()
 

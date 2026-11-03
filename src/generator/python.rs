@@ -558,18 +558,18 @@ impl<'a> ApiPlanner<'a> {
             })
             .collect::<Result<Vec<_>>>()?;
         let mut services = services;
-        let client_resources = services
+        let resource_data = services
             .iter()
             .flat_map(|service| {
                 service.resources.iter().map(|resource| {
-                    let client_resource = ClientResourceResult {
+                    let data = ResourceDataResult {
                         fields: resource
                             .fields
                             .iter()
                             .map(|field| python_field_name(&field.name))
                             .collect(),
                     };
-                    (resource.type_name.clone(), client_resource)
+                    (resource.type_name.clone(), data)
                 })
             })
             .collect::<BTreeMap<_, _>>();
@@ -578,8 +578,8 @@ impl<'a> ApiPlanner<'a> {
             .flat_map(|service| service.operations.iter_mut())
         {
             if operation.output_direct_result {
-                operation.client_resource = Some(
-                    client_resources
+                operation.resource_data = Some(
+                    resource_data
                         .get(&operation.output_ref)
                         .expect("a direct resource result should name a declared resource")
                         .clone(),
@@ -721,10 +721,7 @@ impl<'a> ApiPlanner<'a> {
         sort_python_model_names(&mut package_model_names, &self.variants, model_fragments);
         let root_workflow = targets.contains(&GenerationTarget::Workflow)
             && !targets.contains(&GenerationTarget::Client);
-        let definition_services = services
-            .iter()
-            .filter(|_| targets.is_empty() && resource_names.is_empty())
-            .collect::<Vec<_>>();
+        let definition_services = services.iter().collect::<Vec<_>>();
         let render_init = |root_package_imports: &RootPackageImports| {
             if root_workflow {
                 render_package_init(
@@ -789,6 +786,16 @@ impl<'a> ApiPlanner<'a> {
                 )? {
                     files.insert("models.py", models_source, module_origin.clone())?;
                 }
+                if let Some(data) = self.render_resource_data(services, &operation_model_names) {
+                    files.insert("_resources/_resource_data.py", data, module_origin.clone())?;
+                    if !root_workflow {
+                        files.insert(
+                            "_resources/__init__.py",
+                            render_empty_package_init(),
+                            module_origin.clone(),
+                        )?;
+                    }
+                }
                 Ok(())
             },
             |files, target| match target {
@@ -833,7 +840,7 @@ impl<'a> ApiPlanner<'a> {
         if !definition_services.is_empty() {
             files.insert(
                 "services.py",
-                render_service_module(&definition_services, self.api_plan, self.model_hoists, None),
+                render_service_module(&definition_services, self.api_plan, self.model_hoists),
                 module_origin.clone(),
             )?;
         }
@@ -854,16 +861,18 @@ impl<'a> ApiPlanner<'a> {
                 GeneratedFileOrigin::fixed("generated Python workflow resources"),
             )?;
         }
-        if !services.is_empty() {
+        if services.iter().any(|service| service.endpoint.is_none()) {
             files.insert(
-                "services.py",
-                render_service_module(
-                    &services.iter().collect::<Vec<_>>(),
+                "_clients.py",
+                render_workflow_clients_module(
+                    services,
+                    model_names,
+                    &self.language_imports,
+                    self.support_package,
                     self.api_plan,
                     self.model_hoists,
-                    Some(GenerationTarget::Workflow),
                 ),
-                GeneratedFileOrigin::fixed("generated Python workflow service contracts"),
+                GeneratedFileOrigin::fixed("generated Python workflow endpoint clients"),
             )?;
         }
         let resource_operation_owners = resource_operation_owners(services);
@@ -877,7 +886,7 @@ impl<'a> ApiPlanner<'a> {
         if has_standalone_operations {
             files.insert(
                 "operations/__init__.py",
-                render_operations_package_init(),
+                render_empty_package_init(),
                 GeneratedFileOrigin::fixed("generated Python operations package initializer"),
             )?;
         }
@@ -960,37 +969,15 @@ impl<'a> ApiPlanner<'a> {
             .flat_map(|service| service.resources.iter())
             .collect::<Vec<_>>();
         files.insert(
-            format!("{dir}/services.py"),
-            render_service_module(
-                &services.iter().collect::<Vec<_>>(),
-                self.api_plan,
-                self.model_hoists,
-                Some(GenerationTarget::Client),
-            ),
-            origin(),
-        )?;
-        if let Some(data) = self.render_client_resource_data(services, model_names) {
-            files.insert(
-                format!("{dir}/_resources/_resource_data.py"),
-                data,
-                origin(),
-            )?;
-        }
-        files.insert(
             format!("{dir}/__init__.py"),
             render_client_package_init(services, self.api_plan),
             origin(),
         )?;
         files.insert(format!("{dir}/_extensions.py"), extensions, origin())?;
-        let mut nexus_client = String::new();
-        render_generated_file_header(&mut nexus_client);
-        nexus_client.push_str("\nimport typing\nimport uuid\n\n\n");
-        nexus_client.push_str(PYTHON_CLIENT_NEXUS_PROTOCOL);
-        files.insert(format!("{dir}/_nexus_client.py"), nexus_client, origin())?;
         if !resources.is_empty() {
             files.insert(
                 format!("{dir}/_resources/__init__.py"),
-                render_resources_package_init(services, self.api_plan),
+                render_empty_package_init(),
                 origin(),
             )?;
         }
@@ -1013,8 +1000,8 @@ impl<'a> ApiPlanner<'a> {
         Ok(())
     }
 
-    /// Private identity DTOs decoded by the client API before constructing its handles.
-    fn render_client_resource_data(
+    /// Shared wire identity DTOs, independent of callable resource handles.
+    fn render_resource_data(
         &self,
         services: &[RenderedService<'_>],
         model_names: &[String],
@@ -1022,7 +1009,7 @@ impl<'a> ApiPlanner<'a> {
         let decoded_resources = services
             .iter()
             .flat_map(|service| &service.operations)
-            .filter(|operation| operation.client_resource.is_some())
+            .filter(|operation| operation.resource_data.is_some())
             .map(|operation| operation.output_ref.as_str())
             .collect::<BTreeSet<_>>();
         let mut body = String::new();
@@ -1049,12 +1036,8 @@ impl<'a> ApiPlanner<'a> {
         );
         render_model_name_imports(
             &mut output,
-            "...models",
-            &self
-                .api_plan
-                .module_path
-                .child("client")
-                .child("_resources"),
+            "..models",
+            &self.api_plan.module_path.child("_resources"),
             self.api_plan,
             &used_python_symbol_imports(&body, model_names),
             self.model_hoists,
@@ -1082,9 +1065,9 @@ impl<'a> ApiPlanner<'a> {
         }
         let operations = services
             .iter()
-            .flat_map(|service| service.operations.iter())
+            .flat_map(standalone_operations)
             .collect::<Vec<_>>();
-        let mut body = String::new();
+        let mut body = String::from("_NexusServiceT = typing.TypeVar(\"_NexusServiceT\")\n");
         let type_parameters = operations
             .iter()
             .flat_map(|operation| operation.model_input_type_parameters.iter())
@@ -1148,7 +1131,15 @@ impl<'a> ApiPlanner<'a> {
         ) {
             output.push('\n');
         }
-        render_named_python_import(&mut output, "._nexus_client", &client_nexus_imports(&body));
+        let service_names = services
+            .iter()
+            .map(|service| service.name.to_string())
+            .collect::<Vec<_>>();
+        render_named_python_import(
+            &mut output,
+            "..services",
+            &used_python_symbol_imports(&body, &service_names),
+        );
         let used_model_names = used_python_symbol_imports(&body, model_names);
         if !used_model_names.is_empty() {
             render_model_name_imports(
@@ -1162,9 +1153,13 @@ impl<'a> ApiPlanner<'a> {
         }
         let used_resource_names = used_python_symbol_imports(&body, resource_names);
         if !used_resource_names.is_empty() {
-            render_named_python_import(&mut output, "._resources", &used_resource_names);
+            render_client_resource_imports(
+                &mut output,
+                "._resources.",
+                self.api_plan,
+                &used_resource_names,
+            );
         }
-        render_client_resource_data_import(&mut output, &body, "._resources.", resource_names);
         render_support_import(&mut output, &body, self.support_package, false);
         output.push_str("\n\n");
         output.push_str(&body);
@@ -1217,9 +1212,9 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("        return ");
         output.push_str(&resource.type_name);
         output.push_str("(\n");
-        output.push_str(&format!("            {receiver}._create_nexus_client(\n"));
+        output.push_str(&format!("            {receiver}.create_nexus_client(\n"));
         output.push_str("                service=");
-        output.push_str(&python_string_literal(service.wire_name));
+        output.push_str(service.name);
         output.push_str(",\n                endpoint=");
         output.push_str(&python_string_literal(
             service
@@ -1362,12 +1357,9 @@ impl<'a> ApiPlanner<'a> {
             output.push('\n');
         }
         if client {
-            render_named_python_import(
-                &mut output,
-                ".._nexus_client",
-                &client_nexus_imports(&body),
-            );
-            render_client_resource_data_import(&mut output, &body, ".", resource_names);
+            if body_uses_python_symbol(&body, service.name) {
+                render_named_python_import(&mut output, "...services", &[service.name.to_string()]);
+            }
         }
         let used_model_names = used_python_symbol_imports(&body, model_names);
         if !used_model_names.is_empty() {
@@ -1393,7 +1385,16 @@ impl<'a> ApiPlanner<'a> {
             .filter(|name| !own_names.contains(name))
             .collect::<Vec<_>>();
         if !used_resource_names.is_empty() {
-            render_named_python_import(&mut output, ".", &used_resource_names);
+            if client {
+                render_client_resource_imports(
+                    &mut output,
+                    ".",
+                    self.api_plan,
+                    &used_resource_names,
+                );
+            } else {
+                render_named_python_import(&mut output, ".", &used_resource_names);
+            }
         }
         render_support_import(&mut output, &body, self.support_package, false);
         if !body.is_empty() {
@@ -1420,7 +1421,7 @@ impl<'a> ApiPlanner<'a> {
         });
         output.push_str("class ");
         if target.is_none() {
-            output.push_str(&client_resource_data_type(&resource.type_name));
+            output.push_str(&resource_data_type(&resource.type_name));
         } else {
             output.push_str(&resource.type_name);
         }
@@ -1475,7 +1476,7 @@ impl<'a> ApiPlanner<'a> {
             "\n    def __init__(\n        {receiver},\n        "
         ));
         output.push_str(&parameter);
-        output.push_str(": _NexusClient,\n        /,\n");
+        output.push_str(": temporalio.client.NexusClient[typing.Any],\n        /,\n");
         if !resource.fields.is_empty() {
             output.push_str("        *,\n");
         }
@@ -1492,7 +1493,7 @@ impl<'a> ApiPlanner<'a> {
         }
         output.push_str("    ) -> None:\n");
         output.push_str(&format!(
-            "        {receiver}.{attribute}: _NexusClient = {parameter}\n"
+            "        {receiver}.{attribute}: temporalio.client.NexusClient[typing.Any] = {parameter}\n"
         ));
         for field in &resource.fields {
             let name = python_field_name(&field.name);
@@ -1934,7 +1935,7 @@ impl<'a> ApiPlanner<'a> {
                 .map(|helper| format!("_support.{helper}")),
             output_resource_return,
             output_direct_result,
-            client_resource: None,
+            resource_data: None,
             output_none: operation.output_type().is_none(),
             unpacked_input,
             client_unpacked_input,
@@ -3225,8 +3226,8 @@ struct RenderedOperation<'a> {
     serialization_context_expr: Option<String>,
     output_resource_return: Option<PlannedOperationResourceReturn>,
     output_direct_result: bool,
-    /// The resource that the operation returns directly, for the client target.
-    client_resource: Option<ClientResourceResult>,
+    /// The identity data of a resource returned directly by the operation.
+    resource_data: Option<ResourceDataResult>,
     output_none: bool,
     unpacked_input: Option<RenderedUnpackedInput>,
     /// Target-specific source applicability changes the convenience parameters.
@@ -3249,7 +3250,7 @@ impl RenderedOperation<'_> {
 
 /// The identity fields used to construct a handle with the operation's Nexus client.
 #[derive(Debug, Clone)]
-struct ClientResourceResult {
+struct ResourceDataResult {
     /// The identity fields, which the handle takes from the decoded result.
     fields: Vec<String>,
 }
@@ -4092,33 +4093,9 @@ fn resource_module_name(resource: &PlannedResource) -> String {
     python_ident(&resource.name.to_snake_case())
 }
 
-/// A private identity DTO in the client API package, not a workflow resource.
-fn client_resource_data_type(type_name: &str) -> String {
+/// A shared wire identity DTO, not a callable resource handle.
+fn resource_data_type(type_name: &str) -> String {
     format!("{type_name}Data")
-}
-
-/// The names that a client module imports from the module of the Nexus client protocol.
-fn client_nexus_imports(body: &str) -> Vec<String> {
-    let mut names = vec!["_NexusClient".to_string()];
-    if body_uses_python_symbol(body, "_operation_id") {
-        names.push("_operation_id".to_string());
-    }
-    names
-}
-
-/// Imports identity DTOs from the client API package.
-fn render_client_resource_data_import(
-    output: &mut String,
-    body: &str,
-    parent: &str,
-    resource_names: &[String],
-) {
-    for resource in resource_names {
-        let data_type = client_resource_data_type(resource);
-        if body_uses_python_symbol(body, &data_type) {
-            output.push_str(&format!("from {parent}_resource_data import {data_type}\n"));
-        }
-    }
 }
 
 fn resource_client_identifier(resource: &PlannedResource, base: &str) -> String {
@@ -4162,6 +4139,16 @@ fn resource_operation_owners(services: &[RenderedService<'_>]) -> BTreeMap<Strin
         }
     }
     owners
+}
+
+fn standalone_operations<'a, 'spec>(
+    service: &'a RenderedService<'spec>,
+) -> impl Iterator<Item = &'a RenderedOperation<'spec>> {
+    let owners = resource_operation_owners(std::slice::from_ref(service));
+    service
+        .operations
+        .iter()
+        .filter(move |operation| !owners.contains_key(&operation_key(service.name, operation.name)))
 }
 
 pub(in crate::generator) fn render_generated_file_header(output: &mut String) {
@@ -4342,6 +4329,8 @@ fn render_optional_python_imports_with_skipped_language_modules(
         ("import enum\n", "enum"),
         ("import typing\n", "typing"),
         ("import typing_extensions\n", "typing_extensions"),
+        ("import temporalio.client\n", "temporalio.client"),
+        ("import uuid as _uuid\n", "_uuid"),
     ];
 
     let mut wrote_any = false;
@@ -4743,7 +4732,7 @@ fn render_client_package_init(services: &[RenderedService<'_>], api_plan: &Plann
     output.push('\n');
     render_named_python_import(&mut output, "._extensions", &extensions);
     if !resources.is_empty() {
-        render_named_python_import(&mut output, "._resources", &resources);
+        render_client_resource_imports(&mut output, "._resources.", api_plan, &resources);
     }
     output.push_str("\n__all__ = [\n");
     for name in extensions.iter().chain(&resources) {
@@ -4753,6 +4742,40 @@ fn render_client_package_init(services: &[RenderedService<'_>], api_plan: &Plann
     }
     output.push_str("]\n");
     output
+}
+
+/// Client wire contracts can import identity DTOs without loading handles.
+/// Handles are imported directly from their modules, not through the package initializer.
+fn render_client_resource_imports(
+    output: &mut String,
+    prefix: &str,
+    api_plan: &PlannedSpec,
+    names: &[String],
+) {
+    let holders = resource_holders(api_plan);
+    for resource in api_plan
+        .services
+        .iter()
+        .flat_map(|service| &service.resources)
+    {
+        let resource = &resource.data;
+        let used = std::iter::once(resource.type_name.clone())
+            .chain(
+                holders
+                    .values()
+                    .filter(|(_, resource_type)| *resource_type == resource.type_name)
+                    .map(|(name, _)| name.clone()),
+            )
+            .filter(|name| names.contains(name))
+            .collect::<Vec<_>>();
+        if !used.is_empty() {
+            render_named_python_import(
+                output,
+                &format!("{prefix}{}", resource_module_name(resource)),
+                &used,
+            );
+        }
+    }
 }
 
 fn render_resources_package_init(
@@ -4822,22 +4845,10 @@ fn render_service_module(
     services: &[&RenderedService<'_>],
     api_plan: &PlannedSpec,
     model_hoists: Option<&PythonModelHoists>,
-    target: Option<GenerationTarget>,
 ) -> String {
-    let models_module = target
-        .map(|target| python_api_models_import(target, 1))
-        .unwrap_or_else(|| ".models".to_string());
-    let module_path = target
-        .map(|target| python_api_module_path(api_plan, target))
-        .unwrap_or_else(|| api_plan.module_path.clone());
     let mut module_imports = BTreeSet::new();
     let mut model_type_imports = BTreeSet::new();
-    let resource_modules = services
-        .iter()
-        .flat_map(|service| service.resources.iter())
-        .map(|resource| (resource.type_name.clone(), resource_module_name(resource)))
-        .collect::<BTreeMap<_, _>>();
-    let mut resource_type_imports = BTreeMap::new();
+    let mut resource_data_imports = BTreeSet::new();
     for service in services {
         for operation in &service.operations {
             if let Some(input_module_path) = operation
@@ -4866,9 +4877,8 @@ fn render_service_module(
             }
             if let Some(output_module_path) = &operation.output_module_path {
                 if output_module_path == "._resources" {
-                    if let Some(module_name) = resource_modules.get(&operation.output_ref) {
-                        resource_type_imports
-                            .insert(operation.output_ref.clone(), module_name.clone());
+                    if operation.resource_data.is_some() {
+                        resource_data_imports.insert(resource_data_type(&operation.output_ref));
                     }
                 } else if output_module_path == ".models" {
                     if let Some(type_name) = operation.output_ref.strip_prefix("models.") {
@@ -4889,75 +4899,14 @@ fn render_service_module(
             }
         }
     }
-    let endpoint_services = services
-        .iter()
-        .filter(|service| target == Some(GenerationTarget::Workflow) && service.endpoint.is_none())
-        .collect::<Vec<_>>();
-    let mut endpoint_client_body = String::new();
-    for (index, service) in endpoint_services.iter().enumerate() {
-        render_endpoint_service_object(&mut endpoint_client_body, service);
-        if index + 1 != endpoint_services.len() {
-            endpoint_client_body.push('\n');
-        }
-    }
-    let runtime_model_names = endpoint_services
-        .iter()
-        .flat_map(|service| {
-            service.operations.iter().filter_map(|operation| {
-                operation.unpacked_input.as_ref().map(|input| {
-                    std::iter::once(input.model_name.clone())
-                        .chain(
-                            input
-                                .flattened_messages
-                                .iter()
-                                .map(|message| message.model_name.clone()),
-                        )
-                        .collect::<Vec<_>>()
-                })
-            })
-        })
-        .flatten()
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
-    let used_runtime_model_names =
-        used_python_symbol_imports(&endpoint_client_body, &runtime_model_names);
-    model_type_imports.extend(used_runtime_model_names.iter().cloned());
-    let type_checking_model_names = endpoint_services
-        .iter()
-        .flat_map(|service| {
-            service.operations.iter().flat_map(|operation| {
-                let input_model = operation
-                    .input
-                    .as_ref()
-                    .and_then(|input| model_type_name(&input.type_ref));
-                let output_model = (!resource_modules.contains_key(&operation.output_ref))
-                    .then(|| model_type_name(&operation.output_ref))
-                    .flatten();
-                input_model.into_iter().chain(output_model)
-            })
-        })
-        .filter(|name| !model_type_imports.contains(name))
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
-    let used_type_checking_model_names =
-        used_python_symbol_imports(&endpoint_client_body, &type_checking_model_names);
-    let resource_names = resource_modules.keys().cloned().collect::<Vec<_>>();
-    let used_resource_names = used_python_symbol_imports(&endpoint_client_body, &resource_names);
-    let needs_temporalio_workflow_runtime = endpoint_client_body.contains("temporalio.workflow.");
-    let needs_temporalio_workflow_type_checking = false;
-    let needs_type_checking_imports = needs_temporalio_workflow_type_checking
-        || !used_type_checking_model_names.is_empty()
-        || !used_resource_names.is_empty();
-
     let mut output = String::new();
     render_generated_file_header(&mut output);
     output.push('\n');
     let uses_service = !services.is_empty();
-    let uses_operation = services
-        .iter()
-        .any(|service| !service.operations.is_empty());
+    let uses_operation = uses_service
+        && services
+            .iter()
+            .any(|service| !service.operations.is_empty());
     if uses_operation {
         output.push_str("from nexusrpc import Operation, service\n");
     } else if uses_service {
@@ -4979,7 +4928,7 @@ fn render_service_module(
                 // `TYPE_CHECKING`.
                 || operation.deprecated
         });
-    if uses_typing || endpoint_client_body.contains("typing.") || needs_type_checking_imports {
+    if uses_typing {
         output.push_str("import typing\n");
     }
     if services.iter().any(|service| {
@@ -4991,86 +4940,28 @@ fn render_service_module(
     }) {
         output.push_str("import typing_extensions\n");
     }
-    if needs_temporalio_workflow_runtime {
-        output.push_str("import temporalio.workflow\n");
-    }
-    let mut resource_imports_by_module = BTreeMap::<String, BTreeSet<String>>::new();
-    for (resource_type_name, module_name) in &resource_type_imports {
-        resource_imports_by_module
-            .entry(module_name.clone())
-            .or_default()
-            .insert(resource_type_name.clone());
-    }
-    for service in &endpoint_services {
-        for resource in &service.resources {
-            let binder_name = resource_client_bind_function_name(resource);
-            if endpoint_client_body.contains(&binder_name) {
-                resource_imports_by_module
-                    .entry(resource_module_name(resource))
-                    .or_default()
-                    .insert(binder_name);
-            }
-        }
-    }
-
     if !module_imports.is_empty()
         || !model_type_imports.is_empty()
-        || !resource_imports_by_module.is_empty()
+        || !resource_data_imports.is_empty()
     {
-        if uses_typing || endpoint_client_body.contains("typing.") || needs_type_checking_imports {
+        if uses_typing {
             output.push('\n');
         }
         render_python_module_imports(&mut output, &module_imports);
+        if !resource_data_imports.is_empty() {
+            render_named_python_import(
+                &mut output,
+                "._resources._resource_data",
+                &resource_data_imports.into_iter().collect::<Vec<_>>(),
+            );
+        }
         render_model_name_imports(
             &mut output,
-            &models_module,
-            &module_path,
+            ".models",
+            &api_plan.module_path,
             api_plan,
             &model_type_imports.into_iter().collect::<Vec<_>>(),
             model_hoists,
-        );
-        for (module_name, names) in &resource_imports_by_module {
-            render_named_python_import(
-                &mut output,
-                &format!("._resources.{module_name}"),
-                &names.iter().cloned().collect::<Vec<_>>(),
-            );
-        }
-    }
-    if needs_temporalio_workflow_type_checking {
-        output.push_str("if typing.TYPE_CHECKING:\n");
-        output.push_str("    import temporalio.workflow\n");
-        render_model_name_imports_with_indent(
-            &mut output,
-            &models_module,
-            &module_path,
-            api_plan,
-            &used_type_checking_model_names,
-            model_hoists,
-            "    ",
-        );
-        render_named_python_import_with_indent(
-            &mut output,
-            "._resources",
-            &used_resource_names,
-            "    ",
-        );
-    } else if needs_type_checking_imports {
-        output.push_str("if typing.TYPE_CHECKING:\n");
-        render_model_name_imports_with_indent(
-            &mut output,
-            &models_module,
-            &module_path,
-            api_plan,
-            &used_type_checking_model_names,
-            model_hoists,
-            "    ",
-        );
-        render_named_python_import_with_indent(
-            &mut output,
-            "._resources",
-            &used_resource_names,
-            "    ",
         );
     }
     if !services.is_empty() {
@@ -5082,11 +4973,64 @@ fn render_service_module(
             }
         }
     }
-    if !endpoint_client_body.is_empty() {
-        output.push('\n');
-        output.push_str(&endpoint_client_body);
-    }
+    output
+}
 
+fn render_workflow_clients_module(
+    services: &[RenderedService<'_>],
+    model_names: &[String],
+    language_imports: &[LanguageImportSpec],
+    support_package: &str,
+    api_plan: &PlannedSpec,
+    model_hoists: Option<&PythonModelHoists>,
+) -> String {
+    let mut body = String::new();
+    let mut module_imports = BTreeSet::from(["temporalio.workflow".to_string()]);
+    let mut resource_imports = BTreeMap::<String, Vec<String>>::new();
+    for service in services.iter().filter(|service| service.endpoint.is_none()) {
+        render_endpoint_service_object(&mut body, service);
+        body.push('\n');
+        for operation in &service.operations {
+            if let Some(module) = operation
+                .input
+                .as_ref()
+                .and_then(|input| input.module_path.as_ref())
+            {
+                module_imports.insert(module.clone());
+            }
+            if let Some(module) = &operation.output_module_path {
+                module_imports.insert(module.clone());
+            }
+        }
+        for resource in &service.resources {
+            let names = [
+                resource.type_name.clone(),
+                resource_client_bind_function_name(resource),
+            ];
+            let names = used_python_symbol_imports(&body, &names);
+            if !names.is_empty() {
+                resource_imports.insert(resource_module_name(resource), names);
+            }
+        }
+    }
+    let mut output = String::new();
+    render_generated_file_header(&mut output);
+    output.push('\n');
+    render_optional_python_imports(&mut output, &body, &module_imports, language_imports);
+    render_model_name_imports(
+        &mut output,
+        &python_api_models_import(GenerationTarget::Workflow, 1),
+        &python_api_module_path(api_plan, GenerationTarget::Workflow),
+        api_plan,
+        &used_python_symbol_imports(&body, model_names),
+        model_hoists,
+    );
+    for (module, names) in resource_imports {
+        render_named_python_import(&mut output, &format!("._resources.{module}"), &names);
+    }
+    render_support_import(&mut output, &body, support_package, false);
+    output.push_str("\n\n");
+    output.push_str(&body);
     output
 }
 
@@ -5378,7 +5322,7 @@ pub(in crate::generator) fn module_common_prefix_len(left: &[String], right: &[S
         .count()
 }
 
-fn render_operations_package_init() -> String {
+fn render_empty_package_init() -> String {
     let mut output = String::new();
     render_generated_file_header(&mut output);
     output
@@ -5575,13 +5519,18 @@ fn render_package_init(
         output.push_str("import temporalio.converter\n");
     }
     if !service_object_names.is_empty() {
-        render_named_python_import(&mut output, ".services", &service_object_names);
+        render_named_python_import(&mut output, "._clients", &service_object_names);
     }
     if services
         .iter()
         .any(|service| !service.operations.is_empty())
     {
-        output.push_str("from . import services as _services\n");
+        let services_module = models_module
+            .strip_suffix("models")
+            .expect("the shared models import ends in models");
+        output.push_str(&format!(
+            "from {services_module} import services as _services\n"
+        ));
     }
     if !services.is_empty() {
         for service in services {
@@ -5905,7 +5854,7 @@ fn client_extension_class_name(service: &RenderedService<'_>) -> String {
 fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
     let mut owners = BTreeMap::<String, &str>::new();
     for service in services {
-        for operation in &service.operations {
+        for operation in standalone_operations(service) {
             let names = [
                 operation.attr_name.clone(),
                 client_operation_name(service, operation),
@@ -5947,57 +5896,15 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
     Ok(())
 }
 
-/// The Nexus client that a client extension starts operations with. It has the `start_operation`
-/// of `temporalio.client.NexusClient`, so `Client.create_nexus_client` can supply it.
-const PYTHON_CLIENT_NEXUS_PROTOCOL: &str = r#"_OutputT = typing.TypeVar("_OutputT")
-_OutputT_co = typing.TypeVar("_OutputT_co", covariant=True)
-
-
-class _NexusOperationHandle(typing.Protocol[_OutputT_co]):
-    """A started Nexus operation."""
-
-    async def result(self) -> _OutputT_co: ...
-
-
-# The client modules import the names below, so they aren't unused.
-class _NexusClient(typing.Protocol):  # pyright: ignore[reportUnusedClass]
-    """Starts the operations of one Nexus service, like ``temporalio.client.NexusClient``."""
-
-    @typing.overload
-    async def start_operation(
-        self,
-        operation: str,
-        arg: typing.Any,
-        *,
-        id: str,
-        result_type: type[_OutputT],
-    ) -> _NexusOperationHandle[_OutputT]: ...
-
-    @typing.overload
-    async def start_operation(
-        self,
-        operation: str,
-        arg: typing.Any,
-        *,
-        id: str,
-    ) -> _NexusOperationHandle[typing.Any]: ...
-
-
-def _operation_id() -> str:  # pyright: ignore[reportUnusedFunction]
-    """Return a new random operation ID."""
-    return str(uuid.uuid4())
-"#;
-
-const CLIENT_NEXUS_CLIENT_HOOK: &str = "_create_nexus_client";
+const CLIENT_NEXUS_CLIENT_HOOK: &str = "create_nexus_client";
 
 const PYTHON_CLIENT_EXTENSION_HOOK: &str = r#"
     @abc.abstractmethod
-    def _create_nexus_client(
+    def create_nexus_client(
         self,
-        *,
-        service: str,
+        service: type[_NexusServiceT] | str,
         endpoint: str,
-    ) -> _NexusClient:
+    ) -> temporalio.client.NexusClient[_NexusServiceT]:
         """Return the Nexus client that starts the operations of ``service``."""
         ...
 "#;
@@ -6012,47 +5919,16 @@ fn render_client_extension(output: &mut String, service: &RenderedService<'_>, f
         "    ",
         Some(&format!(
             "Starts the operations of ``{}`` from code outside a Workflow.\n\nA client class \
-             inherits this class and implements ``_create_nexus_client``.",
+             inherits this class and provides the SDK's ``create_nexus_client`` method.",
             service.name
         )),
         &[],
         None,
         service.experimental,
     );
-    if !service.operations.is_empty() || !service.resources.is_empty() {
-        output.push_str("\n    def __init_subclass__(cls, **kwargs: typing.Any) -> None:\n");
-        output.push_str("        super().__init_subclass__(**kwargs)\n");
-        output.push_str(
-            "        # The MRO picks one base for a name that two bases have, with no error.\n",
-        );
-        output.push_str("        for base in cls.__mro__:\n");
-        // `issubclass` on an ABC isn't reliable while Python builds the subclass.
-        output.push_str("            if ");
-        output.push_str(&class_name);
-        output.push_str(" in base.__mro__:\n");
-        output.push_str("                continue\n");
-        output.push_str("            for name in (");
-        for name in service
-            .operations
-            .iter()
-            .map(|operation| operation.attr_name.clone())
-            .chain(service.resources.iter().map(client_resource_factory_name))
-        {
-            output.push_str(&python_string_literal(&name));
-            output.push_str(", ");
-        }
-        output.push_str("):\n");
-        output.push_str("                if name in base.__dict__:\n");
-        output.push_str("                    raise TypeError(\n");
-        output.push_str("                        f\"{cls.__qualname__} gets {name} from ");
-        output.push_str("{base.__qualname__} and from ");
-        output.push_str(&class_name);
-        output.push_str("\"\n");
-        output.push_str("                    )\n");
-    }
     output.push_str(PYTHON_CLIENT_EXTENSION_HOOK);
     output.push_str(factories);
-    for operation in &service.operations {
+    for operation in standalone_operations(service) {
         output.push('\n');
         render_operation_functions(output, GenerationTarget::Client, service, operation);
     }
@@ -6099,6 +5975,11 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
     }
 
     for (operation_index, operation) in service.operations.iter().enumerate() {
+        let descriptor_output_ref = if operation.resource_data.is_some() {
+            resource_data_type(&operation.output_ref)
+        } else {
+            operation.descriptor_output_ref.clone()
+        };
         if operation.experimental {
             output.push_str("    # ");
             output.push_str(".. warning:: ");
@@ -6122,7 +6003,7 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
         ));
         output.push_str(",\n");
         output.push_str("        ");
-        output.push_str(&service_type_ref(&operation.descriptor_output_ref));
+        output.push_str(&service_type_ref(&descriptor_output_ref));
         output.push_str(",\n");
         if operation.deprecated {
             output.push_str(
@@ -6145,9 +6026,7 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
             output.push_str(", input_type=");
             output.push_str(&service_operation_runtime_type_ref(input_type));
             output.push_str(", output_type=");
-            output.push_str(&service_operation_runtime_type_ref(
-                &operation.descriptor_output_ref,
-            ));
+            output.push_str(&service_operation_runtime_type_ref(&descriptor_output_ref));
         }
         output.push_str(")\n");
         if service.doc.is_some() {
@@ -6182,14 +6061,6 @@ fn local_python_model_type_expr(type_ref: &str) -> String {
         .or_else(|| type_ref.strip_prefix("_recursive."))
         .unwrap_or(type_ref)
         .to_string()
-}
-
-fn model_type_name(type_ref: &str) -> Option<String> {
-    let type_name = type_ref
-        .strip_prefix("models.")
-        .or_else(|| type_ref.strip_prefix("_recursive."))
-        .unwrap_or(type_ref);
-    (type_name != "None" && !type_name.contains('.')).then(|| type_name.to_string())
 }
 
 fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
@@ -7791,34 +7662,22 @@ fn render_client_operation_body(
     discard_result: bool,
 ) {
     let target = GenerationTarget::Client;
-    if let Some(client) = client {
-        start_line(output, target, "    nexus_client = ");
-        output.push_str(client);
-        output.push('\n');
-    } else {
+    if client.is_none() {
         render_inline_nexus_client(output, target, service);
     }
-    start_line(
-        output,
-        target,
-        "    handle = await nexus_client.start_operation(\n",
-    );
+    let client = client.unwrap_or("nexus_client");
+    start_line(output, target, "    handle = await ");
+    output.push_str(client);
+    output.push_str(".start_operation(\n");
     start_line(output, target, "        operation=");
-    output.push_str(&python_string_literal(operation.wire_name));
+    output.push_str(service.name);
+    output.push('.');
+    output.push_str(&operation.attr_name);
     output.push_str(",\n");
     start_line(output, target, "        arg=");
     output.push_str(operation_input_wire_expr(operation));
     output.push_str(",\n");
-    start_line(output, target, "        id=_operation_id(),\n");
-    if !operation.output_none {
-        start_line(output, target, "        result_type=");
-        if operation.client_resource.is_some() {
-            output.push_str(&client_resource_data_type(&operation.output_ref));
-        } else {
-            output.push_str(&operation.output_type_expr);
-        }
-        output.push_str(",\n");
-    }
+    start_line(output, target, "        id=f\"{_uuid.uuid4()}\",\n");
     start_line(output, target, "    )\n");
     // A statement that drops a result other than `None` needs `_ =` for basedpyright.
     let await_result = if operation.output_none {
@@ -7844,13 +7703,15 @@ fn render_client_operation_body(
             resource_return,
         );
         if let Some(holder) = &resource_return.holder {
-            render_resource_holder_return(output, target, resource_return, holder);
+            render_resource_holder_return(output, target, resource_return, holder, Some(client));
             return;
         }
         start_line(output, target, "    resource = ");
         output.push_str(&resource_return.resource_type_name);
         output.push_str("(\n");
-        start_line(output, target, "        nexus_client,\n");
+        start_line(output, target, "        ");
+        output.push_str(client);
+        output.push_str(",\n");
         for binding in &resource_return.bindings {
             start_line(output, target, "        ");
             output.push_str(&python_field_name(&binding.field_name));
@@ -7860,7 +7721,7 @@ fn render_client_operation_body(
         }
         start_line(output, target, "    )\n");
         start_line(output, target, "    return resource\n");
-    } else if let Some(resource) = &operation.client_resource {
+    } else if let Some(resource) = &operation.resource_data {
         if resource.fields.is_empty() {
             start_line(output, target, await_result);
         } else {
@@ -7869,7 +7730,9 @@ fn render_client_operation_body(
         start_line(output, target, "    return ");
         output.push_str(&operation.output_ref);
         output.push_str("(\n");
-        start_line(output, target, "        nexus_client,\n");
+        start_line(output, target, "        ");
+        output.push_str(client);
+        output.push_str(",\n");
         for field in &resource.fields {
             start_line(output, target, "        ");
             output.push_str(&format!("{field}=result.{field},\n"));
@@ -8145,6 +8008,7 @@ fn render_request_only_operation_function(
                 GenerationTarget::Workflow,
                 resource_return,
                 holder,
+                None,
             );
             return;
         }
@@ -8169,6 +8033,7 @@ fn render_resource_holder_return(
     target: GenerationTarget,
     resource_return: &PlannedOperationResourceReturn,
     holder: &PlannedResourceHolder,
+    client: Option<&str>,
 ) {
     start_line(output, target, "    return ");
     output.push_str(&holder.model_name);
@@ -8186,8 +8051,10 @@ fn render_resource_holder_return(
         output.push('=');
         output.push_str(&resource_return.resource_type_name);
         output.push_str("(\n");
-        if target == GenerationTarget::Client {
-            start_line(output, target, "            nexus_client,\n");
+        if let Some(client) = client {
+            start_line(output, target, "            ");
+            output.push_str(client);
+            output.push_str(",\n");
         }
         for binding in &resource_return.bindings {
             start_line(output, target, "            ");
@@ -8915,7 +8782,7 @@ fn render_inline_nexus_client(
         GenerationTarget::Client => start_line(
             output,
             target,
-            "    nexus_client = self._create_nexus_client(\n",
+            "    nexus_client = self.create_nexus_client(\n",
         ),
         GenerationTarget::Workflow if service.delay_load_temporalio_workflow => {
             start_line(output, target, "    nexus_client = create_nexus_client(\n")
@@ -8927,7 +8794,11 @@ fn render_inline_nexus_client(
         ),
     }
     start_line(output, target, "        service=");
-    output.push_str(&python_string_literal(service.wire_name));
+    if target == GenerationTarget::Client {
+        output.push_str(service.name);
+    } else {
+        output.push_str(&python_string_literal(service.wire_name));
+    }
     output.push_str(",\n");
     start_line(output, target, "        endpoint=");
     output.push_str(&endpoint);

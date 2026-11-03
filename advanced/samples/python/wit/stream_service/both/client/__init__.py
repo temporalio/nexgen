@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ._extensions import StreamServiceClientExtension
-from ._resources import Stream
+from ._resources.stream import Stream
 
 __all__ = [
     "StreamServiceClientExtension",

@@ -3,97 +3,27 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
-import typing
-import temporalio.workflow
-
+from ._resources._resource_data import UserData
 from .models import (
     GetUserRequest,
     NotifyRequest,
     UpdateEmailRequest,
 )
-from ._resources.user import (
-    User,
-    bind_user_client,
-)
-
-if typing.TYPE_CHECKING:
-    from ._resources import User
 
 
 @service
 class UserService:
     get_user: Operation[
         GetUserRequest,
-        User,
+        UserData,
     ] = Operation(name="GetUser")
 
     update_email: Operation[
         UpdateEmailRequest,
-        User,
+        UserData,
     ] = Operation(name="UpdateEmail")
 
     notify: Operation[
         NotifyRequest,
         None,
     ] = Operation(name="Notify")
-
-
-class UserServiceClient:
-    def __init__(self, endpoint: str) -> None:
-        self._nexus_client: typing.Any = temporalio.workflow.create_nexus_client(
-            service="UserService",
-            endpoint=endpoint,
-        )
-
-    async def get_user(
-        self,
-        *,
-        user_id: str,
-    ) -> User:
-        request = GetUserRequest(
-            user_id=user_id,
-        )
-        handle = await self._nexus_client.start_operation(
-            operation="GetUser",
-            input=request,
-            output_type=User,
-        )
-        resource = await handle
-        return bind_user_client(resource, self._nexus_client)
-
-    async def update_email(
-        self,
-        *,
-        user_id: str,
-        email: str,
-    ) -> User:
-        request = UpdateEmailRequest(
-            user_id=user_id,
-            email=email,
-        )
-        handle = await self._nexus_client.start_operation(
-            operation="UpdateEmail",
-            input=request,
-            output_type=User,
-        )
-        resource = await handle
-        return bind_user_client(resource, self._nexus_client)
-
-    async def notify(
-        self,
-        *,
-        user_id: str,
-        reason: str | None = None,
-        channels: list[str] | None = None,
-        sender: str,
-    ) -> temporalio.workflow.NexusOperationHandle[None]:
-        request = NotifyRequest(
-            user_id=user_id,
-            reason=reason,
-            channels=channels or [],
-            sender=sender,
-        )
-        return await self._nexus_client.start_operation(
-            operation="Notify",
-            input=request,
-        )

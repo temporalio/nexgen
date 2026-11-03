@@ -1,1 +1,0 @@
-Python keeps shared models at the package root and moves workflow APIs into `workflow/` when both API targets are selected. Resource classes and their service contracts belong to their API package; client decoding no longer depends on workflow resource classes.

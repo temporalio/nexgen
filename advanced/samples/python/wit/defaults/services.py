@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
+from ._resources._resource_data import SenderData
 from .models import (
     GetSenderRequest,
     Request,
 )
-from ._resources.sender import Sender
 
 
 @service
@@ -19,7 +19,7 @@ class DefaultsService:
 
     get_sender: Operation[
         GetSenderRequest,
-        Sender,
+        SenderData,
     ] = Operation(name="GetSender")
 
     submit_from_sender: Operation[

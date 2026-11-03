@@ -130,11 +130,15 @@ Data models and their wire converters are shared across API targets. Operation
 wrappers and callable resource classes are target-specific because workflow and
 client code use different SDK entry points.
 
-Python emits shared models at the package root. Each API owns its contracts and
-resources. The client API lives in `client/`; the workflow API lives in
-`workflow/` when both targets are selected, or at the root for workflow-only
-output. Neither API depends on the other. Client resource identity DTOs are
-private to the client API and have no runtime API behavior.
+Python emits shared models and service contracts at the package root, regardless
+of API targets. Contracts describe wire data rather than callable resource
+handles. Each API owns its operation wrappers and handles. The client API lives
+in `client/`; the workflow API lives in `workflow/` when both targets are
+selected, or at the root for workflow-only output. Neither API depends on the
+other. Plain resource identity DTOs live in the root
+`_resources/_resource_data.py` and have no runtime API behavior. Workflow
+endpoint clients live in the workflow API's `_clients.py`, not in the shared
+`services.py`.
 
 Field origins retain per-target expression maps through language selection and
 shared planning. API preparation selects its target's source or default
@@ -143,4 +147,5 @@ handle data. This lets workflow and client APIs share models without sharing
 runtime behavior.
 
 Client resources keep their service-bound Nexus client. API code decodes
-returned resource data and constructs handles with that client.
+returned resource data and constructs handles with that client. Python client
+APIs use the SDK's `NexusClient` and the shared typed operation descriptors.

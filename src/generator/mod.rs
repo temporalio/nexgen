@@ -526,13 +526,19 @@ pub(crate) fn generate_files_from_planned_tree(
 }
 
 pub(crate) fn validate_targets(language: Language) -> Result<()> {
-    if crate::nexgen_config::current()
-        .targets
-        .contains(&GenerationTarget::Client)
-        && !language.has_client_target()
-    {
+    let config = crate::nexgen_config::current();
+    if !config.targets.contains(&GenerationTarget::Client) {
+        return Ok(());
+    }
+    if !language.has_client_target() {
         return Err(Error::UnsupportedClientTarget {
             reason: format!("isn't for {language} yet"),
+        });
+    }
+    if !config.system_nexus {
+        return Err(Error::SystemNexusRequired {
+            feature: "client API generation",
+            context: format!("language `{language}`"),
         });
     }
     Ok(())

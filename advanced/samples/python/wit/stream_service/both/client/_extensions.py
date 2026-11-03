@@ -3,67 +3,39 @@
 from __future__ import annotations
 
 import typing
+import temporalio.client
+import uuid as _uuid
 import datetime
 import abc
 
-from ._nexus_client import (
-    _NexusClient,
-    _operation_id,
-)
+from ..services import StreamService
 from ..models import (
-    AppendRecord,
-    AppendRecordsRequest,
-    AppendRecordsResponse,
-    CloseStreamRequest,
-    CloseStreamResponse,
     CreateStreamRequest,
-    CreateStreamResult,
-    DescribeStreamRequest,
-    DescribeStreamResponse,
     Producer,
-    ReadRecordsRequest,
-    ReadRecordsResponse,
-    StreamReadStart,
     StreamRef,
 )
-from ._resources import Stream
+from ._resources.stream import Stream
+
+
+_NexusServiceT = typing.TypeVar("_NexusServiceT")
 
 
 class StreamServiceClientExtension(abc.ABC):
     """Starts the operations of ``StreamService`` from code outside a Workflow.
 
-    A client class inherits this class and implements ``_create_nexus_client``.
+    A client class inherits this class and provides the SDK's ``create_nexus_client``
+    method.
 
     .. warning::
         This API is experimental and subject to change.
     """
 
-    def __init_subclass__(cls, **kwargs: typing.Any) -> None:
-        super().__init_subclass__(**kwargs)
-        # The MRO picks one base for a name that two bases have, with no error.
-        for base in cls.__mro__:
-            if StreamServiceClientExtension in base.__mro__:
-                continue
-            for name in (
-                "create_stream",
-                "append_records",
-                "close_stream",
-                "read_records",
-                "describe_stream",
-                "get_stream",
-            ):
-                if name in base.__dict__:
-                    raise TypeError(
-                        f"{cls.__qualname__} gets {name} from {base.__qualname__} and from StreamServiceClientExtension"
-                    )
-
     @abc.abstractmethod
-    def _create_nexus_client(
+    def create_nexus_client(
         self,
-        *,
-        service: str,
+        service: type[_NexusServiceT] | str,
         endpoint: str,
-    ) -> _NexusClient:
+    ) -> temporalio.client.NexusClient[_NexusServiceT]:
         """Return the Nexus client that starts the operations of ``service``."""
         ...
 
@@ -75,8 +47,8 @@ class StreamServiceClientExtension(abc.ABC):
     ) -> Stream:
         """Return the ``Stream`` handle that has these identity fields."""
         return Stream(
-            self._create_nexus_client(
-                service="temporal.api.streamservice.v1.StreamService",
+            self.create_nexus_client(
+                service=StreamService,
                 endpoint="__temporal_system",
             ),
             stream=stream,
@@ -87,15 +59,14 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         request: CreateStreamRequest,
     ) -> Stream:
-        nexus_client = self._create_nexus_client(
-            service="temporal.api.streamservice.v1.StreamService",
+        nexus_client = self.create_nexus_client(
+            service=StreamService,
             endpoint="__temporal_system",
         )
         handle = await nexus_client.start_operation(
-            operation="CreateStream",
+            operation=StreamService.create_stream,
             arg=request,
-            id=_operation_id(),
-            result_type=CreateStreamResult,
+            id=f"{_uuid.uuid4()}",
         )
         result = await handle.result()
         if result.stream is None:
@@ -136,155 +107,3 @@ class StreamServiceClientExtension(abc.ABC):
             ref=ref,
         )
         return await self._stream_service_create_stream(request)
-
-    async def _stream_service_append_records(
-        self,
-        request: AppendRecordsRequest,
-    ) -> AppendRecordsResponse:
-        nexus_client = self._create_nexus_client(
-            service="temporal.api.streamservice.v1.StreamService",
-            endpoint="__temporal_system",
-        )
-        handle = await nexus_client.start_operation(
-            operation="AppendRecords",
-            arg=request,
-            id=_operation_id(),
-            result_type=AppendRecordsResponse,
-        )
-        return await handle.result()
-
-    async def append_records(
-        self,
-        *,
-        stream: StreamRef,
-        records: list[AppendRecord] | None = None,
-        producer: Producer | None = None,
-    ) -> AppendRecordsResponse:
-        """Append one batch. Workflow code makes the call from a Local Activity.
-
-        Args:
-            producer: Required outside a Workflow. In a Workflow the transport sets it.
-        """
-        request = AppendRecordsRequest(
-            stream=stream,
-            records=records or [],
-            producer=producer,
-        )
-        return await self._stream_service_append_records(request)
-
-    async def _stream_service_close_stream(
-        self,
-        request: CloseStreamRequest,
-    ) -> CloseStreamResponse:
-        nexus_client = self._create_nexus_client(
-            service="temporal.api.streamservice.v1.StreamService",
-            endpoint="__temporal_system",
-        )
-        handle = await nexus_client.start_operation(
-            operation="CloseStream",
-            arg=request,
-            id=_operation_id(),
-            result_type=CloseStreamResponse,
-        )
-        return await handle.result()
-
-    async def close_stream(
-        self,
-        *,
-        stream: StreamRef,
-        producer: Producer | None = None,
-        result: typing.Any | None = None,
-        failure: BaseException | None = None,
-    ) -> CloseStreamResponse:
-        request = CloseStreamRequest(
-            stream=stream,
-            producer=producer,
-            result=result,
-            failure=failure,
-        )
-        return await self._stream_service_close_stream(request)
-
-    async def _stream_service_read_records(
-        self,
-        request: ReadRecordsRequest,
-    ) -> ReadRecordsResponse:
-        nexus_client = self._create_nexus_client(
-            service="temporal.api.streamservice.v1.StreamService",
-            endpoint="__temporal_system",
-        )
-        handle = await nexus_client.start_operation(
-            operation="ReadRecords",
-            arg=request,
-            id=_operation_id(),
-            result_type=ReadRecordsResponse,
-        )
-        return await handle.result()
-
-    async def read_records(
-        self,
-        *,
-        stream: StreamRef,
-        from_offset: int | None = None,
-        start: StreamReadStart | None = None,
-        max_records: int | None = None,
-        wait: datetime.timedelta | None = None,
-        create_wait: datetime.timedelta | None = None,
-        last: int | None = None,
-        max_bytes: int | None = None,
-    ) -> ReadRecordsResponse:
-        """A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
-        Activity.
-
-        Args:
-            from_offset: Start offset. Empty uses start. OUT_OF_RANGE past the newest
-                offset + 1.
-            start: Where to start when from-offset is empty. Unspecified is the
-                beginning.
-            max_records: About this many items per page, 1 to 1000. A Superseded item
-                stays with its Record.
-            wait: How long to wait for a new Record before an empty answer. At most 60
-                s.
-            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
-                At most 60 s.
-            last: Read the newest this many Records, oldest first. No from-offset. No
-                wait.
-            max_bytes: The maximum Record bytes in a page. A larger Record is still
-                returned alone.
-        """
-        request = ReadRecordsRequest(
-            stream=stream,
-            from_offset=from_offset,
-            start=start,
-            max_records=max_records,
-            wait=wait,
-            create_wait=create_wait,
-            last=last,
-            max_bytes=max_bytes,
-        )
-        return await self._stream_service_read_records(request)
-
-    async def _stream_service_describe_stream(
-        self,
-        request: DescribeStreamRequest,
-    ) -> DescribeStreamResponse:
-        nexus_client = self._create_nexus_client(
-            service="temporal.api.streamservice.v1.StreamService",
-            endpoint="__temporal_system",
-        )
-        handle = await nexus_client.start_operation(
-            operation="DescribeStream",
-            arg=request,
-            id=_operation_id(),
-            result_type=DescribeStreamResponse,
-        )
-        return await handle.result()
-
-    async def describe_stream(
-        self,
-        *,
-        stream: StreamRef,
-    ) -> DescribeStreamResponse:
-        request = DescribeStreamRequest(
-            stream=stream,
-        )
-        return await self._stream_service_describe_stream(request)

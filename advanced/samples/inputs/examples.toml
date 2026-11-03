@@ -30,21 +30,27 @@ languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
 [notification-service]
-targets = ["workflow"]
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
 # The Stream service WIT of temporalio-streams, on the Stream protos of temporalio/api#895 at
 # 44519d8a. Its .NET output builds in Nexgen.DotNetStreamService.csproj.
 [stream-service]
+languages = ["python", "typescript", "dotnet"]
 system_nexus = true
 descriptors = ["temporal_api.bin", "streams.bin"]
 
+[stream-service.models]
+languages = ["python"]
+targets = []
+
 [stream-service.workflow]
-languages = ["typescript", "dotnet"]
 targets = ["workflow"]
 
-# Only Python has the client target, so its output has both APIs.
+[stream-service.client]
+languages = ["python"]
+targets = ["client"]
+
 [stream-service.both]
 languages = ["python"]
 targets = ["workflow", "client"]
@@ -67,21 +73,3 @@ targets = ["workflow"]
 
 [type-showcase]
 targets = ["workflow"]
-
-[target-sources]
-descriptors = "temporal"
-
-[target-sources.models]
-languages = ["python"]
-targets = []
-
-[target-sources.workflow]
-targets = ["workflow"]
-
-[target-sources.client]
-languages = ["python"]
-targets = ["client"]
-
-[target-sources.both]
-languages = ["python"]
-targets = ["workflow", "client"]

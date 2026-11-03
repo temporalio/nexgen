@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
+from ._resources._resource_data import UserData
 from .models import (
     DeactivateRequest,
     GetSyncSettingsRequest,
@@ -14,7 +15,6 @@ from .models import (
     UpdateEmailRequest,
     UpdateNotificationSettingsRequest,
 )
-from ._resources.user import User
 
 
 @service
@@ -27,22 +27,22 @@ class TypeShowcase:
     # .. warning:: This API is experimental and subject to change.
     get_user: Operation[
         GetUserRequest,
-        User,
+        UserData,
     ] = Operation(name="GetUser")
 
     update_email: Operation[
         UpdateEmailRequest,
-        User,
+        UserData,
     ] = Operation(name="UpdateEmail")
 
     rename: Operation[
         RenameRequest,
-        User,
+        UserData,
     ] = Operation(name="Rename")
 
     set_profile: Operation[
         SetProfileRequest,
-        User,
+        UserData,
     ] = Operation(name="SetProfile")
 
     record_sync: Operation[

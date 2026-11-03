@@ -7,7 +7,7 @@ import typing
 
 import nexusrpc
 import temporalio.converter
-from . import services as _services
+from .. import services as _services
 from .operations.create_stream import create_stream
 from ._resources.stream import append_records
 from ._resources.stream import close_stream
