@@ -2034,6 +2034,7 @@ impl<'a> ApiPlanner<'a> {
                     message.info.full_name.clone(),
                     RenderedModel {
                         name: message.model_name.clone(),
+                        type_parameters: Vec::new(),
                         fields: Vec::new(),
                     },
                 );
@@ -2051,6 +2052,10 @@ impl<'a> ApiPlanner<'a> {
             message.info.full_name.clone(),
             RenderedModel {
                 name: go_generic_declaration_name(&model_name, &model_parameters),
+                type_parameters: model_parameters
+                    .iter()
+                    .map(|usage| usage.parameter.name.clone())
+                    .collect(),
                 fields: Vec::new(),
             },
         );
@@ -2561,6 +2566,7 @@ struct RenderedVariantCase {
 pub(in crate::generator) struct RenderedModel {
     /// Go type name (e.g. `"UserProfile"`, `"Coordinates"`).
     pub(in crate::generator) name: String,
+    pub(in crate::generator) type_parameters: Vec<String>,
     /// Struct fields in declaration order.
     pub(in crate::generator) fields: Vec<RenderedField>,
 }
@@ -3308,10 +3314,10 @@ fn ensure_generic_tuple(
     let type_name = format!("Tuple{arity}");
     let key = format!("{GENERIC_MODEL_KEY_PREFIX}{type_name}");
     if !models.contains_key(&key) {
-        let params = (1..=arity)
+        let type_parameters = (1..=arity)
             .map(|index| format!("T{index}"))
-            .collect::<Vec<_>>()
-            .join(", ");
+            .collect::<Vec<_>>();
+        let params = type_parameters.join(", ");
         let fields = (0..arity)
             .map(|index| RenderedField {
                 name: TUPLE_FIELD_NAMES[index].to_string(),
@@ -3325,6 +3331,7 @@ fn ensure_generic_tuple(
             key,
             RenderedModel {
                 name: format!("{type_name}[{params} any]"),
+                type_parameters,
                 fields,
             },
         );
@@ -3341,6 +3348,7 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
             key,
             RenderedModel {
                 name: "Result[T, E any]".to_string(),
+                type_parameters: vec!["T".to_string(), "E".to_string()],
                 fields: vec![
                     RenderedField {
                         name: "Result".to_string(),
@@ -6125,6 +6133,7 @@ mod tests {
                     key.to_string(),
                     super::RenderedModel {
                         name: record.name.clone(),
+                        type_parameters: Vec::new(),
                         fields: Vec::new(),
                     },
                 )
@@ -6192,6 +6201,7 @@ mod tests {
     fn record_getters_skip_private_fields() {
         let model = super::RenderedModel {
             name: "Request".to_string(),
+            type_parameters: Vec::new(),
             fields: ["ID", "iD"]
                 .into_iter()
                 .map(|name| super::RenderedField {

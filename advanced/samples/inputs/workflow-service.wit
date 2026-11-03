@@ -135,6 +135,7 @@ interface workflow-service {
 
   /// @nexus.doc
   ///   "Signal a workflow, starting it first if needed."
+  ///   go="Signal a workflow, starting it first if needed. Encode payloads with the configured data converter."
   ///   returns="A workflow handle to the started workflow."
   /// @nexus.output-transform
   ///   python-type="temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]"

@@ -592,7 +592,8 @@ type SystemNexus_SignalWithStartWorkflowOptions struct {
 	StaticDetails string
 }
 
-// Signal a workflow, starting it first if needed.
+// Signal a workflow, starting it first if needed. Encode payloads with the configured
+// data converter.
 //
 // Input signal: Signal name to send with the start request.
 // Input signalArg: Arguments for the signal.
