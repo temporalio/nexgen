@@ -6,30 +6,31 @@ import (
 	"go.temporal.io/sdk/internal"
 )
 
+// --- Datatypes ---
+
+type systemnexus_request struct {
+	ID string
+}
+
+func (m systemnexus_request) GetID() string {
+	return m.ID
+}
+
 // --- Operations (internal) ---
 
-func systemnexus_firstOperation(ctx internal.Context, request SystemNexus_Request) internal.Future {
+func systemnexus_firstOperation(ctx internal.Context, request systemnexus_request) internal.Future {
 	c := internal.NewSystemNexusClient("InterceptorService")
 	fut := c.ExecuteOperation(ctx, "FirstOperation", request, internal.NexusOperationOptions{})
 	return fut
 }
 
-func systemnexus_secondOperation(ctx internal.Context, request SystemNexus_Request) internal.Future {
+func systemnexus_secondOperation(ctx internal.Context, request systemnexus_request) internal.Future {
 	c := internal.NewSystemNexusClient("InterceptorService")
 	fut := c.ExecuteOperation(ctx, "SecondOperation", request, internal.NexusOperationOptions{})
 	return fut
 }
 
 // --- Operations (public API) ---
-
-type SystemNexus_Request struct {
-	// ID - Required.
-	ID string
-}
-
-func (m SystemNexus_Request) GetID() string {
-	return m.ID
-}
 
 type SystemNexus_Response struct {
 	// Value - Required.
@@ -46,7 +47,7 @@ type SystemNexus_FirstOperationOptions struct {
 }
 
 func SystemNexus_FirstOperation(ctx internal.Context, opts SystemNexus_FirstOperationOptions) internal.Future {
-	return systemnexus_firstOperation(ctx, SystemNexus_Request{
+	return systemnexus_firstOperation(ctx, systemnexus_request{
 		ID: opts.ID,
 	})
 }
@@ -57,7 +58,7 @@ type SystemNexus_SecondOperationOptions struct {
 }
 
 func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOperationOptions) internal.Future {
-	return systemnexus_secondOperation(ctx, SystemNexus_Request{
+	return systemnexus_secondOperation(ctx, systemnexus_request{
 		ID: opts.ID,
 	})
 }

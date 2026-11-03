@@ -1,7 +1,7 @@
 package tests
 
 import (
-	gm "go.temporal.io/sdk/advanced/samples/go/genericmodels_facade"
+	gm "go.temporal.io/sdk/advanced/samples/go/genericmodels"
 	"go.temporal.io/sdk/workflow"
 )
 

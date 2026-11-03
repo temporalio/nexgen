@@ -184,7 +184,8 @@ is a standalone package that imports the SDK's internal APIs.
 System Nexus package-level declarations use `SystemNexus_` for exported symbols
 and `systemnexus_` for private symbols. Receiver methods retain their API names,
 including `TransferTypeConverter`; package initialization still uses `init`.
-Request models are exported so interceptors can name and modify them.
+Prefixing preserves each declaration's visibility; unpacked request envelopes
+remain private unless they are also part of the public API.
 
 #### Go facades
 

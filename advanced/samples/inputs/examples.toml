@@ -7,12 +7,10 @@ descriptors = "temporal"
 [multi-operation-service]
 targets = ["workflow"]
 system_nexus = true
-go_facade = true
 
 [generic-models]
 targets = ["workflow"]
 descriptors = "temporal"
-go_facade = true
 
 [start-workflow]
 targets = ["workflow"]

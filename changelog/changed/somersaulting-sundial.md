@@ -1,1 +1,1 @@
-Go System Nexus bindings use SDK internal APIs and prefixed package-level declarations, export request models for interception, and support hand-written helpers in the generated package.
+Go System Nexus bindings use SDK internal APIs and visibility-preserving prefixed package-level declarations, and support hand-written helpers in the generated package.

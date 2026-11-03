@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -435,4 +436,33 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	for value := range want {
 		s.True(seen[value], "%s was not encoded by the user converter", value)
 	}
+
+	dc := commonconverter.WithDataConverterSystemNexusContext(
+		commonconverter.MakeTransferAware(converter.GetDefaultDataConverter()),
+		converter.GetDefaultDataConverter(),
+	)
+	headerPayload, err := converter.GetDefaultDataConverter().ToPayload("parent")
+	s.Require().NoError(err)
+	wire := workflowservicepb.SignalWithStartWorkflowExecutionRequest{
+		WorkflowId: s.targetID("target"),
+		Header: &common.Header{
+			Fields: map[string]*common.Payload{"trace": headerPayload},
+		},
+	}
+	payload, err := converter.GetDefaultDataConverter().ToPayload(&wire)
+	s.Require().NoError(err)
+	// Allocate the private request type without exposing it through the facade.
+	decoded := reflect.New(reflect.TypeOf(call.Input)).Interface()
+	s.Require().NoError(dc.FromPayload(payload, decoded))
+	withHeaders, ok := decoded.(interface{ GetHeaders() map[string]any })
+	s.Require().True(ok)
+	s.Require().Equal("parent", withHeaders.GetHeaders()["trace"])
+	withHeaders.GetHeaders()["trace"] = "intercepted"
+	payload, err = dc.ToPayload(decoded)
+	s.Require().NoError(err)
+	var encoded workflowservicepb.SignalWithStartWorkflowExecutionRequest
+	s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(payload, &encoded))
+	var header string
+	s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(encoded.Header.Fields["trace"], &header))
+	s.Equal("intercepted", header)
 }

@@ -3,8 +3,8 @@
 WIT-generated packages live in directories such as `protobackedshowcase/` and
 `workflowservice/`. Hand-written converters live in [`support/`](support/) for
 ordinary Nexus samples and [`systemsupport/`](systemsupport/) for System Nexus
-samples. Generated facades live alongside their implementations in directories
-such as `workflowservice_facade/` and `genericmodels_facade/`.
+samples. The workflow-service sample also generates a facade in
+`workflowservice_facade/`.
 
 ## Using the support package
 
@@ -44,10 +44,6 @@ APIs. The generated code imports authored converters from `systemsupport/`. For
 SDK embedding, add `@nexus.namespace go="go.temporal.io/sdk/internal"` to the
 WIT and use the SDK's internal package as both the implementation destination
 and the support package.
-
-The `genericmodels_facade/` package additionally exercises ordinary native APIs
-with generic models. Its native tests call the facade instead of duplicating the
-implementation tests.
 
 A project outside the SDK module tree cannot copy the internal imports
 unchanged. Adapt those conversions using APIs available to your module. For
