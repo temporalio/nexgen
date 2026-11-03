@@ -1216,7 +1216,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("                service=");
         output.push_str(service.name);
         output.push_str(",\n                endpoint=");
-        output.push_str(&python_string_literal(
+        output.push_str(&python_endpoint_expr(
             service
                 .endpoint
                 .as_deref()
@@ -4330,6 +4330,10 @@ fn render_optional_python_imports_with_skipped_language_modules(
         ("import typing\n", "typing"),
         ("import typing_extensions\n", "typing_extensions"),
         ("import temporalio.client\n", "temporalio.client"),
+        (
+            "import temporalio.nexus.system\n",
+            "temporalio.nexus.system",
+        ),
         ("import uuid as _uuid\n", "_uuid"),
     ];
 
@@ -8767,12 +8771,20 @@ fn render_flattened_message_setup(
     output.push_str(")\n");
 }
 
+fn python_endpoint_expr(endpoint: &str) -> String {
+    if crate::nexgen_config::current().system_nexus && endpoint == "__temporal_system" {
+        "temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT".to_string()
+    } else {
+        python_string_literal(endpoint)
+    }
+}
+
 fn render_inline_nexus_client(
     output: &mut String,
     target: GenerationTarget,
     service: &RenderedService<'_>,
 ) {
-    let endpoint = python_string_literal(
+    let endpoint = python_endpoint_expr(
         service
             .endpoint
             .as_deref()

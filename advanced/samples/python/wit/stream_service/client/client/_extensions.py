@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typing
 import temporalio.client
+import temporalio.nexus.system
 import uuid as _uuid
 import datetime
 import abc
@@ -49,7 +50,7 @@ class StreamServiceClientExtension(abc.ABC):
         return Stream(
             self.create_nexus_client(
                 service=StreamService,
-                endpoint="__temporal_system",
+                endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
             ),
             stream=stream,
             created=created,
@@ -61,7 +62,7 @@ class StreamServiceClientExtension(abc.ABC):
     ) -> Stream:
         nexus_client = self.create_nexus_client(
             service=StreamService,
-            endpoint="__temporal_system",
+            endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
         )
         handle = await nexus_client.start_operation(
             operation=StreamService.create_stream,
