@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Run on the oldest (net8.0) and newest (net10.0) supported runtimes. -->
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <!-- Run on the oldest supported runtime (net7.0) and on the oldest and
+         newest LTS runtimes (net8.0, net10.0). -->
+    <TargetFrameworks>net7.0;net8.0;net10.0</TargetFrameworks>
     <LangVersion>9.0</LangVersion>
     <Nullable>enable</Nullable>
     <IsTestProject>true</IsTestProject>
