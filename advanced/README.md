@@ -30,6 +30,8 @@ The generator picks its input format from the file extension, so the same
 
 - [Examples](#examples)
 - [WIT-Direct Generation](#wit-direct-generation)
+  - [Go SDK integration](#go-sdk-integration)
+  - [Go facades](#go-facades)
 - [WIT Directives](#wit-directives)
 - [Proto Backing](#proto-backing)
 - [Validation](#validation)
@@ -228,6 +230,60 @@ The `user-service` example is intentionally small and WIT-native. The
 `type-showcase` example demonstrates broader WIT type coverage: records, enums,
 flags, variants, results, maps, tuples, resources, resource methods, and an
 operation with no return value without proto annotations.
+
+### Go SDK integration
+
+Go support can also live in the generated package. Set `--support-package` to
+the same import path as the WIT's `@nexus.namespace go="..."`. Nexgen omits the
+self-import and calls support helpers without a qualifier. This applies to
+converters, sourced fields, serialization-context helpers, and function-name
+extractors. Same-package helpers need not be exported. Keep authored files
+alongside generated files; nexgen overwrites its own output files but does not
+clear the output directory.
+
+With `--system-nexus`, Go bindings use the SDK's `internal` runtime APIs rather
+than importing `workflow`. WIT type bindings and default expressions should also
+name the appropriate internal APIs. For generation into the SDK's `internal`
+package, use `@nexus.namespace go="go.temporal.io/sdk/internal"`; references to
+that package become unqualified.
+
+The sample WIT omits this Go namespace override so its generated implementation
+is a standalone package that imports the SDK's internal APIs. Its module path is
+under `go.temporal.io/sdk`, which permits importing these internal packages.
+
+System Nexus package-level declarations use `SystemNexus_` for exported symbols
+and `systemnexus_` for private symbols. Receiver methods retain their API names,
+including `TransferTypeConverter`; package initialization still uses `init`.
+Prefixing preserves each declaration's visibility; unpacked request envelopes
+remain private unless they are also part of the public API.
+
+### Go facades
+
+For Go native WIT API generation, supply `--facade-output` and `--facade-import`
+together to write a facade into another package. `--facade-output` selects its
+output directory; `--facade-import` names the implementation package's actual Go
+import path. The facade directory's basename determines its package name. The
+destination need not be `workflow`; it can also be `client` or another package.
+
+```sh
+cargo run --features advanced -- go advanced/samples/inputs/workflow-service.wit \
+  advanced/samples/inputs/deps \
+  --descriptors advanced/samples/descriptors/temporal_api.bin \
+  --native-api --system-nexus \
+  --support-package go.temporal.io/sdk/advanced/samples/go/systemsupport \
+  --output advanced/samples/go/workflowservice \
+  --facade-output advanced/samples/go/workflowservice_facade \
+  --facade-import go.temporal.io/sdk/advanced/samples/go/workflowservice
+```
+
+Facades expose type aliases, constants, and forwarding functions. Aliases retain
+the implementation's methods and type identity. Forwarders retain generic
+parameters, variadic arguments, and operation documentation. System Nexus
+facades expose the original names without the implementation prefix.
+
+Implementation and facade output come from the same compiler plan. The library
+entry point is `generate_to_file_with_go_facade`, with a `GoFacadeRequest`
+specifying the facade output path and implementation import path.
 
 ## WIT Directives
 

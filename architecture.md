@@ -191,11 +191,3 @@ runtime behavior.
 Client resources keep their service-bound Nexus client. API code decodes
 returned resource data and constructs handles with that client. Python client
 APIs use the SDK's `NexusClient` and the shared typed operation descriptors.
-
-Go native API emission can produce an implementation and a facade from the same
-rendered API. The Go backend owns System Nexus declaration prefixes, SDK runtime
-references, and facade aliases and forwarders; these do not add a shared
-compiler pass or change the input-format-neutral model. The output writer sends
-the optional companion facade to its separately configured destination. Go
-package context also resolves support references locally when the configured
-support package matches the generation namespace.

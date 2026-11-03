@@ -36,19 +36,14 @@ cargo run --features advanced -- go advanced/samples/inputs/proto-backed-showcas
   --targets workflow --output advanced/samples/go/protobackedshowcase
 ```
 
-The module path is under `go.temporal.io/sdk`, which permits importing the SDK's
-internal packages. It does not make sample packages part of the SDK packages.
-The System Nexus sample WIT omits a Go namespace override, so generated packages
-take their names from their output directories and import the SDK's internal
-APIs. The generated code imports authored converters from `systemsupport/`. For
-SDK embedding, add `@nexus.namespace go="go.temporal.io/sdk/internal"` to the
-WIT and use the SDK's internal package as both the implementation destination
-and the support package.
-
-A project outside the SDK module tree cannot copy the internal imports
-unchanged. Adapt those conversions using APIs available to your module. For
-`@nexus.source`, write the helper call without the package prefix. The sample
-uses `go="WorkflowNamespace(ctx)"`, which is called as
-`support.WorkflowNamespace(ctx)`. Run `go test ./...` from this sample module
-after generation. See [the WIT guide](../../../GUIDE.md#go) for more detail.
-JSON Schema generation does not need user support.
+The System Nexus sample support source imports `go.temporal.io/sdk/internal`
+because it lives under the SDK module tree; a project in another module cannot
+copy that import unchanged. Adapt those conversions using APIs available to your
+module. For `@nexus.source`, write the helper call without the package prefix.
+The sample uses `go="WorkflowNamespace(ctx)"`; generated code calls
+`support.WorkflowNamespace(ctx)`. The System Nexus support helper calls
+`internal.GetWorkflowInfo(ctx).Namespace`. Run `go test ./...` from this sample
+module after generation. Run the same command from your own module root. See
+[the WIT guide](../../../GUIDE.md#go) for support contracts and
+[the advanced guide](../../README.md#go-sdk-integration) for SDK integration and
+facade options. JSON Schema generation does not need user support.

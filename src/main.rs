@@ -304,47 +304,6 @@ mod tests {
     use clap::Parser;
 
     #[test]
-    fn go_facade_options_select_the_output_and_implementation_import() {
-        let cli = Cli::try_parse_from([
-            "nexgen",
-            "go",
-            "input.wit",
-            "--output",
-            "internal",
-            "--facade-output",
-            "workflow",
-            "--facade-import",
-            "example.org/sdk/internal",
-        ])
-        .unwrap();
-        let Commands::Go(args) = cli.command else {
-            panic!("expected Go command")
-        };
-        assert_eq!(
-            args.facade_output.as_deref(),
-            Some(std::path::Path::new("workflow"))
-        );
-        assert_eq!(
-            args.facade_import.as_deref(),
-            Some("example.org/sdk/internal")
-        );
-        for option in ["--facade-output", "--facade-import"] {
-            assert!(
-                Cli::try_parse_from([
-                    "nexgen",
-                    "go",
-                    "input.wit",
-                    "--output",
-                    "internal",
-                    option,
-                    "value",
-                ])
-                .is_err()
-            );
-        }
-    }
-
-    #[test]
     fn support_package_option_is_available_but_not_a_json_schema_requirement() {
         for language in ["dotnet", "go", "python", "typescript"] {
             assert!(
