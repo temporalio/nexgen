@@ -23,6 +23,14 @@ export enum ExecutionType {
   ExecutionTypeNexusOperation = 3,
 }
 
+function executionTypeFromNumber(value: number): ExecutionType {
+  if (value in ExecutionType) {
+    return value as ExecutionType;
+  }
+  // A newer peer can send a case that this enum doesn't know.
+  return ExecutionType.ExecutionTypeUnspecified;
+}
+
 export enum StreamProducerKind {
   StreamProducerKindUnspecified = 0,
   StreamProducerKindWorkflow = 1,
@@ -32,6 +40,14 @@ export enum StreamProducerKind {
   StreamProducerKindStandaloneActivity = 5,
 }
 
+function streamProducerKindFromNumber(value: number): StreamProducerKind {
+  if (value in StreamProducerKind) {
+    return value as StreamProducerKind;
+  }
+  // A newer peer can send a case that this enum doesn't know.
+  return StreamProducerKind.StreamProducerKindUnspecified;
+}
+
 export enum StreamCloseStatus {
   StreamCloseStatusUnspecified = 0,
   StreamCloseStatusCompleted = 1,
@@ -39,6 +55,14 @@ export enum StreamCloseStatus {
   StreamCloseStatusCanceled = 3,
   StreamCloseStatusTerminated = 4,
   StreamCloseStatusTimedOut = 5,
+}
+
+function streamCloseStatusFromNumber(value: number): StreamCloseStatus {
+  if (value in StreamCloseStatus) {
+    return value as StreamCloseStatus;
+  }
+  // A newer peer can send a case that this enum doesn't know.
+  return StreamCloseStatus.StreamCloseStatusUnspecified;
 }
 
 export enum StreamReadStart {
@@ -52,6 +76,14 @@ export enum StreamStatus {
   StreamStatusOpen = 1,
   StreamStatusClosed = 2,
   StreamStatusExpired = 3,
+}
+
+function streamStatusFromNumber(value: number): StreamStatus {
+  if (value in StreamStatus) {
+    return value as StreamStatus;
+  }
+  // A newer peer can send a case that this enum doesn't know.
+  return StreamStatus.StreamStatusUnspecified;
 }
 
 /**
@@ -152,7 +184,8 @@ export interface Execution {
 
 function executionFromProto(proto: temporal.api.common.v1.IExecution): Execution {
   return {
-    type: proto.type == null ? undefined : (proto.type as number as ExecutionType),
+    type:
+      proto.type == null ? undefined : executionTypeFromNumber(proto.type as number),
     businessId: proto.businessId ?? undefined,
     runId: proto.runId ?? undefined,
   };
@@ -260,7 +293,10 @@ export interface Producer {
 function producerFromProto(proto: temporal.api.stream.v1.IProducer): Producer {
   return {
     id: requiredField(proto.id === "" ? undefined : proto.id, "Producer", "id"),
-    kind: proto.kind == null ? undefined : (proto.kind as number as StreamProducerKind),
+    kind:
+      proto.kind == null
+        ? undefined
+        : streamProducerKindFromNumber(proto.kind as number),
     epoch: proto.epoch == null ? undefined : producerEpochFromProto(proto.epoch),
     runId: proto.runId ?? undefined,
   };
@@ -775,7 +811,7 @@ function supersessionFromProto(
     producerKind:
       proto.producerKind == null
         ? undefined
-        : (proto.producerKind as number as StreamProducerKind),
+        : streamProducerKindFromNumber(proto.producerKind as number),
     epoch: proto.epoch == null ? undefined : producerEpochFromProto(proto.epoch),
     previousCompletedTask:
       proto.previousCompletedTask == null
@@ -874,7 +910,9 @@ function streamCloseFromProto(proto: temporal.api.stream.v1.IStreamClose): Strea
     failure:
       proto.failure == null ? undefined : support.errorFromFailure(proto.failure),
     status:
-      proto.status == null ? undefined : (proto.status as number as StreamCloseStatus),
+      proto.status == null
+        ? undefined
+        : streamCloseStatusFromNumber(proto.status as number),
   };
 }
 
@@ -998,7 +1036,8 @@ function describeStreamResponseFromProto(
   proto: temporal.api.streamservice.v1.IDescribeStreamResponse,
 ): DescribeStreamResponse {
   return {
-    status: proto.status == null ? undefined : (proto.status as number as StreamStatus),
+    status:
+      proto.status == null ? undefined : streamStatusFromNumber(proto.status as number),
     lastOffset: proto.lastOffset ?? undefined,
     retention:
       proto.retention == null ? undefined : support.durationFromProto(proto.retention),

@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 from temporalio.api.common.v1 import message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2
-from streamprotos.temporal.api.enums.v1 import stream_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_stream__pb2
+from temporalio.api.enums.v1 import stream_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_stream__pb2
 from temporalio.api.failure.v1 import message_pb2 as temporal_dot_api_dot_failure_dot_v1_dot_message__pb2
 
 

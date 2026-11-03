@@ -295,12 +295,7 @@ fn validate_typescript(repo_root: &Path, log: &mut ValidationLog) -> Result<()> 
     validate_generated_examples(repo_root, "typescript", log)?;
     for root in sample_roots(repo_root, "typescript") {
         run(log, &root, "npm", &["ci"])?;
-        run(
-            log,
-            &root,
-            "npm",
-            &["exec", "--", "prettier", "--check", "."],
-        )?;
+        run(log, &root, "npm", &["exec", "--", "oxfmt", "--check", "."])?;
         run(log, &root, "npm", &["run", "typecheck"])?;
         run(log, &root, "npm", &["run", "test"])?;
     }

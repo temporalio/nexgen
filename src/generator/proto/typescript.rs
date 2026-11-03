@@ -841,14 +841,27 @@ pub(crate) fn field_name(field: &FieldDescriptorProto, explicit_name: Option<&st
     }
 }
 
+/// The models module function that decodes a proto number as an enum with a fallback case.
+pub(crate) fn enum_from_number_function_name(enum_name: &str) -> String {
+    format!("{}FromNumber", enum_name.to_lower_camel_case())
+}
+
 fn generated_enum_wire_conversion(model: &EnumSpec<PlannedFamily>) -> Option<WireValueConversion> {
     let source = model.source.as_ref()?.proto_type()?;
     let PlannedProtoType::Enum(proto) = source else {
         return None;
     };
+    let from_wire = if model.values.iter().any(|value| value.fallback) {
+        format!(
+            "{}({{wire}} as number)",
+            enum_from_number_function_name(&model.name)
+        )
+    } else {
+        format!("{{wire}} as number as {}", model.name)
+    };
     Some(WireValueConversion {
         annotation: model.name.clone(),
-        from_wire: format!("{{wire}} as number as {}", model.name),
+        from_wire,
         to_wire: format!("{{value}} as number as {}", proto.proto.full_name),
         function_name_to_wire: None,
         wire_function_names: None,

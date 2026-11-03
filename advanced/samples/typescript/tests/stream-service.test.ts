@@ -6,6 +6,8 @@ import { describe, expect, test } from "vitest";
 import {
   type ReadRecordsResponse,
   StreamCloseStatus,
+  StreamStatus,
+  describeStreamResponseTransferTypeConverter,
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/models.ts";
@@ -85,5 +87,16 @@ describe("stream-service generated output", () => {
     expect(
       readRecordsRequestTransferTypeConverter.toTransferType(model).stream?.id,
     ).toBe("stream-1");
+  });
+
+  test("decodes an enum number that it doesn't know as the fallback case", () => {
+    // A newer server can send a Stream status that this code doesn't know.
+    const proto: temporal.api.streamservice.v1.IDescribeStreamResponse = {
+      status: 9 as temporal.api.enums.v1.StreamStatus,
+    };
+
+    const model = describeStreamResponseTransferTypeConverter.fromTransferType(proto);
+
+    expect(model.status).toBe(StreamStatus.StreamStatusUnspecified);
   });
 });

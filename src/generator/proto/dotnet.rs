@@ -3,7 +3,8 @@ use heck::ToLowerCamelCase;
 use crate::error::{Error, Result};
 use crate::generator::dotnet::{
     WireValueConversion, csharp_parameter_name, csharp_type_name, csharp_type_parameter_name,
-    field_property_name, function_args_parameter_type, qualify_dotnet_support_reference,
+    enum_value_name, field_property_name, function_args_parameter_type,
+    qualify_dotnet_support_reference,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoMessageType, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec,
@@ -1106,7 +1107,18 @@ fn value_from_wire_expr(
                 PlannedType::Enum(enumeration)
                     if enum_proto(api_plan, &enumeration.full_name).is_some() =>
                 {
-                    format!("({}){source_expr}", csharp_type_name(&enumeration.name))
+                    let model = csharp_type_name(&enumeration.name);
+                    let fallback = api_plan
+                        .enum_decl(&enumeration.full_name)
+                        .and_then(|decl| decl.values.iter().find(|value| value.fallback));
+                    match fallback {
+                        // A newer peer can send a case that the enum doesn't know.
+                        Some(fallback) => format!(
+                            "(System.Enum.IsDefined(typeof({model}), (int){source_expr}) ? ({model}){source_expr} : {model}.{})",
+                            csharp_type_name(&enum_value_name(&fallback.name))
+                        ),
+                        None => format!("({model}){source_expr}"),
+                    }
                 }
                 _ => source_expr.to_string(),
             };

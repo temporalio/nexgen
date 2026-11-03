@@ -1,0 +1,14 @@
+package test:fallback-arguments;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.proto "temporal.api.enums.v1.Severity"
+  enum alert-level {
+    /// @nexus.fallback "severity-low"
+    severity-unspecified,
+    severity-high,
+    severity-medium,
+    severity-low,
+  }
+}
