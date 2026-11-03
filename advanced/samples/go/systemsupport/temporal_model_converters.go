@@ -1,4 +1,4 @@
-package internal
+package systemsupport
 
 import (
 	"fmt"
@@ -15,8 +15,8 @@ import (
 )
 
 // WorkflowNamespace returns the namespace of the current workflow.
-func WorkflowNamespace(ctx Context) string {
-	return GetWorkflowInfo(ctx).Namespace
+func WorkflowNamespace(ctx sdkinternal.Context) string {
+	return sdkinternal.GetWorkflowInfo(ctx).Namespace
 }
 
 type SignalWithStartWorkflowModelRequest interface {
@@ -67,15 +67,15 @@ func TaskQueueFromProto(_ converter.DataConverter, tq *taskqueue.TaskQueue) (*st
 
 // --- RetryPolicy (temporal.api.common.v1.RetryPolicy) ---
 
-func RetryPolicyToProto(_ converter.DataConverter, p *RetryPolicy) (*common.RetryPolicy, error) {
+func RetryPolicyToProto(_ converter.DataConverter, p *sdkinternal.RetryPolicy) (*common.RetryPolicy, error) {
 	return sdkinternal.ConvertToPBRetryPolicy(p), nil
 }
 
-func RetryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*RetryPolicy, error) {
+func RetryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*sdkinternal.RetryPolicy, error) {
 	if p == nil {
 		return nil, nil
 	}
-	policy := RetryPolicy{
+	policy := sdkinternal.RetryPolicy{
 		BackoffCoefficient:     p.GetBackoffCoefficient(),
 		MaximumAttempts:        p.GetMaximumAttempts(),
 		NonRetryableErrorTypes: p.GetNonRetryableErrorTypes(),
@@ -91,18 +91,18 @@ func RetryPolicyFromProto(_ converter.DataConverter, p *common.RetryPolicy) (*Re
 
 // --- Priority (temporal.api.common.v1.Priority) ---
 
-func PriorityToProto(_ converter.DataConverter, p *Priority) (*common.Priority, error) {
+func PriorityToProto(_ converter.DataConverter, p *sdkinternal.Priority) (*common.Priority, error) {
 	if p == nil {
 		return nil, nil
 	}
 	return sdkinternal.ConvertToPBPriority(*p), nil
 }
 
-func PriorityFromProto(_ converter.DataConverter, p *common.Priority) (*Priority, error) {
+func PriorityFromProto(_ converter.DataConverter, p *common.Priority) (*sdkinternal.Priority, error) {
 	if p == nil {
 		return nil, nil
 	}
-	return &Priority{
+	return &sdkinternal.Priority{
 		PriorityKey:    int(p.GetPriorityKey()),
 		FairnessKey:    p.GetFairnessKey(),
 		FairnessWeight: p.GetFairnessWeight(),
@@ -237,14 +237,14 @@ func HeaderFromProto(dc converter.DataConverter, header *common.Header) (map[str
 
 // --- SearchAttributes (temporal.api.common.v1.SearchAttributes) ---
 
-func SearchAttributesToProto(_ converter.DataConverter, searchAttributes *SearchAttributes) (*common.SearchAttributes, error) {
+func SearchAttributesToProto(_ converter.DataConverter, searchAttributes *sdkinternal.SearchAttributes) (*common.SearchAttributes, error) {
 	if searchAttributes == nil {
 		return nil, nil
 	}
 	return sdkinternal.SerializeSearchAttributes(nil, *searchAttributes)
 }
 
-func SearchAttributesFromProto(_ converter.DataConverter, searchAttributes *common.SearchAttributes) (*SearchAttributes, error) {
+func SearchAttributesFromProto(_ converter.DataConverter, searchAttributes *common.SearchAttributes) (*sdkinternal.SearchAttributes, error) {
 	if searchAttributes == nil {
 		return nil, nil
 	}
@@ -297,19 +297,19 @@ func SearchAttributesFromProto(_ converter.DataConverter, searchAttributes *comm
 
 // --- VersioningOverride (temporal.api.workflow.v1.VersioningOverride) ---
 
-func VersioningOverrideToProto(_ converter.DataConverter, versioningOverride *VersioningOverride) (*workflowpb.VersioningOverride, error) {
+func VersioningOverrideToProto(_ converter.DataConverter, versioningOverride *sdkinternal.VersioningOverride) (*workflowpb.VersioningOverride, error) {
 	if versioningOverride == nil {
 		return nil, nil
 	}
 	return sdkinternal.VersioningOverrideToProto(*versioningOverride), nil
 }
 
-func VersioningOverrideFromProto(_ converter.DataConverter, versioningOverride *workflowpb.VersioningOverride) (*VersioningOverride, error) {
+func VersioningOverrideFromProto(_ converter.DataConverter, versioningOverride *workflowpb.VersioningOverride) (*sdkinternal.VersioningOverride, error) {
 	if versioningOverride == nil {
 		return nil, nil
 	}
 
-	var value VersioningOverride
+	var value sdkinternal.VersioningOverride
 	switch override := versioningOverride.GetOverride().(type) {
 	case *workflowpb.VersioningOverride_AutoUpgrade:
 		value = &sdkinternal.AutoUpgradeVersioningOverride{}
@@ -337,7 +337,7 @@ func VersioningOverrideFromProto(_ converter.DataConverter, versioningOverride *
 }
 
 // WorkflowFunctionName returns the registered name of a workflow function.
-func WorkflowFunctionName(ctx Context, value any) string {
+func WorkflowFunctionName(ctx sdkinternal.Context, value any) string {
 	name, err := sdkinternal.GetWorkflowFunctionName(
 		sdkinternal.GetWorkflowEnvironment(ctx).GetRegistry(),
 		value,

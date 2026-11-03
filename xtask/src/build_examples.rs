@@ -690,15 +690,9 @@ fn build_example_configuration(
     let input_path = example_input_path(repo_root, example_id);
     let mut input_paths = vec![input_path.clone()];
     input_paths.extend(example_linked_input_paths(repo_root, &input_path)?);
-    let facade_output_path = example_output_path(repo_root, language, output_id);
+    let output_path = example_output_path(repo_root, language, output_id);
     let language_root = advanced_language_root(repo_root, language);
     let system_nexus = options.system_nexus.unwrap_or_default();
-    let internal_go = language == Language::Go && system_nexus;
-    let output_path = if internal_go {
-        language_root.join("internal")
-    } else {
-        facade_output_path.clone()
-    };
     let generate_request = GenerateRequest {
         config: NexgenConfig {
             system_nexus,
@@ -706,8 +700,8 @@ fn build_example_configuration(
         },
         language,
         input_paths,
-        support_package: if internal_go {
-            Some("go.temporal.io/sdk/internal".into())
+        support_package: if language == Language::Go && system_nexus {
+            Some("go.temporal.io/sdk/advanced/samples/go/systemsupport".into())
         } else {
             sample_support_package(repo_root, language, &output_path)
         },
@@ -718,43 +712,31 @@ fn build_example_configuration(
         ts_date_time_types: Default::default(),
         dotnet_namespace: None,
     };
-    if internal_go {
+    if language == Language::Go
+        && config
+            .examples
+            .get(example_id)
+            .is_some_and(|example| example.go_facade)
+    {
+        let facade_path = language_root.join(format!(
+            "{}_facade",
+            example_directory_name(language, example_id),
+        ));
+        reset_example_output_directory(&language_root, &facade_path)?;
         generate_to_file_with_go_facade(
             &generate_request,
             &GoFacadeRequest {
-                output_path: facade_output_path.clone(),
-                implementation_import_path: "go.temporal.io/sdk/advanced/samples/go/internal"
-                    .into(),
+                output_path: facade_path.clone(),
+                implementation_import_path: format!(
+                    "go.temporal.io/sdk/advanced/samples/go/{}",
+                    example_directory_name(language, example_id),
+                ),
             },
         )?;
-        format_example_output(&language_root, language, &facade_output_path)?;
-        normalize_example_headers(&facade_output_path)?;
+        format_example_output(&language_root, language, &facade_path)?;
+        normalize_example_headers(&facade_path)?;
     } else {
-        if language == Language::Go
-            && config
-                .examples
-                .get(example_id)
-                .is_some_and(|example| example.go_facade)
-        {
-            let facade_path = language_root
-                .join("facade")
-                .join(example_directory_name(language, example_id));
-            reset_example_output_directory(&language_root, &facade_path)?;
-            generate_to_file_with_go_facade(
-                &generate_request,
-                &GoFacadeRequest {
-                    output_path: facade_path.clone(),
-                    implementation_import_path: format!(
-                        "go.temporal.io/sdk/advanced/samples/go/{}",
-                        example_directory_name(language, example_id),
-                    ),
-                },
-            )?;
-            format_example_output(&language_root, language, &facade_path)?;
-            normalize_example_headers(&facade_path)?;
-        } else {
-            generate_to_file(&generate_request)?;
-        }
+        generate_to_file(&generate_request)?;
     }
     format_example_output(&language_root, language, &output_path)?;
     normalize_example_headers(&output_path)?;

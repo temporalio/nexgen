@@ -3,27 +3,61 @@
 package multioperationservice
 
 import (
-	implementation "go.temporal.io/sdk/advanced/samples/go/internal"
+	"go.temporal.io/sdk/internal"
 )
 
-type Request = implementation.SystemNexus_Request
+// --- Operations (internal) ---
 
-type Response = implementation.SystemNexus_Response
-
-type FirstOperationOptions = implementation.SystemNexus_FirstOperationOptions
-
-type SecondOperationOptions = implementation.SystemNexus_SecondOperationOptions
-
-func FirstOperation(
-	ctx implementation.Context,
-	opts FirstOperationOptions,
-) implementation.Future {
-	return implementation.SystemNexus_FirstOperation(ctx, opts)
+func systemnexus_firstOperation(ctx internal.Context, request SystemNexus_Request) internal.Future {
+	c := internal.NewSystemNexusClient("InterceptorService")
+	fut := c.ExecuteOperation(ctx, "FirstOperation", request, internal.NexusOperationOptions{})
+	return fut
 }
 
-func SecondOperation(
-	ctx implementation.Context,
-	opts SecondOperationOptions,
-) implementation.Future {
-	return implementation.SystemNexus_SecondOperation(ctx, opts)
+func systemnexus_secondOperation(ctx internal.Context, request SystemNexus_Request) internal.Future {
+	c := internal.NewSystemNexusClient("InterceptorService")
+	fut := c.ExecuteOperation(ctx, "SecondOperation", request, internal.NexusOperationOptions{})
+	return fut
+}
+
+// --- Operations (public API) ---
+
+type SystemNexus_Request struct {
+	// ID - Required.
+	ID string
+}
+
+func (m SystemNexus_Request) GetID() string {
+	return m.ID
+}
+
+type SystemNexus_Response struct {
+	// Value - Required.
+	Value string
+}
+
+func (m SystemNexus_Response) GetValue() string {
+	return m.Value
+}
+
+type SystemNexus_FirstOperationOptions struct {
+	// ID - Required.
+	ID string
+}
+
+func SystemNexus_FirstOperation(ctx internal.Context, opts SystemNexus_FirstOperationOptions) internal.Future {
+	return systemnexus_firstOperation(ctx, SystemNexus_Request{
+		ID: opts.ID,
+	})
+}
+
+type SystemNexus_SecondOperationOptions struct {
+	// ID - Required.
+	ID string
+}
+
+func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOperationOptions) internal.Future {
+	return systemnexus_secondOperation(ctx, SystemNexus_Request{
+		ID: opts.ID,
+	})
 }

@@ -9,7 +9,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 
-	"go.temporal.io/sdk/advanced/samples/go/facade/functionexecution"
+	"go.temporal.io/sdk/advanced/samples/go/functionexecution"
 )
 
 const functionExecutionServiceName = "FunctionExecution"

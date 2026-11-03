@@ -5,7 +5,6 @@ world system {
 }
 
 /// @nexus.endpoint "__temporal_system"
-/// @nexus.namespace go="go.temporal.io/sdk/internal"
 interface interceptor-service {
   record request {
     id: string,

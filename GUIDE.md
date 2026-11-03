@@ -178,6 +178,9 @@ name the appropriate internal APIs. For generation into the SDK's `internal`
 package, use `@nexus.namespace go="go.temporal.io/sdk/internal"`; references to
 that package become unqualified.
 
+The sample WIT omits this Go namespace override so its generated implementation
+is a standalone package that imports the SDK's internal APIs.
+
 System Nexus package-level declarations use `SystemNexus_` for exported symbols
 and `systemnexus_` for private symbols. Receiver methods retain their API names,
 including `TransferTypeConverter`; package initialization still uses `init`.
@@ -196,10 +199,10 @@ cargo run --features advanced -- go advanced/samples/inputs/workflow-service.wit
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --native-api --system-nexus \
-  --support-package go.temporal.io/sdk/internal \
-  --output path/to/sdk/internal \
-  --facade-output path/to/sdk/workflow \
-  --facade-import go.temporal.io/sdk/internal
+  --support-package go.temporal.io/sdk/advanced/samples/go/systemsupport \
+  --output advanced/samples/go/workflowservice \
+  --facade-output advanced/samples/go/workflowservice_facade \
+  --facade-import go.temporal.io/sdk/advanced/samples/go/workflowservice
 ```
 
 Facades expose type aliases, constants, and forwarding functions. Aliases retain

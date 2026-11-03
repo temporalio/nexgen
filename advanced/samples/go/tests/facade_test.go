@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	enums "go.temporal.io/api/enums/v1"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
-	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice"
+	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice_facade"
 	"go.temporal.io/sdk/converter"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
 )

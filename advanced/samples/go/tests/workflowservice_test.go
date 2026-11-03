@@ -19,7 +19,7 @@ import (
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
-	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice"
+	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice_facade"
 )
 
 func exampleWorkflow(ctx workflow.Context, attempt int, name string) (string, error) {
