@@ -95,6 +95,14 @@ flowchart LR
 
 ## Passes
 
+WIT annotation syntax is validated inside the WIT frontend, immediately after
+resolving the input packages and before constructing authored IR. The catalog in
+`src/parser/wit/annotations.rs` defines placements, argument names and
+cardinality. Parsing uses that catalog for common checks; a complete resolved
+tree walk checks placements, including unused declarations and linked packages.
+Builders retain semantic checks and interpretation. This is not a new shared
+compiler pass: no WIT annotation concepts cross the parsing boundary.
+
 - `AuthoredValidationPass` validates authored API intent and source-format
   constraints. Native protobuf-backed enums must match the descriptor's full
   case list, order, and numbers; reordered, omitted, and sparse cases are

@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit-directive"
+contains = ["`@nexus.type` on type `models.request` field `value`", "unknown argument `python-from` on record field"]

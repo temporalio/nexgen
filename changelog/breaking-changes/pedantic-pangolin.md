@@ -1,0 +1,1 @@
+WIT annotations now reject unknown names, unsupported placements and arguments, duplicate singleton annotations, and duplicate arguments instead of silently ignoring them, including in unused declarations and linked packages.

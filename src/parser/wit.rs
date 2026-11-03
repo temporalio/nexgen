@@ -15,6 +15,8 @@ use crate::language::Language;
 use crate::nexgen_config::GenerationTarget;
 use crate::spec::*;
 
+mod annotations;
+
 type PackageOrigins = BTreeMap<PackageId, PathBuf>;
 
 pub(crate) struct ParsedWitPackage {
@@ -164,6 +166,7 @@ fn parse_prepared_wit_workspace(
                 message: format_error_chain(&error),
             })?;
     let package_origins = collect_package_origins(&resolve, &source_map)?;
+    annotations::validate(&resolve, package_id, &package_origins, path)?;
     Ok(ParsedWitPackage {
         resolve,
         package_id,
@@ -566,7 +569,6 @@ fn collect_interface_types(
     for type_id in interface.types.values() {
         let type_def = &resolve.types[*type_id];
         validate_type_parameter_directive(resolve, *type_id, type_def, path)?;
-        reject_misplaced_fallback_in_type(resolve, *type_id, type_def, path)?;
         if let Some(record) =
             build_wit_record_spec(resolve, *type_id, type_def, path, &interface_name, language)?
         {
@@ -681,17 +683,9 @@ fn validate_type_parameter_directive(
 ) -> Result<()> {
     let context = format!("type `{}`", wit_type_full_name(resolve, type_id));
     let directives = parse_directives(type_def.docs.contents.as_deref(), path, &context)?;
-    let Some(parameter) = directive(&directives, "type-parameter", path, &context)? else {
+    let Some(_) = directive(&directives, "type-parameter", path, &context)? else {
         return Ok(());
     };
-    if !parameter.args.is_empty() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context,
-            directive: "@nexus.type-parameter".to_string(),
-            reason: "does not take arguments".to_string(),
-        });
-    }
     if !matches!(type_def.kind, TypeDefKind::Type(_)) {
         return Err(Error::InvalidWitDirective {
             path: path.to_path_buf(),
@@ -756,16 +750,9 @@ fn enum_fallback_case(
     for (index, case) in enumeration.cases.iter().enumerate() {
         let case_context = format!("{context} case `{}`", case.name);
         let directives = parse_directives(case.docs.contents.as_deref(), path, &case_context)?;
-        let Some(directive) = directive(&directives, "fallback", path, &case_context)? else {
+        let Some(_) = directive(&directives, "fallback", path, &case_context)? else {
             continue;
         };
-        if !directive.args.is_empty() {
-            return Err(fallback_error(
-                path,
-                &case_context,
-                "does not take arguments",
-            ));
-        }
         if let Some((_, first)) = fallback {
             return Err(fallback_error(
                 path,
@@ -787,51 +774,6 @@ fn enum_fallback_case(
         ));
     }
     Ok(fallback.map(|(index, _)| index))
-}
-
-/// Refuses `@nexus.fallback` on a type, and on the cases of a variant or flags.
-///
-/// A misplaced fallback would have no effect, so the enum would still fail on a case that a newer
-/// peer sends. The author learns that at run time, not at generation time.
-fn reject_misplaced_fallback_in_type(
-    resolve: &Resolve,
-    type_id: TypeId,
-    type_def: &TypeDef,
-    path: &Path,
-) -> Result<()> {
-    let context = format!("type `{}`", wit_type_full_name(resolve, type_id));
-    let directives = parse_directives(type_def.docs.contents.as_deref(), path, &context)?;
-    reject_misplaced_fallback(&directives, path, &context)?;
-    let cases = match &type_def.kind {
-        TypeDefKind::Variant(variant) => variant
-            .cases
-            .iter()
-            .map(|case| (case.name.as_str(), case.docs.contents.as_deref()))
-            .collect(),
-        TypeDefKind::Flags(flags) => flags
-            .flags
-            .iter()
-            .map(|flag| (flag.name.as_str(), flag.docs.contents.as_deref()))
-            .collect(),
-        _ => Vec::new(),
-    };
-    for (name, docs) in cases {
-        let case_context = format!("{context} case `{name}`");
-        let directives = parse_directives(docs, path, &case_context)?;
-        reject_misplaced_fallback(&directives, path, &case_context)?;
-    }
-    Ok(())
-}
-
-fn reject_misplaced_fallback(directives: &[Directive], path: &Path, context: &str) -> Result<()> {
-    if directive(directives, "fallback", path, context)?.is_some() {
-        return Err(fallback_error(
-            path,
-            context,
-            "is only supported on enum cases",
-        ));
-    }
-    Ok(())
 }
 
 fn fallback_error(path: &Path, context: &str, reason: &str) -> Error {
@@ -1214,8 +1156,6 @@ fn build_fields_from_record(
     for field in &record.fields {
         let field_context = format!("{context} field `{}`", field.name);
         let directives = parse_directives(field.docs.contents.as_deref(), path, &field_context)?;
-        reject_misplaced_type_parameter(&directives, path, &field_context)?;
-        reject_misplaced_fallback(&directives, path, &field_context)?;
         let generated_field_name = directive(&directives, "name", path, &field_context)?
             .and_then(|directive| directive_language_value(directive, language))
             .unwrap_or(&field.name)
@@ -1248,21 +1188,12 @@ fn build_fields_from_record(
             });
         }
 
-        if let Some(omit_directive) = omit_directive {
-            if !omit_directive.args.is_empty() {
-                return Err(Error::InvalidWitDirective {
-                    path: path.to_path_buf(),
-                    context: field_context,
-                    directive: "@nexus.omit".to_string(),
-                    reason: "field-level omit does not take arguments".to_string(),
-                });
-            }
-
+        if omit_directive.is_some() {
             for conflicting_directive in ["source", "type", "flattened-type", "function", "default"]
             {
                 if directives
                     .iter()
-                    .any(|directive| directive.name == conflicting_directive)
+                    .any(|directive| directive.name() == conflicting_directive)
                 {
                     return Err(Error::InvalidWitDirective {
                         path: path.to_path_buf(),
@@ -1328,7 +1259,7 @@ fn build_fields_from_record(
         let required = !is_optional_type(resolve, &field.ty);
         if directives
             .iter()
-            .any(|directive| directive.name == "default")
+            .any(|directive| directive.name() == "default")
             && !required
         {
             return Err(Error::InvalidWitDirective {
@@ -1341,16 +1272,6 @@ fn build_fields_from_record(
         let sourced = origin
             .for_language(language)
             .is_some_and(FieldOrigin::is_sourced);
-        if let Some(api_omit_directive) = api_omit_directive {
-            if !api_omit_directive.args.is_empty() {
-                return Err(Error::InvalidWitDirective {
-                    path: path.to_path_buf(),
-                    context: field_context,
-                    directive: "@nexus.api-omit".to_string(),
-                    reason: "field-level api-omit does not take arguments".to_string(),
-                });
-            }
-        }
         let annotation =
             directive(&directives, "type", path, &field_context)?.map(directive_language_string);
         let flattened_annotation = directive(&directives, "flattened-type", path, &field_context)?
@@ -1923,7 +1844,10 @@ fn origin_directives<'a>(
 ) -> Result<Vec<(&'a Directive, Vec<GenerationTarget>)>> {
     let mut selected = Vec::new();
     let mut seen = BTreeSet::new();
-    for directive in directives.iter().filter(|directive| directive.name == kind) {
+    for directive in directives
+        .iter()
+        .filter(|directive| directive.name() == kind)
+    {
         let targets = build_origin_targets(directive, path, context, kind)?;
         for &target in &targets {
             if !seen.insert(target) {
@@ -2001,24 +1925,6 @@ fn build_source_call(
     context: &str,
     language: Language,
 ) -> Result<Option<String>> {
-    for key in [
-        "go-support-import",
-        "python-support-import",
-        "typescript-support-import",
-        "dotnet-support-import",
-    ] {
-        if directive.value(key).is_some() {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: context.to_string(),
-                directive: "@nexus.source".to_string(),
-                reason: format!(
-                    "`{key}` is no longer supported; remove it and call a helper from `--support-package` in the source expression"
-                ),
-            });
-        }
-    }
-
     let Some(source_expr) =
         directive_language_value(directive, language).or_else(|| directive.value("value"))
     else {
@@ -2798,8 +2704,6 @@ fn build_service(
     let interface_name = interface_export_name(key, interface);
     let context = format!("interface `{interface_name}`");
     let directives = parse_directives(interface.docs.contents.as_deref(), path, &context)?;
-    reject_misplaced_type_parameter(&directives, path, &context)?;
-    reject_misplaced_fallback(&directives, path, &context)?;
     let endpoint = directive_value_for_language(&directives, "endpoint", path, &context, language)?;
     let service_name = interface_name.to_upper_camel_case();
     let wire_service_name = build_wire_service_name(&directives, path, &context, &service_name)?;
@@ -2931,16 +2835,6 @@ fn build_resource(
     let constructor = interface.functions.values().find(
         |function| matches!(function.kind, FunctionKind::Constructor(id) if id == resource_id),
     );
-    if let Some(constructor) = constructor {
-        let constructor_context = format!("{context} constructor");
-        let directives = parse_directives(
-            constructor.docs.contents.as_deref(),
-            path,
-            &constructor_context,
-        )?;
-        reject_misplaced_type_parameter(&directives, path, &constructor_context)?;
-        reject_misplaced_fallback(&directives, path, &constructor_context)?;
-    }
     let fields = match constructor {
         Some(constructor) => constructor
             .params
@@ -3014,17 +2908,6 @@ fn build_resource_method(
         method_name.to_upper_camel_case()
     );
     let directives = parse_directives(function.docs.contents.as_deref(), path, &context)?;
-    reject_misplaced_type_parameter(&directives, path, &context)?;
-    reject_misplaced_fallback(&directives, path, &context)?;
-    // The operation has the poll rules, so each method that binds it gets an iterator.
-    if directive(&directives, "poll", path, &context)?.is_some() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.clone(),
-            directive: "@nexus.poll".to_string(),
-            reason: "must be on the operation that the method binds, not on the method".to_string(),
-        });
-    }
     let params = function
         .params
         .iter()
@@ -3133,8 +3016,6 @@ fn build_operation(
     let operation_name = function.name.to_upper_camel_case();
     let context = format!("{service_context} operation `{operation_name}`");
     let directives = parse_directives(function.docs.contents.as_deref(), path, &context)?;
-    reject_misplaced_type_parameter(&directives, path, &context)?;
-    reject_misplaced_fallback(&directives, path, &context)?;
     let wire_operation_name =
         build_wire_operation_name(&directives, path, &context, &operation_name)?;
     let experimental = experimental_directive(&directives, path, &context)?;
@@ -3649,18 +3530,7 @@ pub(crate) fn directive_value(
 }
 
 fn experimental_directive(directives: &[Directive], path: &Path, context: &str) -> Result<bool> {
-    let Some(directive) = directive(directives, "experimental", path, context)? else {
-        return Ok(false);
-    };
-    if !directive.args.is_empty() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.to_string(),
-            directive: "@nexus.experimental".to_string(),
-            reason: "does not take arguments".to_string(),
-        });
-    }
-    Ok(true)
+    Ok(directive(directives, "experimental", path, context)?.is_some())
 }
 
 fn delay_load_temporalio_workflow_directive(
@@ -3668,54 +3538,17 @@ fn delay_load_temporalio_workflow_directive(
     path: &Path,
     context: &str,
 ) -> Result<bool> {
-    let Some(directive) = directive(directives, "delay-load-temporalio-workflow", path, context)?
-    else {
-        return Ok(false);
-    };
-    if !directive.args.is_empty() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.to_string(),
-            directive: "@nexus.delay-load-temporalio-workflow".to_string(),
-            reason: "does not take arguments".to_string(),
-        });
-    }
-    Ok(true)
+    Ok(directive(directives, "delay-load-temporalio-workflow", path, context)?.is_some())
 }
 
 pub(crate) fn directive<'a>(
     directives: &'a [Directive],
     name: &str,
-    path: &Path,
-    context: &str,
+    _path: &Path,
+    _context: &str,
 ) -> Result<Option<&'a Directive>> {
-    let mut matches = directives.iter().filter(|directive| directive.name == name);
-    let first = matches.next();
-    if matches.next().is_some() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.to_string(),
-            directive: format!("@nexus.{name}"),
-            reason: "duplicate directive".to_string(),
-        });
-    }
-    Ok(first)
-}
-
-fn reject_misplaced_type_parameter(
-    directives: &[Directive],
-    path: &Path,
-    context: &str,
-) -> Result<()> {
-    if directive(directives, "type-parameter", path, context)?.is_some() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.to_string(),
-            directive: "@nexus.type-parameter".to_string(),
-            reason: "is only supported on WIT type aliases".to_string(),
-        });
-    }
-    Ok(())
+    // Parsing has already checked singleton cardinality against the catalog.
+    Ok(directives.iter().find(|directive| directive.name() == name))
 }
 
 fn directive_language_value<'a>(directive: &'a Directive, language: Language) -> Option<&'a str> {
@@ -3789,18 +3622,19 @@ pub(crate) fn parse_directives(
         directives.push(parse_directive_line(&previous, path, context)?);
     }
 
+    annotations::validate_parsed(&directives, path, context)?;
     Ok(directives)
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Directive {
-    name: String,
+    rule: &'static annotations::Annotation,
     args: BTreeMap<String, String>,
 }
 
 impl Directive {
     pub(crate) fn name(&self) -> &str {
-        &self.name
+        self.rule.name
     }
 
     pub(crate) fn value(&self, key: &str) -> Option<&str> {
@@ -3820,6 +3654,7 @@ fn parse_directive_line(line: &str, path: &Path, context: &str) -> Result<Direct
 
     let name_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
     let name = &rest[..name_end];
+    let rule = annotations::Annotation::parse(name, path, context)?;
     let mut tail = rest[name_end..].trim_start();
     let mut args = BTreeMap::new();
 
@@ -3845,14 +3680,18 @@ fn parse_directive_line(line: &str, path: &Path, context: &str) -> Result<Direct
         };
         let (value, remaining) =
             parse_directive_value(after_equals.trim_start(), path, context, name)?;
-        args.insert(key.to_string(), value);
+        if args.insert(key.to_string(), value).is_some() {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: context.to_string(),
+                directive: format!("@nexus.{name}"),
+                reason: format!("duplicate argument `{key}`"),
+            });
+        }
         tail = remaining.trim_start();
     }
 
-    Ok(Directive {
-        name: name.to_string(),
-        args,
-    })
+    Ok(Directive { rule, args })
 }
 
 fn parse_directive_value<'a>(
