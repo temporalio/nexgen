@@ -13,9 +13,10 @@ from ..services import StreamService
 from ..models import (
     CreateStreamRequest,
     Producer,
-    StreamRef,
+    StreamHandle,
 )
 from ._resources.stream import Stream
+import temporal_support as _support
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
@@ -43,7 +44,7 @@ class StreamServiceClientExtension(abc.ABC):
     def get_stream(
         self,
         *,
-        stream: StreamRef,
+        handle: StreamHandle,
         created: bool | None,
     ) -> Stream:
         """Return the ``Stream`` handle that has these identity fields."""
@@ -52,7 +53,7 @@ class StreamServiceClientExtension(abc.ABC):
                 service=StreamService,
                 endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
             ),
-            stream=stream,
+            handle=handle,
             created=created,
         )
 
@@ -70,11 +71,11 @@ class StreamServiceClientExtension(abc.ABC):
             id=f"{_uuid.uuid4()}",
         )
         result = await handle.result()
-        if result.stream is None:
-            raise RuntimeError("CreateStream answered without `stream`")
+        if result.handle is None:
+            raise RuntimeError("CreateStream answered without `handle`")
         resource = Stream(
             nexus_client,
-            stream=result.stream,
+            handle=result.handle,
             created=result.created or None,
         )
         return resource
@@ -84,27 +85,24 @@ class StreamServiceClientExtension(abc.ABC):
         *,
         id: str,
         retention: datetime.timedelta | None = None,
-        withdraw_run: str | None = None,
         owner: Producer | None = None,
-        ref: StreamRef | None = None,
+        stream_handle: StreamHandle | None = None,
     ) -> Stream:
         """
         Args:
             id: The Stream id. Required, and never empty.
             retention: The age after which a Record is dropped. Empty is the Store
                 default.
-            withdraw_run: Retry run only. The previous run, whose Records this
-                withdraws.
             owner: The Workflow run that owns the Stream. The Workflow transport sets
                 it.
-            ref: The ref, whose id is stream-id. A create with an owner needs the ref's
-                owner.
+            stream_handle: The handle, whose id is stream-id. With an owner, it needs
+                the handle's owner.
         """
         request = CreateStreamRequest(
             id=id,
             retention=retention,
-            withdraw_run=withdraw_run,
+            withdraw_run=_support.withdraw_run(),
             owner=owner,
-            ref=ref,
+            stream_handle=stream_handle,
         )
         return await self._stream_service_create_stream(request)

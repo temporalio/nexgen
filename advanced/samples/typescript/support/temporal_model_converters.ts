@@ -3,6 +3,8 @@ import type { google, temporal } from "@temporalio/proto";
 import * as workflow from "@temporalio/workflow";
 import type Long from "long";
 
+export * from "./streams";
+
 function int64ToNumber(
   value: Long | number | string | object | null | undefined,
 ): number {

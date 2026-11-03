@@ -23,7 +23,7 @@ else:
 DESCRIPTOR: _descriptor.FileDescriptor
 
 @_typing.final
-class StreamRef(_message.Message):
+class StreamHandle(_message.Message):
     """Experimental. Might change in the future.
     Identifies one Stream. The id is opaque to callers.
     """
@@ -36,7 +36,7 @@ class StreamRef(_message.Message):
     id: _builtins.str
     backend: _builtins.str
     """The name of the backend that holds the Stream, as the Worker and client config register
-    it, so every process routes a ref it receives. Empty is the default backend. The Store
+    it, so every process routes a handle it receives. Empty is the default backend. The Store
     never reads it.
     """
     @_builtins.property
@@ -60,7 +60,7 @@ class StreamRef(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___StreamRef: _TypeAlias = StreamRef  # noqa: Y015
+Global___StreamHandle: _TypeAlias = StreamHandle  # noqa: Y015
 
 @_typing.final
 class ProducerEpoch(_message.Message):
@@ -190,7 +190,7 @@ class AppendRecord(_message.Message):
 Global___AppendRecord: _TypeAlias = AppendRecord  # noqa: Y015
 
 @_typing.final
-class Supersession(_message.Message):
+class StreamSuperseded(_message.Message):
     """Experimental. Might change in the future."""
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -233,7 +233,7 @@ class Supersession(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___Supersession: _TypeAlias = Supersession  # noqa: Y015
+Global___StreamSuperseded: _TypeAlias = StreamSuperseded  # noqa: Y015
 
 @_typing.final
 class StreamData(_message.Message):
@@ -319,9 +319,10 @@ class StreamRecord(_message.Message):
     @_builtins.property
     def data(self) -> Global___StreamData: ...
     @_builtins.property
-    def superseded(self) -> Global___Supersession:
-        """The first batch of a higher epoch carries it. It withdraws the earlier Records that its
-        facts name, and a reader drops them.
+    def superseded(self) -> Global___StreamSuperseded:
+        """The Store keeps only the withdrawal facts of the first batch of a higher epoch. A read
+        builds this item from them. It withdraws the earlier Records that the facts name, and a
+        reader drops them.
         """
 
     @_builtins.property
@@ -331,7 +332,7 @@ class StreamRecord(_message.Message):
         *,
         offset: _builtins.int = ...,
         data: Global___StreamData | None = ...,
-        superseded: Global___Supersession | None = ...,
+        superseded: Global___StreamSuperseded | None = ...,
         close: Global___StreamClose | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["close", b"close", "data", b"data", "item", b"item", "superseded", b"superseded"]  # noqa: Y015

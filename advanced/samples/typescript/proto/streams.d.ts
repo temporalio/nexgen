@@ -53,7 +53,7 @@ declare module "@temporalio/proto" {
 
   // temporal/api/stream/v1/message.proto
   namespace temporal.api.stream.v1 {
-    interface IStreamRef {
+    interface IStreamHandle {
       id?: string | null;
       owner?: temporal.api.common.v1.IExecution | null;
       backend?: string | null;
@@ -79,7 +79,7 @@ declare module "@temporalio/proto" {
     interface IAppendRecord {
       body?: temporal.api.common.v1.IPayload | null;
     }
-    interface ISupersession {
+    interface IStreamSuperseded {
       producerKind?: temporal.api.enums.v1.StreamProducerKind | null;
       producerId?: string | null;
       epoch?: temporal.api.stream.v1.IProducerEpoch | null;
@@ -101,7 +101,7 @@ declare module "@temporalio/proto" {
     interface IStreamRecord {
       offset?: Long | null;
       data?: temporal.api.stream.v1.IStreamData | null;
-      superseded?: temporal.api.stream.v1.ISupersession | null;
+      superseded?: temporal.api.stream.v1.IStreamSuperseded | null;
       close?: temporal.api.stream.v1.IStreamClose | null;
       item?: "data" | "superseded" | "close";
     }
@@ -119,16 +119,16 @@ declare module "@temporalio/proto" {
       withdrawRun?: string | null;
       owner?: temporal.api.stream.v1.IProducer | null;
       closeWithRun?: boolean | null;
-      ref?: temporal.api.stream.v1.IStreamRef | null;
+      streamHandle?: temporal.api.stream.v1.IStreamHandle | null;
       taskToken?: Uint8Array | null;
     }
     interface ICreateStreamResponse {
-      stream?: temporal.api.stream.v1.IStreamRef | null;
+      handle?: temporal.api.stream.v1.IStreamHandle | null;
       created?: boolean | null;
     }
     interface IAppendRecordsRequest {
       namespace?: string | null;
-      stream?: temporal.api.stream.v1.IStreamRef | null;
+      handle?: temporal.api.stream.v1.IStreamHandle | null;
       producer?: temporal.api.stream.v1.IProducer | null;
       sequence?: Long | null;
       records?: temporal.api.stream.v1.IAppendRecord[] | null;
@@ -144,20 +144,19 @@ declare module "@temporalio/proto" {
     }
     interface ICloseStreamRequest {
       namespace?: string | null;
-      stream?: temporal.api.stream.v1.IStreamRef | null;
+      handle?: temporal.api.stream.v1.IStreamHandle | null;
       producer?: temporal.api.stream.v1.IProducer | null;
       result?: temporal.api.common.v1.IPayload | null;
       failure?: temporal.api.failure.v1.IFailure | null;
       previousCompletedTask?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
       failedTasks?: Long[] | null;
       withdrawRun?: string | null;
-      status?: temporal.api.enums.v1.StreamCloseStatus | null;
       taskToken?: Uint8Array | null;
     }
     interface ICloseStreamResponse {}
     interface IReadRecordsRequest {
       namespace?: string | null;
-      stream?: temporal.api.stream.v1.IStreamRef | null;
+      handle?: temporal.api.stream.v1.IStreamHandle | null;
       fromOffset?: Long | null;
       start?: temporal.api.enums.v1.StreamReadStart | null;
       maxRecords?: number | null;
@@ -177,7 +176,7 @@ declare module "@temporalio/proto" {
     }
     interface IDescribeStreamRequest {
       namespace?: string | null;
-      stream?: temporal.api.stream.v1.IStreamRef | null;
+      handle?: temporal.api.stream.v1.IStreamHandle | null;
     }
     interface IDescribeStreamResponse {
       status?: temporal.api.enums.v1.StreamStatus | null;

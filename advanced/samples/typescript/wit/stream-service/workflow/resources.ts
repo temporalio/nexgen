@@ -3,7 +3,7 @@
 import type * as common from "@temporalio/common";
 import type {
   StreamReadStart,
-  StreamRef,
+  StreamHandle,
   AppendRecordsResponse,
   AppendRecord,
   ReadRecordsResponse,
@@ -16,18 +16,18 @@ import { describeStream } from "./operations/describe-stream";
 
 export class Stream {
   public constructor(
-    public readonly stream: StreamRef,
+    public readonly handle: StreamHandle,
     public readonly created: boolean | undefined,
   ) {}
 
   public async publish(records: AppendRecord[]): Promise<AppendRecordsResponse> {
-    const request = { stream: this.stream, records: records };
+    const request = { handle: this.handle, records: records };
     const handle = await appendRecords(request);
     return await handle.result();
   }
 
   public async close(result?: common.Payload, failure?: Error): Promise<void> {
-    const request = { stream: this.stream, result: result, failure: failure };
+    const request = { handle: this.handle, result: result, failure: failure };
     const handle = await closeStream(request);
     await handle.result();
   }
@@ -41,7 +41,7 @@ export class Stream {
     maxBytes?: number,
   ): Promise<ReadRecordsResponse> {
     const request = {
-      stream: this.stream,
+      handle: this.handle,
       fromOffset: fromOffset,
       start: start,
       maxRecords: maxRecords,
@@ -54,7 +54,7 @@ export class Stream {
   }
 
   public async describe(): Promise<DescribeStreamResponse> {
-    const request = { stream: this.stream };
+    const request = { handle: this.handle };
     const handle = await describeStream(request);
     return await handle.result();
   }

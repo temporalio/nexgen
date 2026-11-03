@@ -1,5 +1,5 @@
 // Draft. The Stream service as a System Nexus service, for the Streams API proposal. Each record
-// maps to a message of the protos under ../protos/temporal/api (stream/v1, streamservice/v1 and the
+// maps to a message of the protos under ../temporal/api (stream/v1, streamservice/v1 and the
 // Stream enums in enums/v1). This file is the source. Each SDK copies it and generates its Workflow
 // API and its client with nexgen (`--targets workflow,client --system-nexus`).
 package temporal:nexus@1.0.0;
@@ -31,11 +31,11 @@ interface stream-service {
   // A Stream that a Workflow creates has the id <workflow id>:<first run id>:<name>. Each part is
   // percent-encoded. So a caller that knows the first run id can build the id with no call.
   /// @nexus.doc "Identifies one Stream. The id is opaque to callers."
-  /// @nexus.proto "temporal.api.stream.v1.StreamRef"
-  record stream-ref {
+  /// @nexus.proto "temporal.api.stream.v1.StreamHandle"
+  record stream-handle {
     /// @nexus.doc "The Stream id, 1 to 4096 bytes."
     id: string,
-    /// @nexus.doc "The owning Workflow run chain or Standalone Activity. Empty on a client ref."
+    /// @nexus.doc "The owning Workflow run chain or Standalone Activity. Empty for a client."
     owner: option<execution>,
     /// @nexus.doc "Registered backend name, empty for the default. The Store never reads it."
     backend: option<string>,
@@ -124,8 +124,8 @@ interface stream-service {
   // or strictly between c and t. It also withdraws those at the started event id of c or of t with
   // a lower epoch than c or t. No task in that range can have completed.
   /// @nexus.doc "Which earlier Records a Superseded item withdraws."
-  /// @nexus.proto "temporal.api.stream.v1.Supersession"
-  record supersession {
+  /// @nexus.proto "temporal.api.stream.v1.StreamSuperseded"
+  record stream-superseded {
     producer-id: string,
     /// @nexus.doc "Workflow only. Started event ids of failed or timed out Workflow Tasks."
     failed-tasks: list<s64>,
@@ -175,7 +175,7 @@ interface stream-service {
   /// @nexus.proto "temporal.api.stream.v1.StreamRecord.item"
   variant stream-item {
     data(stream-data),
-    superseded(supersession),
+    superseded(stream-superseded),
     close(stream-close),
   }
 
@@ -199,12 +199,21 @@ interface stream-service {
     stream-id: string,
     /// @nexus.doc "The age after which a Record is dropped. Empty is the Store default."
     retention: option<duration>,
+    // A wrong run would silently withdraw real Records, so it is never a parameter. The helper
+    // gives the previous run in a retry run's Workflow, and nothing elsewhere.
     /// @nexus.doc "Retry run only. The previous run, whose Records this withdraws."
+    /// @nexus.source targets="workflow" python="withdraw_run()" typescript="withdrawRun()"
+    ///   dotnet="StreamWorkflowContext.WithdrawRun()"
+    /// @nexus.source targets="client" python="withdraw_run()" typescript="withdrawRun()"
+    ///   dotnet="StreamWorkflowContext.WithdrawRun()"
     withdraw-run: option<string>,
     /// @nexus.doc "The Workflow run that owns the Stream. The Workflow transport sets it."
+    /// @nexus.source targets="workflow" python="workflow_owner()" typescript="workflowOwner()"
+    ///   dotnet="StreamWorkflowContext.Owner()"
     owner: option<producer>,
-    /// @nexus.doc "The ref, whose id is stream-id. A create with an owner needs the ref's owner."
-    %ref: option<stream-ref>,
+    /// @nexus.doc "The handle, whose id is stream-id. With an owner, it needs the handle's owner."
+    /// @nexus.flatten-in-api fields="backend" fill="id=stream-id"
+    stream-handle: option<stream-handle>,
     // Native only. The SDK Stores don't read it.
     /// @nexus.omit
     close-with-run: placeholder,
@@ -230,21 +239,32 @@ interface stream-service {
   ///   "Append. FAILED_PRECONDITION if closed, fenced or format too new. NOT_FOUND if absent."
   /// @nexus.proto "temporal.api.streamservice.v1.AppendRecordsRequest"
   record append-records-request {
-    %stream: stream-ref,
+    handle: stream-handle,
     records: list<append-record>,
     /// @nexus.doc "Local Activity only. The run's failed or timed out Workflow Tasks."
     /// @nexus.omit
     failed-tasks: list<s64>,
     /// @nexus.doc "Required outside a Workflow. In a Workflow the transport sets it."
+    /// @nexus.source targets="workflow" python="workflow_producer()"
+    ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
+    /// @nexus.source targets="client" python="client_producer()" typescript="clientProducer()"
+    ///   dotnet="StreamActivityContext.Producer()"
     producer: option<producer>,
-    /// @nexus.doc "The batch number in this epoch, 1 or more. It is part of the dedupe key."
-    /// @nexus.omit
+    // A call with no writer state, such as publish, sends no sequence. The Store then numbers the
+    // batch, so nothing dedupes it.
+    /// @nexus.doc
+    ///   "The batch number in this epoch. Empty takes the next one, and a retry writes it again."
     sequence: option<s64>,
     /// @nexus.doc "Local Activity only. The run's last completed Workflow Task."
     /// @nexus.omit
     previous-completed-task: option<workflow-task-epoch>,
+    // A wrong run would silently withdraw real Records, so it is never a parameter. The helper
+    // gives the previous run in a retry run's Workflow, and nothing elsewhere.
     /// @nexus.doc "Retry run only. The previous run, whose Records this withdraws."
-    /// @nexus.omit
+    /// @nexus.source targets="workflow" python="withdraw_run()" typescript="withdrawRun()"
+    ///   dotnet="StreamWorkflowContext.WithdrawRun()"
+    /// @nexus.source targets="client" python="withdraw_run()" typescript="withdrawRun()"
+    ///   dotnet="StreamWorkflowContext.WithdrawRun()"
     withdraw-run: option<string>,
     /// @nexus.omit
     namespace: placeholder,
@@ -264,21 +284,23 @@ interface stream-service {
   /// @nexus.doc "Close a Stream. Readers drain what is left, then end. Later appends are refused."
   /// @nexus.proto "temporal.api.streamservice.v1.CloseStreamRequest"
   record close-stream-request {
-    %stream: stream-ref,
-    /// @nexus.doc "Workflow only. The run's failed or timed out Workflow Tasks."
+    handle: stream-handle,
+    // Native only. The SDK Stores don't read it.
     /// @nexus.omit
-    failed-tasks: list<s64>,
+    failed-tasks: placeholder,
+    /// @nexus.source targets="workflow" python="workflow_producer()"
+    ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
+    /// @nexus.source targets="client" python="client_producer()" typescript="clientProducer()"
+    ///   dotnet="StreamActivityContext.Producer()"
     producer: option<producer>,
     %result: option<payload>,
+    // Each SDK gives a canceled Activity, child Workflow or Nexus Operation as a failure of that
+    // call whose cause is the cancel. So such a failure also cancels.
+    /// @nexus.doc "Empty completes the Stream. A cancel failure cancels it. Any other fails it."
     failure: option<failure>,
-    // The service sets canceled for a failure with canceled_failure_info, so the API omits status.
-    /// @nexus.doc
-    ///   "Empty is completed, or failed with a failure. With a canceled failure, it is canceled."
+    // Native only. The SDK Stores don't read it.
     /// @nexus.omit
-    status: option<stream-close-status>,
-    /// @nexus.doc "Workflow only. The previous completed Workflow Task of the run."
-    /// @nexus.omit
-    previous-completed-task: option<workflow-task-epoch>,
+    previous-completed-task: placeholder,
     /// @nexus.omit
     namespace: placeholder,
     // Native only. The SDK Stores don't read them.
@@ -302,7 +324,7 @@ interface stream-service {
   /// @nexus.doc "Read Records from an offset."
   /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest"
   record read-records-request {
-    %stream: stream-ref,
+    handle: stream-handle,
     /// @nexus.doc "Start offset. Empty uses start. OUT_OF_RANGE past the newest offset + 1."
     from-offset: option<s64>,
     /// @nexus.doc "Where to start when from-offset is empty. Unspecified is the beginning."
@@ -314,6 +336,7 @@ interface stream-service {
     wait: option<duration>,
     /// @nexus.doc "How long to wait for an uncreated Stream. Empty fails at once. At most 60 s."
     create-wait: option<duration>,
+    // Replay needs a fixed range, so the Workflow API omits `last`.
     /// @nexus.doc "Read the newest this many Records, oldest first. No from-offset. No wait."
     last: option<s32>,
     /// @nexus.doc "The maximum Record bytes in a page. A larger Record is still returned alone."
@@ -343,7 +366,7 @@ interface stream-service {
 
   /// @nexus.proto "temporal.api.streamservice.v1.DescribeStreamRequest"
   record describe-stream-request {
-    %stream: stream-ref,
+    handle: stream-handle,
     /// @nexus.omit
     namespace: placeholder,
   }
@@ -356,14 +379,15 @@ interface stream-service {
     retention: option<duration>,
   }
 
-  // A handle never changes, since offsets are values that its methods return. Only a create's
-  // response sets created, so a handle built from a ref has none.
-  /// @nexus.doc "A handle on one Stream. Build it from a stream-ref, or get it from a create."
-  /// @nexus.definition python="temporal_support.StreamDefinition"
-  ///   typescript="StreamDefinition" typescript-import="../../support/temporal_model_converters"
-  ///   dotnet="Nexgen.Support.StreamDefinition"
+  // A stream never changes, since offsets are values that its methods return. Only a create's
+  // response sets created, so a stream built from a handle has none.
+  /// @nexus.doc "One Stream. Build it from a stream-handle, or get it from a create."
+  /// @nexus.definition python="temporalio.common.StreamDefinition"
+  ///   typescript="StreamDefinition" typescript-import="@temporalio/common"
+  ///   dotnet="Temporalio.Common.StreamDefinition"
+  /// @nexus.flatten-in-api param="handle" fields="id backend" keep=true
   resource %stream {
-    constructor(%stream: stream-ref, created: option<bool>);
+    constructor(handle: stream-handle, created: option<bool>);
 
     /// @nexus.doc "Publish values, and return the offset of the last one."
     /// @nexus.operation "append-records"
@@ -411,7 +435,9 @@ interface stream-service {
   /// @nexus.doc
   ///   "A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity."
   /// @nexus.operation name="ReadRecords"
-  /// @nexus.poll python="next_read_request" target="client"
+  /// @nexus.poll python="next_read_request" typescript="nextReadRequest"
+  ///   dotnet="StreamPoll.NextReadRequest" items="records" python-resume="resume_read_request"
+  ///   targets="client"
   read-records: func(request: read-records-request) -> read-records-response;
 
   /// @nexus.operation name="DescribeStream"

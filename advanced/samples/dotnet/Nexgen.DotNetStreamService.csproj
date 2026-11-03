@@ -19,6 +19,7 @@
              Exclude="wit/stream-service/workflow/SystemNexusWorkflowOutboundInterceptor.cs" />
     <Compile Include="proto/streams/**/*.cs" />
     <Compile Include="TemporalSupport/TemporalSupport.cs" />
+    <Compile Include="TemporalSupport/StreamService/*.cs" />
   </ItemGroup>
 
   <ItemGroup>

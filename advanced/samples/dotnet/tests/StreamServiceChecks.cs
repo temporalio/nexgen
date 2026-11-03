@@ -14,14 +14,14 @@ namespace Nexgen.DotNetExamples.Tests
     public class StreamServiceChecks
     {
         [Fact]
-        public void StreamWithItsOwnFieldNameRoundTrips()
+        public void StreamWithItsHandleRoundTrips()
         {
             var converter = DataConverter.Default.PayloadConverter;
-            var stream = new StreamServiceExample.Stream(new StreamServiceExample.StreamRef("stream-1"), null);
+            var stream = new StreamServiceExample.Stream(new StreamServiceExample.StreamHandle("stream-1"), null);
 
             var decoded = converter.ToValue<StreamServiceExample.Stream>(converter.ToPayload(stream));
 
-            Assert.Equal("stream-1", decoded.StreamValue.Id);
+            Assert.Equal("stream-1", decoded.Handle.Id);
         }
 
         // A data item's body goes through the payload converter of the sample assembly, which a
@@ -34,7 +34,7 @@ namespace Nexgen.DotNetExamples.Tests
                 new StreamServiceExample.StreamRecord
                 {
                     Item = new StreamServiceExample.StreamItem.Superseded(
-                        new StreamServiceExample.Supersession("workflow-1", new long[] { 7 })),
+                        new StreamServiceExample.StreamSuperseded("workflow-1", new long[] { 7 })),
                     Offset = 2,
                 },
                 new StreamServiceExample.StreamRecord

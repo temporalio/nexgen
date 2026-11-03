@@ -35,17 +35,9 @@ namespace Temporalio.Workflows
         /// </summary>
         public System.TimeSpan? Retention { get; set; }
         /// <summary>
-        /// Retry run only. The previous run, whose Records this withdraws.
+        /// The handle, whose id is stream-id. With an owner, it needs the handle's owner.
         /// </summary>
-        public string? WithdrawRun { get; set; }
-        /// <summary>
-        /// The Workflow run that owns the Stream. The Workflow transport sets it.
-        /// </summary>
-        public Producer? Owner { get; set; }
-        /// <summary>
-        /// The ref, whose id is stream-id. A create with an owner needs the ref's owner.
-        /// </summary>
-        public StreamRef? Ref { get; set; }
+        public StreamHandle? StreamHandle { get; set; }
     }
 
     /// <summary>
@@ -57,18 +49,18 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsOptions"/> class.
         /// </summary>
-        public AppendRecordsOptions(StreamRef stream, IReadOnlyList<AppendRecord> records)
+        public AppendRecordsOptions(StreamHandle handle, IReadOnlyList<AppendRecord> records)
         {
-            Stream = stream;
+            Handle = handle;
             Records = records;
         }
 
-        public StreamRef Stream { get; set; }
+        public StreamHandle Handle { get; set; }
         public IReadOnlyList<AppendRecord> Records { get; set; }
         /// <summary>
-        /// Required outside a Workflow. In a Workflow the transport sets it.
+        /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
         /// </summary>
-        public Producer? Producer { get; set; }
+        public long? Sequence { get; set; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -77,14 +69,16 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="CloseStreamOptions"/> class.
         /// </summary>
-        public CloseStreamOptions(StreamRef stream)
+        public CloseStreamOptions(StreamHandle handle)
         {
-            Stream = stream;
+            Handle = handle;
         }
 
-        public StreamRef Stream { get; set; }
-        public Producer? Producer { get; set; }
+        public StreamHandle Handle { get; set; }
         public object? Result { get; set; }
+        /// <summary>
+        /// Empty completes the Stream. A cancel failure cancels it. Any other fails it.
+        /// </summary>
         public System.Exception? Failure { get; set; }
     }
 
@@ -97,12 +91,12 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="ReadRecordsOptions"/> class.
         /// </summary>
-        public ReadRecordsOptions(StreamRef stream)
+        public ReadRecordsOptions(StreamHandle handle)
         {
-            Stream = stream;
+            Handle = handle;
         }
 
-        public StreamRef Stream { get; set; }
+        public StreamHandle Handle { get; set; }
         /// <summary>
         /// Start offset. Empty uses start. OUT_OF_RANGE past the newest offset + 1.
         /// </summary>
@@ -139,12 +133,12 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="DescribeStreamOptions"/> class.
         /// </summary>
-        public DescribeStreamOptions(StreamRef stream)
+        public DescribeStreamOptions(StreamHandle handle)
         {
-            Stream = stream;
+            Handle = handle;
         }
 
-        public StreamRef Stream { get; set; }
+        public StreamHandle Handle { get; set; }
     }
 
     /// <summary>
@@ -163,19 +157,17 @@ namespace Temporalio.Workflows
         {
             var client = Workflow.CreateNexusWorkflowClient<IStreamService>(StreamServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<CreateStreamResult>(svc => svc.CreateStream(request)).ConfigureAwait(true);
-            return new Stream((result.Stream ?? throw new System.InvalidOperationException("CreateStream answered without `stream`")), result.Created);
+            return new Stream((result.Handle ?? throw new System.InvalidOperationException("CreateStream answered without `handle`")), result.Created);
         }
 
         /// <param name="options">Create a Stream, or get the open one. A closed, expired or another owner's Stream fails.</param>
         [GeneratedCode("nexgen", null)]
         public static Task<Stream> CreateStreamAsync(CreateStreamOptions options)
         {
-            var request = new CreateStreamRequest(options.Id)
+            var request = new CreateStreamRequest(options.Id, Nexgen.Support.StreamWorkflowContext.WithdrawRun(), Nexgen.Support.StreamWorkflowContext.Owner())
             {
                 Retention = options.Retention,
-                WithdrawRun = options.WithdrawRun,
-                Owner = options.Owner,
-                Ref = options.Ref,
+                StreamHandle = options.StreamHandle,
             };
             return CreateStreamAsync(request);
         }
@@ -199,9 +191,9 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<AppendRecordsResponse> AppendRecordsAsync(AppendRecordsOptions options)
         {
-            var request = new AppendRecordsRequest(options.Stream, options.Records)
+            var request = new AppendRecordsRequest(options.Handle, options.Records, Nexgen.Support.StreamWorkflowContext.Producer(), Nexgen.Support.StreamWorkflowContext.WithdrawRun())
             {
-                Producer = options.Producer,
+                Sequence = options.Sequence,
             };
             return AppendRecordsAsync(request);
         }
@@ -219,9 +211,8 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<CloseStreamResponse> CloseStreamAsync(CloseStreamOptions options)
         {
-            var request = new CloseStreamRequest(options.Stream)
+            var request = new CloseStreamRequest(options.Handle, Nexgen.Support.StreamWorkflowContext.Producer())
             {
-                Producer = options.Producer,
                 Result = options.Result,
                 Failure = options.Failure,
             };
@@ -247,7 +238,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<ReadRecordsResponse> ReadRecordsAsync(ReadRecordsOptions options)
         {
-            var request = new ReadRecordsRequest(options.Stream)
+            var request = new ReadRecordsRequest(options.Handle)
             {
                 FromOffset = options.FromOffset,
                 Start = options.Start,
@@ -272,7 +263,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<DescribeStreamResponse> DescribeStreamAsync(DescribeStreamOptions options)
         {
-            var request = new DescribeStreamRequest(options.Stream);
+            var request = new DescribeStreamRequest(options.Handle);
             return DescribeStreamAsync(request);
         }
 

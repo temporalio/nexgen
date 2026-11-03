@@ -3,6 +3,7 @@
 import * as nexus from "../../../../nexus";
 import { streamService } from "../services";
 import type { CreateStreamRequest } from "../models";
+import * as support from "../../../../support/temporal_model_converters";
 import { Stream } from "../resources";
 
 function requiredField<T>(
@@ -16,10 +17,21 @@ function requiredField<T>(
   return value;
 }
 
+type CreateStreamInput = CreateStreamRequest extends infer Input
+  ? Input extends unknown
+    ? Omit<Input, "owner" | "withdraw_run"> & { owner?: never; withdraw_run?: never }
+    : never
+  : never;
+
 /**
  * @param request - Request for the operation.
  */
-export async function createStream(request: CreateStreamRequest): Promise<Stream> {
+export async function createStream(requestInput: CreateStreamInput): Promise<Stream> {
+  const request = {
+    ...requestInput,
+    withdrawRun: support.withdrawRun(),
+    owner: support.workflowOwner(),
+  } as CreateStreamRequest;
   const client = nexus.createNexusServiceClient({
     service: streamService,
     endpoint: "__temporal_system",
@@ -30,7 +42,7 @@ export async function createStream(request: CreateStreamRequest): Promise<Stream
   );
   const result = await handle.result();
   return new Stream(
-    requiredField(result.stream, "resource", "stream"),
+    requiredField(result.handle, "resource", "handle"),
     result.created ?? undefined,
   );
 }

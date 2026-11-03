@@ -28,54 +28,55 @@ namespace Temporalio.Api.Stream.V1 {
             "cmFsLmFwaS5zdHJlYW0udjEaH2dvb2dsZS9wcm90b2J1Zi90aW1lc3RhbXAu",
             "cHJvdG8aJHRlbXBvcmFsL2FwaS9jb21tb24vdjEvbWVzc2FnZS5wcm90bxoi",
             "dGVtcG9yYWwvYXBpL2VudW1zL3YxL3N0cmVhbS5wcm90bxoldGVtcG9yYWwv",
-            "YXBpL2ZhaWx1cmUvdjEvbWVzc2FnZS5wcm90byJaCglTdHJlYW1SZWYSCgoC",
-            "aWQYASABKAkSMAoFb3duZXIYAiABKAsyIS50ZW1wb3JhbC5hcGkuY29tbW9u",
-            "LnYxLkV4ZWN1dGlvbhIPCgdiYWNrZW5kGAMgASgJIsgBCg1Qcm9kdWNlckVw",
-            "b2NoEh0KFXRhc2tfc3RhcnRlZF9ldmVudF9pZBgBIAEoAxIUCgx0YXNrX2F0",
-            "dGVtcHQYAiABKAUSNQoRdGFza19zdGFydGVkX3RpbWUYBSABKAsyGi5nb29n",
-            "bGUucHJvdG9idWYuVGltZXN0YW1wEjoKFmF0dGVtcHRfc2NoZWR1bGVkX3Rp",
-            "bWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB2F0dGVt",
-            "cHQYBCABKAUilQEKCFByb2R1Y2VyEjcKBGtpbmQYASABKA4yKS50ZW1wb3Jh",
-            "bC5hcGkuZW51bXMudjEuU3RyZWFtUHJvZHVjZXJLaW5kEgoKAmlkGAIgASgJ",
-            "EjQKBWVwb2NoGAMgASgLMiUudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5Qcm9k",
-            "dWNlckVwb2NoEg4KBnJ1bl9pZBgEIAEoCSJwChFXb3JrZmxvd1Rhc2tFcG9j",
-            "aBIYChBzdGFydGVkX2V2ZW50X2lkGAEgASgDEg8KB2F0dGVtcHQYAiABKAUS",
-            "MAoMc3RhcnRlZF90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVz",
-            "dGFtcCJKCgxBcHBlbmRSZWNvcmQSLQoEYm9keRgCIAEoCzIfLnRlbXBvcmFs",
-            "LmFwaS5jb21tb24udjEuUGF5bG9hZEoECAEQAlIFdG9waWMiowIKDFN1cGVy",
-            "c2Vzc2lvbhJACg1wcm9kdWNlcl9raW5kGAEgASgOMikudGVtcG9yYWwuYXBp",
-            "LmVudW1zLnYxLlN0cmVhbVByb2R1Y2VyS2luZBITCgtwcm9kdWNlcl9pZBgC",
-            "IAEoCRI0CgVlcG9jaBgDIAEoCzIlLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEu",
-            "UHJvZHVjZXJFcG9jaBJKChdwcmV2aW91c19jb21wbGV0ZWRfdGFzaxgEIAEo",
-            "CzIpLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuV29ya2Zsb3dUYXNrRXBvY2gS",
-            "FAoMZmFpbGVkX3Rhc2tzGAUgAygDEhQKDHdpdGhkcmF3X3J1bhgGIAEoCRIO",
-            "CgZydW5faWQYByABKAkifAoKU3RyZWFtRGF0YRIyCghwcm9kdWNlchgCIAEo",
-            "CzIgLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuUHJvZHVjZXISLQoEYm9keRgD",
-            "IAEoCzIfLnRlbXBvcmFsLmFwaS5jb21tb24udjEuUGF5bG9hZEoECAEQAlIF",
-            "dG9waWMi3wEKC1N0cmVhbUNsb3NlEjIKCHByb2R1Y2VyGAEgASgLMiAudGVt",
-            "cG9yYWwuYXBpLnN0cmVhbS52MS5Qcm9kdWNlchIvCgZyZXN1bHQYAiABKAsy",
-            "Hy50ZW1wb3JhbC5hcGkuY29tbW9uLnYxLlBheWxvYWQSMQoHZmFpbHVyZRgD",
-            "IAEoCzIgLnRlbXBvcmFsLmFwaS5mYWlsdXJlLnYxLkZhaWx1cmUSOAoGc3Rh",
-            "dHVzGAQgASgOMigudGVtcG9yYWwuYXBpLmVudW1zLnYxLlN0cmVhbUNsb3Nl",
-            "U3RhdHVzIswBCgxTdHJlYW1SZWNvcmQSDgoGb2Zmc2V0GAEgASgDEjIKBGRh",
-            "dGEYAiABKAsyIi50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLlN0cmVhbURhdGFI",
-            "ABI6CgpzdXBlcnNlZGVkGAMgASgLMiQudGVtcG9yYWwuYXBpLnN0cmVhbS52",
-            "MS5TdXBlcnNlc3Npb25IABI0CgVjbG9zZRgEIAEoCzIjLnRlbXBvcmFsLmFw",
-            "aS5zdHJlYW0udjEuU3RyZWFtQ2xvc2VIAEIGCgRpdGVtIk4KElN0cmVhbUVy",
-            "cm9yRGV0YWlscxI4CgZyZWFzb24YASABKA4yKC50ZW1wb3JhbC5hcGkuZW51",
-            "bXMudjEuU3RyZWFtRXJyb3JSZWFzb25CiQEKGWlvLnRlbXBvcmFsLmFwaS5z",
-            "dHJlYW0udjFCDE1lc3NhZ2VQcm90b1ABWiNnby50ZW1wb3JhbC5pby9hcGkv",
-            "c3RyZWFtL3YxO3N0cmVhbaoCGFRlbXBvcmFsaW8uQXBpLlN0cmVhbS5WMeoC",
-            "G1RlbXBvcmFsaW86OkFwaTo6U3RyZWFtOjpWMWIGcHJvdG8z"));
+            "YXBpL2ZhaWx1cmUvdjEvbWVzc2FnZS5wcm90byJdCgxTdHJlYW1IYW5kbGUS",
+            "CgoCaWQYASABKAkSMAoFb3duZXIYAiABKAsyIS50ZW1wb3JhbC5hcGkuY29t",
+            "bW9uLnYxLkV4ZWN1dGlvbhIPCgdiYWNrZW5kGAMgASgJIsgBCg1Qcm9kdWNl",
+            "ckVwb2NoEh0KFXRhc2tfc3RhcnRlZF9ldmVudF9pZBgBIAEoAxIUCgx0YXNr",
+            "X2F0dGVtcHQYAiABKAUSNQoRdGFza19zdGFydGVkX3RpbWUYBSABKAsyGi5n",
+            "b29nbGUucHJvdG9idWYuVGltZXN0YW1wEjoKFmF0dGVtcHRfc2NoZWR1bGVk",
+            "X3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB2F0",
+            "dGVtcHQYBCABKAUilQEKCFByb2R1Y2VyEjcKBGtpbmQYASABKA4yKS50ZW1w",
+            "b3JhbC5hcGkuZW51bXMudjEuU3RyZWFtUHJvZHVjZXJLaW5kEgoKAmlkGAIg",
+            "ASgJEjQKBWVwb2NoGAMgASgLMiUudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5Q",
+            "cm9kdWNlckVwb2NoEg4KBnJ1bl9pZBgEIAEoCSJwChFXb3JrZmxvd1Rhc2tF",
+            "cG9jaBIYChBzdGFydGVkX2V2ZW50X2lkGAEgASgDEg8KB2F0dGVtcHQYAiAB",
+            "KAUSMAoMc3RhcnRlZF90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRp",
+            "bWVzdGFtcCJKCgxBcHBlbmRSZWNvcmQSLQoEYm9keRgCIAEoCzIfLnRlbXBv",
+            "cmFsLmFwaS5jb21tb24udjEuUGF5bG9hZEoECAEQAlIFdG9waWMipwIKEFN0",
+            "cmVhbVN1cGVyc2VkZWQSQAoNcHJvZHVjZXJfa2luZBgBIAEoDjIpLnRlbXBv",
+            "cmFsLmFwaS5lbnVtcy52MS5TdHJlYW1Qcm9kdWNlcktpbmQSEwoLcHJvZHVj",
+            "ZXJfaWQYAiABKAkSNAoFZXBvY2gYAyABKAsyJS50ZW1wb3JhbC5hcGkuc3Ry",
+            "ZWFtLnYxLlByb2R1Y2VyRXBvY2gSSgoXcHJldmlvdXNfY29tcGxldGVkX3Rh",
+            "c2sYBCABKAsyKS50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLldvcmtmbG93VGFz",
+            "a0Vwb2NoEhQKDGZhaWxlZF90YXNrcxgFIAMoAxIUCgx3aXRoZHJhd19ydW4Y",
+            "BiABKAkSDgoGcnVuX2lkGAcgASgJInwKClN0cmVhbURhdGESMgoIcHJvZHVj",
+            "ZXIYAiABKAsyIC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLlByb2R1Y2VyEi0K",
+            "BGJvZHkYAyABKAsyHy50ZW1wb3JhbC5hcGkuY29tbW9uLnYxLlBheWxvYWRK",
+            "BAgBEAJSBXRvcGljIt8BCgtTdHJlYW1DbG9zZRIyCghwcm9kdWNlchgBIAEo",
+            "CzIgLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuUHJvZHVjZXISLwoGcmVzdWx0",
+            "GAIgASgLMh8udGVtcG9yYWwuYXBpLmNvbW1vbi52MS5QYXlsb2FkEjEKB2Zh",
+            "aWx1cmUYAyABKAsyIC50ZW1wb3JhbC5hcGkuZmFpbHVyZS52MS5GYWlsdXJl",
+            "EjgKBnN0YXR1cxgEIAEoDjIoLnRlbXBvcmFsLmFwaS5lbnVtcy52MS5TdHJl",
+            "YW1DbG9zZVN0YXR1cyLQAQoMU3RyZWFtUmVjb3JkEg4KBm9mZnNldBgBIAEo",
+            "AxIyCgRkYXRhGAIgASgLMiIudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJl",
+            "YW1EYXRhSAASPgoKc3VwZXJzZWRlZBgDIAEoCzIoLnRlbXBvcmFsLmFwaS5z",
+            "dHJlYW0udjEuU3RyZWFtU3VwZXJzZWRlZEgAEjQKBWNsb3NlGAQgASgLMiMu",
+            "dGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1DbG9zZUgAQgYKBGl0ZW0i",
+            "TgoSU3RyZWFtRXJyb3JEZXRhaWxzEjgKBnJlYXNvbhgBIAEoDjIoLnRlbXBv",
+            "cmFsLmFwaS5lbnVtcy52MS5TdHJlYW1FcnJvclJlYXNvbkKJAQoZaW8udGVt",
+            "cG9yYWwuYXBpLnN0cmVhbS52MUIMTWVzc2FnZVByb3RvUAFaI2dvLnRlbXBv",
+            "cmFsLmlvL2FwaS9zdHJlYW0vdjE7c3RyZWFtqgIYVGVtcG9yYWxpby5BcGku",
+            "U3RyZWFtLlYx6gIbVGVtcG9yYWxpbzo6QXBpOjpTdHJlYW06OlYxYgZwcm90",
+            "bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.TimestampReflection.Descriptor, global::Temporalio.Api.Common.V1.MessageReflection.Descriptor, global::Temporalio.Api.Enums.V1.StreamReflection.Descriptor, global::Temporalio.Api.Failure.V1.MessageReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamRef), global::Temporalio.Api.Stream.V1.StreamRef.Parser, new[]{ "Id", "Owner", "Backend" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamHandle), global::Temporalio.Api.Stream.V1.StreamHandle.Parser, new[]{ "Id", "Owner", "Backend" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.ProducerEpoch), global::Temporalio.Api.Stream.V1.ProducerEpoch.Parser, new[]{ "TaskStartedEventId", "TaskAttempt", "TaskStartedTime", "AttemptScheduledTime", "Attempt" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.Producer), global::Temporalio.Api.Stream.V1.Producer.Parser, new[]{ "Kind", "Id", "Epoch", "RunId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch), global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch.Parser, new[]{ "StartedEventId", "Attempt", "StartedTime" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.AppendRecord), global::Temporalio.Api.Stream.V1.AppendRecord.Parser, new[]{ "Body" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.Supersession), global::Temporalio.Api.Stream.V1.Supersession.Parser, new[]{ "ProducerKind", "ProducerId", "Epoch", "PreviousCompletedTask", "FailedTasks", "WithdrawRun", "RunId" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamSuperseded), global::Temporalio.Api.Stream.V1.StreamSuperseded.Parser, new[]{ "ProducerKind", "ProducerId", "Epoch", "PreviousCompletedTask", "FailedTasks", "WithdrawRun", "RunId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamData), global::Temporalio.Api.Stream.V1.StreamData.Parser, new[]{ "Producer", "Body" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamClose), global::Temporalio.Api.Stream.V1.StreamClose.Parser, new[]{ "Producer", "Result", "Failure", "Status" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamRecord), global::Temporalio.Api.Stream.V1.StreamRecord.Parser, new[]{ "Offset", "Data", "Superseded", "Close" }, new[]{ "Item" }, null, null, null),
@@ -91,16 +92,16 @@ namespace Temporalio.Api.Stream.V1 {
   /// Identifies one Stream. The id is opaque to callers.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class StreamRef : pb::IMessage<StreamRef>
+  public sealed partial class StreamHandle : pb::IMessage<StreamHandle>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<StreamRef> _parser = new pb::MessageParser<StreamRef>(() => new StreamRef());
+    private static readonly pb::MessageParser<StreamHandle> _parser = new pb::MessageParser<StreamHandle>(() => new StreamHandle());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<StreamRef> Parser { get { return _parser; } }
+    public static pb::MessageParser<StreamHandle> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -116,7 +117,7 @@ namespace Temporalio.Api.Stream.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public StreamRef() {
+    public StreamHandle() {
       OnConstruction();
     }
 
@@ -124,7 +125,7 @@ namespace Temporalio.Api.Stream.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public StreamRef(StreamRef other) : this() {
+    public StreamHandle(StreamHandle other) : this() {
       id_ = other.id_;
       owner_ = other.owner_ != null ? other.owner_.Clone() : null;
       backend_ = other.backend_;
@@ -133,8 +134,8 @@ namespace Temporalio.Api.Stream.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public StreamRef Clone() {
-      return new StreamRef(this);
+    public StreamHandle Clone() {
+      return new StreamHandle(this);
     }
 
     /// <summary>Field number for the "id" field.</summary>
@@ -172,7 +173,7 @@ namespace Temporalio.Api.Stream.V1 {
     private string backend_ = "";
     /// <summary>
     /// The name of the backend that holds the Stream, as the Worker and client config register
-    /// it, so every process routes a ref it receives. Empty is the default backend. The Store
+    /// it, so every process routes a handle it receives. Empty is the default backend. The Store
     /// never reads it.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -187,12 +188,12 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as StreamRef);
+      return Equals(other as StreamHandle);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(StreamRef other) {
+    public bool Equals(StreamHandle other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -291,7 +292,7 @@ namespace Temporalio.Api.Stream.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(StreamRef other) {
+    public void MergeFrom(StreamHandle other) {
       if (other == null) {
         return;
       }
@@ -1586,16 +1587,16 @@ namespace Temporalio.Api.Stream.V1 {
   /// Experimental. Might change in the future.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Supersession : pb::IMessage<Supersession>
+  public sealed partial class StreamSuperseded : pb::IMessage<StreamSuperseded>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<Supersession> _parser = new pb::MessageParser<Supersession>(() => new Supersession());
+    private static readonly pb::MessageParser<StreamSuperseded> _parser = new pb::MessageParser<StreamSuperseded>(() => new StreamSuperseded());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Supersession> Parser { get { return _parser; } }
+    public static pb::MessageParser<StreamSuperseded> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1611,7 +1612,7 @@ namespace Temporalio.Api.Stream.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Supersession() {
+    public StreamSuperseded() {
       OnConstruction();
     }
 
@@ -1619,7 +1620,7 @@ namespace Temporalio.Api.Stream.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Supersession(Supersession other) : this() {
+    public StreamSuperseded(StreamSuperseded other) : this() {
       producerKind_ = other.producerKind_;
       producerId_ = other.producerId_;
       epoch_ = other.epoch_ != null ? other.epoch_.Clone() : null;
@@ -1632,8 +1633,8 @@ namespace Temporalio.Api.Stream.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Supersession Clone() {
-      return new Supersession(this);
+    public StreamSuperseded Clone() {
+      return new StreamSuperseded(this);
     }
 
     /// <summary>Field number for the "producer_kind" field.</summary>
@@ -1731,12 +1732,12 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as Supersession);
+      return Equals(other as StreamSuperseded);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Supersession other) {
+    public bool Equals(StreamSuperseded other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -1879,7 +1880,7 @@ namespace Temporalio.Api.Stream.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Supersession other) {
+    public void MergeFrom(StreamSuperseded other) {
       if (other == null) {
         return;
       }
@@ -2716,13 +2717,14 @@ namespace Temporalio.Api.Stream.V1 {
     /// <summary>Field number for the "superseded" field.</summary>
     public const int SupersededFieldNumber = 3;
     /// <summary>
-    /// The first batch of a higher epoch carries it. It withdraws the earlier Records that its
-    /// facts name, and a reader drops them.
+    /// The Store keeps only the withdrawal facts of the first batch of a higher epoch. A read
+    /// builds this item from them. It withdraws the earlier Records that the facts name, and a
+    /// reader drops them.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.Supersession Superseded {
-      get { return itemCase_ == ItemOneofCase.Superseded ? (global::Temporalio.Api.Stream.V1.Supersession) item_ : null; }
+    public global::Temporalio.Api.Stream.V1.StreamSuperseded Superseded {
+      get { return itemCase_ == ItemOneofCase.Superseded ? (global::Temporalio.Api.Stream.V1.StreamSuperseded) item_ : null; }
       set {
         item_ = value;
         itemCase_ = value == null ? ItemOneofCase.None : ItemOneofCase.Superseded;
@@ -2901,7 +2903,7 @@ namespace Temporalio.Api.Stream.V1 {
           break;
         case ItemOneofCase.Superseded:
           if (Superseded == null) {
-            Superseded = new global::Temporalio.Api.Stream.V1.Supersession();
+            Superseded = new global::Temporalio.Api.Stream.V1.StreamSuperseded();
           }
           Superseded.MergeFrom(other.Superseded);
           break;
@@ -2946,7 +2948,7 @@ namespace Temporalio.Api.Stream.V1 {
             break;
           }
           case 26: {
-            global::Temporalio.Api.Stream.V1.Supersession subBuilder = new global::Temporalio.Api.Stream.V1.Supersession();
+            global::Temporalio.Api.Stream.V1.StreamSuperseded subBuilder = new global::Temporalio.Api.Stream.V1.StreamSuperseded();
             if (itemCase_ == ItemOneofCase.Superseded) {
               subBuilder.MergeFrom(Superseded);
             }
@@ -2996,7 +2998,7 @@ namespace Temporalio.Api.Stream.V1 {
             break;
           }
           case 26: {
-            global::Temporalio.Api.Stream.V1.Supersession subBuilder = new global::Temporalio.Api.Stream.V1.Supersession();
+            global::Temporalio.Api.Stream.V1.StreamSuperseded subBuilder = new global::Temporalio.Api.Stream.V1.StreamSuperseded();
             if (itemCase_ == ItemOneofCase.Superseded) {
               subBuilder.MergeFrom(Superseded);
             }

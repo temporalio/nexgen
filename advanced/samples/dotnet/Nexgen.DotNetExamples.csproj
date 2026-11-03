@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <!-- The generated interceptor partials require matching SDK changes. -->
-    <Compile Remove="bin/**/*.cs;obj/**/*.cs;tests/**/*.cs;json_schema/**/*.cs;**/Support/*.cs;wit/multi-operation-service/**/*.cs;wit/stream-service/**/*.cs;proto/streams/**/*.cs;wit/workflow-handle/**/*.cs;wit/workflow-service/SystemNexusWorkflowOutboundInterceptor.cs" />
+    <Compile Remove="bin/**/*.cs;obj/**/*.cs;tests/**/*.cs;json_schema/**/*.cs;**/Support/*.cs;wit/multi-operation-service/**/*.cs;wit/stream-service/**/*.cs;proto/streams/**/*.cs;TemporalSupport/StreamService/**/*.cs;wit/workflow-handle/**/*.cs;wit/workflow-service/SystemNexusWorkflowOutboundInterceptor.cs" />
   </ItemGroup>
 
   <ItemGroup>
