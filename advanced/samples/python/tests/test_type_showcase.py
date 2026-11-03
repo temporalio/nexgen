@@ -181,7 +181,7 @@ class TypeShowcaseHandler:
 @workflow.defn
 class TypeShowcaseCallerWorkflow:
     @workflow.run
-    async def run(self) -> User:
+    async def run(self) -> UserData:
         user = await type_showcase.get_user(
             user_id="user-123",
             consistency_token="read-123",
@@ -194,7 +194,15 @@ class TypeShowcaseCallerWorkflow:
             report=sync_report(),
         )
         await record_sync_handle
-        return renamed_user
+        assert isinstance(renamed_user, User)
+        # A handle isn't data, so the Workflow returns its identity fields.
+        return UserData(
+            user_id=renamed_user.user_id,
+            email=renamed_user.email,
+            display_name=renamed_user.display_name,
+            status=renamed_user.status,
+            profile=renamed_user.profile,
+        )
 
 
 def test_generated_metadata() -> None:
@@ -343,7 +351,7 @@ async def test_get_user_returns_wit_user_resource_through_real_nexus_client(
         finally:
             await env.delete_nexus_endpoint(endpoint)
 
-    assert isinstance(user, User)
+    assert isinstance(user, UserData)
     assert user.user_id == "user-123"
     assert user.email == "new@example.com"
     assert user.display_name == "New Name"

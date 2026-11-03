@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
-import dataclasses
+import typing_extensions
 
 
-@dataclasses.dataclass
 class SignalResult:
     namespace: str
     started: bool | None
 
-    pass
+    def __init__(
+        self,
+        namespace: str,
+        started: bool | None,
+    ) -> None:
+        self.namespace = namespace
+        self.started = started
+
+    @typing_extensions.override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SignalResult):
+            return NotImplemented
+        return (self.namespace, self.started) == (other.namespace, other.started)
+
+    @typing_extensions.override
+    def __repr__(self) -> str:
+        return f"SignalResult(namespace={self.namespace!r}, started={self.started!r})"

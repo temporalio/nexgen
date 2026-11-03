@@ -6,6 +6,7 @@ import temporalio.workflow
 
 from ..models import GetSenderRequest
 from .._resources import Sender
+from .._resources._resource_data import SenderData
 
 
 async def _get_sender(
@@ -18,9 +19,13 @@ async def _get_sender(
     handle = await nexus_client.start_operation(
         operation="GetSender",
         input=request,
-        output_type=Sender,
+        output_type=SenderData,
     )
-    return await handle
+    result = await handle
+    resource = Sender(
+        token=result.token,
+    )
+    return resource
 
 
 async def get_sender(

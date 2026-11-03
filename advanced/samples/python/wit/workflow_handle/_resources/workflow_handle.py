@@ -2,13 +2,34 @@
 
 from __future__ import annotations
 
-import dataclasses
+import typing_extensions
 
 
-@dataclasses.dataclass
 class WorkflowHandle:
     namespace: str
     workflow_id: str
     run_id: str | None
 
-    pass
+    def __init__(
+        self,
+        namespace: str,
+        workflow_id: str,
+        run_id: str | None,
+    ) -> None:
+        self.namespace = namespace
+        self.workflow_id = workflow_id
+        self.run_id = run_id
+
+    @typing_extensions.override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, WorkflowHandle):
+            return NotImplemented
+        return (self.namespace, self.workflow_id, self.run_id) == (
+            other.namespace,
+            other.workflow_id,
+            other.run_id,
+        )
+
+    @typing_extensions.override
+    def __repr__(self) -> str:
+        return f"WorkflowHandle(namespace={self.namespace!r}, workflow_id={self.workflow_id!r}, run_id={self.run_id!r})"

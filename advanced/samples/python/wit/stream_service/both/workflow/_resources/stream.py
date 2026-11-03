@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import dataclasses
+import typing_extensions
 import temporalio.nexus.system
 import datetime
 import temporalio.workflow
@@ -23,12 +23,29 @@ from ...models import (
 import temporal_support as _support
 
 
-@dataclasses.dataclass
 class Stream:
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
     ref: StreamRef
     created: bool | None
+
+    def __init__(
+        self,
+        ref: StreamRef,
+        created: bool | None,
+    ) -> None:
+        self.ref = ref
+        self.created = created
+
+    @typing_extensions.override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Stream):
+            return NotImplemented
+        return (self.ref, self.created) == (other.ref, other.created)
+
+    @typing_extensions.override
+    def __repr__(self) -> str:
+        return f"Stream(ref={self.ref!r}, created={self.created!r})"
 
     async def publish(
         self,
