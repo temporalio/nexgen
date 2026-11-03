@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import temporalio.nexus.system
 import temporalio.workflow
 
 from ..models import (
@@ -15,7 +16,7 @@ async def _second_operation(
 ) -> temporalio.workflow.NexusOperationHandle[Response,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="InterceptorService",
-        endpoint="__temporal_system",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
     return await nexus_client.start_operation(
         operation="SecondOperation",

@@ -1,7 +1,7 @@
 # TypeScript WIT Samples
 
 Advanced TypeScript sample suite for outputs generated from authored WIT inputs,
-plus the snapshot-only native-api (Nexus service/client) output of the
+plus the snapshot-only Workflow API (Nexus service/client) output of the
 JSON-Schema samples.
 
 - Authored WIT inputs live in [`advanced/samples/inputs/*.wit`](../inputs)
@@ -9,7 +9,7 @@ JSON-Schema samples.
   `advanced/samples/typescript/wit/<example>/`
 - Authored Temporal converters live in the shared `support/` directory;
   generated modules import them rather than copying them into each output
-- Snapshot-only JSON-Schema native-api output lives in
+- Snapshot-only JSON-Schema Workflow API output lives in
   `advanced/samples/typescript/json_schema/api/<example>/`
 - Vitest files live in `advanced/samples/typescript/tests/` (WIT round-trip and
   real-workflow/Nexus tests); proto wire fixtures live in
@@ -80,7 +80,7 @@ cargo run --features advanced -- typescript advanced/samples/inputs/proto-backed
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package ../../support/temporal_model_converters \
-  --native-api --output advanced/samples/typescript/wit/proto-backed-showcase
+  --targets workflow --output advanced/samples/typescript/wit/proto-backed-showcase
 ```
 
 Include both your authored module and generated output in your TypeScript

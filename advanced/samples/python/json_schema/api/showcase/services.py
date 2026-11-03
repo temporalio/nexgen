@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
-import typing
-import temporalio.workflow
-
 from .models import (
     GetShowcaseInput,
     Showcase,
@@ -33,21 +30,3 @@ class ShowcaseServicePy:
     operation name stays `GetShowcase` and the synthesized I/O type stays
     `GetShowcaseInput` (derived from the operation key, not the override).
     """
-
-
-class ShowcaseServicePyClient:
-    def __init__(self, endpoint: str) -> None:
-        self._nexus_client: typing.Any = temporalio.workflow.create_nexus_client(
-            service="example.showcase.v1.ShowcaseService",
-            endpoint=endpoint,
-        )
-
-    async def get_showcase_py(
-        self,
-        request: GetShowcaseInput,
-    ) -> temporalio.workflow.NexusOperationHandle[Showcase]:
-        return await self._nexus_client.start_operation(
-            operation="GetShowcase",
-            input=request,
-            output_type=Showcase,
-        )

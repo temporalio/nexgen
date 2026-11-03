@@ -8,7 +8,7 @@ import typing
 
 import nexusrpc
 import temporalio.converter
-from .services import ShowcaseServicePyClient
+from ._clients import ShowcaseServicePyClient
 from . import services as _services
 
 __all__ = [

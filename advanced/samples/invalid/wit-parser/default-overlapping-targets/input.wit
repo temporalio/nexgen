@@ -1,0 +1,10 @@
+package test:overlapping-defaults@1.0.0;
+world system { export example; }
+interface example {
+  record request {
+    /// @nexus.default targets="workflow,client" python="1" typescript="1" go="1" dotnet="1u"
+    /// @nexus.default targets="client" python="2" typescript="2" go="2" dotnet="2u"
+    attempts: u32,
+  }
+  submit: func(request: request);
+}

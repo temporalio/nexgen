@@ -1,0 +1,29 @@
+package test:cross-service-result-holder@1.0.0;
+
+world system {
+  export jobs;
+  export orders;
+}
+
+/// @nexus.endpoint "jobs"
+interface jobs {
+  resource job {
+    constructor(job-id: string);
+  }
+}
+
+/// @nexus.endpoint "orders"
+interface orders {
+  use jobs.{job};
+
+  record place-request {
+    job-id: string,
+  }
+
+  record place-result {
+    job: own<job>,
+    accepted: bool,
+  }
+
+  place: func(request: place-request) -> place-result;
+}

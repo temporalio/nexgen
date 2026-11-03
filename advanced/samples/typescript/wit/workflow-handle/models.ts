@@ -106,7 +106,7 @@ function startWorkflowRequestToProto(
       model.workflowStartDelay == null
         ? undefined
         : support.durationToProto(model.workflowStartDelay),
-    namespace: model.namespace ?? support.workflowNamespace(),
+    namespace: model.namespace,
   };
 }
 

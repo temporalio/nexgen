@@ -5,8 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use nexgen::error::{Error, ErrorKind};
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
+use nexgen::nexgen_config::GenerationTarget;
 use nexgen::{GenerateRequest, generate_to_file};
 use serde::Deserialize;
 
@@ -20,6 +20,8 @@ struct Expectation {
     descriptors: Option<Descriptors>,
     #[serde(default)]
     system_nexus: bool,
+    #[serde(default)]
+    targets: Vec<GenerationTarget>,
     error: ExpectedError,
 }
 
@@ -159,8 +161,8 @@ fn run_case(directory: &Path, repo: &Path) -> Result<Vec<String>, String> {
         let output = tempfile::tempdir().map_err(|error| error.to_string())?;
         let result = generate_to_file(&GenerateRequest {
             config: nexgen::nexgen_config::NexgenConfig {
-                mode: GenerationMode::NativeApi,
                 system_nexus: expected.system_nexus,
+                targets: expected.targets.clone(),
             },
             language,
             input_paths: inputs.clone(),

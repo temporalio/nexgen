@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use nexgen::generator::TsDateTimeTypes;
 use nexgen::language::Language;
 #[cfg(feature = "advanced")]
-use nexgen::nexgen_config::NexgenConfig;
+use nexgen::nexgen_config::{GenerationTarget, NexgenConfig};
 #[cfg(feature = "advanced")]
 use nexgen::parser::write_prepared_wit_directory;
 #[cfg(feature = "advanced")]
@@ -60,13 +60,15 @@ struct GenerateArgs {
     #[cfg(feature = "advanced")]
     #[arg(long)]
     format: bool,
-    #[cfg(feature = "advanced")]
-    #[arg(long = "native-api")]
-    generate_native_api: bool,
     /// Generate Temporal System Nexus-specific bindings.
     #[cfg(feature = "advanced")]
     #[arg(long = "system-nexus")]
     system_nexus: bool,
+    /// Generate APIs for these callers: workflow or client (Python only).
+    /// Defaults to models and definitions only. Repeat the flag or use commas.
+    #[cfg(feature = "advanced")]
+    #[arg(long = "targets", value_enum, value_delimiter = ',')]
+    targets: Vec<GenerationTarget>,
 }
 
 #[derive(Args)]
@@ -196,72 +198,20 @@ fn main() -> ExitCode {
             Some(args.package_name),
             None,
         )),
-        Commands::Python(args) => {
-            #[cfg(feature = "advanced")]
-            {
-                let system_nexus = args.common.system_nexus;
-                let config = NexgenConfig {
-                    mode: if args.common.generate_native_api {
-                        nexgen::generator::GenerationMode::NativeApi
-                    } else {
-                        nexgen::generator::GenerationMode::DefinitionsOnly
-                    },
-                    system_nexus,
-                };
-                let mut request = generate_request(
-                    Language::Python,
-                    args.common,
-                    Default::default(),
-                    None,
-                    args.support_package,
-                );
-                request.config = config;
-                generate_to_file(&request)
-            }
-            #[cfg(not(feature = "advanced"))]
-            {
-                generate_to_file(&generate_request(
-                    Language::Python,
-                    args.common,
-                    Default::default(),
-                    None,
-                    args.support_package,
-                ))
-            }
-        }
-        Commands::Typescript(args) => {
-            #[cfg(feature = "advanced")]
-            {
-                let system_nexus = args.common.system_nexus;
-                let config = NexgenConfig {
-                    mode: if args.common.generate_native_api {
-                        nexgen::generator::GenerationMode::NativeApi
-                    } else {
-                        nexgen::generator::GenerationMode::DefinitionsOnly
-                    },
-                    system_nexus,
-                };
-                let mut request = generate_request(
-                    Language::TypeScript,
-                    args.common,
-                    args.ts_date_time_types.into(),
-                    None,
-                    args.support_package,
-                );
-                request.config = config;
-                generate_to_file(&request)
-            }
-            #[cfg(not(feature = "advanced"))]
-            {
-                generate_to_file(&generate_request(
-                    Language::TypeScript,
-                    args.common,
-                    args.ts_date_time_types.into(),
-                    None,
-                    args.support_package,
-                ))
-            }
-        }
+        Commands::Python(args) => generate_to_file(&generate_request(
+            Language::Python,
+            args.common,
+            Default::default(),
+            None,
+            args.support_package,
+        )),
+        Commands::Typescript(args) => generate_to_file(&generate_request(
+            Language::TypeScript,
+            args.common,
+            args.ts_date_time_types.into(),
+            None,
+            args.support_package,
+        )),
         #[cfg(feature = "advanced")]
         Commands::AddRpc(args) => add_rpc_to_file(&AddRpcRequest {
             descriptor_paths: args.descriptors,
@@ -300,12 +250,8 @@ fn generate_request(
     GenerateRequest {
         #[cfg(feature = "advanced")]
         config: NexgenConfig {
-            mode: if args.generate_native_api {
-                nexgen::generator::GenerationMode::NativeApi
-            } else {
-                nexgen::generator::GenerationMode::DefinitionsOnly
-            },
             system_nexus: args.system_nexus,
+            targets: args.targets,
         },
         #[cfg(not(feature = "advanced"))]
         config: Default::default(),

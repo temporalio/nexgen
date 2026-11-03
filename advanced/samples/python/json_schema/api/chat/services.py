@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
-import typing
-import temporalio.workflow
-
 from .models import (
     GetRoomInput,
     Room,
@@ -35,39 +32,3 @@ class ChatService:
         None,
     ] = Operation(name="Ping")
     """Liveness probe."""
-
-
-class ChatServiceClient:
-    def __init__(self, endpoint: str) -> None:
-        self._nexus_client: typing.Any = temporalio.workflow.create_nexus_client(
-            service="example.chat.v1.ChatService",
-            endpoint=endpoint,
-        )
-
-    async def send_message(
-        self,
-        request: SendMessageInput,
-    ) -> temporalio.workflow.NexusOperationHandle[SendMessageOutput]:
-        return await self._nexus_client.start_operation(
-            operation="SendMessage",
-            input=request,
-            output_type=SendMessageOutput,
-        )
-
-    async def get_room(
-        self,
-        request: GetRoomInput,
-    ) -> temporalio.workflow.NexusOperationHandle[Room]:
-        return await self._nexus_client.start_operation(
-            operation="GetRoom",
-            input=request,
-            output_type=Room,
-        )
-
-    async def ping(
-        self,
-    ) -> temporalio.workflow.NexusOperationHandle[None]:
-        return await self._nexus_client.start_operation(
-            operation="Ping",
-            input=None,
-        )

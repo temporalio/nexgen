@@ -97,14 +97,17 @@ flowchart LR
   constraints. Native protobuf-backed enums must match the descriptor's full
   case list, order, and numbers; reordered, omitted, and sparse cases are
   rejected before planning. It also checks authored service configuration
-  against the generation mode, with target-specific policies owned by their
+  against the requested API targets. Language-specific policies remain in
   language backends.
 - `LanguageSelectionPass` selects the target-language values from authored
   language maps.
 - `SelectedValidationPass` validates the selected generic surface after
   selection.
 - `ResourceResolutionPass` resolves resource-method and resource-return facts
-  from the API spec and descriptors.
+  from the API spec and descriptors. Operations must return resources owned by
+  their service, including those held in result records. Return bindings
+  determine shared wire models regardless of API targets; resource methods are
+  bound only when an API target is selected.
 - `OperationBindingPass` attaches resolved resource facts to their owning
   operations and resources.
 - `OperationLoweringPass` turns wire-backed resource returns into explicit
@@ -120,3 +123,29 @@ flowchart LR
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
   the consuming module can only resolve it from the tree-wide manifest.
+
+## Models and APIs
+
+Data models and their wire converters are shared across API targets. Operation
+wrappers and callable resource classes are target-specific because workflow and
+client code use different SDK entry points.
+
+Python emits shared models and service contracts at the package root, regardless
+of API targets. Contracts describe wire data rather than callable resource
+handles. Each API owns its operation wrappers and handles. The client API lives
+in `client/`; the workflow API lives in `workflow/` when both targets are
+selected, or at the root for workflow-only output. Neither API depends on the
+other. Plain resource identity DTOs live in the root
+`_resources/_resource_data.py` and have no runtime API behavior. Workflow
+endpoint clients live in the workflow API's `_clients.py`, not in the shared
+`services.py`.
+
+Field origins retain per-target expression maps through language selection and
+shared planning. API preparation selects its target's source or default
+expression when building a request. Model constructors and converters only
+handle data. This lets workflow and client APIs share models without sharing
+runtime behavior.
+
+Client resources keep their service-bound Nexus client. API code decodes
+returned resource data and constructs handles with that client. Python client
+APIs use the SDK's `NexusClient` and the shared typed operation descriptors.

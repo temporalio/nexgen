@@ -10,6 +10,7 @@ from ..models import (
     WorkflowExecution,
 )
 from .._resources import SignalResult
+import temporal_support as _support
 
 
 async def _signal_with_start(
@@ -37,6 +38,7 @@ async def signal_with_start(
     reason: str | None = None,
 ) -> SignalResult:
     request = CancelWorkflowRequest(
+        namespace=_support.workflow_namespace(),
         workflow_execution=workflow_execution,
         reason=reason,
     )

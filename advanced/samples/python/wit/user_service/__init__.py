@@ -7,7 +7,7 @@ import typing
 
 import nexusrpc
 import temporalio.converter
-from .services import UserServiceClient
+from ._clients import UserServiceClient
 from . import services as _services
 
 __all__ = [

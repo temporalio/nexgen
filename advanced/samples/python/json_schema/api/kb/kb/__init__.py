@@ -12,7 +12,7 @@ import typing
 
 import nexusrpc
 import temporalio.converter
-from .services import KnowledgeBaseServiceClient
+from ._clients import KnowledgeBaseServiceClient
 from . import services as _services
 
 __all__ = [

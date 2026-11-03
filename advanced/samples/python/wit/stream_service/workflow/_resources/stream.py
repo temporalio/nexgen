@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import typing
+import temporalio.nexus.system
 import datetime
 import temporalio.workflow
 
@@ -94,7 +95,7 @@ async def _append_records(
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
-        endpoint="__temporal_system",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
     return await nexus_client.start_operation(
         operation="AppendRecords",
@@ -127,7 +128,7 @@ async def _close_stream(
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
-        endpoint="__temporal_system",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
     return await nexus_client.start_operation(
         operation="CloseStream",
@@ -157,7 +158,7 @@ async def _read_records(
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
-        endpoint="__temporal_system",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
     return await nexus_client.start_operation(
         operation="ReadRecords",
@@ -211,7 +212,7 @@ async def _describe_stream(
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
-        endpoint="__temporal_system",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
     return await nexus_client.start_operation(
         operation="DescribeStream",

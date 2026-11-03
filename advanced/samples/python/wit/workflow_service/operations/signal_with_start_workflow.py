@@ -5,6 +5,7 @@ from __future__ import annotations
 import collections.abc
 import typing
 import typing_extensions
+import temporalio.nexus.system
 import datetime
 import temporalio.common
 
@@ -35,7 +36,7 @@ async def _signal_with_start_workflow(
 
     nexus_client = create_nexus_client(
         service="temporal.api.workflowservice.v1.WorkflowService",
-        endpoint="__temporal_system",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
     handle = await nexus_client.start_operation(
         operation="SignalWithStartWorkflowExecution",
@@ -656,5 +657,6 @@ async def signal_with_start_workflow(
         versioning_override=versioning_override,
         start_delay=start_delay,
         user_metadata=user_metadata,
+        namespace=_support.workflow_namespace(),
     )
     return await _signal_with_start_workflow(request)

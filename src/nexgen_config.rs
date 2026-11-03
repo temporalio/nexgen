@@ -5,21 +5,22 @@
 
 use std::cell::RefCell;
 
-use crate::generator::GenerationMode;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NexgenConfig {
-    pub mode: GenerationMode,
     pub system_nexus: bool,
+    pub targets: Vec<GenerationTarget>,
 }
 
-impl Default for NexgenConfig {
-    fn default() -> Self {
-        Self {
-            mode: GenerationMode::DefinitionsOnly,
-            system_nexus: false,
-        }
-    }
+/// One generation target.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, clap::ValueEnum,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum GenerationTarget {
+    /// Workflow code.
+    Workflow,
+    /// Code outside a Workflow, through a client class that inherits a generated extension.
+    Client,
 }
 
 thread_local! {
@@ -27,10 +28,12 @@ thread_local! {
 }
 
 pub fn current() -> NexgenConfig {
-    CONFIGS.with(|configs| configs.borrow().last().copied().unwrap_or_default())
+    CONFIGS.with(|configs| configs.borrow().last().cloned().unwrap_or_default())
 }
 
-pub fn scope(config: NexgenConfig) -> NexgenConfigScope {
+pub fn scope(mut config: NexgenConfig) -> NexgenConfigScope {
+    config.targets.sort_unstable();
+    config.targets.dedup();
     CONFIGS.with(|configs| configs.borrow_mut().push(config));
     NexgenConfigScope
 }
@@ -50,17 +53,33 @@ impl Drop for NexgenConfigScope {
 
 #[cfg(test)]
 mod tests {
-    use super::{NexgenConfig, current, scope};
-    use crate::generator::GenerationMode;
+    use super::{GenerationTarget, NexgenConfig, current, scope};
+
+    #[test]
+    fn normalizes_target_order_and_duplicates_at_scope_entry() {
+        let _scope = scope(NexgenConfig {
+            targets: vec![
+                GenerationTarget::Client,
+                GenerationTarget::Workflow,
+                GenerationTarget::Client,
+                GenerationTarget::Workflow,
+            ],
+            ..Default::default()
+        });
+        assert_eq!(
+            current().targets,
+            vec![GenerationTarget::Workflow, GenerationTarget::Client]
+        );
+    }
 
     #[test]
     fn restores_nested_configuration_after_unwinding() {
         let outer = NexgenConfig {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: true,
+            targets: Vec::new(),
         };
         {
-            let _outer_scope = scope(outer);
+            let _outer_scope = scope(outer.clone());
             assert_eq!(current(), outer);
             let result = std::panic::catch_unwind(|| {
                 let _inner_scope = scope(NexgenConfig::default());
@@ -75,11 +94,11 @@ mod tests {
     #[test]
     fn is_isolated_per_thread() {
         let config = NexgenConfig {
-            mode: GenerationMode::DefinitionsOnly,
             system_nexus: true,
+            targets: Vec::new(),
         };
         {
-            let _scope = scope(config);
+            let _scope = scope(config.clone());
             assert_eq!(current(), config);
             assert_eq!(
                 std::thread::spawn(current).join().unwrap(),

@@ -1,0 +1,11 @@
+package temporal:client-hook-name-clash@1.0.0;
+
+world system { export create; }
+
+// The public operation method would replace the SDK's client factory.
+/// @nexus.endpoint "create"
+interface create {
+  record nexus-client-request { id: string }
+
+  create-nexus-client: func(request: nexus-client-request);
+}

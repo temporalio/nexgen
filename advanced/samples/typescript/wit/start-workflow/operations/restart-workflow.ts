@@ -33,6 +33,12 @@ export async function restartWorkflow(
     ...requestInput,
     namespace: support.workflowNamespace(),
   } as StartWorkflowRequest;
+  return await _restartWorkflow(request);
+}
+
+export async function _restartWorkflow(
+  request: StartWorkflowRequest,
+): Promise<StartedWorkflow> {
   const client = workflow.createNexusServiceClient({
     service: startWorkflowService,
     endpoint: "temporal-system",

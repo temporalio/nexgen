@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import temporalio.nexus.system
 import datetime
 import temporalio.workflow
 
@@ -19,7 +20,7 @@ async def _create_stream(
 ) -> Stream:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
-        endpoint="__temporal_system",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
     handle = await nexus_client.start_operation(
         operation="CreateStream",

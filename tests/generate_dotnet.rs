@@ -58,6 +58,7 @@ fn cli_accepts_unused_dotnet_support_package() {
         .args([
             "dotnet",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--support-package",
             "Custom",
             "--output",

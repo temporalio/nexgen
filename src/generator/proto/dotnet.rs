@@ -11,8 +11,8 @@ use crate::planning::{
     PlannedType, PlannedWireFieldBinding, PlannedWireVariantMember,
 };
 use crate::spec::{
-    AliasTypeSpec, ExternalTypeSourceSpec, ExternalTypeSpec, RecordFieldSpec,
-    RecordFieldVisibility, RecordSpec, TypeReplacementSpec,
+    AliasTypeSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, RecordFieldSpec,
+    RecordSpec, TypeReplacementSpec,
 };
 
 #[derive(Debug, Default)]
@@ -382,7 +382,7 @@ fn validate_record_conversion(
     for (_, field) in record
         .fields
         .iter()
-        .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
     {
         if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
             &field.data.wire_binding
@@ -680,7 +680,7 @@ fn render_model_transfer_converter(
     output.push_str("        var proto = new ");
     output.push_str(&raw_type);
     output.push_str("();\n");
-    for (field_name, sourced_field, _source_expr) in model.sourced_fields() {
+    for (field_name, sourced_field, _) in model.sourced_fields() {
         render_field_to_proto_assignment(
             backend,
             output,
@@ -749,7 +749,7 @@ fn render_model_from_wire_method(
     for (field_name, field) in model
         .fields
         .iter()
-        .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
     {
         render_field_from_wire_setup(
             output,
@@ -801,12 +801,12 @@ fn render_model_from_wire_method(
         .fields
         .iter()
         .filter(|(_, field)| {
-            !field.required || matches!(field.visibility, RecordFieldVisibility::Sourced { .. })
+            !field.required || matches!(field.origin, Some(FieldOrigin::Source { .. }))
         })
         .filter(|(_, field)| {
             !matches!(
-                field.visibility,
-                RecordFieldVisibility::Omitted | RecordFieldVisibility::Sourced { .. }
+                field.origin,
+                Some(FieldOrigin::Omitted | FieldOrigin::Source { .. })
             )
         })
         .collect::<Vec<_>>();

@@ -7,6 +7,8 @@ from nexusrpc import Operation
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 import pytest
 from temporalio import workflow
+from temporalio.api.common.v1 import WorkflowExecution
+from temporalio.api.workflowservice.v1 import RequestCancelWorkflowExecutionRequest
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 import wit.start_workflow as start_workflow
@@ -72,7 +74,7 @@ class StartWorkflowServiceHandler:
         input: start_workflow_models.CancelWorkflowRequest,
     ) -> start_workflow_models.CancelWorkflowResponse:
         self.calls.append(("CancelWorkflow", input))
-        assert input.namespace == "default"
+        assert input.namespace == "stored-namespace"
         assert input.workflow_execution.workflow_id == "workflow-id"
         assert input.workflow_execution.run_id == "run-123"
         return start_workflow_models.CancelWorkflowResponse()
@@ -95,7 +97,13 @@ class StartWorkflowCallerWorkflow:
             workflow_id="workflow-id",
             task_queue=TASK_QUEUE,
         )
-        await handle.cancel()
+        # The handle's namespace wins over the namespace source.
+        stored = StartedWorkflow(
+            namespace="stored-namespace",
+            workflow_id=handle.workflow_id,
+            run_id=handle.run_id,
+        )
+        await stored.cancel()
         restarted_handle = await handle.restart_workflow(
             workflow="ExampleWorkflow",
             task_queue=TASK_QUEUE,
@@ -166,6 +174,22 @@ def test_workflow_execution_serializes() -> None:
 
     assert proto.workflow_id == "workflow-id"
     assert proto.run_id == ""
+
+
+def test_decode_accepts_an_empty_sourced_namespace() -> None:
+    converter = getattr(
+        start_workflow_models.CancelWorkflowRequest,
+        "__temporal_transfer_type_converter",
+    )
+    request = converter.from_transfer_type(
+        RequestCancelWorkflowExecutionRequest(
+            workflow_execution=WorkflowExecution(workflow_id="workflow-id"),
+        ),
+        start_workflow_models.CancelWorkflowRequest,
+    )
+
+    assert request.namespace == ""
+    assert request.workflow_execution.workflow_id == "workflow-id"
 
 
 async def test_start_workflow_returns_wrapper_handle(

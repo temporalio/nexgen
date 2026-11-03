@@ -1,0 +1,22 @@
+package temporal:client-name-clash@1.0.0;
+
+world system {
+  export order-service;
+  export user-service;
+}
+
+/// @nexus.endpoint "orders"
+interface order-service {
+  record describe-request { id: string }
+  record describe-response { status: string }
+
+  describe: func(request: describe-request) -> describe-response;
+}
+
+/// @nexus.endpoint "users"
+interface user-service {
+  record describe-request { id: string }
+  record describe-response { name: string }
+
+  describe: func(request: describe-request) -> describe-response;
+}

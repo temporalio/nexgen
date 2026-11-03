@@ -1,0 +1,11 @@
+package temporal:client-other-language@1.0.0;
+
+world system { export greeting-service; }
+
+/// @nexus.endpoint "greetings"
+interface greeting-service {
+  record greet-request { name: string }
+  record greet-response { message: string }
+
+  greet: func(request: greet-request) -> greet-response;
+}

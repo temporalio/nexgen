@@ -9,8 +9,8 @@ use prost_types::field_descriptor_proto::Type;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::spec::{
-    ApiSpec, ApiSpecTransform, ExternalTypeSpec, JsonModelSpec, OperationSpec, RecordFieldSpec,
-    RecordFieldVisibility, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
+    ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldOrigin, JsonModelSpec, OperationSpec,
+    RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
     ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec, ServiceSpec, Symbol,
     TypeFamily, TypeSpec,
 };
@@ -25,6 +25,7 @@ pub(crate) struct ResourceBoundData {
 }
 
 impl TypeFamily for ResourceBoundFamily {
+    type Origin = Option<crate::spec::FieldOrigin>;
     type SpecData = ResourceBoundData;
     type Record = Symbol;
     type Enum = Symbol;
@@ -47,6 +48,12 @@ struct ResourceBindingMapper {
 }
 
 impl ApiSpecTransform<SelectedFamily, ResourceBoundFamily> for ResourceBindingMapper {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldOrigin>,
+    ) -> Option<crate::spec::FieldOrigin> {
+        origin
+    }
     fn map_spec_data(&mut self, _data: ()) -> ResourceBoundData {
         self.data.clone()
     }
@@ -145,7 +152,7 @@ pub enum ResolvedResourceBindingSource {
     RequestField {
         field_name: String,
         proto_field_name: String,
-        hidden: bool,
+        origin: Option<FieldOrigin>,
     },
     ResultField {
         field_name: String,
@@ -179,7 +186,7 @@ struct MessageFieldInfo {
     proto_name: String,
     api_name: String,
     required: bool,
-    hidden: bool,
+    origin: Option<FieldOrigin>,
     message_name: Option<String>,
 }
 
@@ -187,15 +194,30 @@ pub(crate) fn resolve_service_resources(
     spec: &ApiSpec<SelectedFamily>,
     service: &ServiceSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
+    targets: &[crate::nexgen_config::GenerationTarget],
 ) -> Result<ResolvedServiceResources> {
     let resources = service
         .resources
         .iter()
-        .map(|resource| resolve_resource_methods(spec, service, resource, descriptors))
+        .map(|resource| {
+            if targets.is_empty() {
+                Ok(ResolvedResourceSpec {
+                    name: resource.name.clone(),
+                    doc: resource.doc.clone(),
+                    fields: resource.fields.clone(),
+                    methods: Vec::new(),
+                })
+            } else {
+                resolve_resource_methods(spec, service, resource, descriptors)
+            }
+        })
         .collect::<Result<Vec<_>>>()?;
 
     let mut operation_returns = BTreeMap::new();
     for operation in &service.operations {
+        if let Some(TypeSpec::Resource(resource)) = operation.output_type() {
+            ensure_local_resource_return(service, operation, resource.as_str())?;
+        }
         let holder = operation_output_resource_holder(spec, service, operation)?;
         let resource_name = match &holder {
             Some((_, _, resource_name, _)) => *resource_name,
@@ -491,7 +513,7 @@ fn bind_resource_return_field(
         return Ok(ResolvedResourceBindingSource::RequestField {
             field_name: field.api_name,
             proto_field_name: field.proto_name,
-            hidden: field.hidden,
+            origin: field.origin,
         });
     }
     if let Some(field) =
@@ -543,7 +565,12 @@ fn synthesize_request_plan(
             }
         }
 
-        if field.required {
+        if field.required
+            && !field
+                .origin
+                .as_ref()
+                .is_some_and(FieldOrigin::can_initialize)
+        {
             return Ok(None);
         }
     }
@@ -601,7 +628,12 @@ fn synthesize_record_request_plan(
             continue;
         }
 
-        if field.required {
+        if field.required
+            && !field
+                .origin
+                .as_ref()
+                .is_some_and(FieldOrigin::can_initialize)
+        {
             return Ok(None);
         }
     }
@@ -628,7 +660,7 @@ fn visible_message_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_message_fields(spec, descriptors, message_name)?
         .into_iter()
-        .filter(|field| !field.hidden)
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
         .collect())
 }
 
@@ -638,7 +670,7 @@ fn visible_record_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_record_fields(spec, record_name)?
         .into_iter()
-        .filter(|field| !field.hidden)
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
         .collect())
 }
 
@@ -696,7 +728,7 @@ fn all_record_fields(
     record
         .fields
         .iter()
-        .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
         .map(|(field_name, field)| build_record_field_info(field_name, field, spec))
         .collect()
 }
@@ -707,14 +739,13 @@ fn build_record_field_info(
     spec: &ApiSpec<SelectedFamily>,
 ) -> Result<MessageFieldInfo> {
     let api_name = field.name.clone();
-    let required = field.api_required();
-    let hidden = matches!(field.visibility, RecordFieldVisibility::Sourced { .. });
+    let required = field.required;
     let message_name = api_field_message_name(&field.field_type, spec);
     Ok(MessageFieldInfo {
         proto_name: field_name.to_string(),
         api_name,
         required,
-        hidden,
+        origin: field.origin.clone(),
         message_name,
     })
 }
@@ -751,17 +782,16 @@ fn build_message_field_info(
         record
             .fields
             .get(proto_name)
-            .is_some_and(|field| field.api_required())
-    });
-    let hidden = record.is_some_and(|record| {
-        record.field_omitted(proto_name) || record.field_source(proto_name).is_some()
+            .is_some_and(|field| field.required)
     });
     let message_name = field_message_name(field, descriptors);
     Ok(MessageFieldInfo {
         proto_name: proto_name.to_string(),
         api_name,
         required,
-        hidden,
+        origin: record
+            .and_then(|record| record.fields.get(proto_name))
+            .and_then(|field| field.origin.clone()),
         message_name,
     })
 }
@@ -803,6 +833,24 @@ fn operation_output_resource_name<'a>(
         .map(|_| resource_name.as_str())
 }
 
+fn ensure_local_resource_return(
+    service: &ServiceSpec<SelectedFamily>,
+    operation: &OperationSpec<SelectedFamily>,
+    resource_name: &str,
+) -> Result<()> {
+    if service.resource(resource_name).is_none() {
+        return Err(Error::InvalidResource {
+            service: service.name.clone(),
+            resource: resource_name.to_upper_camel_case(),
+            reason: format!(
+                "operation `{}` returns a resource declared in another service; resources must be returned by their declaring service",
+                operation.name
+            ),
+        });
+    }
+    Ok(())
+}
+
 /// The proto-backed result record of an operation that holds a resource of the service, as
 /// its record name, field key, resource name and proto message name.
 fn operation_output_resource_holder<'a>(
@@ -841,6 +889,7 @@ fn operation_output_resource_holder<'a>(
             ),
         });
     };
+    ensure_local_resource_return(service, operation, resource_name)?;
     let Some(proto_name) = record
         .source
         .as_ref()
@@ -855,9 +904,6 @@ fn operation_output_resource_holder<'a>(
             ),
         });
     };
-    if service.resource(resource_name).is_none() {
-        return Ok(None);
-    }
     Ok(Some((
         record.full_name.as_str(),
         field_key,
@@ -893,12 +939,18 @@ fn operation_output_resource_wire_type(
 /// owning operation and resource nodes by `OperationBindingPass`.
 pub(crate) struct ResourceResolutionPass<'a> {
     descriptors: &'a DescriptorIndex,
-    mode: super::PlanningMode,
+    targets: Vec<crate::nexgen_config::GenerationTarget>,
 }
 
 impl<'a> ResourceResolutionPass<'a> {
-    pub(crate) fn new(descriptors: &'a DescriptorIndex, mode: super::PlanningMode) -> Self {
-        Self { descriptors, mode }
+    pub(crate) fn new(
+        descriptors: &'a DescriptorIndex,
+        targets: Vec<crate::nexgen_config::GenerationTarget>,
+    ) -> Self {
+        Self {
+            descriptors,
+            targets,
+        }
     }
 
     pub(super) fn bind_spec(
@@ -906,17 +958,15 @@ impl<'a> ResourceResolutionPass<'a> {
         spec: ApiSpec<SelectedFamily>,
     ) -> Result<ApiSpec<super::ResourceBoundFamily>> {
         ensure_unique_resource_names(&spec)?;
-        let bindings = if self.mode == super::PlanningMode::NativeApi {
-            spec.services
-                .iter()
-                .map(|service| {
-                    resolve_service_resources(&spec, service, self.descriptors)
-                        .map(|resources| (service.name.clone(), resources))
-                })
-                .collect::<Result<BTreeMap<_, _>>>()?
-        } else {
-            BTreeMap::new()
-        };
+        // Return bindings determine shared wire models even when no callable API is emitted.
+        let bindings = spec
+            .services
+            .iter()
+            .map(|service| {
+                resolve_service_resources(&spec, service, self.descriptors, &self.targets)
+                    .map(|resources| (service.name.clone(), resources))
+            })
+            .collect::<Result<BTreeMap<_, _>>>()?;
         Ok(spec.map_names(ResourceBindingMapper {
             data: ResourceBoundData { bindings },
         }))
@@ -1036,7 +1086,13 @@ interface workflow-service {
 "#;
         let spec = parse(Language::Python, wit);
         let service = &spec.services[0];
-        let resolved = resolve_service_resources(&spec, service, &descriptors()).unwrap();
+        let resolved = resolve_service_resources(
+            &spec,
+            service,
+            &descriptors(),
+            &[crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .unwrap();
         let method = &resolved.resources[0].methods[0];
 
         assert_eq!(method.name, "restart-workflow");
@@ -1079,7 +1135,13 @@ interface user-service {
 "#;
         let spec = parse(Language::Python, wit);
         let service = &spec.services[0];
-        let resolved = resolve_service_resources(&spec, service, &empty_descriptors()).unwrap();
+        let resolved = resolve_service_resources(
+            &spec,
+            service,
+            &empty_descriptors(),
+            &[crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .unwrap();
         let method = &resolved.resources[0].methods[0];
 
         assert_eq!(method.name, "update-email");
@@ -1119,7 +1181,13 @@ interface user-service {
 "#;
         let spec = parse(Language::Python, wit);
         let service = &spec.services[0];
-        let resolved = resolve_service_resources(&spec, service, &empty_descriptors()).unwrap();
+        let resolved = resolve_service_resources(
+            &spec,
+            service,
+            &empty_descriptors(),
+            &[crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .unwrap();
         let method = &resolved.resources[0].methods[0];
 
         assert_eq!(method.name, "update-email");
@@ -1184,7 +1252,13 @@ interface user-service {
 "#;
         let spec = parse(Language::Python, wit);
         let service = &spec.services[0];
-        let resolved = resolve_service_resources(&spec, service, &empty_descriptors()).unwrap();
+        let resolved = resolve_service_resources(
+            &spec,
+            service,
+            &empty_descriptors(),
+            &[crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .unwrap();
         let method = &resolved.resources[0].methods[0];
 
         assert_eq!(method.name, "update-email");

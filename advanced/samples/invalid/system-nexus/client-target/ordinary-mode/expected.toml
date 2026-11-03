@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["client"]
+
+[error]
+kind = "system-nexus-required"
+contains = ["client API generation on language `python` requires System Nexus mode (--system-nexus)"]

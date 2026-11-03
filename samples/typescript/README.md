@@ -29,6 +29,6 @@ npm run typecheck
 npm run test
 ```
 
-The native-api (Nexus service/client) variant of these same schemas is
+The Workflow API (Nexus service/client) variant of these same schemas is
 snapshot-only and lives under
 [`advanced/samples/typescript/json_schema/api`](../../advanced/samples/typescript).

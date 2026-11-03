@@ -28,6 +28,12 @@ struct Selector {
 }
 
 impl ApiSpecTransform<AuthoredFamily, SelectedFamily> for Selector {
+    fn map_origin(
+        &mut self,
+        origin: crate::spec::LanguageFieldOrigins,
+    ) -> Option<crate::spec::FieldOrigin> {
+        origin.for_language(self.language).cloned()
+    }
     fn map_spec_data(&mut self, _data: ()) {}
     fn map_record(&mut self, name: Symbol) -> Symbol {
         name

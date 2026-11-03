@@ -1,24 +1,31 @@
 [workflow-service]
+targets = ["workflow"]
 system_nexus = true
 descriptors = "temporal"
 
 [multi-operation-service]
+targets = ["workflow"]
 system_nexus = true
 
 [generic-models]
+targets = ["workflow"]
 descriptors = "temporal"
 
 [start-workflow]
+targets = ["workflow"]
 descriptors = "temporal"
 
 [proto-backed-showcase]
+targets = ["workflow"]
 descriptors = "temporal"
 
 [proto-generic]
+targets = ["workflow"]
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
 [proto-oneof]
+targets = ["workflow"]
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
@@ -33,8 +40,36 @@ languages = ["python", "typescript", "dotnet"]
 system_nexus = true
 descriptors = ["temporal_api.bin", "streams.bin"]
 
+[stream-service.models]
+languages = ["python"]
+targets = []
+
+[stream-service.workflow]
+targets = ["workflow"]
+
+[stream-service.client]
+languages = ["python"]
+targets = ["client"]
+
+[stream-service.both]
+languages = ["python"]
+targets = ["workflow", "client"]
+
 # A System Nexus operation that returns a resource.
 [workflow-handle]
+targets = ["workflow"]
 languages = ["python", "dotnet", "typescript"]
 system_nexus = true
 descriptors = "temporal"
+
+[defaults]
+targets = ["workflow"]
+
+[function-execution]
+targets = ["workflow"]
+
+[user-service]
+targets = ["workflow"]
+
+[type-showcase]
+targets = ["workflow"]

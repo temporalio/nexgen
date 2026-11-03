@@ -25,6 +25,6 @@ dotnet build Nexgen.DotNetExamples.csproj   # compile the models
 dotnet test tests/                          # round-trip the fixtures
 ```
 
-For the native-api (service/client) form of these same schemas and the WIT-based
-examples, see
+For the Workflow API (service/client) form of these same schemas and the
+WIT-based examples, see
 [`../../advanced/samples/dotnet/`](../../advanced/samples/dotnet/).

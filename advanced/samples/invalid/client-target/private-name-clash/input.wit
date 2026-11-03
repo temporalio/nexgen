@@ -1,0 +1,21 @@
+package temporal:client-private-name-clash@1.0.0;
+
+world system {
+  export order;
+  export order-service;
+}
+
+// Both private client methods are `_order_service_cancel`.
+/// @nexus.endpoint "orders"
+interface order {
+  record service-cancel-request { id: string }
+
+  service-cancel: func(request: service-cancel-request);
+}
+
+/// @nexus.endpoint "order-services"
+interface order-service {
+  record cancel-request { id: string }
+
+  cancel: func(request: cancel-request);
+}

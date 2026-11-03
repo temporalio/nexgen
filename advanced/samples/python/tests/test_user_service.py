@@ -13,6 +13,7 @@ import wit.user_service as user_service
 import wit.user_service.models as user_service_models
 import wit.user_service.services as user_service_services
 from wit.user_service._resources import User
+from wit.user_service._resources._resource_data import UserData
 
 APP_ROOT = Path(__file__).resolve().parent
 OUTPUT_PATH = APP_ROOT.parent / "wit" / "user_service"
@@ -30,8 +31,8 @@ UPDATE_EMAIL_OPERATION = UPDATE_EMAIL_OPERATION_INFO.operation
 def user_resource(
     *,
     email: str,
-) -> User:
-    return User(
+) -> UserData:
+    return UserData(
         user_id="user-123",
         email=email,
     )
@@ -47,7 +48,7 @@ class UserServiceHandler:
         self,
         _ctx: StartOperationContext,
         input: user_service_models.GetUserRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("GetUser", input))
         assert input.user_id == "user-123"
         return user_resource(email="old@example.com")
@@ -57,7 +58,7 @@ class UserServiceHandler:
         self,
         _ctx: StartOperationContext,
         input: user_service_models.UpdateEmailRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("UpdateEmail", input))
         assert input.user_id == "user-123"
         assert input.email == "new@example.com"

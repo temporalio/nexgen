@@ -10,7 +10,7 @@ import {
   describeStreamResponseTransferTypeConverter,
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
-} from "../wit/stream-service/models.ts";
+} from "../wit/stream-service/workflow/models.ts";
 
 describe("stream-service generated output", () => {
   // No SDK has these protos yet, so proto/streams.d.ts declares them. The converters fail to
