@@ -323,7 +323,7 @@ async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_mov
         ReadRecordsResponse(
             records=[StreamRecord(offset=1), StreamRecord(offset=2)], next_offset=3
         ),
-        ReadRecordsResponse(next_offset=3),
+        ReadRecordsResponse(records=[], next_offset=3),
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
     stream = client.get_stream(handle=ref, created=None)
@@ -345,8 +345,8 @@ async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -
     wait = datetime.timedelta(seconds=30)
     pages = [
         ReadRecordsResponse(records=[StreamRecord(offset=1)], next_offset=2),
-        ReadRecordsResponse(next_offset=2),
-        ReadRecordsResponse(done=True),
+        ReadRecordsResponse(records=[], next_offset=2),
+        ReadRecordsResponse(records=[], done=True),
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
     stream = client.get_stream(handle=ref, created=None)
@@ -365,9 +365,9 @@ async def test_a_stream_read_from_the_end_stays_at_the_first_next_offset() -> No
     ref = StreamHandle(id="s1")
     wait = datetime.timedelta(seconds=30)
     pages = [
-        ReadRecordsResponse(next_offset=5),
+        ReadRecordsResponse(records=[], next_offset=5),
         ReadRecordsResponse(records=[StreamRecord(offset=5)], next_offset=6),
-        ReadRecordsResponse(done=True),
+        ReadRecordsResponse(records=[], done=True),
     ]
     client, answers = connect(
         Client,
@@ -418,7 +418,7 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
         {
             "ReadRecords": [
                 ReadRecordsResponse(records=[StreamRecord(offset=1)], next_offset=2),
-                ReadRecordsResponse(done=True),
+                ReadRecordsResponse(records=[], done=True),
             ]
         },
     )
@@ -444,7 +444,7 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
                     records=[StreamRecord(offset=10), StreamRecord(offset=12)],
                     next_offset=15,
                 ),
-                ReadRecordsResponse(next_offset=15),
+                ReadRecordsResponse(records=[], next_offset=15),
                 ReadRecordsResponse(
                     records=[StreamRecord(offset=20)], next_offset=21, done=True
                 ),
@@ -515,7 +515,7 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
                     records=[StreamRecord(offset=1), StreamRecord(offset=2)],
                     next_offset=3,
                 ),
-                ReadRecordsResponse(done=True),
+                ReadRecordsResponse(records=[], done=True),
             ]
         },
     )

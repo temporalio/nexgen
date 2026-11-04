@@ -209,7 +209,7 @@ export const workflowExecutionTransferTypeConverter = {
 };
 export interface TaskQueuePartitions {
   workflowTaskQueuePartitions?: TaskQueuePartition[];
-  activityTaskQueuePartitions?: TaskQueuePartition[];
+  activityTaskQueuePartitions: TaskQueuePartition[];
 }
 
 function taskQueuePartitionsFromProto(
@@ -219,8 +219,12 @@ function taskQueuePartitionsFromProto(
     workflowTaskQueuePartitions: proto.workflowTaskQueuePartitions?.map((value: any) =>
       taskQueuePartitionFromProto(value),
     ),
-    activityTaskQueuePartitions: proto.activityTaskQueuePartitions?.map((value: any) =>
-      taskQueuePartitionFromProto(value),
+    activityTaskQueuePartitions: requiredField(
+      proto.activityTaskQueuePartitions?.map((value: any) =>
+        taskQueuePartitionFromProto(value),
+      ),
+      "TaskQueuePartitions",
+      "activityTaskQueuePartitions",
     ),
   };
 }
@@ -232,8 +236,12 @@ function taskQueuePartitionsToProto(
     workflowTaskQueuePartitions: model.workflowTaskQueuePartitions?.map((value) =>
       taskQueuePartitionToProto(value),
     ),
-    activityTaskQueuePartitions: model.activityTaskQueuePartitions?.map((value) =>
-      taskQueuePartitionToProto(value),
+    activityTaskQueuePartitions: requiredField(
+      model.activityTaskQueuePartitions?.map((value) =>
+        taskQueuePartitionToProto(value),
+      ),
+      "TaskQueuePartitions",
+      "activityTaskQueuePartitions",
     ),
   };
 }
@@ -451,7 +459,7 @@ export const callbackInternalTransferTypeConverter = {
 };
 export interface CallbackNexus {
   url: string;
-  header?: Record<string, string>;
+  header: Record<string, string>;
 }
 
 function callbackNexusFromProto(
@@ -463,7 +471,7 @@ function callbackNexusFromProto(
       "CallbackNexus",
       "url",
     ),
-    header:
+    header: requiredField(
       proto.header == null
         ? undefined
         : (Object.fromEntries(
@@ -471,6 +479,9 @@ function callbackNexusFromProto(
               ([key, value]: [string, any]) => [key, value as string],
             ),
           ) as Record<string, string>),
+      "CallbackNexus",
+      "header",
+    ),
   };
 }
 
@@ -479,7 +490,7 @@ function callbackNexusToProto(
 ): temporal.api.common.v1.Callback.INexus {
   return {
     url: requiredField(model.url, "CallbackNexus", "url"),
-    header:
+    header: requiredField(
       model.header == null
         ? undefined
         : Object.fromEntries(
@@ -487,6 +498,9 @@ function callbackNexusToProto(
               ([key, value]: [string, any]) => [key, value],
             ),
           ),
+      "CallbackNexus",
+      "header",
+    ),
   };
 }
 

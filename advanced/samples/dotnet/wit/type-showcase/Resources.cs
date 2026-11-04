@@ -51,6 +51,13 @@ namespace Nexgen.TypeShowcase
             return Operations.DeactivateAsync(request);
         }
 
+        [GeneratedCode("nexgen", null)]
+        public Task UpdateLabelsAsync(IReadOnlyList<string> tags, IReadOnlyDictionary<string, string> metadata, IReadOnlyList<string>? extraTags, IReadOnlyDictionary<string, string>? extraMetadata)
+        {
+            var request = new UpdateLabelsOptions(UserId, tags, metadata) { ExtraTags = extraTags, ExtraMetadata = extraMetadata };
+            return Operations.UpdateLabelsAsync(request);
+        }
+
     }
 
 }

@@ -48,6 +48,10 @@ namespace Nexgen.TypeShowcase
         void Deactivate(DeactivateRequest request);
 
         [GeneratedCode("nexgen", null)]
+        [NexusOperation("UpdateLabels")]
+        void UpdateLabels(UpdateLabelsRequest request);
+
+        [GeneratedCode("nexgen", null)]
         [NexusOperation("UpdateNotificationSettings")]
         void UpdateNotificationSettings(UpdateNotificationSettingsRequest request);
 
@@ -101,6 +105,8 @@ namespace Nexgen.TypeShowcase
                 TypeShowcaseServiceDefinition.Operations["RecordSync"]),
             [("TypeShowcase", "Deactivate")] = new NexgenOperationInfo<DeactivateRequest, object>(
                 TypeShowcaseServiceDefinition.Operations["Deactivate"]),
+            [("TypeShowcase", "UpdateLabels")] = new NexgenOperationInfo<UpdateLabelsRequest, object>(
+                TypeShowcaseServiceDefinition.Operations["UpdateLabels"]),
             [("TypeShowcase", "UpdateNotificationSettings")] = new NexgenOperationInfo<UpdateNotificationSettingsRequest, object>(
                 TypeShowcaseServiceDefinition.Operations["UpdateNotificationSettings"]),
             [("TypeShowcase", "GetSyncSettings")] = new NexgenOperationInfo<GetSyncSettingsRequest, SyncSettings>(

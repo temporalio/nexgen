@@ -77,11 +77,11 @@ export interface UserProfile {
    * A very long field doc that has to be wrapped because it exceeds the generated
    * comment line width by a comfortable margin for testing.
    */
-  tags?: string[];
+  tags: string[];
   /**
    * Default metadata.
    */
-  metadata?: Record<string, string>;
+  metadata: Record<string, string>;
   capabilities: UserCapability;
   syncState: { tag: "ok"; value: string } | { tag: "err"; value: string };
   notificationTarget: NotificationTarget;
@@ -109,9 +109,9 @@ export interface RecordSyncRequest {
  * @experimental This API is experimental and subject to change.
  */
 export interface SyncReport {
-  route?: [number, number][];
-  attempts?: ({ tag: "ok"; value: string } | { tag: "err"; value: string })[];
-  regionStatus?: Record<
+  route: [number, number][];
+  attempts: ({ tag: "ok"; value: string } | { tag: "err"; value: string })[];
+  regionStatus: Record<
     string,
     { tag: "ok"; value: string } | { tag: "err"; value: string }
   >;
@@ -123,6 +123,14 @@ export interface SyncReport {
 export interface DeactivateRequest {
   userId: string;
   reason?: string;
+}
+
+export interface UpdateLabelsRequest {
+  userId: string;
+  tags: string[];
+  metadata: Record<string, string>;
+  extraTags?: string[];
+  extraMetadata?: Record<string, string>;
 }
 
 export interface UpdateNotificationSettingsRequest {

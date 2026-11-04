@@ -8,6 +8,7 @@ import type {
   SetProfileRequest,
   RecordSyncRequest,
   DeactivateRequest,
+  UpdateLabelsRequest,
   UpdateNotificationSettingsRequest,
   SyncSettings,
   GetSyncSettingsRequest,
@@ -29,6 +30,7 @@ export const typeShowcase = nexus.service("TypeShowcase", {
   setProfile: nexus.operation<SetProfileRequest, User>({ name: "SetProfile" }),
   recordSync: nexus.operation<RecordSyncRequest, void>({ name: "RecordSync" }),
   deactivate: nexus.operation<DeactivateRequest, void>({ name: "Deactivate" }),
+  updateLabels: nexus.operation<UpdateLabelsRequest, void>({ name: "UpdateLabels" }),
   updateNotificationSettings: nexus.operation<UpdateNotificationSettingsRequest, void>({
     name: "UpdateNotificationSettings",
   }),

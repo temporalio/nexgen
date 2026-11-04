@@ -11,11 +11,11 @@ MetadataT = typing.TypeVar("MetadataT")
 OutputT = typing.TypeVar("OutputT")
 
 
-@dataclasses.dataclass(slots=True, kw_only=True)
+@dataclasses.dataclass(slots=True)
 class GenericRequest(typing.Generic[ContextT]):
     context: ContextT
-    contexts: list[ContextT] | None = dataclasses.field(default_factory=list)
-    by_name: dict[str, ContextT] | None = dataclasses.field(default_factory=dict)
+    contexts: list[ContextT]
+    by_name: dict[str, ContextT]
     nested: Inner[ContextT]
     probe: GetterProbe[ContextT] | None = None
 
@@ -29,12 +29,12 @@ class Inner(typing.Generic[ContextT]):
 class GetterProbe(typing.Generic[ContextT]):
     value: ContextT
     other: ContextT | None = None
-    history: list[ContextT] | None = dataclasses.field(default_factory=list)
+    history: list[ContextT]
     tuple_value: tuple[ContextT, ContextT]
     result_value: (
         tuple[typing.Literal["ok"], ContextT] | tuple[typing.Literal["err"], ContextT]
     )
-    lookup: list[tuple[str, int]] | None = dataclasses.field(default_factory=list)
+    lookup: list[tuple[str, int]]
     elapsed: int
     namespace: str
     type: str
@@ -62,7 +62,7 @@ class OperationCompletionFailure:
 class GetterPair(typing.Generic[ContextT, OutputT]):
     value: ContextT
     other: OutputT | None = None
-    history: list[ContextT] | None = dataclasses.field(default_factory=list)
+    history: list[ContextT]
     tuple_value: tuple[ContextT, OutputT]
     result_value: (
         tuple[typing.Literal["ok"], ContextT] | tuple[typing.Literal["err"], OutputT]

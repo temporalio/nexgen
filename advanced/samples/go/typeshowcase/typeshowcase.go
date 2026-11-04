@@ -86,6 +86,34 @@ func (m deactivateRequest) GetReason() *string {
 	return m.Reason
 }
 
+type updateLabelsRequest struct {
+	UserID        string
+	Tags          []string
+	Metadata      map[string]string
+	ExtraTags     []string
+	ExtraMetadata map[string]string
+}
+
+func (m updateLabelsRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m updateLabelsRequest) GetTags() []string {
+	return m.Tags
+}
+
+func (m updateLabelsRequest) GetMetadata() map[string]string {
+	return m.Metadata
+}
+
+func (m updateLabelsRequest) GetExtraTags() []string {
+	return m.ExtraTags
+}
+
+func (m updateLabelsRequest) GetExtraMetadata() map[string]string {
+	return m.ExtraMetadata
+}
+
 type updateNotificationSettingsRequest struct {
 	UserID   string
 	Settings NotificationSettings
@@ -153,6 +181,10 @@ func (u *User) Deactivate(ctx workflow.Context, reason string) workflow.Future {
 	return deactivate(ctx, deactivateRequest{UserID: u.UserID, Reason: reasonPtr})
 }
 
+func (u *User) UpdateLabels(ctx workflow.Context, tags []string, metadata map[string]string, extraTags []string, extraMetadata map[string]string) workflow.Future {
+	return updateLabels(ctx, updateLabelsRequest{UserID: u.UserID, Tags: tags, Metadata: metadata, ExtraTags: extraTags, ExtraMetadata: extraMetadata})
+}
+
 // --- Operations (internal) ---
 
 func getUser(ctx workflow.Context, request getUserRequest) workflow.Future {
@@ -188,6 +220,12 @@ func recordSync(ctx workflow.Context, request recordSyncRequest) workflow.Future
 func deactivate(ctx workflow.Context, request deactivateRequest) workflow.Future {
 	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
 	fut := c.ExecuteOperation(ctx, "Deactivate", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func updateLabels(ctx workflow.Context, request updateLabelsRequest) workflow.Future {
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "UpdateLabels", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
@@ -546,6 +584,29 @@ func Deactivate(ctx workflow.Context, opts DeactivateOptions) workflow.Future {
 	return deactivate(ctx, deactivateRequest{
 		UserID: opts.UserID,
 		Reason: reason,
+	})
+}
+
+type UpdateLabelsOptions struct {
+	// UserID - Required.
+	UserID string
+	// Tags - Required.
+	Tags []string
+	// Metadata - Required.
+	Metadata map[string]string
+	// ExtraTags - Optional.
+	ExtraTags []string
+	// ExtraMetadata - Optional.
+	ExtraMetadata map[string]string
+}
+
+func UpdateLabels(ctx workflow.Context, opts UpdateLabelsOptions) workflow.Future {
+	return updateLabels(ctx, updateLabelsRequest{
+		UserID:        opts.UserID,
+		Tags:          opts.Tags,
+		Metadata:      opts.Metadata,
+		ExtraTags:     opts.ExtraTags,
+		ExtraMetadata: opts.ExtraMetadata,
 	})
 }
 

@@ -6,6 +6,9 @@ import {
   alertTransferTypeConverter as alerts,
   namespaceInfoTransferTypeConverter as namespaces,
   callbackInternalTransferTypeConverter as callbacks,
+  callbackNexusTransferTypeConverter as nexusCallbacks,
+  taskQueuePartitionsTransferTypeConverter as partitions,
+  type TaskQueuePartition,
 } from "../wit/proto-backed-showcase/models.ts";
 
 describe("authored protobuf enum and byte models", () => {
@@ -49,6 +52,35 @@ describe("authored protobuf enum and byte models", () => {
     const model = alerts.fromTransferType({ message: "optional" });
     expect(model.severity).toBeUndefined();
     expect(alerts.toTransferType(model).severity).toBeUndefined();
+  });
+
+  it("keeps bare collections required and optional collections absent", () => {
+    const model = partitions.fromTransferType({
+      activityTaskQueuePartitions: [],
+    });
+    expectTypeOf(model.activityTaskQueuePartitions).toEqualTypeOf<
+      TaskQueuePartition[]
+    >();
+    expectTypeOf(model.workflowTaskQueuePartitions).toEqualTypeOf<
+      TaskQueuePartition[] | undefined
+    >();
+    expect(model.activityTaskQueuePartitions).toEqual([]);
+    expect(model.workflowTaskQueuePartitions).toBeUndefined();
+    expect(partitions.toTransferType(model).activityTaskQueuePartitions).toEqual([]);
+    expect(() => partitions.fromTransferType({})).toThrow(
+      "missing required field TaskQueuePartitions.activityTaskQueuePartitions",
+    );
+
+    const callback = nexusCallbacks.fromTransferType({
+      url: "https://example.test",
+      header: {},
+    });
+    expectTypeOf(callback.header).toEqualTypeOf<Record<string, string>>();
+    expect(callback.header).toEqual({});
+    expect(nexusCallbacks.toTransferType(callback).header).toEqual({});
+    expect(() =>
+      nexusCallbacks.fromTransferType({ url: "https://example.test" }),
+    ).toThrow("missing required field CallbackNexus.header");
   });
 
   it("round-trips byte lists including zero and non-ASCII bytes", () => {

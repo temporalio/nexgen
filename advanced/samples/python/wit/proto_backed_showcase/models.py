@@ -255,14 +255,10 @@ temporalio.converter.transfer_type_convertible(_WorkflowExecutionTransferTypeCon
 )  # pyright: ignore[reportUnusedCallResult]
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(slots=True, kw_only=True)
 class TaskQueuePartitions:
-    workflow_task_queue_partitions: list[TaskQueuePartition] | None = dataclasses.field(
-        default_factory=list
-    )
-    activity_task_queue_partitions: list[TaskQueuePartition] | None = dataclasses.field(
-        default_factory=list
-    )
+    workflow_task_queue_partitions: list[TaskQueuePartition] | None = None
+    activity_task_queue_partitions: list[TaskQueuePartition]
 
 
 class _TaskQueuePartitionsTransferTypeConverter(
@@ -284,6 +280,12 @@ class _TaskQueuePartitionsTransferTypeConverter(
         value: temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
         type_hint: type[TaskQueuePartitions],
     ) -> TaskQueuePartitions:
+        activity_task_queue_partitions = [
+            _TaskQueuePartitionTransferTypeConverter().from_transfer_type(
+                item, TaskQueuePartition
+            )
+            for item in value.activity_task_queue_partitions
+        ]
         return TaskQueuePartitions(
             workflow_task_queue_partitions=[
                 _TaskQueuePartitionTransferTypeConverter().from_transfer_type(
@@ -291,12 +293,7 @@ class _TaskQueuePartitionsTransferTypeConverter(
                 )
                 for item in value.workflow_task_queue_partitions
             ],
-            activity_task_queue_partitions=[
-                _TaskQueuePartitionTransferTypeConverter().from_transfer_type(
-                    item, TaskQueuePartition
-                )
-                for item in value.activity_task_queue_partitions
-            ],
+            activity_task_queue_partitions=activity_task_queue_partitions,
         )
 
     @typing_extensions.override
@@ -311,12 +308,11 @@ class _TaskQueuePartitionsTransferTypeConverter(
                 item.CopyFrom(
                     _TaskQueuePartitionTransferTypeConverter().to_transfer_type(element)
                 )
-        if value.activity_task_queue_partitions:
-            for element in value.activity_task_queue_partitions:
-                item = message.activity_task_queue_partitions.add()
-                item.CopyFrom(
-                    _TaskQueuePartitionTransferTypeConverter().to_transfer_type(element)
-                )
+        for element in value.activity_task_queue_partitions:
+            item = message.activity_task_queue_partitions.add()
+            item.CopyFrom(
+                _TaskQueuePartitionTransferTypeConverter().to_transfer_type(element)
+            )
         return message
 
 
@@ -378,7 +374,7 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class BadBinaries:
-    binaries: dict[str, BadBinary] | None = dataclasses.field(default_factory=dict)
+    binaries: dict[str, BadBinary] | None = None
 
 
 class _BadBinariesTransferTypeConverter(
@@ -563,7 +559,7 @@ temporalio.converter.transfer_type_convertible(_CallbackInternalTransferTypeConv
 @dataclasses.dataclass(slots=True)
 class CallbackNexus:
     url: str
-    header: dict[str, str] | None = dataclasses.field(default_factory=dict)
+    header: dict[str, str]
 
 
 class _CallbackNexusTransferTypeConverter(
@@ -584,9 +580,10 @@ class _CallbackNexusTransferTypeConverter(
         if not value.url:
             raise ValueError("missing required field CallbackNexus.url")
         url = value.url
+        header = {key: item for key, item in value.header.items()}
         return CallbackNexus(
             url=url,
-            header={key: item for key, item in value.header.items()},
+            header=header,
         )
 
     @typing_extensions.override
@@ -596,8 +593,7 @@ class _CallbackNexusTransferTypeConverter(
     ) -> temporalio.api.common.v1.message_pb2.Callback.Nexus:
         message = temporalio.api.common.v1.message_pb2.Callback.Nexus()
         message.url = value.url
-        if value.header:
-            message.header.update(value.header)
+        message.header.update(value.header)
         return message
 
 
@@ -609,7 +605,7 @@ temporalio.converter.transfer_type_convertible(_CallbackNexusTransferTypeConvert
 @dataclasses.dataclass(slots=True, kw_only=True)
 class NamespaceInfo:
     name: str | None = None
-    data: dict[str, str] | None = dataclasses.field(default_factory=dict)
+    data: dict[str, str] | None = None
     state: NamespaceState
 
 

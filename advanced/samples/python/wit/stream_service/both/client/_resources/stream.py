@@ -48,12 +48,12 @@ class Stream:
 
     async def publish(
         self,
-        records: list[AppendRecord] | None = None,
+        records: list[AppendRecord],
     ) -> AppendRecordsResponse:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             handle=self.handle,
-            records=records or [],
+            records=records,
             producer=_support.client_producer(),
             withdraw_run=_support.withdraw_run(),
         )

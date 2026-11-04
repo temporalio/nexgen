@@ -102,7 +102,7 @@ def test_a_record_of_an_unknown_item_kind_has_no_item(models: types.ModuleType) 
 def test_a_request_without_its_handle_is_refused(models: types.ModuleType) -> None:
     converter = models._AppendRecordsRequestTransferTypeConverter()
     wire = converter.to_transfer_type(
-        models.AppendRecordsRequest(handle=models.StreamHandle(id="s-1"))
+        models.AppendRecordsRequest(handle=models.StreamHandle(id="s-1"), records=[])
     )
     assert wire.handle.id == "s-1"
 

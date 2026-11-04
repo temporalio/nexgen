@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import dataclasses
+import inspect
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 import uuid
 
+import pytest
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 from nexusrpc import Operation
 from temporalio import workflow
@@ -149,6 +154,14 @@ class TypeShowcaseHandler:
         assert input.reason == "requested"
 
     @sync_operation
+    async def update_labels(
+        self,
+        _ctx: StartOperationContext,
+        input: type_showcase_models.UpdateLabelsRequest,
+    ) -> None:
+        self.calls.append(("UpdateLabels", input))
+
+    @sync_operation
     async def update_notification_settings(
         self,
         _ctx: StartOperationContext,
@@ -234,6 +247,77 @@ def test_generated_wit_native_models_cover_common_wit_shapes() -> None:
     assert profile.address.coordinates == (45.5152, -122.6784)
     assert profile.metadata == {"tier": "enterprise"}
     assert profile.tags == ["admin", "beta"]
+
+
+@pytest.mark.parametrize("field_name", ["tags", "metadata"])
+def test_native_collection_constructor_arguments_are_required(field_name: str) -> None:
+    profile = user_profile()
+    fields = {field.name: field for field in dataclasses.fields(profile)}
+    assert fields[field_name].default is dataclasses.MISSING
+    assert fields[field_name].default_factory is dataclasses.MISSING
+    supplied = {
+        field.name: getattr(profile, field.name)
+        for field in dataclasses.fields(profile)
+        if field.name != field_name
+    }
+    with pytest.raises(TypeError, match=field_name):
+        _ = inspect.signature(type_showcase_models.UserProfile).bind(**supplied)
+    empty = dataclasses.replace(profile, tags=[], metadata={})
+    assert empty.tags == []
+    assert empty.metadata == {}
+
+    collections: dict[str, list[str] | dict[str, str]] = {"tags": [], "metadata": {}}
+    with pytest.raises(TypeError, match=field_name):
+        _ = inspect.signature(User.update_labels).bind(
+            user_resource(email="user@example.test", display_name="User"),
+            **{
+                name: value for name, value in collections.items() if name != field_name
+            },
+        )
+
+
+@pytest.mark.parametrize("mode", ["omitted", "none", "empty", "populated"])
+async def test_resource_collection_arguments_preserve_absence(mode: str) -> None:
+    handle: asyncio.Future[None] = asyncio.Future()
+    handle.set_result(None)
+    start_operation = AsyncMock(return_value=handle)
+    client = Mock(start_operation=start_operation)
+    tags: list[str] = []
+    metadata: dict[str, str] = {}
+    extra_tags: list[str] | None = None
+    extra_metadata: dict[str, str] | None = None
+    if mode == "empty":
+        extra_tags, extra_metadata = [], {}
+    elif mode == "populated":
+        extra_tags, extra_metadata = ["extra"], {"tier": "enterprise"}
+    user = User(
+        user_id="user-123",
+        email="user@example.test",
+        display_name="User",
+        status=type_showcase_models.UserStatus.Active,
+        profile=user_profile(),
+    )
+
+    with patch("temporalio.workflow.create_nexus_client", return_value=client):
+        if mode == "omitted":
+            await user.update_labels(tags=tags, metadata=metadata)
+        else:
+            await user.update_labels(
+                tags=tags,
+                metadata=metadata,
+                extra_tags=extra_tags,
+                extra_metadata=extra_metadata,
+            )
+
+    start_operation.assert_awaited_once()
+    assert start_operation.await_args is not None
+    request = start_operation.await_args.kwargs["input"]
+    assert isinstance(request, type_showcase_models.UpdateLabelsRequest)
+    assert request.user_id == user.user_id
+    assert request.tags is tags
+    assert request.metadata is metadata
+    assert request.extra_tags is extra_tags
+    assert request.extra_metadata is extra_metadata
 
 
 async def test_get_user_returns_wit_user_resource_through_real_nexus_client(

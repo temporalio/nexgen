@@ -13,6 +13,7 @@ from .models import (
     SetProfileRequest,
     SyncSettings,
     UpdateEmailRequest,
+    UpdateLabelsRequest,
     UpdateNotificationSettingsRequest,
 )
 
@@ -54,6 +55,11 @@ class TypeShowcase:
         DeactivateRequest,
         None,
     ] = Operation(name="Deactivate")
+
+    update_labels: Operation[
+        UpdateLabelsRequest,
+        None,
+    ] = Operation(name="UpdateLabels")
 
     update_notification_settings: Operation[
         UpdateNotificationSettingsRequest,
