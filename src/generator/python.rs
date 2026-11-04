@@ -5947,7 +5947,9 @@ fn client_extension_class_name(service: &RenderedService<'_>) -> String {
 }
 
 /// Refuses an iterator with the name of another operation, method or field, since one of the two
-/// would hide the other.
+/// would hide the other. The iterator name is a Python name, and `@nexus.name` can change it, so
+/// this check stays with the Python generator. `PollValidationPass` refuses a poll of the wrong
+/// shape earlier, for every language.
 fn validate_client_poll_names(services: &[RenderedService<'_>]) -> Result<()> {
     let operation_names = services
         .iter()

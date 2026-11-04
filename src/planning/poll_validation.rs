@@ -1,5 +1,6 @@
 //! Refuse a client poll on an operation that can't get an iterator. The check runs before any
-//! generator, so it doesn't depend on the language.
+//! generator, so it doesn't depend on the language. It runs on the planned spec, since an
+//! operation that returns a resource is known only after resource resolution.
 
 use std::path::Path;
 
