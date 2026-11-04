@@ -69,10 +69,12 @@ flowchart LR
         operationLowered[OperationLoweredFamily]
         planned[PlannedFamily]
         reachable[PlannedFamily<br/>reachable]
+        pollValidated[PlannedFamily<br/>polls validated]
 
         operationBoundForPlanning -->|OperationLoweringPass| operationLowered
         operationLowered -->|TypePlanningPass| planned
         planned -->|ReachabilityPass| reachable
+        reachable -->|PollValidationPass| pollValidated
     end
 
     subgraph emit["Emission"]
@@ -88,7 +90,7 @@ flowchart LR
     authored --> authoredForBinding
     selectedValidated --> selectedForBinding
     operationBound --> operationBoundForPlanning
-    reachable --> reachableForEmission
+    pollValidated --> reachableForEmission
 ```
 
 ## Passes
@@ -119,6 +121,12 @@ flowchart LR
   Reachability and model emission follow native model identity, while
   language-specific converters use the wire metadata.
 - `ReachabilityPass` removes declarations outside the generated surface.
+- `PollValidationPass` refuses a client `@nexus.poll` on an operation that can't
+  get an iterator, such as one with function inputs, an output transform, a
+  resource result, or no result. It runs on the planned spec, since a resource
+  result is known only after resource resolution, and before any language
+  backend, so every language refuses the same polls. Each backend still checks
+  the names of its own iterators.
 - `EmittedNameResolutionPass` resolves final emitted JSON model identifiers. Its
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
