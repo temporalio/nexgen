@@ -67,6 +67,30 @@ fn python_api_models_import(target: GenerationTarget, depth: usize) -> String {
     )
 }
 
+/// Imports the identity DTOs that a Workflow module decodes direct resource results as, from the
+/// root package, which is `depth` packages above the module in the Workflow API.
+fn render_resource_data_import(
+    output: &mut String,
+    body: &str,
+    resources: &[PlannedResource],
+    depth: usize,
+) {
+    let names = resources
+        .iter()
+        .map(|resource| resource_data_type(&resource.type_name))
+        .collect::<Vec<_>>();
+    let used = used_python_symbol_imports(body, &names);
+    if !used.is_empty() {
+        let module = format!(
+            "{}_resources._resource_data",
+            ".".repeat(
+                depth + usize::from(python_api_directory(GenerationTarget::Workflow).is_some())
+            )
+        );
+        render_named_python_import(output, &module, &used);
+    }
+}
+
 pub(in crate::generator) type RootPackageImports = BTreeMap<String, BTreeSet<String>>;
 
 pub(crate) fn validate_service_configuration(spec: &ApiSpec) -> Result<()> {
@@ -568,6 +592,7 @@ impl<'a> ApiPlanner<'a> {
                             .iter()
                             .map(|field| python_field_name(&field.name))
                             .collect(),
+                        has_methods: !resource.methods.is_empty(),
                     };
                     (resource.type_name.clone(), data)
                 })
@@ -1423,6 +1448,9 @@ impl<'a> ApiPlanner<'a> {
                 render_named_python_import(&mut output, ".", &used_resource_names);
             }
         }
+        if !client {
+            render_resource_data_import(&mut output, &body, &service.resources, 2);
+        }
         render_support_import(&mut output, &body, self.support_package, false);
         render_poll_iterator_import(&mut output, &body, ".._poll");
         if !body.is_empty() {
@@ -1442,11 +1470,16 @@ impl<'a> ApiPlanner<'a> {
         target: Option<GenerationTarget>,
     ) {
         let client = target == Some(GenerationTarget::Client);
-        output.push_str(if client {
-            "@dataclasses.dataclass(init=False)\n"
-        } else {
-            "@dataclasses.dataclass\n"
-        });
+        // A handle has calls, so it is a plain class that the payload converter can't encode or
+        // decode. A resource with no methods is data, as its identity DTO is.
+        let handle = target.is_some() && !resource.methods.is_empty();
+        if !handle {
+            output.push_str(if client {
+                "@dataclasses.dataclass(init=False)\n"
+            } else {
+                "@dataclasses.dataclass\n"
+            });
+        }
         output.push_str("class ");
         if target.is_none() {
             output.push_str(&resource_data_type(&resource.type_name));
@@ -1468,6 +1501,8 @@ impl<'a> ApiPlanner<'a> {
         }
         if client {
             self.render_resource_constructor(output, resource);
+        } else if handle {
+            self.render_resource_init(output, resource);
         }
         let Some(target) = target else {
             // Identity DTOs have no API methods or client state.
@@ -1482,6 +1517,7 @@ impl<'a> ApiPlanner<'a> {
             }
             return;
         }
+        render_resource_identity_methods(output, resource);
 
         for method in &resource.methods {
             output.push_str("\n");
@@ -1535,6 +1571,31 @@ impl<'a> ApiPlanner<'a> {
         for field in &resource.fields {
             let name = python_field_name(&field.name);
             output.push_str(&format!("        {receiver}.{name} = {name}\n"));
+        }
+    }
+
+    /// The constructor of a Workflow handle, which takes its identity fields.
+    fn render_resource_init(&self, output: &mut String, resource: &PlannedResource) {
+        let receiver = resource_client_identifier(resource, "self");
+        output.push_str(&format!("\n    def __init__(\n        {receiver},\n"));
+        for field in &resource.fields {
+            output.push_str(&format!(
+                "        {}: {},\n",
+                python_field_name(&field.name),
+                self.python_resource_field_annotation(
+                    &field.kind,
+                    field.optional,
+                    field.function.as_ref()
+                )
+            ));
+        }
+        output.push_str("    ) -> None:\n");
+        for field in &resource.fields {
+            let name = python_field_name(&field.name);
+            output.push_str(&format!("        {receiver}.{name} = {name}\n"));
+        }
+        if resource.fields.is_empty() {
+            output.push_str("        pass\n");
         }
     }
 
@@ -3461,6 +3522,8 @@ impl RenderedOperation<'_> {
 struct ResourceDataResult {
     /// The identity fields, which the handle takes from the decoded result.
     fields: Vec<String>,
+    /// A resource with methods isn't data, so the Workflow API decodes its identity DTO.
+    has_methods: bool,
 }
 
 #[derive(Debug)]
@@ -5249,6 +5312,9 @@ fn render_workflow_clients_module(
     for (module, names) in resource_imports {
         render_named_python_import(&mut output, &format!("._resources.{module}"), &names);
     }
+    for service in services.iter().filter(|service| service.endpoint.is_none()) {
+        render_resource_data_import(&mut output, &body, &service.resources, 1);
+    }
     render_support_import(&mut output, &body, support_package, false);
     output.push_str("\n\n");
     output.push_str(&body);
@@ -5341,6 +5407,7 @@ fn render_operation_module(
     if !used_resource_names.is_empty() {
         render_named_python_import(&mut output, ".._resources", &used_resource_names);
     }
+    render_resource_data_import(&mut output, &body, &service.resources, 2);
     render_support_import(&mut output, &body, support_package, false);
     output.push('\n');
     output.push('\n');
@@ -5982,11 +6049,11 @@ fn render_endpoint_service_object_operation_body(
             output.push_str(operation_input_wire_expr(operation));
             output.push_str(",\n");
             output.push_str("            output_type=");
-            output.push_str(&operation.output_type_expr);
+            output.push_str(&workflow_output_type_expr(operation));
             output.push_str(",\n");
             output.push_str("        )\n");
             if operation.output_module_path.as_deref() == Some("._resources") {
-                output.push_str("        resource = await handle\n");
+                render_resource_from_data(output, "        ", operation);
                 if let Some(resource) = service
                     .resources
                     .iter()
@@ -6567,6 +6634,53 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
     );
 }
 
+/// The equality and the repr of a handle compare its identity fields, as a dataclass's do.
+fn render_resource_identity_methods(output: &mut String, resource: &PlannedResource) {
+    let receiver = resource_client_identifier(resource, "self");
+    let other = resource_client_identifier(resource, "other");
+    let fields = resource
+        .fields
+        .iter()
+        .map(|field| python_field_name(&field.name))
+        .collect::<Vec<_>>();
+    let values = |owner: &str| match fields.as_slice() {
+        [field] => format!("({owner}.{field},)"),
+        fields => format!(
+            "({})",
+            fields
+                .iter()
+                .map(|field| format!("{owner}.{field}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    };
+    output.push_str("\n    @typing_extensions.override\n");
+    output.push_str(&format!(
+        "    def __eq__({receiver}, {other}: object) -> bool:\n"
+    ));
+    output.push_str(&format!(
+        "        if not isinstance({other}, {}):\n",
+        resource.type_name
+    ));
+    output.push_str("            return NotImplemented\n");
+    output.push_str(&format!(
+        "        return {} == {}\n",
+        values(&receiver),
+        values(&other)
+    ));
+    output.push_str("\n    @typing_extensions.override\n");
+    output.push_str(&format!("    def __repr__({receiver}) -> str:\n"));
+    output.push_str(&format!(
+        "        return f\"{}({})\"\n",
+        resource.type_name,
+        fields
+            .iter()
+            .map(|field| format!("{field}={{{receiver}.{field}!r}}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+}
+
 fn render_resource_client_binder(output: &mut String, resource: &PlannedResource) {
     output.push_str("def ");
     output.push_str(&resource_client_bind_function_name(resource));
@@ -6622,7 +6736,7 @@ fn render_resource_method_inline_operation_body(
                 operation_input_wire_expr(operation),
             );
             if operation.output_module_path.as_deref() == Some("._resources") {
-                output.push_str("        resource = await handle\n");
+                render_resource_from_data(output, "        ", operation);
                 if let Some(returned_resource) = service
                     .resources
                     .iter()
@@ -6715,10 +6829,57 @@ fn render_resource_nexus_start_operation(
     output.push_str(",\n");
     if !operation.output_none {
         output.push_str("            output_type=");
-        output.push_str(&operation.output_type_expr);
+        output.push_str(&workflow_output_type_expr(operation));
         output.push_str(",\n");
     }
     output.push_str("        )\n");
+}
+
+/// The `output_type` of a Workflow start call. The payload converter can't build a handle, so a
+/// direct result that is a handle decodes as its identity DTO.
+fn workflow_output_type_expr(operation: &RenderedOperation<'_>) -> String {
+    if decodes_resource_data(operation) {
+        resource_data_type(&operation.output_ref)
+    } else {
+        operation.output_type_expr.clone()
+    }
+}
+
+/// Whether a Workflow call decodes a direct result as the identity DTO of a handle.
+fn decodes_resource_data(operation: &RenderedOperation<'_>) -> bool {
+    operation
+        .resource_data
+        .as_ref()
+        .is_some_and(|data| data.has_methods)
+}
+
+/// Sets `resource` from a direct resource result. A handle is built from the identity DTO that the
+/// result decodes as.
+fn render_resource_from_data(output: &mut String, indent: &str, operation: &RenderedOperation<'_>) {
+    let data = operation
+        .resource_data
+        .as_ref()
+        .expect("a direct resource result should have its identity fields");
+    if !data.has_methods {
+        output.push_str(indent);
+        output.push_str("resource = await handle\n");
+        return;
+    }
+    output.push_str(indent);
+    output.push_str(if data.fields.is_empty() {
+        "_ = await handle\n"
+    } else {
+        "result = await handle\n"
+    });
+    output.push_str(indent);
+    output.push_str("resource = ");
+    output.push_str(&operation.output_ref);
+    output.push_str("(\n");
+    for field in &data.fields {
+        output.push_str(&format!("{indent}    {field}=result.{field},\n"));
+    }
+    output.push_str(indent);
+    output.push_str(")\n");
 }
 
 fn render_resource_method_operation_body(
@@ -8645,10 +8806,15 @@ fn render_request_only_operation_function(
         output.push_str(operation_input_wire_expr(operation));
         output.push_str(",\n");
         output.push_str("        output_type=");
-        output.push_str(&operation.output_type_expr);
+        output.push_str(&workflow_output_type_expr(operation));
         output.push_str(",\n");
         output.push_str("    )\n");
-        output.push_str("    return await handle\n");
+        if decodes_resource_data(operation) {
+            render_resource_from_data(output, "    ", operation);
+            output.push_str("    return resource\n");
+        } else {
+            output.push_str("    return await handle\n");
+        }
         return;
     }
 

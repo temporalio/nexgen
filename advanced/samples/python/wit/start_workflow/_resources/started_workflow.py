@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import dataclasses
+import typing_extensions
 import datetime
 import temporalio.workflow
 
@@ -16,11 +16,34 @@ from ..models import (
 import temporal_support as _support
 
 
-@dataclasses.dataclass
 class StartedWorkflow:
     namespace: str
     workflow_id: str
     run_id: str | None
+
+    def __init__(
+        self,
+        namespace: str,
+        workflow_id: str,
+        run_id: str | None,
+    ) -> None:
+        self.namespace = namespace
+        self.workflow_id = workflow_id
+        self.run_id = run_id
+
+    @typing_extensions.override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, StartedWorkflow):
+            return NotImplemented
+        return (self.namespace, self.workflow_id, self.run_id) == (
+            other.namespace,
+            other.workflow_id,
+            other.run_id,
+        )
+
+    @typing_extensions.override
+    def __repr__(self) -> str:
+        return f"StartedWorkflow(namespace={self.namespace!r}, workflow_id={self.workflow_id!r}, run_id={self.run_id!r})"
 
     async def cancel(
         self,

@@ -6,6 +6,7 @@ import temporalio.workflow
 
 from ..models import GetUserRequest
 from .._resources import User
+from .._resources._resource_data import UserData
 
 
 async def _get_user(
@@ -18,9 +19,17 @@ async def _get_user(
     handle = await nexus_client.start_operation(
         operation="GetUser",
         input=request,
-        output_type=User,
+        output_type=UserData,
     )
-    return await handle
+    result = await handle
+    resource = User(
+        user_id=result.user_id,
+        email=result.email,
+        display_name=result.display_name,
+        status=result.status,
+        profile=result.profile,
+    )
+    return resource
 
 
 async def get_user(
