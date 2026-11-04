@@ -3,5 +3,5 @@ languages = ["dotnet"]
 [error]
 kind = "system-nexus-required"
 contains = [
-  ".NET operations-class overrides on service `Api` requires System Nexus mode (--system-nexus)",
+  "operations-class on interface `api` requires System Nexus mode (--system-nexus)",
 ]

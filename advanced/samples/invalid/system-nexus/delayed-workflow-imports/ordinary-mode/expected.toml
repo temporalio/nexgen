@@ -1,5 +1,5 @@
 [error]
 kind = "system-nexus-required"
 contains = [
-  "delayed Python workflow imports on service `ExampleService` requires System Nexus mode (--system-nexus)",
+  "delay-load-temporalio-workflow on interface `example-service` requires System Nexus mode (--system-nexus)",
 ]

@@ -97,11 +97,16 @@ flowchart LR
 
 WIT annotation syntax is validated inside the WIT frontend, immediately after
 resolving the input packages and before constructing authored IR. The catalog in
-`src/parser/wit/annotations.rs` defines placements, argument names and
-cardinality. Parsing uses that catalog for common checks; a complete resolved
-tree walk checks placements, including unused declarations and linked packages.
-Builders retain semantic checks and interpretation. This is not a new shared
-compiler pass: no WIT annotation concepts cross the parsing boundary.
+`src/parser/wit/annotations.rs` defines placements, argument names, cardinality,
+language eligibility, and System Nexus requirements. Parsing uses that catalog
+for common checks; a complete resolved tree walk checks placements, including
+unused declarations and linked packages. WIT generation checks availability
+against the selected language and mode before lowering. Unqualified annotations
+apply to the selected output; language-qualified annotations can remain inactive
+for other outputs. Scaffolding only checks vocabulary and placements, without
+imposing a generation language or mode. Builders retain semantic checks and
+interpretation. This is not a new shared compiler pass: no WIT annotation
+concepts cross the parsing boundary.
 
 - `AuthoredValidationPass` validates authored API intent and source-format
   constraints. Native protobuf-backed enums must match the descriptor's full

@@ -63,21 +63,16 @@ pub(in crate::generator) fn obsolete_attribute(kind: &str) -> String {
 const EXPERIMENTAL_WARNING: &str =
     "WARNING: This API is experimental and may change in the future.";
 
-pub(crate) fn validate_service_configuration(spec: &ApiSpec, language: Language) -> Result<()> {
+pub(crate) fn validate_namespace_configuration(spec: &ApiSpec, language: Language) -> Result<()> {
     if language != Language::Dotnet || crate::nexgen_config::current().system_nexus {
         return Ok(());
     }
     for service in &spec.services {
-        for (feature, value) in [
-            (".NET namespace overrides", &service.namespace),
-            (".NET operations-class overrides", &service.operations_class),
-        ] {
-            if value.for_language(Language::Dotnet).is_some() {
-                return Err(Error::SystemNexusRequired {
-                    feature,
-                    context: format!("service `{}`", service.name),
-                });
-            }
+        if service.namespace.for_language(Language::Dotnet).is_some() {
+            return Err(Error::SystemNexusRequired {
+                feature: ".NET namespace overrides",
+                context: format!("service `{}`", service.name),
+            });
         }
     }
     if let Some(scope) = &spec.model_scope

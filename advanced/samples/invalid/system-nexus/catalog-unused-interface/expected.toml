@@ -1,0 +1,5 @@
+languages = ["dotnet"]
+
+[error]
+kind = "system-nexus-required"
+contains = ["operations-class on interface `unused` requires System Nexus mode (--system-nexus)"]

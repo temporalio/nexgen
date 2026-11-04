@@ -1614,7 +1614,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.poll`                           | freestanding function                                                                         |
 | `@nexus.serialization-context`          | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
-| `@nexus.flatten-in-api`                 | record, type alias, resource                                                                  |
+| `@nexus.flatten-in-api`                 | record                                                                                        |
 | `@nexus.flattened-type`                 | record field                                                                                  |
 | `@nexus.function`                       | type alias, record field                                                                      |
 | `@nexus.function-args`                  | freestanding function                                                                         |
@@ -1638,6 +1638,46 @@ an external binding also takes `<lang>-from` and `<lang>-to`. Field `type`
 annotations do not take conversion helpers. `doc` return overrides are only
 valid on freestanding functions, and `function` signatures belong on type
 aliases, not record fields.
+
+### Language and System Nexus restrictions
+
+Catalog entries can restrict the languages in which an annotation is valid and
+require System Nexus mode. These checks run before lowering, including on unused
+declarations and linked packages. Scaffolding commands check the annotation
+vocabulary and placement without choosing an output language or generation mode.
+
+An unqualified annotation requests behavior for the current output language. For
+example, `@nexus.operations-class "CustomOperations"` is rejected when
+generating Go or Python instead of silently doing nothing. A positional default
+still applies to every language when combined with an explicit override.
+
+An annotation with only language-qualified values is scoped to those languages.
+`@nexus.operations-class dotnet="CustomOperations"` is therefore valid while
+generating Go, even without System Nexus mode: the annotation is inactive for
+that output. Generating .NET makes it active and requires `--system-nexus`.
+Unsupported language-qualified arguments, such as
+`@nexus.operations-class python="CustomOperations"`, are rejected regardless of
+the selected output language.
+
+The catalog currently declares these restrictions:
+
+<!-- annotation-availability:start -->
+
+| Annotation                              | Language restriction | System Nexus            |
+| --------------------------------------- | -------------------- | ----------------------- |
+| `@nexus.namespace`                      | dotnet, go           | not required by catalog |
+| `@nexus.operations-class`               | dotnet               | required                |
+| `@nexus.delay-load-temporalio-workflow` | none                 | required                |
+| `@nexus.poll`                           | python               | required                |
+
+<!-- annotation-availability:end -->
+
+This index is checked against the catalog. "None" means the catalog imposes no
+language restriction, not that every backend emits the feature. In particular,
+delayed workflow loading remains a Python-specific effect of an unqualified
+marker shared by multi-language WIT files. More detailed backend restrictions
+remain in semantic validation, including .NET's System Nexus requirement for
+namespace overrides.
 
 ### @nexus.endpoint
 
@@ -1679,12 +1719,9 @@ Operation-bearing .NET WIT services use the module-derived namespace.
 `@nexus.operations-class "<class-name>"` or a language-specific override such as
 `@nexus.operations-class dotnet="ModelOperations"`
 
-Selects the operations class name for targets that support an override. A
-positional string supplies the default; a language-specific value overrides it
-for that target.
-
-.NET operations-class overrides are reserved for models-only WIT exports.
-Operation-bearing .NET WIT services use the `Operations` class.
+Selects the .NET operations class name in System Nexus mode. A positional string
+applies to the currently selected language and therefore fails for non-.NET
+output. Use `dotnet=` in WIT files shared with other output languages.
 
 ---
 
