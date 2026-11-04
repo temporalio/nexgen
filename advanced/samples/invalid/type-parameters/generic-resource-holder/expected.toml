@@ -3,4 +3,4 @@ inputs = ["input.wit", "../../../inputs/deps"]
 
 [error]
 kind = "invalid-wit"
-contains = ["field `job`", "holds the generic resource `job`"]
+contains = ["record `job-service.create-job-result` field `job` holds the generic resource `job`, which is not supported"]
