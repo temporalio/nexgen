@@ -1323,6 +1323,12 @@ pub struct OperationPollSpec<F: TypeFamily = AuthoredFamily> {
     pub next: F::Text,
     /// The targets whose API gets the poll. Never empty.
     pub targets: Vec<GenerationTarget>,
+    /// The key of the response's list field whose items the item iterator yields. Without it,
+    /// there is only the page iterator.
+    pub items: Option<String>,
+    /// The support helper that turns a page's request and one of its items into the request that
+    /// resumes after that item.
+    pub resume: F::Text,
 }
 
 impl<F: TypeFamily> OperationPollSpec<F> {
@@ -1333,6 +1339,8 @@ impl<F: TypeFamily> OperationPollSpec<F> {
         OperationPollSpec {
             next: map.map_text(self.next),
             targets: self.targets,
+            items: self.items,
+            resume: map.map_text(self.resume),
         }
     }
 }

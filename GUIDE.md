@@ -2177,7 +2177,8 @@ type or transform expression refers to an otherwise-unavailable module.
 ### @nexus.poll
 
 **Placement:** Operation (function) **Syntax:**
-`@nexus.poll python="<support-helper>" targets="client"`
+`@nexus.poll python="<support-helper>" targets="client"`, with optional
+`items="<field>"` and `python-resume="<support-helper>"`
 
 Generates an `iter_<name>` async iterator on the client extension, and on each
 client resource method that binds the operation. The iterator sends the request,
@@ -2201,16 +2202,48 @@ def next_read_request(request, response):
     return dataclasses.replace(request, from_offset=response.next_offset)
 ```
 
-The stream sample's full helper is in
+With `items="<field>"`, nexgen also generates `iter_<name>_items`. It takes the
+parameters of `iter_<name>`, reads its pages, and yields the items of the list
+field `<field>` of each response. It returns a `PollIterator`, whose
+`next_request` is the request to resume with:
+
+- After an item, the `python-resume` helper gives it. The helper takes the
+  page's request and the item, and returns the request that resumes after the
+  item.
+- Without `python-resume`, it reads the item's page again, so a resumed read can
+  yield an item twice.
+- After a page's last item, it is the page helper's request. It is `None` after
+  the last page.
+
+```wit
+/// @nexus.poll python="next_read_request" items="records"
+///   python-resume="resume_read_request" targets="client"
+read-records: func(request: read-records-request) -> read-records-response;
+```
+
+```python
+def resume_read_request(request, item):
+    return dataclasses.replace(request, from_offset=item.offset + 1)
+```
+
+To resume, pass the fields of a saved `next_request` to `iter_<name>_items`. A
+resource method's iterator takes only the method's parameters, such as
+`from_offset` of the Stream's `iter_read_items`.
+
+The stream sample's full helpers are in
 [`temporal_support/poll.py`](advanced/samples/python/temporal_support/poll.py).
 
-- The iterator yields pages, not the items in them.
+- `iter_<name>` yields pages, and `iter_<name>_items` yields the items in them.
 - All pages use one Nexus client. Each page is a new operation with a new random
   operation ID.
 - Only the Python client target generates the iterator, so `targets` must be
   `client`.
 - nexgen refuses the directive on a resource method, on an operation that it
-  can't poll, and when `iter_<name>` clashes with another member.
+  can't poll, and when an iterator clashes with another member.
+- nexgen refuses an `items` field that the response doesn't have, a field with
+  `@nexus.omit`, or a field that isn't a list in the model, such as a proto
+  `bytes` field. It also refuses `python-resume` without `items`, and `items` in
+  a package with a model or resource called `PollIterator`.
 - Use `asyncio.timeout` to limit a whole iteration. After an error, start a new
   iteration at the last page's `next_offset`.
 
