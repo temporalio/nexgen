@@ -1960,9 +1960,7 @@ occur.
 
 A resource declares each type parameter that it uses with
 `@nexus.type-parameter "<alias>"`, in order. The alias can come from another
-interface through `use`. The fields, method parameters and method results of the
-resource can use only these parameters. A method result that is a generic
-resource takes its type arguments from the resource of the method.
+interface through `use`.
 
 ```wit
 /// @nexus.type-parameter
@@ -1977,40 +1975,25 @@ record append-record {
 resource %stream { ... }
 ```
 
-The resource keeps a runtime type for each parameter. An operation that returns
-the resource takes one runtime type for each parameter, since its request can't
-give one. An operation that a method binds takes one for each parameter that its
-output uses, since a request value doesn't give its type at runtime. The method
-passes the runtime types of its resource. The data converter decodes the generic
-values of the response with these types.
+The resource keeps a runtime type for each parameter, and its calls decode the
+generic values of a response with them. An operation that returns the resource
+takes a runtime type for each parameter. A method passes the types of its
+resource to the operation that it binds.
 
-- Python. The class is `Stream(typing.Generic[BodyT])`, and its `__init__` takes
-  the keyword `body_type: type[BodyT]`. The runtime type isn't a dataclass
-  field, so the data converter doesn't encode it, and a decoded handle decodes
-  its values as `typing.Any`. An unpacked call takes the runtime type as its
-  first positional parameter, so `create_stream(Turn, ...)` returns a
-  `Stream[Turn]`. A call that takes a request takes the runtime type after the
-  request.
-- TypeScript. The class is `Stream<BodyT>`, and its constructor takes
-  `bodyType?: common.TypeInfo<BodyT>` after the fields. The runtime type is a
-  private field with a getter, so the data converter doesn't encode it. A call
-  takes the type info after the request, and it converts the response with the
-  model's `create<Model>TransferTypeConverter` factory.
-- .NET. The class is `Stream<TBody>`, and a call takes the type argument, such
-  as `CreateStreamAsync<Turn>(options)`.
+- Python. `Stream(typing.Generic[BodyT])` takes a `body_type`, so
+  `create_stream(Turn, ...)` returns a `Stream[Turn]`. The client factory takes
+  it too, as in `get_stream(ref=ref, created=None, body_type=Turn)`. The runtime
+  type isn't a dataclass field, so the data converter doesn't encode it, and a
+  decoded handle decodes its values as `typing.Any`.
+- TypeScript. `Stream<BodyT>` takes `bodyType?: common.TypeInfo<BodyT>` after
+  its fields.
+- .NET. A call of `Stream<TBody>` takes the type argument, as in
+  `CreateStreamAsync<Turn>(options)`.
 
-The factory of a client resource takes the runtime types too, as
-`get_stream(ref=ref, created=None, body_type=Turn)`,
-`getStream(ref, undefined, turnType)` or `GetStream<Turn>(ref, null)`.
-
-Go and Java refuse a generic resource. nexgen refuses a resource that uses a
-parameter that it doesn't declare, also through a proto-backed record or a
-returned generic resource, and a declared parameter that the resource doesn't
-use. An operation that a method binds can use only the parameters of the
-resource. A generic resource can't be the result of an operation with no
-`@nexus.proto` message, or a field of a record. Python refuses a resource field
-or a request field with the name of a runtime type, such as `body-type` for
-`body-t`. TypeScript refuses such a resource field.
+Go and Java refuse a generic resource. nexgen also refuses a type parameter that
+a resource uses but doesn't declare, or declares but doesn't use, and a generic
+resource in a record field or in the result of an operation with no
+`@nexus.proto` message.
 
 ---
 
