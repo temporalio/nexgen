@@ -4,10 +4,6 @@ pub(super) fn input_name(operation: &RenderedOperation<'_>) -> String {
     go_declaration_name(&format!("{}Input", go_field_name(operation.name)))
 }
 
-pub(super) fn dispatch_name(operation: &RenderedOperation<'_>) -> String {
-    format!("systemnexus_intercept{}", go_field_name(operation.name))
-}
-
 fn header_field(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
@@ -73,16 +69,12 @@ pub(super) fn render(services: &[RenderedService<'_>], api_plan: &PlannedSpec) -
     }
     output.push_str("}\n");
 
-    for (service, operation) in operations {
+    for (service, operation) in &operations {
         let method = go_field_name(operation.name);
         let input = input_name(operation);
         let request = &operation.input_type;
-        let dispatch = dispatch_name(operation);
         let service_name = go_string_literal(service.wire_name);
         let wire_name = go_string_literal(operation.wire_name);
-        let prepare_header = header_field(service, operation, api_plan)
-            .map(|field| format!("\tctx = systemnexus_contextWithHeader(ctx, &request.{field})\n"))
-            .unwrap_or_default();
         output.push_str(&format!(
             "\n// {input} contains the request before payload conversion.\n\
              // Interceptors may modify it synchronously before forwarding it. They must\n\
@@ -103,8 +95,28 @@ pub(super) fn render(services: &[RenderedService<'_>], api_plan: &PlannedSpec) -
              \t\tOptions: input.Options,\n\
              \t\tNexusHeader: input.NexusHeader,\n\
              \t}})\n\
-             }}\n\
-             \nfunc {dispatch}(ctx Context, outbound WorkflowOutboundInterceptor, input ExecuteNexusOperationInput) NexusOperationFuture {{\n\
+             }}\n"
+        ));
+    }
+    output.push_str(
+        "\nfunc systemnexus_startOperation(ctx Context, outbound WorkflowOutboundInterceptor, input ExecuteNexusOperationInput) NexusOperationFuture {\n\
+         \toperationName, err := nexusOperationName(input.Operation, input.Input)\n\
+         \tif err != nil {\n\
+         \t\treturn systemnexus_failedFuture(ctx, err)\n\
+         \t}\n\
+         \tswitch {\n",
+    );
+    for (service, operation) in operations {
+        let method = go_field_name(operation.name);
+        let input = input_name(operation);
+        let request = &operation.input_type;
+        let service_name = go_string_literal(service.wire_name);
+        let wire_name = go_string_literal(operation.wire_name);
+        let prepare_header = header_field(service, operation, api_plan)
+            .map(|field| format!("\tctx = systemnexus_contextWithHeader(ctx, &request.{field})\n"))
+            .unwrap_or_default();
+        output.push_str(&format!(
+            "\tcase input.Client.Service() == {service_name} && operationName == {wire_name}:\n\
              \trequest, ok := input.Input.({request})\n\
              \tif !ok {{\n\
              \t\treturn systemnexus_failedFuture(ctx, fmt.Errorf(\"system Nexus operation %s/%s expects {request}, got %T\", {service_name}, {wire_name}, input.Input))\n\
@@ -114,9 +126,13 @@ pub(super) fn render(services: &[RenderedService<'_>], api_plan: &PlannedSpec) -
              \t\tRequest: request,\n\
              \t\tOptions: input.Options,\n\
              \t\tNexusHeader: input.NexusHeader,\n\
-             \t}})\n\
-             }}\n"
+             \t}})\n"
         ));
     }
+    output.push_str(
+        "\t}\n\
+         \treturn systemnexus_failedFuture(ctx, fmt.Errorf(\"unsupported system Nexus operation %s/%s\", input.Client.Service(), operationName))\n\
+         }\n",
+    );
     Ok(output)
 }

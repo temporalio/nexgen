@@ -172,7 +172,7 @@ impl<'a> TypeScope<'a> {
 
     fn register_annotation(&mut self, annotation: &str, package: &GoPackageContext) {
         let (imports, expression) = parse_go_expr(annotation);
-        if !imports.iter().any(|path| package.is_self_import(path)) {
+        if !imports.keys().any(|path| package.is_self_import(path)) {
             return;
         }
         let resolved = self.resolve(&expression, &BTreeSet::new());
