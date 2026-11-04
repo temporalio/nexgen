@@ -172,6 +172,32 @@ package-level declarations with `SystemNexus_` (exported) or `systemnexus_`
 (private). To generate into the SDK's `internal` package, set
 `@nexus.namespace go="go.temporal.io/sdk/internal"`.
 
+Workflow System Nexus generation emits an operation-specific outbound interface,
+typed inputs, forwarding methods, terminal methods, and a dispatcher. Standalone
+packages expose `SystemNexus_WorkflowOutboundInterceptor`, its `Base` and
+`Terminal` types, and `SystemNexus_WorkflowOutboundRuntime`. The host implements
+the runtime contract for operation validation, workflow header context, failed
+futures, and scheduling. Call the terminal's `StartOperation` with the head of
+the typed interceptor chain. Terminal scheduling must not re-enter that chain.
+
+For generation into `go.temporal.io/sdk/internal`, nexgen attaches forwarding
+methods directly to `WorkflowOutboundInterceptorBase` and terminal methods to
+`workflowEnvironmentInterceptor`, using the SDK's shared runtime helpers. The
+SDK embeds the generated interface once; its existing `Next` field remains the
+only forwarding state. Both package layouts use the same operation renderer. The
+existing Go `workflow-service` sample exercises dispatch, forwarding, and
+terminal scheduling through the standalone runtime contract.
+
+Interceptor inputs expose the unencoded request, Nexus operation options, and
+Nexus headers. Request envelopes and their nested models become public types;
+the facade exposes their aliases. Interceptors may modify inputs synchronously
+before forwarding but must not retain them or replace their workflow header map.
+Go SDK header bindings use `map[string]*commonpb.Payload`, with pass-through
+converters, so context propagation does not encode headers again. The generated
+dispatcher binds that map to the workflow context before calling interceptors.
+SDK interceptor generation requires concrete request types because Go methods
+cannot declare type parameters.
+
 ### Python
 
 Place an importable Python package in your project and pass its module name, not

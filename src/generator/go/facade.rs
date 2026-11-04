@@ -410,6 +410,16 @@ pub(super) fn render(
             record_for_model_key(api_plan, key).and_then(|record| record.doc.value()),
         );
     }
+    if package.workflow_interceptors
+        && !package.is_self_import("go.temporal.io/sdk/internal")
+        && services
+            .iter()
+            .any(|service| !service.operations.is_empty())
+    {
+        for name in interceptor::STANDALONE_TYPES {
+            plan.add_alias(&mut scope, name, Vec::new(), None);
+        }
+    }
     for service in services {
         for resource in &service.resources {
             plan.add_alias(
@@ -421,7 +431,7 @@ pub(super) fn render(
         }
         if service.endpoint.is_some() {
             for operation in &service.operations {
-                if package.sdk_interceptors {
+                if package.workflow_interceptors {
                     plan.add_alias(
                         &mut scope,
                         &interceptor::input_name(operation),
@@ -722,7 +732,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
-            sdk_interceptors: false,
+            workflow_interceptors: false,
         }
     }
 
