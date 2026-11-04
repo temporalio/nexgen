@@ -45,5 +45,5 @@ The sample uses `go="WorkflowNamespace(ctx)"`; generated code calls
 `internal.GetWorkflowInfo(ctx).Namespace`. Run `go test ./...` from this sample
 module after generation. Run the same command from your own module root. See
 [the WIT guide](../../../GUIDE.md#go) for support contracts and
-[the advanced guide](../../README.md#go-sdk-integration) for SDK integration and
-facade options. JSON Schema generation does not need user support.
+[`@nexus.facade`](../../../GUIDE.md#nexusfacade) for facade generation. JSON
+Schema generation does not need user support.

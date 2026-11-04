@@ -162,6 +162,16 @@ calls `support.WorkflowNamespace(ctx)`. The support package implements it with
 `workflow.GetInfo(ctx).Namespace`. The generated Go package imports support for
 the sourced field. Verify with `go test ./...` from the module root.
 
+Support can also share the generated package. Set `--support-package` and
+`@nexus.namespace go="..."` to the same import path; nexgen omits the
+self-import, so support helpers need not be exported. Authored files alongside
+generated files are preserved.
+
+With `--system-nexus`, Go bindings use SDK `internal` APIs and prefix
+package-level declarations with `SystemNexus_` (exported) or `systemnexus_`
+(private). To generate into the SDK's `internal` package, set
+`@nexus.namespace go="go.temporal.io/sdk/internal"`.
+
 ### Python
 
 Place an importable Python package in your project and pass its module name, not
@@ -1595,6 +1605,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | --------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `@nexus.endpoint`                       | interface                                                                                     |
 | `@nexus.namespace`                      | interface                                                                                     |
+| `@nexus.facade`                         | interface                                                                                     |
 | `@nexus.operations-class`               | interface                                                                                     |
 | `@nexus.service-name`                   | interface                                                                                     |
 | `@nexus.delay-load-temporalio-workflow` | interface                                                                                     |
@@ -1666,6 +1677,7 @@ The catalog currently declares these restrictions:
 | Annotation                              | Language restriction | System Nexus            |
 | --------------------------------------- | -------------------- | ----------------------- |
 | `@nexus.namespace`                      | dotnet, go           | not required by catalog |
+| `@nexus.facade`                         | go                   | not required by catalog |
 | `@nexus.operations-class`               | dotnet               | required                |
 | `@nexus.delay-load-temporalio-workflow` | none                 | required                |
 | `@nexus.poll`                           | python               | required                |
@@ -1706,10 +1718,33 @@ converted to PascalCase: `user-service` becomes `UserService`.
 Selects the generated namespace or package path for targets that support an
 override. A positional string supplies the default; a language-specific value
 overrides it for that target. For Go, the value is an import path; for .NET, it
-is a namespace.
+is a namespace. The Go import path's final segment determines the package name,
+independently of the output directory.
 
 .NET namespace overrides are reserved for models-only WIT exports.
 Operation-bearing .NET WIT services use the module-derived namespace.
+
+---
+
+### @nexus.facade
+
+**Placement:** Interface doc comment **Syntax:**
+`@nexus.facade go="<import-path>"`
+
+Generates a Go facade of type aliases, constants, and forwarding functions.
+Requires `@nexus.namespace` for Go and `--targets workflow`. Use `go=` in
+multi-language WIT files so the annotation is inactive for other languages:
+
+```wit
+/// @nexus.namespace go="go.temporal.io/sdk/internal"
+/// @nexus.facade go="go.temporal.io/sdk/workflow"
+interface workflow-service { ... }
+```
+
+Nexgen emits `<name>.go` and `<name>_facade.go` side by side under `--output`.
+Place them into their respective packages before compiling. Each import path's
+final segment determines its package name. In System Nexus mode, facade names
+omit the implementation's `SystemNexus_` prefix.
 
 ---
 

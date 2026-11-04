@@ -728,17 +728,17 @@ fn build_example_configuration(
                 source,
             })?;
             let name = entry.file_name();
-            let Some(stem) = name
+            if !name
                 .to_str()
-                .and_then(|name| name.strip_suffix("_facade.go"))
-            else {
+                .is_some_and(|name| name.ends_with("_facade.go"))
+            {
                 continue;
-            };
+            }
             fs::create_dir_all(&facade_path).map_err(|source| NexgenError::WriteFile {
                 path: facade_path.clone(),
                 source,
             })?;
-            let destination = facade_path.join(format!("{stem}.go"));
+            let destination = facade_path.join(name);
             fs::rename(entry.path(), &destination).map_err(|source| NexgenError::WriteFile {
                 path: destination,
                 source,

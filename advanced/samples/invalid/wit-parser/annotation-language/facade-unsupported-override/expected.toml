@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.facade` on interface `models`",
+  "argument `python` is not supported for python",
+]

@@ -30,8 +30,6 @@ The generator picks its input format from the file extension, so the same
 
 - [Examples](#examples)
 - [WIT-Direct Generation](#wit-direct-generation)
-  - [Go SDK integration](#go-sdk-integration)
-  - [Go facades](#go-facades)
 - [WIT Directives](#wit-directives)
 - [Proto Backing](#proto-backing)
 - [Validation](#validation)
@@ -230,79 +228,6 @@ The `user-service` example is intentionally small and WIT-native. The
 `type-showcase` example demonstrates broader WIT type coverage: records, enums,
 flags, variants, results, maps, tuples, resources, resource methods, and an
 operation with no return value without proto annotations.
-
-### Go SDK integration
-
-Go support can also live in the generated package. Set `--support-package` to
-the same import path as the WIT's `@nexus.namespace go="..."`. Nexgen omits the
-self-import and calls support helpers without a qualifier. This applies to
-converters, sourced fields, serialization-context helpers, and function-name
-extractors. Same-package helpers need not be exported. Keep authored files
-alongside generated files; nexgen overwrites its own output files but does not
-clear the output directory.
-
-With `--system-nexus`, Go bindings use the SDK's `internal` runtime APIs rather
-than importing `workflow`. WIT type bindings and default expressions should also
-name the appropriate internal APIs. For generation into the SDK's `internal`
-package, use `@nexus.namespace go="go.temporal.io/sdk/internal"`; references to
-that package become unqualified.
-
-The sample WIT declares its own implementation and facade namespaces under
-`go.temporal.io/sdk/advanced/samples/go`. Its implementation is a standalone
-package that imports the SDK's internal APIs. The module path under
-`go.temporal.io/sdk` permits importing these internal packages.
-
-System Nexus package-level declarations use `SystemNexus_` for exported symbols
-and `systemnexus_` for private symbols. Receiver methods retain their API names,
-including `TransferTypeConverter`; package initialization still uses `init`.
-Prefixing preserves each declaration's visibility; unpacked request envelopes
-remain private unless they are also part of the public API.
-
-### Go facades
-
-For Go WIT workflow API generation, declare both package import paths on the
-interface:
-
-```wit
-/// @nexus.namespace go="go.temporal.io/sdk/internal"
-/// @nexus.facade go="go.temporal.io/sdk/workflow"
-interface workflow-service {
-  // ...
-}
-```
-
-`@nexus.facade` requires an explicit implementation namespace and the workflow
-target. The two import paths must be distinct. Each path's final segment
-determines its package name, independently of the output directory. Without an
-explicit namespace, the implementation package still uses the output directory's
-basename.
-
-Nexgen writes `workflowservice.go` and `workflowservice_facade.go` side by side
-under `--output`. Both come from the same compiler plan and the ordinary
-`generate_to_file` library entry point. The output directory is a staging area:
-the two files declare different Go packages and cannot be compiled together. The
-SDK wrapper places them into `internal/workflowservice.go` and
-`workflow/workflowservice.go`, respectively.
-
-The existing sample declares its standalone package paths in the WIT. Generate
-its staging output with:
-
-```sh
-cargo run --features advanced -- go advanced/samples/inputs/workflow-service.wit \
-  advanced/samples/inputs/deps \
-  --descriptors advanced/samples/descriptors/temporal_api.bin \
-  --targets workflow --system-nexus \
-  --support-package go.temporal.io/sdk/advanced/samples/go/systemsupport \
-  --output target/go-workflow-service
-```
-
-`cargo build-examples --format wit --lang go workflow-service` also places the
-sample's files into their checked-in implementation and facade directories.
-
-Facades expose type aliases, constants, and forwarding functions. Aliases retain
-the implementation's methods and type identity. Forwarders retain generic
-parameters, variadic arguments, and operation documentation. System Nexus
-facades expose the original names without the implementation prefix.
 
 ## WIT Directives
 

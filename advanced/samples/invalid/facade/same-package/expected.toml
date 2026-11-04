@@ -1,6 +1,0 @@
-languages = ["go"]
-targets = ["workflow"]
-
-[error]
-kind = "unsupported-go-type"
-contains = ["facade and implementation packages must be distinct"]

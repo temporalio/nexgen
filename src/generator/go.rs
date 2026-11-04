@@ -566,37 +566,13 @@ impl GoPackageContext {
             .primary_facade()
             .and_then(|facade| facade.value())
             .map(|facade| {
-                let implementation_import_path =
-                    import_path
-                        .as_ref()
-                        .ok_or_else(|| Error::UnsupportedGoType {
-                            context: "facade".to_string(),
-                            reason:
-                                "facade generation requires an explicit implementation namespace"
-                                    .to_string(),
-                        })?;
-                if facade == implementation_import_path {
-                    return Err(Error::UnsupportedGoType {
-                        context: "facade".to_string(),
-                        reason: "facade and implementation packages must be distinct".to_string(),
-                    });
-                }
-                if !crate::nexgen_config::current()
-                    .targets
-                    .contains(&GenerationTarget::Workflow)
-                {
-                    return Err(Error::UnsupportedGoType {
-                        context: "facade".to_string(),
-                        reason:
-                            "facade generation requires the workflow target (--targets workflow)"
-                                .to_string(),
-                    });
-                }
                 Ok(GoFacadeOptions {
                     package_name: Self::derive_package_name(
                         facade.rsplit('/').next().unwrap_or(facade),
                     )?,
-                    implementation_import_path: implementation_import_path.clone(),
+                    implementation_import_path: import_path
+                        .clone()
+                        .expect("facade requires an implementation namespace"),
                 })
             })
             .transpose()?;
@@ -6126,7 +6102,7 @@ mod tests {
         let descriptors = crate::descriptors::DescriptorIndex::load_many(&[]).unwrap();
         let bound = crate::planning::ResourceResolutionPass::new(
             &descriptors,
-            crate::planning::PlanningMode::NativeApi,
+            vec![crate::nexgen_config::GenerationTarget::Workflow],
         )
         .apply(selected)
         .unwrap();

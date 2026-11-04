@@ -20,6 +20,10 @@ Strum or the derived enum.
 
 ## Adding a case
 
+Do not add static compiler checks or rejection fixtures for problems that the
+target language's compiler can catch. Validate generated code with that compiler
+instead.
+
 Create `<category>/<case>/` containing `input.wit` and `expected.toml`.
 Categories group the compiler rule, not merely the input format or target:
 

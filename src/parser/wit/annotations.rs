@@ -84,6 +84,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "facade",
+            sites: &[Interface],
+            keys: &["value"],
+            language_keys: &[""],
+            repeatable: false,
+            languages: Some(&[Language::Go]),
+            system_nexus: false,
+        },
+        Annotation {
             name: "operations-class",
             sites: &[Interface],
             keys: &["value", "import"],

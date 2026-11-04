@@ -1,0 +1,6 @@
+package sample:facade@1.0.0;
+
+world system { export models; }
+
+/// @nexus.facade python="example.facade"
+interface models {}

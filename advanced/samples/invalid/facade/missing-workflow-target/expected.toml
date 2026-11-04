@@ -1,5 +1,5 @@
 languages = ["go"]
 
 [error]
-kind = "unsupported-go-type"
-contains = ["facade generation requires the workflow target (--targets workflow)"]
+kind = "invalid-wit-directive"
+contains = ["`@nexus.facade` requires the workflow target (--targets workflow)"]

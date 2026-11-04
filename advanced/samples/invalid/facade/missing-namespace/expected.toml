@@ -2,5 +2,5 @@ languages = ["go"]
 targets = ["workflow"]
 
 [error]
-kind = "unsupported-go-type"
-contains = ["facade generation requires an explicit implementation namespace"]
+kind = "invalid-wit-directive"
+contains = ["`@nexus.facade` must be used with `@nexus.namespace` for go"]
