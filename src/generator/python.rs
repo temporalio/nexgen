@@ -1456,8 +1456,9 @@ impl<'a> ApiPlanner<'a> {
     ) {
         let client = target == Some(GenerationTarget::Client);
         // A handle has calls, so it is a plain class that the payload converter can't encode or
-        // decode. Code passes and compares its identity fields, not the handle. A resource with no
-        // methods is data, as its identity DTO is.
+        // decode. Code passes and compares its identity fields, not the handle. The Workflow
+        // target's handle has no client, but it stays a plain class too, so code can't send it as
+        // data by accident. A resource with no methods is data, as its identity DTO is.
         let handle = target.is_some() && !resource.methods.is_empty();
         if !handle {
             output.push_str(if client {
