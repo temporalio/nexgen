@@ -1,3 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = ["@nexus.type-parameter", "`body-t` isn't a type of this interface"]

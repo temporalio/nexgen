@@ -1,3 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = ["@nexus.type-parameter", "`value` isn't a type alias with `@nexus.type-parameter`"]
