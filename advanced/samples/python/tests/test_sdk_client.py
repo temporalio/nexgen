@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import collections.abc
+import datetime
 import typing
 import uuid
 
@@ -18,6 +19,8 @@ import temporalio.service
 import temporalio.workflow
 from typing_extensions import override
 
+import wit.stream_service.both.workflow as workflow_package
+import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
 from wit.stream_service.both.client import Stream, StreamServiceClientExtension
 from wit.stream_service.both.workflow import _resources as workflow_resources
 from wit.stream_service.client.client import (
@@ -34,6 +37,10 @@ from wit.stream_service.both.models import (
     DescribeStreamRequest,
     DescribeStreamResponse,
     Producer,
+    ReadRecordsRequest,
+    ReadRecordsResponse,
+    StreamReadStart,
+    StreamRecord,
     StreamHandle,
 )
 
@@ -115,6 +122,9 @@ class _AnswersOutbound(temporalio.client.OutboundInterceptor):
         self, input: temporalio.client.GetNexusOperationResultInput
     ) -> typing.Any:
         answer = self._answers.answers[input.operation]
+        if isinstance(answer, list):
+            # A list answers each call in turn.
+            answer = typing.cast(list[object], answer).pop(0)
         if input.result_type is None:
             return answer
         assert self._answers.client is not None
@@ -302,3 +312,129 @@ def test_resource_serialization_carries_only_identity_fields() -> None:
         "handle": dataclasses.asdict(ref),
         "created": None,
     }
+
+
+async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_move() -> (
+    None
+):
+    ref = StreamHandle(id="s1")
+    pages = [
+        ReadRecordsResponse(
+            records=[StreamRecord(offset=1), StreamRecord(offset=2)], next_offset=3
+        ),
+        ReadRecordsResponse(next_offset=3),
+    ]
+    client, answers = connect(Client, {"ReadRecords": list(pages)})
+    stream = client.get_stream(handle=ref, created=None)
+
+    read = [page async for page in stream.iter_read(from_offset=1)]
+
+    assert read == pages
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(handle=ref, from_offset=1),
+        ReadRecordsRequest(handle=ref, from_offset=3),
+    ]
+    # The iteration uses one Nexus client, and each page is a new operation.
+    assert len(client.created_clients) == 1
+    assert len({started.id for started in answers.started}) == len(pages)
+
+
+async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -> None:
+    ref = StreamHandle(id="s1")
+    wait = datetime.timedelta(seconds=30)
+    pages = [
+        ReadRecordsResponse(records=[StreamRecord(offset=1)], next_offset=2),
+        ReadRecordsResponse(next_offset=2),
+        ReadRecordsResponse(done=True),
+    ]
+    client, answers = connect(Client, {"ReadRecords": list(pages)})
+    stream = client.get_stream(handle=ref, created=None)
+
+    read = [page async for page in stream.iter_read(from_offset=1, wait=wait)]
+
+    assert read == pages
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(handle=ref, from_offset=1, wait=wait),
+        ReadRecordsRequest(handle=ref, from_offset=2, wait=wait),
+        ReadRecordsRequest(handle=ref, from_offset=2, wait=wait),
+    ]
+
+
+async def test_a_stream_read_from_the_end_stays_at_the_first_next_offset() -> None:
+    ref = StreamHandle(id="s1")
+    wait = datetime.timedelta(seconds=30)
+    pages = [
+        ReadRecordsResponse(next_offset=5),
+        ReadRecordsResponse(records=[StreamRecord(offset=5)], next_offset=6),
+        ReadRecordsResponse(done=True),
+    ]
+    client, answers = connect(
+        Client,
+        {"CreateStream": CreateStreamResult(handle=ref), "ReadRecords": list(pages)},
+    )
+    stream = await client.create_stream(id="s1")
+
+    read = [
+        page
+        async for page in stream.iter_read(
+            start=StreamReadStart.StreamReadStartEnd, wait=wait
+        )
+    ]
+
+    assert read == pages
+    assert [started.arg for started in answers.started[1:]] == [
+        ReadRecordsRequest(
+            handle=ref, start=StreamReadStart.StreamReadStartEnd, wait=wait
+        ),
+        ReadRecordsRequest(handle=ref, from_offset=5, wait=wait),
+        ReadRecordsRequest(handle=ref, from_offset=6, wait=wait),
+    ]
+    # The handle reads on the Nexus client of its create.
+    assert len(client.created_clients) == 1
+
+
+async def test_a_done_first_page_ends_the_read() -> None:
+    ref = StreamHandle(id="s1")
+    pages = [
+        ReadRecordsResponse(records=[StreamRecord(offset=1)], next_offset=2, done=True)
+    ]
+    client, answers = connect(Client, {"ReadRecords": list(pages)})
+    stream = client.get_stream(handle=ref, created=None)
+
+    read = [page async for page in stream.iter_read()]
+
+    assert read == pages
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(handle=ref)
+    ]
+
+
+async def test_a_changed_page_does_not_change_the_next_request() -> None:
+    ref = StreamHandle(id="s1")
+    wait = datetime.timedelta(seconds=30)
+    client, answers = connect(
+        Client,
+        {
+            "ReadRecords": [
+                ReadRecordsResponse(records=[StreamRecord(offset=1)], next_offset=2),
+                ReadRecordsResponse(done=True),
+            ]
+        },
+    )
+    stream = client.get_stream(handle=ref, created=None)
+
+    async for page in stream.iter_read(from_offset=1, wait=wait):
+        page.next_offset = 9
+
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(handle=ref, from_offset=1, wait=wait),
+        ReadRecordsRequest(handle=ref, from_offset=2, wait=wait),
+    ]
+
+
+def test_only_the_client_target_has_the_read_poll() -> None:
+    assert hasattr(workflow_stream_module, "read_records")
+    assert not hasattr(workflow_stream_module, "iter_read_records")
+    assert not hasattr(workflow_package, "iter_read_records")
+    assert not hasattr(workflow_stream_module.Stream, "iter_read")
+    assert hasattr(Stream, "iter_read")

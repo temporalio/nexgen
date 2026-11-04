@@ -3005,6 +3005,15 @@ fn build_resource_method(
     let directives = parse_directives(function.docs.contents.as_deref(), path, &context)?;
     reject_misplaced_type_parameter(&directives, path, &context)?;
     reject_misplaced_fallback(&directives, path, &context)?;
+    // The operation has the poll rules, so each method that binds it gets an iterator.
+    if directive(&directives, "poll", path, &context)?.is_some() {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.clone(),
+            directive: "@nexus.poll".to_string(),
+            reason: "must be on the operation that the method binds, not on the method".to_string(),
+        });
+    }
     let params = function
         .params
         .iter()
@@ -3143,6 +3152,7 @@ fn build_operation(
         &operation_name,
     )?;
     let serialization_context = build_operation_serialization_context(&directives, path, &context)?;
+    let poll = build_operation_poll(&directives, path, &context)?;
     let output = if let Some(output_type) = function.result.as_ref() {
         Some(
             find_operation_type_spec(resolve, output_type, path, &context)?.ok_or_else(|| {
@@ -3182,6 +3192,7 @@ fn build_operation(
         output,
         output_transform,
         serialization_context,
+        poll,
         data: (),
     })
 }
@@ -3296,6 +3307,62 @@ fn build_operation_output_transform(
             operation: operation_name.to_string(),
         })
     }
+}
+
+/// Reads `@nexus.poll` on an operation. Each language value is a support helper that takes the
+/// request and its response and returns the next request, or `None` to stop.
+fn build_operation_poll(
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<Option<OperationPollSpec>> {
+    let Some(directive) = directive(directives, "poll", path, context)? else {
+        return Ok(None);
+    };
+    let invalid = |reason: String| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.poll".to_string(),
+        reason,
+    };
+    let spec = directive_language_string(directive);
+    if spec.default.is_none() && spec.by_language.is_empty() {
+        return Err(invalid(
+            "needs a support helper that builds the next request".to_string(),
+        ));
+    }
+    for (language, helper) in spec
+        .default
+        .iter()
+        .map(|helper| ("default", helper.as_str()))
+        .chain(
+            spec.by_language
+                .iter()
+                .map(|(language, helper)| (language_key(*language), helper.as_str())),
+        )
+    {
+        if !is_valid_support_helper_path(helper) {
+            return Err(invalid(format!(
+                "invalid `{language}` support helper `{helper}`"
+            )));
+        }
+    }
+    if directive.value("targets").is_none() {
+        return Err(invalid(
+            "needs `targets=\"client\"`, since only the client target gets an iterator".to_string(),
+        ));
+    }
+    let targets = build_origin_targets(directive, path, context, "poll")?;
+    if targets.contains(&GenerationTarget::Workflow) {
+        return Err(invalid(
+            "`targets` includes `workflow`, but only the client target gets an iterator"
+                .to_string(),
+        ));
+    }
+    Ok(Some(OperationPollSpec {
+        next: spec,
+        targets,
+    }))
 }
 
 fn build_operation_serialization_context(

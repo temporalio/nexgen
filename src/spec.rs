@@ -673,6 +673,8 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     pub output: Option<TypeSpec<F>>,
     pub output_transform: Option<OperationOutputTransformSpec<F>>,
     pub serialization_context: F::Text,
+    /// The `@nexus.poll` settings. None when the operation has no poll.
+    pub poll: Option<OperationPollSpec<F>>,
     pub data: F::OperationData,
 }
 
@@ -709,6 +711,7 @@ impl<F: TypeFamily> OperationSpec<F> {
                 .output_transform
                 .map(|transform| transform.map_names_with(map)),
             serialization_context: map.map_text(self.serialization_context),
+            poll: self.poll.map(|poll| poll.map_names_with(map)),
             data,
         }
     }
@@ -1308,6 +1311,28 @@ impl<F: TypeFamily> OperationOutputTransformSpec<F> {
             type_name: map.map_text(self.type_name),
             type_import: map.map_text(self.type_import),
             transform: map.map_text(self.transform),
+        }
+    }
+}
+
+/// The poll of an operation. It changes no model or wire byte.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperationPollSpec<F: TypeFamily = AuthoredFamily> {
+    /// The support helper that turns a request and its response into the next request, or into
+    /// nothing to stop.
+    pub next: F::Text,
+    /// The targets whose API gets the poll. Never empty.
+    pub targets: Vec<GenerationTarget>,
+}
+
+impl<F: TypeFamily> OperationPollSpec<F> {
+    fn map_names_with<G: TypeFamily, M: ApiSpecTransform<F, G>>(
+        self,
+        map: &mut M,
+    ) -> OperationPollSpec<G> {
+        OperationPollSpec {
+            next: map.map_text(self.next),
+            targets: self.targets,
         }
     }
 }

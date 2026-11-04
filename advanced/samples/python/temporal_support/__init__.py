@@ -1,5 +1,6 @@
 """Shared Temporal converters used by the advanced generated samples."""
 
+from .poll import next_read_request as next_read_request
 from .streams import client_producer as client_producer
 from .streams import withdraw_run as withdraw_run
 from .streams import workflow_owner as workflow_owner
