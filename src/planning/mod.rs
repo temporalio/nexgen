@@ -19,6 +19,7 @@ mod authored_validation;
 mod emitted_names;
 mod operation_binding;
 mod operation_lowering;
+mod poll_validation;
 mod proto;
 mod reachability;
 mod resource_resolution;
@@ -33,6 +34,7 @@ pub(crate) use operation_binding::{
     OperationBindingPass, OperationBoundFamily, OperationBoundOperation, OperationBoundResource,
 };
 pub(crate) use operation_lowering::{OperationLoweredFamily, OperationLoweringPass};
+pub(crate) use poll_validation::PollValidationPass;
 pub(crate) use proto::{message_model_name, relative_descriptor_name};
 pub(crate) use reachability::ReachabilityPass;
 pub(crate) use resource_resolution::{

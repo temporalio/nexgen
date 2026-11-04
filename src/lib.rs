@@ -143,7 +143,8 @@ pub(crate) fn compile_tree_to_files(
     let selected_tree = planning::SelectedValidationPass.apply(selected_tree)?;
 
     // selected IR -> resource bindings -> operation relationships -> lowered
-    // operation results -> planned types -> reachability-pruned planned IR
+    // operation results -> planned types -> reachability-pruned planned IR ->
+    // checked client polls
     let resource_bound_tree =
         planning::ResourceResolutionPass::new(descriptors, nexgen_config::current().targets)
             .apply(selected_tree)?;
@@ -153,6 +154,8 @@ pub(crate) fn compile_tree_to_files(
     let type_planning = planning::TypePlanningPass::new(&operation_lowered_tree, descriptors);
     let planned_tree = type_planning.apply(operation_lowered_tree)?;
     let planned_tree = planning::ReachabilityPass::new().apply(planned_tree)?;
+    let planned_tree =
+        planning::PollValidationPass::new(nexgen_config::current().targets).apply(planned_tree)?;
 
     // planned IR -> emitted JSON names -> render target-language files
     let name_resolution = planning::EmittedNameResolutionPass::new(language, &planned_tree)?;

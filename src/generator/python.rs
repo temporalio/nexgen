@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
@@ -99,7 +99,6 @@ pub(crate) fn generate(
         ApiSpecNode::Leaf(leaf) => {
             let generated = generate_leaf(
                 &leaf.spec,
-                &leaf.source_path,
                 support_package,
                 GeneratedFileOrigin::fixed("generated Python package module"),
             )?;
@@ -115,7 +114,6 @@ pub(crate) fn generate(
 
 fn generate_leaf(
     api_plan: &PlannedSpec,
-    source_path: &Path,
     support_package: &str,
     module_origin: GeneratedFileOrigin,
 ) -> Result<PythonGenerationResult> {
@@ -124,31 +122,16 @@ fn generate_leaf(
         .module_imports
         .values()
         .all(BTreeSet::is_empty);
-    ApiPlanner::new(
-        api_plan,
-        source_path,
-        inline_model_rebuilds,
-        None,
-        support_package,
-    )?
-    .build(module_origin)
+    ApiPlanner::new(api_plan, inline_model_rebuilds, None, support_package)?.build(module_origin)
 }
 
 fn generate_leaf_with_model_hoists(
     api_plan: &PlannedSpec,
-    source_path: &Path,
     support_package: &str,
     model_hoists: &PythonModelHoists,
     module_origin: GeneratedFileOrigin,
 ) -> Result<PythonGenerationResult> {
-    ApiPlanner::new(
-        api_plan,
-        source_path,
-        true,
-        Some(model_hoists),
-        support_package,
-    )?
-    .build(module_origin)
+    ApiPlanner::new(api_plan, true, Some(model_hoists), support_package)?.build(module_origin)
 }
 
 fn generate_tree(
@@ -214,7 +197,6 @@ fn generate_tree_node(
         ApiSpecNode::Leaf(leaf) => {
             let generated = generate_leaf_with_model_hoists(
                 &leaf.spec,
-                &leaf.source_path,
                 support_package,
                 model_hoists,
                 GeneratedFileOrigin::input_module(Language::Python, &leaf.source_path),
@@ -338,8 +320,6 @@ fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
 
 struct ApiPlanner<'a> {
     api_plan: &'a PlannedSpec,
-    /// The input path of the module, for the errors that the planner raises.
-    source_path: &'a Path,
     support_package: &'a str,
     inline_model_rebuilds: bool,
     model_hoists: Option<&'a PythonModelHoists>,
@@ -525,7 +505,6 @@ impl ExternalModelBackend for PythonExternalModels {
 impl<'a> ApiPlanner<'a> {
     fn new(
         api_plan: &'a PlannedSpec,
-        source_path: &'a Path,
         inline_model_rebuilds: bool,
         model_hoists: Option<&'a PythonModelHoists>,
         support_package: &'a str,
@@ -537,7 +516,6 @@ impl<'a> ApiPlanner<'a> {
         };
         Ok(Self {
             api_plan,
-            source_path,
             support_package,
             inline_model_rebuilds,
             model_hoists,
@@ -668,7 +646,7 @@ impl<'a> ApiPlanner<'a> {
         // Two services with operations of the same name also clash on a Workflow package file.
         // Check the client names first, so that the error names the client method.
         if targets.contains(&GenerationTarget::Client) {
-            validate_client_polls(services, self.source_path)?;
+            validate_client_poll_names(services)?;
             validate_client_names(services)?;
         }
         let mut files = GeneratedFileMap::default();
@@ -5968,9 +5946,9 @@ fn client_extension_class_name(service: &RenderedService<'_>) -> String {
     format!("{}ClientExtension", service.name)
 }
 
-/// Refuses a client poll that can't get an iterator, and an iterator with the name of another
-/// operation, method or field, since one of the two would hide the other.
-fn validate_client_polls(services: &[RenderedService<'_>], source_path: &Path) -> Result<()> {
+/// Refuses an iterator with the name of another operation, method or field, since one of the two
+/// would hide the other.
+fn validate_client_poll_names(services: &[RenderedService<'_>]) -> Result<()> {
     let operation_names = services
         .iter()
         .flat_map(|service| {
@@ -5986,27 +5964,6 @@ fn validate_client_polls(services: &[RenderedService<'_>], source_path: &Path) -
         for operation in &service.operations {
             if operation.poll_next(GenerationTarget::Client).is_none() {
                 continue;
-            }
-            let reason = if operation
-                .target_unpacked_input(GenerationTarget::Client)
-                .is_some_and(|unpacked_input| !unpacked_input.functions.is_empty())
-            {
-                Some("has function inputs")
-            } else if operation.output_transform_expr.is_some() {
-                Some("has an output transform")
-            } else if operation.output_resource_return.is_some() || operation.output_direct_result {
-                Some("returns a resource")
-            } else if operation.output_none {
-                Some("returns nothing")
-            } else {
-                None
-            };
-            if let Some(reason) = reason {
-                return Err(Error::UnsupportedPoll {
-                    path: source_path.to_path_buf(),
-                    operation: format!("{}.{}", service.name, operation.name),
-                    reason: reason.to_string(),
-                });
             }
             let iterator_name = poll_function_name(&operation.attr_name);
             if let Some(conflicting_declaration) = operation_names.get(&iterator_name) {
