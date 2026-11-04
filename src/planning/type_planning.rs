@@ -324,7 +324,9 @@ fn collect_symbol_module_import(
 }
 
 use super::*;
-use crate::spec::{FunctionTypeDescriptorSpec, OperationOutputTransformSpec, ResourceResultSpec};
+use crate::spec::{
+    FunctionTypeDescriptorSpec, OperationOutputTransformSpec, OperationPollSpec, ResourceResultSpec,
+};
 
 pub(super) struct TypePlanningContext<'a> {
     pub(super) spec: ApiSpec<OperationLoweredFamily>,
@@ -654,8 +656,10 @@ impl<'a> TypePlanningContext<'a> {
                 }
             }),
             serialization_context: operation.serialization_context.clone(),
-            poll_next: operation.poll_next.clone(),
-            poll_targets: operation.poll_targets.clone(),
+            poll: operation.poll.as_ref().map(|poll| OperationPollSpec {
+                next: poll.next.clone(),
+                targets: poll.targets.clone(),
+            }),
             data: PlannedOperationData {
                 output_resource_return: plan_operation_resource_return(
                     &self.spec,
@@ -1848,8 +1852,7 @@ interface alerts {
                     )))),
                     output_transform: None,
                     serialization_context: LanguageStringSpec::default(),
-                    poll_next: LanguageStringSpec::default(),
-                    poll_targets: Vec::new(),
+                    poll: None,
                     data: (),
                 }],
                 resources: Vec::new(),

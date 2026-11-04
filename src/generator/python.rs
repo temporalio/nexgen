@@ -25,8 +25,8 @@ use crate::planning::{
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, FlagsSpec,
     FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec,
-    LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec, RecordSpec, SelectedTextSpec,
-    TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    LanguageImportStyle, ModulePath, OperationPollSpec, OperationSpec, RecordFieldSpec, RecordSpec,
+    SelectedTextSpec, TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpec, ApiSpecBranch, ApiSpecNode};
 
@@ -1718,7 +1718,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("        nexus_client = self.");
         output.push_str(&resource_client_identifier(resource, "_nexus_client"));
         output.push('\n');
-        render_client_poll_loop(output, service, operation, next_expr);
+        render_client_poll_loop(output, service, operation, &next_expr);
     }
 
     fn python_resource_method_result_annotation(&self, method: &PlannedResourceMethod) -> String {
@@ -2038,11 +2038,7 @@ impl<'a> ApiPlanner<'a> {
                 .serialization_context
                 .value()
                 .map(|helper| format!("_support.{helper}")),
-            poll_next_expr: operation
-                .poll_next
-                .value()
-                .map(|helper| format!("_support.{helper}")),
-            poll_targets: operation.poll_targets.clone(),
+            poll: operation.poll.as_ref(),
             output_resource_return,
             output_direct_result,
             resource_data: None,
@@ -3334,9 +3330,7 @@ struct RenderedOperation<'a> {
     output_type_expr: String,
     output_transform_expr: Option<String>,
     serialization_context_expr: Option<String>,
-    /// The support helper that gives the next request of a poll.
-    poll_next_expr: Option<String>,
-    poll_targets: Vec<GenerationTarget>,
+    poll: Option<&'a OperationPollSpec<PlannedFamily>>,
     output_resource_return: Option<PlannedOperationResourceReturn>,
     output_direct_result: bool,
     /// The identity data of a resource returned directly by the operation.
@@ -3351,10 +3345,11 @@ struct RenderedOperation<'a> {
 
 impl RenderedOperation<'_> {
     /// The poll helper, when the target gets the poll.
-    fn poll_next(&self, target: GenerationTarget) -> Option<&str> {
-        self.poll_next_expr
-            .as_deref()
-            .filter(|_| self.poll_targets.contains(&target))
+    fn poll_next(&self, target: GenerationTarget) -> Option<String> {
+        self.poll
+            .filter(|poll| poll.targets.contains(&target))
+            .and_then(|poll| poll.next.value())
+            .map(|helper| format!("_support.{helper}"))
     }
 
     fn target_unpacked_input(&self, target: GenerationTarget) -> Option<&RenderedUnpackedInput> {
@@ -7831,7 +7826,7 @@ fn render_operation_functions(
         && let Some(next_expr) = operation.poll_next(GenerationTarget::Client)
     {
         output.push('\n');
-        render_operation_poll_function(output, service, operation, next_expr);
+        render_operation_poll_function(output, service, operation, &next_expr);
     }
 }
 

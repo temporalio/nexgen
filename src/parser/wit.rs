@@ -3152,7 +3152,7 @@ fn build_operation(
         &operation_name,
     )?;
     let serialization_context = build_operation_serialization_context(&directives, path, &context)?;
-    let (poll_next, poll_targets) = build_operation_poll(&directives, path, &context)?;
+    let poll = build_operation_poll(&directives, path, &context)?;
     let output = if let Some(output_type) = function.result.as_ref() {
         Some(
             find_operation_type_spec(resolve, output_type, path, &context)?.ok_or_else(|| {
@@ -3192,8 +3192,7 @@ fn build_operation(
         output,
         output_transform,
         serialization_context,
-        poll_next,
-        poll_targets,
+        poll,
         data: (),
     })
 }
@@ -3316,9 +3315,9 @@ fn build_operation_poll(
     directives: &[Directive],
     path: &Path,
     context: &str,
-) -> Result<(LanguageStringSpec, Vec<GenerationTarget>)> {
+) -> Result<Option<OperationPollSpec>> {
     let Some(directive) = directive(directives, "poll", path, context)? else {
-        return Ok((LanguageStringSpec::default(), Vec::new()));
+        return Ok(None);
     };
     let invalid = |reason: String| Error::InvalidWitDirective {
         path: path.to_path_buf(),
@@ -3360,7 +3359,10 @@ fn build_operation_poll(
                 .to_string(),
         ));
     }
-    Ok((spec, targets))
+    Ok(Some(OperationPollSpec {
+        next: spec,
+        targets,
+    }))
 }
 
 fn build_operation_serialization_context(
