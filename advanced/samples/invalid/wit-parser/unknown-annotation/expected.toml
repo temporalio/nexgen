@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit-directive"
+contains = ["`@nexus.protoo` on type `models.request`", "unknown annotation"]

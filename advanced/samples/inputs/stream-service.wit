@@ -19,7 +19,7 @@ interface stream-service {
     placeholder,
   };
 
-  /// @nexus.doc "The value type of a Stream's Records. A Stream definition sets it."
+  /// The value type of a Stream's Records. A Stream definition sets it.
   type body-t = payload;
 
   /// @nexus.proto "google.protobuf.Timestamp"
@@ -112,7 +112,7 @@ interface stream-service {
 
   /// @nexus.doc "One Record to append."
   /// @nexus.proto "temporal.api.stream.v1.AppendRecord"
-  /// @nexus.unwrap
+  // TODO: implement @nexus.unwrap.
   record append-record {
     /// @nexus.doc "The value."
     body: body-t,
@@ -139,7 +139,7 @@ interface stream-service {
     run-id: option<string>,
   }
 
-  /// @nexus.doc "How a Stream closed. Only the owner's end on the server terminates or times out."
+  /// How a Stream closed. Only the owner's end on the server terminates or times out.
   /// @nexus.proto "temporal.api.enums.v1.StreamCloseStatus"
   enum stream-close-status {
     /// @nexus.fallback
@@ -212,7 +212,7 @@ interface stream-service {
     ///   dotnet="StreamWorkflowContext.Owner()"
     owner: option<producer>,
     /// @nexus.doc "The handle, whose id is stream-id. With an owner, it needs the handle's owner."
-    /// @nexus.flatten-in-api fields="backend" fill="id=stream-id"
+    // TODO: implement @nexus.flatten-in-api fields="backend" fill="id=stream-id"
     stream-handle: option<stream-handle>,
     // Native only. The SDK Stores don't read it.
     /// @nexus.omit
@@ -382,22 +382,22 @@ interface stream-service {
   // A stream never changes, since offsets are values that its methods return. Only a create's
   // response sets created, so a stream built from a handle has none.
   /// @nexus.doc "One Stream. Build it from a stream-handle, or get it from a create."
-  /// @nexus.definition python="temporalio.common.StreamDefinition"
-  ///   typescript="StreamDefinition" typescript-import="@temporalio/common"
-  ///   dotnet="Temporalio.Common.StreamDefinition"
-  /// @nexus.flatten-in-api param="handle" fields="id backend" keep=true
+  // TODO: implement @nexus.definition python="temporalio.common.StreamDefinition"
+  //   typescript="StreamDefinition" typescript-import="@temporalio/common"
+  //   dotnet="Temporalio.Common.StreamDefinition"
+  // TODO: implement @nexus.flatten-in-api param="handle" fields="id backend" keep=true
   resource %stream {
     constructor(handle: stream-handle, created: option<bool>);
 
     /// @nexus.doc "Publish values, and return the offset of the last one."
     /// @nexus.operation "append-records"
-    /// @nexus.varargs name="values"
-    /// @nexus.result-field "last-offset"
+    // TODO: implement @nexus.varargs name="values"
+    // TODO: implement @nexus.result-field "last-offset"
     publish: func(records: list<append-record>) -> append-records-response;
 
     /// @nexus.doc "Close the Stream. Readers drain what is left, then end."
     /// @nexus.operation "close-stream"
-    /// @nexus.close failure="failure"
+    // TODO: implement @nexus.close failure="failure"
     close: func(%result: option<payload>, failure: option<failure>);
 
     /// @nexus.doc "Read one page of Records. The poll iterator reads them all."
@@ -445,38 +445,38 @@ interface stream-service {
 
   // No operation returns these. A failed call has one in its details. Each SDK raises the class
   // of its reason, or the base class for a reason with no class.
-  /// @nexus.doc "Why a Stream call failed. Each reason has one gRPC status code."
+  /// Why a Stream call failed. Each reason has one gRPC status code.
   /// @nexus.proto "temporal.api.enums.v1.StreamErrorReason"
-  /// @nexus.error details="stream-error-details" field="reason" name="stream-error"
-  ///   python-extends="temporalio.exceptions.ApplicationError"
-  ///   typescript-extends="ApplicationFailure" typescript-extends-import="@temporalio/common"
-  ///   dotnet-extends="Temporalio.Exceptions.ApplicationFailureException"
+  // TODO: implement @nexus.error details="stream-error-details" field="reason" name="stream-error"
+  //   python-extends="temporalio.exceptions.ApplicationError"
+  //   typescript-extends="ApplicationFailure" typescript-extends-import="@temporalio/common"
+  //   dotnet-extends="Temporalio.Exceptions.ApplicationFailureException"
   enum stream-error-reason {
     /// @nexus.fallback
     stream-error-reason-unspecified,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-not-found,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-expired,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-closed,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-fenced,
     stream-error-reason-sequence,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-seq-divergent,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-not-owner,
     stream-error-reason-format-too-new,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-offset,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-too-large,
     stream-error-reason-invalid,
-    /// @nexus.error retryable=true
+    // TODO: implement @nexus.error retryable=true.
     stream-error-reason-storage,
     stream-error-reason-unknown-writer,
-    /// @nexus.error
+    // TODO: implement @nexus.error.
     stream-error-reason-unsupported,
   }
 

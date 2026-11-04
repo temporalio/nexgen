@@ -1,0 +1,6 @@
+package test:annotations;
+world api { export models; }
+interface models {
+  /// @nexus.protoo "example.Message"
+  record request {}
+}

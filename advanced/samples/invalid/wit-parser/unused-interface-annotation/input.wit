@@ -1,0 +1,5 @@
+package test:annotations;
+world api { export models; }
+interface models { record request {} }
+/// @nexus.protoo "ignored"
+interface unused {}

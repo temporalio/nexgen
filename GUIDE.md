@@ -1576,6 +1576,69 @@ All directives are written in WIT doc comments (`///`) and prefixed with
 `@nexus.`. Multi-line directives continue on subsequent `///` lines with
 indented key-value pairs.
 
+### Valid annotation placements
+
+The frontend rejects unknown `@nexus.` names, unsupported placements and
+argument names, duplicate arguments, and duplicate singleton directives.
+Validation covers unused declarations and linked packages too, before target
+selection. An annotation for another target language is still valid; it need not
+affect the currently selected target. Ordinary prose and other comment
+namespaces are not Nexus annotations.
+
+The following placement index is checked against the compiler's annotation
+catalog. A valid placement does not bypass semantic requirements described
+below, such as protobuf bindings, function signatures, and conflicting options.
+
+<!-- annotation-placements:start -->
+
+| Annotation                              | Valid placements                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `@nexus.endpoint`                       | interface                                                                                     |
+| `@nexus.namespace`                      | interface                                                                                     |
+| `@nexus.operations-class`               | interface                                                                                     |
+| `@nexus.service-name`                   | interface                                                                                     |
+| `@nexus.delay-load-temporalio-workflow` | interface                                                                                     |
+| `@nexus.proto`                          | record, enum, flags, variant, type alias, resource                                            |
+| `@nexus.type-parameter`                 | type alias                                                                                    |
+| `@nexus.proto-field`                    | record field                                                                                  |
+| `@nexus.name`                           | record field                                                                                  |
+| `@nexus.type`                           | record field, type alias, resource                                                            |
+| `@nexus.omit`                           | record field                                                                                  |
+| `@nexus.api-omit`                       | record field                                                                                  |
+| `@nexus.source`                         | record field                                                                                  |
+| `@nexus.default`                        | record field                                                                                  |
+| `@nexus.fallback`                       | enum case                                                                                     |
+| `@nexus.experimental`                   | interface, record, variant, freestanding function                                             |
+| `@nexus.doc`                            | record, record field, variant, variant case, resource, resource method, freestanding function |
+| `@nexus.operation`                      | resource method, freestanding function                                                        |
+| `@nexus.poll`                           | freestanding function                                                                         |
+| `@nexus.serialization-context`          | freestanding function                                                                         |
+| `@nexus.output-transform`               | freestanding function                                                                         |
+| `@nexus.flatten-in-api`                 | record, type alias, resource                                                                  |
+| `@nexus.flattened-type`                 | record field                                                                                  |
+| `@nexus.function`                       | type alias, record field                                                                      |
+| `@nexus.function-args`                  | freestanding function                                                                         |
+| `@nexus.add-rpc-compatible-with`        | type alias                                                                                    |
+
+<!-- annotation-placements:end -->
+
+Packages, worlds, world import/export statements, constructors, flags members,
+and enum cases other than `fallback` have no Nexus annotations. Interface and
+type-alias prose can be written as ordinary documentation comments, but
+`@nexus.doc` there has no generated documentation consumer and is rejected.
+
+`add-rpc-compatible-with` may be repeated to declare multiple compatibility
+targets. `source` and `default` may be repeated with disjoint `targets` sets;
+all other annotations are singletons. For language-specific arguments, the
+recognized prefixes are `dotnet`, `go`, `java`, `python`, `ruby`, and
+`typescript`. Prefixes are accepted only for options that the annotation
+actually consumes, not arbitrarily on every directive. For example, `name` takes
+language names, `proto` takes `<lang>-type` and `<lang>-import`, and `type` on
+an external binding also takes `<lang>-from` and `<lang>-to`. Field `type`
+annotations do not take conversion helpers. `doc` return overrides are only
+valid on freestanding functions, and `function` signatures belong on type
+aliases, not record fields.
+
 ### @nexus.endpoint
 
 **Placement:** Interface doc comment **Syntax:**
@@ -1591,6 +1654,49 @@ interface user-service { ... }
 
 The service name (used in generated code) is derived from the interface name
 converted to PascalCase: `user-service` becomes `UserService`.
+
+---
+
+### @nexus.namespace
+
+**Placement:** Interface doc comment **Syntax:**
+`@nexus.namespace "<namespace>"` or language-specific overrides such as
+`@nexus.namespace dotnet="Example.Models" go="example.com/project/models"`
+
+Selects the generated namespace or package path for targets that support an
+override. A positional string supplies the default; a language-specific value
+overrides it for that target. For Go, the value is an import path; for .NET, it
+is a namespace.
+
+.NET namespace overrides are reserved for models-only WIT exports.
+Operation-bearing .NET WIT services use the module-derived namespace.
+
+---
+
+### @nexus.operations-class
+
+**Placement:** Interface doc comment **Syntax:**
+`@nexus.operations-class "<class-name>"` or a language-specific override such as
+`@nexus.operations-class dotnet="ModelOperations"`
+
+Selects the operations class name for targets that support an override. A
+positional string supplies the default; a language-specific value overrides it
+for that target.
+
+.NET operations-class overrides are reserved for models-only WIT exports.
+Operation-bearing .NET WIT services use the `Operations` class.
+
+---
+
+### @nexus.service-name
+
+**Placement:** Interface doc comment **Syntax:**
+`@nexus.service-name "<WireServiceName>"` or
+`@nexus.service-name name="<WireServiceName>"`
+
+Overrides the service's wire name without changing its generated code name or
+Nexus endpoint. Without this directive, the wire name is the interface name
+converted to PascalCase. The override must not be empty.
 
 ---
 
@@ -1850,6 +1956,19 @@ identity: placeholder,
 
 Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 `@nexus.default`, or `@nexus.flattened-type`.
+
+---
+
+### @nexus.api-omit
+
+**Placement:** Record field **Syntax:** `@nexus.api-omit` (no arguments)
+
+Keeps the field on generated models and in proto conversion, but excludes it
+from generated convenience operation APIs. Unlike `@nexus.omit`, this preserves
+the field in the generated model. See [API-omitted fields](#api-omitted-fields)
+for an example.
+
+Cannot be combined with `@nexus.omit` or `@nexus.source`.
 
 ---
 
