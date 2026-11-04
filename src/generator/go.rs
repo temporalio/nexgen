@@ -28,6 +28,7 @@ use super::json_schema::go as json;
 use super::proto::go as proto;
 
 mod facade;
+mod interceptor;
 
 type FunctionArgsSpec = GenericFunctionArgsSpec<PlannedFamily>;
 type FunctionFieldSpec = GenericFunctionFieldSpec<PlannedFamily>;
@@ -544,6 +545,7 @@ pub(in crate::generator) struct GoPackageContext {
     pub(in crate::generator) has_serialization_context: bool,
     support_package: Option<String>,
     facade: Option<GoFacadeOptions>,
+    sdk_interceptors: bool,
 }
 
 impl GoPackageContext {
@@ -579,6 +581,11 @@ impl GoPackageContext {
 
         Ok(Self {
             package_name,
+            sdk_interceptors: crate::nexgen_config::current().system_nexus
+                && crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow)
+                && import_path.as_deref() == Some("go.temporal.io/sdk/internal"),
             import_path,
             has_serialization_context: crate::nexgen_config::current().system_nexus
                 && api_plan
@@ -1222,6 +1229,7 @@ impl<'a> ApiPlanner<'a> {
             &self.flags,
             &self.variants,
             &self.models,
+            self.package.sdk_interceptors,
         );
         apply_go_visibility(
             &visibility,
@@ -1289,6 +1297,11 @@ impl<'a> ApiPlanner<'a> {
                 .insert(self.package.workflow_import().to_string());
         }
         let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
+        if self.package.sdk_interceptors && has_operations {
+            self.imports.insert("fmt".to_string());
+            self.imports
+                .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
+        }
         let has_eager_conversion = services.iter().flat_map(|s| &s.operations).any(|op| {
             op.wire_binding
                 .as_ref()
@@ -1364,7 +1377,7 @@ impl<'a> ApiPlanner<'a> {
         }
         let mut external_imports = self.external_models.imports();
         let registry = if crate::nexgen_config::current().system_nexus
-            && self.package.has_serialization_context
+            && (self.package.has_serialization_context || self.package.sdk_interceptors)
         {
             render_operation_registry(&self.package, &services, &self.imports, &external_imports)?
         } else {
@@ -1434,6 +1447,11 @@ impl<'a> ApiPlanner<'a> {
         for model in self.models.values() {
             validate_model_getter_names(model)?;
         }
+        let interceptors = if self.package.sdk_interceptors {
+            interceptor::render(&services, self.api_plan)?
+        } else {
+            String::new()
+        };
         let output = render_file(
             &self.package,
             &self.imports,
@@ -1451,6 +1469,7 @@ impl<'a> ApiPlanner<'a> {
             self.api_plan,
             &visibility,
             &registry.body,
+            &interceptors,
         );
 
         let mut files = GeneratedFileMap::default();
@@ -2297,10 +2316,9 @@ fn render_operation_registry(
     let mut keys = BTreeSet::new();
     for service in services {
         for operation in &service.operations {
-            let Some(helper) = operation.serialization_context_expr else {
+            if operation.serialization_context_expr.is_none() && !package.sdk_interceptors {
                 continue;
-            };
-            let helper = package.function_name_extractor(helper);
+            }
             if !keys.insert((service.wire_name, operation.wire_name)) {
                 return Err(Error::InvalidWitDirective {
                     path: PathBuf::from("<go-plan>"),
@@ -2318,9 +2336,18 @@ fn render_operation_registry(
                 "\t{{\n\t\tService: {service_name},\n\t\tOperation: {operation_name},\n\t}}: {{\n"
             ));
             let input_type = &operation.input_type;
-            output.push_str(&format!(
-                "\t\tSerializationContext: func(request any) {sc} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
-            ));
+            if let Some(helper) = operation.serialization_context_expr {
+                let helper = package.function_name_extractor(helper);
+                output.push_str(&format!(
+                    "\t\tSerializationContext: func(request any) {sc} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
+                ));
+            }
+            if package.sdk_interceptors {
+                output.push_str(&format!(
+                    "\t\tIntercept: {},\n",
+                    interceptor::dispatch_name(operation)
+                ));
+            }
             output.push_str("\t},\n");
         }
     }
@@ -2680,6 +2707,7 @@ fn compute_go_visibility(
     flags: &IndexMap<String, RenderedFlags>,
     variants: &IndexMap<String, RenderedVariant>,
     models: &IndexMap<String, RenderedModel>,
+    interceptor_inputs: bool,
 ) -> GoVisibility {
     let mut marker = GoVisibilityMarker {
         api_plan,
@@ -2698,6 +2726,14 @@ fn compute_go_visibility(
     for service in &api_plan.services {
         for operation in &service.operations {
             marker.mark_operation_public_surface(operation);
+            if interceptor_inputs
+                && let Some(input) = operation
+                    .input
+                    .as_ref()
+                    .and_then(|input| planned_message_type(input, api_plan))
+            {
+                marker.mark_message_type(&input);
+            }
         }
         for resource in &service.resources {
             marker.mark_resource_public_surface(&resource.data);
@@ -3788,6 +3824,7 @@ fn render_file(
     api_plan: &PlannedSpec,
     visibility: &GoVisibility,
     registry: &str,
+    interceptors: &str,
 ) -> String {
     let mut output = String::new();
     output.push_str(GENERATED_HEADER);
@@ -4047,6 +4084,7 @@ fn render_file(
     }
 
     output.push_str(registry);
+    output.push_str(interceptors);
 
     // Imports collected while planning can become unused when the SDK owns
     // input conversion instead of the generated wrapper, or when the Workflow API
@@ -6142,6 +6180,7 @@ mod tests {
             &Default::default(),
             &Default::default(),
             &models,
+            false,
         );
         for (key, record) in leaf.spec.records() {
             assert_eq!(visibility.is_public(key), record.name == "Response");
@@ -6161,6 +6200,7 @@ mod tests {
             has_serialization_context: false,
             support_package: Some("go.temporal.io/sdk/internal".to_string()),
             facade: None,
+            sdk_interceptors: false,
         };
         assert_eq!(
             package.support_reference("DurationToProto"),
@@ -6279,6 +6319,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            sdk_interceptors: false,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
@@ -6295,6 +6336,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            sdk_interceptors: false,
         };
         assert_eq!(
             package.new_transfer_type_converter(),

@@ -421,6 +421,14 @@ pub(super) fn render(
         }
         if service.endpoint.is_some() {
             for operation in &service.operations {
+                if package.sdk_interceptors {
+                    plan.add_alias(
+                        &mut scope,
+                        &interceptor::input_name(operation),
+                        Vec::new(),
+                        None,
+                    );
+                }
                 plan.add_alias(
                     &mut scope,
                     &format!(
@@ -714,6 +722,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            sdk_interceptors: false,
         }
     }
 
