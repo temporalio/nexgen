@@ -1,35 +1,36 @@
 """The poll helper of the stream-service sample."""
 
-import collections.abc
+from __future__ import annotations
+
 import dataclasses
-import datetime
 import typing
 
+if typing.TYPE_CHECKING:
+    import collections.abc
+    import datetime
 
-class _Request(typing.Protocol):
-    __dataclass_fields__: typing.ClassVar[dict[str, dataclasses.Field[typing.Any]]]
+    from _typeshed import DataclassInstance
 
+    # The generated models import this package, and basedpyright reports even a type-only import
+    # of them here as a cycle. These Protocols name the fields that the helper reads.
+    class _ReadRequest(DataclassInstance, typing.Protocol):
+        @property
+        def from_offset(self) -> int | None: ...
 
-class _ReadRequest(_Request, typing.Protocol):
-    @property
-    def from_offset(self) -> int | None: ...
+        @property
+        def wait(self) -> datetime.timedelta | None: ...
 
-    @property
-    def wait(self) -> datetime.timedelta | None: ...
+    class _ReadResponse(typing.Protocol):
+        @property
+        def records(self) -> collections.abc.Sequence[object] | None: ...
 
+        @property
+        def next_offset(self) -> int | None: ...
 
-class _ReadResponse(typing.Protocol):
-    @property
-    def records(self) -> collections.abc.Sequence[object] | None: ...
+        @property
+        def done(self) -> bool | None: ...
 
-    @property
-    def next_offset(self) -> int | None: ...
-
-    @property
-    def done(self) -> bool | None: ...
-
-
-_ReadRequestT = typing.TypeVar("_ReadRequestT", bound=_ReadRequest)
+    _ReadRequestT = typing.TypeVar("_ReadRequestT", bound=_ReadRequest)
 
 
 def next_read_request(
