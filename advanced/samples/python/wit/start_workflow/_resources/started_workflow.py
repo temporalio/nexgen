@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import typing_extensions
 import datetime
 import temporalio.workflow
 
@@ -30,20 +29,6 @@ class StartedWorkflow:
         self.namespace = namespace
         self.workflow_id = workflow_id
         self.run_id = run_id
-
-    @typing_extensions.override
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, StartedWorkflow):
-            return NotImplemented
-        return (self.namespace, self.workflow_id, self.run_id) == (
-            other.namespace,
-            other.workflow_id,
-            other.run_id,
-        )
-
-    @typing_extensions.override
-    def __repr__(self) -> str:
-        return f"StartedWorkflow(namespace={self.namespace!r}, workflow_id={self.workflow_id!r}, run_id={self.run_id!r})"
 
     async def cancel(
         self,

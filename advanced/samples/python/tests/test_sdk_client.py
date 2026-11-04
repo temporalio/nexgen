@@ -316,7 +316,7 @@ def test_a_resource_is_not_data_but_its_identity_field_is() -> None:
     # Code passes the identity field and builds the handle explicitly.
     decoded = converter.from_payload(payload, StreamRef)
     assert decoded == ref
-    assert client.get_stream(ref=decoded, created=None) == stream
+    assert client.get_stream(ref=decoded, created=None).ref == stream.ref
 
 
 async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_move() -> (

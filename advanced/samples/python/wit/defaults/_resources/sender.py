@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import typing_extensions
 import temporalio.workflow
 
 from ..models import (
@@ -25,16 +24,6 @@ class Sender:
         token: str,
     ) -> None:
         self.token = token
-
-    @typing_extensions.override
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Sender):
-            return NotImplemented
-        return (self.token,) == (other.token,)
-
-    @typing_extensions.override
-    def __repr__(self) -> str:
-        return f"Sender(token={self.token!r})"
 
     async def submit(
         self,

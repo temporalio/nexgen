@@ -1456,7 +1456,8 @@ impl<'a> ApiPlanner<'a> {
     ) {
         let client = target == Some(GenerationTarget::Client);
         // A handle has calls, so it is a plain class that the payload converter can't encode or
-        // decode. A resource with no methods is data, as its identity DTO is.
+        // decode. Code passes and compares its identity fields, not the handle. A resource with no
+        // methods is data, as its identity DTO is.
         let handle = target.is_some() && !resource.methods.is_empty();
         if !handle {
             output.push_str(if client {
@@ -1502,7 +1503,6 @@ impl<'a> ApiPlanner<'a> {
             }
             return;
         }
-        render_resource_identity_methods(output, resource);
 
         for method in &resource.methods {
             output.push_str("\n");
@@ -6542,53 +6542,6 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
         None,
         variant.experimental,
     );
-}
-
-/// The equality and the repr of a handle compare its identity fields, as a dataclass's do.
-fn render_resource_identity_methods(output: &mut String, resource: &PlannedResource) {
-    let receiver = resource_client_identifier(resource, "self");
-    let other = resource_client_identifier(resource, "other");
-    let fields = resource
-        .fields
-        .iter()
-        .map(|field| python_field_name(&field.name))
-        .collect::<Vec<_>>();
-    let values = |owner: &str| match fields.as_slice() {
-        [field] => format!("({owner}.{field},)"),
-        fields => format!(
-            "({})",
-            fields
-                .iter()
-                .map(|field| format!("{owner}.{field}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
-    };
-    output.push_str("\n    @typing_extensions.override\n");
-    output.push_str(&format!(
-        "    def __eq__({receiver}, {other}: object) -> bool:\n"
-    ));
-    output.push_str(&format!(
-        "        if not isinstance({other}, {}):\n",
-        resource.type_name
-    ));
-    output.push_str("            return NotImplemented\n");
-    output.push_str(&format!(
-        "        return {} == {}\n",
-        values(&receiver),
-        values(&other)
-    ));
-    output.push_str("\n    @typing_extensions.override\n");
-    output.push_str(&format!("    def __repr__({receiver}) -> str:\n"));
-    output.push_str(&format!(
-        "        return f\"{}({})\"\n",
-        resource.type_name,
-        fields
-            .iter()
-            .map(|field| format!("{field}={{{receiver}.{field}!r}}"))
-            .collect::<Vec<_>>()
-            .join(", ")
-    ));
 }
 
 fn render_resource_client_binder(output: &mut String, resource: &PlannedResource) {

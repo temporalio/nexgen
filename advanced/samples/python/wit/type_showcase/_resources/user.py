@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import typing_extensions
 import temporalio.workflow
 
 from ..models import (
@@ -38,28 +37,6 @@ class User:
         self.display_name = display_name
         self.status = status
         self.profile = profile
-
-    @typing_extensions.override
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, User):
-            return NotImplemented
-        return (
-            self.user_id,
-            self.email,
-            self.display_name,
-            self.status,
-            self.profile,
-        ) == (
-            other.user_id,
-            other.email,
-            other.display_name,
-            other.status,
-            other.profile,
-        )
-
-    @typing_extensions.override
-    def __repr__(self) -> str:
-        return f"User(user_id={self.user_id!r}, email={self.email!r}, display_name={self.display_name!r}, status={self.status!r}, profile={self.profile!r})"
 
     async def update_email(
         self,

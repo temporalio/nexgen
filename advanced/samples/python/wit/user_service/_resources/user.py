@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import typing
-import typing_extensions
 
 from ..models import (
     NotifyRequest,
@@ -23,16 +22,6 @@ class User:
     ) -> None:
         self.user_id = user_id
         self.email = email
-
-    @typing_extensions.override
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, User):
-            return NotImplemented
-        return (self.user_id, self.email) == (other.user_id, other.email)
-
-    @typing_extensions.override
-    def __repr__(self) -> str:
-        return f"User(user_id={self.user_id!r}, email={self.email!r})"
 
     async def update_email(
         self,
