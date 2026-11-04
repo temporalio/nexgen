@@ -6897,7 +6897,8 @@ fn render_generic_resource_init(
     render_runtime_type_attributes(output, "self", type_variables);
 }
 
-/// The keyword parameter of each runtime type of a generic resource.
+/// The keyword parameter of each runtime type of a generic resource. Python drops type arguments
+/// at runtime, so the handle keeps the class of each one to decode the generic values of a reply.
 fn render_runtime_type_keyword_parameters(output: &mut String, type_variables: &[String]) {
     for name in type_variables {
         output.push_str("        ");
