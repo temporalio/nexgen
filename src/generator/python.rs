@@ -2111,8 +2111,8 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    /// The response attribute that `items` names, and the annotation of one of its items. The poll
-    /// pass has checked that the field is a list.
+    /// The response attribute of the `items` field, and the annotation of one of its items. The
+    /// poll pass has checked that the field is a list.
     fn resolve_poll_items(
         &mut self,
         operation: &OperationSpec<PlannedFamily>,
@@ -2125,13 +2125,13 @@ impl<'a> ApiPlanner<'a> {
         let field = planned_record(api_plan, &record.full_name)
             .fields
             .get(key)
-            .expect("the field that `items` names should exist");
+            .expect("the `items` field should exist");
         let list = match &field.field_type {
             PlannedType::Option(inner) => inner.as_ref(),
             list => list,
         };
         let PlannedType::List(item) = list else {
-            panic!("the field that `items` names should be a list");
+            panic!("the `items` field should be a list");
         };
         let item = self.resolve_planned_value_type(item)?;
         Ok((python_field_name(&field.name), item.annotation))

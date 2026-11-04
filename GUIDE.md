@@ -2197,10 +2197,10 @@ The stream sample's full helpers are in
   `client`.
 - nexgen refuses the directive on a resource method, on an operation that it
   can't poll, and when an iterator clashes with another member.
-- nexgen refuses `items` that names no field of the response, a field with
+- nexgen refuses an `items` field that the response doesn't have, a field with
   `@nexus.omit`, or a field that isn't a list in the model, such as a proto
   `bytes` field. It also refuses `python-resume` without `items`, and `items` in
-  a package with a model or resource named `PollIterator`.
+  a package with a model or resource called `PollIterator`.
 - Use `asyncio.timeout` to limit a whole iteration. After an error, start a new
   iteration at the last page's `next_offset`.
 

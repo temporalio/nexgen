@@ -73,7 +73,7 @@ fn validate_client_polls(spec: &PlannedSpec, path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Why the response field that `items` names has no items to yield, when it has none.
+/// Why the `items` field of the response has no items to yield, when it has none.
 fn items_reason(
     spec: &PlannedSpec,
     operation: &OperationSpec<PlannedFamily>,
@@ -87,12 +87,12 @@ fn items_reason(
     };
     let Some(field) = field else {
         return Some(format!(
-            "has `items` that names `{key}`, which isn't a field of its response"
+            "has an `items` field `{key}` that its response doesn't have"
         ));
     };
     if field.origin.as_ref().is_some_and(FieldOrigin::is_omitted) {
         return Some(format!(
-            "has `items` that names `{key}`, which the response model omits"
+            "has an `items` field `{key}` that the response model omits"
         ));
     }
     let field_type = match &field.field_type {
@@ -102,7 +102,7 @@ fn items_reason(
     // A proto `bytes` field is a WIT `list<u8>`, but the model has no list to yield.
     if !matches!(field_type, TypeSpec::List(_)) {
         return Some(format!(
-            "has `items` that names `{key}`, which isn't a list in its response"
+            "has an `items` field `{key}` that isn't a list in its response"
         ));
     }
     None

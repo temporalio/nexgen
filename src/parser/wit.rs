@@ -3382,7 +3382,7 @@ fn build_operation_poll(
     }
     let items = match directive.value("items") {
         Some(items) => {
-            // `items` names a WIT field, and only the WIT record knows the key of that field.
+            // `items` holds a WIT field name, and only the WIT record knows its key.
             let mut result = function.result;
             let record = loop {
                 let Some(Type::Id(id)) = result else {
