@@ -147,12 +147,12 @@ class Stream:
         )
         nexus_client = self._nexus_client
         while True:
-            handle = await nexus_client.start_operation(
+            operation_handle = await nexus_client.start_operation(
                 operation=StreamService.read_records,
                 arg=request,
                 id=f"{_uuid.uuid4()}",
             )
-            response = await handle.result()
+            response = await operation_handle.result()
             next_request = _support.next_read_request(request, response)
             yield response
             if next_request is None:

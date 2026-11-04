@@ -8236,10 +8236,11 @@ fn render_client_poll_loop(
 ) {
     let target = GenerationTarget::Client;
     start_line(output, target, "    while True:\n");
+    // A standalone iterator takes the request fields as parameters, so `handle` can be one of them.
     start_line(
         output,
         target,
-        "        handle = await nexus_client.start_operation(\n",
+        "        operation_handle = await nexus_client.start_operation(\n",
     );
     start_line(output, target, "            operation=");
     output.push_str(service.name);
@@ -8255,10 +8256,18 @@ fn render_client_poll_loop(
         start_line(output, target, "            ");
         output.push_str(&operation.output_annotation);
         output.push_str(",\n");
-        start_line(output, target, "            await handle.result(),\n");
+        start_line(
+            output,
+            target,
+            "            await operation_handle.result(),\n",
+        );
         start_line(output, target, "        )\n");
     } else {
-        start_line(output, target, "        response = await handle.result()\n");
+        start_line(
+            output,
+            target,
+            "        response = await operation_handle.result()\n",
+        );
     }
     // The helper runs first, so a change to the yielded page doesn't change the next request.
     start_line(output, target, "        next_request = ");
