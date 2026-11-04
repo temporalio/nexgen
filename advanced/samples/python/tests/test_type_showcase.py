@@ -290,7 +290,13 @@ async def test_resource_collection_arguments_preserve_absence(mode: str) -> None
         extra_tags, extra_metadata = [], {}
     elif mode == "populated":
         extra_tags, extra_metadata = ["extra"], {"tier": "enterprise"}
-    user = user_resource(email="user@example.test", display_name="User")
+    user = User(
+        user_id="user-123",
+        email="user@example.test",
+        display_name="User",
+        status=type_showcase_models.UserStatus.Active,
+        profile=user_profile(),
+    )
 
     with patch("temporalio.workflow.create_nexus_client", return_value=client):
         if mode == "omitted":
