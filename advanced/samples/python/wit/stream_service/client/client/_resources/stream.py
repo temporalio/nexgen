@@ -21,8 +21,10 @@ from ...models import (
     ReadRecordsResponse,
     StreamHandle,
     StreamReadStart,
+    StreamRecord,
 )
 import temporal_support as _support
+from .._poll import PollIterator
 
 
 @dataclasses.dataclass(init=False)
@@ -156,6 +158,60 @@ class Stream:
             if next_request is None:
                 return
             request = next_request
+
+    def iter_read_items(
+        self,
+        from_offset: int | None = None,
+        start: StreamReadStart | None = None,
+        max_records: int | None = None,
+        wait: datetime.timedelta | None = None,
+        create_wait: datetime.timedelta | None = None,
+        max_bytes: int | None = None,
+    ) -> PollIterator[ReadRecordsRequest, StreamRecord]:
+        """Yield each item of ``iter_read``, page by page.
+
+        ``next_request`` resumes after the last item that the iterator yielded. It is
+        ``None`` after the last page.
+
+        Read one page of Records. The poll iterator reads them all.
+
+        Args:
+            from_offset: Start offset. Empty uses start. OUT_OF_RANGE past the newest
+                offset + 1.
+            start: Where to start when from-offset is empty. Unspecified is the
+                beginning.
+            max_records: About this many items per page, 1 to 1000. A Superseded item
+                stays with its Record.
+            wait: How long to wait for a new Record before an empty answer. At most 60
+                s.
+            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
+                At most 60 s.
+            max_bytes: The maximum Record bytes in a page. A larger Record is still
+                returned alone.
+        """
+        request = ReadRecordsRequest(
+            handle=self.handle,
+            from_offset=from_offset,
+            start=start,
+            max_records=max_records,
+            wait=wait,
+            create_wait=create_wait,
+            max_bytes=max_bytes,
+        )
+        return PollIterator(
+            request,
+            self.iter_read(
+                from_offset=from_offset,
+                start=start,
+                max_records=max_records,
+                wait=wait,
+                create_wait=create_wait,
+                max_bytes=max_bytes,
+            ),
+            lambda response: response.records,
+            _support.next_read_request,
+            _support.resume_read_request,
+        )
 
     async def describe(
         self,

@@ -1,13 +1,14 @@
-//! Refuse a client poll on an operation that can't get an iterator. The check runs before any
-//! generator, so it doesn't depend on the language. It runs on the planned spec, since an
-//! operation that returns a resource is known only after resource resolution.
+//! Refuse a client poll on an operation that can't get an iterator, or whose `items` field isn't
+//! a list in the model. The check runs before any generator, so it doesn't depend on the
+//! language. It runs on the planned spec, since an operation that returns a resource is known
+//! only after resource resolution.
 
 use std::path::Path;
 
 use super::{PlannedFamily, PlannedSpec, operation_input_model, operation_output_direct_result};
 use crate::error::{Error, Result};
 use crate::nexgen_config::{self, GenerationTarget};
-use crate::spec::{ApiSpecLeaf, CompilerPass, TypeSpec};
+use crate::spec::{ApiSpecLeaf, CompilerPass, FieldOrigin, OperationSpec, TypeSpec};
 
 pub(crate) struct PollValidationPass;
 
@@ -32,13 +33,13 @@ impl CompilerPass<PlannedFamily, PlannedFamily> for PollValidationPass {
 fn validate_client_polls(spec: &PlannedSpec, path: &Path) -> Result<()> {
     for service in &spec.services {
         for operation in &service.operations {
-            let polled = operation
+            let Some(poll) = operation
                 .poll
                 .as_ref()
-                .is_some_and(|poll| poll.targets.contains(&GenerationTarget::Client));
-            if !polled {
+                .filter(|poll| poll.targets.contains(&GenerationTarget::Client))
+            else {
                 continue;
-            }
+            };
             let has_function_inputs = match operation_input_model(operation) {
                 Some(TypeSpec::Record(record)) => spec
                     .record(&record.full_name)
@@ -46,24 +47,63 @@ fn validate_client_polls(spec: &PlannedSpec, path: &Path) -> Result<()> {
                 _ => false,
             };
             let reason = if has_function_inputs {
-                "has function inputs"
+                Some("has function inputs".to_string())
             } else if operation.output_transform.is_some() {
-                "has an output transform"
+                Some("has an output transform".to_string())
             } else if operation.data.output_resource_return.is_some()
                 || operation_output_direct_result(operation)
             {
-                "returns a resource"
+                Some("returns a resource".to_string())
             } else if operation.output_type().is_none() {
-                "returns nothing"
+                Some("returns nothing".to_string())
             } else {
-                continue;
+                poll.items
+                    .as_deref()
+                    .and_then(|key| items_reason(spec, operation, key))
             };
-            return Err(Error::UnsupportedPoll {
-                path: path.to_path_buf(),
-                operation: format!("{}.{}", service.name, operation.name),
-                reason: reason.to_string(),
-            });
+            if let Some(reason) = reason {
+                return Err(Error::UnsupportedPoll {
+                    path: path.to_path_buf(),
+                    operation: format!("{}.{}", service.name, operation.name),
+                    reason,
+                });
+            }
         }
     }
     Ok(())
+}
+
+/// Why the response field that `items` names has no items to yield, when it has none.
+fn items_reason(
+    spec: &PlannedSpec,
+    operation: &OperationSpec<PlannedFamily>,
+    key: &str,
+) -> Option<String> {
+    let field = match operation.output_type() {
+        Some(TypeSpec::Record(record)) => spec
+            .record(&record.full_name)
+            .and_then(|record| record.fields.get(key)),
+        _ => None,
+    };
+    let Some(field) = field else {
+        return Some(format!(
+            "has `items` that names `{key}`, which isn't a field of its response"
+        ));
+    };
+    if field.origin.as_ref().is_some_and(FieldOrigin::is_omitted) {
+        return Some(format!(
+            "has `items` that names `{key}`, which the response model omits"
+        ));
+    }
+    let field_type = match &field.field_type {
+        TypeSpec::Option(inner) => inner.as_ref(),
+        field_type => field_type,
+    };
+    // A proto `bytes` field is a WIT `list<u8>`, but the model has no list to yield.
+    if !matches!(field_type, TypeSpec::List(_)) {
+        return Some(format!(
+            "has `items` that names `{key}`, which isn't a list in its response"
+        ));
+    }
+    None
 }

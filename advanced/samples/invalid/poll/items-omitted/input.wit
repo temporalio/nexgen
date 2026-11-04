@@ -1,0 +1,19 @@
+package temporal:poll-items-omitted@1.0.0;
+
+world service { export reader; }
+
+/// @nexus.endpoint "reader"
+interface reader {
+  record read-request { offset: option<s64> }
+  record read-item { offset: option<s64> }
+
+  record read-response {
+    // The response model leaves out `items`, so the iterator can't yield them.
+    /// @nexus.omit
+    items: list<read-item>,
+    done: option<bool>,
+  }
+
+  /// @nexus.poll python="next_read" items="items" targets="client"
+  read: func(request: read-request) -> read-response;
+}

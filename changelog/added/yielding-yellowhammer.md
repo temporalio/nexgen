@@ -1,0 +1,1 @@
+`@nexus.poll items="<field>"` also generates a Python `iter_<name>_items` iterator, which yields the items of each page that `iter_<name>` reads. It is a `PollIterator`, whose `next_request` is the request to resume with. With `python-resume="<helper>"`, it resumes after the last item that the iterator yielded. Without it, it reads that item's page again.

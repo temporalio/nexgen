@@ -659,6 +659,8 @@ impl<'a> TypePlanningContext<'a> {
             poll: operation.poll.as_ref().map(|poll| OperationPollSpec {
                 next: poll.next.clone(),
                 targets: poll.targets.clone(),
+                items: poll.items.clone(),
+                resume: poll.resume.clone(),
             }),
             data: PlannedOperationData {
                 output_resource_return: plan_operation_resource_return(

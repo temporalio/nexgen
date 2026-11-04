@@ -1,0 +1,15 @@
+package temporal:poll-invalid-resume-helper@1.0.0;
+
+world service { export reader; }
+
+/// @nexus.endpoint "reader"
+interface reader {
+  record read-request { offset: option<s64> }
+  record read-item { offset: option<s64> }
+  record read-response { items: list<read-item>, done: option<bool> }
+
+  // The resume helper names a support helper, not a call.
+  /// @nexus.poll python="next_read" items="items" python-resume="resume_read(request, item)"
+  ///   targets="client"
+  read: func(request: read-request) -> read-response;
+}

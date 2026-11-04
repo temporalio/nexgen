@@ -1,0 +1,15 @@
+package test:python-poll-iterator@1.0.0;
+
+world service { export reader; }
+
+/// @nexus.endpoint "reader"
+interface reader {
+  // The model has the name of the iterator that the item poll returns.
+  record poll-iterator { offset: option<s64> }
+
+  record read-request { offset: option<s64> }
+  record read-response { items: list<poll-iterator>, done: option<bool> }
+
+  /// @nexus.poll python="next_read" items="items" targets="client"
+  read: func(request: read-request) -> read-response;
+}

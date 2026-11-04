@@ -1,0 +1,14 @@
+package temporal:poll-resume-without-items@1.0.0;
+
+world service { export reader; }
+
+/// @nexus.endpoint "reader"
+interface reader {
+  record read-request { offset: option<s64> }
+  record read-item { offset: option<s64> }
+  record read-response { items: list<read-item>, done: option<bool> }
+
+  // A resume point is after an item, so it needs the items.
+  /// @nexus.poll python="next_read" python-resume="resume_read" targets="client"
+  read: func(request: read-request) -> read-response;
+}

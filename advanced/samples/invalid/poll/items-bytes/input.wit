@@ -1,0 +1,27 @@
+package temporal:poll-items-bytes@1.0.0;
+
+world service { export reader; }
+
+/// @nexus.endpoint "reader"
+interface reader {
+  type placeholder = string;
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest"
+  record list-workflows-request {
+    namespace: string,
+    page-size: option<s32>,
+    next-page-token: option<list<u8>>,
+    query: option<string>,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.ListWorkflowExecutionsResponse"
+  record list-workflows-response {
+    /// @nexus.omit
+    executions: placeholder,
+    next-page-token: option<list<u8>>,
+  }
+
+  // The proto field is bytes, so the Python model has no list to yield.
+  /// @nexus.poll python="next_page_request" items="next-page-token" targets="client"
+  list-workflows: func(request: list-workflows-request) -> list-workflows-response;
+}

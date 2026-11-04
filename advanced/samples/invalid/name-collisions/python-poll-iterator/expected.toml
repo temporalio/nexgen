@@ -1,0 +1,9 @@
+languages = ["python"]
+system_nexus = true
+targets = ["workflow", "client"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = [
+  "Python generated name `PollIterator` for the item iterator of poll `Read` conflicts with a model or resource of the package",
+]

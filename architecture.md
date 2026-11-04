@@ -122,7 +122,8 @@ flowchart LR
   language-specific converters use the wire metadata.
 - `ReachabilityPass` removes declarations outside the generated surface.
 - `PollValidationPass` refuses a client `@nexus.poll` on an operation that can't
-  get an iterator, the same way for every language.
+  get an iterator, or whose `items` field isn't a list in the model, the same
+  way for every language.
 - `EmittedNameResolutionPass` resolves final emitted JSON model identifiers. Its
   name manifest spans the whole tree, not one leaf: a `$ref` across input files
   names a model whose `x-<lang>-name` override is declared in the other file, so
