@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use tempfile::TempDir;
 use wit_parser_crate::{
-    Enum, Function, FunctionKind, Handle, Interface, PackageId, PackageSourceMap, Record, Resolve,
-    Type, TypeDef, TypeDefKind, TypeId, TypeOwner, WorldId, WorldItem, WorldKey,
+    Enum, Field, Function, FunctionKind, Handle, Interface, PackageId, PackageSourceMap, Record,
+    Resolve, Type, TypeDef, TypeDefKind, TypeId, TypeOwner, WorldId, WorldItem, WorldKey,
 };
 
 use crate::error::{Error, Result};
@@ -1222,9 +1222,7 @@ fn build_fields_from_record(
             .to_string();
         let omit_directive = directive(&directives, "omit", path, &field_context)?;
         let api_omit_directive = directive(&directives, "api-omit", path, &field_context)?;
-        let proto_field_name =
-            directive_value(&directives, "proto-field", path, &field_context, "value")?
-                .unwrap_or_else(|| field.name.to_snake_case());
+        let proto_field_name = record_field_key(field, &directives, path, &field_context)?;
         let function_directive = directive(&directives, "function", path, &field_context)?;
         let flattened_function_type = if omit_directive.is_none() && function_directive.is_none() {
             find_flattened_function_type_spec(resolve, &field.ty, path, language)?
@@ -1786,6 +1784,19 @@ fn resolve_authored_type_def_kind(
         })),
         _ => Ok(None),
     }
+}
+
+/// The key of a record field in the spec, which is its proto field name.
+fn record_field_key(
+    field: &Field,
+    directives: &[Directive],
+    path: &Path,
+    field_context: &str,
+) -> Result<String> {
+    Ok(
+        directive_value(directives, "proto-field", path, field_context, "value")?
+            .unwrap_or_else(|| field.name.to_snake_case()),
+    )
 }
 
 fn find_wit_record_name_for_type(resolve: &Resolve, ty: &Type) -> Option<String> {
@@ -3152,7 +3163,7 @@ fn build_operation(
         &operation_name,
     )?;
     let serialization_context = build_operation_serialization_context(&directives, path, &context)?;
-    let poll = build_operation_poll(&directives, path, &context)?;
+    let poll = build_operation_poll(resolve, function, &directives, path, &context)?;
     let output = if let Some(output_type) = function.result.as_ref() {
         Some(
             find_operation_type_spec(resolve, output_type, path, &context)?.ok_or_else(|| {
@@ -3312,6 +3323,8 @@ fn build_operation_output_transform(
 /// Reads `@nexus.poll` on an operation. Each language value is a support helper that takes the
 /// request and its response and returns the next request, or `None` to stop.
 fn build_operation_poll(
+    resolve: &Resolve,
+    function: &Function,
     directives: &[Directive],
     path: &Path,
     context: &str,
@@ -3359,9 +3372,57 @@ fn build_operation_poll(
                 .to_string(),
         ));
     }
+    let resume = directive_language_string_for_key(directive, "resume");
+    for helper in resume.default.iter().chain(resume.by_language.values()) {
+        if !is_valid_support_helper_path(helper) {
+            return Err(invalid(format!(
+                "invalid `resume` support helper `{helper}`"
+            )));
+        }
+    }
+    let items = match directive.value("items") {
+        Some(items) => {
+            // `items` holds a WIT field name, and only the WIT record knows its key.
+            let mut result = function.result;
+            let record = loop {
+                let Some(Type::Id(id)) = result else {
+                    break None;
+                };
+                match &resolve.types[id].kind {
+                    TypeDefKind::Record(record) => break Some(record),
+                    TypeDefKind::Type(next) => result = Some(*next),
+                    _ => break None,
+                }
+            }
+            .ok_or_else(|| {
+                invalid("`items` needs an operation whose result is a record".to_string())
+            })?;
+            let field = record
+                .fields
+                .iter()
+                .find(|field| field.name == items)
+                .ok_or_else(|| invalid(format!("`{items}` isn't a field of the response")))?;
+            let field_context = format!("{context} field `{}`", field.name);
+            let field_directives =
+                parse_directives(field.docs.contents.as_deref(), path, &field_context)?;
+            Some(record_field_key(
+                field,
+                &field_directives,
+                path,
+                &field_context,
+            )?)
+        }
+        // The other languages' helpers are gone after language selection, so the check is here.
+        None if !resume.is_empty() => {
+            return Err(invalid("`resume` needs `items`".to_string()));
+        }
+        None => None,
+    };
     Ok(Some(OperationPollSpec {
         next: spec,
         targets,
+        items,
+        resume,
     }))
 }
 

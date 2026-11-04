@@ -22,6 +22,7 @@ from typing_extensions import override
 import wit.stream_service.both.workflow as workflow_package
 import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
 from wit.stream_service.both.client import Stream, StreamServiceClientExtension
+from wit.stream_service.both.client._poll import PollIterator
 from wit.stream_service.both.workflow import _resources as workflow_resources
 from wit.stream_service.client.client import (
     StreamServiceClientExtension as ClientOnlyExtension,
@@ -432,9 +433,130 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
     ]
 
 
+async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None:
+    ref = StreamHandle(id="s1")
+    wait = datetime.timedelta(seconds=30)
+    client, answers = connect(
+        Client,
+        {
+            "ReadRecords": [
+                ReadRecordsResponse(
+                    records=[StreamRecord(offset=10), StreamRecord(offset=12)],
+                    next_offset=15,
+                ),
+                ReadRecordsResponse(next_offset=15),
+                ReadRecordsResponse(
+                    records=[StreamRecord(offset=20)], next_offset=21, done=True
+                ),
+            ]
+        },
+    )
+    stream = client.get_stream(handle=ref, created=None)
+
+    read = stream.iter_read_items(from_offset=10, wait=wait)
+    seen: list[tuple[int | None, int | None]] = []
+    async for record in read:
+        seen.append(
+            (record.offset, read.next_request and read.next_request.from_offset)
+        )
+
+    # After a Record, the read resumes past it. After a page's last Record, it goes on
+    # where the page ends.
+    assert seen == [(10, 11), (12, 15), (20, None)]
+    assert read.next_request is None
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(handle=ref, from_offset=10, wait=wait),
+        ReadRecordsRequest(handle=ref, from_offset=15, wait=wait),
+        ReadRecordsRequest(handle=ref, from_offset=15, wait=wait),
+    ]
+
+
+async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> None:
+    ref = StreamHandle(id="s1")
+    client, answers = connect(
+        Client,
+        {
+            "ReadRecords": [
+                ReadRecordsResponse(
+                    records=[StreamRecord(offset=1), StreamRecord(offset=2)],
+                    next_offset=3,
+                ),
+                ReadRecordsResponse(
+                    records=[StreamRecord(offset=2)], next_offset=3, done=True
+                ),
+            ]
+        },
+    )
+    stream = client.get_stream(handle=ref, created=None)
+
+    read = stream.iter_read_items(from_offset=1)
+    first = await anext(read)
+    saved = read.next_request
+    assert first.offset == 1
+    assert saved is not None
+
+    resumed = stream.iter_read_items(from_offset=saved.from_offset)
+
+    assert [record.offset async for record in resumed] == [2]
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(handle=ref, from_offset=1),
+        ReadRecordsRequest(handle=ref, from_offset=2),
+    ]
+
+
+async def test_a_changed_record_does_not_change_the_next_request() -> None:
+    ref = StreamHandle(id="s1")
+    wait = datetime.timedelta(seconds=30)
+    client, answers = connect(
+        Client,
+        {
+            "ReadRecords": [
+                ReadRecordsResponse(
+                    records=[StreamRecord(offset=1), StreamRecord(offset=2)],
+                    next_offset=3,
+                ),
+                ReadRecordsResponse(done=True),
+            ]
+        },
+    )
+    stream = client.get_stream(handle=ref, created=None)
+
+    read = stream.iter_read_items(from_offset=1, wait=wait)
+    next_offsets: list[int | None] = []
+    async for record in read:
+        record.offset = 9
+        next_offsets.append(read.next_request and read.next_request.from_offset)
+
+    assert next_offsets == [2, 3]
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(handle=ref, from_offset=1, wait=wait),
+        ReadRecordsRequest(handle=ref, from_offset=3, wait=wait),
+    ]
+
+
+async def test_without_a_resume_helper_the_next_request_reads_the_page_again() -> None:
+    async def pages() -> collections.abc.AsyncGenerator[list[int], None]:
+        yield [1, 2]
+        yield [3]
+
+    read = PollIterator(
+        "first",
+        pages(),
+        lambda page: page,
+        lambda request, _page: "second" if request == "first" else None,
+        None,
+    )
+
+    seen = [(item, read.next_request) async for item in read]
+
+    assert seen == [(1, "first"), (2, "second"), (3, None)]
+
+
 def test_only_the_client_target_has_the_read_poll() -> None:
     assert hasattr(workflow_stream_module, "read_records")
     assert not hasattr(workflow_stream_module, "iter_read_records")
     assert not hasattr(workflow_package, "iter_read_records")
     assert not hasattr(workflow_stream_module.Stream, "iter_read")
+    assert not hasattr(workflow_stream_module.Stream, "iter_read_items")
     assert hasattr(Stream, "iter_read")
+    assert hasattr(Stream, "iter_read_items")

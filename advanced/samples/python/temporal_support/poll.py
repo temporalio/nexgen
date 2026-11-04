@@ -22,3 +22,10 @@ def next_read_request(request: typing.Any, response: typing.Any) -> typing.Any:
         return dataclasses.replace(request, last=None)
     # `last` takes no `from_offset`, and a `from_offset` overrides `start`.
     return dataclasses.replace(request, from_offset=next_offset, start=None, last=None)
+
+
+def resume_read_request(request: typing.Any, item: typing.Any) -> typing.Any:
+    # A read that resumes after an item starts past its offset, and doesn't read `last` again.
+    return dataclasses.replace(
+        request, from_offset=(item.offset or 0) + 1, start=None, last=None
+    )
