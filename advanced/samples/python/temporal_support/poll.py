@@ -1,41 +1,12 @@
 """The poll helper of the stream-service sample."""
 
-from __future__ import annotations
-
 import dataclasses
 import typing
 
-if typing.TYPE_CHECKING:
-    import collections.abc
-    import datetime
 
-    from _typeshed import DataclassInstance
-
-    # The generated models import this package, and basedpyright reports even a type-only import
-    # of them here as a cycle. These Protocols name the fields that the helper reads.
-    class _ReadRequest(DataclassInstance, typing.Protocol):
-        @property
-        def from_offset(self) -> int | None: ...
-
-        @property
-        def wait(self) -> datetime.timedelta | None: ...
-
-    class _ReadResponse(typing.Protocol):
-        @property
-        def records(self) -> collections.abc.Sequence[object] | None: ...
-
-        @property
-        def next_offset(self) -> int | None: ...
-
-        @property
-        def done(self) -> bool | None: ...
-
-    _ReadRequestT = typing.TypeVar("_ReadRequestT", bound=_ReadRequest)
-
-
-def next_read_request(
-    request: _ReadRequestT, response: _ReadResponse
-) -> _ReadRequestT | None:
+# The generated models import this package, so a typed import of them here would be a cycle. The
+# helper only reads a few fields and copies the request, so Any is enough.
+def next_read_request(request: typing.Any, response: typing.Any) -> typing.Any:
     if response.done:
         return None
     next_offset = response.next_offset
