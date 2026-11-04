@@ -6,18 +6,10 @@ use std::path::Path;
 
 use super::{PlannedFamily, PlannedSpec, operation_input_model, operation_output_direct_result};
 use crate::error::{Error, Result};
-use crate::nexgen_config::GenerationTarget;
+use crate::nexgen_config::{self, GenerationTarget};
 use crate::spec::{ApiSpecLeaf, CompilerPass, TypeSpec};
 
-pub(crate) struct PollValidationPass {
-    targets: Vec<GenerationTarget>,
-}
-
-impl PollValidationPass {
-    pub(crate) fn new(targets: Vec<GenerationTarget>) -> Self {
-        Self { targets }
-    }
-}
+pub(crate) struct PollValidationPass;
 
 impl CompilerPass<PlannedFamily, PlannedFamily> for PollValidationPass {
     type Error = Error;
@@ -27,7 +19,10 @@ impl CompilerPass<PlannedFamily, PlannedFamily> for PollValidationPass {
         leaf: ApiSpecLeaf<PlannedFamily>,
     ) -> Result<ApiSpecLeaf<PlannedFamily>> {
         // Only the client target gets an iterator.
-        if self.targets.contains(&GenerationTarget::Client) {
+        if nexgen_config::current()
+            .targets
+            .contains(&GenerationTarget::Client)
+        {
             validate_client_polls(&leaf.spec, &leaf.source_path)?;
         }
         Ok(leaf)
