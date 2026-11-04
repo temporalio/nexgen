@@ -33,7 +33,8 @@ from wit.stream_service.both.models import (
     CreateStreamResult,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    StreamRef,
+    Producer,
+    StreamHandle,
 )
 
 
@@ -139,17 +140,17 @@ def connect(
 
 
 async def test_sdk_factory_needs_no_adapter() -> None:
-    ref = StreamRef(id="sdk-stream")
+    ref = StreamHandle(id="sdk-stream")
     client, answers = connect(
         SdkClient,
         {
-            "CreateStream": CreateStreamResult(stream=ref, created=True),
+            "CreateStream": CreateStreamResult(handle=ref, created=True),
             "DescribeStream": DescribeStreamResponse(last_offset=5),
         },
     )
     stream = await client.create_stream(id="sdk-stream")
-    assert stream.stream == ref
-    stored = client.get_stream(stream=ref, created=None)
+    assert stream.handle == ref
+    stored = client.get_stream(handle=ref, created=None)
     assert (await stored.describe()).last_offset == 5
     assert [call.operation for call in answers.started] == [
         "CreateStream",
@@ -161,7 +162,9 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     client, answers = connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(stream=StreamRef(id="s1"), created=True),
+            "CreateStream": CreateStreamResult(
+                handle=StreamHandle(id="s1"), created=True
+            ),
             "AppendRecords": AppendRecordsResponse(last_offset=7),
             "CloseStream": CloseStreamResponse(),
         },
@@ -175,7 +178,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     response = await stream.publish(records=[])
     await stream.close()
 
-    assert stream.stream.id == "s1"
+    assert stream.handle.id == "s1"
     assert response.last_offset == 7
     assert len(client.created_clients) == 1
     create, append, close = answers.started
@@ -192,7 +195,10 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         "__temporal_system",
         "AppendRecords",
     )
-    assert append.arg == AppendRecordsRequest(stream=stream.stream, records=[])
+    # A client call fills the producer from its source.
+    assert append.arg == AppendRecordsRequest(
+        handle=stream.handle, records=[], producer=Producer(id="client:sample")
+    )
     assert uuid.UUID(append.id)
     assert append.result_type is AppendRecordsResponse
     assert (close.service, close.endpoint, close.operation) == (
@@ -200,19 +206,21 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         SYSTEM_ENDPOINT,
         "CloseStream",
     )
-    assert close.arg == CloseStreamRequest(stream=stream.stream)
+    assert close.arg == CloseStreamRequest(
+        handle=stream.handle, producer=Producer(id="client:sample")
+    )
     assert close.result_type is CloseStreamResponse
 
 
-async def test_a_stored_stream_ref_rebuilds_the_handle() -> None:
+async def test_a_stored_stream_handle_rebuilds_the_resource() -> None:
     client, answers = connect(
         Client, {"DescribeStream": DescribeStreamResponse(last_offset=7)}
     )
-    ref = StreamRef(id="stored-stream")
-    response = await client.get_stream(stream=ref, created=None).describe()
+    ref = StreamHandle(id="stored-stream")
+    response = await client.get_stream(handle=ref, created=None).describe()
     assert response.last_offset == 7
     assert len(client.created_clients) == 1
-    assert answers.started[0].arg == DescribeStreamRequest(stream=ref)
+    assert answers.started[0].arg == DescribeStreamRequest(handle=ref)
 
 
 async def test_a_resource_preserves_its_constructor_client_binding() -> None:
@@ -222,13 +230,13 @@ async def test_a_resource_preserves_its_constructor_client_binding() -> None:
     nexus_client: temporalio.client.NexusClient[typing.Any] = (
         client.create_nexus_client(STREAM_SERVICE, "stored-endpoint")
     )
-    ref = StreamRef(id="stored-stream")
-    response = await Stream(nexus_client, stream=ref, created=None).describe()
+    ref = StreamHandle(id="stored-stream")
+    response = await Stream(nexus_client, handle=ref, created=None).describe()
     assert response.last_offset == 9
     assert client.created_clients == [nexus_client]
     assert answers.started[0].endpoint == "stored-endpoint"
     assert answers.started[0].service == STREAM_SERVICE
-    assert answers.started[0].arg == DescribeStreamRequest(stream=ref)
+    assert answers.started[0].arg == DescribeStreamRequest(handle=ref)
 
 
 async def test_client_only_calls_need_no_workflow_context(
@@ -239,11 +247,11 @@ async def test_client_only_calls_need_no_workflow_context(
         raise AssertionError("client calls must not use Workflow APIs")
 
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", forbidden)
-    ref = client_models.StreamRef(id="client-stream")
+    ref = client_models.StreamHandle(id="client-stream")
     client, answers = connect(
         ClientOnly,
         {
-            "CreateStream": client_models.CreateStreamResult(stream=ref, created=True),
+            "CreateStream": client_models.CreateStreamResult(handle=ref, created=True),
             "DescribeStream": client_models.DescribeStreamResponse(last_offset=8),
         },
     )
@@ -253,7 +261,7 @@ async def test_client_only_calls_need_no_workflow_context(
     assert len(client.created_clients) == 1
     create, describe = answers.started
     assert create.arg == client_models.CreateStreamRequest(id="client-stream")
-    assert describe.arg == client_models.DescribeStreamRequest(stream=ref)
+    assert describe.arg == client_models.DescribeStreamRequest(handle=ref)
     assert describe.result_type is client_models.DescribeStreamResponse
 
 
@@ -261,7 +269,9 @@ async def test_each_call_gets_a_new_operation_id() -> None:
     client, answers = connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(stream=StreamRef(id="s1"), created=True),
+            "CreateStream": CreateStreamResult(
+                handle=StreamHandle(id="s1"), created=True
+            ),
             "DescribeStream": DescribeStreamResponse(last_offset=7),
         },
     )
@@ -276,19 +286,19 @@ async def test_each_call_gets_a_new_operation_id() -> None:
 
 def test_a_resource_requires_a_nexus_client() -> None:
     with pytest.raises(TypeError):
-        _ = Stream(stream=StreamRef(id="s1"), created=None)  # pyright: ignore[reportCallIssue]
+        _ = Stream(handle=StreamHandle(id="s1"), created=None)  # pyright: ignore[reportCallIssue]
 
 
 def test_resource_serialization_carries_only_identity_fields() -> None:
     client, _ = connect(Client, {})
-    ref = StreamRef(id="stored-stream")
-    stream = client.get_stream(stream=ref, created=None)
+    ref = StreamHandle(id="stored-stream")
+    stream = client.get_stream(handle=ref, created=None)
     converter = temporalio.converter.PayloadConverter.default
     decoded = converter.from_payload(
         converter.to_payload(stream), workflow_resources.Stream
     )
-    assert decoded == workflow_resources.Stream(stream=ref, created=None)
+    assert decoded == workflow_resources.Stream(handle=ref, created=None)
     assert dataclasses.asdict(stream) == {
-        "stream": dataclasses.asdict(ref),
+        "handle": dataclasses.asdict(ref),
         "created": None,
     }

@@ -33,8 +33,8 @@ descriptors = "temporal"
 languages = ["python", "dotnet", "typescript"]
 descriptors = "temporal"
 
-# The Stream service WIT of temporalio-streams, on the Stream protos of temporalio/api#895 at
-# 44519d8a. Its .NET output builds in Nexgen.DotNetStreamService.csproj.
+# The Stream service WIT of temporalio/api#895, on the Stream protos of that PR. Its .NET output
+# builds in Nexgen.DotNetStreamService.csproj.
 [stream-service]
 languages = ["python", "typescript", "dotnet"]
 system_nexus = true

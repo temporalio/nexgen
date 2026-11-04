@@ -9,10 +9,10 @@ import temporalio.workflow
 from ..models import (
     CreateStreamRequest,
     CreateStreamResult,
-    Producer,
-    StreamRef,
+    StreamHandle,
 )
 from .._resources import Stream
+import temporal_support as _support
 
 
 async def _create_stream(
@@ -28,10 +28,10 @@ async def _create_stream(
         output_type=CreateStreamResult,
     )
     result = await handle
-    if result.stream is None:
-        raise RuntimeError("CreateStream answered without `stream`")
+    if result.handle is None:
+        raise RuntimeError("CreateStream answered without `handle`")
     return Stream(
-        stream=result.stream,
+        handle=result.handle,
         created=result.created or None,
     )
 
@@ -40,24 +40,20 @@ async def create_stream(
     *,
     id: str,
     retention: datetime.timedelta | None = None,
-    withdraw_run: str | None = None,
-    owner: Producer | None = None,
-    ref: StreamRef | None = None,
+    stream_handle: StreamHandle | None = None,
 ) -> Stream:
     """
     Args:
         id: The Stream id. Required, and never empty.
         retention: The age after which a Record is dropped. Empty is the Store default.
-        withdraw_run: Retry run only. The previous run, whose Records this withdraws.
-        owner: The Workflow run that owns the Stream. The Workflow transport sets it.
-        ref: The ref, whose id is stream-id. A create with an owner needs the ref's
-            owner.
+        stream_handle: The handle, whose id is stream-id. With an owner, it needs the
+            handle's owner.
     """
     request = CreateStreamRequest(
         id=id,
         retention=retention,
-        withdraw_run=withdraw_run,
-        owner=owner,
-        ref=ref,
+        withdraw_run=_support.withdraw_run(),
+        owner=_support.workflow_owner(),
+        stream_handle=stream_handle,
     )
     return await _create_stream(request)

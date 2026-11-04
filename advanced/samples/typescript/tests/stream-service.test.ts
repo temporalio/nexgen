@@ -73,19 +73,19 @@ describe("stream-service generated output", () => {
 
   test("maps every field of a read request through its proto", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsRequest = {
-      stream: { id: "stream-1", owner: { businessId: "workflow-1" } },
+      handle: { id: "stream-1", owner: { businessId: "workflow-1" } },
       fromOffset: Long.fromNumber(7),
       maxRecords: 10,
     };
 
     const model = readRecordsRequestTransferTypeConverter.fromTransferType(proto);
 
-    expect(model.stream.id).toBe("stream-1");
-    expect(model.stream.owner?.businessId).toBe("workflow-1");
+    expect(model.handle.id).toBe("stream-1");
+    expect(model.handle.owner?.businessId).toBe("workflow-1");
     expect(model.fromOffset?.toNumber()).toBe(7);
     expect(model.maxRecords).toBe(10);
     expect(
-      readRecordsRequestTransferTypeConverter.toTransferType(model).stream?.id,
+      readRecordsRequestTransferTypeConverter.toTransferType(model).handle?.id,
     ).toBe("stream-1");
   });
 

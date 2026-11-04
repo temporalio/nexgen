@@ -3,13 +3,24 @@
 import * as nexus from "../../../../nexus";
 import { streamService } from "../services";
 import type { CloseStreamResponse, CloseStreamRequest } from "../models";
+import * as support from "../../../../support/temporal_model_converters";
+
+type CloseStreamInput = CloseStreamRequest extends infer Input
+  ? Input extends unknown
+    ? Omit<Input, "producer"> & { producer?: never }
+    : never
+  : never;
 
 /**
  * @param request - Request for the operation.
  */
 export async function closeStream(
-  request: CloseStreamRequest,
+  requestInput: CloseStreamInput,
 ): Promise<nexus.NexusOperationHandle<CloseStreamResponse>> {
+  const request = {
+    ...requestInput,
+    producer: support.workflowProducer(),
+  } as CloseStreamRequest;
   const client = nexus.createNexusServiceClient({
     service: streamService,
     endpoint: "__temporal_system",

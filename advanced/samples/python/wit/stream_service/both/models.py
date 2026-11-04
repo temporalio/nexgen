@@ -98,7 +98,7 @@ class CreateStreamRequest:
     retention: datetime.timedelta | None = None
     withdraw_run: str | None = None
     owner: Producer | None = None
-    ref: StreamRef | None = None
+    stream_handle: StreamHandle | None = None
 
 
 class _CreateStreamRequestTransferTypeConverter(
@@ -132,10 +132,10 @@ class _CreateStreamRequestTransferTypeConverter(
             )
             if value.HasField("owner")
             else None,
-            ref=_StreamRefTransferTypeConverter().from_transfer_type(
-                value.ref, StreamRef
+            stream_handle=_StreamHandleTransferTypeConverter().from_transfer_type(
+                value.stream_handle, StreamHandle
             )
-            if value.HasField("ref")
+            if value.HasField("stream_handle")
             else None,
         )
 
@@ -156,9 +156,11 @@ class _CreateStreamRequestTransferTypeConverter(
             message.owner.CopyFrom(
                 _ProducerTransferTypeConverter().to_transfer_type(value.owner)
             )
-        if value.ref is not None:
-            message.ref.CopyFrom(
-                _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
+        if value.stream_handle is not None:
+            message.stream_handle.CopyFrom(
+                _StreamHandleTransferTypeConverter().to_transfer_type(
+                    value.stream_handle
+                )
             )
         return message
 
@@ -355,7 +357,7 @@ temporalio.converter.transfer_type_convertible(_TimestampTransferTypeConverter)(
 
 
 @dataclasses.dataclass(slots=True)
-class StreamRef:
+class StreamHandle:
     """Identifies one Stream. The id is opaque to callers."""
 
     id: str
@@ -363,25 +365,25 @@ class StreamRef:
     backend: str | None = None
 
 
-class _StreamRefTransferTypeConverter(
+class _StreamHandleTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        StreamRef, temporalio.api.stream.v1.message_pb2.StreamRef
+        StreamHandle, temporalio.api.stream.v1.message_pb2.StreamHandle
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamRef] | None = (
-        temporalio.api.stream.v1.message_pb2.StreamRef
+    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamHandle] | None = (
+        temporalio.api.stream.v1.message_pb2.StreamHandle
     )
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.StreamRef,
-        type_hint: type[StreamRef],
-    ) -> StreamRef:
+        value: temporalio.api.stream.v1.message_pb2.StreamHandle,
+        type_hint: type[StreamHandle],
+    ) -> StreamHandle:
         if not value.id:
-            raise ValueError("missing required field StreamRef.id")
+            raise ValueError("missing required field StreamHandle.id")
         id = value.id
-        return StreamRef(
+        return StreamHandle(
             id=id,
             owner=_ExecutionTransferTypeConverter().from_transfer_type(
                 value.owner, Execution
@@ -394,9 +396,9 @@ class _StreamRefTransferTypeConverter(
     @typing_extensions.override
     def to_transfer_type(
         self,
-        value: StreamRef,
-    ) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        message = temporalio.api.stream.v1.message_pb2.StreamRef()
+        value: StreamHandle,
+    ) -> temporalio.api.stream.v1.message_pb2.StreamHandle:
+        message = temporalio.api.stream.v1.message_pb2.StreamHandle()
         message.id = value.id
         if value.owner is not None:
             message.owner.CopyFrom(
@@ -407,8 +409,8 @@ class _StreamRefTransferTypeConverter(
         return message
 
 
-temporalio.converter.transfer_type_convertible(_StreamRefTransferTypeConverter)(
-    StreamRef
+temporalio.converter.transfer_type_convertible(_StreamHandleTransferTypeConverter)(
+    StreamHandle
 )  # pyright: ignore[reportUnusedCallResult]
 
 
@@ -466,7 +468,7 @@ temporalio.converter.transfer_type_convertible(_ExecutionTransferTypeConverter)(
 
 @dataclasses.dataclass(slots=True)
 class CreateStreamResult:
-    stream: StreamRef | None = None
+    handle: StreamHandle | None = None
     created: bool | None = None
 
 
@@ -488,10 +490,10 @@ class _CreateStreamResultTransferTypeConverter(
         type_hint: type[CreateStreamResult],
     ) -> CreateStreamResult:
         return CreateStreamResult(
-            stream=_StreamRefTransferTypeConverter().from_transfer_type(
-                value.stream, StreamRef
+            handle=_StreamHandleTransferTypeConverter().from_transfer_type(
+                value.handle, StreamHandle
             )
-            if value.HasField("stream")
+            if value.HasField("handle")
             else None,
             created=value.created if bool(value.created) else None,
         )
@@ -504,9 +506,9 @@ class _CreateStreamResultTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse()
         )
-        if value.stream is not None:
-            message.stream.CopyFrom(
-                _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        if value.handle is not None:
+            message.handle.CopyFrom(
+                _StreamHandleTransferTypeConverter().to_transfer_type(value.handle)
             )
         if value.created is not None:
             message.created = value.created
@@ -524,9 +526,11 @@ class AppendRecordsRequest:
     absent.
     """
 
-    stream: StreamRef
+    handle: StreamHandle
     records: list[AppendRecord] | None = dataclasses.field(default_factory=list)
     producer: Producer | None = None
+    sequence: int | None = None
+    withdraw_run: str | None = None
 
 
 class _AppendRecordsRequestTransferTypeConverter(
@@ -546,13 +550,13 @@ class _AppendRecordsRequestTransferTypeConverter(
         value: temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest,
         type_hint: type[AppendRecordsRequest],
     ) -> AppendRecordsRequest:
-        if not value.HasField("stream"):
-            raise ValueError("missing required field AppendRecordsRequest.stream")
-        stream = _StreamRefTransferTypeConverter().from_transfer_type(
-            value.stream, StreamRef
+        if not value.HasField("handle"):
+            raise ValueError("missing required field AppendRecordsRequest.handle")
+        handle = _StreamHandleTransferTypeConverter().from_transfer_type(
+            value.handle, StreamHandle
         )
         return AppendRecordsRequest(
-            stream=stream,
+            handle=handle,
             records=[
                 _AppendRecordTransferTypeConverter().from_transfer_type(
                     item, AppendRecord
@@ -564,6 +568,8 @@ class _AppendRecordsRequestTransferTypeConverter(
             )
             if value.HasField("producer")
             else None,
+            sequence=value.sequence if value.sequence != 0 else None,
+            withdraw_run=value.withdraw_run if bool(value.withdraw_run) else None,
         )
 
     @typing_extensions.override
@@ -574,8 +580,8 @@ class _AppendRecordsRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest()
         )
-        message.stream.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        message.handle.CopyFrom(
+            _StreamHandleTransferTypeConverter().to_transfer_type(value.handle)
         )
         if value.records:
             for element in value.records:
@@ -587,6 +593,10 @@ class _AppendRecordsRequestTransferTypeConverter(
             message.producer.CopyFrom(
                 _ProducerTransferTypeConverter().to_transfer_type(value.producer)
             )
+        if value.sequence is not None:
+            message.sequence = value.sequence
+        if value.withdraw_run is not None:
+            message.withdraw_run = value.withdraw_run
         return message
 
 
@@ -691,7 +701,7 @@ temporalio.converter.transfer_type_convertible(
 class CloseStreamRequest:
     """Close a Stream. Readers drain what is left, then end. Later appends are refused."""
 
-    stream: StreamRef
+    handle: StreamHandle
     producer: Producer | None = None
     result: typing.Any | None = None
     failure: BaseException | None = None
@@ -714,13 +724,13 @@ class _CloseStreamRequestTransferTypeConverter(
         value: temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest,
         type_hint: type[CloseStreamRequest],
     ) -> CloseStreamRequest:
-        if not value.HasField("stream"):
-            raise ValueError("missing required field CloseStreamRequest.stream")
-        stream = _StreamRefTransferTypeConverter().from_transfer_type(
-            value.stream, StreamRef
+        if not value.HasField("handle"):
+            raise ValueError("missing required field CloseStreamRequest.handle")
+        handle = _StreamHandleTransferTypeConverter().from_transfer_type(
+            value.handle, StreamHandle
         )
         return CloseStreamRequest(
-            stream=stream,
+            handle=handle,
             producer=_ProducerTransferTypeConverter().from_transfer_type(
                 value.producer, Producer
             )
@@ -742,8 +752,8 @@ class _CloseStreamRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest()
         )
-        message.stream.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        message.handle.CopyFrom(
+            _StreamHandleTransferTypeConverter().to_transfer_type(value.handle)
         )
         if value.producer is not None:
             message.producer.CopyFrom(
@@ -805,7 +815,7 @@ temporalio.converter.transfer_type_convertible(
 class ReadRecordsRequest:
     """Read Records from an offset."""
 
-    stream: StreamRef
+    handle: StreamHandle
     from_offset: int | None = None
     start: StreamReadStart | None = None
     max_records: int | None = None
@@ -832,13 +842,13 @@ class _ReadRecordsRequestTransferTypeConverter(
         value: temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest,
         type_hint: type[ReadRecordsRequest],
     ) -> ReadRecordsRequest:
-        if not value.HasField("stream"):
-            raise ValueError("missing required field ReadRecordsRequest.stream")
-        stream = _StreamRefTransferTypeConverter().from_transfer_type(
-            value.stream, StreamRef
+        if not value.HasField("handle"):
+            raise ValueError("missing required field ReadRecordsRequest.handle")
+        handle = _StreamHandleTransferTypeConverter().from_transfer_type(
+            value.handle, StreamHandle
         )
         return ReadRecordsRequest(
-            stream=stream,
+            handle=handle,
             from_offset=value.from_offset if value.from_offset != 0 else None,
             start=StreamReadStart(value.start) if value.start != 0 else None,
             max_records=value.max_records if value.max_records != 0 else None,
@@ -860,8 +870,8 @@ class _ReadRecordsRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest()
         )
-        message.stream.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        message.handle.CopyFrom(
+            _StreamHandleTransferTypeConverter().to_transfer_type(value.handle)
         )
         if value.from_offset is not None:
             message.from_offset = value.from_offset
@@ -983,8 +993,8 @@ class _StreamRecordTransferTypeConverter(
                 )
             case "superseded":
                 _oneof_item = StreamItemSuperseded(
-                    _SupersessionTransferTypeConverter().from_transfer_type(
-                        value.superseded, Supersession
+                    _StreamSupersededTransferTypeConverter().from_transfer_type(
+                        value.superseded, StreamSuperseded
                     )
                 )
             case "close":
@@ -1016,7 +1026,7 @@ class _StreamRecordTransferTypeConverter(
                     )
                 case StreamItemSuperseded():
                     message.superseded.CopyFrom(
-                        _SupersessionTransferTypeConverter().to_transfer_type(
+                        _StreamSupersededTransferTypeConverter().to_transfer_type(
                             value.item.value
                         )
                     )
@@ -1091,7 +1101,7 @@ temporalio.converter.transfer_type_convertible(_StreamDataTransferTypeConverter)
 
 
 @dataclasses.dataclass(slots=True)
-class Supersession:
+class StreamSuperseded:
     """Which earlier Records a Superseded item withdraws."""
 
     producer_id: str
@@ -1103,25 +1113,25 @@ class Supersession:
     run_id: str | None = None
 
 
-class _SupersessionTransferTypeConverter(
+class _StreamSupersededTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        Supersession, temporalio.api.stream.v1.message_pb2.Supersession
+        StreamSuperseded, temporalio.api.stream.v1.message_pb2.StreamSuperseded
     ]
 ):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.Supersession] | None = (
-        temporalio.api.stream.v1.message_pb2.Supersession
-    )
+    transfer_type: (
+        type[temporalio.api.stream.v1.message_pb2.StreamSuperseded] | None
+    ) = temporalio.api.stream.v1.message_pb2.StreamSuperseded
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.Supersession,
-        type_hint: type[Supersession],
-    ) -> Supersession:
+        value: temporalio.api.stream.v1.message_pb2.StreamSuperseded,
+        type_hint: type[StreamSuperseded],
+    ) -> StreamSuperseded:
         if not value.producer_id:
-            raise ValueError("missing required field Supersession.producer_id")
+            raise ValueError("missing required field StreamSuperseded.producer_id")
         producer_id = value.producer_id
-        return Supersession(
+        return StreamSuperseded(
             producer_id=producer_id,
             failed_tasks=list(value.failed_tasks),
             producer_kind=_stream_producer_kind_from_proto(value.producer_kind)
@@ -1144,9 +1154,9 @@ class _SupersessionTransferTypeConverter(
     @typing_extensions.override
     def to_transfer_type(
         self,
-        value: Supersession,
-    ) -> temporalio.api.stream.v1.message_pb2.Supersession:
-        message = temporalio.api.stream.v1.message_pb2.Supersession()
+        value: StreamSuperseded,
+    ) -> temporalio.api.stream.v1.message_pb2.StreamSuperseded:
+        message = temporalio.api.stream.v1.message_pb2.StreamSuperseded()
         message.producer_id = value.producer_id
         if value.failed_tasks:
             message.failed_tasks.extend(value.failed_tasks)
@@ -1173,8 +1183,8 @@ class _SupersessionTransferTypeConverter(
         return message
 
 
-temporalio.converter.transfer_type_convertible(_SupersessionTransferTypeConverter)(
-    Supersession
+temporalio.converter.transfer_type_convertible(_StreamSupersededTransferTypeConverter)(
+    StreamSuperseded
 )  # pyright: ignore[reportUnusedCallResult]
 
 
@@ -1308,7 +1318,7 @@ temporalio.converter.transfer_type_convertible(_StreamCloseTransferTypeConverter
 
 @dataclasses.dataclass(slots=True)
 class DescribeStreamRequest:
-    stream: StreamRef
+    handle: StreamHandle
 
 
 class _DescribeStreamRequestTransferTypeConverter(
@@ -1328,13 +1338,13 @@ class _DescribeStreamRequestTransferTypeConverter(
         value: temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest,
         type_hint: type[DescribeStreamRequest],
     ) -> DescribeStreamRequest:
-        if not value.HasField("stream"):
-            raise ValueError("missing required field DescribeStreamRequest.stream")
-        stream = _StreamRefTransferTypeConverter().from_transfer_type(
-            value.stream, StreamRef
+        if not value.HasField("handle"):
+            raise ValueError("missing required field DescribeStreamRequest.handle")
+        handle = _StreamHandleTransferTypeConverter().from_transfer_type(
+            value.handle, StreamHandle
         )
         return DescribeStreamRequest(
-            stream=stream,
+            handle=handle,
         )
 
     @typing_extensions.override
@@ -1345,8 +1355,8 @@ class _DescribeStreamRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest()
         )
-        message.stream.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.stream)
+        message.handle.CopyFrom(
+            _StreamHandleTransferTypeConverter().to_transfer_type(value.handle)
         )
         return message
 
@@ -1421,7 +1431,7 @@ class StreamItemData:
 
 @dataclasses.dataclass(slots=True)
 class StreamItemSuperseded:
-    value: Supersession
+    value: StreamSuperseded
 
 
 @dataclasses.dataclass(slots=True)

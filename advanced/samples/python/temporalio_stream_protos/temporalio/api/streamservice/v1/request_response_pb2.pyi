@@ -41,7 +41,7 @@ class CreateStreamRequest(_message.Message):
     WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
     OWNER_FIELD_NUMBER: _builtins.int
     CLOSE_WITH_RUN_FIELD_NUMBER: _builtins.int
-    REF_FIELD_NUMBER: _builtins.int
+    STREAM_HANDLE_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     stream_id: _builtins.str
@@ -50,7 +50,7 @@ class CreateStreamRequest(_message.Message):
     """Workflow only. The previous run on a retry run's first create, to withdraw its Records."""
     close_with_run: _builtins.bool
     """Only the server reads it. The server closes the Stream with the outcome of the owner's run
-    chain, terminate and timeout included. It needs owner, and a ref with a Workflow owner.
+    chain, terminate and timeout included. It needs owner, and a handle with a Workflow owner.
     (-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: "with" ties the close to the owner's run chain. --)
     """
@@ -65,13 +65,13 @@ class CreateStreamRequest(_message.Message):
     @_builtins.property
     def owner(self) -> _message_pb2.Producer:
         """The Workflow run that owns the Stream. Workflow kind, with its run_id and epoch. It needs a
-        ref whose owner names the run's chain.
+        handle whose owner names the run's chain.
         """
 
     @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef:
-        """The ref of the Stream, with stream_id as its id. A Workflow-owned Stream sets the ref's
-        owner, which names the owner's run chain.
+    def stream_handle(self) -> _message_pb2.StreamHandle:
+        """The handle of the Stream, with stream_id as its id. A Workflow-owned Stream sets the
+        handle's owner, which names the owner's run chain.
         """
 
     def __init__(
@@ -83,12 +83,12 @@ class CreateStreamRequest(_message.Message):
         withdraw_run: _builtins.str = ...,
         owner: _message_pb2.Producer | None = ...,
         close_with_run: _builtins.bool = ...,
-        ref: _message_pb2.StreamRef | None = ...,
+        stream_handle: _message_pb2.StreamHandle | None = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["owner", b"owner", "ref", b"ref", "retention", b"retention"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["owner", b"owner", "retention", b"retention", "stream_handle", b"stream_handle"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["close_with_run", b"close_with_run", "namespace", b"namespace", "owner", b"owner", "ref", b"ref", "retention", b"retention", "stream_id", b"stream_id", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["close_with_run", b"close_with_run", "namespace", b"namespace", "owner", b"owner", "retention", b"retention", "stream_handle", b"stream_handle", "stream_id", b"stream_id", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -100,22 +100,22 @@ class CreateStreamResponse(_message.Message):
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    STREAM_FIELD_NUMBER: _builtins.int
+    HANDLE_FIELD_NUMBER: _builtins.int
     CREATED_FIELD_NUMBER: _builtins.int
     created: _builtins.bool
     @_builtins.property
-    def stream(self) -> _message_pb2.StreamRef:
-        """The ref, with the owner of a Workflow-owned Stream."""
+    def handle(self) -> _message_pb2.StreamHandle:
+        """The handle, with the owner of a Workflow-owned Stream."""
 
     def __init__(
         self,
         *,
-        stream: _message_pb2.StreamRef | None = ...,
+        handle: _message_pb2.StreamHandle | None = ...,
         created: _builtins.bool = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["stream", b"stream"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["handle", b"handle"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created", b"created", "stream", b"stream"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["created", b"created", "handle", b"handle"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -131,7 +131,7 @@ class AppendRecordsRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    STREAM_FIELD_NUMBER: _builtins.int
+    HANDLE_FIELD_NUMBER: _builtins.int
     PRODUCER_FIELD_NUMBER: _builtins.int
     SEQUENCE_FIELD_NUMBER: _builtins.int
     RECORDS_FIELD_NUMBER: _builtins.int
@@ -142,7 +142,9 @@ class AppendRecordsRequest(_message.Message):
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     sequence: _builtins.int
-    """The batch number in this epoch. With the Producer and epoch it is the dedupe key."""
+    """The batch number in this epoch. With the Producer and epoch it is the dedupe key. Zero takes
+    the next number of the epoch. Such a batch has no dedupe, so a retry writes it again.
+    """
     withdraw_run: _builtins.str
     """Local Activity only. The previous run on a retry run's first batch, to withdraw its Records."""
     defer_withdrawal: _builtins.bool
@@ -154,7 +156,7 @@ class AppendRecordsRequest(_message.Message):
     attempt, so nobody else writes as that Activity.
     """
     @_builtins.property
-    def stream(self) -> _message_pb2.StreamRef: ...
+    def handle(self) -> _message_pb2.StreamHandle: ...
     @_builtins.property
     def producer(self) -> _message_pb2.Producer:
         """Required outside a Workflow. In a Workflow the transport sets it."""
@@ -174,7 +176,7 @@ class AppendRecordsRequest(_message.Message):
         self,
         *,
         namespace: _builtins.str = ...,
-        stream: _message_pb2.StreamRef | None = ...,
+        handle: _message_pb2.StreamHandle | None = ...,
         producer: _message_pb2.Producer | None = ...,
         sequence: _builtins.int = ...,
         records: _abc.Iterable[_message_pb2.AppendRecord] | None = ...,
@@ -184,9 +186,9 @@ class AppendRecordsRequest(_message.Message):
         defer_withdrawal: _builtins.bool = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["previous_completed_task", b"previous_completed_task", "producer", b"producer", "stream", b"stream"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["handle", b"handle", "previous_completed_task", b"previous_completed_task", "producer", b"producer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["defer_withdrawal", b"defer_withdrawal", "failed_tasks", b"failed_tasks", "namespace", b"namespace", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "records", b"records", "sequence", b"sequence", "stream", b"stream", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["defer_withdrawal", b"defer_withdrawal", "failed_tasks", b"failed_tasks", "handle", b"handle", "namespace", b"namespace", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "records", b"records", "sequence", b"sequence", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -223,32 +225,32 @@ class CloseStreamRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    STREAM_FIELD_NUMBER: _builtins.int
+    HANDLE_FIELD_NUMBER: _builtins.int
     PRODUCER_FIELD_NUMBER: _builtins.int
     RESULT_FIELD_NUMBER: _builtins.int
     FAILURE_FIELD_NUMBER: _builtins.int
     PREVIOUS_COMPLETED_TASK_FIELD_NUMBER: _builtins.int
     FAILED_TASKS_FIELD_NUMBER: _builtins.int
     WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
-    STATUS_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     withdraw_run: _builtins.str
     """Only the server reads it. The previous run on a retry run's close, to withdraw its Records."""
-    status: _stream_pb2.StreamCloseStatus.ValueType
-    """Empty is COMPLETED with no failure, CANCELED with a failure that has canceled_failure_info,
-    and FAILED with any other failure.
-    """
     task_token: _builtins.bytes
     """Only the server reads it. It checks the token as on the append."""
     @_builtins.property
-    def stream(self) -> _message_pb2.StreamRef: ...
+    def handle(self) -> _message_pb2.StreamHandle: ...
     @_builtins.property
     def producer(self) -> _message_pb2.Producer: ...
     @_builtins.property
     def result(self) -> _message_pb2_1.Payload: ...
     @_builtins.property
-    def failure(self) -> _message_pb2_2.Failure: ...
+    def failure(self) -> _message_pb2_2.Failure:
+        """The close status comes from it. No failure is COMPLETED. A failure is CANCELED when it has
+        canceled_failure_info, or when it is an Activity, child Workflow or Nexus Operation failure
+        whose cause has canceled_failure_info. Any other failure is FAILED.
+        """
+
     @_builtins.property
     def previous_completed_task(self) -> _message_pb2.WorkflowTaskEpoch:
         """Only the server reads these. They are the run's task facts, as on the append."""
@@ -259,19 +261,18 @@ class CloseStreamRequest(_message.Message):
         self,
         *,
         namespace: _builtins.str = ...,
-        stream: _message_pb2.StreamRef | None = ...,
+        handle: _message_pb2.StreamHandle | None = ...,
         producer: _message_pb2.Producer | None = ...,
         result: _message_pb2_1.Payload | None = ...,
         failure: _message_pb2_2.Failure | None = ...,
         previous_completed_task: _message_pb2.WorkflowTaskEpoch | None = ...,
         failed_tasks: _abc.Iterable[_builtins.int] | None = ...,
         withdraw_run: _builtins.str = ...,
-        status: _stream_pb2.StreamCloseStatus.ValueType = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["failure", b"failure", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "result", b"result", "stream", b"stream"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["failure", b"failure", "handle", b"handle", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "result", b"result"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["failed_tasks", b"failed_tasks", "failure", b"failure", "namespace", b"namespace", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "result", b"result", "status", b"status", "stream", b"stream", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["failed_tasks", b"failed_tasks", "failure", b"failure", "handle", b"handle", "namespace", b"namespace", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "result", b"result", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -301,7 +302,7 @@ class ReadRecordsRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    STREAM_FIELD_NUMBER: _builtins.int
+    HANDLE_FIELD_NUMBER: _builtins.int
     FROM_OFFSET_FIELD_NUMBER: _builtins.int
     START_FIELD_NUMBER: _builtins.int
     MAX_RECORDS_FIELD_NUMBER: _builtins.int
@@ -352,7 +353,7 @@ class ReadRecordsRequest(_message.Message):
         aip.dev/not-precedent: The floor is the lowest from_offset of the run's reads. --)
     """
     @_builtins.property
-    def stream(self) -> _message_pb2.StreamRef: ...
+    def handle(self) -> _message_pb2.StreamHandle: ...
     @_builtins.property
     def wait(self) -> _duration_pb2.Duration: ...
     @_builtins.property
@@ -365,7 +366,7 @@ class ReadRecordsRequest(_message.Message):
         self,
         *,
         namespace: _builtins.str = ...,
-        stream: _message_pb2.StreamRef | None = ...,
+        handle: _message_pb2.StreamHandle | None = ...,
         from_offset: _builtins.int = ...,
         start: _stream_pb2.StreamReadStart.ValueType = ...,
         max_records: _builtins.int = ...,
@@ -377,9 +378,9 @@ class ReadRecordsRequest(_message.Message):
         max_bytes: _builtins.int = ...,
         floor_from: _builtins.int = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "stream", b"stream", "wait", b"wait"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "handle", b"handle", "wait", b"wait"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "floor_from", b"floor_from", "from_offset", b"from_offset", "last", b"last", "max_bytes", b"max_bytes", "max_records", b"max_records", "namespace", b"namespace", "start", b"start", "stream", b"stream", "to_offset", b"to_offset", "wait", b"wait", "wake_only", b"wake_only"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "floor_from", b"floor_from", "from_offset", b"from_offset", "handle", b"handle", "last", b"last", "max_bytes", b"max_bytes", "max_records", b"max_records", "namespace", b"namespace", "start", b"start", "to_offset", b"to_offset", "wait", b"wait", "wake_only", b"wake_only"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -427,19 +428,19 @@ class DescribeStreamRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    STREAM_FIELD_NUMBER: _builtins.int
+    HANDLE_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     @_builtins.property
-    def stream(self) -> _message_pb2.StreamRef: ...
+    def handle(self) -> _message_pb2.StreamHandle: ...
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
-        stream: _message_pb2.StreamRef | None = ...,
+        handle: _message_pb2.StreamHandle | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["stream", b"stream"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["handle", b"handle"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "stream", b"stream"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["handle", b"handle", "namespace", b"namespace"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

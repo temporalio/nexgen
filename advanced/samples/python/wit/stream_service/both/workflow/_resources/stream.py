@@ -16,19 +16,19 @@ from ...models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
+    StreamHandle,
     StreamReadStart,
-    StreamRef,
 )
+import temporal_support as _support
 
 
 @dataclasses.dataclass
 class Stream:
-    """A handle on one Stream. Build it from a stream-ref, or get it from a create."""
+    """One Stream. Build it from a stream-handle, or get it from a create."""
 
-    stream: StreamRef
+    handle: StreamHandle
     created: bool | None
 
     async def publish(
@@ -37,8 +37,10 @@ class Stream:
     ) -> AppendRecordsResponse:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
-            stream=self.stream,
+            handle=self.handle,
             records=records or [],
+            producer=_support.workflow_producer(),
+            withdraw_run=_support.withdraw_run(),
         )
         handle = await _append_records(request)
         return await handle
@@ -50,9 +52,10 @@ class Stream:
     ) -> None:
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
-            stream=self.stream,
+            handle=self.handle,
             result=result,
             failure=failure,
+            producer=_support.workflow_producer(),
         )
         handle = await _close_stream(request)
         await handle
@@ -68,7 +71,7 @@ class Stream:
     ) -> ReadRecordsResponse:
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
-            stream=self.stream,
+            handle=self.handle,
             from_offset=from_offset,
             start=start,
             max_records=max_records,
@@ -84,7 +87,7 @@ class Stream:
     ) -> DescribeStreamResponse:
         """Describe the Stream's status, newest offset and Retention."""
         request = DescribeStreamRequest(
-            stream=self.stream,
+            handle=self.handle,
         )
         handle = await _describe_stream(request)
         return await handle
@@ -106,19 +109,22 @@ async def _append_records(
 
 async def append_records(
     *,
-    stream: StreamRef,
+    handle: StreamHandle,
     records: list[AppendRecord] | None = None,
-    producer: Producer | None = None,
+    sequence: int | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     """Append one batch. Workflow code makes the call from a Local Activity.
 
     Args:
-        producer: Required outside a Workflow. In a Workflow the transport sets it.
+        sequence: The batch number in this epoch. Empty takes the next one, and a retry
+            writes it again.
     """
     request = AppendRecordsRequest(
-        stream=stream,
+        handle=handle,
         records=records or [],
-        producer=producer,
+        producer=_support.workflow_producer(),
+        sequence=sequence,
+        withdraw_run=_support.withdraw_run(),
     )
     return await _append_records(request)
 
@@ -139,14 +145,18 @@ async def _close_stream(
 
 async def close_stream(
     *,
-    stream: StreamRef,
-    producer: Producer | None = None,
+    handle: StreamHandle,
     result: typing.Any | None = None,
     failure: BaseException | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
+    """
+    Args:
+        failure: Empty completes the Stream. A cancel failure cancels it. Any other
+            fails it.
+    """
     request = CloseStreamRequest(
-        stream=stream,
-        producer=producer,
+        handle=handle,
+        producer=_support.workflow_producer(),
         result=result,
         failure=failure,
     )
@@ -169,7 +179,7 @@ async def _read_records(
 
 async def read_records(
     *,
-    stream: StreamRef,
+    handle: StreamHandle,
     from_offset: int | None = None,
     start: StreamReadStart | None = None,
     max_records: int | None = None,
@@ -195,7 +205,7 @@ async def read_records(
             alone.
     """
     request = ReadRecordsRequest(
-        stream=stream,
+        handle=handle,
         from_offset=from_offset,
         start=start,
         max_records=max_records,
@@ -223,9 +233,9 @@ async def _describe_stream(
 
 async def describe_stream(
     *,
-    stream: StreamRef,
+    handle: StreamHandle,
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     request = DescribeStreamRequest(
-        stream=stream,
+        handle=handle,
     )
     return await _describe_stream(request)

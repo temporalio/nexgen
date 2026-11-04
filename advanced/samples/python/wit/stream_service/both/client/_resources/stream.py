@@ -18,16 +18,17 @@ from ...models import (
     DescribeStreamResponse,
     ReadRecordsRequest,
     ReadRecordsResponse,
+    StreamHandle,
     StreamReadStart,
-    StreamRef,
 )
+import temporal_support as _support
 
 
 @dataclasses.dataclass(init=False)
 class Stream:
-    """A handle on one Stream. Build it from a stream-ref, or get it from a create."""
+    """One Stream. Build it from a stream-handle, or get it from a create."""
 
-    stream: StreamRef
+    handle: StreamHandle
     created: bool | None
 
     def __init__(
@@ -35,11 +36,11 @@ class Stream:
         nexus_client: temporalio.client.NexusClient[typing.Any],
         /,
         *,
-        stream: StreamRef,
+        handle: StreamHandle,
         created: bool | None,
     ) -> None:
         self._nexus_client: temporalio.client.NexusClient[typing.Any] = nexus_client
-        self.stream = stream
+        self.handle = handle
         self.created = created
 
     async def publish(
@@ -48,8 +49,10 @@ class Stream:
     ) -> AppendRecordsResponse:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
-            stream=self.stream,
+            handle=self.handle,
             records=records or [],
+            producer=_support.client_producer(),
+            withdraw_run=_support.withdraw_run(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.append_records,
@@ -65,9 +68,10 @@ class Stream:
     ) -> None:
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
-            stream=self.stream,
+            handle=self.handle,
             result=result,
             failure=failure,
+            producer=_support.client_producer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.close_stream,
@@ -87,7 +91,7 @@ class Stream:
     ) -> ReadRecordsResponse:
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
-            stream=self.stream,
+            handle=self.handle,
             from_offset=from_offset,
             start=start,
             max_records=max_records,
@@ -107,7 +111,7 @@ class Stream:
     ) -> DescribeStreamResponse:
         """Describe the Stream's status, newest offset and Retention."""
         request = DescribeStreamRequest(
-            stream=self.stream,
+            handle=self.handle,
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.describe_stream,
